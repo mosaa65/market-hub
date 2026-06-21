@@ -133,11 +133,11 @@ function POSPage() {
     try {
       const { data, error } = await supabase.rpc("create_sale", {
         _warehouse_id: warehouseId,
-        _customer_id: customerId || null,
+        _customer_id: (customerId || null) as any,
         _payment_method: paymentMethod,
         _paid: paymentMethod === "credit" ? 0 : (paidN || total),
         _discount: discountN,
-        _note: note || null,
+        _note: (note || null) as any,
         _items: cart.map(l => ({
           product_id: l.product_id,
           quantity: l.quantity,
