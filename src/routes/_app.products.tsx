@@ -1,28 +1,72 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
-import { Plus, Package, Search } from "lucide-react";
+import { Plus, Package, Search, Pencil, Trash2, X } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/products")({
   head: () => ({ meta: [{ title: "Products — Vortex ERP" }] }),
   component: ProductsPage,
 });
 
+type ProductRow = {
+  id: string; name: string; name_ar: string | null; sku: string | null; barcode: string | null;
+  sale_price: number; cost_price: number; tax_rate: number; min_stock: number;
+  is_active: boolean; category_id: string | null; brand_id: string | null; unit_id: string | null;
+  category?: { name: string } | null; brand?: { name: string } | null; unit?: { short_name: string } | null;
+};
+
 function ProductsPage() {
   const { t } = useI18n();
-  const { data, isLoading } = useQuery({
+  const qc = useQueryClient();
+  const [query, setQuery] = useState("");
+  const [editing, setEditing] = useState<ProductRow | null>(null);
+  const [open, setOpen] = useState(false);
+
+  const { data: products, isLoading } = useQuery({
     queryKey: ["products"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, sku, barcode, sale_price, cost_price, min_stock, is_active, category:categories(name), brand:brands(name)")
+        .select("id, name, name_ar, sku, barcode, sale_price, cost_price, tax_rate, min_stock, is_active, category_id, brand_id, unit_id, category:categories(name), brand:brands(name), unit:units(short_name)")
         .order("created_at", { ascending: false })
-        .limit(100);
+        .limit(500);
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as unknown as ProductRow[];
     },
+  });
+
+  const { data: meta } = useQuery({
+    queryKey: ["products-meta"],
+    queryFn: async () => {
+      const [c, b, u] = await Promise.all([
+        supabase.from("categories").select("id, name").order("name"),
+        supabase.from("brands").select("id, name").order("name"),
+        supabase.from("units").select("id, name, short_name").order("name"),
+      ]);
+      return { categories: c.data ?? [], brands: b.data ?? [], units: u.data ?? [] };
+    },
+  });
+
+  const filtered = useMemo(() => {
+    if (!products) return [];
+    const q = query.trim().toLowerCase();
+    if (!q) return products;
+    return products.filter((p) =>
+      [p.name, p.name_ar, p.sku, p.barcode].some((x) => (x ?? "").toLowerCase().includes(q))
+    );
+  }, [products, query]);
+
+  const remove = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("products").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Product deleted"); qc.invalidateQueries({ queryKey: ["products"] }); },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   return (
@@ -31,7 +75,10 @@ function ProductsPage() {
         title={t("products.title")}
         subtitle="Catalog, pricing, barcodes and stock thresholds."
         actions={
-          <button className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:opacity-90 transition">
+          <button
+            onClick={() => { setEditing(null); setOpen(true); }}
+            className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:opacity-90 transition"
+          >
             <Plus className="h-3.5 w-3.5" /> {t("common.new")}
           </button>
         }
@@ -41,8 +88,14 @@ function ProductsPage() {
         <div className="flex items-center gap-2 border-b border-border p-3">
           <div className="flex h-9 flex-1 items-center gap-2 rounded-md border border-border bg-surface px-3 text-sm">
             <Search className="h-3.5 w-3.5 text-muted-foreground" />
-            <input className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground" placeholder="Search products, SKU, barcode..." />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
+              placeholder="Search products, SKU, barcode..."
+            />
           </div>
+          <span className="text-[11px] text-muted-foreground tabular-nums">{filtered.length} items</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -53,18 +106,19 @@ function ProductsPage() {
                 <th className="px-4 py-2.5 text-start font-medium">Category</th>
                 <th className="px-4 py-2.5 text-end font-medium">Cost</th>
                 <th className="px-4 py-2.5 text-end font-medium">Price</th>
-                <th className="px-4 py-2.5 text-end font-medium">Min Stock</th>
+                <th className="px-4 py-2.5 text-end font-medium">Min</th>
                 <th className="px-4 py-2.5 text-end font-medium">Status</th>
+                <th className="px-4 py-2.5 text-end font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
               {isLoading && Array.from({ length: 6 }).map((_, i) => (
                 <tr key={i} className="border-b border-border/60">
-                  <td colSpan={7} className="px-4 py-3"><div className="h-4 w-full rounded shimmer" /></td>
+                  <td colSpan={8} className="px-4 py-3"><div className="h-4 w-full rounded shimmer" /></td>
                 </tr>
               ))}
-              {!isLoading && (data?.length ?? 0) === 0 && (
-                <tr><td colSpan={7} className="px-4 py-16 text-center">
+              {!isLoading && filtered.length === 0 && (
+                <tr><td colSpan={8} className="px-4 py-16 text-center">
                   <div className="mx-auto grid h-10 w-10 place-items-center rounded-md bg-surface border border-border">
                     <Package className="h-5 w-5 text-muted-foreground" />
                   </div>
@@ -72,9 +126,12 @@ function ProductsPage() {
                   <p className="text-xs text-muted-foreground">Add your first product to start tracking inventory.</p>
                 </td></tr>
               )}
-              {data?.map((p: any) => (
+              {filtered.map((p) => (
                 <tr key={p.id} className="border-b border-border/60 hover:bg-accent/40 transition-colors">
-                  <td className="px-4 py-2.5 font-medium text-foreground">{p.name}</td>
+                  <td className="px-4 py-2.5">
+                    <div className="font-medium text-foreground">{p.name}</div>
+                    {p.name_ar && <div className="text-[11px] text-muted-foreground" dir="rtl">{p.name_ar}</div>}
+                  </td>
                   <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">{p.sku ?? "—"}</td>
                   <td className="px-4 py-2.5 text-muted-foreground">{p.category?.name ?? "—"}</td>
                   <td className="px-4 py-2.5 text-end font-mono">{Number(p.cost_price).toFixed(2)}</td>
@@ -85,12 +142,163 @@ function ProductsPage() {
                       {p.is_active ? "Active" : "Inactive"}
                     </span>
                   </td>
+                  <td className="px-4 py-2.5 text-end">
+                    <div className="inline-flex items-center gap-1">
+                      <button
+                        onClick={() => { setEditing(p); setOpen(true); }}
+                        className="grid h-7 w-7 place-items-center rounded-md border border-border bg-surface text-muted-foreground hover:text-foreground transition"
+                        title="Edit"
+                      ><Pencil className="h-3.5 w-3.5" /></button>
+                      <button
+                        onClick={() => { if (confirm(`Delete "${p.name}"?`)) remove.mutate(p.id); }}
+                        className="grid h-7 w-7 place-items-center rounded-md border border-border bg-surface text-muted-foreground hover:text-destructive transition"
+                        title="Delete"
+                      ><Trash2 className="h-3.5 w-3.5" /></button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </div>
+
+      {open && (
+        <ProductDialog
+          initial={editing}
+          meta={meta ?? { categories: [], brands: [], units: [] }}
+          onClose={() => setOpen(false)}
+          onSaved={() => { setOpen(false); qc.invalidateQueries({ queryKey: ["products"] }); }}
+        />
+      )}
     </>
+  );
+}
+
+function ProductDialog({
+  initial, meta, onClose, onSaved,
+}: {
+  initial: ProductRow | null;
+  meta: { categories: { id: string; name: string }[]; brands: { id: string; name: string }[]; units: { id: string; name: string; short_name: string }[] };
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [form, setForm] = useState({
+    name: initial?.name ?? "",
+    name_ar: initial?.name_ar ?? "",
+    sku: initial?.sku ?? "",
+    barcode: initial?.barcode ?? "",
+    category_id: initial?.category_id ?? "",
+    brand_id: initial?.brand_id ?? "",
+    unit_id: initial?.unit_id ?? "",
+    cost_price: initial?.cost_price?.toString() ?? "0",
+    sale_price: initial?.sale_price?.toString() ?? "0",
+    tax_rate: initial?.tax_rate?.toString() ?? "0",
+    min_stock: initial?.min_stock?.toString() ?? "0",
+    is_active: initial?.is_active ?? true,
+  });
+  const [saving, setSaving] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.name.trim()) { toast.error("Name is required"); return; }
+    setSaving(true);
+    const payload = {
+      name: form.name.trim(),
+      name_ar: form.name_ar.trim() || null,
+      sku: form.sku.trim() || null,
+      barcode: form.barcode.trim() || null,
+      category_id: form.category_id || null,
+      brand_id: form.brand_id || null,
+      unit_id: form.unit_id || null,
+      cost_price: Number(form.cost_price) || 0,
+      sale_price: Number(form.sale_price) || 0,
+      tax_rate: Number(form.tax_rate) || 0,
+      min_stock: Number(form.min_stock) || 0,
+      is_active: form.is_active,
+    };
+    const { error } = initial
+      ? await supabase.from("products").update(payload).eq("id", initial.id)
+      : await supabase.from("products").insert(payload);
+    setSaving(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success(initial ? "Product updated" : "Product created");
+    onSaved();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
+      <form
+        onSubmit={submit}
+        onClick={(e) => e.stopPropagation()}
+        className="panel-elevated w-full max-w-2xl overflow-hidden"
+      >
+        <div className="flex items-center justify-between border-b border-border px-5 py-3">
+          <h2 className="text-sm font-semibold text-foreground">{initial ? "Edit product" : "New product"}</h2>
+          <button type="button" onClick={onClose} className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-accent">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 p-5 sm:grid-cols-2 max-h-[70vh] overflow-y-auto">
+          <Field label="Name (English) *" className="sm:col-span-2">
+            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} required />
+          </Field>
+          <Field label="Name (Arabic)" className="sm:col-span-2">
+            <input value={form.name_ar} onChange={(e) => setForm({ ...form, name_ar: e.target.value })} className={inputCls} dir="rtl" />
+          </Field>
+          <Field label="SKU"><input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className={inputCls} /></Field>
+          <Field label="Barcode"><input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} className={inputCls} /></Field>
+          <Field label="Category">
+            <select value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })} className={inputCls}>
+              <option value="">—</option>
+              {meta.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </Field>
+          <Field label="Brand">
+            <select value={form.brand_id} onChange={(e) => setForm({ ...form, brand_id: e.target.value })} className={inputCls}>
+              <option value="">—</option>
+              {meta.brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+          </Field>
+          <Field label="Unit">
+            <select value={form.unit_id} onChange={(e) => setForm({ ...form, unit_id: e.target.value })} className={inputCls}>
+              <option value="">—</option>
+              {meta.units.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.short_name})</option>)}
+            </select>
+          </Field>
+          <Field label="Min stock"><input type="number" step="0.01" value={form.min_stock} onChange={(e) => setForm({ ...form, min_stock: e.target.value })} className={inputCls} /></Field>
+          <Field label="Cost price"><input type="number" step="0.01" value={form.cost_price} onChange={(e) => setForm({ ...form, cost_price: e.target.value })} className={inputCls} /></Field>
+          <Field label="Sale price"><input type="number" step="0.01" value={form.sale_price} onChange={(e) => setForm({ ...form, sale_price: e.target.value })} className={inputCls} /></Field>
+          <Field label="Tax rate (%)"><input type="number" step="0.01" value={form.tax_rate} onChange={(e) => setForm({ ...form, tax_rate: e.target.value })} className={inputCls} /></Field>
+          <Field label="Status">
+            <label className="flex h-9 items-center gap-2 rounded-md border border-border bg-surface px-3 text-sm">
+              <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} />
+              <span className="text-muted-foreground">Active</span>
+            </label>
+          </Field>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 border-t border-border bg-surface/40 px-5 py-3">
+          <button type="button" onClick={onClose} className="flex h-9 items-center rounded-md border border-border bg-surface px-3 text-xs font-medium text-muted-foreground hover:text-foreground transition">
+            Cancel
+          </button>
+          <button type="submit" disabled={saving} className="flex h-9 items-center rounded-md bg-primary px-4 text-xs font-medium text-primary-foreground hover:opacity-90 transition disabled:opacity-50">
+            {saving ? "Saving..." : initial ? "Save changes" : "Create product"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+const inputCls = "h-9 w-full rounded-md border border-border bg-surface px-3 text-sm text-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition";
+
+function Field({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) {
+  return (
+    <label className={`flex flex-col gap-1.5 ${className}`}>
+      <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{label}</span>
+      {children}
+    </label>
   );
 }
