@@ -203,8 +203,8 @@ function AdjustDialog({
     const { error: mvErr } = await supabase.from("stock_movements").insert({
       product_id: product.id,
       warehouse_id: warehouseId,
-      movement_type: mode === "in" ? "adjustment_in" : "adjustment_out",
-      quantity: q,
+      movement_type: "adjustment",
+      quantity: signed,
       unit_cost: Number(unitCost) || 0,
       note: note || null,
       created_by: user?.id ?? null,
