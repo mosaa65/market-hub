@@ -715,6 +715,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_purchase: {
+        Args: {
+          _discount: number
+          _items: Json
+          _note: string
+          _paid: number
+          _payment_method: string
+          _supplier_id: string
+          _warehouse_id: string
+        }
+        Returns: string
+      }
       create_sale: {
         Args: {
           _customer_id: string
@@ -736,6 +748,7 @@ export type Database = {
       }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
       next_invoice_number: { Args: never; Returns: string }
+      next_purchase_number: { Args: never; Returns: string }
     }
     Enums: {
       app_role: "owner" | "manager" | "accountant" | "cashier" | "warehouse"
