@@ -4,7 +4,7 @@ import {
   LayoutDashboard, ScanBarcode, Package, Warehouse, Receipt, Truck,
   Users, Building2, Wallet, BarChart3, ShieldCheck, Bell, Settings,
   Search, Command as CommandIcon, LogOut, Moon, Sun, Languages, Sparkles,
-  ChevronRight,
+  ChevronRight, RotateCcw, ArrowRightLeft,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
@@ -27,6 +27,8 @@ const sections: Section[] = [
       { to: "/inventory", icon: Warehouse, key: "nav.inventory" },
       { to: "/sales", icon: Receipt, key: "nav.sales" },
       { to: "/purchases", icon: Truck, key: "nav.purchases" },
+      { to: "/returns", icon: RotateCcw, key: "nav.returns" },
+      { to: "/transfers", icon: ArrowRightLeft, key: "nav.transfers" },
     ],
   },
   {
