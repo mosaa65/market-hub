@@ -6,6 +6,7 @@ import { useI18n } from "@/lib/i18n";
 import {
   LayoutDashboard, ScanBarcode, Package, Warehouse, Receipt, Truck,
   Users, Building2, Wallet, BarChart3, Settings, Bell, ShieldCheck,
+  RotateCcw, ArrowRightLeft,
 } from "lucide-react";
 
 export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
@@ -25,6 +26,8 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
           <CommandItem onSelect={() => go("/inventory")}><Warehouse /> {t("nav.inventory")}</CommandItem>
           <CommandItem onSelect={() => go("/sales")}><Receipt /> {t("nav.sales")}</CommandItem>
           <CommandItem onSelect={() => go("/purchases")}><Truck /> {t("nav.purchases")}</CommandItem>
+          <CommandItem onSelect={() => go("/returns")}><RotateCcw /> {t("nav.returns")}</CommandItem>
+          <CommandItem onSelect={() => go("/transfers")}><ArrowRightLeft /> {t("nav.transfers")}</CommandItem>
           <CommandItem onSelect={() => go("/customers")}><Users /> {t("nav.customers")}</CommandItem>
           <CommandItem onSelect={() => go("/suppliers")}><Building2 /> {t("nav.suppliers")}</CommandItem>
         </CommandGroup>
