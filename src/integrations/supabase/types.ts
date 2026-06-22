@@ -154,6 +154,71 @@ export type Database = {
         }
         Relationships: []
       }
+      expense_categories: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          name_ar: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          name_ar?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          name_ar?: string | null
+        }
+        Relationships: []
+      }
+      expenses: {
+        Row: {
+          amount: number
+          category_id: string | null
+          created_at: string
+          created_by: string | null
+          expense_date: string
+          id: string
+          note: string | null
+          payment_method: Database["public"]["Enums"]["payment_method"]
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          category_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          expense_date?: string
+          id?: string
+          note?: string | null
+          payment_method?: Database["public"]["Enums"]["payment_method"]
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          category_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          expense_date?: string
+          id?: string
+          note?: string | null
+          payment_method?: Database["public"]["Enums"]["payment_method"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expenses_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "expense_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory: {
         Row: {
           id: string
