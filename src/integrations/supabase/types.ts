@@ -493,6 +493,118 @@ export type Database = {
           },
         ]
       }
+      purchase_return_items: {
+        Row: {
+          id: string
+          product_id: string
+          quantity: number
+          return_id: string
+          tax: number
+          total: number
+          unit_cost: number
+        }
+        Insert: {
+          id?: string
+          product_id: string
+          quantity: number
+          return_id: string
+          tax?: number
+          total?: number
+          unit_cost: number
+        }
+        Update: {
+          id?: string
+          product_id?: string
+          quantity?: number
+          return_id?: string
+          tax?: number
+          total?: number
+          unit_cost?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_return_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_return_items_return_id_fkey"
+            columns: ["return_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_returns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_returns: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          invoice_id: string | null
+          note: string | null
+          refund_method: Database["public"]["Enums"]["payment_method"] | null
+          return_number: string
+          subtotal: number
+          supplier_id: string | null
+          tax: number
+          total: number
+          warehouse_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          invoice_id?: string | null
+          note?: string | null
+          refund_method?: Database["public"]["Enums"]["payment_method"] | null
+          return_number: string
+          subtotal?: number
+          supplier_id?: string | null
+          tax?: number
+          total?: number
+          warehouse_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          invoice_id?: string | null
+          note?: string | null
+          refund_method?: Database["public"]["Enums"]["payment_method"] | null
+          return_number?: string
+          subtotal?: number
+          supplier_id?: string | null
+          tax?: number
+          total?: number
+          warehouse_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_returns_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_returns_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_returns_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sales_invoice_items: {
         Row: {
           discount: number
@@ -610,6 +722,118 @@ export type Database = {
           },
         ]
       }
+      sales_return_items: {
+        Row: {
+          id: string
+          product_id: string
+          quantity: number
+          return_id: string
+          tax: number
+          total: number
+          unit_price: number
+        }
+        Insert: {
+          id?: string
+          product_id: string
+          quantity: number
+          return_id: string
+          tax?: number
+          total?: number
+          unit_price: number
+        }
+        Update: {
+          id?: string
+          product_id?: string
+          quantity?: number
+          return_id?: string
+          tax?: number
+          total?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_return_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_return_items_return_id_fkey"
+            columns: ["return_id"]
+            isOneToOne: false
+            referencedRelation: "sales_returns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales_returns: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          id: string
+          invoice_id: string | null
+          note: string | null
+          refund_method: Database["public"]["Enums"]["payment_method"] | null
+          return_number: string
+          subtotal: number
+          tax: number
+          total: number
+          warehouse_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          id?: string
+          invoice_id?: string | null
+          note?: string | null
+          refund_method?: Database["public"]["Enums"]["payment_method"] | null
+          return_number: string
+          subtotal?: number
+          tax?: number
+          total?: number
+          warehouse_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          id?: string
+          invoice_id?: string | null
+          note?: string | null
+          refund_method?: Database["public"]["Enums"]["payment_method"] | null
+          return_number?: string
+          subtotal?: number
+          tax?: number
+          total?: number
+          warehouse_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_returns_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_returns_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "sales_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_returns_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stock_movements: {
         Row: {
           created_at: string
@@ -658,6 +882,90 @@ export type Database = {
           {
             foreignKeyName: "stock_movements_warehouse_id_fkey"
             columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_transfer_items: {
+        Row: {
+          id: string
+          product_id: string
+          quantity: number
+          transfer_id: string
+        }
+        Insert: {
+          id?: string
+          product_id: string
+          quantity: number
+          transfer_id: string
+        }
+        Update: {
+          id?: string
+          product_id?: string
+          quantity?: number
+          transfer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_transfer_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_transfer_items_transfer_id_fkey"
+            columns: ["transfer_id"]
+            isOneToOne: false
+            referencedRelation: "stock_transfers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_transfers: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          from_warehouse_id: string
+          id: string
+          note: string | null
+          status: string
+          to_warehouse_id: string
+          transfer_number: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          from_warehouse_id: string
+          id?: string
+          note?: string | null
+          status?: string
+          to_warehouse_id: string
+          transfer_number: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          from_warehouse_id?: string
+          id?: string
+          note?: string | null
+          status?: string
+          to_warehouse_id?: string
+          transfer_number?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_transfers_from_warehouse_id_fkey"
+            columns: ["from_warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_transfers_to_warehouse_id_fkey"
+            columns: ["to_warehouse_id"]
             isOneToOne: false
             referencedRelation: "warehouses"
             referencedColumns: ["id"]
@@ -792,6 +1100,17 @@ export type Database = {
         }
         Returns: string
       }
+      create_purchase_return: {
+        Args: {
+          _invoice_id: string
+          _items: Json
+          _note: string
+          _refund_method: string
+          _supplier_id: string
+          _warehouse_id: string
+        }
+        Returns: string
+      }
       create_sale: {
         Args: {
           _customer_id: string
@@ -804,6 +1123,21 @@ export type Database = {
         }
         Returns: string
       }
+      create_sales_return: {
+        Args: {
+          _customer_id: string
+          _invoice_id: string
+          _items: Json
+          _note: string
+          _refund_method: string
+          _warehouse_id: string
+        }
+        Returns: string
+      }
+      create_stock_transfer: {
+        Args: { _from: string; _items: Json; _note: string; _to: string }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -814,6 +1148,9 @@ export type Database = {
       is_staff: { Args: { _user_id: string }; Returns: boolean }
       next_invoice_number: { Args: never; Returns: string }
       next_purchase_number: { Args: never; Returns: string }
+      next_purchase_return_number: { Args: never; Returns: string }
+      next_sales_return_number: { Args: never; Returns: string }
+      next_transfer_number: { Args: never; Returns: string }
     }
     Enums: {
       app_role: "owner" | "manager" | "accountant" | "cashier" | "warehouse"
