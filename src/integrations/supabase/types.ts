@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_logs: {
+        Row: {
+          action: string
+          actor_id: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          payload: Json | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          payload?: Json | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          payload?: Json | null
+        }
+        Relationships: []
+      }
       brands: {
         Row: {
           created_at: string
@@ -124,6 +154,7 @@ export type Database = {
           email: string | null
           id: string
           is_active: boolean
+          loyalty_points: number
           name: string
           phone: string | null
           updated_at: string
@@ -136,6 +167,7 @@ export type Database = {
           email?: string | null
           id?: string
           is_active?: boolean
+          loyalty_points?: number
           name: string
           phone?: string | null
           updated_at?: string
@@ -148,6 +180,7 @@ export type Database = {
           email?: string | null
           id?: string
           is_active?: boolean
+          loyalty_points?: number
           name?: string
           phone?: string | null
           updated_at?: string
@@ -251,6 +284,107 @@ export type Database = {
           },
           {
             foreignKeyName: "inventory_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      loyalty_transactions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          customer_id: string
+          id: string
+          kind: string
+          note: string | null
+          points: number
+          reference_id: string | null
+          reference_type: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          customer_id: string
+          id?: string
+          kind: string
+          note?: string | null
+          points: number
+          reference_id?: string | null
+          reference_type?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string
+          id?: string
+          kind?: string
+          note?: string | null
+          points?: number
+          reference_id?: string | null
+          reference_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loyalty_transactions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_batches: {
+        Row: {
+          batch_number: string
+          created_at: string
+          created_by: string | null
+          expiry_date: string | null
+          id: string
+          note: string | null
+          product_id: string
+          quantity: number
+          unit_cost: number
+          updated_at: string
+          warehouse_id: string
+        }
+        Insert: {
+          batch_number: string
+          created_at?: string
+          created_by?: string | null
+          expiry_date?: string | null
+          id?: string
+          note?: string | null
+          product_id: string
+          quantity?: number
+          unit_cost?: number
+          updated_at?: string
+          warehouse_id: string
+        }
+        Update: {
+          batch_number?: string
+          created_at?: string
+          created_by?: string | null
+          expiry_date?: string | null
+          id?: string
+          note?: string | null
+          product_id?: string
+          quantity?: number
+          unit_cost?: number
+          updated_at?: string
+          warehouse_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_batches_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_batches_warehouse_id_fkey"
             columns: ["warehouse_id"]
             isOneToOne: false
             referencedRelation: "warehouses"
@@ -1088,6 +1222,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      adjust_loyalty: {
+        Args: {
+          _customer: string
+          _kind: string
+          _note: string
+          _points: number
+        }
+        Returns: string
+      }
       create_purchase: {
         Args: {
           _discount: number
