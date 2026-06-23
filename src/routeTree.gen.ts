@@ -23,10 +23,14 @@ import { Route as AppPurchasesRouteImport } from './routes/_app.purchases'
 import { Route as AppProductsRouteImport } from './routes/_app.products'
 import { Route as AppPosRouteImport } from './routes/_app.pos'
 import { Route as AppNotificationsRouteImport } from './routes/_app.notifications'
+import { Route as AppLoyaltyRouteImport } from './routes/_app.loyalty'
 import { Route as AppInventoryRouteImport } from './routes/_app.inventory'
 import { Route as AppFinanceRouteImport } from './routes/_app.finance'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppCustomersRouteImport } from './routes/_app.customers'
+import { Route as AppBatchesRouteImport } from './routes/_app.batches'
+import { Route as AppBarcodesRouteImport } from './routes/_app.barcodes'
+import { Route as AppAuditRouteImport } from './routes/_app.audit'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -97,6 +101,11 @@ const AppNotificationsRoute = AppNotificationsRouteImport.update({
   path: '/notifications',
   getParentRoute: () => AppRoute,
 } as any)
+const AppLoyaltyRoute = AppLoyaltyRouteImport.update({
+  id: '/loyalty',
+  path: '/loyalty',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppInventoryRoute = AppInventoryRouteImport.update({
   id: '/inventory',
   path: '/inventory',
@@ -117,14 +126,33 @@ const AppCustomersRoute = AppCustomersRouteImport.update({
   path: '/customers',
   getParentRoute: () => AppRoute,
 } as any)
+const AppBatchesRoute = AppBatchesRouteImport.update({
+  id: '/batches',
+  path: '/batches',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppBarcodesRoute = AppBarcodesRouteImport.update({
+  id: '/barcodes',
+  path: '/barcodes',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAuditRoute = AppAuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/audit': typeof AppAuditRoute
+  '/barcodes': typeof AppBarcodesRoute
+  '/batches': typeof AppBatchesRoute
   '/customers': typeof AppCustomersRoute
   '/dashboard': typeof AppDashboardRoute
   '/finance': typeof AppFinanceRoute
   '/inventory': typeof AppInventoryRoute
+  '/loyalty': typeof AppLoyaltyRoute
   '/notifications': typeof AppNotificationsRoute
   '/pos': typeof AppPosRoute
   '/products': typeof AppProductsRoute
@@ -140,10 +168,14 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/audit': typeof AppAuditRoute
+  '/barcodes': typeof AppBarcodesRoute
+  '/batches': typeof AppBatchesRoute
   '/customers': typeof AppCustomersRoute
   '/dashboard': typeof AppDashboardRoute
   '/finance': typeof AppFinanceRoute
   '/inventory': typeof AppInventoryRoute
+  '/loyalty': typeof AppLoyaltyRoute
   '/notifications': typeof AppNotificationsRoute
   '/pos': typeof AppPosRoute
   '/products': typeof AppProductsRoute
@@ -161,10 +193,14 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
   '/auth': typeof AuthRoute
+  '/_app/audit': typeof AppAuditRoute
+  '/_app/barcodes': typeof AppBarcodesRoute
+  '/_app/batches': typeof AppBatchesRoute
   '/_app/customers': typeof AppCustomersRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/finance': typeof AppFinanceRoute
   '/_app/inventory': typeof AppInventoryRoute
+  '/_app/loyalty': typeof AppLoyaltyRoute
   '/_app/notifications': typeof AppNotificationsRoute
   '/_app/pos': typeof AppPosRoute
   '/_app/products': typeof AppProductsRoute
@@ -182,10 +218,14 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/audit'
+    | '/barcodes'
+    | '/batches'
     | '/customers'
     | '/dashboard'
     | '/finance'
     | '/inventory'
+    | '/loyalty'
     | '/notifications'
     | '/pos'
     | '/products'
@@ -201,10 +241,14 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
+    | '/audit'
+    | '/barcodes'
+    | '/batches'
     | '/customers'
     | '/dashboard'
     | '/finance'
     | '/inventory'
+    | '/loyalty'
     | '/notifications'
     | '/pos'
     | '/products'
@@ -221,10 +265,14 @@ export interface FileRouteTypes {
     | '/'
     | '/_app'
     | '/auth'
+    | '/_app/audit'
+    | '/_app/barcodes'
+    | '/_app/batches'
     | '/_app/customers'
     | '/_app/dashboard'
     | '/_app/finance'
     | '/_app/inventory'
+    | '/_app/loyalty'
     | '/_app/notifications'
     | '/_app/pos'
     | '/_app/products'
@@ -344,6 +392,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppNotificationsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/loyalty': {
+      id: '/_app/loyalty'
+      path: '/loyalty'
+      fullPath: '/loyalty'
+      preLoaderRoute: typeof AppLoyaltyRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/inventory': {
       id: '/_app/inventory'
       path: '/inventory'
@@ -372,14 +427,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCustomersRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/batches': {
+      id: '/_app/batches'
+      path: '/batches'
+      fullPath: '/batches'
+      preLoaderRoute: typeof AppBatchesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/barcodes': {
+      id: '/_app/barcodes'
+      path: '/barcodes'
+      fullPath: '/barcodes'
+      preLoaderRoute: typeof AppBarcodesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/audit': {
+      id: '/_app/audit'
+      path: '/audit'
+      fullPath: '/audit'
+      preLoaderRoute: typeof AppAuditRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
 interface AppRouteChildren {
+  AppAuditRoute: typeof AppAuditRoute
+  AppBarcodesRoute: typeof AppBarcodesRoute
+  AppBatchesRoute: typeof AppBatchesRoute
   AppCustomersRoute: typeof AppCustomersRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppFinanceRoute: typeof AppFinanceRoute
   AppInventoryRoute: typeof AppInventoryRoute
+  AppLoyaltyRoute: typeof AppLoyaltyRoute
   AppNotificationsRoute: typeof AppNotificationsRoute
   AppPosRoute: typeof AppPosRoute
   AppProductsRoute: typeof AppProductsRoute
@@ -394,10 +474,14 @@ interface AppRouteChildren {
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppAuditRoute: AppAuditRoute,
+  AppBarcodesRoute: AppBarcodesRoute,
+  AppBatchesRoute: AppBatchesRoute,
   AppCustomersRoute: AppCustomersRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppFinanceRoute: AppFinanceRoute,
   AppInventoryRoute: AppInventoryRoute,
+  AppLoyaltyRoute: AppLoyaltyRoute,
   AppNotificationsRoute: AppNotificationsRoute,
   AppPosRoute: AppPosRoute,
   AppProductsRoute: AppProductsRoute,
