@@ -6,7 +6,7 @@ import { useI18n } from "@/lib/i18n";
 import {
   LayoutDashboard, ScanBarcode, Package, Warehouse, Receipt, Truck,
   Users, Building2, Wallet, BarChart3, Settings, Bell, ShieldCheck,
-  RotateCcw, ArrowRightLeft,
+  RotateCcw, ArrowRightLeft, CalendarClock, Barcode, Gift, History,
 } from "lucide-react";
 
 export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
@@ -28,7 +28,10 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
           <CommandItem onSelect={() => go("/purchases")}><Truck /> {t("nav.purchases")}</CommandItem>
           <CommandItem onSelect={() => go("/returns")}><RotateCcw /> {t("nav.returns")}</CommandItem>
           <CommandItem onSelect={() => go("/transfers")}><ArrowRightLeft /> {t("nav.transfers")}</CommandItem>
+          <CommandItem onSelect={() => go("/batches")}><CalendarClock /> {t("nav.batches")}</CommandItem>
+          <CommandItem onSelect={() => go("/barcodes")}><Barcode /> {t("nav.barcodes")}</CommandItem>
           <CommandItem onSelect={() => go("/customers")}><Users /> {t("nav.customers")}</CommandItem>
+          <CommandItem onSelect={() => go("/loyalty")}><Gift /> {t("nav.loyalty")}</CommandItem>
           <CommandItem onSelect={() => go("/suppliers")}><Building2 /> {t("nav.suppliers")}</CommandItem>
         </CommandGroup>
         <CommandSeparator />
@@ -39,6 +42,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
         <CommandSeparator />
         <CommandGroup heading="Admin">
           <CommandItem onSelect={() => go("/users")}><ShieldCheck /> {t("nav.users")}</CommandItem>
+          <CommandItem onSelect={() => go("/audit")}><History /> {t("nav.audit")}</CommandItem>
           <CommandItem onSelect={() => go("/notifications")}><Bell /> {t("nav.notifications")}</CommandItem>
           <CommandItem onSelect={() => go("/settings")}><Settings /> {t("nav.settings")}</CommandItem>
         </CommandGroup>

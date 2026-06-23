@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Receipt, Search, Eye, X } from "lucide-react";
+import { Receipt, Search, Eye, X, FileDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { useI18n } from "@/lib/i18n";
 import { money } from "@/lib/format";
+import { generateInvoicePDF } from "@/lib/pdf";
 
 export const Route = createFileRoute("/_app/sales")({
   head: () => ({ meta: [{ title: "Sales — Vortex ERP" }] }),
@@ -170,6 +171,29 @@ function SalesPage() {
               <Row label="Paid" value={money(Number(selected.paid))} />
             </div>
             <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={async () => {
+                  const { data: cs } = await supabase.from("company_settings").select("*").limit(1).maybeSingle();
+                  generateInvoicePDF({
+                    title: "Sales Invoice",
+                    number: selected.invoice_number,
+                    date: new Date(selected.created_at).toLocaleString(),
+                    partyLabel: "Bill To",
+                    partyName: selected.customers?.name ?? "Walk-in",
+                    warehouse: selected.warehouses?.name ?? undefined,
+                    payment: selected.payment_method,
+                    status: selected.status,
+                    lines: lines.map(l => ({ product: l.products?.name ?? "—", qty: Number(l.quantity), price: Number(l.unit_price), total: Number(l.total) })),
+                    subtotal: Number(selected.subtotal), tax: Number(selected.tax), discount: Number(selected.discount),
+                    total: Number(selected.total), paid: Number(selected.paid),
+                    company: cs ? { name: (cs as any).company_name, address: (cs as any).address, phone: (cs as any).phone, vat: (cs as any).vat_number } : undefined,
+                    currency: (cs as any)?.currency ?? "",
+                  });
+                }}
+                className="flex items-center gap-1.5 h-9 rounded-md border border-border px-4 text-sm hover:bg-surface-2"
+              >
+                <FileDown className="h-4 w-4" /> PDF
+              </button>
               <button onClick={() => window.print()} className="h-9 rounded-md border border-border px-4 text-sm hover:bg-surface-2">Print</button>
               <button onClick={() => setSelected(null)} className="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90">Close</button>
             </div>

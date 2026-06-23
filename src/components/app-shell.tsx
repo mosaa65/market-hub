@@ -4,7 +4,7 @@ import {
   LayoutDashboard, ScanBarcode, Package, Warehouse, Receipt, Truck,
   Users, Building2, Wallet, BarChart3, ShieldCheck, Bell, Settings,
   Search, Command as CommandIcon, LogOut, Moon, Sun, Languages, Sparkles,
-  ChevronRight, RotateCcw, ArrowRightLeft,
+  ChevronRight, RotateCcw, ArrowRightLeft, CalendarClock, Barcode, Gift, History,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
@@ -25,10 +25,12 @@ const sections: Section[] = [
       { to: "/pos", icon: ScanBarcode, key: "nav.pos" },
       { to: "/products", icon: Package, key: "nav.products" },
       { to: "/inventory", icon: Warehouse, key: "nav.inventory" },
+      { to: "/batches", icon: CalendarClock, key: "nav.batches" },
       { to: "/sales", icon: Receipt, key: "nav.sales" },
       { to: "/purchases", icon: Truck, key: "nav.purchases" },
       { to: "/returns", icon: RotateCcw, key: "nav.returns" },
       { to: "/transfers", icon: ArrowRightLeft, key: "nav.transfers" },
+      { to: "/barcodes", icon: Barcode, key: "nav.barcodes" },
     ],
   },
   {
@@ -36,6 +38,7 @@ const sections: Section[] = [
     items: [
       { to: "/customers", icon: Users, key: "nav.customers" },
       { to: "/suppliers", icon: Building2, key: "nav.suppliers" },
+      { to: "/loyalty", icon: Gift, key: "nav.loyalty" },
     ],
   },
   {
@@ -49,6 +52,7 @@ const sections: Section[] = [
     titleKey: "nav.section.admin",
     items: [
       { to: "/users", icon: ShieldCheck, key: "nav.users" },
+      { to: "/audit", icon: History, key: "nav.audit" },
       { to: "/notifications", icon: Bell, key: "nav.notifications" },
       { to: "/settings", icon: Settings, key: "nav.settings" },
     ],
