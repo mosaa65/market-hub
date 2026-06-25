@@ -1,6 +1,7 @@
 import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useAuth } from "@/lib/auth";
+import { useI18n } from "@/lib/i18n";
 import { AppShell } from "@/components/app-shell";
 
 export const Route = createFileRoute("/_app")({
@@ -9,6 +10,7 @@ export const Route = createFileRoute("/_app")({
 
 function AppLayout() {
   const { session, loading } = useAuth();
+  const { t } = useI18n();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -20,7 +22,7 @@ function AppLayout() {
       <div className="flex min-h-screen items-center justify-center">
         <div className="flex flex-col items-center gap-3 text-sm text-muted-foreground">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-primary" />
-          <span>Loading permissions...</span>
+          <span>{t("auth.roles_loading")}</span>
         </div>
       </div>
     );
