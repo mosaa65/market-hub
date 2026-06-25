@@ -22,7 +22,7 @@ type Row = {
 };
 
 function InventoryPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const qc = useQueryClient();
   const [query, setQuery] = useState("");
   const [warehouseId, setWarehouseId] = useState<string>("");
@@ -67,7 +67,7 @@ function InventoryPage() {
     <>
       <PageHeader
         title={t("inventory.title")}
-        subtitle="Stock on hand, low-stock alerts and adjustments."
+        subtitle={t("inventory.subtitle")}
       />
 
       <div className="panel-elevated overflow-hidden">
@@ -76,7 +76,7 @@ function InventoryPage() {
             <Search className="h-3.5 w-3.5 text-muted-foreground" />
             <input
               value={query} onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by product or SKU..."
+              placeholder={t("inventory.search")}
               className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
             />
           </div>
@@ -85,22 +85,22 @@ function InventoryPage() {
             onChange={(e) => setWarehouseId(e.target.value)}
             className="h-9 rounded-md border border-border bg-surface px-3 text-sm text-foreground outline-none"
           >
-            <option value="">All warehouses</option>
+            <option value="">{t("inventory.all_warehouses")}</option>
             {(warehouses ?? []).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
           </select>
-          <span className="text-[11px] text-muted-foreground tabular-nums">{filtered.length} items</span>
+          <span className="text-[11px] text-muted-foreground tabular-nums">{filtered.length} {lang === "ar" ? "عنصر" : "items"}</span>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-                <th className="px-4 py-2.5 text-start font-medium">Product</th>
+                <th className="px-4 py-2.5 text-start font-medium">{t("products.product")}</th>
                 <th className="px-4 py-2.5 text-start font-medium">SKU</th>
-                <th className="px-4 py-2.5 text-end font-medium">Min</th>
-                <th className="px-4 py-2.5 text-end font-medium">On hand</th>
-                <th className="px-4 py-2.5 text-end font-medium">Status</th>
-                <th className="px-4 py-2.5 text-end font-medium">Actions</th>
+                <th className="px-4 py-2.5 text-end font-medium">{t("products.min")}</th>
+                <th className="px-4 py-2.5 text-end font-medium">{t("inventory.on_hand")}</th>
+                <th className="px-4 py-2.5 text-end font-medium">{t("common.status")}</th>
+                <th className="px-4 py-2.5 text-end font-medium">{t("common.actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -114,8 +114,8 @@ function InventoryPage() {
                   <div className="mx-auto grid h-10 w-10 place-items-center rounded-md bg-surface border border-border">
                     <Warehouse className="h-5 w-5 text-muted-foreground" />
                   </div>
-                  <p className="mt-3 text-sm text-foreground">No inventory yet</p>
-                  <p className="text-xs text-muted-foreground">Add products and record stock movements.</p>
+                  <p className="mt-3 text-sm text-foreground">{t("inventory.no_inventory")}</p>
+                  <p className="text-xs text-muted-foreground">{t("inventory.empty_hint")}</p>
                 </td></tr>
               )}
               {filtered.map((r) => {
@@ -130,19 +130,19 @@ function InventoryPage() {
                     <td className="px-4 py-2.5 text-end">
                       {low ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-warning/10 px-2 py-0.5 text-[10px] font-medium text-warning">
-                          <AlertTriangle className="h-3 w-3" /> Low
+                          <AlertTriangle className="h-3 w-3" /> {t("inventory.low")}
                         </span>
                       ) : (
-                        <span className="inline-flex rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-medium text-success">OK</span>
+                        <span className="inline-flex rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-medium text-success">{t("inventory.ok")}</span>
                       )}
                     </td>
                     <td className="px-4 py-2.5 text-end">
                       <button
                         onClick={() => setAdjust({ product: r })}
                         disabled={!warehouseId}
-                        title={!warehouseId ? "Select a warehouse" : "Adjust stock"}
+                        title={!warehouseId ? t("inventory.select_warehouse") : t("inventory.adjust_stock")}
                         className="inline-flex h-7 items-center gap-1 rounded-md border border-border bg-surface px-2 text-xs text-muted-foreground hover:text-foreground transition disabled:opacity-40"
-                      ><ArrowUpDown className="h-3 w-3" /> Adjust</button>
+                      ><ArrowUpDown className="h-3 w-3" /> {t("inventory.adjust")}</button>
                     </td>
                   </tr>
                 );
@@ -174,6 +174,7 @@ function AdjustDialog({
   product: Row; warehouseId: string; currentQty: number;
   onClose: () => void; onSaved: () => void;
 }) {
+  const { t } = useI18n();
   const { user } = useAuth();
   const [mode, setMode] = useState<"in" | "out">("in");
   const [qty, setQty] = useState("1");
@@ -184,11 +185,11 @@ function AdjustDialog({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const q = Number(qty);
-    if (!q || q <= 0) { toast.error("Quantity must be > 0"); return; }
+    if (!q || q <= 0) { toast.error(t("inventory.qty_required")); return; }
     setSaving(true);
     const signed = mode === "in" ? q : -q;
     const newQty = currentQty + signed;
-    if (newQty < 0) { toast.error("Resulting stock cannot be negative"); setSaving(false); return; }
+    if (newQty < 0) { toast.error(t("inventory.negative")); setSaving(false); return; }
 
     // 1) upsert inventory row
     const { error: invErr } = await supabase
@@ -211,7 +212,7 @@ function AdjustDialog({
     });
     if (mvErr) { toast.error(mvErr.message); setSaving(false); return; }
 
-    toast.success("Stock adjusted");
+    toast.success(t("inventory.adjusted"));
     setSaving(false);
     onSaved();
   }
@@ -221,8 +222,8 @@ function AdjustDialog({
       <form onSubmit={submit} onClick={(e) => e.stopPropagation()} className="panel-elevated w-full max-w-md overflow-hidden">
         <div className="flex items-center justify-between border-b border-border px-5 py-3">
           <div>
-            <h2 className="text-sm font-semibold text-foreground">Adjust stock</h2>
-            <p className="text-[11px] text-muted-foreground">{product.name} · Current: <span className="font-mono">{currentQty.toFixed(2)}</span></p>
+            <h2 className="text-sm font-semibold text-foreground">{t("inventory.adjust_stock")}</h2>
+            <p className="text-[11px] text-muted-foreground">{product.name} · {t("inventory.on_hand")}: <span className="font-mono">{currentQty.toFixed(2)}</span></p>
           </div>
           <button type="button" onClick={onClose} className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-accent">
             <X className="h-4 w-4" />
@@ -234,42 +235,42 @@ function AdjustDialog({
             <button
               type="button" onClick={() => setMode("in")}
               className={`flex h-10 items-center justify-center gap-1.5 rounded-md border text-sm font-medium transition ${mode === "in" ? "border-success/50 bg-success/10 text-success" : "border-border bg-surface text-muted-foreground"}`}
-            ><Plus className="h-4 w-4" /> Stock in</button>
+            ><Plus className="h-4 w-4" /> {t("inventory.stock_in")}</button>
             <button
               type="button" onClick={() => setMode("out")}
               className={`flex h-10 items-center justify-center gap-1.5 rounded-md border text-sm font-medium transition ${mode === "out" ? "border-destructive/50 bg-destructive/10 text-destructive" : "border-border bg-surface text-muted-foreground"}`}
-            ><Minus className="h-4 w-4" /> Stock out</button>
+            ><Minus className="h-4 w-4" /> {t("inventory.stock_out")}</button>
           </div>
 
           <label className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Quantity</span>
+            <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{t("common.quantity")}</span>
             <input type="number" step="0.01" min="0" value={qty} onChange={(e) => setQty(e.target.value)} className="h-9 rounded-md border border-border bg-surface px-3 text-sm outline-none" required autoFocus />
           </label>
 
           {mode === "in" && (
             <label className="flex flex-col gap-1.5">
-              <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Unit cost (optional)</span>
+              <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{t("inventory.unit_cost")}</span>
               <input type="number" step="0.01" min="0" value={unitCost} onChange={(e) => setUnitCost(e.target.value)} className="h-9 rounded-md border border-border bg-surface px-3 text-sm outline-none" />
             </label>
           )}
 
           <label className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Note</span>
-            <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} className="rounded-md border border-border bg-surface p-3 text-sm outline-none resize-none" placeholder="Reason for adjustment..." />
+            <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{t("common.note")}</span>
+            <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} className="rounded-md border border-border bg-surface p-3 text-sm outline-none resize-none" placeholder={t("inventory.reason")} />
           </label>
 
           <div className="rounded-md border border-border bg-surface/60 p-3 text-xs">
             <div className="flex items-center justify-between text-muted-foreground">
-              <span>New on-hand</span>
+              <span>{t("inventory.new_on_hand")}</span>
               <span className="font-mono text-foreground">{(currentQty + (mode === "in" ? Number(qty) : -Number(qty || 0))).toFixed(2)}</span>
             </div>
           </div>
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-border bg-surface/40 px-5 py-3">
-          <button type="button" onClick={onClose} className="flex h-9 items-center rounded-md border border-border bg-surface px-3 text-xs font-medium text-muted-foreground hover:text-foreground transition">Cancel</button>
+          <button type="button" onClick={onClose} className="flex h-9 items-center rounded-md border border-border bg-surface px-3 text-xs font-medium text-muted-foreground hover:text-foreground transition">{t("common.cancel")}</button>
           <button type="submit" disabled={saving} className="flex h-9 items-center rounded-md bg-primary px-4 text-xs font-medium text-primary-foreground hover:opacity-90 transition disabled:opacity-50">
-            {saving ? "Saving..." : "Apply adjustment"}
+            {saving ? t("common.saving") : t("inventory.apply")}
           </button>
         </div>
       </form>
