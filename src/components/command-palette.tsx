@@ -18,8 +18,8 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
     <CommandDialog open={open} onOpenChange={onOpenChange}>
       <CommandInput placeholder={t("common.search")} />
       <CommandList>
-        <CommandEmpty>No results found.</CommandEmpty>
-        <CommandGroup heading="Navigate">
+        <CommandEmpty>{t("common.no_results")}</CommandEmpty>
+        <CommandGroup heading={t("common.navigate")}>
           <CommandItem onSelect={() => go("/dashboard")}><LayoutDashboard /> {t("nav.dashboard")}</CommandItem>
           <CommandItem onSelect={() => go("/pos")}><ScanBarcode /> {t("nav.pos")}</CommandItem>
           <CommandItem onSelect={() => go("/products")}><Package /> {t("nav.products")}</CommandItem>
@@ -35,12 +35,12 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
           <CommandItem onSelect={() => go("/suppliers")}><Building2 /> {t("nav.suppliers")}</CommandItem>
         </CommandGroup>
         <CommandSeparator />
-        <CommandGroup heading="Accounting">
+        <CommandGroup heading={t("common.accounting")}>
           <CommandItem onSelect={() => go("/finance")}><Wallet /> {t("nav.finance")}</CommandItem>
           <CommandItem onSelect={() => go("/reports")}><BarChart3 /> {t("nav.reports")}</CommandItem>
         </CommandGroup>
         <CommandSeparator />
-        <CommandGroup heading="Admin">
+        <CommandGroup heading={t("common.admin")}>
           <CommandItem onSelect={() => go("/users")}><ShieldCheck /> {t("nav.users")}</CommandItem>
           <CommandItem onSelect={() => go("/audit")}><History /> {t("nav.audit")}</CommandItem>
           <CommandItem onSelect={() => go("/notifications")}><Bell /> {t("nav.notifications")}</CommandItem>
