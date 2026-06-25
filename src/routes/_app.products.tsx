@@ -20,7 +20,7 @@ type ProductRow = {
 };
 
 function ProductsPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const qc = useQueryClient();
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<ProductRow | null>(null);
@@ -65,7 +65,7 @@ function ProductsPage() {
       const { error } = await supabase.from("products").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("Product deleted"); qc.invalidateQueries({ queryKey: ["products"] }); },
+    onSuccess: () => { toast.success(t("products.deleted")); qc.invalidateQueries({ queryKey: ["products"] }); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -73,7 +73,7 @@ function ProductsPage() {
     <>
       <PageHeader
         title={t("products.title")}
-        subtitle="Catalog, pricing, barcodes and stock thresholds."
+        subtitle={t("products.subtitle")}
         actions={
           <button
             onClick={() => { setEditing(null); setOpen(true); }}
@@ -92,23 +92,23 @@ function ProductsPage() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
-              placeholder="Search products, SKU, barcode..."
+                placeholder={t("products.search")}
             />
           </div>
-          <span className="text-[11px] text-muted-foreground tabular-nums">{filtered.length} items</span>
+          <span className="text-[11px] text-muted-foreground tabular-nums">{filtered.length} {lang === "ar" ? "عنصر" : "items"}</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-                <th className="px-4 py-2.5 text-start font-medium">Product</th>
+                <th className="px-4 py-2.5 text-start font-medium">{t("products.product")}</th>
                 <th className="px-4 py-2.5 text-start font-medium">SKU</th>
-                <th className="px-4 py-2.5 text-start font-medium">Category</th>
-                <th className="px-4 py-2.5 text-end font-medium">Cost</th>
-                <th className="px-4 py-2.5 text-end font-medium">Price</th>
-                <th className="px-4 py-2.5 text-end font-medium">Min</th>
-                <th className="px-4 py-2.5 text-end font-medium">Status</th>
-                <th className="px-4 py-2.5 text-end font-medium">Actions</th>
+                <th className="px-4 py-2.5 text-start font-medium">{t("products.category")}</th>
+                <th className="px-4 py-2.5 text-end font-medium">{t("common.cost")}</th>
+                <th className="px-4 py-2.5 text-end font-medium">{t("common.price")}</th>
+                <th className="px-4 py-2.5 text-end font-medium">{t("products.min")}</th>
+                <th className="px-4 py-2.5 text-end font-medium">{t("common.status")}</th>
+                <th className="px-4 py-2.5 text-end font-medium">{t("common.actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -122,8 +122,8 @@ function ProductsPage() {
                   <div className="mx-auto grid h-10 w-10 place-items-center rounded-md bg-surface border border-border">
                     <Package className="h-5 w-5 text-muted-foreground" />
                   </div>
-                  <p className="mt-3 text-sm text-foreground">No products yet</p>
-                  <p className="text-xs text-muted-foreground">Add your first product to start tracking inventory.</p>
+                  <p className="mt-3 text-sm text-foreground">{t("products.no_products")}</p>
+                  <p className="text-xs text-muted-foreground">{t("products.empty_hint")}</p>
                 </td></tr>
               )}
               {filtered.map((p) => (
@@ -139,7 +139,7 @@ function ProductsPage() {
                   <td className="px-4 py-2.5 text-end font-mono text-muted-foreground">{Number(p.min_stock)}</td>
                   <td className="px-4 py-2.5 text-end">
                     <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${p.is_active ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}`}>
-                      {p.is_active ? "Active" : "Inactive"}
+                      {p.is_active ? t("common.active") : t("common.inactive")}
                     </span>
                   </td>
                   <td className="px-4 py-2.5 text-end">
@@ -147,12 +147,12 @@ function ProductsPage() {
                       <button
                         onClick={() => { setEditing(p); setOpen(true); }}
                         className="grid h-7 w-7 place-items-center rounded-md border border-border bg-surface text-muted-foreground hover:text-foreground transition"
-                        title="Edit"
+                        title={t("common.edit")}
                       ><Pencil className="h-3.5 w-3.5" /></button>
                       <button
-                        onClick={() => { if (confirm(`Delete "${p.name}"?`)) remove.mutate(p.id); }}
+                        onClick={() => { if (confirm(`${t("common.delete")} "${p.name}"?`)) remove.mutate(p.id); }}
                         className="grid h-7 w-7 place-items-center rounded-md border border-border bg-surface text-muted-foreground hover:text-destructive transition"
-                        title="Delete"
+                        title={t("common.delete")}
                       ><Trash2 className="h-3.5 w-3.5" /></button>
                     </div>
                   </td>
@@ -183,6 +183,7 @@ function ProductDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { t } = useI18n();
   const [form, setForm] = useState({
     name: initial?.name ?? "",
     name_ar: initial?.name_ar ?? "",
@@ -201,7 +202,7 @@ function ProductDialog({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.name.trim()) { toast.error("Name is required"); return; }
+    if (!form.name.trim()) { toast.error(t("products.name_required")); return; }
     setSaving(true);
     const payload = {
       name: form.name.trim(),
@@ -222,7 +223,7 @@ function ProductDialog({
       : await supabase.from("products").insert(payload);
     setSaving(false);
     if (error) { toast.error(error.message); return; }
-    toast.success(initial ? "Product updated" : "Product created");
+    toast.success(initial ? t("products.updated") : t("products.created"));
     onSaved();
   }
 
@@ -234,22 +235,22 @@ function ProductDialog({
         className="panel-elevated w-full max-w-2xl overflow-hidden"
       >
         <div className="flex items-center justify-between border-b border-border px-5 py-3">
-          <h2 className="text-sm font-semibold text-foreground">{initial ? "Edit product" : "New product"}</h2>
+          <h2 className="text-sm font-semibold text-foreground">{initial ? t("products.edit_product") : t("products.new_product")}</h2>
           <button type="button" onClick={onClose} className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-accent">
             <X className="h-4 w-4" />
           </button>
         </div>
 
         <div className="grid grid-cols-1 gap-3 p-5 sm:grid-cols-2 max-h-[70vh] overflow-y-auto">
-          <Field label="Name (English) *" className="sm:col-span-2">
+          <Field label={langLabel(t("common.name"), "English", true)} className="sm:col-span-2">
             <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} required />
           </Field>
-          <Field label="Name (Arabic)" className="sm:col-span-2">
+          <Field label={langLabel(t("common.name"), "Arabic")} className="sm:col-span-2">
             <input value={form.name_ar} onChange={(e) => setForm({ ...form, name_ar: e.target.value })} className={inputCls} dir="rtl" />
           </Field>
           <Field label="SKU"><input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className={inputCls} /></Field>
           <Field label="Barcode"><input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} className={inputCls} /></Field>
-          <Field label="Category">
+          <Field label={t("products.category")}>
             <select value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })} className={inputCls}>
               <option value="">—</option>
               {meta.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -267,29 +268,33 @@ function ProductDialog({
               {meta.units.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.short_name})</option>)}
             </select>
           </Field>
-          <Field label="Min stock"><input type="number" step="0.01" value={form.min_stock} onChange={(e) => setForm({ ...form, min_stock: e.target.value })} className={inputCls} /></Field>
-          <Field label="Cost price"><input type="number" step="0.01" value={form.cost_price} onChange={(e) => setForm({ ...form, cost_price: e.target.value })} className={inputCls} /></Field>
-          <Field label="Sale price"><input type="number" step="0.01" value={form.sale_price} onChange={(e) => setForm({ ...form, sale_price: e.target.value })} className={inputCls} /></Field>
-          <Field label="Tax rate (%)"><input type="number" step="0.01" value={form.tax_rate} onChange={(e) => setForm({ ...form, tax_rate: e.target.value })} className={inputCls} /></Field>
-          <Field label="Status">
+          <Field label={t("products.min")}><input type="number" step="0.01" value={form.min_stock} onChange={(e) => setForm({ ...form, min_stock: e.target.value })} className={inputCls} /></Field>
+          <Field label={t("common.cost")}><input type="number" step="0.01" value={form.cost_price} onChange={(e) => setForm({ ...form, cost_price: e.target.value })} className={inputCls} /></Field>
+          <Field label={t("common.price")}><input type="number" step="0.01" value={form.sale_price} onChange={(e) => setForm({ ...form, sale_price: e.target.value })} className={inputCls} /></Field>
+          <Field label={langLabel("Tax rate", "%")}><input type="number" step="0.01" value={form.tax_rate} onChange={(e) => setForm({ ...form, tax_rate: e.target.value })} className={inputCls} /></Field>
+          <Field label={t("common.status")}>
             <label className="flex h-9 items-center gap-2 rounded-md border border-border bg-surface px-3 text-sm">
               <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} />
-              <span className="text-muted-foreground">Active</span>
+              <span className="text-muted-foreground">{t("common.active")}</span>
             </label>
           </Field>
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-border bg-surface/40 px-5 py-3">
           <button type="button" onClick={onClose} className="flex h-9 items-center rounded-md border border-border bg-surface px-3 text-xs font-medium text-muted-foreground hover:text-foreground transition">
-            Cancel
+            {t("common.cancel")}
           </button>
           <button type="submit" disabled={saving} className="flex h-9 items-center rounded-md bg-primary px-4 text-xs font-medium text-primary-foreground hover:opacity-90 transition disabled:opacity-50">
-            {saving ? "Saving..." : initial ? "Save changes" : "Create product"}
+            {saving ? t("common.saving") : initial ? t("common.save") : t("products.new_product")}
           </button>
         </div>
       </form>
     </div>
   );
+}
+
+function langLabel(label: string, suffix: string, required = false) {
+  return `${label} (${suffix})${required ? " *" : ""}`;
 }
 
 const inputCls = "h-9 w-full rounded-md border border-border bg-surface px-3 text-sm text-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition";
