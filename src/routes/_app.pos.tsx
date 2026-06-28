@@ -44,7 +44,7 @@ function POSPage() {
   const [cart, setCart] = useState<CartLine[]>([]);
   const [paid, setPaid] = useState<string>("");
   const [discount, setDiscount] = useState<string>("");
-  const [paymentMethod, setPaymentMethod] = useState<"cash"|"card"|"bank"|"credit">("cash");
+  const [paymentMethod, setPaymentMethod] = useState<"cash"|"card"|"bank_transfer"|"credit">("cash");
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
   const [lastInvoice, setLastInvoice] = useState<{ id: string; number: string } | null>(null);
@@ -88,11 +88,11 @@ function POSPage() {
       const idx = prev.findIndex(l => l.product_id === p.id);
       if (idx >= 0) {
         const next = [...prev];
-        if (next[idx].quantity + 1 > stock) { toast.error(`Max stock: ${stock}`); return prev; }
+        if (next[idx].quantity + 1 > stock) { toast.error(`${t("pos.max_stock")}: ${stock}`); return prev; }
         next[idx] = { ...next[idx], quantity: next[idx].quantity + 1 };
         return next;
       }
-      if (stock < 1) { toast.error("Out of stock"); return prev; }
+      if (stock < 1) { toast.error(t("pos.out_of_stock")); return prev; }
       return [...prev, {
         product_id: p.id,
         name: lang === "ar" && p.name_ar ? p.name_ar : p.name,
@@ -106,7 +106,7 @@ function POSPage() {
   function setQty(pid: string, qty: number) {
     const stock = stockMap[pid] ?? 0;
     if (qty < 1) return setCart(c => c.filter(l => l.product_id !== pid));
-    if (qty > stock) { toast.error(`Max stock: ${stock}`); return; }
+    if (qty > stock) { toast.error(`${t("pos.max_stock")}: ${stock}`); return; }
     setCart(c => c.map(l => l.product_id === pid ? { ...l, quantity: qty } : l));
   }
 
@@ -127,8 +127,8 @@ function POSPage() {
   const change = Math.max(0, paidN - total);
 
   async function checkout() {
-    if (!warehouseId) return toast.error("Select a warehouse");
-    if (cart.length === 0) return toast.error("Cart is empty");
+    if (!warehouseId) return toast.error(t("pos.select_warehouse"));
+    if (cart.length === 0) return toast.error(t("pos.cart_empty"));
     setLoading(true);
     try {
       const { data, error } = await supabase.rpc("create_sale", {
@@ -149,12 +149,12 @@ function POSPage() {
       const invoiceId = data as string;
       const { data: inv } = await supabase.from("sales_invoices").select("invoice_number").eq("id", invoiceId).maybeSingle();
       setLastInvoice({ id: invoiceId, number: inv?.invoice_number ?? "" });
-      toast.success(`Sale complete — ${inv?.invoice_number ?? ""}`);
+      toast.success(`${t("pos.sale_complete")} — ${inv?.invoice_number ?? ""}`);
       setCart([]); setPaid(""); setDiscount(""); setNote("");
       await loadStock(warehouseId);
       searchRef.current?.focus();
     } catch (err: any) {
-      toast.error(err.message ?? "Checkout failed");
+      toast.error(err.message ?? t("pos.checkout_failed"));
     } finally { setLoading(false); }
   }
 
@@ -162,7 +162,7 @@ function POSPage() {
     <>
       <PageHeader
         title={t("pos.title")}
-        subtitle="Scan, click, checkout. Stock auto-decrements on each sale."
+        subtitle={t("pos.subtitle")}
         actions={
           <div className="flex items-center gap-2">
             <select value={warehouseId} onChange={e => setWarehouseId(e.target.value)} className="h-9 rounded-md border border-input bg-surface px-2 text-sm">
@@ -182,7 +182,7 @@ function POSPage() {
               value={search}
               onChange={e => setSearch(e.target.value)}
               onKeyDown={handleScan}
-              placeholder="Search or scan barcode..."
+              placeholder={t("pos.search_or_scan")}
               className="h-10 w-full rounded-md border border-input bg-surface pl-9 pr-3 text-sm rtl:pl-3 rtl:pr-9 focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
               autoFocus
             />
@@ -211,7 +211,7 @@ function POSPage() {
             {filtered.length === 0 && (
               <div className="col-span-full grid place-items-center py-12 text-sm text-muted-foreground">
                 <ScanBarcode className="mb-2 h-8 w-8 opacity-50" />
-                No products match
+                {t("pos.no_products")}
               </div>
             )}
           </div>
@@ -220,24 +220,24 @@ function POSPage() {
         {/* Cart */}
         <div className="panel-elevated flex flex-col p-4">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold">Cart ({cart.length})</h2>
+            <h2 className="text-sm font-semibold">{t("pos.cart")} ({cart.length})</h2>
             {cart.length > 0 && (
               <button onClick={() => setCart([])} className="text-xs text-muted-foreground hover:text-destructive">
-                Clear
+                {t("pos.clear")}
               </button>
             )}
           </div>
 
           <div className="mb-3">
             <select value={customerId} onChange={e => setCustomerId(e.target.value)} className="h-9 w-full rounded-md border border-input bg-surface px-2 text-sm">
-              <option value="">Walk-in customer</option>
+              <option value="">{t("pos.walkin")}</option>
               {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
 
           <div className="flex-1 space-y-2 overflow-y-auto max-h-[40vh]">
             {cart.length === 0 ? (
-              <div className="grid place-items-center py-10 text-sm text-muted-foreground">Empty</div>
+              <div className="grid place-items-center py-10 text-sm text-muted-foreground">{t("pos.empty_cart")}</div>
             ) : cart.map(l => (
               <div key={l.product_id} className="rounded-md border border-border bg-surface p-2">
                 <div className="flex items-start justify-between gap-2">
@@ -267,25 +267,27 @@ function POSPage() {
           </div>
 
           <div className="mt-4 space-y-2 border-t border-border pt-3 text-sm">
-            <Row label="Subtotal" value={money(subtotal)} />
-            <Row label="Tax" value={money(taxTotal)} />
+            <Row label={t("pos.subtotal")} value={money(subtotal)} />
+            <Row label={t("pos.tax")} value={money(taxTotal)} />
             <div className="flex items-center justify-between gap-2">
-              <span className="text-muted-foreground">Discount</span>
+              <span className="text-muted-foreground">{t("pos.discount")}</span>
               <input type="number" value={discount} onChange={e => setDiscount(e.target.value)} placeholder="0" className="h-7 w-24 rounded border border-border bg-surface px-2 text-end text-xs" />
             </div>
-            <Row label="Total" value={money(total)} bold />
+            <Row label={t("pos.total")} value={money(total)} bold />
           </div>
 
           <div className="mt-3 grid grid-cols-4 gap-1">
-            {(["cash","card","bank","credit"] as const).map(m => (
-              <button key={m} onClick={() => setPaymentMethod(m)} className={`h-8 rounded-md border text-xs capitalize transition ${paymentMethod === m ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-surface-2"}`}>{m}</button>
+            {(["cash","card","bank_transfer","credit"] as const).map(m => (
+              <button key={m} onClick={() => setPaymentMethod(m)} className={`h-8 rounded-md border text-xs transition ${paymentMethod === m ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-surface-2"}`}>
+                {m === "bank_transfer" ? t("pos.pm.bank") : t(`pos.pm.${m}`)}
+              </button>
             ))}
           </div>
 
           {paymentMethod !== "credit" && (
             <div className="mt-2 flex items-center gap-2">
-              <input type="number" value={paid} onChange={e => setPaid(e.target.value)} placeholder={`Paid (default ${total.toFixed(2)})`} className="h-9 flex-1 rounded-md border border-input bg-surface px-2 text-sm" />
-              {paidN > 0 && change > 0 && <span className="text-xs text-muted-foreground">Change: {money(change)}</span>}
+              <input type="number" value={paid} onChange={e => setPaid(e.target.value)} placeholder={`${t("pos.paid")} (${total.toFixed(2)})`} className="h-9 flex-1 rounded-md border border-input bg-surface px-2 text-sm" />
+              {paidN > 0 && change > 0 && <span className="text-xs text-muted-foreground">{t("pos.change")}: {money(change)}</span>}
             </div>
           )}
 
@@ -295,7 +297,7 @@ function POSPage() {
             className="mt-3 flex h-11 items-center justify-center gap-2 rounded-md bg-primary text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
           >
             {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-            Checkout · {money(total)}
+            {t("pos.checkout")} · {money(total)}
           </button>
         </div>
       </div>
@@ -304,16 +306,16 @@ function POSPage() {
         <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur-sm p-4">
           <div className="panel-elevated w-full max-w-sm p-6">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Sale completed</h3>
+              <h3 className="text-lg font-semibold">{t("pos.sale_complete")}</h3>
               <button onClick={() => setLastInvoice(null)} className="rounded p-1 hover:bg-surface-2"><X className="h-4 w-4" /></button>
             </div>
-            <p className="text-sm text-muted-foreground">Invoice number</p>
+            <p className="text-sm text-muted-foreground">{t("pos.invoice_number")}</p>
             <p className="mb-4 font-mono text-lg">{lastInvoice.number}</p>
             <div className="flex gap-2">
               <button onClick={() => window.print()} className="flex h-9 flex-1 items-center justify-center gap-2 rounded-md border border-border text-sm hover:bg-surface-2">
-                <Printer className="h-4 w-4" /> Print
+                <Printer className="h-4 w-4" /> {t("common.print")}
               </button>
-              <button onClick={() => setLastInvoice(null)} className="h-9 flex-1 rounded-md bg-primary text-sm font-medium text-primary-foreground hover:opacity-90">New sale</button>
+              <button onClick={() => setLastInvoice(null)} className="h-9 flex-1 rounded-md bg-primary text-sm font-medium text-primary-foreground hover:opacity-90">{t("pos.new_sale")}</button>
             </div>
           </div>
         </div>
