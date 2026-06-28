@@ -95,14 +95,14 @@ function ProductsPage() {
                 placeholder={t("products.search")}
             />
           </div>
-          <span className="text-[11px] text-muted-foreground tabular-nums">{filtered.length} {lang === "ar" ? "عنصر" : "items"}</span>
+          <span className="text-[11px] text-muted-foreground tabular-nums">{filtered.length} {t("products.items")}</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
                 <th className="px-4 py-2.5 text-start font-medium">{t("products.product")}</th>
-                <th className="px-4 py-2.5 text-start font-medium">SKU</th>
+                <th className="px-4 py-2.5 text-start font-medium">{t("products.sku")}</th>
                 <th className="px-4 py-2.5 text-start font-medium">{t("products.category")}</th>
                 <th className="px-4 py-2.5 text-end font-medium">{t("common.cost")}</th>
                 <th className="px-4 py-2.5 text-end font-medium">{t("common.price")}</th>
@@ -242,27 +242,27 @@ function ProductDialog({
         </div>
 
         <div className="grid grid-cols-1 gap-3 p-5 sm:grid-cols-2 max-h-[70vh] overflow-y-auto">
-          <Field label={langLabel(t("common.name"), "English", true)} className="sm:col-span-2">
+          <Field label={`${t("products.name_en")} *`} className="sm:col-span-2">
             <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} required />
           </Field>
-          <Field label={langLabel(t("common.name"), "Arabic")} className="sm:col-span-2">
+          <Field label={t("products.name_ar")} className="sm:col-span-2">
             <input value={form.name_ar} onChange={(e) => setForm({ ...form, name_ar: e.target.value })} className={inputCls} dir="rtl" />
           </Field>
-          <Field label="SKU"><input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className={inputCls} /></Field>
-          <Field label="Barcode"><input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} className={inputCls} /></Field>
+          <Field label={t("products.sku")}><input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className={inputCls} /></Field>
+          <Field label={t("products.barcode")}><input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} className={inputCls} /></Field>
           <Field label={t("products.category")}>
             <select value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })} className={inputCls}>
               <option value="">—</option>
               {meta.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </Field>
-          <Field label="Brand">
+          <Field label={t("products.brand")}>
             <select value={form.brand_id} onChange={(e) => setForm({ ...form, brand_id: e.target.value })} className={inputCls}>
               <option value="">—</option>
               {meta.brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
           </Field>
-          <Field label="Unit">
+          <Field label={t("products.unit")}>
             <select value={form.unit_id} onChange={(e) => setForm({ ...form, unit_id: e.target.value })} className={inputCls}>
               <option value="">—</option>
               {meta.units.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.short_name})</option>)}
@@ -271,7 +271,7 @@ function ProductDialog({
           <Field label={t("products.min")}><input type="number" step="0.01" value={form.min_stock} onChange={(e) => setForm({ ...form, min_stock: e.target.value })} className={inputCls} /></Field>
           <Field label={t("common.cost")}><input type="number" step="0.01" value={form.cost_price} onChange={(e) => setForm({ ...form, cost_price: e.target.value })} className={inputCls} /></Field>
           <Field label={t("common.price")}><input type="number" step="0.01" value={form.sale_price} onChange={(e) => setForm({ ...form, sale_price: e.target.value })} className={inputCls} /></Field>
-          <Field label={langLabel("Tax rate", "%")}><input type="number" step="0.01" value={form.tax_rate} onChange={(e) => setForm({ ...form, tax_rate: e.target.value })} className={inputCls} /></Field>
+          <Field label={t("products.tax_rate")}><input type="number" step="0.01" value={form.tax_rate} onChange={(e) => setForm({ ...form, tax_rate: e.target.value })} className={inputCls} /></Field>
           <Field label={t("common.status")}>
             <label className="flex h-9 items-center gap-2 rounded-md border border-border bg-surface px-3 text-sm">
               <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} />
