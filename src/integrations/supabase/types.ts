@@ -978,6 +978,8 @@ export type Database = {
           product_id: string
           quantity: number
           reference: string | null
+          reference_id: string | null
+          reference_type: string | null
           unit_cost: number | null
           warehouse_id: string
         }
@@ -990,6 +992,8 @@ export type Database = {
           product_id: string
           quantity: number
           reference?: string | null
+          reference_id?: string | null
+          reference_type?: string | null
           unit_cost?: number | null
           warehouse_id: string
         }
@@ -1002,6 +1006,8 @@ export type Database = {
           product_id?: string
           quantity?: number
           reference?: string | null
+          reference_id?: string | null
+          reference_type?: string | null
           unit_cost?: number | null
           warehouse_id?: string
         }
