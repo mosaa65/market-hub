@@ -150,7 +150,13 @@ function StatCard({
           <Icon className="h-4 w-4" />
         </div>
       </div>
-function StatCardInner() { return null; }
+      <div className="mt-3 flex items-center gap-1 text-xs">
+        {up ? <ArrowUpRight className="h-3.5 w-3.5 text-success" /> : <ArrowDownRight className="h-3.5 w-3.5 text-destructive" />}
+        <span className={up ? "text-success" : "text-destructive"}>{delta}</span>
+        <span className="text-muted-foreground">{useI18n().t("dash.vs_last_period")}</span>
+      </div>
+    </div>
+  );
+}
 
-function StatCardOuter() { return null; }
 
