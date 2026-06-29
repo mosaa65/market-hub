@@ -133,6 +133,7 @@ function StatCard({
   label: string; value: string; delta: string; up: boolean;
   icon: typeof DollarSign; accent: "primary" | "chart-2" | "chart-3" | "warning";
 }) {
+  const { t } = useI18n();
   const colorMap: Record<string, string> = {
     primary: "text-primary bg-primary/10",
     "chart-2": "text-chart-2 bg-chart-2/10",
@@ -153,10 +154,11 @@ function StatCard({
       <div className="mt-3 flex items-center gap-1 text-xs">
         {up ? <ArrowUpRight className="h-3.5 w-3.5 text-success" /> : <ArrowDownRight className="h-3.5 w-3.5 text-destructive" />}
         <span className={up ? "text-success" : "text-destructive"}>{delta}</span>
-        <span className="text-muted-foreground">{useI18n().t("dash.vs_last_period")}</span>
+        <span className="text-muted-foreground">{t("dash.vs_last_period")}</span>
       </div>
     </div>
   );
 }
+
 
 
