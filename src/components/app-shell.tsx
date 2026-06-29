@@ -165,7 +165,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <button
               onClick={() => setLang(lang === "en" ? "ar" : "en")}
               className="flex h-9 items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-              title="Language"
+              title={t("common.language")}
             >
               <Languages className="h-3.5 w-3.5" />
               {lang === "en" ? "EN" : "ع"}
@@ -173,18 +173,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <button
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
               className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-surface text-muted-foreground hover:text-foreground transition-colors"
-              title="Theme"
+              title={t("common.theme")}
             >
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
             <button
               className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-surface text-muted-foreground hover:text-foreground transition-colors relative"
-              title="Notifications"
+              title={t("nav.notifications")}
               onClick={() => navigate({ to: "/notifications" })}
             >
               <Bell className="h-4 w-4" />
               <span className="absolute top-1.5 end-1.5 h-1.5 w-1.5 rounded-full bg-primary" />
             </button>
+
           </div>
         </header>
 

@@ -50,14 +50,15 @@ function AuthPage() {
           },
         });
         if (error) throw error;
-        toast.success("Account created. You're signed in.");
+        toast.success(t("auth.account_created"));
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       }
     } catch (err: any) {
-      toast.error(err.message ?? "Authentication failed");
+      toast.error(err.message ?? t("auth.failed"));
     } finally {
+
       setLoading(false);
     }
   }
@@ -92,7 +93,7 @@ function AuthPage() {
                   value={fullName} onChange={(e) => setFullName(e.target.value)}
                   type="text" autoComplete="name" required
                   className="h-10 w-full rounded-md border border-input bg-surface px-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
-                  placeholder="Sara Ali"
+                  placeholder={t("auth.name_placeholder")}
                 />
               </div>
             )}
@@ -102,7 +103,7 @@ function AuthPage() {
                 value={email} onChange={(e) => setEmail(e.target.value)}
                 type="email" autoComplete="email" required
                 className="h-10 w-full rounded-md border border-input bg-surface px-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
-                placeholder="you@company.com"
+                placeholder={t("auth.email_placeholder")}
               />
             </div>
             <div>
