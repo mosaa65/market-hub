@@ -66,6 +66,20 @@ function SalesPage() {
     (r.customers?.name ?? "").toLowerCase().includes(search.toLowerCase())
   );
 
+  const pmLabel = (m: string) => {
+    const map: Record<string, string> = {
+      cash: t("pos.pm.cash"), card: t("pos.pm.card"),
+      bank_transfer: t("pos.pm.bank"), bank: t("pos.pm.bank"), credit: t("pos.pm.credit"),
+    };
+    return map[m] ?? m;
+  };
+  const statusLabel = (s: string) => {
+    const map: Record<string, string> = {
+      paid: t("sales.status.paid"), partial: t("sales.status.partial"),
+      unpaid: t("sales.status.unpaid"), cancelled: t("sales.status.cancelled"),
+    };
+    return map[s] ?? s;
+  };
   const statusColor = (s: string) =>
     s === "paid" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
     s === "partial" ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
@@ -74,13 +88,13 @@ function SalesPage() {
 
   return (
     <>
-      <PageHeader title={t("sales.title")} subtitle="All sales invoices from POS and direct sales." />
+      <PageHeader title={t("sales.title")} subtitle={t("sales.subtitle")} />
       <div className="panel-elevated p-4">
         <div className="relative mb-4">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground rtl:left-auto rtl:right-3" />
           <input
             value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search invoice # or customer..."
+            placeholder={t("sales.search")}
             className="h-10 w-full rounded-md border border-input bg-surface pl-9 pr-3 text-sm rtl:pl-3 rtl:pr-9 focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
           />
         </div>
@@ -89,33 +103,33 @@ function SalesPage() {
           <table className="w-full text-sm">
             <thead className="text-xs uppercase tracking-wide text-muted-foreground">
               <tr className="border-b border-border">
-                <th className="px-3 py-2 text-start font-medium">Invoice</th>
-                <th className="px-3 py-2 text-start font-medium">Date</th>
-                <th className="px-3 py-2 text-start font-medium">Customer</th>
-                <th className="px-3 py-2 text-start font-medium">Warehouse</th>
-                <th className="px-3 py-2 text-start font-medium">Payment</th>
-                <th className="px-3 py-2 text-start font-medium">Status</th>
-                <th className="px-3 py-2 text-end font-medium">Total</th>
+                <th className="px-3 py-2 text-start font-medium">{t("sales.invoice")}</th>
+                <th className="px-3 py-2 text-start font-medium">{t("common.date")}</th>
+                <th className="px-3 py-2 text-start font-medium">{t("common.customer")}</th>
+                <th className="px-3 py-2 text-start font-medium">{t("common.warehouse")}</th>
+                <th className="px-3 py-2 text-start font-medium">{t("sales.payment")}</th>
+                <th className="px-3 py-2 text-start font-medium">{t("common.status")}</th>
+                <th className="px-3 py-2 text-end font-medium">{t("common.total")}</th>
                 <th className="px-3 py-2"></th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={8} className="py-10 text-center text-muted-foreground">Loading…</td></tr>
+                <tr><td colSpan={8} className="py-10 text-center text-muted-foreground">{t("common.loading")}</td></tr>
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={8} className="py-12 text-center text-muted-foreground">
                   <Receipt className="mx-auto mb-2 h-8 w-8 opacity-50" />
-                  No sales yet
+                  {t("sales.no_sales")}
                 </td></tr>
               ) : filtered.map(r => (
                 <tr key={r.id} className="border-b border-border/50 hover:bg-surface-2/50">
                   <td className="px-3 py-2.5 font-mono text-xs">{r.invoice_number}</td>
                   <td className="px-3 py-2.5 text-muted-foreground">{new Date(r.created_at).toLocaleString()}</td>
-                  <td className="px-3 py-2.5">{r.customers?.name ?? "Walk-in"}</td>
+                  <td className="px-3 py-2.5">{r.customers?.name ?? t("pos.walkin")}</td>
                   <td className="px-3 py-2.5 text-muted-foreground">{r.warehouses?.name ?? "—"}</td>
-                  <td className="px-3 py-2.5 capitalize text-muted-foreground">{r.payment_method}</td>
+                  <td className="px-3 py-2.5 text-muted-foreground">{pmLabel(r.payment_method)}</td>
                   <td className="px-3 py-2.5">
-                    <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] capitalize ${statusColor(r.status)}`}>{r.status}</span>
+                    <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] ${statusColor(r.status)}`}>{statusLabel(r.status)}</span>
                   </td>
                   <td className="px-3 py-2.5 text-end font-semibold">{money(Number(r.total))}</td>
                   <td className="px-3 py-2.5 text-end">
@@ -141,15 +155,20 @@ function SalesPage() {
               <button onClick={() => setSelected(null)} className="rounded p-1 hover:bg-surface-2"><X className="h-4 w-4" /></button>
             </div>
             <div className="mb-4 grid grid-cols-2 gap-3 text-sm">
-              <Field label="Customer" value={selected.customers?.name ?? "Walk-in"} />
-              <Field label="Warehouse" value={selected.warehouses?.name ?? "—"} />
-              <Field label="Payment" value={selected.payment_method} />
-              <Field label="Status" value={selected.status} />
+              <Field label={t("common.customer")} value={selected.customers?.name ?? t("pos.walkin")} />
+              <Field label={t("common.warehouse")} value={selected.warehouses?.name ?? "—"} />
+              <Field label={t("sales.payment")} value={pmLabel(selected.payment_method)} />
+              <Field label={t("common.status")} value={statusLabel(selected.status)} />
             </div>
             <div className="overflow-hidden rounded-md border border-border">
               <table className="w-full text-sm">
                 <thead className="bg-surface text-xs text-muted-foreground">
-                  <tr><th className="px-3 py-2 text-start">Product</th><th className="px-3 py-2 text-end">Qty</th><th className="px-3 py-2 text-end">Price</th><th className="px-3 py-2 text-end">Total</th></tr>
+                  <tr>
+                    <th className="px-3 py-2 text-start">{t("common.product")}</th>
+                    <th className="px-3 py-2 text-end">{t("common.qty")}</th>
+                    <th className="px-3 py-2 text-end">{t("common.price")}</th>
+                    <th className="px-3 py-2 text-end">{t("common.total")}</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {lines.map(l => (
@@ -164,25 +183,25 @@ function SalesPage() {
               </table>
             </div>
             <div className="mt-4 space-y-1 text-sm">
-              <Row label="Subtotal" value={money(Number(selected.subtotal))} />
-              <Row label="Tax" value={money(Number(selected.tax))} />
-              <Row label="Discount" value={money(Number(selected.discount))} />
-              <Row label="Total" value={money(Number(selected.total))} bold />
-              <Row label="Paid" value={money(Number(selected.paid))} />
+              <Row label={t("common.subtotal")} value={money(Number(selected.subtotal))} />
+              <Row label={t("common.tax")} value={money(Number(selected.tax))} />
+              <Row label={t("common.discount")} value={money(Number(selected.discount))} />
+              <Row label={t("common.total")} value={money(Number(selected.total))} bold />
+              <Row label={t("common.paid")} value={money(Number(selected.paid))} />
             </div>
             <div className="mt-4 flex justify-end gap-2">
               <button
                 onClick={async () => {
                   const { data: cs } = await supabase.from("company_settings").select("*").limit(1).maybeSingle();
                   generateInvoicePDF({
-                    title: "Sales Invoice",
+                    title: t("sales.invoice_doc"),
                     number: selected.invoice_number,
                     date: new Date(selected.created_at).toLocaleString(),
-                    partyLabel: "Bill To",
-                    partyName: selected.customers?.name ?? "Walk-in",
+                    partyLabel: t("sales.bill_to"),
+                    partyName: selected.customers?.name ?? t("pos.walkin"),
                     warehouse: selected.warehouses?.name ?? undefined,
-                    payment: selected.payment_method,
-                    status: selected.status,
+                    payment: pmLabel(selected.payment_method),
+                    status: statusLabel(selected.status),
                     lines: lines.map(l => ({ product: l.products?.name ?? "—", qty: Number(l.quantity), price: Number(l.unit_price), total: Number(l.total) })),
                     subtotal: Number(selected.subtotal), tax: Number(selected.tax), discount: Number(selected.discount),
                     total: Number(selected.total), paid: Number(selected.paid),
@@ -194,8 +213,8 @@ function SalesPage() {
               >
                 <FileDown className="h-4 w-4" /> PDF
               </button>
-              <button onClick={() => window.print()} className="h-9 rounded-md border border-border px-4 text-sm hover:bg-surface-2">Print</button>
-              <button onClick={() => setSelected(null)} className="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90">Close</button>
+              <button onClick={() => window.print()} className="h-9 rounded-md border border-border px-4 text-sm hover:bg-surface-2">{t("common.print")}</button>
+              <button onClick={() => setSelected(null)} className="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90">{t("common.close")}</button>
             </div>
           </div>
         </div>
@@ -208,7 +227,7 @@ function Field({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="capitalize">{value}</p>
+      <p>{value}</p>
     </div>
   );
 }

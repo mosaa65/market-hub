@@ -68,8 +68,8 @@ function DashboardPage() {
         <div className="panel-elevated lg:col-span-2 p-5">
           <div className="mb-4 flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-semibold text-foreground">Revenue trend</h3>
-              <p className="text-xs text-muted-foreground">Last 14 days</p>
+              <h3 className="text-sm font-semibold text-foreground">{t("dash.revenue_trend")}</h3>
+              <p className="text-xs text-muted-foreground">{t("dash.last_14_days")}</p>
             </div>
             <span className="rounded-md border border-border bg-surface px-2 py-0.5 text-[10px] text-muted-foreground">DEMO</span>
           </div>
@@ -99,7 +99,7 @@ function DashboardPage() {
 
         <div className="panel-elevated p-5">
           <h3 className="text-sm font-semibold text-foreground">{t("dash.top_products")}</h3>
-          <p className="text-xs text-muted-foreground">Last 30 days</p>
+          <p className="text-xs text-muted-foreground">{t("dash.last_30_days")}</p>
           <div className="mt-4 h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={trend.slice(0, 6)}>
@@ -119,7 +119,7 @@ function DashboardPage() {
         <p className="mt-1 text-xs text-muted-foreground">{t("dash.empty")}</p>
         <div className="mt-6 grid place-items-center py-10 text-sm text-muted-foreground">
           <div className="rounded-md border border-dashed border-border bg-surface px-4 py-3">
-            No invoices yet — start with the POS or create a sales invoice.
+            {t("dash.no_invoices_hint")}
           </div>
         </div>
       </div>
@@ -133,6 +133,7 @@ function StatCard({
   label: string; value: string; delta: string; up: boolean;
   icon: typeof DollarSign; accent: "primary" | "chart-2" | "chart-3" | "warning";
 }) {
+  const { t } = useI18n();
   const colorMap: Record<string, string> = {
     primary: "text-primary bg-primary/10",
     "chart-2": "text-chart-2 bg-chart-2/10",
@@ -153,8 +154,11 @@ function StatCard({
       <div className="mt-3 flex items-center gap-1 text-xs">
         {up ? <ArrowUpRight className="h-3.5 w-3.5 text-success" /> : <ArrowDownRight className="h-3.5 w-3.5 text-destructive" />}
         <span className={up ? "text-success" : "text-destructive"}>{delta}</span>
-        <span className="text-muted-foreground">vs last period</span>
+        <span className="text-muted-foreground">{t("dash.vs_last_period")}</span>
       </div>
     </div>
   );
 }
+
+
+
