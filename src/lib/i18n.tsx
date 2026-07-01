@@ -671,6 +671,17 @@ const ar: Dict = {
   "sales.status.partial": "جزئية",
   "sales.status.unpaid": "غير مدفوعة",
   "sales.status.cancelled": "ملغية",
+  "print.title": "طباعة الفاتورة",
+  "print.subtitle": "اختر القالب المناسب لاحتياجاتك.",
+  "print.thermal": "فاتورة حرارية",
+  "print.thermal_desc": "طابعة مدمجة 80 مم",
+  "print.standard": "فاتورة عادية A4",
+  "print.standard_desc": "تصميم أعمال أنيق",
+  "print.elegant": "فاتورة فاخرة",
+  "print.elegant_desc": "تصميم A4 راقٍ بلمسات ذهبية",
+  "print.download_pdf": "تحميل PDF",
+  "print.thanks": "شكراً لتعاملكم معنا",
+  "print.powered": "Vortex ERP",
 
   // المشتريات
   "purchases.title": "المشتريات",
