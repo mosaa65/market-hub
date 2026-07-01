@@ -231,31 +231,55 @@ function SalesPage() {
               <Row label={t("common.paid")} value={money(Number(selected.paid))} />
             </div>
             <div className="mt-4 flex justify-end gap-2">
-              <button
-                onClick={async () => {
-                  const { data: cs } = await supabase.from("company_settings").select("*").limit(1).maybeSingle();
-                  generateInvoicePDF({
-                    title: t("sales.invoice_doc"),
-                    number: selected.invoice_number,
-                    date: new Date(selected.created_at).toLocaleString(),
-                    partyLabel: t("sales.bill_to"),
-                    partyName: selected.customers?.name ?? t("pos.walkin"),
-                    warehouse: selected.warehouses?.name ?? undefined,
-                    payment: pmLabel(selected.payment_method),
-                    status: statusLabel(selected.status),
-                    lines: lines.map(l => ({ product: l.products?.name ?? "—", qty: Number(l.quantity), price: Number(l.unit_price), total: Number(l.total) })),
-                    subtotal: Number(selected.subtotal), tax: Number(selected.tax), discount: Number(selected.discount),
-                    total: Number(selected.total), paid: Number(selected.paid),
-                    company: cs ? { name: (cs as any).company_name, address: (cs as any).address, phone: (cs as any).phone, vat: (cs as any).vat_number } : undefined,
-                    currency: (cs as any)?.currency ?? "",
-                  });
-                }}
-                className="flex items-center gap-1.5 h-9 rounded-md border border-border px-4 text-sm hover:bg-surface-2"
-              >
-                <FileDown className="h-4 w-4" /> PDF
+              <button onClick={doPDF} className="flex items-center gap-1.5 h-9 rounded-md border border-border px-4 text-sm hover:bg-surface-2">
+                <FileDown className="h-4 w-4" /> {t("print.download_pdf")}
               </button>
-              <button onClick={() => window.print()} className="h-9 rounded-md border border-border px-4 text-sm hover:bg-surface-2">{t("common.print")}</button>
-              <button onClick={() => setSelected(null)} className="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90">{t("common.close")}</button>
+              <button onClick={() => setPrintOpen(true)} className="flex items-center gap-1.5 h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90">
+                <Printer className="h-4 w-4" /> {t("common.print")}
+              </button>
+              <button onClick={() => setSelected(null)} className="h-9 rounded-md border border-border px-4 text-sm hover:bg-surface-2">{t("common.close")}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {printOpen && selected && (
+        <div className="fixed inset-0 z-[60] grid place-items-center bg-background/80 backdrop-blur-sm p-4" onClick={() => setPrintOpen(false)}>
+          <div className="panel-elevated w-full max-w-2xl p-6" onClick={e => e.stopPropagation()}>
+            <div className="mb-5 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold">{t("print.title")}</h3>
+                <p className="text-xs text-muted-foreground">{t("print.subtitle")}</p>
+              </div>
+              <button onClick={() => setPrintOpen(false)} className="rounded p-1 hover:bg-surface-2"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <TemplateCard
+                icon={<ScrollText className="h-6 w-6" />}
+                title={t("print.thermal")}
+                desc={t("print.thermal_desc")}
+                accent="from-amber-500/20 to-orange-500/10 border-amber-500/30"
+                onClick={() => doPrint("thermal")}
+              />
+              <TemplateCard
+                icon={<Printer className="h-6 w-6" />}
+                title={t("print.standard")}
+                desc={t("print.standard_desc")}
+                accent="from-blue-500/20 to-indigo-500/10 border-blue-500/30"
+                onClick={() => doPrint("standard")}
+              />
+              <TemplateCard
+                icon={<Sparkles className="h-6 w-6" />}
+                title={t("print.elegant")}
+                desc={t("print.elegant_desc")}
+                accent="from-yellow-500/20 via-amber-500/10 to-rose-500/10 border-yellow-500/40"
+                onClick={() => doPrint("elegant")}
+              />
+            </div>
+            <div className="mt-5 flex justify-end">
+              <button onClick={doPDF} className="flex items-center gap-1.5 h-9 rounded-md border border-border px-4 text-sm hover:bg-surface-2">
+                <FileDown className="h-4 w-4" /> {t("print.download_pdf")}
+              </button>
             </div>
           </div>
         </div>
