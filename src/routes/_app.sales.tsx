@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Receipt, Search, Eye, X, FileDown } from "lucide-react";
+import { Receipt, Search, Eye, X, FileDown, Printer, Sparkles, ScrollText } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { useI18n } from "@/lib/i18n";
 import { money } from "@/lib/format";
-import { generateInvoicePDF } from "@/lib/pdf";
+import { generateInvoicePDF, type InvoiceDoc } from "@/lib/pdf";
+import { printInvoice, type InvoiceTemplate } from "@/lib/invoice-print";
 
 export const Route = createFileRoute("/_app/sales")({
   head: () => ({ meta: [{ title: "Sales — Vortex ERP" }] }),
