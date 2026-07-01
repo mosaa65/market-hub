@@ -305,7 +305,7 @@ function Row({ label, value, bold }: { label: string; value: string; bold?: bool
   );
 }
 
-function TemplateCard({ icon, title, desc, accent, onClick }: { icon: React.ReactNode; title: string; desc: string; accent: string; onClick: () => void }) {
+function TemplateCard({ icon, title, desc, accent, onClick }: { icon: ReactNode; title: string; desc: string; accent: string; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
