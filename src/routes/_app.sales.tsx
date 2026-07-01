@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { Receipt, Search, Eye, X, FileDown } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import { Receipt, Search, Eye, X, FileDown, Printer, Sparkles, ScrollText } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { useI18n } from "@/lib/i18n";
 import { money } from "@/lib/format";
-import { generateInvoicePDF } from "@/lib/pdf";
+import { generateInvoicePDF, type InvoiceDoc } from "@/lib/pdf";
+import { printInvoice, type InvoiceTemplate } from "@/lib/invoice-print";
 
 export const Route = createFileRoute("/_app/sales")({
   head: () => ({ meta: [{ title: "Sales — Vortex ERP" }] }),
@@ -32,12 +33,52 @@ interface Line {
 }
 
 function SalesPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [rows, setRows] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Invoice | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
+  const [printOpen, setPrintOpen] = useState(false);
+
+  async function buildDoc(): Promise<InvoiceDoc | null> {
+    if (!selected) return null;
+    const { data: cs } = await supabase.from("company_settings").select("*").limit(1).maybeSingle();
+    return {
+      title: t("sales.invoice_doc"),
+      number: selected.invoice_number,
+      date: new Date(selected.created_at).toLocaleString(),
+      partyLabel: t("sales.bill_to"),
+      partyName: selected.customers?.name ?? t("pos.walkin"),
+      warehouse: selected.warehouses?.name ?? undefined,
+      payment: pmLabel(selected.payment_method),
+      status: statusLabel(selected.status),
+      lines: lines.map(l => ({ product: l.products?.name ?? "—", qty: Number(l.quantity), price: Number(l.unit_price), total: Number(l.total) })),
+      subtotal: Number(selected.subtotal), tax: Number(selected.tax), discount: Number(selected.discount),
+      total: Number(selected.total), paid: Number(selected.paid),
+      company: cs ? { name: (cs as any).company_name, address: (cs as any).address, phone: (cs as any).phone, vat: (cs as any).vat_number } : undefined,
+      currency: (cs as any)?.currency ?? "",
+    };
+  }
+
+  async function doPrint(template: InvoiceTemplate) {
+    const doc = await buildDoc();
+    if (!doc) return;
+    printInvoice(doc, template, {
+      invoice: t("sales.invoice"), date: t("common.date"), billTo: t("sales.bill_to"),
+      warehouse: t("common.warehouse"), payment: t("sales.payment"), status: t("common.status"),
+      product: t("common.product"), qty: t("common.qty"), price: t("common.price"), total: t("common.total"),
+      subtotal: t("common.subtotal"), tax: t("common.tax"), discount: t("common.discount"),
+      grandTotal: t("common.total"), paid: t("common.paid"), balance: t("common.balance"),
+      thanks: t("print.thanks"), poweredBy: t("print.powered"),
+    }, lang === "ar");
+    setPrintOpen(false);
+  }
+
+  async function doPDF() {
+    const doc = await buildDoc();
+    if (doc) generateInvoicePDF(doc);
+  }
 
   async function load() {
     setLoading(true);
@@ -190,31 +231,55 @@ function SalesPage() {
               <Row label={t("common.paid")} value={money(Number(selected.paid))} />
             </div>
             <div className="mt-4 flex justify-end gap-2">
-              <button
-                onClick={async () => {
-                  const { data: cs } = await supabase.from("company_settings").select("*").limit(1).maybeSingle();
-                  generateInvoicePDF({
-                    title: t("sales.invoice_doc"),
-                    number: selected.invoice_number,
-                    date: new Date(selected.created_at).toLocaleString(),
-                    partyLabel: t("sales.bill_to"),
-                    partyName: selected.customers?.name ?? t("pos.walkin"),
-                    warehouse: selected.warehouses?.name ?? undefined,
-                    payment: pmLabel(selected.payment_method),
-                    status: statusLabel(selected.status),
-                    lines: lines.map(l => ({ product: l.products?.name ?? "—", qty: Number(l.quantity), price: Number(l.unit_price), total: Number(l.total) })),
-                    subtotal: Number(selected.subtotal), tax: Number(selected.tax), discount: Number(selected.discount),
-                    total: Number(selected.total), paid: Number(selected.paid),
-                    company: cs ? { name: (cs as any).company_name, address: (cs as any).address, phone: (cs as any).phone, vat: (cs as any).vat_number } : undefined,
-                    currency: (cs as any)?.currency ?? "",
-                  });
-                }}
-                className="flex items-center gap-1.5 h-9 rounded-md border border-border px-4 text-sm hover:bg-surface-2"
-              >
-                <FileDown className="h-4 w-4" /> PDF
+              <button onClick={doPDF} className="flex items-center gap-1.5 h-9 rounded-md border border-border px-4 text-sm hover:bg-surface-2">
+                <FileDown className="h-4 w-4" /> {t("print.download_pdf")}
               </button>
-              <button onClick={() => window.print()} className="h-9 rounded-md border border-border px-4 text-sm hover:bg-surface-2">{t("common.print")}</button>
-              <button onClick={() => setSelected(null)} className="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90">{t("common.close")}</button>
+              <button onClick={() => setPrintOpen(true)} className="flex items-center gap-1.5 h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90">
+                <Printer className="h-4 w-4" /> {t("common.print")}
+              </button>
+              <button onClick={() => setSelected(null)} className="h-9 rounded-md border border-border px-4 text-sm hover:bg-surface-2">{t("common.close")}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {printOpen && selected && (
+        <div className="fixed inset-0 z-[60] grid place-items-center bg-background/80 backdrop-blur-sm p-4" onClick={() => setPrintOpen(false)}>
+          <div className="panel-elevated w-full max-w-2xl p-6" onClick={e => e.stopPropagation()}>
+            <div className="mb-5 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold">{t("print.title")}</h3>
+                <p className="text-xs text-muted-foreground">{t("print.subtitle")}</p>
+              </div>
+              <button onClick={() => setPrintOpen(false)} className="rounded p-1 hover:bg-surface-2"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <TemplateCard
+                icon={<ScrollText className="h-6 w-6" />}
+                title={t("print.thermal")}
+                desc={t("print.thermal_desc")}
+                accent="from-amber-500/20 to-orange-500/10 border-amber-500/30"
+                onClick={() => doPrint("thermal")}
+              />
+              <TemplateCard
+                icon={<Printer className="h-6 w-6" />}
+                title={t("print.standard")}
+                desc={t("print.standard_desc")}
+                accent="from-blue-500/20 to-indigo-500/10 border-blue-500/30"
+                onClick={() => doPrint("standard")}
+              />
+              <TemplateCard
+                icon={<Sparkles className="h-6 w-6" />}
+                title={t("print.elegant")}
+                desc={t("print.elegant_desc")}
+                accent="from-yellow-500/20 via-amber-500/10 to-rose-500/10 border-yellow-500/40"
+                onClick={() => doPrint("elegant")}
+              />
+            </div>
+            <div className="mt-5 flex justify-end">
+              <button onClick={doPDF} className="flex items-center gap-1.5 h-9 rounded-md border border-border px-4 text-sm hover:bg-surface-2">
+                <FileDown className="h-4 w-4" /> {t("print.download_pdf")}
+              </button>
             </div>
           </div>
         </div>
@@ -237,5 +302,20 @@ function Row({ label, value, bold }: { label: string; value: string; bold?: bool
       <span>{label}</span>
       <span className={bold ? "text-foreground" : ""}>{value}</span>
     </div>
+  );
+}
+
+function TemplateCard({ icon, title, desc, accent, onClick }: { icon: ReactNode; title: string; desc: string; accent: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`group relative overflow-hidden rounded-lg border bg-gradient-to-br p-4 text-start transition hover:scale-[1.02] hover:shadow-lg ${accent}`}
+    >
+      <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-md bg-background/60 backdrop-blur">
+        {icon}
+      </div>
+      <div className="font-semibold">{title}</div>
+      <div className="mt-1 text-xs text-muted-foreground">{desc}</div>
+    </button>
   );
 }
