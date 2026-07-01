@@ -304,3 +304,18 @@ function Row({ label, value, bold }: { label: string; value: string; bold?: bool
     </div>
   );
 }
+
+function TemplateCard({ icon, title, desc, accent, onClick }: { icon: React.ReactNode; title: string; desc: string; accent: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`group relative overflow-hidden rounded-lg border bg-gradient-to-br p-4 text-start transition hover:scale-[1.02] hover:shadow-lg ${accent}`}
+    >
+      <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-md bg-background/60 backdrop-blur">
+        {icon}
+      </div>
+      <div className="font-semibold">{title}</div>
+      <div className="mt-1 text-xs text-muted-foreground">{desc}</div>
+    </button>
+  );
+}
