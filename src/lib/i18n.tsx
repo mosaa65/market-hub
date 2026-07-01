@@ -231,6 +231,17 @@ const en: Dict = {
   "sales.status.partial": "Partial",
   "sales.status.unpaid": "Unpaid",
   "sales.status.cancelled": "Cancelled",
+  "print.title": "Print invoice",
+  "print.subtitle": "Choose a template that fits your needs.",
+  "print.thermal": "Thermal receipt",
+  "print.thermal_desc": "80mm compact printer",
+  "print.standard": "Standard A4",
+  "print.standard_desc": "Clean business format",
+  "print.elegant": "Elegant premium",
+  "print.elegant_desc": "Luxury A4 with gold accents",
+  "print.download_pdf": "Download PDF",
+  "print.thanks": "Thank you for your business",
+  "print.powered": "Vortex ERP",
 
   // Purchases
   "purchases.title": "Purchases",
