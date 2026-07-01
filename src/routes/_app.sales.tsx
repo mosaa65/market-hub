@@ -33,12 +33,52 @@ interface Line {
 }
 
 function SalesPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [rows, setRows] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Invoice | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
+  const [printOpen, setPrintOpen] = useState(false);
+
+  async function buildDoc(): Promise<InvoiceDoc | null> {
+    if (!selected) return null;
+    const { data: cs } = await supabase.from("company_settings").select("*").limit(1).maybeSingle();
+    return {
+      title: t("sales.invoice_doc"),
+      number: selected.invoice_number,
+      date: new Date(selected.created_at).toLocaleString(),
+      partyLabel: t("sales.bill_to"),
+      partyName: selected.customers?.name ?? t("pos.walkin"),
+      warehouse: selected.warehouses?.name ?? undefined,
+      payment: pmLabel(selected.payment_method),
+      status: statusLabel(selected.status),
+      lines: lines.map(l => ({ product: l.products?.name ?? "—", qty: Number(l.quantity), price: Number(l.unit_price), total: Number(l.total) })),
+      subtotal: Number(selected.subtotal), tax: Number(selected.tax), discount: Number(selected.discount),
+      total: Number(selected.total), paid: Number(selected.paid),
+      company: cs ? { name: (cs as any).company_name, address: (cs as any).address, phone: (cs as any).phone, vat: (cs as any).vat_number } : undefined,
+      currency: (cs as any)?.currency ?? "",
+    };
+  }
+
+  async function doPrint(template: InvoiceTemplate) {
+    const doc = await buildDoc();
+    if (!doc) return;
+    printInvoice(doc, template, {
+      invoice: t("sales.invoice"), date: t("common.date"), billTo: t("sales.bill_to"),
+      warehouse: t("common.warehouse"), payment: t("sales.payment"), status: t("common.status"),
+      product: t("common.product"), qty: t("common.qty"), price: t("common.price"), total: t("common.total"),
+      subtotal: t("common.subtotal"), tax: t("common.tax"), discount: t("common.discount"),
+      grandTotal: t("common.total"), paid: t("common.paid"), balance: t("common.balance"),
+      thanks: t("print.thanks"), poweredBy: t("print.powered"),
+    }, lang === "ar");
+    setPrintOpen(false);
+  }
+
+  async function doPDF() {
+    const doc = await buildDoc();
+    if (doc) generateInvoicePDF(doc);
+  }
 
   async function load() {
     setLoading(true);
