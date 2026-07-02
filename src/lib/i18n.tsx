@@ -919,6 +919,39 @@ const ar: Dict = {
   "loyalty.redeem": "استبدال",
   "loyalty.adjust_kind": "تسوية",
   "loyalty.updated": "تم التحديث",
+
+  // المستودعات
+  "warehouses.title": "المستودعات",
+  "warehouses.subtitle": "إدارة مواقع التخزين",
+  "warehouses.name": "الاسم بالإنجليزي",
+  "warehouses.name_ar": "الاسم بالعربي",
+  "warehouses.code": "الرمز",
+  "warehouses.address": "العنوان",
+  "warehouses.is_default": "افتراضي",
+  "warehouses.set_default": "تعيين كافتراضي",
+  "warehouses.new": "مستودع جديد",
+  "warehouses.edit": "تعديل المستودع",
+  "warehouses.empty": "لا توجد مستودعات بعد",
+  "warehouses.empty_hint": "أنشئ أول مستودع لتبدأ بتتبّع المخزون",
+
+  // الفهرس: التصنيفات / العلامات / الوحدات
+  "catalog.title": "الفهرس",
+  "catalog.subtitle": "إدارة التصنيفات والعلامات التجارية والوحدات",
+  "catalog.categories": "التصنيفات",
+  "catalog.brands": "العلامات التجارية",
+  "catalog.units": "الوحدات",
+  "catalog.name_en": "الاسم بالإنجليزي",
+  "catalog.name_ar": "الاسم بالعربي",
+  "catalog.short_name": "الاختصار",
+  "catalog.new_category": "تصنيف جديد",
+  "catalog.edit_category": "تعديل التصنيف",
+  "catalog.new_brand": "علامة تجارية جديدة",
+  "catalog.edit_brand": "تعديل العلامة التجارية",
+  "catalog.new_unit": "وحدة جديدة",
+  "catalog.edit_unit": "تعديل الوحدة",
+  "catalog.empty": "لا توجد عناصر بعد",
+  "catalog.name_required": "الاسم بالعربي مطلوب",
+  "catalog.confirm_delete": "حذف هذا العنصر؟",
 };
 
 const dicts: Record<Lang, Dict> = { en, ar };
