@@ -24,7 +24,10 @@ const sections: Section[] = [
     items: [
       { to: "/pos", icon: ScanBarcode, key: "nav.pos" },
       { to: "/products", icon: Package, key: "nav.products" },
+      { to: "/products", icon: Package, key: "nav.products" },
+      { to: "/catalog", icon: Layers, key: "nav.catalog" },
       { to: "/inventory", icon: Warehouse, key: "nav.inventory" },
+      { to: "/warehouses", icon: Boxes, key: "nav.warehouses" },
       { to: "/batches", icon: CalendarClock, key: "nav.batches" },
       { to: "/sales", icon: Receipt, key: "nav.sales" },
       { to: "/purchases", icon: Truck, key: "nav.purchases" },
