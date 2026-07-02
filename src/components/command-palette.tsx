@@ -6,7 +6,7 @@ import { useI18n } from "@/lib/i18n";
 import {
   LayoutDashboard, ScanBarcode, Package, Warehouse, Receipt, Truck,
   Users, Building2, Wallet, BarChart3, Settings, Bell, ShieldCheck,
-  RotateCcw, ArrowRightLeft, CalendarClock, Barcode, Gift, History,
+  RotateCcw, ArrowRightLeft, CalendarClock, Barcode, Gift, History, Layers, Boxes,
 } from "lucide-react";
 
 export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
