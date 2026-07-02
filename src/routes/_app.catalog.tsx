@@ -167,14 +167,16 @@ function CatalogDialog({ tab, initial, onClose, onSaved }: { tab: Tab; initial: 
     if (!form.name_ar.trim() && !form.name.trim()) { toast.error(t("catalog.name_required")); return; }
     setSaving(true);
     const table = tab === "categories" ? "categories" : tab === "brands" ? "brands" : "units";
-    const payload: Record<string, unknown> = {
+    const base = {
       name: (form.name.trim() || form.name_ar.trim()),
       name_ar: form.name_ar.trim() || null,
     };
-    if (tab === "units") payload.short_name = form.short_name.trim() || form.name.trim().slice(0, 4) || "unit";
-    const { error } = initial
-      ? await supabase.from(table as "categories").update(payload).eq("id", initial.id)
-      : await supabase.from(table as "categories").insert(payload);
+    const payload = tab === "units"
+      ? { ...base, short_name: form.short_name.trim() || form.name.trim().slice(0, 4) || "unit" }
+      : base;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const q: any = supabase.from(table as "categories");
+    const { error } = initial ? await q.update(payload).eq("id", initial.id) : await q.insert(payload);
     setSaving(false);
     if (error) { toast.error(error.message); return; }
     toast.success(t("common.saved") || "Saved");

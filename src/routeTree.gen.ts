@@ -29,6 +29,7 @@ import { Route as AppInventoryRouteImport } from './routes/_app.inventory'
 import { Route as AppFinanceRouteImport } from './routes/_app.finance'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppCustomersRouteImport } from './routes/_app.customers'
+import { Route as AppCatalogRouteImport } from './routes/_app.catalog'
 import { Route as AppBatchesRouteImport } from './routes/_app.batches'
 import { Route as AppBarcodesRouteImport } from './routes/_app.barcodes'
 import { Route as AppAuditRouteImport } from './routes/_app.audit'
@@ -132,6 +133,11 @@ const AppCustomersRoute = AppCustomersRouteImport.update({
   path: '/customers',
   getParentRoute: () => AppRoute,
 } as any)
+const AppCatalogRoute = AppCatalogRouteImport.update({
+  id: '/catalog',
+  path: '/catalog',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppBatchesRoute = AppBatchesRouteImport.update({
   id: '/batches',
   path: '/batches',
@@ -154,6 +160,7 @@ export interface FileRoutesByFullPath {
   '/audit': typeof AppAuditRoute
   '/barcodes': typeof AppBarcodesRoute
   '/batches': typeof AppBatchesRoute
+  '/catalog': typeof AppCatalogRoute
   '/customers': typeof AppCustomersRoute
   '/dashboard': typeof AppDashboardRoute
   '/finance': typeof AppFinanceRoute
@@ -178,6 +185,7 @@ export interface FileRoutesByTo {
   '/audit': typeof AppAuditRoute
   '/barcodes': typeof AppBarcodesRoute
   '/batches': typeof AppBatchesRoute
+  '/catalog': typeof AppCatalogRoute
   '/customers': typeof AppCustomersRoute
   '/dashboard': typeof AppDashboardRoute
   '/finance': typeof AppFinanceRoute
@@ -204,6 +212,7 @@ export interface FileRoutesById {
   '/_app/audit': typeof AppAuditRoute
   '/_app/barcodes': typeof AppBarcodesRoute
   '/_app/batches': typeof AppBatchesRoute
+  '/_app/catalog': typeof AppCatalogRoute
   '/_app/customers': typeof AppCustomersRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/finance': typeof AppFinanceRoute
@@ -230,6 +239,7 @@ export interface FileRouteTypes {
     | '/audit'
     | '/barcodes'
     | '/batches'
+    | '/catalog'
     | '/customers'
     | '/dashboard'
     | '/finance'
@@ -254,6 +264,7 @@ export interface FileRouteTypes {
     | '/audit'
     | '/barcodes'
     | '/batches'
+    | '/catalog'
     | '/customers'
     | '/dashboard'
     | '/finance'
@@ -279,6 +290,7 @@ export interface FileRouteTypes {
     | '/_app/audit'
     | '/_app/barcodes'
     | '/_app/batches'
+    | '/_app/catalog'
     | '/_app/customers'
     | '/_app/dashboard'
     | '/_app/finance'
@@ -446,6 +458,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCustomersRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/catalog': {
+      id: '/_app/catalog'
+      path: '/catalog'
+      fullPath: '/catalog'
+      preLoaderRoute: typeof AppCatalogRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/batches': {
       id: '/_app/batches'
       path: '/batches'
@@ -474,6 +493,7 @@ interface AppRouteChildren {
   AppAuditRoute: typeof AppAuditRoute
   AppBarcodesRoute: typeof AppBarcodesRoute
   AppBatchesRoute: typeof AppBatchesRoute
+  AppCatalogRoute: typeof AppCatalogRoute
   AppCustomersRoute: typeof AppCustomersRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppFinanceRoute: typeof AppFinanceRoute
@@ -497,6 +517,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAuditRoute: AppAuditRoute,
   AppBarcodesRoute: AppBarcodesRoute,
   AppBatchesRoute: AppBatchesRoute,
+  AppCatalogRoute: AppCatalogRoute,
   AppCustomersRoute: AppCustomersRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppFinanceRoute: AppFinanceRoute,
