@@ -45,9 +45,9 @@ function ProductsPage() {
     queryKey: ["products-meta"],
     queryFn: async () => {
       const [c, b, u] = await Promise.all([
-        supabase.from("categories").select("id, name").order("name"),
-        supabase.from("brands").select("id, name").order("name"),
-        supabase.from("units").select("id, name, short_name").order("name"),
+        supabase.from("categories").select("id, name, name_ar").order("name"),
+        supabase.from("brands").select("id, name, name_ar").order("name"),
+        supabase.from("units").select("id, name, name_ar, short_name").order("name"),
       ]);
       return { categories: c.data ?? [], brands: b.data ?? [], units: u.data ?? [] };
     },
