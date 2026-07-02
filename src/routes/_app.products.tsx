@@ -186,11 +186,15 @@ function ProductDialog({
   initial, meta, onClose, onSaved,
 }: {
   initial: ProductRow | null;
-  meta: { categories: { id: string; name: string }[]; brands: { id: string; name: string }[]; units: { id: string; name: string; short_name: string }[] };
+  meta: {
+    categories: { id: string; name: string; name_ar: string | null }[];
+    brands: { id: string; name: string; name_ar: string | null }[];
+    units: { id: string; name: string; name_ar: string | null; short_name: string }[];
+  };
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [form, setForm] = useState({
     name: initial?.name ?? "",
     name_ar: initial?.name_ar ?? "",
@@ -209,10 +213,11 @@ function ProductDialog({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.name.trim()) { toast.error(t("products.name_required")); return; }
+    if (!form.name_ar.trim() && !form.name.trim()) { toast.error(t("products.name_required")); return; }
     setSaving(true);
     const payload = {
-      name: form.name.trim(),
+      // DB requires name NOT NULL; fall back to Arabic if English blank
+      name: (form.name.trim() || form.name_ar.trim()),
       name_ar: form.name_ar.trim() || null,
       sku: form.sku.trim() || null,
       barcode: form.barcode.trim() || null,
@@ -234,6 +239,8 @@ function ProductDialog({
     onSaved();
   }
 
+  const labelOf = (en: string, ar: string | null) => lang === "ar" ? (ar || en) : (en || ar || "");
+
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
       <form
@@ -249,30 +256,30 @@ function ProductDialog({
         </div>
 
         <div className="grid grid-cols-1 gap-3 p-5 sm:grid-cols-2 max-h-[70vh] overflow-y-auto">
-          <Field label={`${t("products.name_en")} *`} className="sm:col-span-2">
-            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} required />
+          <Field label={`${t("products.name_ar")} *`} className="sm:col-span-2">
+            <input value={form.name_ar} onChange={(e) => setForm({ ...form, name_ar: e.target.value })} className={inputCls} dir="rtl" required />
           </Field>
-          <Field label={t("products.name_ar")} className="sm:col-span-2">
-            <input value={form.name_ar} onChange={(e) => setForm({ ...form, name_ar: e.target.value })} className={inputCls} dir="rtl" />
+          <Field label={t("products.name_en")} className="sm:col-span-2">
+            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} />
           </Field>
           <Field label={t("products.sku")}><input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className={inputCls} /></Field>
           <Field label={t("products.barcode")}><input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} className={inputCls} /></Field>
           <Field label={t("products.category")}>
             <select value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })} className={inputCls}>
               <option value="">—</option>
-              {meta.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {meta.categories.map((c) => <option key={c.id} value={c.id}>{labelOf(c.name, c.name_ar)}</option>)}
             </select>
           </Field>
           <Field label={t("products.brand")}>
             <select value={form.brand_id} onChange={(e) => setForm({ ...form, brand_id: e.target.value })} className={inputCls}>
               <option value="">—</option>
-              {meta.brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              {meta.brands.map((b) => <option key={b.id} value={b.id}>{labelOf(b.name, b.name_ar)}</option>)}
             </select>
           </Field>
           <Field label={t("products.unit")}>
             <select value={form.unit_id} onChange={(e) => setForm({ ...form, unit_id: e.target.value })} className={inputCls}>
               <option value="">—</option>
-              {meta.units.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.short_name})</option>)}
+              {meta.units.map((u) => <option key={u.id} value={u.id}>{labelOf(u.name, u.name_ar)} ({u.short_name})</option>)}
             </select>
           </Field>
           <Field label={t("products.min")}><input type="number" step="0.01" value={form.min_stock} onChange={(e) => setForm({ ...form, min_stock: e.target.value })} className={inputCls} /></Field>
@@ -298,10 +305,6 @@ function ProductDialog({
       </form>
     </div>
   );
-}
-
-function langLabel(label: string, suffix: string, required = false) {
-  return `${label} (${suffix})${required ? " *" : ""}`;
 }
 
 const inputCls = "h-9 w-full rounded-md border border-border bg-surface px-3 text-sm text-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition";
