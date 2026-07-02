@@ -4,7 +4,7 @@ import {
   LayoutDashboard, ScanBarcode, Package, Warehouse, Receipt, Truck,
   Users, Building2, Wallet, BarChart3, ShieldCheck, Bell, Settings,
   Search, Command as CommandIcon, LogOut, Moon, Sun, Languages, Sparkles,
-  ChevronRight, RotateCcw, ArrowRightLeft, CalendarClock, Barcode, Gift, History,
+  ChevronRight, RotateCcw, ArrowRightLeft, CalendarClock, Barcode, Gift, History, Layers, Boxes,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
