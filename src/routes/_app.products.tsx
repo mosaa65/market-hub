@@ -16,7 +16,9 @@ type ProductRow = {
   id: string; name: string; name_ar: string | null; sku: string | null; barcode: string | null;
   sale_price: number; cost_price: number; tax_rate: number; min_stock: number;
   is_active: boolean; category_id: string | null; brand_id: string | null; unit_id: string | null;
-  category?: { name: string } | null; brand?: { name: string } | null; unit?: { short_name: string } | null;
+  category?: { name: string; name_ar: string | null } | null;
+  brand?: { name: string; name_ar: string | null } | null;
+  unit?: { short_name: string; name_ar: string | null } | null;
 };
 
 function ProductsPage() {
