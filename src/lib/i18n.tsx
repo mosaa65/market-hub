@@ -455,6 +455,8 @@ const ar: Dict = {
   "nav.pos": "نقطة البيع",
   "nav.products": "المنتجات",
   "nav.inventory": "المخزون",
+  "nav.warehouses": "المستودعات",
+  "nav.catalog": "الفهرس (تصنيفات/علامات/وحدات)",
   "nav.sales": "المبيعات",
   "nav.purchases": "المشتريات",
   "nav.returns": "المرتجعات",
