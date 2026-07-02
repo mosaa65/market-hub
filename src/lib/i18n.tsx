@@ -444,6 +444,39 @@ const en: Dict = {
   "loyalty.redeem": "Redeem",
   "loyalty.adjust_kind": "Adjust",
   "loyalty.updated": "Updated",
+
+  // Warehouses
+  "warehouses.title": "Warehouses",
+  "warehouses.subtitle": "Manage your storage locations",
+  "warehouses.name": "Name",
+  "warehouses.name_ar": "Name (Arabic)",
+  "warehouses.code": "Code",
+  "warehouses.address": "Address",
+  "warehouses.is_default": "Default",
+  "warehouses.set_default": "Set as default",
+  "warehouses.new": "New warehouse",
+  "warehouses.edit": "Edit warehouse",
+  "warehouses.empty": "No warehouses yet",
+  "warehouses.empty_hint": "Create your first warehouse to start tracking stock",
+
+  // Catalog: Categories / Brands / Units
+  "catalog.title": "Catalog",
+  "catalog.subtitle": "Manage categories, brands, and units",
+  "catalog.categories": "Categories",
+  "catalog.brands": "Brands",
+  "catalog.units": "Units",
+  "catalog.name_en": "Name (English)",
+  "catalog.name_ar": "Name (Arabic)",
+  "catalog.short_name": "Short name",
+  "catalog.new_category": "New category",
+  "catalog.edit_category": "Edit category",
+  "catalog.new_brand": "New brand",
+  "catalog.edit_brand": "Edit brand",
+  "catalog.new_unit": "New unit",
+  "catalog.edit_unit": "Edit unit",
+  "catalog.empty": "No items yet",
+  "catalog.name_required": "Arabic name is required",
+  "catalog.confirm_delete": "Delete this item?",
 };
 
 const ar: Dict = {
