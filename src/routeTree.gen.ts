@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppWarehousesRouteImport } from './routes/_app.warehouses'
 import { Route as AppUsersRouteImport } from './routes/_app.users'
 import { Route as AppTransfersRouteImport } from './routes/_app.transfers'
 import { Route as AppSuppliersRouteImport } from './routes/_app.suppliers'
@@ -45,6 +46,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppWarehousesRoute = AppWarehousesRouteImport.update({
+  id: '/warehouses',
+  path: '/warehouses',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppUsersRoute = AppUsersRouteImport.update({
   id: '/users',
@@ -164,6 +170,7 @@ export interface FileRoutesByFullPath {
   '/suppliers': typeof AppSuppliersRoute
   '/transfers': typeof AppTransfersRoute
   '/users': typeof AppUsersRoute
+  '/warehouses': typeof AppWarehousesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -187,6 +194,7 @@ export interface FileRoutesByTo {
   '/suppliers': typeof AppSuppliersRoute
   '/transfers': typeof AppTransfersRoute
   '/users': typeof AppUsersRoute
+  '/warehouses': typeof AppWarehousesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -212,6 +220,7 @@ export interface FileRoutesById {
   '/_app/suppliers': typeof AppSuppliersRoute
   '/_app/transfers': typeof AppTransfersRoute
   '/_app/users': typeof AppUsersRoute
+  '/_app/warehouses': typeof AppWarehousesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -237,6 +246,7 @@ export interface FileRouteTypes {
     | '/suppliers'
     | '/transfers'
     | '/users'
+    | '/warehouses'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -260,6 +270,7 @@ export interface FileRouteTypes {
     | '/suppliers'
     | '/transfers'
     | '/users'
+    | '/warehouses'
   id:
     | '__root__'
     | '/'
@@ -284,6 +295,7 @@ export interface FileRouteTypes {
     | '/_app/suppliers'
     | '/_app/transfers'
     | '/_app/users'
+    | '/_app/warehouses'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -314,6 +326,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_app/warehouses': {
+      id: '/_app/warehouses'
+      path: '/warehouses'
+      fullPath: '/warehouses'
+      preLoaderRoute: typeof AppWarehousesRouteImport
+      parentRoute: typeof AppRoute
     }
     '/_app/users': {
       id: '/_app/users'
@@ -471,6 +490,7 @@ interface AppRouteChildren {
   AppSuppliersRoute: typeof AppSuppliersRoute
   AppTransfersRoute: typeof AppTransfersRoute
   AppUsersRoute: typeof AppUsersRoute
+  AppWarehousesRoute: typeof AppWarehousesRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -493,6 +513,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppSuppliersRoute: AppSuppliersRoute,
   AppTransfersRoute: AppTransfersRoute,
   AppUsersRoute: AppUsersRoute,
+  AppWarehousesRoute: AppWarehousesRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
