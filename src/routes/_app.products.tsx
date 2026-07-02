@@ -128,14 +128,18 @@ function ProductsPage() {
                   <p className="text-xs text-muted-foreground">{t("products.empty_hint")}</p>
                 </td></tr>
               )}
-              {filtered.map((p) => (
+              {filtered.map((p) => {
+                const primary = lang === "ar" ? (p.name_ar || p.name) : (p.name || p.name_ar || "—");
+                const secondary = lang === "ar" ? p.name : p.name_ar;
+                const catLabel = lang === "ar" ? (p.category?.name_ar || p.category?.name) : (p.category?.name || p.category?.name_ar);
+                return (
                 <tr key={p.id} className="border-b border-border/60 hover:bg-accent/40 transition-colors">
                   <td className="px-4 py-2.5">
-                    <div className="font-medium text-foreground">{p.name}</div>
-                    {p.name_ar && <div className="text-[11px] text-muted-foreground" dir="rtl">{p.name_ar}</div>}
+                    <div className="font-medium text-foreground" dir={lang === "ar" ? "rtl" : "ltr"}>{primary}</div>
+                    {secondary && <div className="text-[11px] text-muted-foreground" dir={lang === "ar" ? "ltr" : "rtl"}>{secondary}</div>}
                   </td>
                   <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">{p.sku ?? "—"}</td>
-                  <td className="px-4 py-2.5 text-muted-foreground">{p.category?.name ?? "—"}</td>
+                  <td className="px-4 py-2.5 text-muted-foreground">{catLabel ?? "—"}</td>
                   <td className="px-4 py-2.5 text-end font-mono">{Number(p.cost_price).toFixed(2)}</td>
                   <td className="px-4 py-2.5 text-end font-mono text-foreground">{Number(p.sale_price).toFixed(2)}</td>
                   <td className="px-4 py-2.5 text-end font-mono text-muted-foreground">{Number(p.min_stock)}</td>
@@ -152,14 +156,15 @@ function ProductsPage() {
                         title={t("common.edit")}
                       ><Pencil className="h-3.5 w-3.5" /></button>
                       <button
-                        onClick={() => { if (confirm(`${t("common.delete")} "${p.name}"?`)) remove.mutate(p.id); }}
+                        onClick={() => { if (confirm(`${t("common.delete")} "${primary}"?`)) remove.mutate(p.id); }}
                         className="grid h-7 w-7 place-items-center rounded-md border border-border bg-surface text-muted-foreground hover:text-destructive transition"
                         title={t("common.delete")}
                       ><Trash2 className="h-3.5 w-3.5" /></button>
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
