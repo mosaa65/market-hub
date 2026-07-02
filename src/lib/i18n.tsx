@@ -13,6 +13,8 @@ const en: Dict = {
   "nav.pos": "POS",
   "nav.products": "Products",
   "nav.inventory": "Inventory",
+  "nav.warehouses": "Warehouses",
+  "nav.catalog": "Catalog (Categories/Brands/Units)",
   "nav.sales": "Sales",
   "nav.purchases": "Purchases",
   "nav.returns": "Returns",
