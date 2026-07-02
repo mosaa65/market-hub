@@ -16,7 +16,9 @@ type ProductRow = {
   id: string; name: string; name_ar: string | null; sku: string | null; barcode: string | null;
   sale_price: number; cost_price: number; tax_rate: number; min_stock: number;
   is_active: boolean; category_id: string | null; brand_id: string | null; unit_id: string | null;
-  category?: { name: string } | null; brand?: { name: string } | null; unit?: { short_name: string } | null;
+  category?: { name: string; name_ar: string | null } | null;
+  brand?: { name: string; name_ar: string | null } | null;
+  unit?: { short_name: string; name_ar: string | null } | null;
 };
 
 function ProductsPage() {
@@ -31,7 +33,7 @@ function ProductsPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, name_ar, sku, barcode, sale_price, cost_price, tax_rate, min_stock, is_active, category_id, brand_id, unit_id, category:categories(name), brand:brands(name), unit:units(short_name)")
+        .select("id, name, name_ar, sku, barcode, sale_price, cost_price, tax_rate, min_stock, is_active, category_id, brand_id, unit_id, category:categories(name, name_ar), brand:brands(name, name_ar), unit:units(short_name, name_ar)")
         .order("created_at", { ascending: false })
         .limit(500);
       if (error) throw error;
@@ -43,9 +45,9 @@ function ProductsPage() {
     queryKey: ["products-meta"],
     queryFn: async () => {
       const [c, b, u] = await Promise.all([
-        supabase.from("categories").select("id, name").order("name"),
-        supabase.from("brands").select("id, name").order("name"),
-        supabase.from("units").select("id, name, short_name").order("name"),
+        supabase.from("categories").select("id, name, name_ar").order("name"),
+        supabase.from("brands").select("id, name, name_ar").order("name"),
+        supabase.from("units").select("id, name, name_ar, short_name").order("name"),
       ]);
       return { categories: c.data ?? [], brands: b.data ?? [], units: u.data ?? [] };
     },
@@ -126,14 +128,18 @@ function ProductsPage() {
                   <p className="text-xs text-muted-foreground">{t("products.empty_hint")}</p>
                 </td></tr>
               )}
-              {filtered.map((p) => (
+              {filtered.map((p) => {
+                const primary = lang === "ar" ? (p.name_ar || p.name) : (p.name || p.name_ar || "—");
+                const secondary = lang === "ar" ? p.name : p.name_ar;
+                const catLabel = lang === "ar" ? (p.category?.name_ar || p.category?.name) : (p.category?.name || p.category?.name_ar);
+                return (
                 <tr key={p.id} className="border-b border-border/60 hover:bg-accent/40 transition-colors">
                   <td className="px-4 py-2.5">
-                    <div className="font-medium text-foreground">{p.name}</div>
-                    {p.name_ar && <div className="text-[11px] text-muted-foreground" dir="rtl">{p.name_ar}</div>}
+                    <div className="font-medium text-foreground" dir={lang === "ar" ? "rtl" : "ltr"}>{primary}</div>
+                    {secondary && <div className="text-[11px] text-muted-foreground" dir={lang === "ar" ? "ltr" : "rtl"}>{secondary}</div>}
                   </td>
                   <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">{p.sku ?? "—"}</td>
-                  <td className="px-4 py-2.5 text-muted-foreground">{p.category?.name ?? "—"}</td>
+                  <td className="px-4 py-2.5 text-muted-foreground">{catLabel ?? "—"}</td>
                   <td className="px-4 py-2.5 text-end font-mono">{Number(p.cost_price).toFixed(2)}</td>
                   <td className="px-4 py-2.5 text-end font-mono text-foreground">{Number(p.sale_price).toFixed(2)}</td>
                   <td className="px-4 py-2.5 text-end font-mono text-muted-foreground">{Number(p.min_stock)}</td>
@@ -150,14 +156,15 @@ function ProductsPage() {
                         title={t("common.edit")}
                       ><Pencil className="h-3.5 w-3.5" /></button>
                       <button
-                        onClick={() => { if (confirm(`${t("common.delete")} "${p.name}"?`)) remove.mutate(p.id); }}
+                        onClick={() => { if (confirm(`${t("common.delete")} "${primary}"?`)) remove.mutate(p.id); }}
                         className="grid h-7 w-7 place-items-center rounded-md border border-border bg-surface text-muted-foreground hover:text-destructive transition"
                         title={t("common.delete")}
                       ><Trash2 className="h-3.5 w-3.5" /></button>
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -179,11 +186,15 @@ function ProductDialog({
   initial, meta, onClose, onSaved,
 }: {
   initial: ProductRow | null;
-  meta: { categories: { id: string; name: string }[]; brands: { id: string; name: string }[]; units: { id: string; name: string; short_name: string }[] };
+  meta: {
+    categories: { id: string; name: string; name_ar: string | null }[];
+    brands: { id: string; name: string; name_ar: string | null }[];
+    units: { id: string; name: string; name_ar: string | null; short_name: string }[];
+  };
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [form, setForm] = useState({
     name: initial?.name ?? "",
     name_ar: initial?.name_ar ?? "",
@@ -202,10 +213,11 @@ function ProductDialog({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.name.trim()) { toast.error(t("products.name_required")); return; }
+    if (!form.name_ar.trim() && !form.name.trim()) { toast.error(t("products.name_required")); return; }
     setSaving(true);
     const payload = {
-      name: form.name.trim(),
+      // DB requires name NOT NULL; fall back to Arabic if English blank
+      name: (form.name.trim() || form.name_ar.trim()),
       name_ar: form.name_ar.trim() || null,
       sku: form.sku.trim() || null,
       barcode: form.barcode.trim() || null,
@@ -227,6 +239,8 @@ function ProductDialog({
     onSaved();
   }
 
+  const labelOf = (en: string, ar: string | null) => lang === "ar" ? (ar || en) : (en || ar || "");
+
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
       <form
@@ -242,30 +256,30 @@ function ProductDialog({
         </div>
 
         <div className="grid grid-cols-1 gap-3 p-5 sm:grid-cols-2 max-h-[70vh] overflow-y-auto">
-          <Field label={`${t("products.name_en")} *`} className="sm:col-span-2">
-            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} required />
+          <Field label={`${t("products.name_ar")} *`} className="sm:col-span-2">
+            <input value={form.name_ar} onChange={(e) => setForm({ ...form, name_ar: e.target.value })} className={inputCls} dir="rtl" required />
           </Field>
-          <Field label={t("products.name_ar")} className="sm:col-span-2">
-            <input value={form.name_ar} onChange={(e) => setForm({ ...form, name_ar: e.target.value })} className={inputCls} dir="rtl" />
+          <Field label={t("products.name_en")} className="sm:col-span-2">
+            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} />
           </Field>
           <Field label={t("products.sku")}><input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className={inputCls} /></Field>
           <Field label={t("products.barcode")}><input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} className={inputCls} /></Field>
           <Field label={t("products.category")}>
             <select value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })} className={inputCls}>
               <option value="">—</option>
-              {meta.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {meta.categories.map((c) => <option key={c.id} value={c.id}>{labelOf(c.name, c.name_ar)}</option>)}
             </select>
           </Field>
           <Field label={t("products.brand")}>
             <select value={form.brand_id} onChange={(e) => setForm({ ...form, brand_id: e.target.value })} className={inputCls}>
               <option value="">—</option>
-              {meta.brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              {meta.brands.map((b) => <option key={b.id} value={b.id}>{labelOf(b.name, b.name_ar)}</option>)}
             </select>
           </Field>
           <Field label={t("products.unit")}>
             <select value={form.unit_id} onChange={(e) => setForm({ ...form, unit_id: e.target.value })} className={inputCls}>
               <option value="">—</option>
-              {meta.units.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.short_name})</option>)}
+              {meta.units.map((u) => <option key={u.id} value={u.id}>{labelOf(u.name, u.name_ar)} ({u.short_name})</option>)}
             </select>
           </Field>
           <Field label={t("products.min")}><input type="number" step="0.01" value={form.min_stock} onChange={(e) => setForm({ ...form, min_stock: e.target.value })} className={inputCls} /></Field>
@@ -291,10 +305,6 @@ function ProductDialog({
       </form>
     </div>
   );
-}
-
-function langLabel(label: string, suffix: string, required = false) {
-  return `${label} (${suffix})${required ? " *" : ""}`;
 }
 
 const inputCls = "h-9 w-full rounded-md border border-border bg-surface px-3 text-sm text-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/30 transition";

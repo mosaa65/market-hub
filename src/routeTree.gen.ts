@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppWarehousesRouteImport } from './routes/_app.warehouses'
 import { Route as AppUsersRouteImport } from './routes/_app.users'
 import { Route as AppTransfersRouteImport } from './routes/_app.transfers'
 import { Route as AppSuppliersRouteImport } from './routes/_app.suppliers'
@@ -28,6 +29,7 @@ import { Route as AppInventoryRouteImport } from './routes/_app.inventory'
 import { Route as AppFinanceRouteImport } from './routes/_app.finance'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppCustomersRouteImport } from './routes/_app.customers'
+import { Route as AppCatalogRouteImport } from './routes/_app.catalog'
 import { Route as AppBatchesRouteImport } from './routes/_app.batches'
 import { Route as AppBarcodesRouteImport } from './routes/_app.barcodes'
 import { Route as AppAuditRouteImport } from './routes/_app.audit'
@@ -45,6 +47,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppWarehousesRoute = AppWarehousesRouteImport.update({
+  id: '/warehouses',
+  path: '/warehouses',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppUsersRoute = AppUsersRouteImport.update({
   id: '/users',
@@ -126,6 +133,11 @@ const AppCustomersRoute = AppCustomersRouteImport.update({
   path: '/customers',
   getParentRoute: () => AppRoute,
 } as any)
+const AppCatalogRoute = AppCatalogRouteImport.update({
+  id: '/catalog',
+  path: '/catalog',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppBatchesRoute = AppBatchesRouteImport.update({
   id: '/batches',
   path: '/batches',
@@ -148,6 +160,7 @@ export interface FileRoutesByFullPath {
   '/audit': typeof AppAuditRoute
   '/barcodes': typeof AppBarcodesRoute
   '/batches': typeof AppBatchesRoute
+  '/catalog': typeof AppCatalogRoute
   '/customers': typeof AppCustomersRoute
   '/dashboard': typeof AppDashboardRoute
   '/finance': typeof AppFinanceRoute
@@ -164,6 +177,7 @@ export interface FileRoutesByFullPath {
   '/suppliers': typeof AppSuppliersRoute
   '/transfers': typeof AppTransfersRoute
   '/users': typeof AppUsersRoute
+  '/warehouses': typeof AppWarehousesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -171,6 +185,7 @@ export interface FileRoutesByTo {
   '/audit': typeof AppAuditRoute
   '/barcodes': typeof AppBarcodesRoute
   '/batches': typeof AppBatchesRoute
+  '/catalog': typeof AppCatalogRoute
   '/customers': typeof AppCustomersRoute
   '/dashboard': typeof AppDashboardRoute
   '/finance': typeof AppFinanceRoute
@@ -187,6 +202,7 @@ export interface FileRoutesByTo {
   '/suppliers': typeof AppSuppliersRoute
   '/transfers': typeof AppTransfersRoute
   '/users': typeof AppUsersRoute
+  '/warehouses': typeof AppWarehousesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -196,6 +212,7 @@ export interface FileRoutesById {
   '/_app/audit': typeof AppAuditRoute
   '/_app/barcodes': typeof AppBarcodesRoute
   '/_app/batches': typeof AppBatchesRoute
+  '/_app/catalog': typeof AppCatalogRoute
   '/_app/customers': typeof AppCustomersRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/finance': typeof AppFinanceRoute
@@ -212,6 +229,7 @@ export interface FileRoutesById {
   '/_app/suppliers': typeof AppSuppliersRoute
   '/_app/transfers': typeof AppTransfersRoute
   '/_app/users': typeof AppUsersRoute
+  '/_app/warehouses': typeof AppWarehousesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -221,6 +239,7 @@ export interface FileRouteTypes {
     | '/audit'
     | '/barcodes'
     | '/batches'
+    | '/catalog'
     | '/customers'
     | '/dashboard'
     | '/finance'
@@ -237,6 +256,7 @@ export interface FileRouteTypes {
     | '/suppliers'
     | '/transfers'
     | '/users'
+    | '/warehouses'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -244,6 +264,7 @@ export interface FileRouteTypes {
     | '/audit'
     | '/barcodes'
     | '/batches'
+    | '/catalog'
     | '/customers'
     | '/dashboard'
     | '/finance'
@@ -260,6 +281,7 @@ export interface FileRouteTypes {
     | '/suppliers'
     | '/transfers'
     | '/users'
+    | '/warehouses'
   id:
     | '__root__'
     | '/'
@@ -268,6 +290,7 @@ export interface FileRouteTypes {
     | '/_app/audit'
     | '/_app/barcodes'
     | '/_app/batches'
+    | '/_app/catalog'
     | '/_app/customers'
     | '/_app/dashboard'
     | '/_app/finance'
@@ -284,6 +307,7 @@ export interface FileRouteTypes {
     | '/_app/suppliers'
     | '/_app/transfers'
     | '/_app/users'
+    | '/_app/warehouses'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -314,6 +338,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_app/warehouses': {
+      id: '/_app/warehouses'
+      path: '/warehouses'
+      fullPath: '/warehouses'
+      preLoaderRoute: typeof AppWarehousesRouteImport
+      parentRoute: typeof AppRoute
     }
     '/_app/users': {
       id: '/_app/users'
@@ -427,6 +458,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCustomersRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/catalog': {
+      id: '/_app/catalog'
+      path: '/catalog'
+      fullPath: '/catalog'
+      preLoaderRoute: typeof AppCatalogRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/batches': {
       id: '/_app/batches'
       path: '/batches'
@@ -455,6 +493,7 @@ interface AppRouteChildren {
   AppAuditRoute: typeof AppAuditRoute
   AppBarcodesRoute: typeof AppBarcodesRoute
   AppBatchesRoute: typeof AppBatchesRoute
+  AppCatalogRoute: typeof AppCatalogRoute
   AppCustomersRoute: typeof AppCustomersRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppFinanceRoute: typeof AppFinanceRoute
@@ -471,12 +510,14 @@ interface AppRouteChildren {
   AppSuppliersRoute: typeof AppSuppliersRoute
   AppTransfersRoute: typeof AppTransfersRoute
   AppUsersRoute: typeof AppUsersRoute
+  AppWarehousesRoute: typeof AppWarehousesRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppAuditRoute: AppAuditRoute,
   AppBarcodesRoute: AppBarcodesRoute,
   AppBatchesRoute: AppBatchesRoute,
+  AppCatalogRoute: AppCatalogRoute,
   AppCustomersRoute: AppCustomersRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppFinanceRoute: AppFinanceRoute,
@@ -493,6 +534,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppSuppliersRoute: AppSuppliersRoute,
   AppTransfersRoute: AppTransfersRoute,
   AppUsersRoute: AppUsersRoute,
+  AppWarehousesRoute: AppWarehousesRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

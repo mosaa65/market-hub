@@ -1,0 +1,3 @@
+ALTER TABLE public.brands ADD COLUMN IF NOT EXISTS name_ar TEXT;
+ALTER TABLE public.units ADD COLUMN IF NOT EXISTS name_ar TEXT;
+ALTER TABLE public.warehouses ADD COLUMN IF NOT EXISTS name_ar TEXT;

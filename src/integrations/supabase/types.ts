@@ -49,16 +49,19 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          name_ar: string | null
         }
         Insert: {
           created_at?: string
           id?: string
           name: string
+          name_ar?: string | null
         }
         Update: {
           created_at?: string
           id?: string
           name?: string
+          name_ar?: string | null
         }
         Relationships: []
       }
@@ -1153,18 +1156,21 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          name_ar: string | null
           short_name: string
         }
         Insert: {
           created_at?: string
           id?: string
           name: string
+          name_ar?: string | null
           short_name: string
         }
         Update: {
           created_at?: string
           id?: string
           name?: string
+          name_ar?: string | null
           short_name?: string
         }
         Relationships: []
@@ -1199,6 +1205,7 @@ export type Database = {
           is_active: boolean
           is_default: boolean
           name: string
+          name_ar: string | null
           updated_at: string
         }
         Insert: {
@@ -1209,6 +1216,7 @@ export type Database = {
           is_active?: boolean
           is_default?: boolean
           name: string
+          name_ar?: string | null
           updated_at?: string
         }
         Update: {
@@ -1219,6 +1227,7 @@ export type Database = {
           is_active?: boolean
           is_default?: boolean
           name?: string
+          name_ar?: string | null
           updated_at?: string
         }
         Relationships: []

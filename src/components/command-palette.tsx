@@ -6,7 +6,7 @@ import { useI18n } from "@/lib/i18n";
 import {
   LayoutDashboard, ScanBarcode, Package, Warehouse, Receipt, Truck,
   Users, Building2, Wallet, BarChart3, Settings, Bell, ShieldCheck,
-  RotateCcw, ArrowRightLeft, CalendarClock, Barcode, Gift, History,
+  RotateCcw, ArrowRightLeft, CalendarClock, Barcode, Gift, History, Layers, Boxes,
 } from "lucide-react";
 
 export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
@@ -24,6 +24,8 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
           <CommandItem onSelect={() => go("/pos")}><ScanBarcode /> {t("nav.pos")}</CommandItem>
           <CommandItem onSelect={() => go("/products")}><Package /> {t("nav.products")}</CommandItem>
           <CommandItem onSelect={() => go("/inventory")}><Warehouse /> {t("nav.inventory")}</CommandItem>
+          <CommandItem onSelect={() => go("/warehouses")}><Boxes /> {t("nav.warehouses")}</CommandItem>
+          <CommandItem onSelect={() => go("/catalog")}><Layers /> {t("nav.catalog")}</CommandItem>
           <CommandItem onSelect={() => go("/sales")}><Receipt /> {t("nav.sales")}</CommandItem>
           <CommandItem onSelect={() => go("/purchases")}><Truck /> {t("nav.purchases")}</CommandItem>
           <CommandItem onSelect={() => go("/returns")}><RotateCcw /> {t("nav.returns")}</CommandItem>
