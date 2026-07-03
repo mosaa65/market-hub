@@ -59,7 +59,7 @@ function POSPage() {
     const [{ data: ws }, { data: cs }, { data: ps }] = await Promise.all([
       supabase.from("warehouses").select("id,name").eq("is_active", true).order("name"),
       supabase.from("customers").select("id,name").eq("is_active", true).order("name"),
-      supabase.from("products").select("id,sku,barcode,name,name_ar,sale_price,tax_rate,image_url").eq("is_active", true).order("name").limit(500),
+      supabase.from("products").select("id,sku,barcode,name,name_ar,sale_price,tax_rate,image_url,unit:units(short_name,name,name_ar),category:categories(name,name_ar)").eq("is_active", true).order("name").limit(500),
     ]);
     setWarehouses(ws ?? []);
     setCustomers(cs ?? []);
