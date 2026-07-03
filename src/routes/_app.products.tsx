@@ -244,7 +244,7 @@ function ProductDialog({
       <form
         onSubmit={submit}
         onClick={(e) => e.stopPropagation()}
-        className="panel-elevated w-full max-w-2xl overflow-hidden"
+        className="panel-elevated w-full max-w-3xl overflow-hidden"
       >
         <div className="flex items-center justify-between border-b border-border px-5 py-3">
           <h2 className="text-sm font-semibold text-foreground">{initial ? t("products.edit_product") : t("products.new_product")}</h2>
