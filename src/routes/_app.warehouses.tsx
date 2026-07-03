@@ -69,20 +69,18 @@ function WarehousesPage() {
       <PageHeader
         title={t("warehouses.title")}
         subtitle={t("warehouses.subtitle")}
-        actions={
-          <button onClick={() => { setEditing(null); setOpen(true); }} className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:opacity-90 transition">
-            <Plus className="h-3.5 w-3.5" /> {t("warehouses.new")}
-          </button>
-        }
       />
 
       <div className="panel-elevated overflow-hidden">
         <div className="flex items-center gap-2 border-b border-border p-3">
-          <div className="flex h-9 flex-1 items-center gap-2 rounded-md border border-border bg-surface px-3 text-sm">
-            <Search className="h-3.5 w-3.5 text-muted-foreground" />
+          <div className="flex h-10 flex-1 items-center gap-2 rounded-full border border-border bg-surface px-4 text-sm">
+            <Search className="h-4 w-4 text-muted-foreground" />
             <input value={q} onChange={(e) => setQ(e.target.value)} className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground" placeholder={t("common.search")} />
+            <span className="hidden sm:inline text-[11px] text-muted-foreground tabular-nums">{filtered.length}</span>
           </div>
-          <span className="text-[11px] text-muted-foreground tabular-nums">{filtered.length}</span>
+          <button onClick={() => { setEditing(null); setOpen(true); }} className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm shadow-primary/20 hover:opacity-90 transition">
+            <Plus className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{t("warehouses.new")}</span>
+          </button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -199,10 +197,10 @@ function WarehouseDialog({ initial, onClose, onSaved }: { initial: Row | null; o
           <button type="button" onClick={onClose} className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-accent"><X className="h-4 w-4" /></button>
         </div>
         <div className="grid grid-cols-1 gap-3 p-5 sm:grid-cols-2">
-          <Field label={`${t("warehouses.name_ar")} *`} className="sm:col-span-2">
+          <Field label={`${t("warehouses.name_ar")} *`}>
             <input value={form.name_ar} onChange={(e) => setForm({ ...form, name_ar: e.target.value })} className={inputCls} dir="rtl" required />
           </Field>
-          <Field label={t("warehouses.name")} className="sm:col-span-2">
+          <Field label={t("warehouses.name")}>
             <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} />
           </Field>
           <Field label={t("warehouses.code")}>

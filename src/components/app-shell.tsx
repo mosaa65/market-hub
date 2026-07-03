@@ -3,27 +3,25 @@ import { useEffect, useState } from "react";
 import {
   LayoutDashboard, ScanBarcode, Package, Warehouse, Receipt, Truck,
   Users, Building2, Wallet, BarChart3, ShieldCheck, Bell, Settings,
-  Search, Command as CommandIcon, LogOut, Moon, Sun, Languages, Sparkles,
-  ChevronRight, RotateCcw, ArrowRightLeft, CalendarClock, Barcode, Gift, History, Layers, Boxes,
+  Search, Command as CommandIcon, LogOut, Moon, Sun, Sparkles,
+  RotateCcw, ArrowRightLeft, CalendarClock, Barcode, Gift, History, Layers, Boxes,
+  Menu,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { CommandPalette } from "@/components/command-palette";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
 type Item = { to: string; icon: typeof LayoutDashboard; key: string };
 type Section = { titleKey: string; items: Item[] };
 
 const sections: Section[] = [
-  {
-    titleKey: "nav.section.overview",
-    items: [{ to: "/dashboard", icon: LayoutDashboard, key: "nav.dashboard" }],
-  },
+  { titleKey: "nav.section.overview", items: [{ to: "/dashboard", icon: LayoutDashboard, key: "nav.dashboard" }] },
   {
     titleKey: "nav.section.operations",
     items: [
       { to: "/pos", icon: ScanBarcode, key: "nav.pos" },
-      { to: "/products", icon: Package, key: "nav.products" },
       { to: "/products", icon: Package, key: "nav.products" },
       { to: "/catalog", icon: Layers, key: "nav.catalog" },
       { to: "/inventory", icon: Warehouse, key: "nav.inventory" },
@@ -62,12 +60,80 @@ const sections: Section[] = [
   },
 ];
 
-export function AppShell({ children }: { children: React.ReactNode }) {
-  const { t, lang, setLang, dir } = useI18n();
+function SidebarContents({ onNavigate }: { onNavigate?: () => void }) {
+  const { t, dir } = useI18n();
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  return (
+    <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
+      <div className="flex h-16 items-center gap-2.5 px-5 border-b border-sidebar-border/60">
+        <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-primary via-primary to-chart-4 shadow-lg shadow-primary/20 ring-1 ring-white/10">
+          <Sparkles className="h-4 w-4 text-primary-foreground" />
+        </div>
+        <div className="flex flex-col leading-tight">
+          <span className="text-sm font-semibold tracking-tight text-foreground">{t("app.name")}</span>
+          <span className="text-[10px] text-muted-foreground">ERP · v0.1</span>
+        </div>
+      </div>
+
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
+        {sections.map((sec) => (
+          <div key={sec.titleKey}>
+            <div className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">
+              {t(sec.titleKey)}
+            </div>
+            <ul className="space-y-0.5">
+              {sec.items.map((it) => {
+                const active = pathname === it.to || pathname.startsWith(it.to + "/");
+                return (
+                  <li key={it.to}>
+                    <Link
+                      to={it.to}
+                      onClick={onNavigate}
+                      className={cn(
+                        "group relative flex items-center gap-3 rounded-xl px-3 py-2 text-[13px] font-medium transition-all",
+                        active
+                          ? "bg-gradient-to-r from-primary/15 to-primary/5 text-foreground shadow-[inset_0_0_0_1px_oklch(1_0_0_/_0.06)]"
+                          : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground"
+                      )}
+                    >
+                      {active && (
+                        <span className={cn("absolute inset-y-2 w-[3px] rounded-full bg-primary", dir === "rtl" ? "right-0" : "left-0")} />
+                      )}
+                      <it.icon className={cn("h-4 w-4 shrink-0 transition-colors", active ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
+                      <span className="truncate">{t(it.key)}</span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+      </nav>
+
+      <div className="border-t border-sidebar-border/60 p-3">
+        <button
+          onClick={async () => { await signOut(); navigate({ to: "/auth", replace: true }); }}
+          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] text-muted-foreground hover:bg-sidebar-accent hover:text-foreground transition-colors"
+        >
+          <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-gradient-to-br from-primary/20 to-chart-4/20 text-[11px] font-semibold text-foreground">
+            {(user?.email ?? "?").charAt(0).toUpperCase()}
+          </div>
+          <span className="min-w-0 flex-1 truncate text-start">{user?.email}</span>
+          <LogOut className="h-3.5 w-3.5 shrink-0" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function AppShell({ children }: { children: React.ReactNode }) {
+  const { t, dir } = useI18n();
+  const navigate = useNavigate();
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [theme, setTheme] = useState<"dark" | "light">(() =>
     (typeof window !== "undefined" && (localStorage.getItem("theme") as "dark" | "light")) || "dark"
   );
@@ -94,106 +160,64 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="relative z-10 flex min-h-screen w-full text-foreground">
-      {/* Sidebar */}
-      <aside className={cn("hidden md:flex w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground", sideEdge, "border-sidebar-border")}>
-        <div className="flex h-14 items-center gap-2 px-4 border-b border-sidebar-border">
-          <div className="grid h-7 w-7 place-items-center rounded-md bg-gradient-to-br from-primary to-chart-4 shadow-[0_0_0_1px_oklch(1_0_0_/_0.08)_inset]">
-            <Sparkles className="h-3.5 w-3.5 text-primary-foreground" />
-          </div>
-          <div className="flex flex-col leading-tight">
-            <span className="text-sm font-semibold tracking-tight text-foreground">{t("app.name")}</span>
-            <span className="text-[10px] text-muted-foreground">ERP · v0.1</span>
-          </div>
-        </div>
-
-        <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-5">
-          {sections.map((sec) => (
-            <div key={sec.titleKey}>
-              <div className="px-2 pb-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                {t(sec.titleKey)}
-              </div>
-              <ul className="space-y-0.5">
-                {sec.items.map((it) => {
-                  const active = pathname === it.to || pathname.startsWith(it.to + "/");
-                  return (
-                    <li key={it.to}>
-                      <Link
-                        to={it.to}
-                        className={cn(
-                          "group flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] transition-colors",
-                          active
-                            ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                            : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
-                        )}
-                      >
-                        <it.icon className={cn("h-4 w-4 shrink-0", active ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
-                        <span className="truncate">{t(it.key)}</span>
-                        {active && <ChevronRight className={cn("ms-auto h-3.5 w-3.5 text-muted-foreground", dir === "rtl" && "rotate-180")} />}
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ))}
-        </nav>
-
-        <div className="border-t border-sidebar-border p-2">
-          <button
-            onClick={async () => { await signOut(); navigate({ to: "/auth", replace: true }); }}
-            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
-          >
-            <LogOut className="h-4 w-4" />
-            <span className="truncate">{user?.email}</span>
-          </button>
-        </div>
+      {/* Desktop sidebar */}
+      <aside className={cn("hidden md:flex w-64 shrink-0 flex-col", sideEdge, "border-sidebar-border/60")}>
+        <SidebarContents />
       </aside>
+
+      {/* Mobile drawer */}
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+        <SheetContent side={dir === "rtl" ? "right" : "left"} className="w-72 p-0 bg-sidebar border-sidebar-border/60">
+          <SidebarContents onNavigate={() => setMobileOpen(false)} />
+        </SheetContent>
+      </Sheet>
 
       {/* Main column */}
       <div className="flex flex-1 flex-col min-w-0">
         {/* Top bar */}
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-background/70 px-4 backdrop-blur-xl">
+        <header className="sticky top-0 z-30 flex h-16 items-center gap-2.5 border-b border-border/60 bg-background/70 px-4 backdrop-blur-xl sm:px-6">
+          <button
+            onClick={() => setMobileOpen(true)}
+            className="md:hidden grid h-10 w-10 place-items-center rounded-full border border-border/60 bg-surface text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Open menu"
+          >
+            <Menu className="h-4.5 w-4.5" />
+          </button>
+
           <button
             onClick={() => setPaletteOpen(true)}
-            className="group flex h-9 flex-1 max-w-md items-center gap-2 rounded-md border border-border bg-surface px-3 text-sm text-muted-foreground transition-colors hover:border-ring/40 hover:text-foreground"
+            className="group flex h-10 flex-1 max-w-xl items-center gap-2.5 rounded-full border border-border/60 bg-surface/80 px-4 text-sm text-muted-foreground transition-all hover:border-ring/40 hover:bg-surface hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
           >
             <Search className="h-4 w-4" />
             <span className="flex-1 text-start truncate">{t("common.search")}</span>
-            <kbd className="hidden sm:inline-flex items-center gap-1 rounded border border-border bg-background px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
+            <kbd className="hidden sm:inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/60 px-2 py-0.5 text-[10px] font-mono text-muted-foreground">
               <CommandIcon className="h-3 w-3" /> K
             </kbd>
           </button>
 
-          <div className="ms-auto flex items-center gap-1.5">
-            <button
-              onClick={() => setLang(lang === "en" ? "ar" : "en")}
-              className="flex h-9 items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-              title={t("common.language")}
-            >
-              <Languages className="h-3.5 w-3.5" />
-              {lang === "en" ? "EN" : "ع"}
-            </button>
+          <div className="ms-auto flex items-center gap-2">
             <button
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-surface text-muted-foreground hover:text-foreground transition-colors"
+              className="grid h-10 w-10 place-items-center rounded-full border border-border/60 bg-surface text-muted-foreground hover:text-foreground hover:border-ring/40 transition-colors"
               title={t("common.theme")}
+              aria-label={t("common.theme")}
             >
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
             <button
-              className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-surface text-muted-foreground hover:text-foreground transition-colors relative"
+              className="relative grid h-10 w-10 place-items-center rounded-full border border-border/60 bg-surface text-muted-foreground hover:text-foreground hover:border-ring/40 transition-colors"
               title={t("nav.notifications")}
+              aria-label={t("nav.notifications")}
               onClick={() => navigate({ to: "/notifications" })}
             >
               <Bell className="h-4 w-4" />
-              <span className="absolute top-1.5 end-1.5 h-1.5 w-1.5 rounded-full bg-primary" />
+              <span className="absolute top-2 end-2 h-1.5 w-1.5 rounded-full bg-primary ring-2 ring-background" />
             </button>
-
           </div>
         </header>
 
         <main className="flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-[1400px] p-6">{children}</div>
+          <div className="mx-auto w-full max-w-[1400px] p-4 sm:p-6">{children}</div>
         </main>
       </div>
 

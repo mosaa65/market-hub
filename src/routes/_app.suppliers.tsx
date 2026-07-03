@@ -62,18 +62,17 @@ function SuppliersPage() {
 
   return (
     <>
-      <PageHeader title={t("suppliers.title")} subtitle={t("suppliers.subtitle")}
-        actions={
-          <button onClick={() => setEdit({})} className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90">
-            <Plus className="h-4 w-4" /> {t("suppliers.new")}
-          </button>
-        }
-      />
+      <PageHeader title={t("suppliers.title")} subtitle={t("suppliers.subtitle")} />
       <div className="panel-elevated p-4">
-        <div className="relative mb-4">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground rtl:left-auto rtl:right-3" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t("suppliers.search")}
-            className="h-10 w-full rounded-md border border-input bg-surface pl-9 pr-3 text-sm rtl:pl-3 rtl:pr-9 focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20" />
+        <div className="mb-4 flex items-center gap-2">
+          <div className="flex h-10 flex-1 items-center gap-2 rounded-full border border-input bg-surface px-4 text-sm">
+            <Search className="h-4 w-4 text-muted-foreground" />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t("suppliers.search")}
+              className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground" />
+          </div>
+          <button onClick={() => setEdit({})} className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm shadow-primary/20 hover:opacity-90 transition">
+            <Plus className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{t("suppliers.new")}</span>
+          </button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

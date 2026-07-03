@@ -76,28 +76,26 @@ function ProductsPage() {
       <PageHeader
         title={t("products.title")}
         subtitle={t("products.subtitle")}
-        actions={
-          <button
-            onClick={() => { setEditing(null); setOpen(true); }}
-            className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:opacity-90 transition"
-          >
-            <Plus className="h-3.5 w-3.5" /> {t("common.new")}
-          </button>
-        }
       />
 
       <div className="panel-elevated overflow-hidden">
         <div className="flex items-center gap-2 border-b border-border p-3">
-          <div className="flex h-9 flex-1 items-center gap-2 rounded-md border border-border bg-surface px-3 text-sm">
-            <Search className="h-3.5 w-3.5 text-muted-foreground" />
+          <div className="flex h-10 flex-1 items-center gap-2 rounded-full border border-border bg-surface px-4 text-sm">
+            <Search className="h-4 w-4 text-muted-foreground" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
-                placeholder={t("products.search")}
+              placeholder={t("products.search")}
             />
+            <span className="hidden sm:inline text-[11px] text-muted-foreground tabular-nums">{filtered.length}</span>
           </div>
-          <span className="text-[11px] text-muted-foreground tabular-nums">{filtered.length} {t("products.items")}</span>
+          <button
+            onClick={() => { setEditing(null); setOpen(true); }}
+            className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm shadow-primary/20 hover:opacity-90 transition"
+          >
+            <Plus className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{t("common.new")}</span>
+          </button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -246,7 +244,7 @@ function ProductDialog({
       <form
         onSubmit={submit}
         onClick={(e) => e.stopPropagation()}
-        className="panel-elevated w-full max-w-2xl overflow-hidden"
+        className="panel-elevated w-full max-w-3xl overflow-hidden"
       >
         <div className="flex items-center justify-between border-b border-border px-5 py-3">
           <h2 className="text-sm font-semibold text-foreground">{initial ? t("products.edit_product") : t("products.new_product")}</h2>
@@ -255,21 +253,21 @@ function ProductDialog({
           </button>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 p-5 sm:grid-cols-2 max-h-[70vh] overflow-y-auto">
-          <Field label={`${t("products.name_ar")} *`} className="sm:col-span-2">
+        <div className="grid grid-cols-1 gap-3 p-5 sm:grid-cols-2 lg:grid-cols-3 max-h-[70vh] overflow-y-auto">
+          <Field label={`${t("products.name_ar")} *`}>
             <input value={form.name_ar} onChange={(e) => setForm({ ...form, name_ar: e.target.value })} className={inputCls} dir="rtl" required />
           </Field>
-          <Field label={t("products.name_en")} className="sm:col-span-2">
+          <Field label={t("products.name_en")}>
             <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} />
           </Field>
-          <Field label={t("products.sku")}><input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className={inputCls} /></Field>
-          <Field label={t("products.barcode")}><input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} className={inputCls} /></Field>
           <Field label={t("products.category")}>
             <select value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })} className={inputCls}>
               <option value="">—</option>
               {meta.categories.map((c) => <option key={c.id} value={c.id}>{labelOf(c.name, c.name_ar)}</option>)}
             </select>
           </Field>
+          <Field label={t("products.sku")}><input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className={inputCls} /></Field>
+          <Field label={t("products.barcode")}><input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} className={inputCls} /></Field>
           <Field label={t("products.brand")}>
             <select value={form.brand_id} onChange={(e) => setForm({ ...form, brand_id: e.target.value })} className={inputCls}>
               <option value="">—</option>
@@ -282,10 +280,10 @@ function ProductDialog({
               {meta.units.map((u) => <option key={u.id} value={u.id}>{labelOf(u.name, u.name_ar)} ({u.short_name})</option>)}
             </select>
           </Field>
-          <Field label={t("products.min")}><input type="number" step="0.01" value={form.min_stock} onChange={(e) => setForm({ ...form, min_stock: e.target.value })} className={inputCls} /></Field>
           <Field label={t("common.cost")}><input type="number" step="0.01" value={form.cost_price} onChange={(e) => setForm({ ...form, cost_price: e.target.value })} className={inputCls} /></Field>
           <Field label={t("common.price")}><input type="number" step="0.01" value={form.sale_price} onChange={(e) => setForm({ ...form, sale_price: e.target.value })} className={inputCls} /></Field>
           <Field label={t("products.tax_rate")}><input type="number" step="0.01" value={form.tax_rate} onChange={(e) => setForm({ ...form, tax_rate: e.target.value })} className={inputCls} /></Field>
+          <Field label={t("products.min")}><input type="number" step="0.01" value={form.min_stock} onChange={(e) => setForm({ ...form, min_stock: e.target.value })} className={inputCls} /></Field>
           <Field label={t("common.status")}>
             <label className="flex h-9 items-center gap-2 rounded-md border border-border bg-surface px-3 text-sm">
               <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} />

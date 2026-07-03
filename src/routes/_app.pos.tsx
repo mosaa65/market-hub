@@ -21,6 +21,8 @@ interface Product {
   sale_price: number;
   tax_rate: number;
   image_url: string | null;
+  unit?: { short_name: string; name_ar: string | null; name: string } | null;
+  category?: { name: string; name_ar: string | null } | null;
 }
 interface CartLine {
   product_id: string;
@@ -57,7 +59,7 @@ function POSPage() {
     const [{ data: ws }, { data: cs }, { data: ps }] = await Promise.all([
       supabase.from("warehouses").select("id,name").eq("is_active", true).order("name"),
       supabase.from("customers").select("id,name").eq("is_active", true).order("name"),
-      supabase.from("products").select("id,sku,barcode,name,name_ar,sale_price,tax_rate,image_url").eq("is_active", true).order("name").limit(500),
+      supabase.from("products").select("id,sku,barcode,name,name_ar,sale_price,tax_rate,image_url,unit:units(short_name,name,name_ar),category:categories(name,name_ar)").eq("is_active", true).order("name").limit(500),
     ]);
     setWarehouses(ws ?? []);
     setCustomers(cs ?? []);
@@ -192,15 +194,20 @@ function POSPage() {
             {filtered.map(p => {
               const stock = stockMap[p.id] ?? 0;
               const low = stock <= 0;
+              const catLabel = lang === "ar" ? (p.category?.name_ar || p.category?.name) : (p.category?.name || p.category?.name_ar);
+              const unitLabel = lang === "ar" ? (p.unit?.name_ar || p.unit?.short_name) : (p.unit?.short_name || p.unit?.name_ar);
               return (
                 <button
                   key={p.id}
                   onClick={() => addToCart(p)}
                   disabled={low}
-                  className="group relative flex flex-col items-start gap-1 rounded-lg border border-border bg-surface p-3 text-start transition hover:border-ring hover:bg-surface-2 disabled:opacity-40"
+                  className="group relative flex flex-col items-start gap-1 rounded-xl border border-border bg-surface p-3 text-start transition hover:border-ring hover:bg-surface-2 disabled:opacity-40"
                 >
                   <div className="line-clamp-2 text-sm font-medium">{lang === "ar" && p.name_ar ? p.name_ar : p.name}</div>
-                  <div className="text-[11px] text-muted-foreground">{p.sku ?? "—"}</div>
+                  <div className="flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground">
+                    {catLabel && <span className="rounded-full bg-surface-2 px-1.5 py-0.5">{catLabel}</span>}
+                    {unitLabel && <span className="rounded-full bg-surface-2 px-1.5 py-0.5">{unitLabel}</span>}
+                  </div>
                   <div className="mt-1 flex w-full items-center justify-between">
                     <span className="text-sm font-semibold text-primary">{money(Number(p.sale_price))}</span>
                     <span className={`text-[10px] ${low ? "text-destructive" : "text-muted-foreground"}`}>{stock}</span>
