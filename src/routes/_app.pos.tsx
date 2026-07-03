@@ -21,6 +21,8 @@ interface Product {
   sale_price: number;
   tax_rate: number;
   image_url: string | null;
+  unit?: { short_name: string; name_ar: string | null; name: string } | null;
+  category?: { name: string; name_ar: string | null } | null;
 }
 interface CartLine {
   product_id: string;
