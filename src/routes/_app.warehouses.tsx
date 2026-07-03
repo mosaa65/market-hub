@@ -197,10 +197,10 @@ function WarehouseDialog({ initial, onClose, onSaved }: { initial: Row | null; o
           <button type="button" onClick={onClose} className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-accent"><X className="h-4 w-4" /></button>
         </div>
         <div className="grid grid-cols-1 gap-3 p-5 sm:grid-cols-2">
-          <Field label={`${t("warehouses.name_ar")} *`} className="sm:col-span-2">
+          <Field label={`${t("warehouses.name_ar")} *`}>
             <input value={form.name_ar} onChange={(e) => setForm({ ...form, name_ar: e.target.value })} className={inputCls} dir="rtl" required />
           </Field>
-          <Field label={t("warehouses.name")} className="sm:col-span-2">
+          <Field label={t("warehouses.name")}>
             <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} />
           </Field>
           <Field label={t("warehouses.code")}>
