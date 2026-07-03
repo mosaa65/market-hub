@@ -19,7 +19,7 @@ export const Route = createFileRoute("/_app/settings")({
 });
 
 function SettingsPage() {
-  const { t, lang } = useI18n();
+  const { t, lang, setLang } = useI18n();
   const { hasRole } = useAuth();
   const canEdit = hasRole("owner") || hasRole("manager");
   const [form, setForm] = useState<any>({
