@@ -92,6 +92,29 @@ function SettingsPage() {
             <Field label={lang === "ar" ? "رابط الشعار" : "Logo URL"} v={form.logo_url ?? ""} on={(v) => setForm({ ...form, logo_url: v })} disabled={!canEdit} />
           </CardContent>
         </Card>
+        <Card className="lg:col-span-2">
+          <CardHeader><CardTitle className="text-base flex items-center gap-2"><Languages className="h-4 w-4" />{lang === "ar" ? "المظهر واللغة" : "Appearance & Language"}</CardTitle></CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between rounded-md border border-border p-3">
+              <div>
+                <div className="text-sm font-medium">{lang === "ar" ? "اللغة" : "Language"}</div>
+                <div className="text-xs text-muted-foreground">{lang === "ar" ? "اختر لغة الواجهة، يتم حفظ اختيارك تلقائياً" : "Choose the interface language, your choice is saved automatically"}</div>
+              </div>
+              <div className="inline-flex rounded-full border border-border bg-surface p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setLang("en")}
+                  className={`h-8 rounded-full px-4 text-xs font-medium transition-colors ${lang === "en" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                >English</button>
+                <button
+                  type="button"
+                  onClick={() => setLang("ar")}
+                  className={`h-8 rounded-full px-4 text-xs font-medium transition-colors ${lang === "ar" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                >العربية</button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </>
   );
