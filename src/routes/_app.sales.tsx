@@ -41,6 +41,9 @@ function SalesPage() {
   const [lines, setLines] = useState<Line[]>([]);
   const [printOpen, setPrintOpen] = useState(false);
 
+  const whName = (w: { name: string; name_ar: string | null } | null | undefined) =>
+    !w ? undefined : (lang === "ar" ? (w.name_ar || w.name) : (w.name || w.name_ar || undefined));
+
   async function buildDoc(): Promise<InvoiceDoc | null> {
     if (!selected) return null;
     const { data: cs } = await supabase.from("company_settings").select("*").limit(1).maybeSingle();
@@ -50,7 +53,7 @@ function SalesPage() {
       date: new Date(selected.created_at).toLocaleString(),
       partyLabel: t("sales.bill_to"),
       partyName: selected.customers?.name ?? t("pos.walkin"),
-      warehouse: selected.warehouses?.name ?? undefined,
+      warehouse: whName(selected.warehouses) ?? undefined,
       payment: pmLabel(selected.payment_method),
       status: statusLabel(selected.status),
       lines: lines.map(l => ({ product: l.products?.name ?? "—", qty: Number(l.quantity), price: Number(l.unit_price), total: Number(l.total) })),
