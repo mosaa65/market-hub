@@ -170,7 +170,7 @@ function POSPage() {
         actions={
           <div className="flex items-center gap-2">
             <select value={warehouseId} onChange={e => setWarehouseId(e.target.value)} className="h-9 rounded-md border border-input bg-surface px-2 text-sm">
-              {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+              {warehouses.map(w => <option key={w.id} value={w.id}>{lang === "ar" ? (w.name_ar || w.name) : (w.name || w.name_ar)}</option>)}
             </select>
           </div>
         }
