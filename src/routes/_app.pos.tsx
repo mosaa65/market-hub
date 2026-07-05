@@ -312,25 +312,100 @@ function POSPage() {
       </div>
 
       {lastInvoice && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur-sm p-4">
-          <div className="panel-elevated w-full max-w-sm p-6">
+        <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur-sm p-4" onClick={() => setLastInvoice(null)}>
+          <div className="panel-elevated w-full max-w-2xl p-6" onClick={e => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold">{t("pos.sale_complete")}</h3>
+              <div>
+                <h3 className="text-lg font-semibold">{t("pos.sale_complete")}</h3>
+                <p className="text-xs text-muted-foreground">{t("pos.invoice_number")}: <span className="font-mono">{lastInvoice.number}</span></p>
+              </div>
               <button onClick={() => setLastInvoice(null)} className="rounded p-1 hover:bg-surface-2"><X className="h-4 w-4" /></button>
             </div>
-            <p className="text-sm text-muted-foreground">{t("pos.invoice_number")}</p>
-            <p className="mb-4 font-mono text-lg">{lastInvoice.number}</p>
-            <div className="flex gap-2">
-              <button onClick={() => window.print()} className="flex h-9 flex-1 items-center justify-center gap-2 rounded-md border border-border text-sm hover:bg-surface-2">
-                <Printer className="h-4 w-4" /> {t("common.print")}
+            <p className="mb-3 text-sm font-medium">{t("print.title")}</p>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <TemplateCard
+                icon={<ScrollText className="h-6 w-6" />}
+                title={t("print.thermal")}
+                desc={t("print.thermal_desc")}
+                accent="from-amber-500/20 to-orange-500/10 border-amber-500/30"
+                onClick={() => doPrintLast("thermal")}
+              />
+              <TemplateCard
+                icon={<Printer className="h-6 w-6" />}
+                title={t("print.standard")}
+                desc={t("print.standard_desc")}
+                accent="from-blue-500/20 to-indigo-500/10 border-blue-500/30"
+                onClick={() => doPrintLast("standard")}
+              />
+              <TemplateCard
+                icon={<Sparkles className="h-6 w-6" />}
+                title={t("print.elegant")}
+                desc={t("print.elegant_desc")}
+                accent="from-yellow-500/20 via-amber-500/10 to-rose-500/10 border-yellow-500/40"
+                onClick={() => doPrintLast("elegant")}
+              />
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button onClick={doPDFLast} className="flex items-center gap-1.5 h-9 rounded-md border border-border px-4 text-sm hover:bg-surface-2">
+                <FileDown className="h-4 w-4" /> {t("print.download_pdf")}
               </button>
-              <button onClick={() => setLastInvoice(null)} className="h-9 flex-1 rounded-md bg-primary text-sm font-medium text-primary-foreground hover:opacity-90">{t("pos.new_sale")}</button>
+              <button onClick={() => setLastInvoice(null)} className="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90">{t("pos.new_sale")}</button>
             </div>
           </div>
         </div>
       )}
     </>
   );
+
+  async function buildLastDoc(): Promise<InvoiceDoc | null> {
+    if (!lastInvoice) return null;
+    const [{ data: inv }, { data: items }, { data: cs }] = await Promise.all([
+      supabase.from("sales_invoices").select("invoice_number,status,subtotal,discount,tax,total,paid,payment_method,created_at,customers(name),warehouses(name,name_ar)").eq("id", lastInvoice.id).maybeSingle(),
+      supabase.from("sales_invoice_items").select("quantity,unit_price,total,products(name,name_ar)").eq("invoice_id", lastInvoice.id),
+      supabase.from("company_settings").select("*").limit(1).maybeSingle(),
+    ]);
+    if (!inv) return null;
+    const wh = (inv as any).warehouses;
+    const whLabel = wh ? (lang === "ar" ? (wh.name_ar || wh.name) : (wh.name || wh.name_ar)) : undefined;
+    const pmMap: Record<string, string> = { cash: t("pos.pm.cash"), card: t("pos.pm.card"), bank_transfer: t("pos.pm.bank"), credit: t("pos.pm.credit") };
+    const stMap: Record<string, string> = { paid: t("sales.status.paid"), partial: t("sales.status.partial"), unpaid: t("sales.status.unpaid"), cancelled: t("sales.status.cancelled") };
+    return {
+      title: t("sales.invoice_doc"),
+      number: (inv as any).invoice_number,
+      date: new Date((inv as any).created_at).toLocaleString(),
+      partyLabel: t("sales.bill_to"),
+      partyName: (inv as any).customers?.name ?? t("pos.walkin"),
+      warehouse: whLabel,
+      payment: pmMap[(inv as any).payment_method] ?? (inv as any).payment_method,
+      status: stMap[(inv as any).status] ?? (inv as any).status,
+      lines: (items ?? []).map((l: any) => ({
+        product: lang === "ar" ? (l.products?.name_ar || l.products?.name || "—") : (l.products?.name || l.products?.name_ar || "—"),
+        qty: Number(l.quantity), price: Number(l.unit_price), total: Number(l.total),
+      })),
+      subtotal: Number((inv as any).subtotal), tax: Number((inv as any).tax), discount: Number((inv as any).discount),
+      total: Number((inv as any).total), paid: Number((inv as any).paid),
+      company: cs ? { name: (cs as any).company_name, address: (cs as any).address, phone: (cs as any).phone, vat: (cs as any).vat_number } : undefined,
+      currency: (cs as any)?.currency ?? "",
+    };
+  }
+
+  async function doPrintLast(template: InvoiceTemplate) {
+    const doc = await buildLastDoc();
+    if (!doc) return;
+    printInvoice(doc, template, {
+      invoice: t("sales.invoice"), date: t("common.date"), billTo: t("sales.bill_to"),
+      warehouse: t("common.warehouse"), payment: t("sales.payment"), status: t("common.status"),
+      product: t("common.product"), qty: t("common.qty"), price: t("common.price"), total: t("common.total"),
+      subtotal: t("common.subtotal"), tax: t("common.tax"), discount: t("common.discount"),
+      grandTotal: t("common.total"), paid: t("common.paid"), balance: t("common.balance"),
+      thanks: t("print.thanks"), poweredBy: t("print.powered"),
+    }, lang === "ar");
+  }
+
+  async function doPDFLast() {
+    const doc = await buildLastDoc();
+    if (doc) generateInvoicePDF(doc);
+  }
 }
 
 function Row({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
@@ -341,3 +416,19 @@ function Row({ label, value, bold }: { label: string; value: string; bold?: bool
     </div>
   );
 }
+
+function TemplateCard({ icon, title, desc, accent, onClick }: { icon: ReactNode; title: string; desc: string; accent: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`group relative overflow-hidden rounded-lg border bg-gradient-to-br p-4 text-start transition hover:scale-[1.02] hover:shadow-lg ${accent}`}
+    >
+      <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-md bg-background/60 backdrop-blur">
+        {icon}
+      </div>
+      <div className="font-semibold">{title}</div>
+      <div className="mt-1 text-xs text-muted-foreground">{desc}</div>
+    </button>
+  );
+}
+
