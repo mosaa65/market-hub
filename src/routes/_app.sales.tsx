@@ -25,7 +25,7 @@ interface Invoice {
   payment_method: string;
   created_at: string;
   customers: { name: string } | null;
-  warehouses: { name: string } | null;
+  warehouses: { name: string; name_ar: string | null } | null;
 }
 interface Line {
   id: string; quantity: number; unit_price: number; tax: number; total: number;
