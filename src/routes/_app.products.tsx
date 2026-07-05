@@ -150,12 +150,12 @@ function ProductsPage() {
                     <div className="inline-flex items-center gap-1">
                       <button
                         onClick={() => { setEditing(p); setOpen(true); }}
-                        className="grid h-7 w-7 place-items-center rounded-md border border-border bg-surface text-muted-foreground hover:text-foreground transition"
+                        className="grid h-8 w-8 place-items-center rounded-full border border-border bg-surface text-muted-foreground hover:bg-surface-2 hover:text-foreground transition"
                         title={t("common.edit")}
                       ><Pencil className="h-3.5 w-3.5" /></button>
                       <button
                         onClick={() => { if (confirm(`${t("common.delete")} "${primary}"?`)) remove.mutate(p.id); }}
-                        className="grid h-7 w-7 place-items-center rounded-md border border-border bg-surface text-muted-foreground hover:text-destructive transition"
+                        className="grid h-8 w-8 place-items-center rounded-full border border-destructive/30 bg-destructive/5 text-destructive hover:bg-destructive/10 transition"
                         title={t("common.delete")}
                       ><Trash2 className="h-3.5 w-3.5" /></button>
                     </div>
