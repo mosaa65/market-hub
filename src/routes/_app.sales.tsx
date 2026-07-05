@@ -84,7 +84,7 @@ function SalesPage() {
     setLoading(true);
     const { data } = await supabase
       .from("sales_invoices")
-      .select("id,invoice_number,status,subtotal,discount,tax,total,paid,payment_method,created_at,customers(name),warehouses(name)")
+      .select("id,invoice_number,status,subtotal,discount,tax,total,paid,payment_method,created_at,customers(name),warehouses(name,name_ar)")
       .order("created_at", { ascending: false })
       .limit(200);
     setRows((data ?? []) as any);
