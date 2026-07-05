@@ -33,7 +33,7 @@ interface CartLine {
   tax_rate: number;
   quantity: number;
 }
-interface Warehouse { id: string; name: string }
+interface Warehouse { id: string; name: string; name_ar: string | null }
 interface Customer { id: string; name: string }
 
 function POSPage() {
