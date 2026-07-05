@@ -31,7 +31,7 @@ function InventoryPage() {
   const { data: warehouses } = useQuery({
     queryKey: ["warehouses"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("warehouses").select("id, name, code, is_default").eq("is_active", true).order("is_default", { ascending: false });
+      const { data, error } = await supabase.from("warehouses").select("id, name, name_ar, code, is_default").eq("is_active", true).order("is_default", { ascending: false });
       if (error) throw error;
       const list = data ?? [];
       if (list.length && !warehouseId) setWarehouseId(list[0].id);
