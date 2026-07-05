@@ -1,11 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Search, Plus, Minus, Trash2, ScanBarcode, Loader2, X, Printer } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Search, Plus, Minus, Trash2, ScanBarcode, Loader2, X, Printer, Sparkles, ScrollText, FileDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { money } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
 import { toast } from "sonner";
+import { printInvoice, type InvoiceTemplate } from "@/lib/invoice-print";
+import { generateInvoicePDF, type InvoiceDoc } from "@/lib/pdf";
 
 export const Route = createFileRoute("/_app/pos")({
   head: () => ({ meta: [{ title: "POS — Vortex ERP" }] }),
