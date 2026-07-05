@@ -170,7 +170,7 @@ function SalesPage() {
                   <td className="px-3 py-2.5 font-mono text-xs">{r.invoice_number}</td>
                   <td className="px-3 py-2.5 text-muted-foreground">{new Date(r.created_at).toLocaleString()}</td>
                   <td className="px-3 py-2.5">{r.customers?.name ?? t("pos.walkin")}</td>
-                  <td className="px-3 py-2.5 text-muted-foreground">{r.warehouses?.name ?? "—"}</td>
+                  <td className="px-3 py-2.5 text-muted-foreground">{whName(r.warehouses) ?? "—"}</td>
                   <td className="px-3 py-2.5 text-muted-foreground">{pmLabel(r.payment_method)}</td>
                   <td className="px-3 py-2.5">
                     <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] ${statusColor(r.status)}`}>{statusLabel(r.status)}</span>
@@ -200,7 +200,7 @@ function SalesPage() {
             </div>
             <div className="mb-4 grid grid-cols-2 gap-3 text-sm">
               <Field label={t("common.customer")} value={selected.customers?.name ?? t("pos.walkin")} />
-              <Field label={t("common.warehouse")} value={selected.warehouses?.name ?? "—"} />
+              <Field label={t("common.warehouse")} value={whName(selected.warehouses) ?? "—"} />
               <Field label={t("sales.payment")} value={pmLabel(selected.payment_method)} />
               <Field label={t("common.status")} value={statusLabel(selected.status)} />
             </div>
