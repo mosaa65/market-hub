@@ -104,9 +104,9 @@ function SuppliersPage() {
                     </span>
                   </td>
                   <td className="px-3 py-2.5 text-end">
-                    <div className="flex justify-end gap-1">
-                      <button onClick={() => setEdit(r)} className="rounded p-1.5 text-muted-foreground hover:bg-surface-2 hover:text-foreground"><Edit className="h-4 w-4" /></button>
-                      <button onClick={() => remove(r.id)} className="rounded p-1.5 text-muted-foreground hover:bg-surface-2 hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
+                    <div className="flex justify-end gap-1.5">
+                      <button onClick={() => setEdit(r)} title={t("common.edit")} className="grid h-8 w-8 place-items-center rounded-full border border-border bg-surface text-muted-foreground hover:bg-surface-2 hover:text-foreground transition"><Edit className="h-3.5 w-3.5" /></button>
+                      <button onClick={() => remove(r.id)} title={t("common.delete")} className="grid h-8 w-8 place-items-center rounded-full border border-destructive/30 bg-destructive/5 text-destructive hover:bg-destructive/10 transition"><Trash2 className="h-3.5 w-3.5" /></button>
                     </div>
                   </td>
                 </tr>
