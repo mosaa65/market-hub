@@ -204,7 +204,7 @@ function ViewDialog({ invoice, lines, onClose, pmLabel, statusLabel }: { invoice
 }
 
 function CreateDialog({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [products, setProducts] = useState<Product[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
