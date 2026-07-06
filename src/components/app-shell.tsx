@@ -5,7 +5,7 @@ import {
   Users, Building2, Wallet, BarChart3, ShieldCheck, Bell, Settings,
   Search, Command as CommandIcon, LogOut, Moon, Sun, Sparkles,
   RotateCcw, ArrowRightLeft, CalendarClock, Barcode, Gift, History, Layers, Boxes,
-  Menu,
+  Menu, HandCoins, AlertTriangle,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";

@@ -28,6 +28,7 @@ import { Route as AppNotificationsRouteImport } from './routes/_app.notification
 import { Route as AppLoyaltyRouteImport } from './routes/_app.loyalty'
 import { Route as AppInventoryRouteImport } from './routes/_app.inventory'
 import { Route as AppFinanceRouteImport } from './routes/_app.finance'
+import { Route as AppDebtsRouteImport } from './routes/_app.debts'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppCustomersRouteImport } from './routes/_app.customers'
 import { Route as AppCatalogRouteImport } from './routes/_app.catalog'
@@ -129,6 +130,11 @@ const AppFinanceRoute = AppFinanceRouteImport.update({
   path: '/finance',
   getParentRoute: () => AppRoute,
 } as any)
+const AppDebtsRoute = AppDebtsRouteImport.update({
+  id: '/debts',
+  path: '/debts',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -169,6 +175,7 @@ export interface FileRoutesByFullPath {
   '/catalog': typeof AppCatalogRoute
   '/customers': typeof AppCustomersRoute
   '/dashboard': typeof AppDashboardRoute
+  '/debts': typeof AppDebtsRoute
   '/finance': typeof AppFinanceRoute
   '/inventory': typeof AppInventoryRoute
   '/loyalty': typeof AppLoyaltyRoute
@@ -195,6 +202,7 @@ export interface FileRoutesByTo {
   '/catalog': typeof AppCatalogRoute
   '/customers': typeof AppCustomersRoute
   '/dashboard': typeof AppDashboardRoute
+  '/debts': typeof AppDebtsRoute
   '/finance': typeof AppFinanceRoute
   '/inventory': typeof AppInventoryRoute
   '/loyalty': typeof AppLoyaltyRoute
@@ -223,6 +231,7 @@ export interface FileRoutesById {
   '/_app/catalog': typeof AppCatalogRoute
   '/_app/customers': typeof AppCustomersRoute
   '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/debts': typeof AppDebtsRoute
   '/_app/finance': typeof AppFinanceRoute
   '/_app/inventory': typeof AppInventoryRoute
   '/_app/loyalty': typeof AppLoyaltyRoute
@@ -251,6 +260,7 @@ export interface FileRouteTypes {
     | '/catalog'
     | '/customers'
     | '/dashboard'
+    | '/debts'
     | '/finance'
     | '/inventory'
     | '/loyalty'
@@ -277,6 +287,7 @@ export interface FileRouteTypes {
     | '/catalog'
     | '/customers'
     | '/dashboard'
+    | '/debts'
     | '/finance'
     | '/inventory'
     | '/loyalty'
@@ -304,6 +315,7 @@ export interface FileRouteTypes {
     | '/_app/catalog'
     | '/_app/customers'
     | '/_app/dashboard'
+    | '/_app/debts'
     | '/_app/finance'
     | '/_app/inventory'
     | '/_app/loyalty'
@@ -463,6 +475,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppFinanceRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/debts': {
+      id: '/_app/debts'
+      path: '/debts'
+      fullPath: '/debts'
+      preLoaderRoute: typeof AppDebtsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/dashboard': {
       id: '/_app/dashboard'
       path: '/dashboard'
@@ -515,6 +534,7 @@ interface AppRouteChildren {
   AppCatalogRoute: typeof AppCatalogRoute
   AppCustomersRoute: typeof AppCustomersRoute
   AppDashboardRoute: typeof AppDashboardRoute
+  AppDebtsRoute: typeof AppDebtsRoute
   AppFinanceRoute: typeof AppFinanceRoute
   AppInventoryRoute: typeof AppInventoryRoute
   AppLoyaltyRoute: typeof AppLoyaltyRoute
@@ -540,6 +560,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppCatalogRoute: AppCatalogRoute,
   AppCustomersRoute: AppCustomersRoute,
   AppDashboardRoute: AppDashboardRoute,
+  AppDebtsRoute: AppDebtsRoute,
   AppFinanceRoute: AppFinanceRoute,
   AppInventoryRoute: AppInventoryRoute,
   AppLoyaltyRoute: AppLoyaltyRoute,
