@@ -17,7 +17,7 @@ interface Invoice {
   subtotal: number; discount: number; tax: number; total: number; paid: number;
   payment_method: string; created_at: string;
   suppliers: { name: string } | null;
-  warehouses: { name: string } | null;
+  warehouses: { name: string; name_ar: string | null } | null;
 }
 interface Line {
   id: string; quantity: number; unit_cost: number; tax: number; total: number;
