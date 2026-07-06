@@ -25,7 +25,7 @@ interface Line {
 }
 interface Product { id: string; name: string; sku: string | null; cost_price: number; tax_rate: number }
 interface Supplier { id: string; name: string }
-interface Warehouse { id: string; name: string }
+interface Warehouse { id: string; name: string; name_ar: string | null }
 interface CartLine { product_id: string; name: string; unit_cost: number; tax_rate: number; quantity: number }
 
 function PurchasesPage() {
