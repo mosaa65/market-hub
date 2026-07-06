@@ -100,7 +100,7 @@ function ReturnsPage() {
                       <TableCell className="font-mono text-xs">{r.return_number}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleString()}</TableCell>
                       <TableCell>{r.suppliers?.name ?? "—"}</TableCell>
-                      <TableCell>{r.warehouses?.name}</TableCell>
+                      <TableCell>{whName(r.warehouses)}</TableCell>
                       <TableCell className="text-end font-mono">{money(Number(r.total))}</TableCell>
                     </TableRow>
                   ))}
