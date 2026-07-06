@@ -249,7 +249,7 @@ function NewPurchaseReturn({ onSaved }: { onSaved: () => void }) {
   useEffect(() => {
     if (!open) return;
     Promise.all([
-      supabase.from("warehouses").select("id,name").eq("is_active", true).order("name"),
+      supabase.from("warehouses").select("id,name,name_ar").eq("is_active", true).order("name"),
       supabase.from("suppliers").select("id,name").eq("is_active", true).order("name"),
       supabase.from("products").select("id,name,name_ar,sku,cost_price,tax_rate").eq("is_active", true).order("name").limit(200),
     ]).then(([w, s, p]) => {
