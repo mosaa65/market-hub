@@ -23,8 +23,9 @@ function TransfersPage() {
   const { t, lang } = useI18n();
   const [list, setList] = useState<any[]>([]);
 
+  const whName = (w?: { name: string; name_ar?: string | null } | null) => !w ? "—" : lang === "ar" ? (w.name_ar || w.name) : (w.name || w.name_ar || "—");
   async function load() {
-    const { data } = await supabase.from("stock_transfers").select("*, from:warehouses!stock_transfers_from_warehouse_id_fkey(name), to:warehouses!stock_transfers_to_warehouse_id_fkey(name), stock_transfer_items(quantity)").order("created_at", { ascending: false }).limit(100);
+    const { data } = await supabase.from("stock_transfers").select("*, from:warehouses!stock_transfers_from_warehouse_id_fkey(name,name_ar), to:warehouses!stock_transfers_to_warehouse_id_fkey(name,name_ar), stock_transfer_items(quantity)").order("created_at", { ascending: false }).limit(100);
     setList(data ?? []);
   }
   useEffect(() => { load(); }, []);
@@ -52,9 +53,9 @@ function TransfersPage() {
                   <TableRow key={r.id}>
                     <TableCell className="font-mono text-xs">{r.transfer_number}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleString()}</TableCell>
-                    <TableCell>{r.from?.name}</TableCell>
+                    <TableCell>{whName(r.from)}</TableCell>
                     <TableCell><ArrowRightLeft className="h-4 w-4 text-muted-foreground" /></TableCell>
-                    <TableCell>{r.to?.name}</TableCell>
+                    <TableCell>{whName(r.to)}</TableCell>
                     <TableCell className="text-end font-mono">{r.stock_transfer_items?.length ?? 0}</TableCell>
                   </TableRow>
                 ))}
@@ -80,7 +81,7 @@ function NewTransfer({ onSaved }: { onSaved: () => void }) {
   useEffect(() => {
     if (!open) return;
     Promise.all([
-      supabase.from("warehouses").select("id,name").eq("is_active", true).order("name"),
+      supabase.from("warehouses").select("id,name,name_ar").eq("is_active", true).order("name"),
       supabase.from("products").select("id,name,name_ar,sku").eq("is_active", true).order("name").limit(200),
     ]).then(([w, p]) => {
       setWarehouses(w.data ?? []); setProducts(p.data ?? []);
@@ -121,12 +122,12 @@ function NewTransfer({ onSaved }: { onSaved: () => void }) {
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5"><Label>{lang === "ar" ? "من مستودع" : "From warehouse"}</Label>
               <Select value={from} onValueChange={setFrom}><SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                <SelectContent>{warehouses.map((w) => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}</SelectContent>
+                <SelectContent>{warehouses.map((w) => <SelectItem key={w.id} value={w.id}>{lang === "ar" ? (w.name_ar || w.name) : (w.name || w.name_ar || "")}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="grid gap-1.5"><Label>{lang === "ar" ? "إلى مستودع" : "To warehouse"}</Label>
               <Select value={to} onValueChange={setTo}><SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                <SelectContent>{warehouses.filter((w) => w.id !== from).map((w) => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}</SelectContent>
+                <SelectContent>{warehouses.filter((w) => w.id !== from).map((w) => <SelectItem key={w.id} value={w.id}>{lang === "ar" ? (w.name_ar || w.name) : (w.name || w.name_ar || "")}</SelectItem>)}</SelectContent>
               </Select>
             </div>
           </div>

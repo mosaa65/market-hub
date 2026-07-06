@@ -23,10 +23,12 @@ import { Route as AppReportsRouteImport } from './routes/_app.reports'
 import { Route as AppPurchasesRouteImport } from './routes/_app.purchases'
 import { Route as AppProductsRouteImport } from './routes/_app.products'
 import { Route as AppPosRouteImport } from './routes/_app.pos'
+import { Route as AppPaymentsRouteImport } from './routes/_app.payments'
 import { Route as AppNotificationsRouteImport } from './routes/_app.notifications'
 import { Route as AppLoyaltyRouteImport } from './routes/_app.loyalty'
 import { Route as AppInventoryRouteImport } from './routes/_app.inventory'
 import { Route as AppFinanceRouteImport } from './routes/_app.finance'
+import { Route as AppDebtsRouteImport } from './routes/_app.debts'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppCustomersRouteImport } from './routes/_app.customers'
 import { Route as AppCatalogRouteImport } from './routes/_app.catalog'
@@ -103,6 +105,11 @@ const AppPosRoute = AppPosRouteImport.update({
   path: '/pos',
   getParentRoute: () => AppRoute,
 } as any)
+const AppPaymentsRoute = AppPaymentsRouteImport.update({
+  id: '/payments',
+  path: '/payments',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppNotificationsRoute = AppNotificationsRouteImport.update({
   id: '/notifications',
   path: '/notifications',
@@ -121,6 +128,11 @@ const AppInventoryRoute = AppInventoryRouteImport.update({
 const AppFinanceRoute = AppFinanceRouteImport.update({
   id: '/finance',
   path: '/finance',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDebtsRoute = AppDebtsRouteImport.update({
+  id: '/debts',
+  path: '/debts',
   getParentRoute: () => AppRoute,
 } as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
@@ -163,10 +175,12 @@ export interface FileRoutesByFullPath {
   '/catalog': typeof AppCatalogRoute
   '/customers': typeof AppCustomersRoute
   '/dashboard': typeof AppDashboardRoute
+  '/debts': typeof AppDebtsRoute
   '/finance': typeof AppFinanceRoute
   '/inventory': typeof AppInventoryRoute
   '/loyalty': typeof AppLoyaltyRoute
   '/notifications': typeof AppNotificationsRoute
+  '/payments': typeof AppPaymentsRoute
   '/pos': typeof AppPosRoute
   '/products': typeof AppProductsRoute
   '/purchases': typeof AppPurchasesRoute
@@ -188,10 +202,12 @@ export interface FileRoutesByTo {
   '/catalog': typeof AppCatalogRoute
   '/customers': typeof AppCustomersRoute
   '/dashboard': typeof AppDashboardRoute
+  '/debts': typeof AppDebtsRoute
   '/finance': typeof AppFinanceRoute
   '/inventory': typeof AppInventoryRoute
   '/loyalty': typeof AppLoyaltyRoute
   '/notifications': typeof AppNotificationsRoute
+  '/payments': typeof AppPaymentsRoute
   '/pos': typeof AppPosRoute
   '/products': typeof AppProductsRoute
   '/purchases': typeof AppPurchasesRoute
@@ -215,10 +231,12 @@ export interface FileRoutesById {
   '/_app/catalog': typeof AppCatalogRoute
   '/_app/customers': typeof AppCustomersRoute
   '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/debts': typeof AppDebtsRoute
   '/_app/finance': typeof AppFinanceRoute
   '/_app/inventory': typeof AppInventoryRoute
   '/_app/loyalty': typeof AppLoyaltyRoute
   '/_app/notifications': typeof AppNotificationsRoute
+  '/_app/payments': typeof AppPaymentsRoute
   '/_app/pos': typeof AppPosRoute
   '/_app/products': typeof AppProductsRoute
   '/_app/purchases': typeof AppPurchasesRoute
@@ -242,10 +260,12 @@ export interface FileRouteTypes {
     | '/catalog'
     | '/customers'
     | '/dashboard'
+    | '/debts'
     | '/finance'
     | '/inventory'
     | '/loyalty'
     | '/notifications'
+    | '/payments'
     | '/pos'
     | '/products'
     | '/purchases'
@@ -267,10 +287,12 @@ export interface FileRouteTypes {
     | '/catalog'
     | '/customers'
     | '/dashboard'
+    | '/debts'
     | '/finance'
     | '/inventory'
     | '/loyalty'
     | '/notifications'
+    | '/payments'
     | '/pos'
     | '/products'
     | '/purchases'
@@ -293,10 +315,12 @@ export interface FileRouteTypes {
     | '/_app/catalog'
     | '/_app/customers'
     | '/_app/dashboard'
+    | '/_app/debts'
     | '/_app/finance'
     | '/_app/inventory'
     | '/_app/loyalty'
     | '/_app/notifications'
+    | '/_app/payments'
     | '/_app/pos'
     | '/_app/products'
     | '/_app/purchases'
@@ -416,6 +440,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPosRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/payments': {
+      id: '/_app/payments'
+      path: '/payments'
+      fullPath: '/payments'
+      preLoaderRoute: typeof AppPaymentsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/notifications': {
       id: '/_app/notifications'
       path: '/notifications'
@@ -442,6 +473,13 @@ declare module '@tanstack/react-router' {
       path: '/finance'
       fullPath: '/finance'
       preLoaderRoute: typeof AppFinanceRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/debts': {
+      id: '/_app/debts'
+      path: '/debts'
+      fullPath: '/debts'
+      preLoaderRoute: typeof AppDebtsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/dashboard': {
@@ -496,10 +534,12 @@ interface AppRouteChildren {
   AppCatalogRoute: typeof AppCatalogRoute
   AppCustomersRoute: typeof AppCustomersRoute
   AppDashboardRoute: typeof AppDashboardRoute
+  AppDebtsRoute: typeof AppDebtsRoute
   AppFinanceRoute: typeof AppFinanceRoute
   AppInventoryRoute: typeof AppInventoryRoute
   AppLoyaltyRoute: typeof AppLoyaltyRoute
   AppNotificationsRoute: typeof AppNotificationsRoute
+  AppPaymentsRoute: typeof AppPaymentsRoute
   AppPosRoute: typeof AppPosRoute
   AppProductsRoute: typeof AppProductsRoute
   AppPurchasesRoute: typeof AppPurchasesRoute
@@ -520,10 +560,12 @@ const AppRouteChildren: AppRouteChildren = {
   AppCatalogRoute: AppCatalogRoute,
   AppCustomersRoute: AppCustomersRoute,
   AppDashboardRoute: AppDashboardRoute,
+  AppDebtsRoute: AppDebtsRoute,
   AppFinanceRoute: AppFinanceRoute,
   AppInventoryRoute: AppInventoryRoute,
   AppLoyaltyRoute: AppLoyaltyRoute,
   AppNotificationsRoute: AppNotificationsRoute,
+  AppPaymentsRoute: AppPaymentsRoute,
   AppPosRoute: AppPosRoute,
   AppProductsRoute: AppProductsRoute,
   AppPurchasesRoute: AppPurchasesRoute,

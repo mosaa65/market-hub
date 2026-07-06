@@ -5,7 +5,7 @@ import {
   Users, Building2, Wallet, BarChart3, ShieldCheck, Bell, Settings,
   Search, Command as CommandIcon, LogOut, Moon, Sun, Sparkles,
   RotateCcw, ArrowRightLeft, CalendarClock, Barcode, Gift, History, Layers, Boxes,
-  Menu,
+  Menu, HandCoins, AlertTriangle,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
@@ -45,6 +45,8 @@ const sections: Section[] = [
   {
     titleKey: "nav.section.accounting",
     items: [
+      { to: "/payments", icon: HandCoins, key: "nav.payments" },
+      { to: "/debts", icon: AlertTriangle, key: "nav.debts" },
       { to: "/finance", icon: Wallet, key: "nav.finance" },
       { to: "/reports", icon: BarChart3, key: "nav.reports" },
     ],

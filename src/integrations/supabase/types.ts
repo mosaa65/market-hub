@@ -148,6 +148,60 @@ export type Database = {
         }
         Relationships: []
       }
+      customer_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          customer_id: string
+          id: string
+          invoice_id: string | null
+          note: string | null
+          payment_date: string
+          payment_method: Database["public"]["Enums"]["payment_method"]
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          customer_id: string
+          id?: string
+          invoice_id?: string | null
+          note?: string | null
+          payment_date?: string
+          payment_method?: Database["public"]["Enums"]["payment_method"]
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string
+          id?: string
+          invoice_id?: string | null
+          note?: string | null
+          payment_date?: string
+          payment_method?: Database["public"]["Enums"]["payment_method"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_payments_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_payments_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "sales_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           address: string | null
@@ -1309,6 +1363,17 @@ export type Database = {
       next_purchase_return_number: { Args: never; Returns: string }
       next_sales_return_number: { Args: never; Returns: string }
       next_transfer_number: { Args: never; Returns: string }
+      record_customer_payment: {
+        Args: {
+          _amount: number
+          _customer_id: string
+          _invoice_id: string
+          _method: string
+          _note: string
+          _payment_date: string
+        }
+        Returns: string
+      }
     }
     Enums: {
       app_role: "owner" | "manager" | "accountant" | "cashier" | "warehouse"
