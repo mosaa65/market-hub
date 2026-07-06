@@ -177,7 +177,7 @@ function NewSalesReturn({ onSaved }: { onSaved: () => void }) {
           <div className="grid grid-cols-3 gap-3">
             <div className="grid gap-1.5"><Label>{lang === "ar" ? "المستودع" : "Warehouse"}</Label>
               <Select value={warehouseId} onValueChange={setWarehouseId}><SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{warehouses.map((w) => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}</SelectContent>
+                <SelectContent>{warehouses.map((w) => <SelectItem key={w.id} value={w.id}>{lang === "ar" ? (w.name_ar || w.name) : (w.name || w.name_ar || "")}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="grid gap-1.5"><Label>{lang === "ar" ? "العميل" : "Customer"}</Label>
