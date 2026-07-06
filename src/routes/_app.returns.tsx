@@ -30,10 +30,11 @@ function ReturnsPage() {
   const [salesReturns, setSalesReturns] = useState<any[]>([]);
   const [purchaseReturns, setPurchaseReturns] = useState<any[]>([]);
 
+  const whName = (w?: { name: string; name_ar?: string | null } | null) => !w ? "—" : lang === "ar" ? (w.name_ar || w.name) : (w.name || w.name_ar || "—");
   async function load() {
     const [sr, pr] = await Promise.all([
-      supabase.from("sales_returns").select("*, customers(name), warehouses(name)").order("created_at", { ascending: false }).limit(100),
-      supabase.from("purchase_returns").select("*, suppliers(name), warehouses(name)").order("created_at", { ascending: false }).limit(100),
+      supabase.from("sales_returns").select("*, customers(name), warehouses(name,name_ar)").order("created_at", { ascending: false }).limit(100),
+      supabase.from("purchase_returns").select("*, suppliers(name), warehouses(name,name_ar)").order("created_at", { ascending: false }).limit(100),
     ]);
     setSalesReturns(sr.data ?? []);
     setPurchaseReturns(pr.data ?? []);
