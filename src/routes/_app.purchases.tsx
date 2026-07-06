@@ -123,7 +123,7 @@ function PurchasesPage() {
                   <td className="px-3 py-2.5 font-mono text-xs">{r.invoice_number}</td>
                   <td className="px-3 py-2.5 text-muted-foreground">{new Date(r.created_at).toLocaleString()}</td>
                   <td className="px-3 py-2.5">{r.suppliers?.name ?? "—"}</td>
-                  <td className="px-3 py-2.5 text-muted-foreground">{r.warehouses?.name ?? "—"}</td>
+                  <td className="px-3 py-2.5 text-muted-foreground">{whName(r.warehouses)}</td>
                   <td className="px-3 py-2.5 text-muted-foreground">{pmLabel(r.payment_method)}</td>
                   <td className="px-3 py-2.5">
                     <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] ${statusColor(r.status)}`}>{statusLabel(r.status)}</span>
