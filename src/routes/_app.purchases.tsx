@@ -146,7 +146,9 @@ function PurchasesPage() {
 }
 
 function ViewDialog({ invoice, lines, onClose, pmLabel, statusLabel }: { invoice: Invoice; lines: Line[]; onClose: () => void; pmLabel: (m: string) => string; statusLabel: (s: string) => string }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const wh = invoice.warehouses;
+  const whLabel = !wh ? "—" : lang === "ar" ? (wh.name_ar || wh.name) : (wh.name || wh.name_ar || "—");
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur-sm p-4">
       <div className="panel-elevated w-full max-w-2xl p-6">
@@ -159,7 +161,7 @@ function ViewDialog({ invoice, lines, onClose, pmLabel, statusLabel }: { invoice
         </div>
         <div className="mb-4 grid grid-cols-2 gap-3 text-sm">
           <Field label={t("common.supplier")} value={invoice.suppliers?.name ?? "—"} />
-          <Field label={t("common.warehouse")} value={invoice.warehouses?.name ?? "—"} />
+          <Field label={t("common.warehouse")} value={whLabel} />
           <Field label={t("sales.payment")} value={pmLabel(invoice.payment_method)} />
           <Field label={t("common.status")} value={statusLabel(invoice.status)} />
         </div>
