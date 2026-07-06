@@ -42,7 +42,7 @@ function PurchasesPage() {
     setLoading(true);
     const { data } = await supabase
       .from("purchase_invoices")
-      .select("id,invoice_number,status,subtotal,discount,tax,total,paid,payment_method,created_at,suppliers(name),warehouses(name)")
+      .select("id,invoice_number,status,subtotal,discount,tax,total,paid,payment_method,created_at,suppliers(name),warehouses(name,name_ar)")
       .order("created_at", { ascending: false }).limit(200);
     setRows((data ?? []) as any);
     setLoading(false);
