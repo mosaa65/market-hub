@@ -29,7 +29,8 @@ interface Warehouse { id: string; name: string; name_ar: string | null }
 interface CartLine { product_id: string; name: string; unit_cost: number; tax_rate: number; quantity: number }
 
 function PurchasesPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const whName = (w?: { name: string; name_ar: string | null } | null) => (!w ? "—" : lang === "ar" ? (w.name_ar || w.name) : (w.name || w.name_ar || "—"));
   const [rows, setRows] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
