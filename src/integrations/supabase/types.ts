@@ -1384,6 +1384,8 @@ export type Database = {
         | "partial"
         | "cancelled"
         | "returned"
+        | "received"
+        | "completed"
       movement_type:
         | "purchase"
         | "sale"
@@ -1393,7 +1395,9 @@ export type Database = {
         | "return_in"
         | "return_out"
         | "opening"
-      payment_method: "cash" | "card" | "bank_transfer" | "credit"
+        | "purchase_return"
+        | "sale_return"
+      payment_method: "cash" | "card" | "bank_transfer" | "credit" | "mobile_money"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1529,6 +1533,8 @@ export const Constants = {
         "partial",
         "cancelled",
         "returned",
+        "received",
+        "completed",
       ],
       movement_type: [
         "purchase",
@@ -1539,8 +1545,10 @@ export const Constants = {
         "return_in",
         "return_out",
         "opening",
+        "purchase_return",
+        "sale_return",
       ],
-      payment_method: ["cash", "card", "bank_transfer", "credit"],
+      payment_method: ["cash", "card", "bank_transfer", "credit", "mobile_money"],
     },
   },
 } as const

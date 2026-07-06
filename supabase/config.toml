@@ -1,1 +1,5 @@
-project_id = "eupprlzlkbbjrotwnoll"
+project_id = "slmnyjontxydoyuvqitm"
+
+[db.seed]
+enabled = true
+sql_paths = ["./seeds/seed.sql"]
