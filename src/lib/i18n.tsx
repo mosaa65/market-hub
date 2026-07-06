@@ -504,6 +504,8 @@ const ar: Dict = {
   "nav.suppliers": "الموردون",
   "nav.finance": "المالية",
   "nav.reports": "التقارير",
+  "nav.payments": "تحصيل الدفعات",
+  "nav.debts": "ديون العملاء",
   "nav.users": "المستخدمون والصلاحيات",
   "nav.notifications": "الإشعارات",
   "nav.settings": "الإعدادات",
