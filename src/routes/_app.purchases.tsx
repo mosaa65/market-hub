@@ -296,7 +296,7 @@ function CreateDialog({ onClose, onDone }: { onClose: () => void; onDone: () => 
           <div>
             <label className="mb-1 block text-xs text-muted-foreground">{t("common.warehouse")} *</label>
             <select value={warehouseId} onChange={e => setWarehouseId(e.target.value)} className="h-9 w-full rounded-md border border-input bg-surface px-2 text-sm">
-              {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+              {warehouses.map(w => <option key={w.id} value={w.id}>{lang === "ar" ? (w.name_ar || w.name) : (w.name || w.name_ar || "")}</option>)}
             </select>
           </div>
         </div>
