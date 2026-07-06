@@ -17,7 +17,7 @@ interface Invoice {
   subtotal: number; discount: number; tax: number; total: number; paid: number;
   payment_method: string; created_at: string;
   suppliers: { name: string } | null;
-  warehouses: { name: string } | null;
+  warehouses: { name: string; name_ar: string | null } | null;
 }
 interface Line {
   id: string; quantity: number; unit_cost: number; tax: number; total: number;
@@ -25,11 +25,12 @@ interface Line {
 }
 interface Product { id: string; name: string; sku: string | null; cost_price: number; tax_rate: number }
 interface Supplier { id: string; name: string }
-interface Warehouse { id: string; name: string }
+interface Warehouse { id: string; name: string; name_ar: string | null }
 interface CartLine { product_id: string; name: string; unit_cost: number; tax_rate: number; quantity: number }
 
 function PurchasesPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const whName = (w?: { name: string; name_ar: string | null } | null) => (!w ? "—" : lang === "ar" ? (w.name_ar || w.name) : (w.name || w.name_ar || "—"));
   const [rows, setRows] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -41,7 +42,7 @@ function PurchasesPage() {
     setLoading(true);
     const { data } = await supabase
       .from("purchase_invoices")
-      .select("id,invoice_number,status,subtotal,discount,tax,total,paid,payment_method,created_at,suppliers(name),warehouses(name)")
+      .select("id,invoice_number,status,subtotal,discount,tax,total,paid,payment_method,created_at,suppliers(name),warehouses(name,name_ar)")
       .order("created_at", { ascending: false }).limit(200);
     setRows((data ?? []) as any);
     setLoading(false);
@@ -122,7 +123,7 @@ function PurchasesPage() {
                   <td className="px-3 py-2.5 font-mono text-xs">{r.invoice_number}</td>
                   <td className="px-3 py-2.5 text-muted-foreground">{new Date(r.created_at).toLocaleString()}</td>
                   <td className="px-3 py-2.5">{r.suppliers?.name ?? "—"}</td>
-                  <td className="px-3 py-2.5 text-muted-foreground">{r.warehouses?.name ?? "—"}</td>
+                  <td className="px-3 py-2.5 text-muted-foreground">{whName(r.warehouses)}</td>
                   <td className="px-3 py-2.5 text-muted-foreground">{pmLabel(r.payment_method)}</td>
                   <td className="px-3 py-2.5">
                     <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] ${statusColor(r.status)}`}>{statusLabel(r.status)}</span>
@@ -145,7 +146,9 @@ function PurchasesPage() {
 }
 
 function ViewDialog({ invoice, lines, onClose, pmLabel, statusLabel }: { invoice: Invoice; lines: Line[]; onClose: () => void; pmLabel: (m: string) => string; statusLabel: (s: string) => string }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const wh = invoice.warehouses;
+  const whLabel = !wh ? "—" : lang === "ar" ? (wh.name_ar || wh.name) : (wh.name || wh.name_ar || "—");
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur-sm p-4">
       <div className="panel-elevated w-full max-w-2xl p-6">
@@ -158,7 +161,7 @@ function ViewDialog({ invoice, lines, onClose, pmLabel, statusLabel }: { invoice
         </div>
         <div className="mb-4 grid grid-cols-2 gap-3 text-sm">
           <Field label={t("common.supplier")} value={invoice.suppliers?.name ?? "—"} />
-          <Field label={t("common.warehouse")} value={invoice.warehouses?.name ?? "—"} />
+          <Field label={t("common.warehouse")} value={whLabel} />
           <Field label={t("sales.payment")} value={pmLabel(invoice.payment_method)} />
           <Field label={t("common.status")} value={statusLabel(invoice.status)} />
         </div>
@@ -201,7 +204,7 @@ function ViewDialog({ invoice, lines, onClose, pmLabel, statusLabel }: { invoice
 }
 
 function CreateDialog({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [products, setProducts] = useState<Product[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -220,7 +223,7 @@ function CreateDialog({ onClose, onDone }: { onClose: () => void; onDone: () => 
       const [{ data: ps }, { data: ss }, { data: ws }] = await Promise.all([
         supabase.from("products").select("id,name,sku,cost_price,tax_rate").eq("is_active", true).order("name").limit(500),
         supabase.from("suppliers").select("id,name").eq("is_active", true).order("name"),
-        supabase.from("warehouses").select("id,name").eq("is_active", true).order("name"),
+        supabase.from("warehouses").select("id,name,name_ar").eq("is_active", true).order("name"),
       ]);
       setProducts(ps ?? []); setSuppliers(ss ?? []); setWarehouses(ws ?? []);
       if (ws?.[0]) setWarehouseId(ws[0].id);
@@ -293,7 +296,7 @@ function CreateDialog({ onClose, onDone }: { onClose: () => void; onDone: () => 
           <div>
             <label className="mb-1 block text-xs text-muted-foreground">{t("common.warehouse")} *</label>
             <select value={warehouseId} onChange={e => setWarehouseId(e.target.value)} className="h-9 w-full rounded-md border border-input bg-surface px-2 text-sm">
-              {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+              {warehouses.map(w => <option key={w.id} value={w.id}>{lang === "ar" ? (w.name_ar || w.name) : (w.name || w.name_ar || "")}</option>)}
             </select>
           </div>
         </div>

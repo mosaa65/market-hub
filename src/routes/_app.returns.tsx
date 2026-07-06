@@ -30,10 +30,11 @@ function ReturnsPage() {
   const [salesReturns, setSalesReturns] = useState<any[]>([]);
   const [purchaseReturns, setPurchaseReturns] = useState<any[]>([]);
 
+  const whName = (w?: { name: string; name_ar?: string | null } | null) => !w ? "—" : lang === "ar" ? (w.name_ar || w.name) : (w.name || w.name_ar || "—");
   async function load() {
     const [sr, pr] = await Promise.all([
-      supabase.from("sales_returns").select("*, customers(name), warehouses(name)").order("created_at", { ascending: false }).limit(100),
-      supabase.from("purchase_returns").select("*, suppliers(name), warehouses(name)").order("created_at", { ascending: false }).limit(100),
+      supabase.from("sales_returns").select("*, customers(name), warehouses(name,name_ar)").order("created_at", { ascending: false }).limit(100),
+      supabase.from("purchase_returns").select("*, suppliers(name), warehouses(name,name_ar)").order("created_at", { ascending: false }).limit(100),
     ]);
     setSalesReturns(sr.data ?? []);
     setPurchaseReturns(pr.data ?? []);
@@ -74,7 +75,7 @@ function ReturnsPage() {
                       <TableCell className="font-mono text-xs">{r.return_number}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleString()}</TableCell>
                       <TableCell>{r.customers?.name ?? "—"}</TableCell>
-                      <TableCell>{r.warehouses?.name}</TableCell>
+                      <TableCell>{whName(r.warehouses)}</TableCell>
                       <TableCell className="text-end font-mono">{money(Number(r.total))}</TableCell>
                     </TableRow>
                   ))}
@@ -99,7 +100,7 @@ function ReturnsPage() {
                       <TableCell className="font-mono text-xs">{r.return_number}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleString()}</TableCell>
                       <TableCell>{r.suppliers?.name ?? "—"}</TableCell>
-                      <TableCell>{r.warehouses?.name}</TableCell>
+                      <TableCell>{whName(r.warehouses)}</TableCell>
                       <TableCell className="text-end font-mono">{money(Number(r.total))}</TableCell>
                     </TableRow>
                   ))}
@@ -128,7 +129,7 @@ function NewSalesReturn({ onSaved }: { onSaved: () => void }) {
   useEffect(() => {
     if (!open) return;
     Promise.all([
-      supabase.from("warehouses").select("id,name").eq("is_active", true).order("name"),
+      supabase.from("warehouses").select("id,name,name_ar").eq("is_active", true).order("name"),
       supabase.from("customers").select("id,name").eq("is_active", true).order("name"),
       supabase.from("products").select("id,name,name_ar,sku,sale_price,tax_rate").eq("is_active", true).order("name").limit(200),
     ]).then(([w, c, p]) => {
@@ -176,7 +177,7 @@ function NewSalesReturn({ onSaved }: { onSaved: () => void }) {
           <div className="grid grid-cols-3 gap-3">
             <div className="grid gap-1.5"><Label>{lang === "ar" ? "المستودع" : "Warehouse"}</Label>
               <Select value={warehouseId} onValueChange={setWarehouseId}><SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{warehouses.map((w) => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}</SelectContent>
+                <SelectContent>{warehouses.map((w) => <SelectItem key={w.id} value={w.id}>{lang === "ar" ? (w.name_ar || w.name) : (w.name || w.name_ar || "")}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="grid gap-1.5"><Label>{lang === "ar" ? "العميل" : "Customer"}</Label>
@@ -248,7 +249,7 @@ function NewPurchaseReturn({ onSaved }: { onSaved: () => void }) {
   useEffect(() => {
     if (!open) return;
     Promise.all([
-      supabase.from("warehouses").select("id,name").eq("is_active", true).order("name"),
+      supabase.from("warehouses").select("id,name,name_ar").eq("is_active", true).order("name"),
       supabase.from("suppliers").select("id,name").eq("is_active", true).order("name"),
       supabase.from("products").select("id,name,name_ar,sku,cost_price,tax_rate").eq("is_active", true).order("name").limit(200),
     ]).then(([w, s, p]) => {
@@ -294,7 +295,7 @@ function NewPurchaseReturn({ onSaved }: { onSaved: () => void }) {
           <div className="grid grid-cols-3 gap-3">
             <div className="grid gap-1.5"><Label>{lang === "ar" ? "المستودع" : "Warehouse"}</Label>
               <Select value={warehouseId} onValueChange={setWarehouseId}><SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{warehouses.map((w) => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}</SelectContent>
+                <SelectContent>{warehouses.map((w) => <SelectItem key={w.id} value={w.id}>{lang === "ar" ? (w.name_ar || w.name) : (w.name || w.name_ar || "")}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="grid gap-1.5"><Label>{lang === "ar" ? "المورد" : "Supplier"}</Label>
