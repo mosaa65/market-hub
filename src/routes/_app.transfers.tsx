@@ -53,9 +53,9 @@ function TransfersPage() {
                   <TableRow key={r.id}>
                     <TableCell className="font-mono text-xs">{r.transfer_number}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleString()}</TableCell>
-                    <TableCell>{r.from?.name}</TableCell>
+                    <TableCell>{whName(r.from)}</TableCell>
                     <TableCell><ArrowRightLeft className="h-4 w-4 text-muted-foreground" /></TableCell>
-                    <TableCell>{r.to?.name}</TableCell>
+                    <TableCell>{whName(r.to)}</TableCell>
                     <TableCell className="text-end font-mono">{r.stock_transfer_items?.length ?? 0}</TableCell>
                   </TableRow>
                 ))}
