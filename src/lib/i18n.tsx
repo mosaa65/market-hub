@@ -27,6 +27,8 @@ const en: Dict = {
   "nav.suppliers": "Suppliers",
   "nav.finance": "Finance",
   "nav.reports": "Reports",
+  "nav.payments": "Customer Payments",
+  "nav.debts": "Customer Debts",
   "nav.users": "Users & Roles",
   "nav.notifications": "Notifications",
   "nav.settings": "Settings",
