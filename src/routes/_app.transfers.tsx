@@ -23,8 +23,9 @@ function TransfersPage() {
   const { t, lang } = useI18n();
   const [list, setList] = useState<any[]>([]);
 
+  const whName = (w?: { name: string; name_ar?: string | null } | null) => !w ? "—" : lang === "ar" ? (w.name_ar || w.name) : (w.name || w.name_ar || "—");
   async function load() {
-    const { data } = await supabase.from("stock_transfers").select("*, from:warehouses!stock_transfers_from_warehouse_id_fkey(name), to:warehouses!stock_transfers_to_warehouse_id_fkey(name), stock_transfer_items(quantity)").order("created_at", { ascending: false }).limit(100);
+    const { data } = await supabase.from("stock_transfers").select("*, from:warehouses!stock_transfers_from_warehouse_id_fkey(name,name_ar), to:warehouses!stock_transfers_to_warehouse_id_fkey(name,name_ar), stock_transfer_items(quantity)").order("created_at", { ascending: false }).limit(100);
     setList(data ?? []);
   }
   useEffect(() => { load(); }, []);
