@@ -223,7 +223,7 @@ function CreateDialog({ onClose, onDone }: { onClose: () => void; onDone: () => 
       const [{ data: ps }, { data: ss }, { data: ws }] = await Promise.all([
         supabase.from("products").select("id,name,sku,cost_price,tax_rate").eq("is_active", true).order("name").limit(500),
         supabase.from("suppliers").select("id,name").eq("is_active", true).order("name"),
-        supabase.from("warehouses").select("id,name").eq("is_active", true).order("name"),
+        supabase.from("warehouses").select("id,name,name_ar").eq("is_active", true).order("name"),
       ]);
       setProducts(ps ?? []); setSuppliers(ss ?? []); setWarehouses(ws ?? []);
       if (ws?.[0]) setWarehouseId(ws[0].id);
