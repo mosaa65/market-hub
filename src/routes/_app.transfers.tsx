@@ -127,7 +127,7 @@ function NewTransfer({ onSaved }: { onSaved: () => void }) {
             </div>
             <div className="grid gap-1.5"><Label>{lang === "ar" ? "إلى مستودع" : "To warehouse"}</Label>
               <Select value={to} onValueChange={setTo}><SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                <SelectContent>{warehouses.filter((w) => w.id !== from).map((w) => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}</SelectContent>
+                <SelectContent>{warehouses.filter((w) => w.id !== from).map((w) => <SelectItem key={w.id} value={w.id}>{lang === "ar" ? (w.name_ar || w.name) : (w.name || w.name_ar || "")}</SelectItem>)}</SelectContent>
               </Select>
             </div>
           </div>
