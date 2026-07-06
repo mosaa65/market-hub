@@ -81,7 +81,7 @@ function NewTransfer({ onSaved }: { onSaved: () => void }) {
   useEffect(() => {
     if (!open) return;
     Promise.all([
-      supabase.from("warehouses").select("id,name").eq("is_active", true).order("name"),
+      supabase.from("warehouses").select("id,name,name_ar").eq("is_active", true).order("name"),
       supabase.from("products").select("id,name,name_ar,sku").eq("is_active", true).order("name").limit(200),
     ]).then(([w, p]) => {
       setWarehouses(w.data ?? []); setProducts(p.data ?? []);
