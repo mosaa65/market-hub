@@ -50,16 +50,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Vortex ERP — Grocery & Wholesale Trading Platform" },
-      { name: "description", content: "Enterprise ERP for grocery wholesalers, supermarkets and food trading companies. Inventory, POS, sales, purchases, and finance — in one platform." },
+      { title: "فورتيكس ERP - منصة البيع بالجملة والتجزئة" },
+      { name: "description", content: "نظام ERP متكامل لإدارة المبيعات، المشتريات، المخزون، نقاط البيع، والمالية في منصة واحدة." },
       { name: "author", content: "Vortex" },
       { name: "theme-color", content: "#0A0A0B" },
-      { property: "og:title", content: "Vortex ERP — Grocery & Wholesale Trading Platform" },
-      { property: "og:description", content: "Enterprise ERP for grocery wholesalers, supermarkets and food trading companies. Inventory, POS, sales, purchases, and finance — in one platform." },
+      { property: "og:title", content: "فورتيكس ERP - منصة البيع بالجملة والتجزئة" },
+      { property: "og:description", content: "نظام ERP متكامل لإدارة المبيعات، المشتريات، المخزون، نقاط البيع، والمالية في منصة واحدة." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "Vortex ERP — Grocery & Wholesale Trading Platform" },
-      { name: "twitter:description", content: "Enterprise ERP for grocery wholesalers, supermarkets and food trading companies. Inventory, POS, sales, purchases, and finance — in one platform." },
+      { name: "twitter:title", content: "فورتيكس ERP - منصة البيع بالجملة والتجزئة" },
+      { name: "twitter:description", content: "نظام ERP متكامل لإدارة المبيعات، المشتريات، المخزون، نقاط البيع، والمالية في منصة واحدة." },
       { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/140ea316-e570-4ca2-bfbb-ac4e2ba79f9b" },
       { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/140ea316-e570-4ca2-bfbb-ac4e2ba79f9b" },
     ],
@@ -78,7 +78,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className="dark">
+    <html lang="ar" dir="rtl" className="dark">
       <head><HeadContent /></head>
       <body>
         {children}

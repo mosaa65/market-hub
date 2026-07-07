@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Search, Plus, Minus, Trash2, ScanBarcode, Loader2, X, Printer, Sparkles, ScrollText, FileDown, Filter, Warehouse } from "lucide-react";
+import { Search, Plus, Minus, Trash2, ScanBarcode, Loader2, X, Printer, Sparkles, ScrollText, FileDown, Filter, Warehouse, ChevronDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { money } from "@/lib/format";
@@ -111,6 +111,8 @@ function POSPage() {
     (data ?? []).forEach((r: any) => { m[r.product_id] = Number(r.quantity); });
     setStockMap(m);
   }
+
+  const selectClassName = "h-10 w-full appearance-none rounded-full border border-border/70 bg-background/95 px-3 pr-9 text-sm text-foreground shadow-sm outline-none transition focus:border-primary/60 focus:ring-2 focus:ring-primary/20";
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -234,10 +236,11 @@ function POSPage() {
               <select
                 value={warehouseId}
                 onChange={e => setWarehouseId(e.target.value)}
-                className="h-10 appearance-none rounded-full border border-amber-500/30 bg-amber-500/10 py-2 pl-9 pr-3 text-sm font-medium text-amber-700 outline-none transition hover:bg-amber-500/20 dark:text-amber-300"
+                className="h-10 appearance-none rounded-full border border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-orange-400/10 py-2 pl-9 pr-9 text-sm font-medium text-amber-700 shadow-sm outline-none transition hover:bg-amber-500/20 dark:text-amber-300"
               >
                 {warehouses.map(w => <option key={w.id} value={w.id}>{lang === "ar" ? (w.name_ar || w.name) : (w.name || w.name_ar)}</option>)}
               </select>
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-amber-700 dark:text-amber-300" />
             </div>
           </div>
 
@@ -252,24 +255,33 @@ function POSPage() {
               <div className="grid gap-2 md:grid-cols-3">
                 <label className="grid gap-1.5 text-xs text-muted-foreground">
                   <span>{t("common.categories")}</span>
-                  <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="h-9 rounded-full border border-border bg-background px-3 text-sm text-foreground">
-                    <option value="">{t("common.all")}</option>
-                    {categories.map(c => <option key={c.id} value={c.id}>{lang === "ar" ? (c.name_ar || c.name) : (c.name || c.name_ar || "")}</option>)}
-                  </select>
+                  <div className="relative">
+                    <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className={selectClassName}>
+                      <option value="">{t("common.all")}</option>
+                      {categories.map(c => <option key={c.id} value={c.id}>{lang === "ar" ? (c.name_ar || c.name) : (c.name || c.name_ar || "")}</option>)}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  </div>
                 </label>
                 <label className="grid gap-1.5 text-xs text-muted-foreground">
                   <span>{t("common.brands")}</span>
-                  <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="h-9 rounded-full border border-border bg-background px-3 text-sm text-foreground">
-                    <option value="">{t("common.all")}</option>
-                    {brands.map(b => <option key={b.id} value={b.id}>{lang === "ar" ? (b.name_ar || b.name) : (b.name || b.name_ar || "")}</option>)}
-                  </select>
+                  <div className="relative">
+                    <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className={selectClassName}>
+                      <option value="">{t("common.all")}</option>
+                      {brands.map(b => <option key={b.id} value={b.id}>{lang === "ar" ? (b.name_ar || b.name) : (b.name || b.name_ar || "")}</option>)}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  </div>
                 </label>
                 <label className="grid gap-1.5 text-xs text-muted-foreground">
                   <span>{t("common.units")}</span>
-                  <select value={selectedUnit} onChange={(e) => setSelectedUnit(e.target.value)} className="h-9 rounded-full border border-border bg-background px-3 text-sm text-foreground">
-                    <option value="">{t("common.all")}</option>
-                    {units.map(u => <option key={u.id} value={u.id}>{lang === "ar" ? (u.name_ar || u.short_name || u.name) : (u.short_name || u.name || u.name_ar || "")}</option>)}
-                  </select>
+                  <div className="relative">
+                    <select value={selectedUnit} onChange={(e) => setSelectedUnit(e.target.value)} className={selectClassName}>
+                      <option value="">{t("common.all")}</option>
+                      {units.map(u => <option key={u.id} value={u.id}>{lang === "ar" ? (u.name_ar || u.short_name || u.name) : (u.short_name || u.name || u.name_ar || "")}</option>)}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  </div>
                 </label>
               </div>
             </div>

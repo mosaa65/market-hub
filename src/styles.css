@@ -160,14 +160,17 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
-    font-family: var(--font-sans);
+    font-family: "IBM Plex Sans Arabic", "Cairo", "Tajawal", "Noto Sans Arabic", var(--font-sans);
     font-feature-settings: "cv11","ss01","ss03";
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     letter-spacing: -0.01em;
   }
 
-  html[dir="rtl"] body { font-family: var(--font-arabic); }
+  html[dir="rtl"] body,
+  html[dir="rtl"] body * {
+    font-family: "IBM Plex Sans Arabic", "Cairo", "Tajawal", "Noto Sans Arabic", var(--font-arabic) !important;
+  }
 
   h1, h2, h3, h4, .font-display {
     font-family: var(--font-display);

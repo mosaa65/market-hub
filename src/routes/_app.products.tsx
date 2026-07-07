@@ -8,7 +8,7 @@ import { Plus, Package, Search, Pencil, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/products")({
-  head: () => ({ meta: [{ title: "Products — Vortex ERP" }] }),
+  head: () => ({ meta: [{ title: "المنتجات — فورتيكس ERP" }] }),
   component: ProductsPage,
 });
 

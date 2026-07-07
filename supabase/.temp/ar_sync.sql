@@ -7,7 +7,22 @@
 BEGIN;
 
 INSERT INTO company_settings (id, name, legal_name, tax_number, currency, currency_symbol, tax_rate, logo_url, address, phone, email, invoice_prefix, barcode_enabled, updated_at) VALUES
-  (1, 'نهج لوازم القرطاسية', 'شركة نهج لوازم القرطاسية', '300-XYZ-001', 'YER', '﷼', 15, NULL, 'صنعاء، اليمن', '777123456', 'info@nahj-stationery.example', 'INV-', TRUE, '2026-07-05T09:01:00+00:00');
+  (1, 'نهج لوازم القرطاسية', 'شركة نهج لوازم القرطاسية', '300-XYZ-001', 'YER', '﷼', 15, NULL, 'صنعاء، اليمن', '777123456', 'info@nahj-stationery.example', 'INV-', TRUE, '2026-07-05T09:01:00+00:00')
+ON CONFLICT (id) DO UPDATE SET
+  name = EXCLUDED.name,
+  legal_name = EXCLUDED.legal_name,
+  tax_number = EXCLUDED.tax_number,
+  currency = EXCLUDED.currency,
+  currency_symbol = EXCLUDED.currency_symbol,
+  tax_rate = EXCLUDED.tax_rate,
+  logo_url = EXCLUDED.logo_url,
+  address = EXCLUDED.address,
+  phone = EXCLUDED.phone,
+  email = EXCLUDED.email,
+  invoice_prefix = EXCLUDED.invoice_prefix,
+  barcode_enabled = EXCLUDED.barcode_enabled,
+  updated_at = EXCLUDED.updated_at;
+
 INSERT INTO categories (id, name, name_ar, parent_id) VALUES
   ('7b5b5e7a-8603-5df6-bff1-23cfd0d74fbf', 'القرطاسية والمستلزمات', 'المكتبات والقرطاسية', NULL),
   ('4b867143-fb9c-57d4-b06c-a96f142eb6d2', 'الدفاتر', 'الدفاتر', '7b5b5e7a-8603-5df6-bff1-23cfd0d74fbf'),
@@ -19,7 +34,12 @@ INSERT INTO categories (id, name, name_ar, parent_id) VALUES
   ('babfc3a9-dc59-5691-b457-39f264dec70e', 'اللواصق والتصحيح', 'اللواصق والتصحيح', '7b5b5e7a-8603-5df6-bff1-23cfd0d74fbf'),
   ('ca9747db-71f7-54fc-a808-516e6a6f687e', 'مستلزمات المكتب', 'مستلزمات المكتب', '7b5b5e7a-8603-5df6-bff1-23cfd0d74fbf'),
   ('5290955d-8af5-5994-a34a-47ef5dbd043f', 'الفنون والتلوين', 'الألوان والفنون', '7b5b5e7a-8603-5df6-bff1-23cfd0d74fbf'),
-  ('f676a8c9-dbd4-50ba-8fd9-d315b8dd0579', 'مستلزمات الطباعة', 'مستلزمات الطباعة', '7b5b5e7a-8603-5df6-bff1-23cfd0d74fbf');
+  ('f676a8c9-dbd4-50ba-8fd9-d315b8dd0579', 'مستلزمات الطباعة', 'مستلزمات الطباعة', '7b5b5e7a-8603-5df6-bff1-23cfd0d74fbf')
+ON CONFLICT (id) DO UPDATE SET
+  name = EXCLUDED.name,
+  name_ar = EXCLUDED.name_ar,
+  parent_id = EXCLUDED.parent_id;
+
 INSERT INTO brands (id, name, created_at, name_ar) VALUES
   ('9df86f1d-1f09-5adf-b3a5-94729a18db64', 'ديلي', '2026-07-05T09:06:00+00:00', 'ديلي'),
   ('4046e6d0-ccab-5c5e-ae5d-27070db5fc9f', 'مابيد', '2026-07-05T09:07:00+00:00', 'ماپيد'),
@@ -27,17 +47,37 @@ INSERT INTO brands (id, name, created_at, name_ar) VALUES
   ('bdb18c05-6c07-5acc-81dd-4ea3d20b30fc', 'بيك', '2026-07-05T09:09:00+00:00', 'بيك'),
   ('9bd9b290-7c5c-5227-8bfa-b6cc4c8824a2', 'ستايدلر', '2026-07-05T09:10:00+00:00', 'ستايدلر'),
   ('d863eccd-c6b9-570d-99b7-7519218b387d', 'إم آند جي', '2026-07-05T09:11:00+00:00', 'إم آند جي'),
-  ('56a96271-c262-5a1a-b761-e5d9b99a2e9b', 'مستورد عام', '2026-07-05T09:12:00+00:00', 'مستورد عام');
+  ('56a96271-c262-5a1a-b761-e5d9b99a2e9b', 'مستورد عام', '2026-07-05T09:12:00+00:00', 'مستورد عام')
+ON CONFLICT (id) DO UPDATE SET
+  name = EXCLUDED.name,
+  created_at = EXCLUDED.created_at,
+  name_ar = EXCLUDED.name_ar;
+
 INSERT INTO units (id, name, short_name, name_ar) VALUES
   ('9d6ba316-ead6-5039-9f10-dd02b48085f6', 'قطعة', 'pc', 'قطعة'),
   ('0a3b2b87-a30b-5362-9705-259516bc441f', 'حزمة', 'pk', 'باكيت'),
   ('ac4378de-8ec0-5879-bc71-d75a9c864ce2', 'علبة', 'bx', 'علبة'),
   ('ed34803d-3743-5365-9071-02ee5d548d69', 'رزمة', 'rm', 'ريمة'),
   ('9843f487-a8bf-53cd-a5f8-1bbe9d0abec3', 'طقم', 'st', 'طقم'),
-  ('1ff213a3-4bef-5782-9b3f-0802ee7bd1e9', 'دفتر', 'nb', 'دفتر');
+  ('1ff213a3-4bef-5782-9b3f-0802ee7bd1e9', 'دفتر', 'nb', 'دفتر')
+ON CONFLICT (id) DO UPDATE SET
+  name = EXCLUDED.name,
+  short_name = EXCLUDED.short_name,
+  name_ar = EXCLUDED.name_ar;
+
 INSERT INTO warehouses (id, name, code, address, is_default, is_active, created_at, updated_at, name_ar) VALUES
   ('b740ad4e-34c3-5e42-aca8-6add4d667371', 'المستودع الرئيسي صنعاء', 'WH-SAN', 'صنعاء، المنطقة الصناعية', TRUE, TRUE, '2026-07-05T09:01:00+00:00', '2026-07-05T09:01:00+00:00', 'المستودع الرئيسي صنعاء'),
-  ('e2e84f67-db8d-56b1-a80e-2256351c0dbc', 'مستودع فرع عدن', 'WH-ADN', 'عدن، خورمكسر', FALSE, TRUE, '2026-07-05T09:02:00+00:00', '2026-07-05T09:02:00+00:00', 'مستودع فرع عدن');
+  ('e2e84f67-db8d-56b1-a80e-2256351c0dbc', 'مستودع فرع عدن', 'WH-ADN', 'عدن، خورمكسر', FALSE, TRUE, '2026-07-05T09:02:00+00:00', '2026-07-05T09:02:00+00:00', 'مستودع فرع عدن')
+ON CONFLICT (id) DO UPDATE SET
+  name = EXCLUDED.name,
+  code = EXCLUDED.code,
+  address = EXCLUDED.address,
+  is_default = EXCLUDED.is_default,
+  is_active = EXCLUDED.is_active,
+  created_at = EXCLUDED.created_at,
+  updated_at = EXCLUDED.updated_at,
+  name_ar = EXCLUDED.name_ar;
+
 INSERT INTO suppliers (id, name, phone, email, address, balance, is_active, created_at, updated_at) VALUES
   ('76c9784a-de03-5d79-bca9-e464028ba262', 'شركة صنعاء لمستلزمات المكاتب', '01-500100', 'supply1@example.com', 'صنعاء، شارع الزبيري', 0, TRUE, '2026-07-05T09:21:00+00:00', '2026-07-05T09:21:00+00:00'),
   ('44634490-e916-5696-b961-ec8c3e44609b', 'تجارة الورق والمكاتب - عدن', '02-700200', 'supply2@example.com', 'عدن، كريتر', 0, TRUE, '2026-07-05T09:22:00+00:00', '2026-07-05T09:22:00+00:00'),
@@ -46,7 +86,17 @@ INSERT INTO suppliers (id, name, phone, email, address, balance, is_active, crea
   ('9106a083-6cf8-5dde-986e-1206358a525c', 'إب للتجارة واحتياجات المكتب', '05-300500', 'supply5@example.com', 'إب، القلعة', 0, TRUE, '2026-07-05T09:25:00+00:00', '2026-07-05T09:25:00+00:00'),
   ('ff062e71-0e62-5826-9156-727686a50ca6', 'المكلا للمستلزمات الحديثة', '06-800600', 'supply6@example.com', 'المكلا، الشرق', 0, TRUE, '2026-07-05T09:26:00+00:00', '2026-07-05T09:26:00+00:00'),
   ('ed839b7f-1c91-577b-948d-86162f70275b', 'مركز عمران للجملة', '07-900700', 'supply7@example.com', 'عمران، السوق الرئيسي', 0, TRUE, '2026-07-05T09:27:00+00:00', '2026-07-05T09:27:00+00:00'),
-  ('06e8e09b-3ac3-5d6d-aa07-94a56ec2b955', 'مأرب للتجارة العامة', '08-100800', 'supply8@example.com', 'مأرب، المدينة', 0, TRUE, '2026-07-05T09:28:00+00:00', '2026-07-05T09:28:00+00:00');
+  ('06e8e09b-3ac3-5d6d-aa07-94a56ec2b955', 'مأرب للتجارة العامة', '08-100800', 'supply8@example.com', 'مأرب، المدينة', 0, TRUE, '2026-07-05T09:28:00+00:00', '2026-07-05T09:28:00+00:00')
+ON CONFLICT (id) DO UPDATE SET
+  name = EXCLUDED.name,
+  phone = EXCLUDED.phone,
+  email = EXCLUDED.email,
+  address = EXCLUDED.address,
+  balance = EXCLUDED.balance,
+  is_active = EXCLUDED.is_active,
+  created_at = EXCLUDED.created_at,
+  updated_at = EXCLUDED.updated_at;
+
 INSERT INTO customers (id, name, phone, email, address, credit_limit, balance, is_active, created_at, updated_at, loyalty_points) VALUES
   ('d1c1e62e-20b0-55e6-8630-cd4167a64c0a', 'مدرسة النجاح', '777100001', 'customer1@example.com', 'اليمن - الفرع 1', 155000, 0, TRUE, '2026-07-05T09:01:00+00:00', '2026-07-05T09:01:00+00:00', 0),
   ('f861e1bf-1999-5f56-aa0d-608819877706', 'أكاديمية المستقبل', '777100002', 'customer2@example.com', 'اليمن - الفرع 2', 160000, 0, TRUE, '2026-07-05T09:02:00+00:00', '2026-07-05T09:02:00+00:00', 0),
@@ -67,7 +117,19 @@ INSERT INTO customers (id, name, phone, email, address, credit_limit, balance, i
   ('c67f1e2c-23ee-5d0f-9fcb-2dfaacb7990f', 'مدرسة القمم', '777100017', 'customer17@example.com', 'اليمن - الفرع 17', 235000, 0, TRUE, '2026-07-05T09:17:00+00:00', '2026-07-05T09:17:00+00:00', 0),
   ('d7301a00-364d-5c5a-9bd7-783af7e9a3ac', 'مكتب أطلس', '777100018', 'customer18@example.com', 'اليمن - الفرع 18', 240000, 0, TRUE, '2026-07-05T09:18:00+00:00', '2026-07-05T09:18:00+00:00', 0),
   ('e3d18903-a5ba-5f9f-98d3-d6503cd29c67', 'قرطاسية بدر', '777100019', 'customer19@example.com', 'اليمن - الفرع 19', 245000, 0, TRUE, '2026-07-05T09:19:00+00:00', '2026-07-05T09:19:00+00:00', 0),
-  ('9ae48ad9-3e56-5074-b388-304ce6d5c35b', 'سما ميديا', '777100020', 'customer20@example.com', 'اليمن - الفرع 20', 250000, 0, TRUE, '2026-07-05T09:20:00+00:00', '2026-07-05T09:20:00+00:00', 0);
+  ('9ae48ad9-3e56-5074-b388-304ce6d5c35b', 'سما ميديا', '777100020', 'customer20@example.com', 'اليمن - الفرع 20', 250000, 0, TRUE, '2026-07-05T09:20:00+00:00', '2026-07-05T09:20:00+00:00', 0)
+ON CONFLICT (id) DO UPDATE SET
+  name = EXCLUDED.name,
+  phone = EXCLUDED.phone,
+  email = EXCLUDED.email,
+  address = EXCLUDED.address,
+  credit_limit = EXCLUDED.credit_limit,
+  balance = EXCLUDED.balance,
+  is_active = EXCLUDED.is_active,
+  created_at = EXCLUDED.created_at,
+  updated_at = EXCLUDED.updated_at,
+  loyalty_points = EXCLUDED.loyalty_points;
+
 INSERT INTO expense_categories (id, name, name_ar, created_at) VALUES
   ('dc1f51ad-ebe7-5f9c-9648-5e124c4dca17', 'الإيجار', 'الإيجار', '2026-07-05T09:01:00+00:00'),
   ('1f6e2aee-6cd3-55f0-abff-9ff61fada0ab', 'الرواتب', 'الرواتب', '2026-07-05T09:02:00+00:00'),
@@ -75,7 +137,12 @@ INSERT INTO expense_categories (id, name, name_ar, created_at) VALUES
   ('d550d5ae-bda0-5506-b8d9-18abaf752565', 'الخدمات', 'الخدمات', '2026-07-05T09:04:00+00:00'),
   ('04ec8b9a-deb3-5107-9eda-0b428e92267e', 'الصيانة', 'الصيانة', '2026-07-05T09:05:00+00:00'),
   ('bab4a9a4-3fe9-5d07-bc75-ced14df582f3', 'التغليف', 'التغليف', '2026-07-05T09:06:00+00:00'),
-  ('6dac640a-7a6e-511a-83f5-6dec2020facf', 'الإنترنت', 'الإنترنت', '2026-07-05T09:07:00+00:00');
+  ('6dac640a-7a6e-511a-83f5-6dec2020facf', 'الإنترنت', 'الإنترنت', '2026-07-05T09:07:00+00:00')
+ON CONFLICT (id) DO UPDATE SET
+  name = EXCLUDED.name,
+  name_ar = EXCLUDED.name_ar,
+  created_at = EXCLUDED.created_at;
+
 INSERT INTO auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
   raw_app_meta_data, raw_user_meta_data, created_at, updated_at
@@ -166,12 +233,47 @@ INSERT INTO products (id, sku, barcode, name, name_ar, description, image_url, c
   ('8910f5a6-a647-522f-bc06-9bd818e72e14', 'STN-053', '6291000000053', 'خرطوشة تونر ليزر أسود', 'خرطوشة تونر ليزر أسود', 'سعر التجزئة 29500 ريال يمني | سعر الجملة 25075 ريال يمني | سعر الجملة الكبيرة 22125 ريال يمني', NULL, 'f676a8c9-dbd4-50ba-8fd9-d315b8dd0579', '56a96271-c262-5a1a-b761-e5d9b99a2e9b', '9d6ba316-ead6-5039-9f10-dd02b48085f6', 22000, 29500, 15, 10, FALSE, TRUE, '2026-07-05T10:03:00+00:00', '2026-07-05T10:03:00+00:00'),
   ('64de6c21-8a50-5003-8de9-54072b2f31cb', 'STN-054', '6291000000054', 'طقم خراطيش حبر ملون', 'طقم خراطيش حبر ملون', 'سعر التجزئة 21000 ريال يمني | سعر الجملة 17850 ريال يمني | سعر الجملة الكبيرة 15750 ريال يمني', NULL, 'f676a8c9-dbd4-50ba-8fd9-d315b8dd0579', '56a96271-c262-5a1a-b761-e5d9b99a2e9b', '9843f487-a8bf-53cd-a5f8-1bbe9d0abec3', 15500, 21000, 15, 10, FALSE, TRUE, '2026-07-05T10:04:00+00:00', '2026-07-05T10:04:00+00:00'),
   ('b4fe7b6f-ab0d-563b-a184-ac7cc5fd38cf', 'STN-055', '6291000000055', 'أوراق تنظيف طابعة', 'أوراق تنظيف طابعة', 'سعر التجزئة 900 ريال يمني | سعر الجملة 765 ريال يمني | سعر الجملة الكبيرة 675 ريال يمني', NULL, 'f676a8c9-dbd4-50ba-8fd9-d315b8dd0579', '56a96271-c262-5a1a-b761-e5d9b99a2e9b', '0a3b2b87-a30b-5362-9705-259516bc441f', 650, 900, 15, 20, FALSE, TRUE, '2026-07-05T10:05:00+00:00', '2026-07-05T10:05:00+00:00'),
-  ('4d9ca227-96c2-5000-b4d9-e51517159c00', 'STN-056', '6291000000056', 'أكياس تغليف A4', 'أكياس تغليف A4', 'سعر التجزئة 2300 ريال يمني | سعر الجملة 1955 ريال يمني | سعر الجملة الكبيرة 1725 ريال يمني', NULL, 'f676a8c9-dbd4-50ba-8fd9-d315b8dd0579', '56a96271-c262-5a1a-b761-e5d9b99a2e9b', '0a3b2b87-a30b-5362-9705-259516bc441f', 1700, 2300, 15, 15, FALSE, TRUE, '2026-07-05T10:06:00+00:00', '2026-07-05T10:06:00+00:00');
+  ('4d9ca227-96c2-5000-b4d9-e51517159c00', 'STN-056', '6291000000056', 'أكياس تغليف A4', 'أكياس تغليف A4', 'سعر التجزئة 2300 ريال يمني | سعر الجملة 1955 ريال يمني | سعر الجملة الكبيرة 1725 ريال يمني', NULL, 'f676a8c9-dbd4-50ba-8fd9-d315b8dd0579', '56a96271-c262-5a1a-b761-e5d9b99a2e9b', '0a3b2b87-a30b-5362-9705-259516bc441f', 1700, 2300, 15, 15, FALSE, TRUE, '2026-07-05T10:06:00+00:00', '2026-07-05T10:06:00+00:00')
+ON CONFLICT (id) DO UPDATE SET
+  sku = EXCLUDED.sku,
+  barcode = EXCLUDED.barcode,
+  name = EXCLUDED.name,
+  name_ar = EXCLUDED.name_ar,
+  description = EXCLUDED.description,
+  image_url = EXCLUDED.image_url,
+  category_id = EXCLUDED.category_id,
+  brand_id = EXCLUDED.brand_id,
+  unit_id = EXCLUDED.unit_id,
+  cost_price = EXCLUDED.cost_price,
+  sale_price = EXCLUDED.sale_price,
+  tax_rate = EXCLUDED.tax_rate,
+  min_stock = EXCLUDED.min_stock,
+  track_expiry = EXCLUDED.track_expiry,
+  is_active = EXCLUDED.is_active,
+  created_at = EXCLUDED.created_at,
+  updated_at = EXCLUDED.updated_at;
+
 INSERT INTO purchase_invoices (id, invoice_number, supplier_id, warehouse_id, status, subtotal, discount, tax, total, paid, payment_method, note, created_by, created_at, updated_at) VALUES
   ('80af452a-9d57-51bd-b656-6ac0896e8d73', 'PINV-0001', '76c9784a-de03-5d79-bca9-e464028ba262', 'b740ad4e-34c3-5e42-aca8-6add4d667371', 'received', 105901.6, 338.4, 15885.24, 121786.84, 121786.84, 'cash', 'فاتورة شراء تجريبية PINV-0001', '5da94d74-bd35-5649-afd6-7694627a7d16', '2026-07-05T10:41:00+00:00', '2026-07-05T10:41:00+00:00'),
   ('205331b3-9e92-5527-8a98-8a9a4ac792a1', 'PINV-0002', '44634490-e916-5696-b961-ec8c3e44609b', 'b740ad4e-34c3-5e42-aca8-6add4d667371', 'received', 109491.6, 1458.4, 16423.74, 125915.34, 62957.67, 'bank_transfer', 'فاتورة شراء تجريبية PINV-0002', '5da94d74-bd35-5649-afd6-7694627a7d16', '2026-07-05T10:42:00+00:00', '2026-07-05T10:42:00+00:00'),
   ('e9292e5e-e4f6-5567-abb9-843485180b3d', 'PINV-0003', '414cd942-6f07-5bcb-915c-c9e31ced0f43', 'e2e84f67-db8d-56b1-a80e-2256351c0dbc', 'received', 85533, 717, 12829.94, 98362.94, 98362.94, 'cash', 'فاتورة شراء تجريبية PINV-0003', '5da94d74-bd35-5649-afd6-7694627a7d16', '2026-07-05T10:43:00+00:00', '2026-07-05T10:43:00+00:00'),
-  ('843efd90-75dc-5914-96e3-1bf975d9dae5', 'PINV-0004', 'c6a47bba-f05f-56a4-b332-ed44bb935543', 'b740ad4e-34c3-5e42-aca8-6add4d667371', 'received', 307751, 5099, 46162.65, 353913.65, 176956.83, 'bank_transfer', 'فاتورة شراء تجريبية PINV-0004', '5da94d74-bd35-5649-afd6-7694627a7d16', '2026-07-05T10:44:00+00:00', '2026-07-05T10:44:00+00:00');
+  ('843efd90-75dc-5914-96e3-1bf975d9dae5', 'PINV-0004', 'c6a47bba-f05f-56a4-b332-ed44bb935543', 'b740ad4e-34c3-5e42-aca8-6add4d667371', 'received', 307751, 5099, 46162.65, 353913.65, 176956.83, 'bank_transfer', 'فاتورة شراء تجريبية PINV-0004', '5da94d74-bd35-5649-afd6-7694627a7d16', '2026-07-05T10:44:00+00:00', '2026-07-05T10:44:00+00:00')
+ON CONFLICT (id) DO UPDATE SET
+  invoice_number = EXCLUDED.invoice_number,
+  supplier_id = EXCLUDED.supplier_id,
+  warehouse_id = EXCLUDED.warehouse_id,
+  status = EXCLUDED.status,
+  subtotal = EXCLUDED.subtotal,
+  discount = EXCLUDED.discount,
+  tax = EXCLUDED.tax,
+  total = EXCLUDED.total,
+  paid = EXCLUDED.paid,
+  payment_method = EXCLUDED.payment_method,
+  note = EXCLUDED.note,
+  created_by = EXCLUDED.created_by,
+  created_at = EXCLUDED.created_at,
+  updated_at = EXCLUDED.updated_at;
+
 INSERT INTO purchase_invoice_items (id, invoice_id, product_id, quantity, unit_cost, discount, tax, total) VALUES
   ('c1e2304a-25a3-5ab6-9b1e-0fcad00d2f3f', '80af452a-9d57-51bd-b656-6ac0896e8d73', '001903a3-52ab-51ce-a397-c6e698e69a13', 101, 390, 0, 5908.5, 45298.5),
   ('b43d04c0-0598-525b-bba7-9705b39be38d', '80af452a-9d57-51bd-b656-6ac0896e8d73', '2d180117-9227-5e31-8c49-4df0e71237bf', 23, 260, 179.4, 870.09, 6670.69),
@@ -195,19 +297,65 @@ INSERT INTO purchase_invoice_items (id, invoice_id, product_id, quantity, unit_c
   ('ad3b1d45-2978-50c2-9fc1-a43e77ba4909', '843efd90-75dc-5914-96e3-1bf975d9dae5', '40d88f5b-9c50-5a1f-a77e-4e3c02924b22', 27, 4200, 2268, 16669.8, 127801.8),
   ('c2796dad-3677-5751-a8ac-96759c66850f', '843efd90-75dc-5914-96e3-1bf975d9dae5', 'f0859cfd-faa2-548a-b5f3-679c84b09d6d', 15, 7600, 2280, 16758, 128478),
   ('3dfe3de8-8b21-5bdb-a593-a6cbfe31529c', '843efd90-75dc-5914-96e3-1bf975d9dae5', 'dbeed0d9-9475-5f94-8b36-97f64273ef4e', 9, 1800, 0, 2430, 18630),
-  ('9b9473d3-6d18-5abe-8480-9e1590422e61', '843efd90-75dc-5914-96e3-1bf975d9dae5', '599a01f0-db2c-5a1f-983a-af3c8f5143c6', 29, 950, 551, 4049.85, 31048.85);
+  ('9b9473d3-6d18-5abe-8480-9e1590422e61', '843efd90-75dc-5914-96e3-1bf975d9dae5', '599a01f0-db2c-5a1f-983a-af3c8f5143c6', 29, 950, 551, 4049.85, 31048.85)
+ON CONFLICT (id) DO UPDATE SET
+  invoice_id = EXCLUDED.invoice_id,
+  product_id = EXCLUDED.product_id,
+  quantity = EXCLUDED.quantity,
+  unit_cost = EXCLUDED.unit_cost,
+  discount = EXCLUDED.discount,
+  tax = EXCLUDED.tax,
+  total = EXCLUDED.total;
+
 INSERT INTO purchase_returns (id, return_number, invoice_id, supplier_id, warehouse_id, subtotal, tax, total, refund_method, note, created_by, created_at) VALUES
-  ('5b5b9bcf-e40a-574d-bf6c-2219e1e25079', 'PRN-0001', '80af452a-9d57-51bd-b656-6ac0896e8d73', '76c9784a-de03-5d79-bca9-e464028ba262', 'b740ad4e-34c3-5e42-aca8-6add4d667371', 8840, 1326, 10166, 'cash', 'مرتجعات بسبب تلف الكراتين', 'e9bea84a-7055-5574-873c-62869fd3801d', '2026-07-05T13:11:00+00:00');
+  ('5b5b9bcf-e40a-574d-bf6c-2219e1e25079', 'PRN-0001', '80af452a-9d57-51bd-b656-6ac0896e8d73', '76c9784a-de03-5d79-bca9-e464028ba262', 'b740ad4e-34c3-5e42-aca8-6add4d667371', 8840, 1326, 10166, 'cash', 'مرتجعات بسبب تلف الكراتين', 'e9bea84a-7055-5574-873c-62869fd3801d', '2026-07-05T13:11:00+00:00')
+ON CONFLICT (id) DO UPDATE SET
+  return_number = EXCLUDED.return_number,
+  invoice_id = EXCLUDED.invoice_id,
+  supplier_id = EXCLUDED.supplier_id,
+  warehouse_id = EXCLUDED.warehouse_id,
+  subtotal = EXCLUDED.subtotal,
+  tax = EXCLUDED.tax,
+  total = EXCLUDED.total,
+  refund_method = EXCLUDED.refund_method,
+  note = EXCLUDED.note,
+  created_by = EXCLUDED.created_by,
+  created_at = EXCLUDED.created_at;
+
 INSERT INTO purchase_return_items (id, return_id, product_id, quantity, unit_cost, tax, total) VALUES
   ('74fe3620-ec24-5224-b3f6-5efdcac8df18', '5b5b9bcf-e40a-574d-bf6c-2219e1e25079', '001903a3-52ab-51ce-a397-c6e698e69a13', 20, 390, 1170, 8970),
-  ('555b125b-5862-5804-a6e8-8e494a7ae378', '5b5b9bcf-e40a-574d-bf6c-2219e1e25079', '2d180117-9227-5e31-8c49-4df0e71237bf', 4, 260, 156, 1196);
+  ('555b125b-5862-5804-a6e8-8e494a7ae378', '5b5b9bcf-e40a-574d-bf6c-2219e1e25079', '2d180117-9227-5e31-8c49-4df0e71237bf', 4, 260, 156, 1196)
+ON CONFLICT (id) DO UPDATE SET
+  return_id = EXCLUDED.return_id,
+  product_id = EXCLUDED.product_id,
+  quantity = EXCLUDED.quantity,
+  unit_cost = EXCLUDED.unit_cost,
+  tax = EXCLUDED.tax,
+  total = EXCLUDED.total;
+
 INSERT INTO sales_invoices (id, invoice_number, customer_id, warehouse_id, status, subtotal, discount, tax, total, paid, payment_method, note, created_by, created_at, updated_at) VALUES
   ('8af1676c-cab7-5ce5-8e64-76d33cd5ebcd', 'SINV-0001', 'd1c1e62e-20b0-55e6-8630-cd4167a64c0a', 'b740ad4e-34c3-5e42-aca8-6add4d667371', 'completed', 15294, 616, 2294.1, 17588.1, 17588.1, 'cash', 'فاتورة بيع تجريبية SINV-0001', 'ac5f3bcb-7bed-546b-83d3-01d9752940f8', '2026-07-05T14:01:00+00:00', '2026-07-05T14:01:00+00:00'),
   ('4704213b-a1bf-5edc-830a-814b687bdf46', 'SINV-0002', 'f861e1bf-1999-5f56-aa0d-608819877706', 'b740ad4e-34c3-5e42-aca8-6add4d667371', 'completed', 16949.4, 1230.6, 2542.41, 19491.81, 19491.81, 'mobile_money', 'فاتورة بيع تجريبية SINV-0002', 'ac5f3bcb-7bed-546b-83d3-01d9752940f8', '2026-07-05T14:02:00+00:00', '2026-07-05T14:02:00+00:00'),
   ('52b28ce4-e4de-5ae3-9fb6-318c352e8cf4', 'SINV-0003', '52b63356-21d2-5597-bbef-20421b2186a4', 'b740ad4e-34c3-5e42-aca8-6add4d667371', 'completed', 20877.5, 822.5, 3131.63, 24009.13, 24009.13, 'cash', 'فاتورة بيع تجريبية SINV-0003', 'ac5f3bcb-7bed-546b-83d3-01d9752940f8', '2026-07-05T14:03:00+00:00', '2026-07-05T14:03:00+00:00'),
   ('f64f41d7-85d8-50aa-875c-c01b6b514dcc', 'SINV-0004', '28e2daee-c384-5153-aba1-0263102c377a', 'e2e84f67-db8d-56b1-a80e-2256351c0dbc', 'completed', 42303.8, 2496.2, 6345.57, 48649.37, 0, 'credit', 'فاتورة بيع تجريبية SINV-0004', 'ac5f3bcb-7bed-546b-83d3-01d9752940f8', '2026-07-05T14:04:00+00:00', '2026-07-05T14:04:00+00:00'),
   ('890d020a-51f2-5a77-b2d4-941447d7d120', 'SINV-0005', '766378c3-4ae2-54e6-8093-fb3cf8eca253', 'e2e84f67-db8d-56b1-a80e-2256351c0dbc', 'completed', 25082.6, 1077.4, 3762.39, 28844.99, 28844.99, 'cash', 'فاتورة بيع تجريبية SINV-0005', 'ac5f3bcb-7bed-546b-83d3-01d9752940f8', '2026-07-05T14:05:00+00:00', '2026-07-05T14:05:00+00:00'),
-  ('d31ca1c0-f55e-5730-926d-2c50816da704', 'SINV-0006', '0592b8ba-5968-5b3b-bd62-bb6a0f73a1cd', 'b740ad4e-34c3-5e42-aca8-6add4d667371', 'completed', 16356.5, 403.5, 2453.47, 18809.97, 18809.97, 'bank_transfer', 'فاتورة بيع تجريبية SINV-0006', 'ac5f3bcb-7bed-546b-83d3-01d9752940f8', '2026-07-05T14:06:00+00:00', '2026-07-05T14:06:00+00:00');
+  ('d31ca1c0-f55e-5730-926d-2c50816da704', 'SINV-0006', '0592b8ba-5968-5b3b-bd62-bb6a0f73a1cd', 'b740ad4e-34c3-5e42-aca8-6add4d667371', 'completed', 16356.5, 403.5, 2453.47, 18809.97, 18809.97, 'bank_transfer', 'فاتورة بيع تجريبية SINV-0006', 'ac5f3bcb-7bed-546b-83d3-01d9752940f8', '2026-07-05T14:06:00+00:00', '2026-07-05T14:06:00+00:00')
+ON CONFLICT (id) DO UPDATE SET
+  invoice_number = EXCLUDED.invoice_number,
+  customer_id = EXCLUDED.customer_id,
+  warehouse_id = EXCLUDED.warehouse_id,
+  status = EXCLUDED.status,
+  subtotal = EXCLUDED.subtotal,
+  discount = EXCLUDED.discount,
+  tax = EXCLUDED.tax,
+  total = EXCLUDED.total,
+  paid = EXCLUDED.paid,
+  payment_method = EXCLUDED.payment_method,
+  note = EXCLUDED.note,
+  created_by = EXCLUDED.created_by,
+  created_at = EXCLUDED.created_at,
+  updated_at = EXCLUDED.updated_at;
+
 INSERT INTO sales_invoice_items (id, invoice_id, product_id, quantity, unit_price, discount, tax, total) VALUES
   ('918d435c-ae99-5a1b-b273-fdb0d0c77409', '8af1676c-cab7-5ce5-8e64-76d33cd5ebcd', '001903a3-52ab-51ce-a397-c6e698e69a13', 6, 520, 0, 468, 3588),
   ('bab5dcdf-8163-56bc-a9f4-31168b46cebb', '8af1676c-cab7-5ce5-8e64-76d33cd5ebcd', 'c14e3195-5f79-5430-9de7-333e4baadfd3', 15, 120, 0, 270, 2070),
@@ -238,12 +386,42 @@ INSERT INTO sales_invoice_items (id, invoice_id, product_id, quantity, unit_pric
   ('61ffa367-ae2a-5811-8419-75c86f253850', 'd31ca1c0-f55e-5730-926d-2c50816da704', '51b7a423-d661-5a08-b199-aeb4bc76320b', 10, 290, 0, 435, 3335),
   ('6f12b182-a11e-5d25-a442-96e450e345dd', 'd31ca1c0-f55e-5730-926d-2c50816da704', 'e6dded17-80f2-5cfe-b098-375fbdf00f32', 13, 330, 214.5, 611.32, 4686.82),
   ('9ef2ac74-f648-5f43-a168-e0d6f8d131aa', 'd31ca1c0-f55e-5730-926d-2c50816da704', '599a01f0-db2c-5a1f-983a-af3c8f5143c6', 3, 1250, 0, 562.5, 4312.5),
-  ('8b45859f-1830-58f0-bafc-fb442323b900', 'd31ca1c0-f55e-5730-926d-2c50816da704', 'ddd85847-7ca7-5b08-8c97-ee468cda33ef', 9, 300, 189, 376.65, 2887.65);
+  ('8b45859f-1830-58f0-bafc-fb442323b900', 'd31ca1c0-f55e-5730-926d-2c50816da704', 'ddd85847-7ca7-5b08-8c97-ee468cda33ef', 9, 300, 189, 376.65, 2887.65)
+ON CONFLICT (id) DO UPDATE SET
+  invoice_id = EXCLUDED.invoice_id,
+  product_id = EXCLUDED.product_id,
+  quantity = EXCLUDED.quantity,
+  unit_price = EXCLUDED.unit_price,
+  discount = EXCLUDED.discount,
+  tax = EXCLUDED.tax,
+  total = EXCLUDED.total;
+
 INSERT INTO sales_returns (id, return_number, invoice_id, customer_id, warehouse_id, subtotal, tax, total, refund_method, note, created_by, created_at) VALUES
-  ('30ff21de-efcc-5e8b-94c2-97ac6e474bd4', 'SRN-0001', '8af1676c-cab7-5ce5-8e64-76d33cd5ebcd', 'd1c1e62e-20b0-55e6-8630-cd4167a64c0a', 'b740ad4e-34c3-5e42-aca8-6add4d667371', 2400, 360, 2760, 'cash', 'العميل غيّر رأيه', 'ac5f3bcb-7bed-546b-83d3-01d9752940f8', '2026-07-05T14:51:00+00:00');
+  ('30ff21de-efcc-5e8b-94c2-97ac6e474bd4', 'SRN-0001', '8af1676c-cab7-5ce5-8e64-76d33cd5ebcd', 'd1c1e62e-20b0-55e6-8630-cd4167a64c0a', 'b740ad4e-34c3-5e42-aca8-6add4d667371', 2400, 360, 2760, 'cash', 'العميل غيّر رأيه', 'ac5f3bcb-7bed-546b-83d3-01d9752940f8', '2026-07-05T14:51:00+00:00')
+ON CONFLICT (id) DO UPDATE SET
+  return_number = EXCLUDED.return_number,
+  invoice_id = EXCLUDED.invoice_id,
+  customer_id = EXCLUDED.customer_id,
+  warehouse_id = EXCLUDED.warehouse_id,
+  subtotal = EXCLUDED.subtotal,
+  tax = EXCLUDED.tax,
+  total = EXCLUDED.total,
+  refund_method = EXCLUDED.refund_method,
+  note = EXCLUDED.note,
+  created_by = EXCLUDED.created_by,
+  created_at = EXCLUDED.created_at;
+
 INSERT INTO sales_return_items (id, return_id, product_id, quantity, unit_price, tax, total) VALUES
   ('d68b2147-571b-59c9-a546-3ee126e2040d', '30ff21de-efcc-5e8b-94c2-97ac6e474bd4', '001903a3-52ab-51ce-a397-c6e698e69a13', 3, 520, 234, 1794),
-  ('e9828516-74d0-5cbb-a2c7-b2650243dd12', '30ff21de-efcc-5e8b-94c2-97ac6e474bd4', 'c14e3195-5f79-5430-9de7-333e4baadfd3', 7, 120, 126, 966);
+  ('e9828516-74d0-5cbb-a2c7-b2650243dd12', '30ff21de-efcc-5e8b-94c2-97ac6e474bd4', 'c14e3195-5f79-5430-9de7-333e4baadfd3', 7, 120, 126, 966)
+ON CONFLICT (id) DO UPDATE SET
+  return_id = EXCLUDED.return_id,
+  product_id = EXCLUDED.product_id,
+  quantity = EXCLUDED.quantity,
+  unit_price = EXCLUDED.unit_price,
+  tax = EXCLUDED.tax,
+  total = EXCLUDED.total;
+
 INSERT INTO inventory (id, product_id, warehouse_id, quantity, updated_at) VALUES
   ('ce085bb9-1663-5bf2-a561-53da8f068d6b', '001903a3-52ab-51ce-a397-c6e698e69a13', 'b740ad4e-34c3-5e42-aca8-6add4d667371', 71, '2026-07-06T01:41:00+00:00'),
   ('daf45687-4a7b-56af-bba5-107f7e314add', '001903a3-52ab-51ce-a397-c6e698e69a13', 'e2e84f67-db8d-56b1-a80e-2256351c0dbc', 17, '2026-07-06T05:01:00+00:00'),
@@ -353,7 +531,13 @@ INSERT INTO inventory (id, product_id, warehouse_id, quantity, updated_at) VALUE
   ('5127932d-539d-51e2-8154-bcb33b108feb', 'b4fe7b6f-ab0d-563b-a184-ac7cc5fd38cf', 'b740ad4e-34c3-5e42-aca8-6add4d667371', 34, '2026-07-06T02:35:00+00:00'),
   ('db9a4971-5ce0-5477-b2f5-f052746e5648', 'b4fe7b6f-ab0d-563b-a184-ac7cc5fd38cf', 'e2e84f67-db8d-56b1-a80e-2256351c0dbc', 7, '2026-07-06T05:55:00+00:00'),
   ('f8dede40-f731-5eee-be05-548f7ef9d49b', '4d9ca227-96c2-5000-b4d9-e51517159c00', 'b740ad4e-34c3-5e42-aca8-6add4d667371', 47, '2026-07-06T02:36:00+00:00'),
-  ('b0a4a4d5-193a-5c19-8a40-39d5a0565439', '4d9ca227-96c2-5000-b4d9-e51517159c00', 'e2e84f67-db8d-56b1-a80e-2256351c0dbc', 15, '2026-07-06T05:56:00+00:00');
+  ('b0a4a4d5-193a-5c19-8a40-39d5a0565439', '4d9ca227-96c2-5000-b4d9-e51517159c00', 'e2e84f67-db8d-56b1-a80e-2256351c0dbc', 15, '2026-07-06T05:56:00+00:00')
+ON CONFLICT (id) DO UPDATE SET
+  product_id = EXCLUDED.product_id,
+  warehouse_id = EXCLUDED.warehouse_id,
+  quantity = EXCLUDED.quantity,
+  updated_at = EXCLUDED.updated_at;
+
 INSERT INTO product_batches (id, product_id, warehouse_id, batch_number, expiry_date, quantity, unit_cost, note, created_by, created_at, updated_at) VALUES
   ('c4620070-a910-5b3e-b5c3-f0dd9e4ddd79', '001903a3-52ab-51ce-a397-c6e698e69a13', 'b740ad4e-34c3-5e42-aca8-6add4d667371', 'B-0001-A', NULL, 71, 390, NULL, 'e9bea84a-7055-5574-873c-62869fd3801d', '2026-07-06T03:21:00+00:00', '2026-07-06T03:21:00+00:00'),
   ('b618ebb4-e7c8-5436-8505-65663ff1cefe', '001903a3-52ab-51ce-a397-c6e698e69a13', 'e2e84f67-db8d-56b1-a80e-2256351c0dbc', 'B-0001-B', NULL, 17, 390, 'Branch allocation', 'e9bea84a-7055-5574-873c-62869fd3801d', '2026-07-06T06:41:00+00:00', '2026-07-06T06:41:00+00:00'),
@@ -463,10 +647,31 @@ INSERT INTO product_batches (id, product_id, warehouse_id, batch_number, expiry_
   ('09d5a2cb-dd55-5961-aa9c-5be6aede33ad', 'b4fe7b6f-ab0d-563b-a184-ac7cc5fd38cf', 'b740ad4e-34c3-5e42-aca8-6add4d667371', 'B-0055-A', NULL, 34, 650, NULL, 'e9bea84a-7055-5574-873c-62869fd3801d', '2026-07-06T04:15:00+00:00', '2026-07-06T04:15:00+00:00'),
   ('0595fb40-ef56-5024-86a2-ab7492a6d825', 'b4fe7b6f-ab0d-563b-a184-ac7cc5fd38cf', 'e2e84f67-db8d-56b1-a80e-2256351c0dbc', 'B-0055-B', NULL, 7, 650, 'Branch allocation', 'e9bea84a-7055-5574-873c-62869fd3801d', '2026-07-06T07:35:00+00:00', '2026-07-06T07:35:00+00:00'),
   ('19294397-c7c9-5333-8398-a503310cbcd2', '4d9ca227-96c2-5000-b4d9-e51517159c00', 'b740ad4e-34c3-5e42-aca8-6add4d667371', 'B-0056-A', NULL, 47, 1700, NULL, 'e9bea84a-7055-5574-873c-62869fd3801d', '2026-07-06T04:16:00+00:00', '2026-07-06T04:16:00+00:00'),
-  ('7041cc7b-f056-5289-bcc4-10b9be495801', '4d9ca227-96c2-5000-b4d9-e51517159c00', 'e2e84f67-db8d-56b1-a80e-2256351c0dbc', 'B-0056-B', NULL, 15, 1700, 'Branch allocation', 'e9bea84a-7055-5574-873c-62869fd3801d', '2026-07-06T07:36:00+00:00', '2026-07-06T07:36:00+00:00');
+  ('7041cc7b-f056-5289-bcc4-10b9be495801', '4d9ca227-96c2-5000-b4d9-e51517159c00', 'e2e84f67-db8d-56b1-a80e-2256351c0dbc', 'B-0056-B', NULL, 15, 1700, 'Branch allocation', 'e9bea84a-7055-5574-873c-62869fd3801d', '2026-07-06T07:36:00+00:00', '2026-07-06T07:36:00+00:00')
+ON CONFLICT (id) DO UPDATE SET
+  product_id = EXCLUDED.product_id,
+  warehouse_id = EXCLUDED.warehouse_id,
+  batch_number = EXCLUDED.batch_number,
+  expiry_date = EXCLUDED.expiry_date,
+  quantity = EXCLUDED.quantity,
+  unit_cost = EXCLUDED.unit_cost,
+  note = EXCLUDED.note,
+  created_by = EXCLUDED.created_by,
+  created_at = EXCLUDED.created_at,
+  updated_at = EXCLUDED.updated_at;
+
 INSERT INTO stock_transfers (id, transfer_number, from_warehouse_id, to_warehouse_id, status, note, created_by, created_at) VALUES
   ('0405a0c2-e46a-5cd9-a981-28f94331ba7e', 'ST-0001', 'b740ad4e-34c3-5e42-aca8-6add4d667371', 'e2e84f67-db8d-56b1-a80e-2256351c0dbc', 'completed', 'إعادة توازن مخزون الفرع', 'e9bea84a-7055-5574-873c-62869fd3801d', '2026-07-05T15:41:00+00:00'),
-  ('92b92b92-1227-595a-9560-a2852348e173', 'ST-0002', 'b740ad4e-34c3-5e42-aca8-6add4d667371', 'e2e84f67-db8d-56b1-a80e-2256351c0dbc', 'completed', 'إعادة توازن مخزون الفرع', 'e9bea84a-7055-5574-873c-62869fd3801d', '2026-07-05T15:42:00+00:00');
+  ('92b92b92-1227-595a-9560-a2852348e173', 'ST-0002', 'b740ad4e-34c3-5e42-aca8-6add4d667371', 'e2e84f67-db8d-56b1-a80e-2256351c0dbc', 'completed', 'إعادة توازن مخزون الفرع', 'e9bea84a-7055-5574-873c-62869fd3801d', '2026-07-05T15:42:00+00:00')
+ON CONFLICT (id) DO UPDATE SET
+  transfer_number = EXCLUDED.transfer_number,
+  from_warehouse_id = EXCLUDED.from_warehouse_id,
+  to_warehouse_id = EXCLUDED.to_warehouse_id,
+  status = EXCLUDED.status,
+  note = EXCLUDED.note,
+  created_by = EXCLUDED.created_by,
+  created_at = EXCLUDED.created_at;
+
 INSERT INTO stock_transfer_items (id, transfer_id, product_id, quantity) VALUES
   ('796f164c-5b4e-5ae2-a0ff-f42b90aea04b', '0405a0c2-e46a-5cd9-a981-28f94331ba7e', '7dee747f-7bf9-52a0-b159-f0a085fbd843', 20),
   ('0ef744d5-3fcf-5450-a80d-4598dafaa6c3', '0405a0c2-e46a-5cd9-a981-28f94331ba7e', '557f5c5d-c139-586c-886e-65ee2c3f03bb', 16),
@@ -477,7 +682,12 @@ INSERT INTO stock_transfer_items (id, transfer_id, product_id, quantity) VALUES
   ('4818bd7f-d396-5be6-99ce-2cc6fc6e29ff', '92b92b92-1227-595a-9560-a2852348e173', '40d88f5b-9c50-5a1f-a77e-4e3c02924b22', 24),
   ('65cb1c02-13a4-5427-992c-fc07c4d8d988', '92b92b92-1227-595a-9560-a2852348e173', 'f0859cfd-faa2-548a-b5f3-679c84b09d6d', 14),
   ('d6cb9b1b-268e-5684-80b8-75dcadad583f', '92b92b92-1227-595a-9560-a2852348e173', 'dbeed0d9-9475-5f94-8b36-97f64273ef4e', 18),
-  ('eb01d0d0-bb1e-512c-93ba-e005b1107e71', '92b92b92-1227-595a-9560-a2852348e173', '599a01f0-db2c-5a1f-983a-af3c8f5143c6', 14);
+  ('eb01d0d0-bb1e-512c-93ba-e005b1107e71', '92b92b92-1227-595a-9560-a2852348e173', '599a01f0-db2c-5a1f-983a-af3c8f5143c6', 14)
+ON CONFLICT (id) DO UPDATE SET
+  transfer_id = EXCLUDED.transfer_id,
+  product_id = EXCLUDED.product_id,
+  quantity = EXCLUDED.quantity;
+
 INSERT INTO stock_movements (id, product_id, warehouse_id, movement_type, quantity, unit_cost, reference, note, created_by, created_at, reference_type, reference_id) VALUES
   ('d75eb4db-dc41-53d8-ab82-de9aaf5f1774', '7dee747f-7bf9-52a0-b159-f0a085fbd843', 'b740ad4e-34c3-5e42-aca8-6add4d667371', 'transfer_out', 20, 50, 'ST-0001', 'أُرسل إلى الفرع', 'e9bea84a-7055-5574-873c-62869fd3801d', '2026-07-05T17:21:00+00:00', 'stock_transfer', '0405a0c2-e46a-5cd9-a981-28f94331ba7e'),
   ('b6d02eef-8aef-59ea-9a89-f673fff7f245', '7dee747f-7bf9-52a0-b159-f0a085fbd843', 'e2e84f67-db8d-56b1-a80e-2256351c0dbc', 'transfer_in', 20, 50, 'ST-0001', 'استُلم من الرئيسي', 'e9bea84a-7055-5574-873c-62869fd3801d', '2026-07-05T19:02:00+00:00', 'stock_transfer', '0405a0c2-e46a-5cd9-a981-28f94331ba7e'),
@@ -524,7 +734,20 @@ INSERT INTO stock_movements (id, product_id, warehouse_id, movement_type, quanti
   ('1c050757-49a4-56d5-813d-1856153f4ef5', '001903a3-52ab-51ce-a397-c6e698e69a13', 'b740ad4e-34c3-5e42-aca8-6add4d667371', 'purchase_return', 20, 390, 'PRN-0001', 'إرجاع إلى المورد', 'e9bea84a-7055-5574-873c-62869fd3801d', '2026-07-06T00:01:00+00:00', 'purchase_return', '5b5b9bcf-e40a-574d-bf6c-2219e1e25079'),
   ('f8b650e1-6adc-5acf-9bfe-76b29fae3a6d', '2d180117-9227-5e31-8c49-4df0e71237bf', 'b740ad4e-34c3-5e42-aca8-6add4d667371', 'purchase_return', 4, 260, 'PRN-0001', 'إرجاع إلى المورد', 'e9bea84a-7055-5574-873c-62869fd3801d', '2026-07-06T00:02:00+00:00', 'purchase_return', '5b5b9bcf-e40a-574d-bf6c-2219e1e25079'),
   ('64c2db97-bda2-5e94-b4a8-7b6c338d94bc', '001903a3-52ab-51ce-a397-c6e698e69a13', 'b740ad4e-34c3-5e42-aca8-6add4d667371', 'sale_return', 3, 520, 'SRN-0001', 'إرجاع من العميل', 'ac5f3bcb-7bed-546b-83d3-01d9752940f8', '2026-07-06T00:51:00+00:00', 'sales_return', '30ff21de-efcc-5e8b-94c2-97ac6e474bd4'),
-  ('52420a13-3cd1-5ae8-8c6e-a8dcb1188b86', 'c14e3195-5f79-5430-9de7-333e4baadfd3', 'b740ad4e-34c3-5e42-aca8-6add4d667371', 'sale_return', 7, 120, 'SRN-0001', 'إرجاع من العميل', 'ac5f3bcb-7bed-546b-83d3-01d9752940f8', '2026-07-06T00:52:00+00:00', 'sales_return', '30ff21de-efcc-5e8b-94c2-97ac6e474bd4');
+  ('52420a13-3cd1-5ae8-8c6e-a8dcb1188b86', 'c14e3195-5f79-5430-9de7-333e4baadfd3', 'b740ad4e-34c3-5e42-aca8-6add4d667371', 'sale_return', 7, 120, 'SRN-0001', 'إرجاع من العميل', 'ac5f3bcb-7bed-546b-83d3-01d9752940f8', '2026-07-06T00:52:00+00:00', 'sales_return', '30ff21de-efcc-5e8b-94c2-97ac6e474bd4')
+ON CONFLICT (id) DO UPDATE SET
+  product_id = EXCLUDED.product_id,
+  warehouse_id = EXCLUDED.warehouse_id,
+  movement_type = EXCLUDED.movement_type,
+  quantity = EXCLUDED.quantity,
+  unit_cost = EXCLUDED.unit_cost,
+  reference = EXCLUDED.reference,
+  note = EXCLUDED.note,
+  created_by = EXCLUDED.created_by,
+  created_at = EXCLUDED.created_at,
+  reference_type = EXCLUDED.reference_type,
+  reference_id = EXCLUDED.reference_id;
+
 INSERT INTO loyalty_transactions (id, customer_id, points, kind, reference_type, reference_id, note, created_by, created_at) VALUES
   ('42b01813-902b-5ae7-b1f4-8240bcf052a3', 'd1c1e62e-20b0-55e6-8630-cd4167a64c0a', 10, 'earn', 'sales_invoice', '8af1676c-cab7-5ce5-8e64-76d33cd5ebcd', 'نقاط مكتسبة من SINV-0001', 'ac5f3bcb-7bed-546b-83d3-01d9752940f8', '2026-07-06T08:21:00+00:00'),
   ('d7d65e45-ae26-53c1-bc5b-577db9ab70d7', 'f861e1bf-1999-5f56-aa0d-608819877706', 20, 'earn', 'sales_invoice', '4704213b-a1bf-5edc-830a-814b687bdf46', 'نقاط مكتسبة من SINV-0002', 'ac5f3bcb-7bed-546b-83d3-01d9752940f8', '2026-07-06T08:22:00+00:00'),
@@ -532,7 +755,17 @@ INSERT INTO loyalty_transactions (id, customer_id, points, kind, reference_type,
   ('ee5601d6-e36d-525e-91a5-04e71deb0afd', '28e2daee-c384-5153-aba1-0263102c377a', 40, 'earn', 'sales_invoice', 'f64f41d7-85d8-50aa-875c-c01b6b514dcc', 'نقاط مكتسبة من SINV-0004', 'ac5f3bcb-7bed-546b-83d3-01d9752940f8', '2026-07-06T08:24:00+00:00'),
   ('53e5bc1b-e3b4-56d1-9cb1-a73e039b4744', '766378c3-4ae2-54e6-8093-fb3cf8eca253', 50, 'earn', 'sales_invoice', '890d020a-51f2-5a77-b2d4-941447d7d120', 'نقاط مكتسبة من SINV-0005', 'ac5f3bcb-7bed-546b-83d3-01d9752940f8', '2026-07-06T08:25:00+00:00'),
   ('c70b55a3-675e-5501-b7be-f5c5005138b5', '0592b8ba-5968-5b3b-bd62-bb6a0f73a1cd', 60, 'earn', 'sales_invoice', 'd31ca1c0-f55e-5730-926d-2c50816da704', 'نقاط مكتسبة من SINV-0006', 'ac5f3bcb-7bed-546b-83d3-01d9752940f8', '2026-07-06T08:26:00+00:00'),
-  ('e241ab84-b66f-5d88-9a8d-532f54f8fa94', 'd1c1e62e-20b0-55e6-8630-cd4167a64c0a', 25, 'redeem', 'sales_invoice', '8af1676c-cab7-5ce5-8e64-76d33cd5ebcd', 'تم استبدالها عند تسوية المرتجع', 'ac5f3bcb-7bed-546b-83d3-01d9752940f8', '2026-07-06T10:00:00+00:00');
+  ('e241ab84-b66f-5d88-9a8d-532f54f8fa94', 'd1c1e62e-20b0-55e6-8630-cd4167a64c0a', 25, 'redeem', 'sales_invoice', '8af1676c-cab7-5ce5-8e64-76d33cd5ebcd', 'تم استبدالها عند تسوية المرتجع', 'ac5f3bcb-7bed-546b-83d3-01d9752940f8', '2026-07-06T10:00:00+00:00')
+ON CONFLICT (id) DO UPDATE SET
+  customer_id = EXCLUDED.customer_id,
+  points = EXCLUDED.points,
+  kind = EXCLUDED.kind,
+  reference_type = EXCLUDED.reference_type,
+  reference_id = EXCLUDED.reference_id,
+  note = EXCLUDED.note,
+  created_by = EXCLUDED.created_by,
+  created_at = EXCLUDED.created_at;
+
 INSERT INTO expenses (id, category_id, amount, payment_method, expense_date, note, created_by, created_at, updated_at) VALUES
   ('7926622d-0c4a-5abb-9a6e-521f5df10224', 'dc1f51ad-ebe7-5f9c-9648-5e124c4dca17', 650000, 'cash', '2026-06-30', 'إيجار المستودع الشهري', '5da94d74-bd35-5649-afd6-7694627a7d16', '2026-07-06T11:40:00+00:00', '2026-07-06T11:40:00+00:00'),
   ('e7f78a85-c2d7-5d97-8403-83a873bd1618', '1f6e2aee-6cd3-55f0-abff-9ff61fada0ab', 1200000, 'bank_transfer', '2026-07-01', 'رواتب الموظفين', '5da94d74-bd35-5649-afd6-7694627a7d16', '2026-07-06T11:41:00+00:00', '2026-07-06T11:41:00+00:00'),
@@ -540,10 +773,28 @@ INSERT INTO expenses (id, category_id, amount, payment_method, expense_date, not
   ('4c8ed56d-3fca-50cc-9189-dd02fbd72fd0', 'd550d5ae-bda0-5506-b8d9-18abaf752565', 70000, 'cash', '2026-07-03', 'الكهرباء والماء', '5da94d74-bd35-5649-afd6-7694627a7d16', '2026-07-06T11:43:00+00:00', '2026-07-06T11:43:00+00:00'),
   ('90e03dbc-bac8-5d9e-92a5-c8731b712e21', '04ec8b9a-deb3-5107-9eda-0b428e92267e', 45000, 'cash', '2026-07-04', 'إصلاحات بسيطة للأرفف', 'e9bea84a-7055-5574-873c-62869fd3801d', '2026-07-06T11:44:00+00:00', '2026-07-06T11:44:00+00:00'),
   ('f0005871-0c83-5fe5-80db-aa89f4edb7d8', 'bab4a9a4-3fe9-5d07-bc75-ced14df582f3', 38000, 'cash', '2026-07-05', 'مواد تغليف', 'ac5f3bcb-7bed-546b-83d3-01d9752940f8', '2026-07-06T11:45:00+00:00', '2026-07-06T11:45:00+00:00'),
-  ('45710d54-adeb-5569-b33c-ac34e6f57061', '6dac640a-7a6e-511a-83f5-6dec2020facf', 15000, 'cash', '2026-07-05', 'اشتراك الإنترنت', '5da94d74-bd35-5649-afd6-7694627a7d16', '2026-07-06T11:46:00+00:00', '2026-07-06T11:46:00+00:00');
+  ('45710d54-adeb-5569-b33c-ac34e6f57061', '6dac640a-7a6e-511a-83f5-6dec2020facf', 15000, 'cash', '2026-07-05', 'اشتراك الإنترنت', '5da94d74-bd35-5649-afd6-7694627a7d16', '2026-07-06T11:46:00+00:00', '2026-07-06T11:46:00+00:00')
+ON CONFLICT (id) DO UPDATE SET
+  category_id = EXCLUDED.category_id,
+  amount = EXCLUDED.amount,
+  payment_method = EXCLUDED.payment_method,
+  expense_date = EXCLUDED.expense_date,
+  note = EXCLUDED.note,
+  created_by = EXCLUDED.created_by,
+  created_at = EXCLUDED.created_at,
+  updated_at = EXCLUDED.updated_at;
+
 INSERT INTO audit_logs (id, actor_id, action, entity_type, entity_id, payload, created_at) VALUES
   ('5daef607-5898-530e-b792-93adb593b402', '5da94d74-bd35-5649-afd6-7694627a7d16', 'create', 'purchase_invoice', '80af452a-9d57-51bd-b656-6ac0896e8d73', '{"invoice_number": "PINV-0001", "total": 121786.84}'::jsonb, '2026-07-05T12:21:00+00:00'),
   ('505c24d2-9a31-5893-821b-8c1fa87a72a7', '5da94d74-bd35-5649-afd6-7694627a7d16', 'create', 'purchase_invoice', '205331b3-9e92-5527-8a98-8a9a4ac792a1', '{"invoice_number": "PINV-0002", "total": 125915.34}'::jsonb, '2026-07-05T12:22:00+00:00'),
   ('ac5817a7-66d1-5d91-91f0-8f6e8f3946e5', '5da94d74-bd35-5649-afd6-7694627a7d16', 'create', 'purchase_invoice', 'e9292e5e-e4f6-5567-abb9-843485180b3d', '{"invoice_number": "PINV-0003", "total": 98362.94}'::jsonb, '2026-07-05T12:23:00+00:00'),
-  ('b46bfa8a-9d8c-5d29-9b9a-be0b3fd12048', '5da94d74-bd35-5649-afd6-7694627a7d16', 'create', 'purchase_invoice', '843efd90-75dc-5914-96e3-1bf975d9dae5', '{"invoice_number": "PINV-0004", "total": 353913.65}'::jsonb, '2026-07-05T12:24:00+00:00');
+  ('b46bfa8a-9d8c-5d29-9b9a-be0b3fd12048', '5da94d74-bd35-5649-afd6-7694627a7d16', 'create', 'purchase_invoice', '843efd90-75dc-5914-96e3-1bf975d9dae5', '{"invoice_number": "PINV-0004", "total": 353913.65}'::jsonb, '2026-07-05T12:24:00+00:00')
+ON CONFLICT (id) DO UPDATE SET
+  actor_id = EXCLUDED.actor_id,
+  action = EXCLUDED.action,
+  entity_type = EXCLUDED.entity_type,
+  entity_id = EXCLUDED.entity_id,
+  payload = EXCLUDED.payload,
+  created_at = EXCLUDED.created_at;
+
 COMMIT;

@@ -161,9 +161,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const sideEdge = dir === "rtl" ? "border-l" : "border-r";
 
   return (
-    <div className="relative z-10 flex min-h-screen w-full text-foreground">
+    <div className="relative z-10 flex h-screen w-full overflow-hidden text-foreground">
       {/* Desktop sidebar */}
-      <aside className={cn("hidden md:flex w-64 shrink-0 min-h-0 flex-col overflow-hidden", sideEdge, "border-sidebar-border/60")}>
+      <aside className={cn("hidden md:flex h-full w-64 shrink-0 flex-col overflow-hidden", sideEdge, "border-sidebar-border/60")}>
         <SidebarContents />
       </aside>
 
@@ -175,7 +175,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </Sheet>
 
       {/* Main column */}
-      <div className="flex flex-1 min-h-0 flex-col min-w-0">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Top bar */}
         <header className="sticky top-0 z-30 flex h-16 items-center gap-2.5 border-b border-border/60 bg-background/70 px-4 backdrop-blur-xl sm:px-6">
           <button
@@ -218,7 +218,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 min-h-0 overflow-y-auto">
           <div className="mx-auto w-full max-w-[1400px] p-4 sm:p-6">{children}</div>
         </main>
       </div>

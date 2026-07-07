@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 export type Lang = "en" | "ar";
 
 type Dict = Record<string, string>;
+const STORAGE_KEY = "lang_v2";
 
 const en: Dict = {
   "app.name": "Vortex ERP",
@@ -1085,15 +1086,16 @@ const Ctx = createContext<I18nCtx | null>(null);
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>(() => {
-    if (typeof window === "undefined") return "en";
-    return (localStorage.getItem("lang") as Lang) || "en";
+    if (typeof window === "undefined") return "ar";
+    const stored = localStorage.getItem(STORAGE_KEY) as Lang | null;
+    return stored === "en" || stored === "ar" ? stored : "ar";
   });
 
   useEffect(() => {
     const dir = lang === "ar" ? "rtl" : "ltr";
     document.documentElement.dir = dir;
     document.documentElement.lang = lang;
-    localStorage.setItem("lang", lang);
+    localStorage.setItem(STORAGE_KEY, lang);
   }, [lang]);
 
   const value: I18nCtx = {

@@ -8,7 +8,7 @@ import { money } from "@/lib/format";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/suppliers")({
-  head: () => ({ meta: [{ title: "Suppliers — Vortex ERP" }] }),
+  head: () => ({ meta: [{ title: "الموردون — فورتيكس ERP" }] }),
   component: SuppliersPage,
 });
 
