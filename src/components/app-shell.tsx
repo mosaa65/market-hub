@@ -69,7 +69,7 @@ function SidebarContents({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-sidebar text-sidebar-foreground">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-sidebar text-sidebar-foreground">
       <div className="flex h-16 items-center gap-2.5 px-5 border-b border-sidebar-border/60">
         <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-primary via-primary to-chart-4 shadow-lg shadow-primary/20 ring-1 ring-white/10">
           <Sparkles className="h-4 w-4 text-primary-foreground" />
@@ -80,7 +80,7 @@ function SidebarContents({ onNavigate }: { onNavigate?: () => void }) {
         </div>
       </div>
 
-      <nav className="flex-1 min-h-0 overflow-y-auto px-3 py-4 space-y-6">
+      <nav className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3 py-4 space-y-6 overscroll-contain [scrollbar-gutter:stable]">
         {sections.map((sec) => (
           <div key={sec.titleKey}>
             <div className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">
@@ -163,7 +163,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative z-10 flex min-h-screen w-full text-foreground">
       {/* Desktop sidebar */}
-      <aside className={cn("hidden md:flex w-64 shrink-0 min-h-0 flex-col", sideEdge, "border-sidebar-border/60")}>
+      <aside className={cn("hidden md:flex w-64 shrink-0 min-h-0 flex-col overflow-hidden", sideEdge, "border-sidebar-border/60")}>
         <SidebarContents />
       </aside>
 

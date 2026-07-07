@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { PageHeader } from "@/components/page-header";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
@@ -23,27 +24,53 @@ function DashboardPage() {
     queryKey: ["dashboard-stats"],
     queryFn: async () => {
       const since = new Date(Date.now() - 30 * 86400_000).toISOString();
-      const [sales, customers, lowStock] = await Promise.all([
-        supabase.from("sales_invoices").select("total, created_at, status").gte("created_at", since),
+      const [salesRes, customersRes, productsRes] = await Promise.all([
+        supabase.from("sales_invoices").select("id, invoice_number, total, created_at, status, customers(name)").gte("created_at", since).order("created_at", { ascending: false }).limit(12),
         supabase.from("customers").select("id", { count: "exact", head: true }).eq("is_active", true),
-        supabase.from("products").select("id, name, min_stock, inventory(quantity)").limit(50),
+        supabase.from("products").select("id, name, min_stock, inventory(quantity)").limit(100),
       ]);
-      const totalRev = (sales.data ?? []).reduce((a, b: any) => a + Number(b.total ?? 0), 0);
-      const orderCount = (sales.data ?? []).length;
+
+      const sales = (salesRes.data ?? []) as any[];
+      const totalRev = sales.reduce((a, b: any) => a + Number(b.total ?? 0), 0);
+      const orderCount = sales.length;
+      const alerts = (productsRes.data ?? []).filter((p: any) => {
+        const stock = Number((p.inventory?.[0]?.quantity ?? 0) || 0);
+        return stock <= Number(p.min_stock ?? 0);
+      }).length;
+
+      const recentSales = sales.map((s: any) => ({
+        id: s.id,
+        invoice_number: s.invoice_number,
+        total: Number(s.total ?? 0),
+        created_at: s.created_at,
+        customer: s.customers?.name ?? "Walk-in",
+      }));
+
       return {
         revenue: totalRev,
         orders: orderCount,
-        customers: customers.count ?? 0,
-        alerts: 0,
+        customers: customersRes.count ?? 0,
+        alerts,
+        recentSales,
+        sales,
       };
     },
   });
 
-  const trend = Array.from({ length: 14 }).map((_, i) => ({
-    day: `D${i + 1}`,
-    sales: Math.round(800 + Math.sin(i / 2) * 350 + Math.random() * 300),
-    orders: Math.round(8 + Math.cos(i / 2) * 4 + Math.random() * 3),
-  }));
+  const trend = useMemo(() => {
+    const sales = (stats?.sales ?? []) as any[];
+    return Array.from({ length: 14 }).map((_, i) => {
+      const day = new Date();
+      day.setDate(day.getDate() - (13 - i));
+      const key = day.toISOString().slice(0, 10);
+      const daySales = sales.filter((s: any) => s.created_at?.slice(0, 10) === key);
+      return {
+        day: day.toLocaleDateString("en", { month: "short", day: "numeric" }),
+        sales: daySales.reduce((sum: number, s: any) => sum + Number(s.total ?? 0), 0),
+        orders: daySales.length,
+      };
+    });
+  }, [stats]);
 
   return (
     <>
@@ -116,11 +143,26 @@ function DashboardPage() {
 
       <div className="mt-6 panel-elevated p-5">
         <h3 className="text-sm font-semibold text-foreground">{t("dash.recent_sales")}</h3>
-        <p className="mt-1 text-xs text-muted-foreground">{t("dash.empty")}</p>
-        <div className="mt-6 grid place-items-center py-10 text-sm text-muted-foreground">
-          <div className="rounded-md border border-dashed border-border bg-surface px-4 py-3">
-            {t("dash.no_invoices_hint")}
-          </div>
+        <p className="mt-1 text-xs text-muted-foreground">{t("dash.last_30_days")}</p>
+        <div className="mt-4 space-y-2">
+          {(stats?.recentSales ?? []).length > 0 ? (
+            (stats?.recentSales ?? []).map((sale: any) => (
+              <div key={sale.id} className="flex items-center justify-between rounded-lg border border-border bg-surface/70 px-3 py-2">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium text-foreground">{sale.invoice_number}</div>
+                  <div className="truncate text-xs text-muted-foreground">{sale.customer}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm font-semibold text-foreground">{money(sale.total)}</div>
+                  <div className="text-[11px] text-muted-foreground">{new Date(sale.created_at).toLocaleDateString()}</div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="grid place-items-center rounded-lg border border-dashed border-border bg-surface px-4 py-10 text-sm text-muted-foreground">
+              {t("dash.no_invoices_hint")}
+            </div>
+          )}
         </div>
       </div>
     </>

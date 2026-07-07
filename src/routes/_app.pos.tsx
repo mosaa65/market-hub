@@ -90,9 +90,9 @@ function POSPage() {
       supabase.from("warehouses").select("id,name,name_ar").eq("is_active", true).order("name"),
       supabase.from("customers").select("id,name").eq("is_active", true).order("name"),
       supabase.from("products").select("id,sku,barcode,name,name_ar,sale_price,tax_rate,image_url,category_id,brand_id,unit_id,unit:units(short_name,name,name_ar),category:categories(name,name_ar),brand:brands(name,name_ar)").eq("is_active", true).order("name").limit(500),
-      supabase.from("categories").select("id,name,name_ar").eq("is_active", true).order("name"),
-      supabase.from("brands").select("id,name,name_ar").eq("is_active", true).order("name"),
-      supabase.from("units").select("id,name,name_ar,short_name").eq("is_active", true).order("name"),
+      supabase.from("categories").select("id,name,name_ar").order("name"),
+      supabase.from("brands").select("id,name,name_ar").order("name"),
+      supabase.from("units").select("id,name,name_ar,short_name").order("name"),
     ]);
     setWarehouses(ws ?? []);
     setCustomers(cs ?? []);
