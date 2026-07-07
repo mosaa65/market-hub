@@ -46,7 +46,7 @@ function CustomersPage() {
   );
 
   async function save() {
-    if (!edit?.name?.trim()) return toast.error(lang === "ar" ? "الاسم مطلوب" : "Name is required");
+    if (!edit?.name?.trim()) return toast.error(t("common.required"));
     const payload = {
       name: edit.name.trim(),
       phone: edit.phone || null,
@@ -63,7 +63,7 @@ function CustomersPage() {
     setEdit(null); await load();
   }
   async function remove(id: string) {
-    if (!confirm(lang === "ar" ? "هل تريد حذف هذا العميل؟" : "Delete this customer?")) return;
+    if (!confirm(t("common.confirm_delete"))) return;
     const { error } = await supabase.from("customers").delete().eq("id", id);
     if (error) return toast.error(error.message);
     toast.success(t("common.deleted")); await load();

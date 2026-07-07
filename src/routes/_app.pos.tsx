@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Search, Plus, Minus, Trash2, ScanBarcode, Loader2, X, Printer, Sparkles, ScrollText, FileDown } from "lucide-react";
+import { Search, Plus, Minus, Trash2, ScanBarcode, Loader2, X, Printer, Sparkles, ScrollText, FileDown, Filter, Warehouse } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { money } from "@/lib/format";
@@ -23,8 +23,12 @@ interface Product {
   sale_price: number;
   tax_rate: number;
   image_url: string | null;
+  category_id?: string | null;
+  brand_id?: string | null;
+  unit_id?: string | null;
   unit?: { short_name: string; name_ar: string | null; name: string } | null;
   category?: { name: string; name_ar: string | null } | null;
+  brand?: { name: string; name_ar: string | null } | null;
 }
 interface CartLine {
   product_id: string;
@@ -35,6 +39,7 @@ interface CartLine {
 }
 interface Warehouse { id: string; name: string; name_ar: string | null }
 interface Customer { id: string; name: string }
+interface MetaOption { id: string; name: string; name_ar: string | null }
 
 function POSPage() {
   const { t, lang } = useI18n();
@@ -42,9 +47,16 @@ function POSPage() {
   const [stockMap, setStockMap] = useState<Record<string, number>>({});
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [categories, setCategories] = useState<MetaOption[]>([]);
+  const [brands, setBrands] = useState<MetaOption[]>([]);
+  const [units, setUnits] = useState<MetaOption[]>([]);
   const [warehouseId, setWarehouseId] = useState<string>("");
   const [customerId, setCustomerId] = useState<string>("");
   const [search, setSearch] = useState("");
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedBrand, setSelectedBrand] = useState("");
+  const [selectedUnit, setSelectedUnit] = useState("");
   const [cart, setCart] = useState<CartLine[]>([]);
   const [paid, setPaid] = useState<string>("");
   const [discount, setDiscount] = useState<string>("");
@@ -57,16 +69,41 @@ function POSPage() {
   useEffect(() => { void loadAll(); }, []);
   useEffect(() => { if (warehouseId) void loadStock(warehouseId); }, [warehouseId]);
 
+  useEffect(() => {
+    const channel = supabase.channel("pos-live-meta");
+    const tables = ["categories", "brands", "units", "products", "warehouses", "customers"] as const;
+
+    tables.forEach(table => {
+      channel.on(
+        "postgres_changes",
+        { event: "*", schema: "public", table },
+        () => { void loadAll(); }
+      );
+    });
+
+    channel.subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, []);
+
   async function loadAll() {
-    const [{ data: ws }, { data: cs }, { data: ps }] = await Promise.all([
+    const [{ data: ws }, { data: cs }, { data: ps }, { data: cats }, { data: brs }, { data: uns }] = await Promise.all([
       supabase.from("warehouses").select("id,name,name_ar").eq("is_active", true).order("name"),
       supabase.from("customers").select("id,name").eq("is_active", true).order("name"),
-      supabase.from("products").select("id,sku,barcode,name,name_ar,sale_price,tax_rate,image_url,unit:units(short_name,name,name_ar),category:categories(name,name_ar)").eq("is_active", true).order("name").limit(500),
+      supabase.from("products").select("id,sku,barcode,name,name_ar,sale_price,tax_rate,image_url,category_id,brand_id,unit_id,unit:units(short_name,name,name_ar),category:categories(name,name_ar),brand:brands(name,name_ar)").eq("is_active", true).order("name").limit(500),
+      supabase.from("categories").select("id,name,name_ar").eq("is_active", true).order("name"),
+      supabase.from("brands").select("id,name,name_ar").eq("is_active", true).order("name"),
+      supabase.from("units").select("id,name,name_ar,short_name").eq("is_active", true).order("name"),
     ]);
     setWarehouses(ws ?? []);
     setCustomers(cs ?? []);
     setProducts(ps ?? []);
-    if (ws?.[0]) setWarehouseId(ws[0].id);
+    setCategories(cats ?? []);
+    setBrands(brs ?? []);
+    setUnits(uns ?? []);
+    setWarehouseId(prev => {
+      if (prev && (ws ?? []).some(w => w.id === prev)) return prev;
+      return ws?.[0]?.id ?? "";
+    });
   }
   async function loadStock(wid: string) {
     const { data } = await supabase.from("inventory").select("product_id,quantity").eq("warehouse_id", wid);
@@ -77,14 +114,14 @@ function POSPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return products.slice(0, 60);
-    return products.filter(p =>
-      p.name.toLowerCase().includes(q) ||
-      (p.name_ar ?? "").includes(q) ||
-      (p.sku ?? "").toLowerCase().includes(q) ||
-      (p.barcode ?? "").toLowerCase().includes(q)
-    ).slice(0, 60);
-  }, [products, search]);
+    return products.filter(p => {
+      const matchesQuery = !q || p.name.toLowerCase().includes(q) || (p.name_ar ?? "").includes(q) || (p.sku ?? "").toLowerCase().includes(q) || (p.barcode ?? "").toLowerCase().includes(q);
+      const matchesCategory = !selectedCategory || p.category_id === selectedCategory;
+      const matchesBrand = !selectedBrand || p.brand_id === selectedBrand;
+      const matchesUnit = !selectedUnit || p.unit_id === selectedUnit;
+      return matchesQuery && matchesCategory && matchesBrand && matchesUnit;
+    }).slice(0, 60);
+  }, [products, search, selectedCategory, selectedBrand, selectedUnit]);
 
   function addToCart(p: Product) {
     const stock = stockMap[p.id] ?? 0;
@@ -164,33 +201,79 @@ function POSPage() {
 
   return (
     <>
-      <PageHeader
-        title={t("pos.title")}
-        subtitle={t("pos.subtitle")}
-        actions={
-          <div className="flex items-center gap-2">
-            <select value={warehouseId} onChange={e => setWarehouseId(e.target.value)} className="h-9 rounded-md border border-input bg-surface px-2 text-sm">
-              {warehouses.map(w => <option key={w.id} value={w.id}>{lang === "ar" ? (w.name_ar || w.name) : (w.name || w.name_ar)}</option>)}
-            </select>
-          </div>
-        }
-      />
+      <PageHeader title={t("pos.title")} subtitle={t("pos.subtitle")} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_420px]">
         {/* Product grid */}
         <div className="panel-elevated p-4">
-          <div className="relative mb-4">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground rtl:left-auto rtl:right-3" />
-            <input
-              ref={searchRef}
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              onKeyDown={handleScan}
-              placeholder={t("pos.search_or_scan")}
-              className="h-10 w-full rounded-md border border-input bg-surface pl-9 pr-3 text-sm rtl:pl-3 rtl:pr-9 focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
-              autoFocus
-            />
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-input bg-surface px-3 h-10 shadow-sm">
+              <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <input
+                ref={searchRef}
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                onKeyDown={handleScan}
+                placeholder={t("pos.search_or_scan")}
+                className="w-full flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                autoFocus
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setFilterOpen(v => !v)}
+              className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-full border border-border bg-surface px-3 text-sm text-muted-foreground transition hover:border-ring hover:text-foreground"
+            >
+              <Filter className="h-4 w-4" />
+              <span className="hidden sm:inline">{t("common.filter")}</span>
+            </button>
+
+            <div className="relative">
+              <Warehouse className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-amber-700 dark:text-amber-300" />
+              <select
+                value={warehouseId}
+                onChange={e => setWarehouseId(e.target.value)}
+                className="h-10 appearance-none rounded-full border border-amber-500/30 bg-amber-500/10 py-2 pl-9 pr-3 text-sm font-medium text-amber-700 outline-none transition hover:bg-amber-500/20 dark:text-amber-300"
+              >
+                {warehouses.map(w => <option key={w.id} value={w.id}>{lang === "ar" ? (w.name_ar || w.name) : (w.name || w.name_ar)}</option>)}
+              </select>
+            </div>
           </div>
+
+          {filterOpen && (
+            <div className="mb-4 rounded-[28px] border border-border bg-surface/90 p-3 shadow-sm">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <div className="text-sm font-semibold">{t("pos.filters")}</div>
+                <button type="button" onClick={() => { setSelectedCategory(""); setSelectedBrand(""); setSelectedUnit(""); }} className="text-xs text-muted-foreground hover:text-foreground">
+                  {t("common.reset")}
+                </button>
+              </div>
+              <div className="grid gap-2 md:grid-cols-3">
+                <label className="grid gap-1.5 text-xs text-muted-foreground">
+                  <span>{t("common.categories")}</span>
+                  <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="h-9 rounded-full border border-border bg-background px-3 text-sm text-foreground">
+                    <option value="">{t("common.all")}</option>
+                    {categories.map(c => <option key={c.id} value={c.id}>{lang === "ar" ? (c.name_ar || c.name) : (c.name || c.name_ar || "")}</option>)}
+                  </select>
+                </label>
+                <label className="grid gap-1.5 text-xs text-muted-foreground">
+                  <span>{t("common.brands")}</span>
+                  <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="h-9 rounded-full border border-border bg-background px-3 text-sm text-foreground">
+                    <option value="">{t("common.all")}</option>
+                    {brands.map(b => <option key={b.id} value={b.id}>{lang === "ar" ? (b.name_ar || b.name) : (b.name || b.name_ar || "")}</option>)}
+                  </select>
+                </label>
+                <label className="grid gap-1.5 text-xs text-muted-foreground">
+                  <span>{t("common.units")}</span>
+                  <select value={selectedUnit} onChange={(e) => setSelectedUnit(e.target.value)} className="h-9 rounded-full border border-border bg-background px-3 text-sm text-foreground">
+                    <option value="">{t("common.all")}</option>
+                    {units.map(u => <option key={u.id} value={u.id}>{lang === "ar" ? (u.name_ar || u.short_name || u.name) : (u.short_name || u.name || u.name_ar || "")}</option>)}
+                  </select>
+                </label>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4 max-h-[calc(100vh-280px)] overflow-y-auto pr-1">
             {filtered.map(p => {

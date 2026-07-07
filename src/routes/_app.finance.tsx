@@ -79,7 +79,7 @@ function FinancePage() {
   useEffect(() => { load(); }, []);
 
   async function saveExpense() {
-    if (!form.category_id || !form.amount) { toast.error(lang === "ar" ? "أكمل البيانات" : "Fill the form"); return; }
+    if (!form.category_id || !form.amount) { toast.error(t("common.fill_form")); return; }
     const { error } = await supabase.from("expenses").insert({
       category_id: form.category_id,
       amount: Number(form.amount),
@@ -88,14 +88,14 @@ function FinancePage() {
       note: form.note || null,
     });
     if (error) { toast.error(error.message); return; }
-    toast.success(lang === "ar" ? "تم الحفظ" : "Saved");
+    toast.success(t("common.saved") || t("common.success"));
     setOpen(false);
     setForm({ category_id: "", amount: "", payment_method: "cash", note: "", expense_date: new Date().toISOString().slice(0, 10) });
     load();
   }
 
   async function delExpense(id: string) {
-    if (!confirm(lang === "ar" ? "حذف المصروف؟" : "Delete expense?")) return;
+    if (!confirm(t("common.confirm_delete"))) return;
     const { error } = await supabase.from("expenses").delete().eq("id", id);
     if (error) return toast.error(error.message);
     load();

@@ -102,12 +102,12 @@ function NewTransfer({ onSaved }: { onSaved: () => void }) {
   }
 
   async function save() {
-    if (!from || !to || from === to || lines.length === 0) { toast.error(lang === "ar" ? "تحقق من البيانات" : "Check the form"); return; }
+    if (!from || !to || from === to || lines.length === 0) { toast.error(t("transfers.check_form")); return; }
     const { error } = await supabase.rpc("create_stock_transfer" as any, {
       _from: from, _to: to, _note: note || null, _items: lines as any,
     });
     if (error) { toast.error(error.message); return; }
-    toast.success(lang === "ar" ? "تم التحويل" : "Transferred");
+    toast.success(t("transfers.done"));
     setOpen(false); setLines([]); setNote(""); onSaved();
   }
 

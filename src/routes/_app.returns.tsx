@@ -156,13 +156,13 @@ function NewSalesReturn({ onSaved }: { onSaved: () => void }) {
   const total = lines.reduce((a, l) => a + l.quantity * l.unit_price * (1 + l.tax_rate / 100), 0);
 
   async function save() {
-    if (!warehouseId || lines.length === 0) { toast.error(lang === "ar" ? "أكمل البيانات" : "Fill the form"); return; }
+    if (!warehouseId || lines.length === 0) { toast.error(t("common.fill_form")); return; }
     const { data, error } = await supabase.rpc("create_sales_return" as any, {
       _invoice_id: null, _warehouse_id: warehouseId, _customer_id: customerId || null,
       _refund_method: refundMethod, _note: note || null, _items: lines as any,
     });
     if (error) { toast.error(error.message); return; }
-    toast.success(lang === "ar" ? "تم الحفظ" : "Saved");
+    toast.success(t("common.saved") || t("common.success"));
     setOpen(false); setLines([]); setNote(""); onSaved();
   }
 
@@ -274,13 +274,13 @@ function NewPurchaseReturn({ onSaved }: { onSaved: () => void }) {
   const total = lines.reduce((a, l) => a + l.quantity * l.unit_cost * (1 + l.tax_rate / 100), 0);
 
   async function save() {
-    if (!warehouseId || !supplierId || lines.length === 0) { toast.error(lang === "ar" ? "أكمل البيانات" : "Fill the form"); return; }
+    if (!warehouseId || !supplierId || lines.length === 0) { toast.error(t("common.fill_form")); return; }
     const { error } = await supabase.rpc("create_purchase_return" as any, {
       _invoice_id: null, _warehouse_id: warehouseId, _supplier_id: supplierId,
       _refund_method: refundMethod, _note: note || null, _items: lines as any,
     });
     if (error) { toast.error(error.message); return; }
-    toast.success(lang === "ar" ? "تم الحفظ" : "Saved");
+    toast.success(t("common.saved") || t("common.success"));
     setOpen(false); setLines([]); setNote(""); onSaved();
   }
 

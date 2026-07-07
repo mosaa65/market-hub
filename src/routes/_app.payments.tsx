@@ -73,8 +73,8 @@ function PaymentsPage() {
   async function submit() {
     if (!selected) return;
     const amt = Number(amount);
-    if (!amt || amt <= 0) return toast.error(lang === "ar" ? "أدخل مبلغ صحيح" : "Enter a valid amount");
-    if (selectedInvoice && amt > remaining + 0.01) return toast.error(lang === "ar" ? "المبلغ يتجاوز المتبقي" : "Amount exceeds remaining");
+    if (!amt || amt <= 0) return toast.error(t("payments.invalid_amount") || (lang === "ar" ? "أدخل مبلغ صحيح" : "Enter a valid amount"));
+    if (selectedInvoice && amt > remaining + 0.01) return toast.error(t("payments.exceeds_remaining") || (lang === "ar" ? "المبلغ يتجاوز المتبقي" : "Amount exceeds remaining"));
     setSaving(true);
     try {
       const { error } = await supabase.rpc("record_customer_payment" as any, {
@@ -86,10 +86,10 @@ function PaymentsPage() {
         _note: note || null,
       });
       if (error) throw error;
-      toast.success(lang === "ar" ? "تم تسجيل الدفعة" : "Payment recorded");
+      toast.success(t("payments.recorded") || (lang === "ar" ? "تم تسجيل الدفعة" : "Payment recorded"));
       await refresh();
     } catch (e: any) {
-      toast.error(e.message ?? "Failed");
+      toast.error(e.message ?? t("common.failed"));
     } finally { setSaving(false); }
   }
 

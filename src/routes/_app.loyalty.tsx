@@ -138,12 +138,12 @@ function AdjustDialog({ customers, onSaved }: { customers: Customer[]; onSaved: 
   const [form, setForm] = useState({ customer_id: "", points: 10, kind: "earn", note: "" });
 
   async function save() {
-    if (!form.customer_id || !form.points) { toast.error(lang === "ar" ? "أكمل البيانات" : "Fill required fields"); return; }
+    if (!form.customer_id || !form.points) { toast.error(t("common.fill_form")); return; }
     const { error } = await supabase.rpc("adjust_loyalty" as any, {
       _customer: form.customer_id, _points: form.points, _kind: form.kind, _note: form.note || null,
     });
     if (error) return toast.error(error.message);
-    toast.success(lang === "ar" ? "تم التحديث" : "Updated");
+    toast.success(t("common.updated"));
     setOpen(false); setForm({ customer_id: "", points: 10, kind: "earn", note: "" }); onSaved();
   }
 

@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Save, Building2, Receipt, Languages } from "lucide-react";
+import { setCompanySettingsCache } from "@/lib/format";
 
 export const Route = createFileRoute("/_app/settings")({
   head: () => ({ meta: [{ title: "Settings — Vortex ERP" }] }),
@@ -31,7 +32,11 @@ function SettingsPage() {
 
   useEffect(() => {
     supabase.from("company_settings").select("*").order("id").limit(1).maybeSingle().then(({ data }) => {
-      if (data) { setForm(data); setExists(true); }
+      if (data) {
+        setForm(data);
+        setExists(true);
+        setCompanySettingsCache({ currency: data.currency, currency_symbol: data.currency_symbol });
+      }
     });
   }, []);
 
@@ -43,7 +48,8 @@ function SettingsPage() {
       : await supabase.from("company_settings").insert(payload);
     setSaving(false);
     if (res.error) return toast.error(res.error.message);
-    toast.success(lang === "ar" ? "تم الحفظ" : "Saved");
+    setCompanySettingsCache({ currency: payload.currency, currency_symbol: payload.currency_symbol });
+    toast.success(t("common.saved") || t("common.success"));
     setExists(true);
   }
 

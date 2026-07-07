@@ -88,7 +88,7 @@ function InventoryPage() {
             <option value="">{t("inventory.all_warehouses")}</option>
             {(warehouses ?? []).map((w: any) => <option key={w.id} value={w.id}>{lang === "ar" ? (w.name_ar || w.name) : (w.name || w.name_ar)}</option>)}
           </select>
-          <span className="text-[11px] text-muted-foreground tabular-nums">{filtered.length} {lang === "ar" ? "عنصر" : "items"}</span>
+          <span className="text-[11px] text-muted-foreground tabular-nums">{filtered.length} {t("inventory.items")}</span>
         </div>
 
         <div className="overflow-x-auto">

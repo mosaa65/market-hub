@@ -56,10 +56,10 @@ function BatchesPage() {
   }
 
   async function remove(id: string) {
-    if (!confirm(lang === "ar" ? "حذف الدفعة؟" : "Delete batch?")) return;
+    if (!confirm(t("common.confirm_delete"))) return;
     const { error } = await supabase.from("product_batches").delete().eq("id", id);
     if (error) return toast.error(error.message);
-    toast.success(lang === "ar" ? "تم الحذف" : "Deleted"); load();
+    toast.success(t("common.deleted")); load();
   }
 
   const expiringCount = rows.filter(r => r.expiry_date && new Date(r.expiry_date) < soon).length;
@@ -153,11 +153,11 @@ function NewBatchModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
 
   async function save() {
     if (!form.product_id || !form.warehouse_id || !form.batch_number) {
-      toast.error(lang === "ar" ? "أكمل البيانات" : "Fill required fields"); return;
+      toast.error(t("common.fill_form")); return;
     }
     const { error } = await supabase.from("product_batches").insert({ ...form, expiry_date: form.expiry_date || null });
     if (error) return toast.error(error.message);
-    toast.success(lang === "ar" ? "تم الحفظ" : "Saved");
+    toast.success(t("common.saved") || t("common.success"));
     onSaved();
   }
 

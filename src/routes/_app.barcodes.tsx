@@ -19,7 +19,7 @@ export const Route = createFileRoute("/_app/barcodes")({
 interface Product { id: string; name: string; sku: string | null; barcode: string | null; price: number; }
 
 function BarcodesPage() {
-  const { lang } = useI18n();
+  const { t } = useI18n();
   const [products, setProducts] = useState<Product[]>([]);
   const [productId, setProductId] = useState("");
   const [search, setSearch] = useState("");
@@ -73,20 +73,20 @@ function BarcodesPage() {
   return (
     <>
       <PageHeader
-        title={lang === "ar" ? "طباعة الباركود" : "Barcode labels"}
-        subtitle={lang === "ar" ? "اختر منتجاً واطبع ملصقات على ورق A4" : "Select a product and print A4 label sheets"}
-        actions={<Button disabled={!product} onClick={print}><Printer className="h-4 w-4 me-1" />{lang === "ar" ? "طباعة" : "Print"}</Button>}
+        title={t("barcodes.title")}
+        subtitle={t("barcodes.subtitle")}
+        actions={<Button disabled={!product} onClick={print}><Printer className="h-4 w-4 me-1" />{t("common.print")}</Button>}
       />
 
       <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
         <Card>
           <CardContent className="p-4 space-y-3">
             <div className="grid gap-1.5">
-              <Label>{lang === "ar" ? "ابحث" : "Search"}</Label>
-              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={lang === "ar" ? "اسم أو رمز" : "Name or SKU"} />
+              <Label>{t("common.search")}</Label>
+              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("barcodes.name_or_sku")} />
             </div>
             <div className="grid gap-1.5">
-              <Label>{lang === "ar" ? "المنتج" : "Product"}</Label>
+              <Label>{t("common.product")}</Label>
               <Select value={productId} onValueChange={setProductId}>
                 <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                 <SelectContent>{filtered.map(p => <SelectItem key={p.id} value={p.id}>{p.name}{p.sku ? ` · ${p.sku}` : ""}</SelectItem>)}</SelectContent>
@@ -94,11 +94,11 @@ function BarcodesPage() {
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="grid gap-1.5">
-                <Label>{lang === "ar" ? "النسخ" : "Copies"}</Label>
+                <Label>{t("barcodes.copies")}</Label>
                 <Input type="number" min={1} max={200} value={copies} onChange={(e) => setCopies(Math.min(200, Math.max(1, Number(e.target.value))))} />
               </div>
               <div className="grid gap-1.5">
-                <Label>{lang === "ar" ? "النوع" : "Format"}</Label>
+                <Label>{t("barcodes.format")}</Label>
                 <Select value={format} onValueChange={(v) => setFormat(v as any)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -110,7 +110,7 @@ function BarcodesPage() {
             </div>
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={showPrice} onChange={(e) => setShowPrice(e.target.checked)} className="h-4 w-4 rounded border-border" />
-              {lang === "ar" ? "إظهار السعر" : "Show price"}
+              {t("barcodes.show_price")}
             </label>
             {product && (
               <div className="rounded-md border border-border p-3 text-xs">
@@ -126,7 +126,7 @@ function BarcodesPage() {
             {!product ? (
               <div className="py-20 text-center text-muted-foreground">
                 <BarcodeIcon className="mx-auto mb-2 h-10 w-10 opacity-40" />
-                {lang === "ar" ? "اختر منتجاً للمعاينة" : "Pick a product to preview labels"}
+                {t("barcodes.pick_product")}
               </div>
             ) : (
               <div ref={sheetRef} className="sheet grid grid-cols-4 gap-2" style={{ background: "white", color: "black", padding: "8px", borderRadius: 6 }}>

@@ -21,7 +21,7 @@ interface Log {
 }
 
 function AuditPage() {
-  const { lang } = useI18n();
+  const { t } = useI18n();
   const { hasRole } = useAuth();
   const allowed = hasRole("owner") || hasRole("manager");
   const [rows, setRows] = useState<Log[]>([]);
@@ -50,9 +50,9 @@ function AuditPage() {
   if (!allowed) {
     return (
       <>
-        <PageHeader title={lang === "ar" ? "سجل الأحداث" : "Audit logs"} subtitle="" />
+        <PageHeader title={t("audit.title")} subtitle="" />
         <Card><CardContent className="p-8 text-center text-muted-foreground">
-          {lang === "ar" ? "هذه الصفحة متاحة للمالك والمدير فقط" : "This page is restricted to owners and managers"}
+          {t("audit.restricted")}
         </CardContent></Card>
       </>
     );
@@ -61,29 +61,29 @@ function AuditPage() {
   return (
     <>
       <PageHeader
-        title={lang === "ar" ? "سجل الأحداث" : "Audit logs"}
-        subtitle={lang === "ar" ? "آخر 500 حدث مهم في النظام" : "Latest 500 important actions"}
+        title={t("audit.title")}
+        subtitle={t("audit.subtitle")}
       />
       <Card>
         <CardContent className="p-4">
           <div className="relative mb-4">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground rtl:left-auto rtl:right-3" />
             <Input value={search} onChange={(e) => setSearch(e.target.value)}
-              placeholder={lang === "ar" ? "ابحث في الإجراء أو الكيان" : "Search action or entity"}
+              placeholder={t("audit.search")}
               className="pl-9 rtl:pl-3 rtl:pr-9" />
           </div>
           <Table>
             <TableHeader><TableRow>
-              <TableHead>{lang === "ar" ? "الوقت" : "Time"}</TableHead>
-              <TableHead>{lang === "ar" ? "المستخدم" : "Actor"}</TableHead>
-              <TableHead>{lang === "ar" ? "الإجراء" : "Action"}</TableHead>
-              <TableHead>{lang === "ar" ? "النوع" : "Entity"}</TableHead>
-              <TableHead>{lang === "ar" ? "المعرّف" : "ID"}</TableHead>
+              <TableHead>{t("common.date")}</TableHead>
+              <TableHead>{t("audit.actor")}</TableHead>
+              <TableHead>{t("common.action")}</TableHead>
+              <TableHead>{t("audit.entity")}</TableHead>
+              <TableHead>{t("audit.id")}</TableHead>
             </TableRow></TableHeader>
             <TableBody>
               {filtered.length === 0 ? <TableRow><TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
                 <History className="mx-auto mb-2 h-8 w-8 opacity-50" />
-                {lang === "ar" ? "لا توجد سجلات" : "No logs yet"}
+                {t("audit.none")}
               </TableCell></TableRow>
               : filtered.map(r => (
                 <TableRow key={r.id}>

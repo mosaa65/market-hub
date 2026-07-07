@@ -42,7 +42,7 @@ function UsersPage() {
   async function assignRole(userId: string, role: string) {
     const { error } = await supabase.from("user_roles").insert({ user_id: userId, role: role as any });
     if (error) return toast.error(error.message);
-    toast.success(lang === "ar" ? "تم منح الصلاحية" : "Role granted");
+    toast.success(t("users.role_granted") || (lang === "ar" ? "تم منح الصلاحية" : "Role granted"));
     load();
   }
 

@@ -60,24 +60,24 @@ function DebtsPage() {
     return { totalDebt, debtors, overLimit };
   }, [rows]);
 
-  const pmLabel = (m: string) => m === "cash" ? (lang === "ar" ? "نقدي" : "Cash") : m === "card" ? (lang === "ar" ? "بطاقة" : "Card") : m === "bank_transfer" ? (lang === "ar" ? "تحويل بنكي" : "Bank") : m;
+  const pmLabel = (m: string) => m === "cash" ? t("pos.pm.cash") : m === "card" ? t("pos.pm.card") : m === "bank_transfer" ? t("pos.pm.bank") : m;
 
   return (
     <>
       <PageHeader
-        title={lang === "ar" ? "ديون العملاء" : "Customer Debts"}
-        subtitle={lang === "ar" ? "الرصيد الحالي وسجل الفواتير والتحصيلات لكل عميل" : "Balance, invoices and collections per customer"}
+        title={t("debts.title")}
+        subtitle={t("debts.subtitle")}
         actions={
           <Link to="/payments" className="flex h-10 items-center gap-1.5 rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm shadow-primary/20 hover:opacity-90">
-            {lang === "ar" ? "تحصيل دفعة" : "Record payment"}
+            {t("debts.record_payment")}
           </Link>
         }
       />
 
       <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <SumCard label={lang === "ar" ? "إجمالي الديون" : "Total debt"} value={money(totals.totalDebt)} tone="warn" />
-        <SumCard label={lang === "ar" ? "عدد المدينين" : "Debtors"} value={String(totals.debtors)} tone="info" />
-        <SumCard label={lang === "ar" ? "تجاوز الحد" : "Over credit limit"} value={String(totals.overLimit)} tone="neg" />
+        <SumCard label={t("debts.total_debt")} value={money(totals.totalDebt)} tone="warn" />
+        <SumCard label={t("debts.debtors")} value={String(totals.debtors)} tone="info" />
+        <SumCard label={t("debts.over_limit")} value={String(totals.overLimit)} tone="neg" />
       </div>
 
       <div className="panel-elevated p-4">
@@ -85,14 +85,14 @@ function DebtsPage() {
           <div className="flex h-10 flex-1 min-w-[220px] items-center gap-2 rounded-full border border-input bg-surface px-4 text-sm">
             <Search className="h-4 w-4 text-muted-foreground" />
             <input value={search} onChange={e => setSearch(e.target.value)}
-              placeholder={lang === "ar" ? "ابحث عن عميل..." : "Search customer…"}
+              placeholder={t("debts.search_customer")}
               className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground" />
           </div>
           <div className="flex rounded-full border border-input bg-surface p-1 text-xs">
             {(["debt", "over_limit", "all"] as const).map(f => (
               <button key={f} onClick={() => setFilter(f)}
                 className={`rounded-full px-3 py-1.5 transition ${filter === f ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>
-                {f === "debt" ? (lang === "ar" ? "المدينون" : "Debtors") : f === "over_limit" ? (lang === "ar" ? "تجاوز الحد" : "Over limit") : (lang === "ar" ? "الكل" : "All")}
+                {f === "debt" ? t("debts.filter.debtors") : f === "over_limit" ? t("debts.filter.over_limit") : t("debts.filter.all")}
               </button>
             ))}
           </div>
@@ -102,11 +102,11 @@ function DebtsPage() {
           <table className="w-full text-sm">
             <thead className="text-xs uppercase text-muted-foreground">
               <tr className="border-b border-border">
-                <th className="px-3 py-2 text-start font-medium">{lang === "ar" ? "العميل" : "Customer"}</th>
-                <th className="px-3 py-2 text-start font-medium">{lang === "ar" ? "الهاتف" : "Phone"}</th>
-                <th className="px-3 py-2 text-end font-medium">{lang === "ar" ? "حد الائتمان" : "Credit limit"}</th>
-                <th className="px-3 py-2 text-end font-medium">{lang === "ar" ? "الرصيد" : "Balance"}</th>
-                <th className="px-3 py-2 text-start font-medium">{lang === "ar" ? "الحالة" : "Status"}</th>
+                <th className="px-3 py-2 text-start font-medium">{t("common.customer")}</th>
+                <th className="px-3 py-2 text-start font-medium">{t("common.phone")}</th>
+                <th className="px-3 py-2 text-end font-medium">{t("customers.credit_limit")}</th>
+                <th className="px-3 py-2 text-end font-medium">{t("common.balance")}</th>
+                <th className="px-3 py-2 text-start font-medium">{t("common.status")}</th>
                 <th className="px-3 py-2"></th>
               </tr>
             </thead>
@@ -127,12 +127,12 @@ function DebtsPage() {
                     <td className="px-3 py-2.5 text-end font-mono text-muted-foreground">{money(lim)}</td>
                     <td className={`px-3 py-2.5 text-end font-mono font-semibold ${bal > 0 ? (over ? "text-rose-500" : "text-amber-500") : "text-muted-foreground"}`}>{money(bal)}</td>
                     <td className="px-3 py-2.5">
-                      {over ? <span className="inline-flex items-center gap-1 rounded-full border border-rose-500/30 bg-rose-500/10 px-2 py-0.5 text-[10px] text-rose-500"><AlertCircle className="h-3 w-3" />{lang === "ar" ? "تجاوز الحد" : "Over limit"}</span>
-                       : bal > 0 ? <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-500">{lang === "ar" ? "مدين" : "Debtor"}</span>
-                       : <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-500">{lang === "ar" ? "مسدد" : "Clear"}</span>}
+                      {over ? <span className="inline-flex items-center gap-1 rounded-full border border-rose-500/30 bg-rose-500/10 px-2 py-0.5 text-[10px] text-rose-500"><AlertCircle className="h-3 w-3" />{t("debts.filter.over_limit")}</span>
+                       : bal > 0 ? <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-500">{t("debts.debtor")}</span>
+                       : <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-500">{t("debts.clear")}</span>}
                     </td>
                     <td className="px-3 py-2.5 text-end">
-                      <button className="rounded-full border border-border bg-surface px-3 py-1 text-xs text-muted-foreground hover:bg-surface-2">{lang === "ar" ? "عرض" : "View"}</button>
+                      <button className="rounded-full border border-border bg-surface px-3 py-1 text-xs text-muted-foreground hover:bg-surface-2">{t("debts.view")}</button>
                     </td>
                   </tr>
                 );
@@ -147,12 +147,12 @@ function DebtsPage() {
           <div className="panel-elevated flex max-h-[90vh] w-full max-w-3xl flex-col p-6">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
-                <div className="text-xs uppercase text-muted-foreground">{lang === "ar" ? "سجل العميل" : "Customer record"}</div>
+                <div className="text-xs uppercase text-muted-foreground">{t("debts.customer_record")}</div>
                 <h3 className="text-lg font-semibold">{selected.name}</h3>
                 <div className="text-xs text-muted-foreground">{selected.phone ?? "—"} · {selected.email ?? "—"}</div>
               </div>
               <div className="text-end">
-                <div className="text-[10px] uppercase text-muted-foreground">{lang === "ar" ? "الرصيد الحالي" : "Balance"}</div>
+                <div className="text-[10px] uppercase text-muted-foreground">{t("debts.balance")}</div>
                 <div className="font-mono text-xl font-semibold text-amber-500">{money(Number(selected.balance))}</div>
               </div>
               <button onClick={() => setSelected(null)} className="rounded p-1 hover:bg-surface-2"><X className="h-4 w-4" /></button>
@@ -160,16 +160,16 @@ function DebtsPage() {
 
             <div className="flex-1 space-y-4 overflow-y-auto">
               <div>
-                <h4 className="mb-2 text-sm font-semibold">{lang === "ar" ? "الفواتير" : "Invoices"}</h4>
+                <h4 className="mb-2 text-sm font-semibold">{t("debts.invoices")}</h4>
                 {invoices.length === 0 ? (
-                  <div className="rounded border border-border py-6 text-center text-sm text-muted-foreground">{lang === "ar" ? "لا فواتير" : "No invoices"}</div>
+                  <div className="rounded border border-border py-6 text-center text-sm text-muted-foreground">{t("debts.no_invoices")}</div>
                 ) : (
                   <table className="w-full text-sm">
                     <thead className="text-xs text-muted-foreground"><tr className="border-b border-border">
                       <th className="py-1.5 text-start">#</th><th className="py-1.5 text-start">{lang === "ar" ? "التاريخ" : "Date"}</th>
                       <th className="py-1.5 text-end">{lang === "ar" ? "الإجمالي" : "Total"}</th>
                       <th className="py-1.5 text-end">{lang === "ar" ? "المدفوع" : "Paid"}</th>
-                      <th className="py-1.5 text-end">{lang === "ar" ? "المتبقي" : "Remaining"}</th>
+                      <th className="py-1.5 text-end">{t("debts.remaining")}</th>
                     </tr></thead>
                     <tbody>
                       {invoices.map(i => {
@@ -190,9 +190,9 @@ function DebtsPage() {
               </div>
 
               <div>
-                <h4 className="mb-2 text-sm font-semibold">{lang === "ar" ? "التحصيلات" : "Collections"}</h4>
+                <h4 className="mb-2 text-sm font-semibold">{t("debts.collections")}</h4>
                 {payments.length === 0 ? (
-                  <div className="rounded border border-border py-6 text-center text-sm text-muted-foreground">{lang === "ar" ? "لا تحصيلات" : "No collections"}</div>
+                  <div className="rounded border border-border py-6 text-center text-sm text-muted-foreground">{t("debts.no_collections")}</div>
                 ) : (
                   <table className="w-full text-sm">
                     <thead className="text-xs text-muted-foreground"><tr className="border-b border-border">
@@ -205,7 +205,7 @@ function DebtsPage() {
                       {payments.map(p => (
                         <tr key={p.id} className="border-b border-border/40">
                           <td className="py-1.5 text-muted-foreground">{p.payment_date}</td>
-                          <td className="py-1.5 font-mono text-xs">{p.sales_invoices?.invoice_number ?? (lang === "ar" ? "على الحساب" : "On account")}</td>
+                          <td className="py-1.5 font-mono text-xs">{p.sales_invoices?.invoice_number ?? t("debts.on_account")}</td>
                           <td className="py-1.5 text-muted-foreground">{pmLabel(p.payment_method)}</td>
                           <td className="py-1.5 text-end font-mono font-semibold text-emerald-500">{money(Number(p.amount))}</td>
                         </tr>
