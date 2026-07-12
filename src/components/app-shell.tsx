@@ -17,7 +17,10 @@ type Item = { to: string; icon: typeof LayoutDashboard; key: string };
 type Section = { titleKey: string; items: Item[] };
 
 const sections: Section[] = [
-  { titleKey: "nav.section.overview", items: [{ to: "/dashboard", icon: LayoutDashboard, key: "nav.dashboard" }] },
+  { titleKey: "nav.section.overview", items: [
+    { to: "/dashboard", icon: LayoutDashboard, key: "nav.dashboard" },
+    { to: "/analytics", icon: LineChart, key: "nav.analytics" },
+  ] },
   {
     titleKey: "nav.section.operations",
     items: [
