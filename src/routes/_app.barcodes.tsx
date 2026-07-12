@@ -58,8 +58,9 @@ function BarcodesPage() {
   }
   useEffect(() => {
     loadProducts();
-    supabase.from("company_settings").select("company_name").limit(1).maybeSingle().then(({ data }) => {
-      if (data?.company_name) setCompanyName(data.company_name);
+    supabase.from("company_settings").select("trade_name,legal_name").limit(1).maybeSingle().then(({ data }) => {
+      const nm = (data as any)?.trade_name || (data as any)?.legal_name;
+      if (nm) setCompanyName(nm);
     });
   }, []);
 
