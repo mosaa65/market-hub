@@ -10,6 +10,7 @@ const en: Dict = {
 
   // Navigation
   "nav.dashboard": "Dashboard",
+  "nav.analytics": "Analytics",
   "nav.pos": "POS",
   "nav.products": "Products",
   "nav.inventory": "Inventory",
