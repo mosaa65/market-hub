@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/page-header";
 import { toast } from "sonner";
 import { printInvoice, type InvoiceTemplate } from "@/lib/invoice-print";
 import { generateInvoicePDF, type InvoiceDoc } from "@/lib/pdf";
+import { BarcodeScanner } from "@/components/barcode-scanner";
 
 export const Route = createFileRoute("/_app/pos")({
   head: () => ({ meta: [{ title: "POS — Vortex ERP" }] }),
