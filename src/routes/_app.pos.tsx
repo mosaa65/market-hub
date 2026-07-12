@@ -53,6 +53,7 @@ function POSPage() {
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
   const [lastInvoice, setLastInvoice] = useState<{ id: string; number: string } | null>(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { void loadAll(); }, []);
