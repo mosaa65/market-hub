@@ -335,6 +335,13 @@ function POSPage() {
         </div>
       </div>
 
+      <BarcodeScanner
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        continuous
+        onDetected={(code) => handleCode(code)}
+      />
+
       {lastInvoice && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur-sm p-4" onClick={() => setLastInvoice(null)}>
           <div className="panel-elevated w-full max-w-2xl p-6" onClick={e => e.stopPropagation()}>
