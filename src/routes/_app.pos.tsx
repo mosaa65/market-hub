@@ -120,9 +120,22 @@ function POSPage() {
     if (e.key !== "Enter") return;
     const q = search.trim();
     if (!q) return;
+    handleCode(q);
+  }
+
+  function handleCode(code: string) {
+    const q = code.trim();
+    if (!q) return;
     const exact = products.find(p => p.barcode === q || p.sku === q);
     if (exact) { addToCart(exact); setSearch(""); return; }
-    if (filtered.length === 1) { addToCart(filtered[0]); setSearch(""); }
+    const partial = products.filter(p =>
+      p.name.toLowerCase().includes(q.toLowerCase()) ||
+      (p.name_ar ?? "").includes(q) ||
+      (p.sku ?? "").toLowerCase().includes(q.toLowerCase()) ||
+      (p.barcode ?? "").toLowerCase().includes(q.toLowerCase())
+    );
+    if (partial.length === 1) { addToCart(partial[0]); setSearch(""); return; }
+    toast.error(lang === "ar" ? `لم يُعثر على منتج للباركود: ${q}` : `No product for: ${q}`);
   }
 
   const subtotal = cart.reduce((s, l) => s + l.unit_price * l.quantity, 0);
