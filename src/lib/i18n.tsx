@@ -488,6 +488,7 @@ const ar: Dict = {
 
   // التنقل
   "nav.dashboard": "لوحة التحكم",
+  "nav.analytics": "التحليلات",
   "nav.pos": "نقطة البيع",
   "nav.products": "المنتجات",
   "nav.inventory": "المخزون",
