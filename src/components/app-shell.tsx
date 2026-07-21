@@ -5,7 +5,7 @@ import {
   Users, Building2, Wallet, BarChart3, ShieldCheck, Bell, Settings,
   Search, Command as CommandIcon, LogOut, Moon, Sun, Sparkles,
   RotateCcw, ArrowRightLeft, CalendarClock, Barcode, Gift, History, Layers, Boxes,
-  Menu, HandCoins, AlertTriangle,
+  Menu, HandCoins, AlertTriangle, LineChart,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
@@ -17,7 +17,10 @@ type Item = { to: string; icon: typeof LayoutDashboard; key: string };
 type Section = { titleKey: string; items: Item[] };
 
 const sections: Section[] = [
-  { titleKey: "nav.section.overview", items: [{ to: "/dashboard", icon: LayoutDashboard, key: "nav.dashboard" }] },
+  { titleKey: "nav.section.overview", items: [
+    { to: "/dashboard", icon: LayoutDashboard, key: "nav.dashboard" },
+    { to: "/analytics", icon: LineChart, key: "nav.analytics" },
+  ] },
   {
     titleKey: "nav.section.operations",
     items: [

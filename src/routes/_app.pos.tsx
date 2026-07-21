@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/page-header";
 import { toast } from "sonner";
 import { printInvoice, type InvoiceTemplate } from "@/lib/invoice-print";
 import { generateInvoicePDF, type InvoiceDoc } from "@/lib/pdf";
+import { BarcodeScanner } from "@/components/barcode-scanner";
 
 export const Route = createFileRoute("/_app/pos")({
   head: () => ({ meta: [{ title: "POS — Vortex ERP" }] }),
@@ -64,6 +65,7 @@ function POSPage() {
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
   const [lastInvoice, setLastInvoice] = useState<{ id: string; number: string } | null>(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { void loadAll(); }, []);
@@ -157,9 +159,22 @@ function POSPage() {
     if (e.key !== "Enter") return;
     const q = search.trim();
     if (!q) return;
+    handleCode(q);
+  }
+
+  function handleCode(code: string) {
+    const q = code.trim();
+    if (!q) return;
     const exact = products.find(p => p.barcode === q || p.sku === q);
     if (exact) { addToCart(exact); setSearch(""); return; }
-    if (filtered.length === 1) { addToCart(filtered[0]); setSearch(""); }
+    const partial = products.filter(p =>
+      p.name.toLowerCase().includes(q.toLowerCase()) ||
+      (p.name_ar ?? "").includes(q) ||
+      (p.sku ?? "").toLowerCase().includes(q.toLowerCase()) ||
+      (p.barcode ?? "").toLowerCase().includes(q.toLowerCase())
+    );
+    if (partial.length === 1) { addToCart(partial[0]); setSearch(""); return; }
+    toast.error(lang === "ar" ? `لم يُعثر على منتج للباركود: ${q}` : `No product for: ${q}`);
   }
 
   const subtotal = cart.reduce((s, l) => s + l.unit_price * l.quantity, 0);
@@ -229,6 +244,15 @@ function POSPage() {
             >
               <Filter className="h-4 w-4" />
               <span className="hidden sm:inline">{t("common.filter")}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setScannerOpen(true)}
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-primary/30 bg-primary/10 text-primary transition hover:bg-primary/20"
+              title={lang === "ar" ? "قراءة الباركود بالكاميرا" : "Scan with camera"}
+            >
+              <ScanBarcode className="h-4 w-4" />
             </button>
 
             <div className="relative">
@@ -406,7 +430,14 @@ function POSPage() {
         </div>
       </div>
 
-      {lastInvoice && (
+        <BarcodeScanner
+          open={scannerOpen}
+          onClose={() => setScannerOpen(false)}
+          continuous
+          onDetected={handleCode}
+        />
+
+        {lastInvoice && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur-sm p-4" onClick={() => setLastInvoice(null)}>
           <div className="panel-elevated w-full max-w-2xl p-6" onClick={e => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">

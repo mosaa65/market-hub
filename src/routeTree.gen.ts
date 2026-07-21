@@ -35,6 +35,7 @@ import { Route as AppCatalogRouteImport } from './routes/_app.catalog'
 import { Route as AppBatchesRouteImport } from './routes/_app.batches'
 import { Route as AppBarcodesRouteImport } from './routes/_app.barcodes'
 import { Route as AppAuditRouteImport } from './routes/_app.audit'
+import { Route as AppAnalyticsRouteImport } from './routes/_app.analytics'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -165,10 +166,16 @@ const AppAuditRoute = AppAuditRouteImport.update({
   path: '/audit',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAnalyticsRoute = AppAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/analytics': typeof AppAnalyticsRoute
   '/audit': typeof AppAuditRoute
   '/barcodes': typeof AppBarcodesRoute
   '/batches': typeof AppBatchesRoute
@@ -196,6 +203,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/analytics': typeof AppAnalyticsRoute
   '/audit': typeof AppAuditRoute
   '/barcodes': typeof AppBarcodesRoute
   '/batches': typeof AppBatchesRoute
@@ -225,6 +233,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
   '/auth': typeof AuthRoute
+  '/_app/analytics': typeof AppAnalyticsRoute
   '/_app/audit': typeof AppAuditRoute
   '/_app/barcodes': typeof AppBarcodesRoute
   '/_app/batches': typeof AppBatchesRoute
@@ -254,6 +263,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/analytics'
     | '/audit'
     | '/barcodes'
     | '/batches'
@@ -281,6 +291,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
+    | '/analytics'
     | '/audit'
     | '/barcodes'
     | '/batches'
@@ -309,6 +320,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_app'
     | '/auth'
+    | '/_app/analytics'
     | '/_app/audit'
     | '/_app/barcodes'
     | '/_app/batches'
@@ -524,10 +536,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAuditRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/analytics': {
+      id: '/_app/analytics'
+      path: '/analytics'
+      fullPath: '/analytics'
+      preLoaderRoute: typeof AppAnalyticsRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
 interface AppRouteChildren {
+  AppAnalyticsRoute: typeof AppAnalyticsRoute
   AppAuditRoute: typeof AppAuditRoute
   AppBarcodesRoute: typeof AppBarcodesRoute
   AppBatchesRoute: typeof AppBatchesRoute
@@ -554,6 +574,7 @@ interface AppRouteChildren {
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppAnalyticsRoute: AppAnalyticsRoute,
   AppAuditRoute: AppAuditRoute,
   AppBarcodesRoute: AppBarcodesRoute,
   AppBatchesRoute: AppBatchesRoute,

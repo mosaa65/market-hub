@@ -11,6 +11,7 @@ const en: Dict = {
 
   // Navigation
   "nav.dashboard": "Dashboard",
+  "nav.analytics": "Analytics",
   "nav.pos": "POS",
   "nav.products": "Products",
   "nav.inventory": "Inventory",
@@ -545,6 +546,7 @@ const ar: Dict = {
 
   // التنقل
   "nav.dashboard": "لوحة التحكم",
+  "nav.analytics": "التحليلات",
   "nav.pos": "نقطة البيع",
   "nav.products": "المنتجات",
   "nav.inventory": "المخزون",
