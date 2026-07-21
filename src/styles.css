@@ -231,6 +231,17 @@
   }
 }
 
+/* Preserve readable record columns on phones; the surrounding containers already scroll horizontally. */
+@media (max-width: 640px) {
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .overflow-x-auto > table {
+    min-width: 680px;
+  }
+}
+
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }

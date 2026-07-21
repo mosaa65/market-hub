@@ -66,7 +66,9 @@ function POSPage() {
   const [loading, setLoading] = useState(false);
   const [lastInvoice, setLastInvoice] = useState<{ id: string; number: string } | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [hardwareScannerActive, setHardwareScannerActive] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+  const scanHandlerRef = useRef<(code: string) => void>(() => undefined);
 
   useEffect(() => { void loadAll(); }, []);
   useEffect(() => { if (warehouseId) void loadStock(warehouseId); }, [warehouseId]);
@@ -166,16 +168,56 @@ function POSPage() {
     const q = code.trim();
     if (!q) return;
     const exact = products.find(p => p.barcode === q || p.sku === q);
-    if (exact) { addToCart(exact); setSearch(""); return; }
+    if (exact) { addToCart(exact); confirmScan(); setSearch(""); return; }
     const partial = products.filter(p =>
       p.name.toLowerCase().includes(q.toLowerCase()) ||
       (p.name_ar ?? "").includes(q) ||
       (p.sku ?? "").toLowerCase().includes(q.toLowerCase()) ||
       (p.barcode ?? "").toLowerCase().includes(q.toLowerCase())
     );
-    if (partial.length === 1) { addToCart(partial[0]); setSearch(""); return; }
+    if (partial.length === 1) { addToCart(partial[0]); confirmScan(); setSearch(""); return; }
     toast.error(lang === "ar" ? `لم يُعثر على منتج للباركود: ${q}` : `No product for: ${q}`);
   }
+
+  function confirmScan() {
+    navigator.vibrate?.(35);
+    try {
+      const Ctx = window.AudioContext ?? (window as any).webkitAudioContext;
+      const ctx = new Ctx();
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
+      oscillator.frequency.value = 1046.5;
+      gain.gain.setValueAtTime(0.07, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.09);
+      oscillator.connect(gain); gain.connect(ctx.destination);
+      oscillator.start(); oscillator.stop(ctx.currentTime + 0.09);
+      oscillator.addEventListener("ended", () => void ctx.close());
+    } catch { /* Audio feedback is optional when the browser blocks it. */ }
+  }
+
+  scanHandlerRef.current = handleCode;
+
+  useEffect(() => {
+    if (!hardwareScannerActive) return;
+    let buffer = "";
+    let lastKeyAt = 0;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.altKey || event.metaKey) return;
+      if (event.key === "Enter") {
+        if (buffer.length >= 3) scanHandlerRef.current(buffer);
+        buffer = "";
+        event.preventDefault();
+        return;
+      }
+      if (event.key.length !== 1) return;
+      const now = Date.now();
+      buffer = now - lastKeyAt > 100 ? event.key : buffer + event.key;
+      lastKeyAt = now;
+      event.preventDefault();
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [hardwareScannerActive]);
 
   const subtotal = cart.reduce((s, l) => s + l.unit_price * l.quantity, 0);
   const taxTotal = cart.reduce((s, l) => s + l.unit_price * l.quantity * (l.tax_rate / 100), 0);
@@ -222,7 +264,7 @@ function POSPage() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_420px]">
         {/* Product grid */}
-        <div className="panel-elevated p-4">
+        <div className="order-2 panel-elevated p-4 lg:order-1">
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-input bg-surface px-3 h-10 shadow-sm">
               <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -253,6 +295,15 @@ function POSPage() {
               title={lang === "ar" ? "قراءة الباركود بالكاميرا" : "Scan with camera"}
             >
               <ScanBarcode className="h-4 w-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setHardwareScannerActive(v => !v)}
+              className={`h-10 shrink-0 rounded-full border px-3 text-xs font-medium transition ${hardwareScannerActive ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "border-border bg-surface text-muted-foreground hover:bg-surface-2"}`}
+              title={lang === "ar" ? "تفعيل قارئ الباركود الخارجي" : "Enable physical barcode reader"}
+            >
+              {hardwareScannerActive ? (lang === "ar" ? "القارئ مفعّل" : "Reader on") : (lang === "ar" ? "قارئ خارجي" : "Reader")}
             </button>
 
             <div className="relative">
@@ -346,9 +397,9 @@ function POSPage() {
         </div>
 
         {/* Cart */}
-        <div className="panel-elevated flex flex-col p-4">
+        <div className="order-1 flex max-h-[62vh] flex-col overflow-hidden panel-elevated p-4 lg:order-2 lg:max-h-none">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold">{t("pos.cart")} ({cart.length})</h2>
+            <h2 className="text-sm font-semibold">{t("pos.cart")} <span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary">{cart.length}</span></h2>
             {cart.length > 0 && (
               <button onClick={() => setCart([])} className="text-xs text-muted-foreground hover:text-destructive">
                 {t("pos.clear")}
@@ -363,7 +414,7 @@ function POSPage() {
             </select>
           </div>
 
-          <div className="flex-1 space-y-2 overflow-y-auto max-h-[40vh]">
+          <div className="flex-1 space-y-2 overflow-y-auto max-h-[24vh] lg:max-h-[40vh]">
             {cart.length === 0 ? (
               <div className="grid place-items-center py-10 text-sm text-muted-foreground">{t("pos.empty_cart")}</div>
             ) : cart.map(l => (
