@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { toast } from "sonner";
+import { InamaSoftFooter } from "@/components/inama-soft-footer";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "تسجيل الدخول — فورتيكس ERP" }] }),
@@ -75,7 +76,7 @@ function AuthPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.18),_transparent_34%),radial-gradient(circle_at_bottom_right,_rgba(16,185,129,0.16),_transparent_30%)] px-4 py-10 sm:px-6 lg:px-8" dir={dir}>
+    <div className="relative flex min-h-screen items-center justify-center overflow-x-hidden overflow-y-auto bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.18),_transparent_34%),radial-gradient(circle_at_bottom_right,_rgba(16,185,129,0.16),_transparent_30%)] px-4 py-10 sm:px-6 lg:px-8" dir={dir}>
       <div className="absolute inset-0 -z-10 overflow-hidden">
         <div className="absolute left-1/2 top-[-10rem] h-[30rem] w-[30rem] -translate-x-1/2 rounded-full bg-primary/20 blur-[140px]" />
         <div className="absolute bottom-[-8rem] right-[-4rem] h-[24rem] w-[24rem] rounded-full bg-chart-4/20 blur-[140px]" />
@@ -222,6 +223,7 @@ function AuthPage() {
           </div>
         </div>
       </div>
+      <InamaSoftFooter className="relative z-10 mx-auto mt-6 w-full max-w-6xl rounded-[24px] border border-white/20 bg-background/80 shadow-[0_20px_60px_rgba(15,23,42,0.12)] backdrop-blur-xl" />
     </div>
   );
 }

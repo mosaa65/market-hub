@@ -1,0 +1,42 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e7]:
+    - generic [ref=e10]:
+      - generic [ref=e11]:
+        - img [ref=e12]
+        - text: فورتكس
+      - heading "بوابتك الرقمية لإدارة الأعمال" [level=2] [ref=e16]
+      - paragraph [ref=e17]: تابع المبيعات، المخزون، والعمليات من مكان واحد مع واجهة حديثة وأداء سريع.
+      - generic [ref=e19]:
+        - img [ref=e21]
+        - generic [ref=e24]:
+          - paragraph [ref=e25]: أمان موثوق
+          - paragraph [ref=e26]: بياناتك محفوظة داخل بيئة آمنة ومهيأة للعمل اليومي.
+    - generic [ref=e27]:
+      - generic [ref=e28]:
+        - generic [ref=e29]:
+          - img [ref=e31]
+          - generic [ref=e34]:
+            - paragraph [ref=e35]: فورتكس
+            - paragraph [ref=e36]: منصة تجارة الجملة والبقالة
+        - generic [ref=e37]: تسجيل الدخول
+      - generic [ref=e38]:
+        - heading "مرحباً بعودتك" [level=1] [ref=e39]
+        - paragraph [ref=e40]: سجل الدخول للمتابعة إلى مساحة عملك.
+      - generic [ref=e41]:
+        - generic [ref=e42]:
+          - generic [ref=e43]: البريد الإلكتروني
+          - generic [ref=e44]:
+            - img [ref=e45]
+            - textbox "you@company.com" [ref=e48]: codex.showcase@nahj-stationery.example
+        - generic [ref=e49]:
+          - generic [ref=e50]: كلمة المرور
+          - generic [ref=e51]:
+            - img [ref=e52]
+            - textbox "••••••••" [ref=e55]: Showcase123!
+        - button "تسجيل الدخول" [ref=e56]
+      - generic [ref=e57]:
+        - generic [ref=e58]: ليس لديك حساب؟
+        - button "إنشاء حساب" [ref=e59]:
+          - img [ref=e60]
+          - text: إنشاء حساب
+  - region "Notifications alt+T"

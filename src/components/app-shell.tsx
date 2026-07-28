@@ -12,6 +12,7 @@ import { useAuth } from "@/lib/auth";
 import { CommandPalette } from "@/components/command-palette";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { InamaSoftFooter } from "@/components/inama-soft-footer";
 
 type Item = { to: string; icon: typeof LayoutDashboard; key: string };
 type Section = { titleKey: string; items: Item[] };
@@ -223,6 +224,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <main className="flex-1 min-h-0 overflow-y-auto">
           <div className="mx-auto w-full max-w-[1400px] p-4 sm:p-6">{children}</div>
+          <InamaSoftFooter />
         </main>
       </div>
 
