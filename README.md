@@ -152,9 +152,13 @@ Select any image to view it at full size. The verified UI captures live in `scre
 
 ### Finance and Insight | المالية والرؤى
 
-| Finance | Loyalty | Reports |
-| --- | --- | --- |
-| [![Vortex ERP finance screen](screenshots/035-finance.png)](screenshots/035-finance.png)<br><sub>Finance — expenses and balances</sub> | [![Vortex ERP loyalty screen](screenshots/041-loyalty.png)](screenshots/041-loyalty.png)<br><sub>Customers — loyalty administration</sub> | [![Vortex ERP reports screen](screenshots/043-reports.png)](screenshots/043-reports.png)<br><sub>Insight — operational reporting</sub> |
+| Finance | Loyalty |
+| --- | --- |
+| [![Vortex ERP finance screen](screenshots/035-finance.png)](screenshots/035-finance.png)<br><sub>Finance — expenses and balances</sub> | [![Vortex ERP loyalty screen](screenshots/041-loyalty.png)](screenshots/041-loyalty.png)<br><sub>Customers — loyalty administration</sub> |
+
+| Advanced analytics | Reports |
+| --- | --- |
+| [![Vortex ERP advanced analytics screen](screenshots/052-analytics.png)](screenshots/052-analytics.png)<br><sub>Insight — revenue, profit, product, category, and warehouse analysis</sub> | [![Vortex ERP reports screen](screenshots/043-reports.png)](screenshots/043-reports.png)<br><sub>Insight — operational reporting</sub> |
 
 ### Administration | الإدارة
 
@@ -394,7 +398,7 @@ The following points describe implemented behavior and its boundaries; the repos
 ## Installation & Configuration
 
 1. Ensure Node.js and npm are available. The repository includes both `package-lock.json` and Bun configuration; the documented workflow uses npm.
-2. Follow the [Quick Start](#quick-start) clone and install sequence.
+2. Follow the [Quick Start](#quick-start--بدء-سريع) clone and install sequence.
 3. Configure Supabase. No `.env.example` file is present, so the values below are derived from the environment reads in the source code.
 
 ```bash
@@ -420,7 +424,7 @@ Keep `SUPABASE_SERVICE_ROLE_KEY` out of `VITE_` variables and client code. The s
 ## Project Structure
 
 ```text
-market-prime/
+market-hub/
 ├── public/
 ├── screenshots/
 ├── src/
@@ -546,7 +550,6 @@ The following owner-proposed priorities are intentionally separated from the imp
 - [ ] Performance tuning informed by production usage.
 
 🇸🇦 **العربية**
-
 
 تفصل الأولويات التالية التي اقترحها مالك المشروع عمداً عن قائمة مهام التنفيذ.
 

@@ -49,3 +49,4 @@
 049. 049-barcodes.png
 050. 050-notifications.png
 051. 051-audit.png
+052. 052-analytics.png
