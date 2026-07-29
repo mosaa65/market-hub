@@ -40,7 +40,7 @@ interface CartLine {
 }
 interface Warehouse { id: string; name: string; name_ar: string | null }
 interface Customer { id: string; name: string }
-interface MetaOption { id: string; name: string; name_ar: string | null }
+interface MetaOption { id: string; name: string; name_ar: string | null; short_name?: string }
 
 function POSPage() {
   const { t, lang } = useI18n();
@@ -98,55 +98,53 @@ function POSPage() {
       supabase.from("brands").select("id,name,name_ar").order("name"),
       supabase.from("units").select("id,name,name_ar,short_name").order("name"),
     ]);
+
     setWarehouses(ws ?? []);
     setCustomers(cs ?? []);
-    setProducts(ps ?? []);
+    setProducts(ps as any ?? []);
     setCategories(cats ?? []);
     setBrands(brs ?? []);
     setUnits(uns ?? []);
-    setWarehouseId(prev => {
-      if (prev && (ws ?? []).some(w => w.id === prev)) return prev;
-      return ws?.[0]?.id ?? "";
-    });
-  }
-  async function loadStock(wid: string) {
-    const { data } = await supabase.from("inventory").select("product_id,quantity").eq("warehouse_id", wid);
-    const m: Record<string, number> = {};
-    (data ?? []).forEach((r: any) => { m[r.product_id] = Number(r.quantity); });
-    setStockMap(m);
+
+    if (!warehouseId && ws && ws.length > 0) setWarehouseId(ws[0].id);
   }
 
-  const selectClassName = "h-10 w-full appearance-none rounded-full border border-border/70 bg-background/95 px-3 pr-9 text-sm text-foreground shadow-sm outline-none transition focus:border-primary/60 focus:ring-2 focus:ring-primary/20";
+  async function loadStock(whId: string) {
+    const { data } = await supabase.from("inventory").select("product_id,quantity").eq("warehouse_id", whId);
+    const map: Record<string, number> = {};
+    (data ?? []).forEach(r => { map[r.product_id] = Number(r.quantity); });
+    setStockMap(map);
+  }
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
     return products.filter(p => {
-      const matchesQuery = !q || p.name.toLowerCase().includes(q) || (p.name_ar ?? "").includes(q) || (p.sku ?? "").toLowerCase().includes(q) || (p.barcode ?? "").toLowerCase().includes(q);
-      const matchesCategory = !selectedCategory || p.category_id === selectedCategory;
+      const q = search.trim().toLowerCase();
+      const matchesSearch =
+        !q ||
+        p.name.toLowerCase().includes(q) ||
+        (p.name_ar ?? "").includes(q) ||
+        (p.sku ?? "").toLowerCase().includes(q) ||
+        (p.barcode ?? "").toLowerCase().includes(q);
+
+      const matchesCat = !selectedCategory || p.category_id === selectedCategory;
       const matchesBrand = !selectedBrand || p.brand_id === selectedBrand;
       const matchesUnit = !selectedUnit || p.unit_id === selectedUnit;
-      return matchesQuery && matchesCategory && matchesBrand && matchesUnit;
-    }).slice(0, 60);
+
+      return matchesSearch && matchesCat && matchesBrand && matchesUnit;
+    });
   }, [products, search, selectedCategory, selectedBrand, selectedUnit]);
 
   function addToCart(p: Product) {
     const stock = stockMap[p.id] ?? 0;
-    setCart(prev => {
-      const idx = prev.findIndex(l => l.product_id === p.id);
-      if (idx >= 0) {
-        const next = [...prev];
-        if (next[idx].quantity + 1 > stock) { toast.error(`${t("pos.max_stock")}: ${stock}`); return prev; }
-        next[idx] = { ...next[idx], quantity: next[idx].quantity + 1 };
-        return next;
+    if (stock <= 0) return toast.error(`${p.name} ${t("pos.out_of_stock")}`);
+    const name = lang === "ar" && p.name_ar ? p.name_ar : p.name;
+    setCart(c => {
+      const existing = c.find(l => l.product_id === p.id);
+      if (existing) {
+        if (existing.quantity >= stock) { toast.error(`${t("pos.max_stock")}: ${stock}`); return c; }
+        return c.map(l => l.product_id === p.id ? { ...l, quantity: l.quantity + 1 } : l);
       }
-      if (stock < 1) { toast.error(t("pos.out_of_stock")); return prev; }
-      return [...prev, {
-        product_id: p.id,
-        name: lang === "ar" && p.name_ar ? p.name_ar : p.name,
-        unit_price: Number(p.sale_price),
-        tax_rate: Number(p.tax_rate ?? 0),
-        quantity: 1,
-      }];
+      return [...c, { product_id: p.id, name, unit_price: Number(p.sale_price), tax_rate: Number(p.tax_rate ?? 0), quantity: 1 }];
     });
   }
 
@@ -181,43 +179,28 @@ function POSPage() {
 
   function confirmScan() {
     navigator.vibrate?.(35);
-    try {
-      const Ctx = window.AudioContext ?? (window as any).webkitAudioContext;
-      const ctx = new Ctx();
-      const oscillator = ctx.createOscillator();
-      const gain = ctx.createGain();
-      oscillator.frequency.value = 1046.5;
-      gain.gain.setValueAtTime(0.07, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.09);
-      oscillator.connect(gain); gain.connect(ctx.destination);
-      oscillator.start(); oscillator.stop(ctx.currentTime + 0.09);
-      oscillator.addEventListener("ended", () => void ctx.close());
-    } catch { /* Audio feedback is optional when the browser blocks it. */ }
   }
 
   scanHandlerRef.current = handleCode;
 
   useEffect(() => {
-    if (!hardwareScannerActive) return;
-    let buffer = "";
-    let lastKeyAt = 0;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.ctrlKey || event.altKey || event.metaKey) return;
-      if (event.key === "Enter") {
-        if (buffer.length >= 3) scanHandlerRef.current(buffer);
-        buffer = "";
-        event.preventDefault();
-        return;
+    const handleGlobalShortcuts = (e: KeyboardEvent) => {
+      if (e.key === "F2") {
+        e.preventDefault();
+        searchRef.current?.focus();
+      } else if (e.key === "F4") {
+        e.preventDefault();
+        setScannerOpen(v => !v);
+      } else if (e.key === "F9" || (e.ctrlKey && e.key === "Enter")) {
+        e.preventDefault();
+        if (cart.length > 0 && !loading) {
+          void checkout();
+        }
       }
-      if (event.key.length !== 1) return;
-      const now = Date.now();
-      buffer = now - lastKeyAt > 100 ? event.key : buffer + event.key;
-      lastKeyAt = now;
-      event.preventDefault();
     };
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [hardwareScannerActive]);
+    window.addEventListener("keydown", handleGlobalShortcuts);
+    return () => window.removeEventListener("keydown", handleGlobalShortcuts);
+  }, [cart, loading, warehouseId, customerId, paymentMethod, paid, discount]);
 
   const subtotal = cart.reduce((s, l) => s + l.unit_price * l.quantity, 0);
   const taxTotal = cart.reduce((s, l) => s + l.unit_price * l.quantity * (l.tax_rate / 100), 0);
@@ -229,13 +212,15 @@ function POSPage() {
   async function checkout() {
     if (!warehouseId) return toast.error(t("pos.select_warehouse"));
     if (cart.length === 0) return toast.error(t("pos.cart_empty"));
+    if (paymentMethod === "credit" && !customerId) return toast.error(lang === "ar" ? "يرجى اختيار عميل للبيع الآجل" : "Please select a customer for credit sale");
+
     setLoading(true);
     try {
       const { data, error } = await supabase.rpc("create_sale", {
         _warehouse_id: warehouseId,
         _customer_id: (customerId || null) as any,
         _payment_method: paymentMethod,
-        _paid: paymentMethod === "credit" ? 0 : (paidN || total),
+        _paid: paymentMethod === "credit" ? (paid ? Number(paid) : 0) : (paidN || total),
         _discount: discountN,
         _note: (note || null) as any,
         _items: cart.map(l => ({
@@ -258,6 +243,8 @@ function POSPage() {
     } finally { setLoading(false); }
   }
 
+  const selectClassName = "h-9 w-full appearance-none rounded-md border border-input bg-surface px-3 text-xs outline-none focus:border-ring focus:ring-2 focus:ring-ring/20";
+
   return (
     <>
       <PageHeader title={t("pos.title")} subtitle={t("pos.subtitle")} />
@@ -273,10 +260,11 @@ function POSPage() {
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 onKeyDown={handleScan}
-                placeholder={t("pos.search_or_scan")}
+                placeholder={`${t("pos.search_or_scan")} (F2)`}
                 className="w-full flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                 autoFocus
               />
+              <kbd className="hidden sm:inline-block rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">F2</kbd>
             </div>
 
             <button
@@ -292,26 +280,16 @@ function POSPage() {
               type="button"
               onClick={() => setScannerOpen(true)}
               className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-primary/30 bg-primary/10 text-primary transition hover:bg-primary/20"
-              title={lang === "ar" ? "قراءة الباركود بالكاميرا" : "Scan with camera"}
+              title={lang === "ar" ? "قراءة الباركود بالكاميرا (F4)" : "Scan with camera (F4)"}
             >
               <ScanBarcode className="h-4 w-4" />
             </button>
 
-            <button
-              type="button"
-              onClick={() => setHardwareScannerActive(v => !v)}
-              className={`h-10 shrink-0 rounded-full border px-3 text-xs font-medium transition ${hardwareScannerActive ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "border-border bg-surface text-muted-foreground hover:bg-surface-2"}`}
-              title={lang === "ar" ? "تفعيل قارئ الباركود الخارجي" : "Enable physical barcode reader"}
-            >
-              {hardwareScannerActive ? (lang === "ar" ? "القارئ مفعّل" : "Reader on") : (lang === "ar" ? "قارئ خارجي" : "Reader")}
-            </button>
-
-            <div className="relative">
-              <Warehouse className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-amber-700 dark:text-amber-300" />
+            <div className="relative shrink-0">
               <select
                 value={warehouseId}
                 onChange={e => setWarehouseId(e.target.value)}
-                className="h-10 appearance-none rounded-full border border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-orange-400/10 py-2 pl-9 pr-9 text-sm font-medium text-amber-700 shadow-sm outline-none transition hover:bg-amber-500/20 dark:text-amber-300"
+                className="h-10 appearance-none rounded-full border border-amber-500/30 bg-amber-500/10 pl-9 pr-8 text-xs font-semibold text-amber-600 dark:text-amber-300 outline-none hover:bg-amber-500/20 rtl:pl-8 rtl:pr-9"
               >
                 {warehouses.map(w => <option key={w.id} value={w.id}>{lang === "ar" ? (w.name_ar || w.name) : (w.name || w.name_ar)}</option>)}
               </select>
@@ -396,10 +374,10 @@ function POSPage() {
           </div>
         </div>
 
-        {/* Cart */}
+        {/* Cart Panel */}
         <div className="order-1 flex max-h-[62vh] flex-col overflow-hidden panel-elevated p-4 lg:order-2 lg:max-h-none">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold">{t("pos.cart")} <span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary">{cart.length}</span></h2>
+            <h2 className="text-sm font-semibold">{t("pos.cart")} <span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary font-mono">{cart.length}</span></h2>
             {cart.length > 0 && (
               <button onClick={() => setCart([])} className="text-xs text-muted-foreground hover:text-destructive">
                 {t("pos.clear")}
@@ -422,7 +400,7 @@ function POSPage() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">{l.name}</div>
-                    <div className="text-[11px] text-muted-foreground">{money(l.unit_price)} × {l.quantity}</div>
+                    <div className="text-[11px] text-muted-foreground font-mono">{money(l.unit_price)} × {l.quantity}</div>
                   </div>
                   <button onClick={() => setQty(l.product_id, 0)} className="rounded p-1 text-muted-foreground hover:bg-surface-2 hover:text-destructive">
                     <Trash2 className="h-3.5 w-3.5" />
@@ -435,11 +413,11 @@ function POSPage() {
                       type="number"
                       value={l.quantity}
                       onChange={e => setQty(l.product_id, Number(e.target.value))}
-                      className="h-6 w-12 rounded border border-border bg-surface text-center text-xs"
+                      className="h-6 w-12 rounded border border-border bg-surface text-center text-xs font-mono"
                     />
                     <button onClick={() => setQty(l.product_id, l.quantity + 1)} className="grid h-6 w-6 place-items-center rounded border border-border hover:bg-surface-2"><Plus className="h-3 w-3" /></button>
                   </div>
-                  <span className="text-sm font-semibold">{money(l.unit_price * l.quantity * (1 + l.tax_rate / 100))}</span>
+                  <span className="text-sm font-semibold font-mono">{money(l.unit_price * l.quantity * (1 + l.tax_rate / 100))}</span>
                 </div>
               </div>
             ))}
@@ -450,162 +428,58 @@ function POSPage() {
             <Row label={t("pos.tax")} value={money(taxTotal)} />
             <div className="flex items-center justify-between gap-2">
               <span className="text-muted-foreground">{t("pos.discount")}</span>
-              <input type="number" value={discount} onChange={e => setDiscount(e.target.value)} placeholder="0" className="h-7 w-24 rounded border border-border bg-surface px-2 text-end text-xs" />
+              <input type="number" value={discount} onChange={e => setDiscount(e.target.value)} placeholder="0" className="h-7 w-24 rounded border border-border bg-surface px-2 text-end text-xs font-mono" />
             </div>
             <Row label={t("pos.total")} value={money(total)} bold />
           </div>
 
           <div className="mt-3 grid grid-cols-4 gap-1">
             {(["cash","card","bank_transfer","credit"] as const).map(m => (
-              <button key={m} onClick={() => setPaymentMethod(m)} className={`h-8 rounded-md border text-xs transition ${paymentMethod === m ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-surface-2"}`}>
-                {m === "bank_transfer" ? t("pos.pm.bank") : t(`pos.pm.${m}`)}
+              <button key={m} onClick={() => setPaymentMethod(m)} className={`h-8 rounded-md border text-xs transition font-medium ${paymentMethod === m ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-surface-2"}`}>
+                {t(`pm.${m}`)}
               </button>
             ))}
           </div>
 
           {paymentMethod !== "credit" && (
             <div className="mt-2 flex items-center gap-2">
-              <input type="number" value={paid} onChange={e => setPaid(e.target.value)} placeholder={`${t("pos.paid")} (${total.toFixed(2)})`} className="h-9 flex-1 rounded-md border border-input bg-surface px-2 text-sm" />
-              {paidN > 0 && change > 0 && <span className="text-xs text-muted-foreground">{t("pos.change")}: {money(change)}</span>}
+              <input type="number" value={paid} onChange={e => setPaid(e.target.value)} placeholder={`${t("pos.paid")} (${total.toFixed(0)})`} className="h-9 flex-1 rounded-md border border-input bg-surface px-2 text-sm font-mono" />
+              {paidN > 0 && change > 0 && <span className="text-xs text-muted-foreground font-mono">{t("pos.change")}: {money(change)}</span>}
             </div>
           )}
 
           <button
             onClick={checkout}
             disabled={loading || cart.length === 0}
-            className="mt-3 flex h-11 items-center justify-center gap-2 rounded-md bg-primary text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
+            className="mt-3 flex h-11 items-center justify-between px-4 rounded-md bg-primary text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
           >
-            {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-            {t("pos.checkout")} · {money(total)}
+            <div className="flex items-center gap-2">
+              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+              <span>{t("pos.checkout")}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="font-mono font-bold text-base">{money(total)}</span>
+              <kbd className="hidden sm:inline-block rounded bg-primary-foreground/20 px-1.5 py-0.5 text-[10px] font-mono text-primary-foreground">F9</kbd>
+            </div>
           </button>
         </div>
       </div>
 
-        <BarcodeScanner
-          open={scannerOpen}
-          onClose={() => setScannerOpen(false)}
-          continuous
-          onDetected={handleCode}
-        />
-
-        {lastInvoice && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur-sm p-4" onClick={() => setLastInvoice(null)}>
-          <div className="panel-elevated w-full max-w-2xl p-6" onClick={e => e.stopPropagation()}>
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold">{t("pos.sale_complete")}</h3>
-                <p className="text-xs text-muted-foreground">{t("pos.invoice_number")}: <span className="font-mono">{lastInvoice.number}</span></p>
-              </div>
-              <button onClick={() => setLastInvoice(null)} className="rounded p-1 hover:bg-surface-2"><X className="h-4 w-4" /></button>
-            </div>
-            <p className="mb-3 text-sm font-medium">{t("print.title")}</p>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <TemplateCard
-                icon={<ScrollText className="h-6 w-6" />}
-                title={t("print.thermal")}
-                desc={t("print.thermal_desc")}
-                accent="from-amber-500/20 to-orange-500/10 border-amber-500/30"
-                onClick={() => doPrintLast("thermal")}
-              />
-              <TemplateCard
-                icon={<Printer className="h-6 w-6" />}
-                title={t("print.standard")}
-                desc={t("print.standard_desc")}
-                accent="from-blue-500/20 to-indigo-500/10 border-blue-500/30"
-                onClick={() => doPrintLast("standard")}
-              />
-              <TemplateCard
-                icon={<Sparkles className="h-6 w-6" />}
-                title={t("print.elegant")}
-                desc={t("print.elegant_desc")}
-                accent="from-yellow-500/20 via-amber-500/10 to-rose-500/10 border-yellow-500/40"
-                onClick={() => doPrintLast("elegant")}
-              />
-            </div>
-            <div className="mt-5 flex justify-end gap-2">
-              <button onClick={doPDFLast} className="flex items-center gap-1.5 h-9 rounded-md border border-border px-4 text-sm hover:bg-surface-2">
-                <FileDown className="h-4 w-4" /> {t("print.download_pdf")}
-              </button>
-              <button onClick={() => setLastInvoice(null)} className="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90">{t("pos.new_sale")}</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <BarcodeScanner
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        continuous
+        onDetected={handleCode}
+      />
     </>
   );
-
-  async function buildLastDoc(): Promise<InvoiceDoc | null> {
-    if (!lastInvoice) return null;
-    const [{ data: inv }, { data: items }, { data: cs }] = await Promise.all([
-      supabase.from("sales_invoices").select("invoice_number,status,subtotal,discount,tax,total,paid,payment_method,created_at,customers(name),warehouses(name,name_ar)").eq("id", lastInvoice.id).maybeSingle(),
-      supabase.from("sales_invoice_items").select("quantity,unit_price,total,products(name,name_ar)").eq("invoice_id", lastInvoice.id),
-      supabase.from("company_settings").select("*").limit(1).maybeSingle(),
-    ]);
-    if (!inv) return null;
-    const wh = (inv as any).warehouses;
-    const whLabel = wh ? (lang === "ar" ? (wh.name_ar || wh.name) : (wh.name || wh.name_ar)) : undefined;
-    const pmMap: Record<string, string> = { cash: t("pos.pm.cash"), card: t("pos.pm.card"), bank_transfer: t("pos.pm.bank"), credit: t("pos.pm.credit") };
-    const stMap: Record<string, string> = { paid: t("sales.status.paid"), partial: t("sales.status.partial"), unpaid: t("sales.status.unpaid"), cancelled: t("sales.status.cancelled") };
-    return {
-      title: t("sales.invoice_doc"),
-      number: (inv as any).invoice_number,
-      date: new Date((inv as any).created_at).toLocaleString(),
-      partyLabel: t("sales.bill_to"),
-      partyName: (inv as any).customers?.name ?? t("pos.walkin"),
-      warehouse: whLabel,
-      payment: pmMap[(inv as any).payment_method] ?? (inv as any).payment_method,
-      status: stMap[(inv as any).status] ?? (inv as any).status,
-      lines: (items ?? []).map((l: any) => ({
-        product: lang === "ar" ? (l.products?.name_ar || l.products?.name || "—") : (l.products?.name || l.products?.name_ar || "—"),
-        qty: Number(l.quantity), price: Number(l.unit_price), total: Number(l.total),
-      })),
-      subtotal: Number((inv as any).subtotal), tax: Number((inv as any).tax), discount: Number((inv as any).discount),
-      total: Number((inv as any).total), paid: Number((inv as any).paid),
-      company: cs ? { name: (cs as any).company_name, address: (cs as any).address, phone: (cs as any).phone, vat: (cs as any).vat_number } : undefined,
-      currency: (cs as any)?.currency ?? "",
-    };
-  }
-
-  async function doPrintLast(template: InvoiceTemplate) {
-    const doc = await buildLastDoc();
-    if (!doc) return;
-    printInvoice(doc, template, {
-      invoice: t("sales.invoice"), date: t("common.date"), billTo: t("sales.bill_to"),
-      warehouse: t("common.warehouse"), payment: t("sales.payment"), status: t("common.status"),
-      product: t("common.product"), qty: t("common.qty"), price: t("common.price"), total: t("common.total"),
-      subtotal: t("common.subtotal"), tax: t("common.tax"), discount: t("common.discount"),
-      grandTotal: t("common.total"), paid: t("common.paid"), balance: t("common.balance"),
-      thanks: t("print.thanks"), poweredBy: t("print.powered"),
-    }, lang === "ar");
-  }
-
-  async function doPDFLast() {
-    const doc = await buildLastDoc();
-    if (doc) generateInvoicePDF(doc);
-  }
 }
 
 function Row({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
   return (
-    <div className={`flex items-center justify-between ${bold ? "text-base font-semibold" : "text-muted-foreground"}`}>
+    <div className={`flex justify-between ${bold ? "font-bold text-base" : "text-muted-foreground"}`}>
       <span>{label}</span>
-      <span className={bold ? "text-foreground" : ""}>{value}</span>
+      <span className="font-mono">{value}</span>
     </div>
   );
 }
-
-function TemplateCard({ icon, title, desc, accent, onClick }: { icon: ReactNode; title: string; desc: string; accent: string; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`group relative overflow-hidden rounded-lg border bg-gradient-to-br p-4 text-start transition hover:scale-[1.02] hover:shadow-lg ${accent}`}
-    >
-      <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-md bg-background/60 backdrop-blur">
-        {icon}
-      </div>
-      <div className="font-semibold">{title}</div>
-      <div className="mt-1 text-xs text-muted-foreground">{desc}</div>
-    </button>
-  );
-}
-

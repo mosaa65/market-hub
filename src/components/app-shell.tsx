@@ -5,7 +5,7 @@ import {
   Users, Building2, Wallet, BarChart3, ShieldCheck, Bell, Settings,
   Search, Command as CommandIcon, LogOut, Moon, Sun, Sparkles,
   RotateCcw, ArrowRightLeft, CalendarClock, Barcode, Gift, History, Layers, Boxes,
-  Menu, HandCoins, AlertTriangle, LineChart,
+  Menu, HandCoins, AlertTriangle, LineChart, FileText, BookOpen, Scale, Landmark, PieChart,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
@@ -32,8 +32,9 @@ const sections: Section[] = [
       { to: "/warehouses", icon: Boxes, key: "nav.warehouses" },
       { to: "/batches", icon: CalendarClock, key: "nav.batches" },
       { to: "/sales", icon: Receipt, key: "nav.sales" },
+      { to: "/sales-returns", icon: RotateCcw, key: "nav.sales_returns" },
       { to: "/purchases", icon: Truck, key: "nav.purchases" },
-      { to: "/returns", icon: RotateCcw, key: "nav.returns" },
+      { to: "/purchase-returns", icon: RotateCcw, key: "nav.purchase_returns" },
       { to: "/transfers", icon: ArrowRightLeft, key: "nav.transfers" },
       { to: "/barcodes", icon: Barcode, key: "nav.barcodes" },
     ],
@@ -51,6 +52,11 @@ const sections: Section[] = [
     items: [
       { to: "/payments", icon: HandCoins, key: "nav.payments" },
       { to: "/debts", icon: AlertTriangle, key: "nav.debts" },
+      { to: "/account-statement", icon: FileText, key: "nav.account_statement" },
+      { to: "/daily-journal", icon: BookOpen, key: "nav.daily_journal" },
+      { to: "/trial-balance", icon: Scale, key: "nav.trial_balance" },
+      { to: "/income-statement", icon: PieChart, key: "nav.income_statement" },
+      { to: "/balance-sheet", icon: Landmark, key: "nav.balance_sheet" },
       { to: "/finance", icon: Wallet, key: "nav.finance" },
       { to: "/reports", icon: BarChart3, key: "nav.reports" },
     ],

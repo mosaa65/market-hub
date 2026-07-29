@@ -26,23 +26,15 @@ export function setCompanySettingsCache(settings: CompanySettingsCache | null | 
 
 export function money(n: number, currency?: string, locale?: string) {
   const settings = readCompanySettingsCache();
-  const currencyCode = currency || settings.currency || "USD";
-  const resolvedLocale = locale || (typeof navigator !== "undefined" ? navigator.language : "en-US");
-  const symbol = settings.currency_symbol?.trim();
+  const currencyCode = currency || settings.currency || "YER";
+  const resolvedLocale = locale || (typeof navigator !== "undefined" ? navigator.language : "ar-YE");
+  const symbol = settings.currency_symbol?.trim() || "﷼";
 
-  if (symbol) {
-    const base = new Intl.NumberFormat(resolvedLocale, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(n);
-    return `${symbol}${base}`;
-  }
-
-  return new Intl.NumberFormat(resolvedLocale, {
-    style: "currency",
-    currency: currencyCode,
+  const base = new Intl.NumberFormat(resolvedLocale, {
+    minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   }).format(n);
+  return `${base} ${symbol}`;
 }
 
 export function num(n: number, locale = "en-US") {

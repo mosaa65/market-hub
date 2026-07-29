@@ -88,7 +88,7 @@ function UsersPage() {
                         {r.roles.length === 0 ? <span className="text-xs text-muted-foreground">{lang === "ar" ? "بلا دور" : "no role"}</span>
                           : r.roles.map((ro: any) => (
                             <Badge key={ro.id} variant={ro.role === "owner" ? "default" : "secondary"} className="gap-1">
-                              <ShieldCheck className="h-3 w-3" />{ro.role}
+                              <ShieldCheck className="h-3 w-3" />{t(`role.${ro.role}`)}
                               {isOwner && r.id !== user?.id && (
                                 <button onClick={() => removeRole(ro.id)} className="ms-1 opacity-60 hover:opacity-100"><Trash2 className="h-3 w-3" /></button>
                               )}
@@ -100,9 +100,9 @@ function UsersPage() {
                     {isOwner && (
                       <TableCell className="text-end">
                         <Select onValueChange={(v) => assignRole(r.id, v)}>
-                          <SelectTrigger className="w-36 h-8 ms-auto"><SelectValue placeholder={lang === "ar" ? "إضافة دور" : "Add role"} /></SelectTrigger>
+                          <SelectTrigger className="w-44 h-8 ms-auto"><SelectValue placeholder={lang === "ar" ? "إضافة دور" : "Add role"} /></SelectTrigger>
                           <SelectContent>
-                            {ROLES.filter((ro) => !r.roles.find((x: any) => x.role === ro)).map((ro) => <SelectItem key={ro} value={ro}>{ro}</SelectItem>)}
+                            {ROLES.filter((ro) => !r.roles.find((x: any) => x.role === ro)).map((ro) => <SelectItem key={ro} value={ro}>{t(`role.${ro}`)}</SelectItem>)}
                           </SelectContent>
                         </Select>
                       </TableCell>

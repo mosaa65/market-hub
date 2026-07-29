@@ -14,28 +14,35 @@ import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppWarehousesRouteImport } from './routes/_app.warehouses'
 import { Route as AppUsersRouteImport } from './routes/_app.users'
+import { Route as AppTrialBalanceRouteImport } from './routes/_app.trial-balance'
 import { Route as AppTransfersRouteImport } from './routes/_app.transfers'
 import { Route as AppSuppliersRouteImport } from './routes/_app.suppliers'
 import { Route as AppSettingsRouteImport } from './routes/_app.settings'
+import { Route as AppSalesReturnsRouteImport } from './routes/_app.sales-returns'
 import { Route as AppSalesRouteImport } from './routes/_app.sales'
 import { Route as AppReturnsRouteImport } from './routes/_app.returns'
 import { Route as AppReportsRouteImport } from './routes/_app.reports'
 import { Route as AppPurchasesRouteImport } from './routes/_app.purchases'
+import { Route as AppPurchaseReturnsRouteImport } from './routes/_app.purchase-returns'
 import { Route as AppProductsRouteImport } from './routes/_app.products'
 import { Route as AppPosRouteImport } from './routes/_app.pos'
 import { Route as AppPaymentsRouteImport } from './routes/_app.payments'
 import { Route as AppNotificationsRouteImport } from './routes/_app.notifications'
 import { Route as AppLoyaltyRouteImport } from './routes/_app.loyalty'
 import { Route as AppInventoryRouteImport } from './routes/_app.inventory'
+import { Route as AppIncomeStatementRouteImport } from './routes/_app.income-statement'
 import { Route as AppFinanceRouteImport } from './routes/_app.finance'
 import { Route as AppDebtsRouteImport } from './routes/_app.debts'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
+import { Route as AppDailyJournalRouteImport } from './routes/_app.daily-journal'
 import { Route as AppCustomersRouteImport } from './routes/_app.customers'
 import { Route as AppCatalogRouteImport } from './routes/_app.catalog'
 import { Route as AppBatchesRouteImport } from './routes/_app.batches'
 import { Route as AppBarcodesRouteImport } from './routes/_app.barcodes'
+import { Route as AppBalanceSheetRouteImport } from './routes/_app.balance-sheet'
 import { Route as AppAuditRouteImport } from './routes/_app.audit'
 import { Route as AppAnalyticsRouteImport } from './routes/_app.analytics'
+import { Route as AppAccountStatementRouteImport } from './routes/_app.account-statement'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -61,6 +68,11 @@ const AppUsersRoute = AppUsersRouteImport.update({
   path: '/users',
   getParentRoute: () => AppRoute,
 } as any)
+const AppTrialBalanceRoute = AppTrialBalanceRouteImport.update({
+  id: '/trial-balance',
+  path: '/trial-balance',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppTransfersRoute = AppTransfersRouteImport.update({
   id: '/transfers',
   path: '/transfers',
@@ -74,6 +86,11 @@ const AppSuppliersRoute = AppSuppliersRouteImport.update({
 const AppSettingsRoute = AppSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSalesReturnsRoute = AppSalesReturnsRouteImport.update({
+  id: '/sales-returns',
+  path: '/sales-returns',
   getParentRoute: () => AppRoute,
 } as any)
 const AppSalesRoute = AppSalesRouteImport.update({
@@ -94,6 +111,11 @@ const AppReportsRoute = AppReportsRouteImport.update({
 const AppPurchasesRoute = AppPurchasesRouteImport.update({
   id: '/purchases',
   path: '/purchases',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPurchaseReturnsRoute = AppPurchaseReturnsRouteImport.update({
+  id: '/purchase-returns',
+  path: '/purchase-returns',
   getParentRoute: () => AppRoute,
 } as any)
 const AppProductsRoute = AppProductsRouteImport.update({
@@ -126,6 +148,11 @@ const AppInventoryRoute = AppInventoryRouteImport.update({
   path: '/inventory',
   getParentRoute: () => AppRoute,
 } as any)
+const AppIncomeStatementRoute = AppIncomeStatementRouteImport.update({
+  id: '/income-statement',
+  path: '/income-statement',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppFinanceRoute = AppFinanceRouteImport.update({
   id: '/finance',
   path: '/finance',
@@ -139,6 +166,11 @@ const AppDebtsRoute = AppDebtsRouteImport.update({
 const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDailyJournalRoute = AppDailyJournalRouteImport.update({
+  id: '/daily-journal',
+  path: '/daily-journal',
   getParentRoute: () => AppRoute,
 } as any)
 const AppCustomersRoute = AppCustomersRouteImport.update({
@@ -161,6 +193,11 @@ const AppBarcodesRoute = AppBarcodesRouteImport.update({
   path: '/barcodes',
   getParentRoute: () => AppRoute,
 } as any)
+const AppBalanceSheetRoute = AppBalanceSheetRouteImport.update({
+  id: '/balance-sheet',
+  path: '/balance-sheet',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAuditRoute = AppAuditRouteImport.update({
   id: '/audit',
   path: '/audit',
@@ -171,60 +208,79 @@ const AppAnalyticsRoute = AppAnalyticsRouteImport.update({
   path: '/analytics',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAccountStatementRoute = AppAccountStatementRouteImport.update({
+  id: '/account-statement',
+  path: '/account-statement',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/account-statement': typeof AppAccountStatementRoute
   '/analytics': typeof AppAnalyticsRoute
   '/audit': typeof AppAuditRoute
+  '/balance-sheet': typeof AppBalanceSheetRoute
   '/barcodes': typeof AppBarcodesRoute
   '/batches': typeof AppBatchesRoute
   '/catalog': typeof AppCatalogRoute
   '/customers': typeof AppCustomersRoute
+  '/daily-journal': typeof AppDailyJournalRoute
   '/dashboard': typeof AppDashboardRoute
   '/debts': typeof AppDebtsRoute
   '/finance': typeof AppFinanceRoute
+  '/income-statement': typeof AppIncomeStatementRoute
   '/inventory': typeof AppInventoryRoute
   '/loyalty': typeof AppLoyaltyRoute
   '/notifications': typeof AppNotificationsRoute
   '/payments': typeof AppPaymentsRoute
   '/pos': typeof AppPosRoute
   '/products': typeof AppProductsRoute
+  '/purchase-returns': typeof AppPurchaseReturnsRoute
   '/purchases': typeof AppPurchasesRoute
   '/reports': typeof AppReportsRoute
   '/returns': typeof AppReturnsRoute
   '/sales': typeof AppSalesRoute
+  '/sales-returns': typeof AppSalesReturnsRoute
   '/settings': typeof AppSettingsRoute
   '/suppliers': typeof AppSuppliersRoute
   '/transfers': typeof AppTransfersRoute
+  '/trial-balance': typeof AppTrialBalanceRoute
   '/users': typeof AppUsersRoute
   '/warehouses': typeof AppWarehousesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/account-statement': typeof AppAccountStatementRoute
   '/analytics': typeof AppAnalyticsRoute
   '/audit': typeof AppAuditRoute
+  '/balance-sheet': typeof AppBalanceSheetRoute
   '/barcodes': typeof AppBarcodesRoute
   '/batches': typeof AppBatchesRoute
   '/catalog': typeof AppCatalogRoute
   '/customers': typeof AppCustomersRoute
+  '/daily-journal': typeof AppDailyJournalRoute
   '/dashboard': typeof AppDashboardRoute
   '/debts': typeof AppDebtsRoute
   '/finance': typeof AppFinanceRoute
+  '/income-statement': typeof AppIncomeStatementRoute
   '/inventory': typeof AppInventoryRoute
   '/loyalty': typeof AppLoyaltyRoute
   '/notifications': typeof AppNotificationsRoute
   '/payments': typeof AppPaymentsRoute
   '/pos': typeof AppPosRoute
   '/products': typeof AppProductsRoute
+  '/purchase-returns': typeof AppPurchaseReturnsRoute
   '/purchases': typeof AppPurchasesRoute
   '/reports': typeof AppReportsRoute
   '/returns': typeof AppReturnsRoute
   '/sales': typeof AppSalesRoute
+  '/sales-returns': typeof AppSalesReturnsRoute
   '/settings': typeof AppSettingsRoute
   '/suppliers': typeof AppSuppliersRoute
   '/transfers': typeof AppTransfersRoute
+  '/trial-balance': typeof AppTrialBalanceRoute
   '/users': typeof AppUsersRoute
   '/warehouses': typeof AppWarehousesRoute
 }
@@ -233,28 +289,35 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
   '/auth': typeof AuthRoute
+  '/_app/account-statement': typeof AppAccountStatementRoute
   '/_app/analytics': typeof AppAnalyticsRoute
   '/_app/audit': typeof AppAuditRoute
+  '/_app/balance-sheet': typeof AppBalanceSheetRoute
   '/_app/barcodes': typeof AppBarcodesRoute
   '/_app/batches': typeof AppBatchesRoute
   '/_app/catalog': typeof AppCatalogRoute
   '/_app/customers': typeof AppCustomersRoute
+  '/_app/daily-journal': typeof AppDailyJournalRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/debts': typeof AppDebtsRoute
   '/_app/finance': typeof AppFinanceRoute
+  '/_app/income-statement': typeof AppIncomeStatementRoute
   '/_app/inventory': typeof AppInventoryRoute
   '/_app/loyalty': typeof AppLoyaltyRoute
   '/_app/notifications': typeof AppNotificationsRoute
   '/_app/payments': typeof AppPaymentsRoute
   '/_app/pos': typeof AppPosRoute
   '/_app/products': typeof AppProductsRoute
+  '/_app/purchase-returns': typeof AppPurchaseReturnsRoute
   '/_app/purchases': typeof AppPurchasesRoute
   '/_app/reports': typeof AppReportsRoute
   '/_app/returns': typeof AppReturnsRoute
   '/_app/sales': typeof AppSalesRoute
+  '/_app/sales-returns': typeof AppSalesReturnsRoute
   '/_app/settings': typeof AppSettingsRoute
   '/_app/suppliers': typeof AppSuppliersRoute
   '/_app/transfers': typeof AppTransfersRoute
+  '/_app/trial-balance': typeof AppTrialBalanceRoute
   '/_app/users': typeof AppUsersRoute
   '/_app/warehouses': typeof AppWarehousesRoute
 }
@@ -263,56 +326,70 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/account-statement'
     | '/analytics'
     | '/audit'
+    | '/balance-sheet'
     | '/barcodes'
     | '/batches'
     | '/catalog'
     | '/customers'
+    | '/daily-journal'
     | '/dashboard'
     | '/debts'
     | '/finance'
+    | '/income-statement'
     | '/inventory'
     | '/loyalty'
     | '/notifications'
     | '/payments'
     | '/pos'
     | '/products'
+    | '/purchase-returns'
     | '/purchases'
     | '/reports'
     | '/returns'
     | '/sales'
+    | '/sales-returns'
     | '/settings'
     | '/suppliers'
     | '/transfers'
+    | '/trial-balance'
     | '/users'
     | '/warehouses'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/auth'
+    | '/account-statement'
     | '/analytics'
     | '/audit'
+    | '/balance-sheet'
     | '/barcodes'
     | '/batches'
     | '/catalog'
     | '/customers'
+    | '/daily-journal'
     | '/dashboard'
     | '/debts'
     | '/finance'
+    | '/income-statement'
     | '/inventory'
     | '/loyalty'
     | '/notifications'
     | '/payments'
     | '/pos'
     | '/products'
+    | '/purchase-returns'
     | '/purchases'
     | '/reports'
     | '/returns'
     | '/sales'
+    | '/sales-returns'
     | '/settings'
     | '/suppliers'
     | '/transfers'
+    | '/trial-balance'
     | '/users'
     | '/warehouses'
   id:
@@ -320,28 +397,35 @@ export interface FileRouteTypes {
     | '/'
     | '/_app'
     | '/auth'
+    | '/_app/account-statement'
     | '/_app/analytics'
     | '/_app/audit'
+    | '/_app/balance-sheet'
     | '/_app/barcodes'
     | '/_app/batches'
     | '/_app/catalog'
     | '/_app/customers'
+    | '/_app/daily-journal'
     | '/_app/dashboard'
     | '/_app/debts'
     | '/_app/finance'
+    | '/_app/income-statement'
     | '/_app/inventory'
     | '/_app/loyalty'
     | '/_app/notifications'
     | '/_app/payments'
     | '/_app/pos'
     | '/_app/products'
+    | '/_app/purchase-returns'
     | '/_app/purchases'
     | '/_app/reports'
     | '/_app/returns'
     | '/_app/sales'
+    | '/_app/sales-returns'
     | '/_app/settings'
     | '/_app/suppliers'
     | '/_app/transfers'
+    | '/_app/trial-balance'
     | '/_app/users'
     | '/_app/warehouses'
   fileRoutesById: FileRoutesById
@@ -389,6 +473,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppUsersRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/trial-balance': {
+      id: '/_app/trial-balance'
+      path: '/trial-balance'
+      fullPath: '/trial-balance'
+      preLoaderRoute: typeof AppTrialBalanceRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/transfers': {
       id: '/_app/transfers'
       path: '/transfers'
@@ -408,6 +499,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/sales-returns': {
+      id: '/_app/sales-returns'
+      path: '/sales-returns'
+      fullPath: '/sales-returns'
+      preLoaderRoute: typeof AppSalesReturnsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/sales': {
@@ -436,6 +534,13 @@ declare module '@tanstack/react-router' {
       path: '/purchases'
       fullPath: '/purchases'
       preLoaderRoute: typeof AppPurchasesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/purchase-returns': {
+      id: '/_app/purchase-returns'
+      path: '/purchase-returns'
+      fullPath: '/purchase-returns'
+      preLoaderRoute: typeof AppPurchaseReturnsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/products': {
@@ -480,6 +585,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppInventoryRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/income-statement': {
+      id: '/_app/income-statement'
+      path: '/income-statement'
+      fullPath: '/income-statement'
+      preLoaderRoute: typeof AppIncomeStatementRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/finance': {
       id: '/_app/finance'
       path: '/finance'
@@ -499,6 +611,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof AppDashboardRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/daily-journal': {
+      id: '/_app/daily-journal'
+      path: '/daily-journal'
+      fullPath: '/daily-journal'
+      preLoaderRoute: typeof AppDailyJournalRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/customers': {
@@ -529,6 +648,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppBarcodesRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/balance-sheet': {
+      id: '/_app/balance-sheet'
+      path: '/balance-sheet'
+      fullPath: '/balance-sheet'
+      preLoaderRoute: typeof AppBalanceSheetRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/audit': {
       id: '/_app/audit'
       path: '/audit'
@@ -543,59 +669,80 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAnalyticsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/account-statement': {
+      id: '/_app/account-statement'
+      path: '/account-statement'
+      fullPath: '/account-statement'
+      preLoaderRoute: typeof AppAccountStatementRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
 interface AppRouteChildren {
+  AppAccountStatementRoute: typeof AppAccountStatementRoute
   AppAnalyticsRoute: typeof AppAnalyticsRoute
   AppAuditRoute: typeof AppAuditRoute
+  AppBalanceSheetRoute: typeof AppBalanceSheetRoute
   AppBarcodesRoute: typeof AppBarcodesRoute
   AppBatchesRoute: typeof AppBatchesRoute
   AppCatalogRoute: typeof AppCatalogRoute
   AppCustomersRoute: typeof AppCustomersRoute
+  AppDailyJournalRoute: typeof AppDailyJournalRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppDebtsRoute: typeof AppDebtsRoute
   AppFinanceRoute: typeof AppFinanceRoute
+  AppIncomeStatementRoute: typeof AppIncomeStatementRoute
   AppInventoryRoute: typeof AppInventoryRoute
   AppLoyaltyRoute: typeof AppLoyaltyRoute
   AppNotificationsRoute: typeof AppNotificationsRoute
   AppPaymentsRoute: typeof AppPaymentsRoute
   AppPosRoute: typeof AppPosRoute
   AppProductsRoute: typeof AppProductsRoute
+  AppPurchaseReturnsRoute: typeof AppPurchaseReturnsRoute
   AppPurchasesRoute: typeof AppPurchasesRoute
   AppReportsRoute: typeof AppReportsRoute
   AppReturnsRoute: typeof AppReturnsRoute
   AppSalesRoute: typeof AppSalesRoute
+  AppSalesReturnsRoute: typeof AppSalesReturnsRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppSuppliersRoute: typeof AppSuppliersRoute
   AppTransfersRoute: typeof AppTransfersRoute
+  AppTrialBalanceRoute: typeof AppTrialBalanceRoute
   AppUsersRoute: typeof AppUsersRoute
   AppWarehousesRoute: typeof AppWarehousesRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppAccountStatementRoute: AppAccountStatementRoute,
   AppAnalyticsRoute: AppAnalyticsRoute,
   AppAuditRoute: AppAuditRoute,
+  AppBalanceSheetRoute: AppBalanceSheetRoute,
   AppBarcodesRoute: AppBarcodesRoute,
   AppBatchesRoute: AppBatchesRoute,
   AppCatalogRoute: AppCatalogRoute,
   AppCustomersRoute: AppCustomersRoute,
+  AppDailyJournalRoute: AppDailyJournalRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppDebtsRoute: AppDebtsRoute,
   AppFinanceRoute: AppFinanceRoute,
+  AppIncomeStatementRoute: AppIncomeStatementRoute,
   AppInventoryRoute: AppInventoryRoute,
   AppLoyaltyRoute: AppLoyaltyRoute,
   AppNotificationsRoute: AppNotificationsRoute,
   AppPaymentsRoute: AppPaymentsRoute,
   AppPosRoute: AppPosRoute,
   AppProductsRoute: AppProductsRoute,
+  AppPurchaseReturnsRoute: AppPurchaseReturnsRoute,
   AppPurchasesRoute: AppPurchasesRoute,
   AppReportsRoute: AppReportsRoute,
   AppReturnsRoute: AppReturnsRoute,
   AppSalesRoute: AppSalesRoute,
+  AppSalesReturnsRoute: AppSalesReturnsRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppSuppliersRoute: AppSuppliersRoute,
   AppTransfersRoute: AppTransfersRoute,
+  AppTrialBalanceRoute: AppTrialBalanceRoute,
   AppUsersRoute: AppUsersRoute,
   AppWarehousesRoute: AppWarehousesRoute,
 }
