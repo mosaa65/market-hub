@@ -12,13 +12,15 @@ export const Route = createFileRoute("/_app/catalog")({
   component: CatalogPage,
 });
 
-type Tab = "categories" | "brands" | "units";
+type Tab = "categories" | "brands" | "units" | "origins" | "qualities" | "makes" | "models";
 
 type Item = {
   id: string;
   name: string;
   name_ar: string | null;
   short_name?: string | null;
+  code?: string | null;
+  make_id?: string | null;
 };
 
 function CatalogPage() {
@@ -28,7 +30,7 @@ function CatalogPage() {
   const tabs: { key: Tab; label: string }[] = [
     { key: "categories", label: t("catalog.categories") },
     { key: "brands", label: t("catalog.brands") },
-    { key: "units", label: t("catalog.units") },
+    { key: "units", label: t("catalog.units") }, { key: "origins", label: "بلدان المنشأ" }, { key: "qualities", label: "درجات الجودة" }, { key: "makes", label: "ماركات الدراجات" }, { key: "models", label: "موديلات الدراجات" },
   ];
 
   return (
@@ -57,13 +59,13 @@ function CatalogTable({ tab }: { tab: Tab }) {
   const [editing, setEditing] = useState<Item | null>(null);
   const [open, setOpen] = useState(false);
 
-  const table = tab === "categories" ? "categories" : tab === "brands" ? "brands" : "units";
-  const cols = tab === "units" ? "id, name, name_ar, short_name" : "id, name, name_ar";
+  const table = tab === "categories" ? "categories" : tab === "brands" ? "brands" : tab === "units" ? "units" : tab === "origins" ? "countries_of_origin" : tab === "qualities" ? "quality_grades" : tab === "makes" ? "vehicle_makes" : "vehicle_models";
+  const cols = tab === "units" ? "id, name, name_ar, short_name" : tab === "origins" || tab === "qualities" ? "id, name, name_ar, code" : tab === "models" ? "id, name, name_ar, make_id" : "id, name, name_ar";
 
   const { data, isLoading } = useQuery({
     queryKey: ["catalog", tab],
     queryFn: async () => {
-      const { data, error } = await supabase.from(table as "categories").select(cols).order("name");
+      const { data, error } = await (supabase as any).from(table).select(cols).order("name");
       if (error) throw error;
       return (data ?? []) as unknown as Item[];
     },
@@ -77,14 +79,14 @@ function CatalogTable({ tab }: { tab: Tab }) {
 
   const remove = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from(table as "categories").delete().eq("id", id);
+      const { error } = await (supabase as any).from(table).delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => { toast.success(t("common.deleted") || "Deleted"); qc.invalidateQueries({ queryKey: ["catalog", tab] }); qc.invalidateQueries({ queryKey: ["products-meta"] }); },
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const newLabel = tab === "categories" ? t("catalog.new_category") : tab === "brands" ? t("catalog.new_brand") : t("catalog.new_unit");
+  const newLabel = tab === "categories" ? t("catalog.new_category") : tab === "brands" ? t("catalog.new_brand") : tab === "units" ? t("catalog.new_unit") : "إضافة جديد";
 
   return (
     <div className="panel-elevated overflow-hidden">
@@ -105,6 +107,7 @@ function CatalogTable({ tab }: { tab: Tab }) {
               <th className="px-4 py-2.5 text-start font-medium">{t("catalog.name_ar")}</th>
               <th className="px-4 py-2.5 text-start font-medium">{t("catalog.name_en")}</th>
               {tab === "units" && <th className="px-4 py-2.5 text-start font-medium">{t("catalog.short_name")}</th>}
+              {(tab === "origins" || tab === "qualities") && <th className="px-4 py-2.5 text-start font-medium">الكود</th>}
               <th className="px-4 py-2.5 text-end font-medium">{t("common.actions")}</th>
             </tr>
           </thead>
@@ -123,6 +126,7 @@ function CatalogTable({ tab }: { tab: Tab }) {
                 <td className="px-4 py-2.5 font-medium text-foreground" dir="rtl">{r.name_ar || "—"}</td>
                 <td className="px-4 py-2.5 text-muted-foreground">{r.name || "—"}</td>
                 {tab === "units" && <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">{r.short_name ?? "—"}</td>}
+                {(tab === "origins" || tab === "qualities") && <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">{r.code ?? "—"}</td>}
                 <td className="px-4 py-2.5 text-end">
                   <div className="inline-flex items-center gap-1">
                     <button onClick={() => { setEditing(r); setOpen(true); }} className="grid h-8 w-8 place-items-center rounded-full border border-border bg-surface text-muted-foreground hover:bg-surface-2 hover:text-foreground transition" title={t("common.edit")}><Pencil className="h-3.5 w-3.5" /></button>
@@ -155,25 +159,30 @@ function CatalogDialog({ tab, initial, onClose, onSaved }: { tab: Tab; initial: 
     name: initial?.name ?? "",
     name_ar: initial?.name_ar ?? "",
     short_name: initial?.short_name ?? "",
+    code: initial?.code ?? "",
+    make_id: initial?.make_id ?? "",
   });
+  const { data: makes = [] } = useQuery({ queryKey: ["vehicle-makes"], enabled: tab === "models", queryFn: async () => ((await (supabase as any).from("vehicle_makes").select("id,name,name_ar").order("name")).data ?? []) });
   const [saving, setSaving] = useState(false);
 
   const editLabel = tab === "categories" ? (initial ? t("catalog.edit_category") : t("catalog.new_category"))
     : tab === "brands" ? (initial ? t("catalog.edit_brand") : t("catalog.new_brand"))
-    : (initial ? t("catalog.edit_unit") : t("catalog.new_unit"));
+    : tab === "units" ? (initial ? t("catalog.edit_unit") : t("catalog.new_unit")) : (initial ? "تعديل" : "إضافة");
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name_ar.trim() && !form.name.trim()) { toast.error(t("catalog.name_required")); return; }
     setSaving(true);
-    const table = tab === "categories" ? "categories" : tab === "brands" ? "brands" : "units";
+    const table = tab === "categories" ? "categories" : tab === "brands" ? "brands" : tab === "units" ? "units" : tab === "origins" ? "countries_of_origin" : tab === "qualities" ? "quality_grades" : tab === "makes" ? "vehicle_makes" : "vehicle_models";
     const base = {
       name: (form.name.trim() || form.name_ar.trim()),
       name_ar: form.name_ar.trim() || null,
     };
+    const baseCode = form.code.trim().toUpperCase() || form.name.trim().replace(/[^A-Za-z0-9]/g, "").slice(0, tab === "origins" ? 2 : 20).toUpperCase();
     const payload = tab === "units"
       ? { ...base, short_name: form.short_name.trim() || form.name.trim().slice(0, 4) || "unit" }
-      : base;
+      : tab === "origins" || tab === "qualities" ? { ...base, code: baseCode }
+      : tab === "models" ? { ...base, make_id: form.make_id } : base;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const q: any = supabase.from(table as "categories");
     const { error } = initial ? await q.update(payload).eq("id", initial.id) : await q.insert(payload);
@@ -202,6 +211,8 @@ function CatalogDialog({ tab, initial, onClose, onSaved }: { tab: Tab; initial: 
               <input value={form.short_name} onChange={(e) => setForm({ ...form, short_name: e.target.value })} className={inputCls} />
             </Field>
           )}
+          {(tab === "origins" || tab === "qualities") && <Field label="الكود"><input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} className={inputCls} placeholder={tab === "origins" ? "JP" : "GENUINE"} /></Field>}
+          {tab === "models" && <Field label="ماركة الدراجة"><select required value={form.make_id} onChange={(e) => setForm({ ...form, make_id: e.target.value })} className={inputCls}><option value="">اختر الماركة</option>{makes.map((m: any) => <option key={m.id} value={m.id}>{m.name_ar || m.name}</option>)}</select></Field>}
         </div>
         <div className="flex items-center justify-end gap-2 border-t border-border bg-surface/40 px-5 py-3">
           <button type="button" onClick={onClose} className="flex h-9 items-center rounded-md border border-border bg-surface px-3 text-xs font-medium text-muted-foreground hover:text-foreground transition">{t("common.cancel")}</button>
