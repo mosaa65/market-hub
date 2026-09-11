@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
@@ -15,6 +15,7 @@ export const Route = createFileRoute("/_app/products")({
 type ProductRow = {
   id: string; name: string; name_ar: string | null; sku: string | null; barcode: string | null;
   sale_price: number; cost_price: number; tax_rate: number; min_stock: number; shelf_location: string | null;
+  origin_id: string | null; quality_grade_id: string | null;
   is_active: boolean; category_id: string | null; brand_id: string | null; unit_id: string | null;
   category?: { name: string; name_ar: string | null } | null;
   brand?: { name: string; name_ar: string | null } | null;
@@ -33,7 +34,7 @@ function ProductsPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, name_ar, sku, barcode, sale_price, cost_price, tax_rate, min_stock, shelf_location, is_active, category_id, brand_id, unit_id, category:categories(name, name_ar), brand:brands(name, name_ar), unit:units(short_name, name_ar)")
+        .select("id, name, name_ar, sku, barcode, sale_price, cost_price, tax_rate, min_stock, shelf_location, origin_id, quality_grade_id, is_active, category_id, brand_id, unit_id, category:categories(name, name_ar), brand:brands(name, name_ar), unit:units(short_name, name_ar)")
         .order("created_at", { ascending: false })
         .limit(500);
       if (error) throw error;
@@ -44,12 +45,15 @@ function ProductsPage() {
   const { data: meta } = useQuery({
     queryKey: ["products-meta"],
     queryFn: async () => {
-      const [c, b, u] = await Promise.all([
+      const [c, b, u, origins, qualities, models] = await Promise.all([
         supabase.from("categories").select("id, name, name_ar").order("name"),
         supabase.from("brands").select("id, name, name_ar").order("name"),
         supabase.from("units").select("id, name, name_ar, short_name").order("name"),
+        (supabase as any).from("countries_of_origin").select("id,code,name,name_ar").order("name"),
+        (supabase as any).from("quality_grades").select("id,code,name,name_ar,sort_order").order("sort_order"),
+        (supabase as any).from("vehicle_models").select("id,name,name_ar,vehicle_makes(name,name_ar)").order("name"),
       ]);
-      return { categories: c.data ?? [], brands: b.data ?? [], units: u.data ?? [] };
+      return { categories: c.data ?? [], brands: b.data ?? [], units: u.data ?? [], origins: origins.data ?? [], qualities: qualities.data ?? [], models: models.data ?? [] };
     },
   });
 
@@ -173,7 +177,7 @@ function ProductsPage() {
       {open && (
         <ProductDialog
           initial={editing}
-          meta={meta ?? { categories: [], brands: [], units: [] }}
+          meta={meta ?? { categories: [], brands: [], units: [], origins: [], qualities: [], models: [] }}
           onClose={() => setOpen(false)}
           onSaved={() => { setOpen(false); qc.invalidateQueries({ queryKey: ["products"] }); }}
         />
@@ -190,6 +194,7 @@ function ProductDialog({
     categories: { id: string; name: string; name_ar: string | null }[];
     brands: { id: string; name: string; name_ar: string | null }[];
     units: { id: string; name: string; name_ar: string | null; short_name: string }[];
+    origins: { id: string; code: string; name: string; name_ar: string }[]; qualities: { id: string; name: string; name_ar: string }[]; models: any[];
   };
   onClose: () => void;
   onSaved: () => void;
@@ -208,9 +213,12 @@ function ProductDialog({
     tax_rate: initial?.tax_rate?.toString() ?? "0",
     min_stock: initial?.min_stock?.toString() ?? "0",
     shelf_location: initial?.shelf_location ?? "",
+    origin_id: initial?.origin_id ?? "", quality_grade_id: initial?.quality_grade_id ?? "",
     is_active: initial?.is_active ?? true,
   });
   const [saving, setSaving] = useState(false);
+  const [compatibleModels, setCompatibleModels] = useState<string[]>([]);
+  useEffect(() => { if (initial?.id) (supabase as any).from("product_compatibilities").select("vehicle_model_id").eq("product_id", initial.id).then(({ data }: any) => setCompatibleModels((data ?? []).map((r: any) => r.vehicle_model_id))); }, [initial?.id]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -230,11 +238,17 @@ function ProductDialog({
       tax_rate: Number(form.tax_rate) || 0,
       min_stock: Number(form.min_stock) || 0,
       shelf_location: form.shelf_location.trim() || null,
+      origin_id: form.origin_id || null, quality_grade_id: form.quality_grade_id || null,
       is_active: form.is_active,
     };
-    const { error } = initial
-      ? await supabase.from("products").update(payload).eq("id", initial.id)
-      : await supabase.from("products").insert(payload);
+    const request: any = initial
+      ? (supabase.from("products") as any).update(payload).eq("id", initial.id).select("id").single()
+      : (supabase.from("products") as any).insert(payload).select("id").single();
+    const { data, error } = await request;
+    if (!error) {
+      await (supabase as any).from("product_compatibilities").delete().eq("product_id", data.id);
+      if (compatibleModels.length) await (supabase as any).from("product_compatibilities").insert(compatibleModels.map(vehicle_model_id => ({ product_id: data.id, vehicle_model_id })));
+    }
     setSaving(false);
     if (error) { toast.error(error.message); return; }
     toast.success(initial ? t("products.updated") : t("products.created"));
@@ -279,6 +293,9 @@ function ProductDialog({
               {meta.brands.map((b) => <option key={b.id} value={b.id}>{labelOf(b.name, b.name_ar)}</option>)}
             </select>
           </Field>
+          <Field label={lang === "ar" ? "بلد المنشأ" : "Country of origin"}><select value={form.origin_id} onChange={e => setForm({ ...form, origin_id: e.target.value })} className={inputCls}><option value="">—</option>{meta.origins.map(o => <option key={o.id} value={o.id}>{lang === "ar" ? o.name_ar : o.name} ({o.code})</option>)}</select></Field>
+          <Field label={lang === "ar" ? "درجة الجودة" : "Quality grade"}><select value={form.quality_grade_id} onChange={e => setForm({ ...form, quality_grade_id: e.target.value })} className={inputCls}><option value="">—</option>{meta.qualities.map(q => <option key={q.id} value={q.id}>{lang === "ar" ? q.name_ar : q.name}</option>)}</select></Field>
+          <Field label={lang === "ar" ? "توافق الدراجة (متعدد)" : "Motorcycle compatibility (multiple)"} className="sm:col-span-2 lg:col-span-3"><div className="grid max-h-28 grid-cols-2 gap-1 overflow-y-auto rounded-md border border-border bg-surface p-2 sm:grid-cols-3">{meta.models.map((m: any) => <label key={m.id} className="flex items-center gap-1.5 rounded px-1 py-1 text-xs hover:bg-surface-2"><input type="checkbox" checked={compatibleModels.includes(m.id)} onChange={e => setCompatibleModels(x => e.target.checked ? [...x, m.id] : x.filter(id => id !== m.id))} />{lang === "ar" ? (m.vehicle_makes?.name_ar || m.vehicle_makes?.name) : m.vehicle_makes?.name} — {lang === "ar" ? (m.name_ar || m.name) : m.name}</label>)}</div></Field>
           <Field label={t("products.unit")}>
             <select value={form.unit_id} onChange={(e) => setForm({ ...form, unit_id: e.target.value })} className={inputCls}>
               <option value="">—</option>
