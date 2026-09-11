@@ -1381,6 +1381,7 @@ export type Database = {
         | "draft"
         | "confirmed"
         | "paid"
+        | "unpaid"
         | "partial"
         | "cancelled"
         | "returned"
@@ -1530,6 +1531,7 @@ export const Constants = {
         "draft",
         "confirmed",
         "paid",
+        "unpaid",
         "partial",
         "cancelled",
         "returned",

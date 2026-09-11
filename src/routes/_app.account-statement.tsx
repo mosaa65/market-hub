@@ -67,7 +67,7 @@ function AccountStatementPage() {
     if (partyType === "customer") {
       const { data: sales } = await supabase
         .from("sales_invoices")
-        .select("id, invoice_number, total, paid, created_at, note, payment_method")
+        .select("id, invoice_number, total, created_at, note, sales_invoice_items(quantity,products(name,name_ar))")
         .eq("customer_id", partyId)
         .order("created_at", { ascending: true });
 
@@ -78,9 +78,28 @@ function AccountStatementPage() {
           type: lang === "ar" ? "فاتورة مبيعات آجل" : "Credit Sale Invoice",
           reference: s.invoice_number,
           debit: Number(s.total),
-          credit: Number(s.paid || 0),
+          credit: 0,
           balance: 0,
-          note: s.note || (lang === "ar" ? "شراء مواد غذائية وسلع آجل" : "Credit Sale Goods"),
+          note: s.note || (s.sales_invoice_items ?? []).map((line: any) => `${lang === "ar" ? (line.products?.name_ar || line.products?.name) : line.products?.name} × ${line.quantity}`).join("، ") || (lang === "ar" ? "مبيعات للعميل" : "Customer sale"),
+        });
+      });
+
+      const { data: payments } = await supabase
+        .from("customer_payments")
+        .select("id, amount, payment_date, note, payment_method, invoice_id, sales_invoices(invoice_number)")
+        .eq("customer_id", partyId)
+        .order("payment_date", { ascending: true });
+
+      (payments ?? []).forEach((p: any) => {
+        items.push({
+          id: p.id,
+          date: p.payment_date,
+          type: lang === "ar" ? "سداد من العميل" : "Customer payment",
+          reference: p.sales_invoices?.invoice_number ?? "—",
+          debit: 0,
+          credit: Number(p.amount),
+          balance: 0,
+          note: p.note || (lang === "ar" ? `تحصيل ${p.payment_method === "cash" ? "نقدًا" : "دفعة"}` : `Payment (${p.payment_method})`),
         });
       });
     } else {
@@ -104,6 +123,7 @@ function AccountStatementPage() {
       });
     }
 
+    items.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     // Calculate Running Balance
     let runningBalance = 0;
     const itemsWithBalance = items.map((item) => {

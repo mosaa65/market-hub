@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Search, Plus, Minus, Trash2, ScanBarcode, Loader2, X, Printer, Sparkles, ScrollText, FileDown, Filter, Warehouse, ChevronDown } from "lucide-react";
+import { Search, Plus, Minus, Trash2, ScanBarcode, Loader2, X, Printer, Sparkles, ScrollText, FileDown, Filter, Warehouse, ChevronDown, UserPlus, CalendarDays, Wrench } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { money } from "@/lib/format";
@@ -37,6 +37,7 @@ interface CartLine {
   unit_price: number;
   tax_rate: number;
   quantity: number;
+  is_service?: boolean;
 }
 interface Warehouse { id: string; name: string; name_ar: string | null }
 interface Customer { id: string; name: string }
@@ -63,6 +64,14 @@ function POSPage() {
   const [discount, setDiscount] = useState<string>("");
   const [paymentMethod, setPaymentMethod] = useState<"cash"|"card"|"bank_transfer"|"credit">("cash");
   const [note, setNote] = useState("");
+  const [saleDate, setSaleDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [newCustomerOpen, setNewCustomerOpen] = useState(false);
+  const [newCustomerName, setNewCustomerName] = useState("");
+  const [newCustomerPhone, setNewCustomerPhone] = useState("");
+  const [serviceOpen, setServiceOpen] = useState(false);
+  const [serviceName, setServiceName] = useState("");
+  const [servicePrice, setServicePrice] = useState("");
+  const [serviceNote, setServiceNote] = useState("");
   const [loading, setLoading] = useState(false);
   const [lastInvoice, setLastInvoice] = useState<{ id: string; number: string } | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -149,10 +158,20 @@ function POSPage() {
   }
 
   function setQty(pid: string, qty: number) {
+    const service = cart.find(l => l.product_id === pid)?.is_service;
+    if (service) { if (qty < 1) setCart(c => c.filter(l => l.product_id !== pid)); else setCart(c => c.map(l => l.product_id === pid ? { ...l, quantity: qty } : l)); return; }
     const stock = stockMap[pid] ?? 0;
     if (qty < 1) return setCart(c => c.filter(l => l.product_id !== pid));
     if (qty > stock) { toast.error(`${t("pos.max_stock")}: ${stock}`); return; }
     setCart(c => c.map(l => l.product_id === pid ? { ...l, quantity: qty } : l));
+  }
+
+  function addService() {
+    const price = Number(servicePrice);
+    if (!serviceName.trim() || !Number.isFinite(price) || price < 0) return toast.error(lang === "ar" ? "أدخل اسم الخدمة وسعرها" : "Enter a service name and price");
+    const id = `service-${crypto.randomUUID()}`;
+    setCart(c => [...c, { product_id: id, name: serviceNote.trim() ? `${serviceName.trim()} — ${serviceNote.trim()}` : serviceName.trim(), unit_price: price, tax_rate: 0, quantity: 1, is_service: true }]);
+    setServiceName(""); setServicePrice(""); setServiceNote(""); setServiceOpen(false);
   }
 
   function handleScan(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -223,11 +242,14 @@ function POSPage() {
         _paid: paymentMethod === "credit" ? (paid ? Number(paid) : 0) : (paidN || total),
         _discount: discountN,
         _note: (note || null) as any,
+        _sale_date: saleDate,
         _items: cart.map(l => ({
           product_id: l.product_id,
           quantity: l.quantity,
           unit_price: l.unit_price,
           tax_rate: l.tax_rate,
+          is_service: !!l.is_service,
+          name: l.name,
         })),
       });
       if (error) throw error;
@@ -235,12 +257,23 @@ function POSPage() {
       const { data: inv } = await supabase.from("sales_invoices").select("invoice_number").eq("id", invoiceId).maybeSingle();
       setLastInvoice({ id: invoiceId, number: inv?.invoice_number ?? "" });
       toast.success(`${t("pos.sale_complete")} — ${inv?.invoice_number ?? ""}`);
-      setCart([]); setPaid(""); setDiscount(""); setNote("");
+      setCart([]); setPaid(""); setDiscount(""); setNote(""); setSaleDate(new Date().toISOString().slice(0, 10));
       await loadStock(warehouseId);
       searchRef.current?.focus();
     } catch (err: any) {
       toast.error(err.message ?? t("pos.checkout_failed"));
     } finally { setLoading(false); }
+  }
+
+  async function createCustomer() {
+    const name = newCustomerName.trim();
+    if (!name) return toast.error(lang === "ar" ? "اسم العميل مطلوب" : "Customer name is required");
+    const { data, error } = await supabase.from("customers").insert({ name, phone: newCustomerPhone.trim() || null }).select("id,name").single();
+    if (error) return toast.error(error.message);
+    setCustomers(current => [...current, data].sort((a, b) => a.name.localeCompare(b.name)));
+    setCustomerId(data.id);
+    setNewCustomerName(""); setNewCustomerPhone(""); setNewCustomerOpen(false);
+    toast.success(lang === "ar" ? "تمت إضافة العميل واختياره" : "Customer added and selected");
   }
 
   const selectClassName = "h-9 w-full appearance-none rounded-md border border-input bg-surface px-3 text-xs outline-none focus:border-ring focus:ring-2 focus:ring-ring/20";
@@ -376,7 +409,7 @@ function POSPage() {
 
         {/* Cart Panel */}
         <div className="order-1 flex max-h-[62vh] flex-col overflow-hidden panel-elevated p-4 lg:order-2 lg:max-h-none">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex items-center justify-between rounded-xl border border-border/60 bg-gradient-to-l from-primary/5 to-transparent px-3 py-2">
             <h2 className="text-sm font-semibold">{t("pos.cart")} <span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary font-mono">{cart.length}</span></h2>
             {cart.length > 0 && (
               <button onClick={() => setCart([])} className="text-xs text-muted-foreground hover:text-destructive">
@@ -385,18 +418,21 @@ function POSPage() {
             )}
           </div>
 
-          <div className="mb-3">
-            <select value={customerId} onChange={e => setCustomerId(e.target.value)} className="h-9 w-full rounded-md border border-input bg-surface px-2 text-sm">
+          <div className="mb-3 flex items-center justify-between rounded-xl border border-dashed border-violet-500/30 bg-violet-500/5 px-3 py-2"><span className="text-xs text-muted-foreground">{lang === "ar" ? "خدمة أو أجرة تركيب بسعر متفق عليه" : "Service or labour at an agreed price"}</span><button type="button" onClick={() => setServiceOpen(true)} title={lang === "ar" ? "إضافة خدمة" : "Add service"} className="grid h-10 w-10 place-items-center rounded-full bg-violet-600 text-white shadow-lg shadow-violet-500/25 transition hover:scale-105 hover:bg-violet-500 active:scale-95"><Wrench className="h-4 w-4" /></button></div>
+
+          <div className="mb-3 flex items-center gap-2">
+            <select aria-label={lang === "ar" ? "العميل" : "Customer"} value={customerId} onChange={e => setCustomerId(e.target.value)} className="h-9 min-w-0 flex-1 rounded-md border border-input bg-surface px-2 text-sm">
               <option value="">{t("pos.walkin")}</option>
               {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
+            <button type="button" onClick={() => setNewCustomerOpen(true)} title={lang === "ar" ? "إضافة عميل" : "Add customer"} className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-primary/30 bg-primary/10 text-primary transition hover:bg-primary/20"><UserPlus className="h-4 w-4" /></button>
           </div>
 
           <div className="flex-1 space-y-2 overflow-y-auto max-h-[24vh] lg:max-h-[40vh]">
             {cart.length === 0 ? (
               <div className="grid place-items-center py-10 text-sm text-muted-foreground">{t("pos.empty_cart")}</div>
             ) : cart.map(l => (
-              <div key={l.product_id} className="rounded-md border border-border bg-surface p-2">
+              <div key={l.product_id} className={`rounded-xl border p-3 shadow-sm ${l.is_service ? "border-violet-500/25 bg-violet-500/5" : "border-border bg-surface"}`}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">{l.name}</div>
@@ -436,17 +472,21 @@ function POSPage() {
           <div className="mt-3 grid grid-cols-4 gap-1">
             {(["cash","card","bank_transfer","credit"] as const).map(m => (
               <button key={m} onClick={() => setPaymentMethod(m)} className={`h-8 rounded-md border text-xs transition font-medium ${paymentMethod === m ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-surface-2"}`}>
-                {t(`pm.${m}`)}
+                {t(`pos.pm.${m}`)}
               </button>
             ))}
           </div>
 
-          {paymentMethod !== "credit" && (
-            <div className="mt-2 flex items-center gap-2">
-              <input type="number" value={paid} onChange={e => setPaid(e.target.value)} placeholder={`${t("pos.paid")} (${total.toFixed(0)})`} className="h-9 flex-1 rounded-md border border-input bg-surface px-2 text-sm font-mono" />
-              {paidN > 0 && change > 0 && <span className="text-xs text-muted-foreground font-mono">{t("pos.change")}: {money(change)}</span>}
-            </div>
-          )}
+          <label className="mt-2 flex h-9 items-center gap-2 rounded-md border border-input bg-surface px-2 text-xs text-muted-foreground">
+            <CalendarDays className="h-4 w-4 text-primary" />
+            <span className="shrink-0">{lang === "ar" ? "تاريخ الفاتورة" : "Invoice date"}</span>
+            <input type="date" value={saleDate} onChange={e => setSaleDate(e.target.value)} className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none" />
+          </label>
+
+          <div className="mt-2 flex items-center gap-2">
+            <input type="number" min="0" value={paid} onChange={e => setPaid(e.target.value)} placeholder={`${paymentMethod === "credit" ? (lang === "ar" ? "المدفوع الآن (اختياري)" : "Paid now (optional)") : t("pos.paid")} (${total.toFixed(0)})`} className="h-9 flex-1 rounded-md border border-input bg-surface px-2 text-sm font-mono" />
+            {paymentMethod === "credit" ? <span className="text-xs font-mono text-amber-600 dark:text-amber-300">{lang === "ar" ? "المتبقي:" : "Due:"} {money(Math.max(0, total - paidN))}</span> : paidN > 0 && change > 0 ? <span className="text-xs text-muted-foreground font-mono">{t("pos.change")}: {money(change)}</span> : null}
+          </div>
 
           <button
             onClick={checkout}
@@ -471,6 +511,8 @@ function POSPage() {
         continuous
         onDetected={handleCode}
       />
+      {newCustomerOpen && <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 p-4 backdrop-blur-sm"><form onSubmit={e => { e.preventDefault(); void createCustomer(); }} className="panel-elevated w-full max-w-sm p-5"><div className="mb-4 flex items-center justify-between"><h3 className="font-semibold">{lang === "ar" ? "إضافة عميل سريعًا" : "Quick add customer"}</h3><button type="button" onClick={() => setNewCustomerOpen(false)} className="rounded p-1 hover:bg-surface-2"><X className="h-4 w-4" /></button></div><div className="space-y-3"><input autoFocus value={newCustomerName} onChange={e => setNewCustomerName(e.target.value)} placeholder={lang === "ar" ? "اسم العميل *" : "Customer name *"} className="h-10 w-full rounded-md border border-input bg-surface px-3 text-sm" /><input value={newCustomerPhone} onChange={e => setNewCustomerPhone(e.target.value)} placeholder={lang === "ar" ? "رقم الجوال (اختياري)" : "Phone (optional)"} className="h-10 w-full rounded-md border border-input bg-surface px-3 text-sm" /></div><div className="mt-4 flex justify-end gap-2"><button type="button" onClick={() => setNewCustomerOpen(false)} className="h-9 rounded-md border border-border px-3 text-sm">{t("common.cancel")}</button><button className="h-9 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground">{lang === "ar" ? "إضافة واختيار" : "Add & select"}</button></div></form></div>}
+      {serviceOpen && <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 p-4 backdrop-blur-sm"><form onSubmit={e => { e.preventDefault(); addService(); }} className="panel-elevated w-full max-w-sm p-5"><div className="mb-4 flex items-center justify-between"><h3 className="font-semibold">{lang === "ar" ? "إضافة خدمة" : "Add service"}</h3><button type="button" onClick={() => setServiceOpen(false)}><X className="h-4 w-4" /></button></div><div className="space-y-3"><input autoFocus value={serviceName} onChange={e => setServiceName(e.target.value)} placeholder={lang === "ar" ? "مثال: تغيير زيت أو بنشرة وتركيب" : "e.g. Oil change or installation"} className="h-10 w-full rounded-md border border-input bg-surface px-3 text-sm" /><input type="number" min="0" value={servicePrice} onChange={e => setServicePrice(e.target.value)} placeholder={lang === "ar" ? "السعر المتفق عليه" : "Agreed price"} className="h-10 w-full rounded-md border border-input bg-surface px-3 text-sm" /><input value={serviceNote} onChange={e => setServiceNote(e.target.value)} placeholder={lang === "ar" ? "ملاحظة اختيارية" : "Optional note"} className="h-10 w-full rounded-md border border-input bg-surface px-3 text-sm" /></div><div className="mt-4 flex justify-end gap-2"><button type="button" onClick={() => setServiceOpen(false)} className="h-9 rounded-md border border-border px-3 text-sm">{t("common.cancel")}</button><button className="h-9 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground">{lang === "ar" ? "إضافة للسلة" : "Add to cart"}</button></div></form></div>}
     </>
   );
 }

@@ -31,6 +31,8 @@ function CustomersPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [edit, setEdit] = useState<Partial<Customer> | null>(null);
+  const [selected, setSelected] = useState<Customer | null>(null);
+  const [activity, setActivity] = useState<{ label: string; date: string; amount: number; kind: "sale" | "payment" }[]>([]);
 
   async function load() {
     setLoading(true);
@@ -69,6 +71,19 @@ function CustomersPage() {
     toast.success(t("common.deleted")); await load();
   }
 
+  async function openCustomer(customer: Customer) {
+    setSelected(customer);
+    setActivity([]);
+    const [sales, payments] = await Promise.all([
+      supabase.from("sales_invoices").select("invoice_number,created_at,total").eq("customer_id", customer.id).order("created_at", { ascending: false }),
+      supabase.from("customer_payments").select("payment_date,amount,sales_invoices(invoice_number)").eq("customer_id", customer.id).order("payment_date", { ascending: false }),
+    ]);
+    setActivity([
+      ...(sales.data ?? []).map(s => ({ label: `${lang === "ar" ? "فاتورة" : "Invoice"} ${s.invoice_number}`, date: s.created_at, amount: Number(s.total), kind: "sale" as const })),
+      ...(payments.data ?? []).map((p: any) => ({ label: `${lang === "ar" ? "سداد" : "Payment"} ${p.sales_invoices?.invoice_number ?? ""}`, date: p.payment_date, amount: Number(p.amount), kind: "payment" as const })),
+    ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+  }
+
   return (
     <>
       <PageHeader title={t("customers.title")} subtitle={t("customers.subtitle")} />
@@ -104,7 +119,7 @@ function CustomersPage() {
                   <Users className="mx-auto mb-2 h-8 w-8 opacity-50" />{t("customers.no_customers")}
                 </td></tr>
               ) : filtered.map(r => (
-                <tr key={r.id} className="border-b border-border/50 hover:bg-surface-2/50">
+                <tr key={r.id} onClick={() => void openCustomer(r)} className="cursor-pointer border-b border-border/50 hover:bg-surface-2/50">
                   <td className="px-3 py-2.5 font-medium">{r.name}</td>
                   <td className="px-3 py-2.5 text-muted-foreground">{r.phone ?? "—"}</td>
                   <td className="px-3 py-2.5 text-muted-foreground">{r.email ?? "—"}</td>
@@ -117,8 +132,8 @@ function CustomersPage() {
                   </td>
                   <td className="px-3 py-2.5 text-end">
                     <div className="flex justify-end gap-1.5">
-                      <button onClick={() => setEdit(r)} title={t("common.edit")} className="grid h-8 w-8 place-items-center rounded-full border border-border bg-surface text-muted-foreground hover:bg-surface-2 hover:text-foreground transition"><Pencil className="h-3.5 w-3.5" /></button>
-                      <button onClick={() => remove(r.id)} title={t("common.delete")} className="grid h-8 w-8 place-items-center rounded-full border border-destructive/30 bg-destructive/5 text-destructive hover:bg-destructive/10 transition"><Trash2 className="h-3.5 w-3.5" /></button>
+                      <button onClick={e => { e.stopPropagation(); setEdit(r); }} title={t("common.edit")} className="grid h-8 w-8 place-items-center rounded-full border border-border bg-surface text-muted-foreground hover:bg-surface-2 hover:text-foreground transition"><Pencil className="h-3.5 w-3.5" /></button>
+                      <button onClick={e => { e.stopPropagation(); void remove(r.id); }} title={t("common.delete")} className="grid h-8 w-8 place-items-center rounded-full border border-destructive/30 bg-destructive/5 text-destructive hover:bg-destructive/10 transition"><Trash2 className="h-3.5 w-3.5" /></button>
                     </div>
                   </td>
                 </tr>
@@ -155,6 +170,7 @@ function CustomersPage() {
           </div>
         </div>
       )}
+      {selected && <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 p-4 backdrop-blur-sm"><div className="panel-elevated w-full max-w-xl p-6"><div className="mb-4 flex items-start justify-between"><div><h3 className="text-lg font-semibold">{selected.name}</h3><p className="text-xs text-muted-foreground">{selected.phone || selected.email || "—"}</p></div><button onClick={() => setSelected(null)} className="rounded p-1 hover:bg-surface-2"><X className="h-4 w-4" /></button></div><div className="mb-4 grid grid-cols-2 gap-3 rounded-lg bg-surface-2 p-3 text-sm"><div><span className="text-xs text-muted-foreground">{lang === "ar" ? "الرصيد المستحق" : "Outstanding balance"}</span><div className="font-mono font-bold text-primary">{money(Number(selected.balance))}</div></div><div><span className="text-xs text-muted-foreground">{lang === "ar" ? "حد الائتمان" : "Credit limit"}</span><div className="font-mono font-bold">{money(Number(selected.credit_limit))}</div></div></div><h4 className="mb-2 text-sm font-semibold">{lang === "ar" ? "كل الحركات" : "All activity"}</h4><div className="max-h-72 space-y-2 overflow-y-auto">{activity.length === 0 ? <p className="py-6 text-center text-sm text-muted-foreground">{lang === "ar" ? "لا توجد حركات لهذا العميل" : "No activity for this customer"}</p> : activity.map((item, index) => <div key={`${item.label}-${index}`} className="flex items-center justify-between rounded-md border border-border p-2 text-sm"><div><div>{item.label}</div><div className="text-xs text-muted-foreground">{new Date(item.date).toLocaleDateString()}</div></div><span className={`font-mono ${item.kind === "sale" ? "text-rose-500" : "text-emerald-500"}`}>{item.kind === "sale" ? "+" : "−"}{money(item.amount)}</span></div>)}</div></div></div>}
     </>
   );
 }

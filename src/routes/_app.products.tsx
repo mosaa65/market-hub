@@ -14,7 +14,7 @@ export const Route = createFileRoute("/_app/products")({
 
 type ProductRow = {
   id: string; name: string; name_ar: string | null; sku: string | null; barcode: string | null;
-  sale_price: number; cost_price: number; tax_rate: number; min_stock: number;
+  sale_price: number; cost_price: number; tax_rate: number; min_stock: number; shelf_location: string | null;
   is_active: boolean; category_id: string | null; brand_id: string | null; unit_id: string | null;
   category?: { name: string; name_ar: string | null } | null;
   brand?: { name: string; name_ar: string | null } | null;
@@ -33,7 +33,7 @@ function ProductsPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, name_ar, sku, barcode, sale_price, cost_price, tax_rate, min_stock, is_active, category_id, brand_id, unit_id, category:categories(name, name_ar), brand:brands(name, name_ar), unit:units(short_name, name_ar)")
+        .select("id, name, name_ar, sku, barcode, sale_price, cost_price, tax_rate, min_stock, shelf_location, is_active, category_id, brand_id, unit_id, category:categories(name, name_ar), brand:brands(name, name_ar), unit:units(short_name, name_ar)")
         .order("created_at", { ascending: false })
         .limit(500);
       if (error) throw error;
@@ -104,6 +104,7 @@ function ProductsPage() {
                 <th className="px-4 py-2.5 text-start font-medium">{t("products.product")}</th>
                 <th className="px-4 py-2.5 text-start font-medium">{t("products.sku")}</th>
                 <th className="px-4 py-2.5 text-start font-medium">{t("products.category")}</th>
+                <th className="px-4 py-2.5 text-start font-medium">{lang === "ar" ? "موقع الرف" : "Shelf"}</th>
                 <th className="px-4 py-2.5 text-end font-medium">{t("common.cost")}</th>
                 <th className="px-4 py-2.5 text-end font-medium">{t("common.price")}</th>
                 <th className="px-4 py-2.5 text-end font-medium">{t("products.min")}</th>
@@ -138,6 +139,7 @@ function ProductsPage() {
                   </td>
                   <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">{p.sku ?? "—"}</td>
                   <td className="px-4 py-2.5 text-muted-foreground">{catLabel ?? "—"}</td>
+                  <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">{p.shelf_location ?? "—"}</td>
                   <td className="px-4 py-2.5 text-end font-mono">{Number(p.cost_price).toFixed(2)}</td>
                   <td className="px-4 py-2.5 text-end font-mono text-foreground">{Number(p.sale_price).toFixed(2)}</td>
                   <td className="px-4 py-2.5 text-end font-mono text-muted-foreground">{Number(p.min_stock)}</td>
@@ -205,6 +207,7 @@ function ProductDialog({
     sale_price: initial?.sale_price?.toString() ?? "0",
     tax_rate: initial?.tax_rate?.toString() ?? "0",
     min_stock: initial?.min_stock?.toString() ?? "0",
+    shelf_location: initial?.shelf_location ?? "",
     is_active: initial?.is_active ?? true,
   });
   const [saving, setSaving] = useState(false);
@@ -226,6 +229,7 @@ function ProductDialog({
       sale_price: Number(form.sale_price) || 0,
       tax_rate: Number(form.tax_rate) || 0,
       min_stock: Number(form.min_stock) || 0,
+      shelf_location: form.shelf_location.trim() || null,
       is_active: form.is_active,
     };
     const { error } = initial
@@ -268,6 +272,7 @@ function ProductDialog({
           </Field>
           <Field label={t("products.sku")}><input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className={inputCls} /></Field>
           <Field label={t("products.barcode")}><input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} className={inputCls} /></Field>
+          <Field label={lang === "ar" ? "موقع الرف" : "Shelf location"}><input value={form.shelf_location} onChange={(e) => setForm({ ...form, shelf_location: e.target.value })} placeholder={lang === "ar" ? "مثال: رف A - 03" : "e.g. Shelf A - 03"} className={inputCls} /></Field>
           <Field label={t("products.brand")}>
             <select value={form.brand_id} onChange={(e) => setForm({ ...form, brand_id: e.target.value })} className={inputCls}>
               <option value="">—</option>
