@@ -134,20 +134,13 @@ BEGIN
 
   -- For cash/card/bank/mobile sales, record only the receivable amount as paid;
   -- any customer tender above the total is change, not revenue or a credit.
-  IF _payment_method = 'credit' THEN
-    IF _customer_id IS NULL THEN
-      RAISE EXCEPTION 'A customer is required for a credit sale';
-    END IF;
-    v_paid := least(coalesce(_paid, 0), v_total);
-  ELSE
-    v_paid := v_total;
+  v_paid := least(coalesce(_paid, 0), v_total);
+  v_outstanding := round(v_total - v_paid, 2);
+  IF v_outstanding > 0 AND _customer_id IS NULL THEN
+    RAISE EXCEPTION 'A customer is required when the sale has an unpaid amount';
   END IF;
-
-  v_outstanding := v_total - v_paid;
-  IF v_outstanding > 0 THEN
-    IF coalesce(v_customer_balance, 0) + v_outstanding > coalesce(v_credit_limit, 0) THEN
-      RAISE EXCEPTION 'Credit limit would be exceeded';
-    END IF;
+  IF v_outstanding > 0 AND NOT public.customer_credit_limit_allows(_customer_id, v_outstanding) THEN
+    RAISE EXCEPTION 'Credit limit exceeded: current balance %, requested debt %, limit %', coalesce(v_customer_balance, 0), v_outstanding, coalesce(v_credit_limit, 0);
   END IF;
 
   v_status := CASE
@@ -315,10 +308,6 @@ BEGIN
     RAISE EXCEPTION 'Customer is unavailable';
   END IF;
 
-  IF coalesce(v_customer_balance, 0) < v_remaining THEN
-    RAISE EXCEPTION 'Customer balance reconciliation is required before recording this payment';
-  END IF;
-
   IF _invoice_id IS NOT NULL THEN
     SELECT id, total, paid, customer_id
       INTO v_invoice
@@ -398,14 +387,17 @@ BEGIN
     END LOOP;
 
     IF v_remaining > 0 THEN
-      RAISE EXCEPTION 'Payment exceeds the customer outstanding balance';
+      INSERT INTO public.customer_payments (customer_id, invoice_id, amount, payment_method, payment_date, note, created_by)
+      VALUES (_customer_id, NULL, v_remaining, _method::public.payment_method, coalesce(_payment_date, current_date), coalesce(nullif(trim(_note), ''), 'دفعة مقدمة'), v_user)
+      RETURNING id INTO v_id;
     END IF;
   END IF;
 
   UPDATE public.customers
-  SET balance = balance - _amount,
-      updated_at = now()
+  SET balance = round(coalesce(balance, 0) - _amount, 2), updated_at = now()
   WHERE id = _customer_id;
+  INSERT INTO public.customer_ledger(customer_id, entry_type, credit, reference_id, reference_type, occurred_at, created_by, source_key, note)
+  VALUES (_customer_id, 'payment', round(_amount, 2), v_id, 'customer_payment', coalesce(_payment_date, current_date)::timestamptz, v_user, 'payment:' || v_id, coalesce(nullif(trim(_note), ''), 'دفعة عميل'));
 
   INSERT INTO public.audit_logs (actor_id, action, entity_type, entity_id, payload)
   VALUES (

@@ -157,7 +157,10 @@ function CustomersPage() {
                 <Input label={t("common.email")} value={edit.email ?? ""} onChange={v => setEdit({ ...edit, email: v })} type="email" />
               </div>
               <Input label={t("common.address")} value={edit.address ?? ""} onChange={v => setEdit({ ...edit, address: v })} />
-              <Input label={t("customers.credit_limit")} value={String(edit.credit_limit ?? 0)} onChange={v => setEdit({ ...edit, credit_limit: Number(v) as any })} type="number" />
+              <div>
+                <Input label={t("customers.credit_limit")} value={String(edit.credit_limit ?? 0)} onChange={v => setEdit({ ...edit, credit_limit: Number(v) as any })} type="number" />
+                <p className="mt-1 text-[11px] text-muted-foreground">{lang === "ar" ? "اتركه صفرًا لفتح الآجل بلا سقف (ما لم يُفعّل السقف من الإعدادات)." : "Zero means unlimited credit unless enforcement is enabled in Settings."}</p>
+              </div>
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={edit.is_active ?? true} onChange={e => setEdit({ ...edit, is_active: e.target.checked })} className="h-4 w-4 rounded border-border" />
                 {t("common.active")}

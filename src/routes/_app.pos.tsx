@@ -68,6 +68,7 @@ function POSPage() {
   const [newCustomerOpen, setNewCustomerOpen] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState("");
   const [newCustomerPhone, setNewCustomerPhone] = useState("");
+  const [newCustomerCreditLimit, setNewCustomerCreditLimit] = useState("");
   const [serviceOpen, setServiceOpen] = useState(false);
   const [serviceName, setServiceName] = useState("");
   const [servicePrice, setServicePrice] = useState("");
@@ -231,7 +232,8 @@ function POSPage() {
   async function checkout() {
     if (!warehouseId) return toast.error(t("pos.select_warehouse"));
     if (cart.length === 0) return toast.error(t("pos.cart_empty"));
-    if (paymentMethod === "credit" && !customerId) return toast.error(lang === "ar" ? "يرجى اختيار عميل للبيع الآجل" : "Please select a customer for credit sale");
+    if (paidN < total && !customerId) return toast.error(lang === "ar" ? "يرجى اختيار العميل لتسجيل المبلغ المتبقي كدين" : "Select a customer so the unpaid amount can be recorded as debt");
+    if (paidN < 0) return toast.error(lang === "ar" ? "المبلغ المدفوع لا يمكن أن يكون سالبًا" : "Paid amount cannot be negative");
 
     setLoading(true);
     try {
@@ -239,7 +241,7 @@ function POSPage() {
         _warehouse_id: warehouseId,
         _customer_id: (customerId || null) as any,
         _payment_method: paymentMethod,
-        _paid: paymentMethod === "credit" ? (paid ? Number(paid) : 0) : (paidN || total),
+        _paid: Math.min(Math.max(paidN, 0), total),
         _discount: discountN,
         _note: (note || null) as any,
         _sale_date: saleDate,
@@ -268,11 +270,11 @@ function POSPage() {
   async function createCustomer() {
     const name = newCustomerName.trim();
     if (!name) return toast.error(lang === "ar" ? "اسم العميل مطلوب" : "Customer name is required");
-    const { data, error } = await supabase.from("customers").insert({ name, phone: newCustomerPhone.trim() || null }).select("id,name").single();
+    const { data, error } = await supabase.from("customers").insert({ name, phone: newCustomerPhone.trim() || null, credit_limit: Math.max(0, Number(newCustomerCreditLimit || 0)) }).select("id,name").single();
     if (error) return toast.error(error.message);
     setCustomers(current => [...current, data].sort((a, b) => a.name.localeCompare(b.name)));
     setCustomerId(data.id);
-    setNewCustomerName(""); setNewCustomerPhone(""); setNewCustomerOpen(false);
+    setNewCustomerName(""); setNewCustomerPhone(""); setNewCustomerCreditLimit(""); setNewCustomerOpen(false);
     toast.success(lang === "ar" ? "تمت إضافة العميل واختياره" : "Customer added and selected");
   }
 
@@ -511,7 +513,7 @@ function POSPage() {
         continuous
         onDetected={handleCode}
       />
-      {newCustomerOpen && <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 p-4 backdrop-blur-sm"><form onSubmit={e => { e.preventDefault(); void createCustomer(); }} className="panel-elevated w-full max-w-sm p-5"><div className="mb-4 flex items-center justify-between"><h3 className="font-semibold">{lang === "ar" ? "إضافة عميل سريعًا" : "Quick add customer"}</h3><button type="button" onClick={() => setNewCustomerOpen(false)} className="rounded p-1 hover:bg-surface-2"><X className="h-4 w-4" /></button></div><div className="space-y-3"><input autoFocus value={newCustomerName} onChange={e => setNewCustomerName(e.target.value)} placeholder={lang === "ar" ? "اسم العميل *" : "Customer name *"} className="h-10 w-full rounded-md border border-input bg-surface px-3 text-sm" /><input value={newCustomerPhone} onChange={e => setNewCustomerPhone(e.target.value)} placeholder={lang === "ar" ? "رقم الجوال (اختياري)" : "Phone (optional)"} className="h-10 w-full rounded-md border border-input bg-surface px-3 text-sm" /></div><div className="mt-4 flex justify-end gap-2"><button type="button" onClick={() => setNewCustomerOpen(false)} className="h-9 rounded-md border border-border px-3 text-sm">{t("common.cancel")}</button><button className="h-9 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground">{lang === "ar" ? "إضافة واختيار" : "Add & select"}</button></div></form></div>}
+      {newCustomerOpen && <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 p-4 backdrop-blur-sm"><form onSubmit={e => { e.preventDefault(); void createCustomer(); }} className="panel-elevated w-full max-w-sm p-5"><div className="mb-4 flex items-center justify-between"><h3 className="font-semibold">{lang === "ar" ? "إضافة عميل سريعًا" : "Quick add customer"}</h3><button type="button" onClick={() => setNewCustomerOpen(false)} className="rounded p-1 hover:bg-surface-2"><X className="h-4 w-4" /></button></div><div className="space-y-3"><input autoFocus value={newCustomerName} onChange={e => setNewCustomerName(e.target.value)} placeholder={lang === "ar" ? "اسم العميل *" : "Customer name *"} className="h-10 w-full rounded-md border border-input bg-surface px-3 text-sm" /><input value={newCustomerPhone} onChange={e => setNewCustomerPhone(e.target.value)} placeholder={lang === "ar" ? "رقم الجوال (اختياري)" : "Phone (optional)"} className="h-10 w-full rounded-md border border-input bg-surface px-3 text-sm" /><div><input type="number" min="0" value={newCustomerCreditLimit} onChange={e => setNewCustomerCreditLimit(e.target.value)} placeholder={lang === "ar" ? "حد الائتمان — صفر = بلا سقف" : "Credit limit — zero means unlimited"} className="h-10 w-full rounded-md border border-input bg-surface px-3 text-sm" /><p className="mt-1 text-[11px] text-muted-foreground">{lang === "ar" ? "يمكن تركه صفرًا للسماح بالآجل." : "Leave zero to allow credit sales."}</p></div></div><div className="mt-4 flex justify-end gap-2"><button type="button" onClick={() => setNewCustomerOpen(false)} className="h-9 rounded-md border border-border px-3 text-sm">{t("common.cancel")}</button><button className="h-9 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground">{lang === "ar" ? "إضافة واختيار" : "Add & select"}</button></div></form></div>}
       {serviceOpen && <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 p-4 backdrop-blur-sm"><form onSubmit={e => { e.preventDefault(); addService(); }} className="panel-elevated w-full max-w-sm p-5"><div className="mb-4 flex items-center justify-between"><h3 className="font-semibold">{lang === "ar" ? "إضافة خدمة" : "Add service"}</h3><button type="button" onClick={() => setServiceOpen(false)}><X className="h-4 w-4" /></button></div><div className="space-y-3"><input autoFocus value={serviceName} onChange={e => setServiceName(e.target.value)} placeholder={lang === "ar" ? "مثال: تغيير زيت أو بنشرة وتركيب" : "e.g. Oil change or installation"} className="h-10 w-full rounded-md border border-input bg-surface px-3 text-sm" /><input type="number" min="0" value={servicePrice} onChange={e => setServicePrice(e.target.value)} placeholder={lang === "ar" ? "السعر المتفق عليه" : "Agreed price"} className="h-10 w-full rounded-md border border-input bg-surface px-3 text-sm" /><input value={serviceNote} onChange={e => setServiceNote(e.target.value)} placeholder={lang === "ar" ? "ملاحظة اختيارية" : "Optional note"} className="h-10 w-full rounded-md border border-input bg-surface px-3 text-sm" /></div><div className="mt-4 flex justify-end gap-2"><button type="button" onClick={() => setServiceOpen(false)} className="h-9 rounded-md border border-border px-3 text-sm">{t("common.cancel")}</button><button className="h-9 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground">{lang === "ar" ? "إضافة للسلة" : "Add to cart"}</button></div></form></div>}
     </>
   );

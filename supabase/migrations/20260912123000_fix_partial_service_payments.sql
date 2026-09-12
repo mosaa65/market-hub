@@ -25,12 +25,24 @@ BEGIN
     v_final_paid := least(coalesce(_paid, 0), v_total + v_service_total);
     v_balance_adjustment := (v_total + v_service_total - v_final_paid) - (v_total - v_paid);
     SELECT balance, credit_limit INTO v_balance, v_limit FROM public.customers WHERE id = _customer_id FOR UPDATE;
-    IF coalesce(v_balance, 0) + v_balance_adjustment > coalesce(v_limit, 0) THEN RAISE EXCEPTION 'Credit limit would be exceeded'; END IF;
-    UPDATE public.customers SET balance = balance + v_balance_adjustment, updated_at = now() WHERE id = _customer_id;
-  ELSE v_final_paid := v_total + v_service_total; END IF;
-  UPDATE public.sales_invoices SET total = v_total + v_service_total, subtotal = subtotal + v_service_total, paid = v_final_paid,
-    status = CASE WHEN v_final_paid >= v_total + v_service_total THEN 'paid'::public.invoice_status WHEN v_final_paid = 0 THEN 'unpaid'::public.invoice_status ELSE 'partial'::public.invoice_status END,
+    IF coalesce(v_balance, 0) + v_balance_adjustment > coalesce(v_limit, 0) AND coalesce(v_limit, 0) > 0 THEN RAISE EXCEPTION 'Credit limit exceeded'; END IF;
+  ELSE v_final_paid := least(coalesce(_paid, 0), v_total + v_service_total); END IF;
+  v_total := round(v_total + v_service_total, 2);
+  v_final_paid := least(greatest(coalesce(_paid, 0), 0), v_total);
+  IF v_total > v_final_paid AND _customer_id IS NULL THEN
+    RAISE EXCEPTION 'A customer is required when the sale has an unpaid amount';
+  END IF;
+  IF v_total > v_final_paid AND NOT public.customer_credit_limit_allows(_customer_id, round(v_total - v_final_paid, 2)) THEN
+    RAISE EXCEPTION 'Credit limit exceeded: current balance %, requested debt %, limit %', v_balance, round(v_total - v_final_paid, 2), v_limit;
+  END IF;
+  UPDATE public.sales_invoices SET total = v_total, subtotal = round(subtotal + v_service_total, 2), paid = v_final_paid,
+    status = CASE WHEN v_final_paid >= v_total THEN 'paid'::public.invoice_status WHEN v_final_paid = 0 THEN 'unpaid'::public.invoice_status ELSE 'partial'::public.invoice_status END,
     created_at = _sale_date::timestamp + localtime, updated_at = now() WHERE id = v_invoice_id;
+  IF _customer_id IS NOT NULL AND v_total > v_final_paid THEN
+    UPDATE public.customers SET balance = round(coalesce(balance, 0) + (v_total - v_final_paid) - greatest(v_total - v_paid, 0), 2), updated_at = now() WHERE id = _customer_id;
+    INSERT INTO public.customer_ledger(customer_id, entry_type, debit, reference_id, reference_type, occurred_at, created_by, source_key, note)
+    VALUES (_customer_id, 'sale', round(v_total - v_final_paid, 2), v_invoice_id, 'sales_invoice', _sale_date::timestamp + localtime, auth.uid(), 'sale:' || v_invoice_id, 'قيد بيع آجل');
+  END IF;
   UPDATE public.stock_movements SET created_at = _sale_date::timestamp + localtime WHERE reference_id = v_invoice_id AND reference_type = 'sale';
   RETURN v_invoice_id;
 END; $$;
