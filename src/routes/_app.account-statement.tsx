@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { z } from "zod";
 import { PageHeader } from "@/components/page-header";
 import { useI18n } from "@/lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,7 +13,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Printer, Download, UserCheck, Building2, Calendar, FileSpreadsheet } from "lucide-react";
 
+const accountStatementSearchSchema = z.object({
+  customerId: z.string().optional(),
+});
+
 export const Route = createFileRoute("/_app/account-statement")({
+  validateSearch: (search: Record<string, unknown>) => accountStatementSearchSchema.parse(search),
   head: () => ({ meta: [{ title: "كشف حساب — Vortex ERP" }] }),
   component: AccountStatementPage,
 });
@@ -30,6 +36,8 @@ interface StatementItem {
 
 function AccountStatementPage() {
   const { t, lang } = useI18n();
+  const searchParams = Route.useSearch();
+  const customerId = searchParams?.customerId;
   const [partyType, setPartyType] = useState<"customer" | "supplier">("customer");
   const [partyId, setPartyId] = useState<string>("");
   const [partyList, setPartyList] = useState<{ id: string; name: string; balance?: number }[]>([]);
@@ -37,8 +45,11 @@ function AccountStatementPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    if (customerId) {
+      setPartyType("customer");
+    }
     void loadParties();
-  }, [partyType]);
+  }, [partyType, customerId]);
 
   useEffect(() => {
     if (partyId) void loadStatement();
@@ -49,8 +60,13 @@ function AccountStatementPage() {
     setStatement([]);
     if (partyType === "customer") {
       const { data } = await supabase.from("customers").select("id, name, balance").order("name");
-      setPartyList(data ?? []);
-      if (data && data.length > 0) setPartyId(data[0].id);
+      const list = data ?? [];
+      setPartyList(list);
+      if (customerId && list.some(c => c.id === customerId)) {
+        setPartyId(customerId);
+      } else if (list.length > 0) {
+        setPartyId(list[0].id);
+      }
     } else {
       const { data } = await supabase.from("suppliers").select("id, name, balance").order("name");
       setPartyList(data ?? []);

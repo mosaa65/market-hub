@@ -1,12 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Search, Users, X, AlertCircle, Printer } from "lucide-react";
+import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { useI18n } from "@/lib/i18n";
 import { money } from "@/lib/format";
 
+const debtsSearchSchema = z.object({
+  customerId: z.string().optional(),
+});
+
 export const Route = createFileRoute("/_app/debts")({
+  validateSearch: (search: Record<string, unknown>) => debtsSearchSchema.parse(search),
   head: () => ({ meta: [{ title: "Customer Debts — Vortex ERP" }] }),
   component: DebtsPage,
 });
@@ -17,6 +23,8 @@ interface Payment { id: string; amount: number; payment_date: string; payment_me
 
 function DebtsPage() {
   const { t, lang } = useI18n();
+  const searchParams = Route.useSearch();
+  const customerId = searchParams?.customerId;
   const [rows, setRows] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -28,10 +36,22 @@ function DebtsPage() {
   async function load() {
     setLoading(true);
     const { data } = await supabase.from("customers").select("id,name,phone,email,balance,credit_limit").eq("is_active", true).order("balance", { ascending: false });
-    setRows((data ?? []) as Customer[]);
+    const list = (data ?? []) as Customer[];
+    setRows(list);
     setLoading(false);
+
+    if (customerId) {
+      let target = list.find(c => c.id === customerId);
+      if (!target) {
+        const { data: c } = await supabase.from("customers").select("id,name,phone,email,balance,credit_limit").eq("id", customerId).maybeSingle();
+        if (c) target = c as Customer;
+      }
+      if (target) {
+        void openDetail(target);
+      }
+    }
   }
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load(); }, [customerId]);
 
   async function openDetail(c: Customer) {
     setSelected(c);

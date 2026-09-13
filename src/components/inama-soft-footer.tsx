@@ -1,5 +1,4 @@
 import { Github, Globe2, Heart, Linkedin, Mail, MapPin, Phone } from "lucide-react";
-
 import { cn } from "@/lib/utils";
 
 type InamaSoftFooterProps = {
@@ -9,83 +8,55 @@ type InamaSoftFooterProps = {
 export function InamaSoftFooter({ className }: InamaSoftFooterProps) {
   return (
     <footer
-      className={cn("border-t border-border/60 bg-background/70 px-4 py-6 sm:px-6", className)}
+      className={cn(
+        "border-t border-border/40 bg-background/50 px-4 py-2 sm:px-6 text-[11px] text-muted-foreground/60 transition-colors",
+        className
+      )}
     >
-      <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5 text-sm text-muted-foreground">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-3">
-            <img
-              src="/inama-soft-logo.ico"
-              alt="Inama Soft logo"
-              className="h-11 w-11 rounded-xl object-contain ring-1 ring-border/70"
-            />
-            <div>
-              <p className="font-semibold text-foreground">Inama Soft</p>
-              <p className="text-xs">Collaborative Development Group</p>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
-            <span className="inline-flex items-center gap-1.5">
-              <MapPin className="h-3.5 w-3.5" />
-              Ibb, Yemen
-            </span>
-            <a
-              className="inline-flex items-center gap-1.5 transition-colors hover:text-primary"
-              href="mailto:mousa.mc13@gmail.com"
-            >
-              <Mail className="h-3.5 w-3.5" />
-              mousa.mc13@gmail.com
-            </a>
-            <a
-              className="inline-flex items-center gap-1.5 transition-colors hover:text-primary"
-              href="tel:+967772217218"
-            >
-              <Phone className="h-3.5 w-3.5" />
-              +967 772 217 218
-            </a>
-          </div>
+      <div className="mx-auto flex w-full max-w-[1400px] flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
+        {/* Left: subtle brand & copyright */}
+        <div className="flex items-center gap-2">
+          <img
+            src="/inama-soft-logo.ico"
+            alt="Inama Soft"
+            className="h-4 w-4 rounded object-contain opacity-70"
+          />
+          <span className="font-medium text-foreground/80">Inama Soft</span>
+          <span>·</span>
+          <span>Mousa Gamil Al-Awadhi</span>
+          <span className="hidden sm:inline">·</span>
+          <span className="hidden sm:inline-flex items-center gap-1">
+            <MapPin className="h-3 w-3" /> Ibb, Yemen
+          </span>
         </div>
 
-        <div className="flex flex-col gap-3 border-t border-border/50 pt-4 text-xs sm:flex-row sm:items-center sm:justify-between">
-          <p className="inline-flex flex-wrap items-center gap-1.5">
-            Made with <Heart className="h-3.5 w-3.5 fill-primary text-primary" aria-label="love" />{" "}
-            by <span className="font-medium text-foreground">Inama Soft</span>
-            <span aria-hidden="true">·</span>
-            <span>Mousa Gamil Al-Awadhi</span>
-          </p>
-          <nav
-            className="flex flex-wrap items-center gap-x-3 gap-y-2"
-            aria-label="Inama Soft links"
+        {/* Right: minimal contact & social links */}
+        <div className="flex items-center gap-3">
+          <a
+            href="tel:+967772217218"
+            className="hidden sm:inline-flex items-center gap-1 transition-colors hover:text-foreground"
           >
-            <a
-              className="inline-flex items-center gap-1 hover:text-primary"
-              href="https://inma-soft.vercel.app"
-              target="_blank"
-              rel="noreferrer"
-            >
-              <Globe2 className="h-3.5 w-3.5" />
-              Website
-            </a>
-            <a
-              className="inline-flex items-center gap-1 hover:text-primary"
-              href="https://www.linkedin.com/in/mousa-al-awadhi-6518633a8"
-              target="_blank"
-              rel="noreferrer"
-            >
-              <Linkedin className="h-3.5 w-3.5" />
-              LinkedIn
-            </a>
-            <a
-              className="inline-flex items-center gap-1 hover:text-primary"
-              href="https://github.com/mosaa65"
-              target="_blank"
-              rel="noreferrer"
-            >
-              <Github className="h-3.5 w-3.5" />
-              GitHub
-            </a>
-          </nav>
+            <Phone className="h-3 w-3" />
+            <span>+967 772 217 218</span>
+          </a>
+          <a
+            href="https://inma-soft.vercel.app"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
+          >
+            <Globe2 className="h-3 w-3" />
+            <span>Website</span>
+          </a>
+          <a
+            href="https://github.com/mosaa65"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
+          >
+            <Github className="h-3 w-3" />
+            <span>GitHub</span>
+          </a>
         </div>
       </div>
     </footer>

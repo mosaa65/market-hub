@@ -1,13 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Search, Plus, Wallet, X, Loader2, User } from "lucide-react";
+import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { useI18n } from "@/lib/i18n";
 import { money } from "@/lib/format";
 import { toast } from "sonner";
 
+const paymentsSearchSchema = z.object({
+  customerId: z.string().optional(),
+});
+
 export const Route = createFileRoute("/_app/payments")({
+  validateSearch: (search: Record<string, unknown>) => paymentsSearchSchema.parse(search),
   head: () => ({ meta: [{ title: "Customer Payments — Vortex ERP" }] }),
   component: PaymentsPage,
 });
@@ -18,6 +24,8 @@ interface Payment { id: string; amount: number; payment_date: string; payment_me
 
 function PaymentsPage() {
   const { t, lang } = useI18n();
+  const searchParams = Route.useSearch();
+  const customerId = searchParams?.customerId;
   const [customerSearch, setCustomerSearch] = useState("");
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selected, setSelected] = useState<Customer | null>(null);
@@ -33,9 +41,20 @@ function PaymentsPage() {
   useEffect(() => {
     (async () => {
       const { data } = await supabase.from("customers").select("id,name,phone,balance").eq("is_active", true).order("name").limit(200);
-      setCustomers((data ?? []) as Customer[]);
+      const list = (data ?? []) as Customer[];
+      setCustomers(list);
+      if (customerId) {
+        let target = list.find(c => c.id === customerId);
+        if (!target) {
+          const { data: c } = await supabase.from("customers").select("id,name,phone,balance").eq("id", customerId).maybeSingle();
+          if (c) target = c as Customer;
+        }
+        if (target) {
+          void loadCustomer(target);
+        }
+      }
     })();
-  }, []);
+  }, [customerId]);
 
   const filteredCustomers = useMemo(() => {
     const q = customerSearch.trim().toLowerCase();
