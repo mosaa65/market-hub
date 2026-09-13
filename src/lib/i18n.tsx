@@ -142,6 +142,10 @@ const en: Dict = {
   "common.categories": "Categories",
   "common.brands": "Brands",
   "common.units": "Units",
+  "common.origins": "Countries of Origin",
+  "common.qualities": "Quality Grades",
+  "common.makes": "Vehicle Makes",
+  "common.models": "Vehicle Models",
 
   // Dashboard
   "dash.title": "Dashboard",
@@ -241,6 +245,10 @@ const en: Dict = {
   "pos.filter_by": "Filter by categories, brands & units",
   "pos.clear_filters": "Clear filters",
   "pos.warehouse": "Warehouse",
+  "pos.overpaid": "Paid amount exceeds total",
+  "pos.overpaid_warning": "Paid amount exceeds invoice total",
+  "pos.remaining_debt": "Remaining debt",
+  "pos.all_catalog_filters": "Catalog filters",
 
   // Inventory
   "inventory.title": "Inventory",
@@ -685,6 +693,10 @@ const ar: Dict = {
   "common.categories": "التصنيفات",
   "common.brands": "العلامات التجارية",
   "common.units": "الوحدات",
+  "common.origins": "بلدان المنشأ",
+  "common.qualities": "درجات الجودة",
+  "common.makes": "ماركات المركبات",
+  "common.models": "موديلات المركبات",
 
   // لوحة التحكم
   "dash.title": "لوحة التحكم",
@@ -784,6 +796,10 @@ const ar: Dict = {
   "pos.filter_by": "تصفية حسب التصنيفات والعلامات التجارية والوحدات",
   "pos.clear_filters": "إزالة التصفية",
   "pos.warehouse": "المستودع",
+  "pos.overpaid": "المبلغ المدفوع أكبر من الإجمالي",
+  "pos.overpaid_warning": "المبلغ المدفوع أكبر من إجمالي الفاتورة",
+  "pos.remaining_debt": "المتبقي كدين",
+  "pos.all_catalog_filters": "تصفية الفهرس الشامل",
 
   // المخزون
   "inventory.title": "المخزون",
