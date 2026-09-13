@@ -29,6 +29,7 @@ import { money } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
 import { toast } from "sonner";
 import { BarcodeScanner } from "@/components/barcode-scanner";
+import { useCatalogModules } from "@/lib/catalog-modules";
 
 export const Route = createFileRoute("/_app/pos")({
   head: () => ({ meta: [{ title: "نقطة البيع — فورتيكس ERP" }] }),
@@ -92,6 +93,7 @@ interface Compatibility {
 
 function POSPage() {
   const { t, lang } = useI18n();
+  const { config: catalogConfig } = useCatalogModules();
   const [products, setProducts] = useState<Product[]>([]);
   const [stockMap, setStockMap] = useState<Record<string, number>>({});
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -251,14 +253,23 @@ function POSPage() {
   const activeFiltersCount = useMemo(() => {
     return [
       selectedCategory,
-      selectedBrand,
-      selectedUnit,
-      selectedOrigin,
-      selectedQuality,
-      selectedMake,
-      selectedModel,
+      catalogConfig.enableBrands ? selectedBrand : "",
+      catalogConfig.enableUnits ? selectedUnit : "",
+      catalogConfig.enableOrigins ? selectedOrigin : "",
+      catalogConfig.enableQualityGrades ? selectedQuality : "",
+      catalogConfig.enableMakesAndModels ? selectedMake : "",
+      catalogConfig.enableMakesAndModels ? selectedModel : "",
     ].filter(Boolean).length;
-  }, [selectedCategory, selectedBrand, selectedUnit, selectedOrigin, selectedQuality, selectedMake, selectedModel]);
+  }, [
+    selectedCategory,
+    selectedBrand,
+    selectedUnit,
+    selectedOrigin,
+    selectedQuality,
+    selectedMake,
+    selectedModel,
+    catalogConfig,
+  ]);
 
   function resetFilters() {
     setSelectedCategory("");
@@ -312,12 +323,12 @@ function POSPage() {
         (p.barcode ?? "").toLowerCase().includes(q);
 
       const matchesCat = !selectedCategory || p.category_id === selectedCategory;
-      const matchesBrand = !selectedBrand || p.brand_id === selectedBrand;
-      const matchesUnit = !selectedUnit || p.unit_id === selectedUnit;
-      const matchesOrigin = !selectedOrigin || p.origin_id === selectedOrigin;
-      const matchesQuality = !selectedQuality || p.quality_grade_id === selectedQuality;
-      const matchesMake = !compatibleWithMake || compatibleWithMake.has(p.id);
-      const matchesModel = !compatibleWithModel || compatibleWithModel.has(p.id);
+      const matchesBrand = !catalogConfig.enableBrands || !selectedBrand || p.brand_id === selectedBrand;
+      const matchesUnit = !catalogConfig.enableUnits || !selectedUnit || p.unit_id === selectedUnit;
+      const matchesOrigin = !catalogConfig.enableOrigins || !selectedOrigin || p.origin_id === selectedOrigin;
+      const matchesQuality = !catalogConfig.enableQualityGrades || !selectedQuality || p.quality_grade_id === selectedQuality;
+      const matchesMake = !catalogConfig.enableMakesAndModels || !compatibleWithMake || compatibleWithMake.has(p.id);
+      const matchesModel = !catalogConfig.enableMakesAndModels || !compatibleWithModel || compatibleWithModel.has(p.id);
 
       return (
         matchesSearch &&
@@ -342,6 +353,7 @@ function POSPage() {
     selectedModel,
     compatibilities,
     models,
+    catalogConfig,
   ]);
 
   function addToCart(p: Product) {
@@ -752,7 +764,8 @@ function POSPage() {
                 </label>
 
                 {/* 2. Brands */}
-                <label className="grid gap-1 text-xs text-muted-foreground">
+                {catalogConfig.enableBrands && (
+                  <label className="grid gap-1 text-xs text-muted-foreground">
                   <span className="font-medium text-foreground/80">{t("common.brands")}</span>
                   <div className="relative">
                     <select
@@ -770,9 +783,11 @@ function POSPage() {
                     <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                   </div>
                 </label>
+                )}
 
                 {/* 3. Units */}
-                <label className="grid gap-1 text-xs text-muted-foreground">
+                {catalogConfig.enableUnits && (
+                  <label className="grid gap-1 text-xs text-muted-foreground">
                   <span className="font-medium text-foreground/80">{t("common.units")}</span>
                   <div className="relative">
                     <select
@@ -790,9 +805,11 @@ function POSPage() {
                     <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                   </div>
                 </label>
+                )}
 
                 {/* 4. Countries of Origin */}
-                <label className="grid gap-1 text-xs text-muted-foreground">
+                {catalogConfig.enableOrigins && (
+                  <label className="grid gap-1 text-xs text-muted-foreground">
                   <span className="font-medium text-foreground/80">{lang === "ar" ? "بلدان المنشأ" : "Country of Origin"}</span>
                   <div className="relative">
                     <select
@@ -811,9 +828,11 @@ function POSPage() {
                     <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                   </div>
                 </label>
+                )}
 
                 {/* 5. Quality Grades */}
-                <label className="grid gap-1 text-xs text-muted-foreground">
+                {catalogConfig.enableQualityGrades && (
+                  <label className="grid gap-1 text-xs text-muted-foreground">
                   <span className="font-medium text-foreground/80">{lang === "ar" ? "درجات الجودة" : "Quality Grade"}</span>
                   <div className="relative">
                     <select
@@ -831,9 +850,11 @@ function POSPage() {
                     <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                   </div>
                 </label>
+                )}
 
                 {/* 6. Vehicle Makes */}
-                <label className="grid gap-1 text-xs text-muted-foreground">
+                {catalogConfig.enableMakesAndModels && (
+                  <label className="grid gap-1 text-xs text-muted-foreground">
                   <span className="font-medium text-foreground/80">{lang === "ar" ? "ماركات المركبات" : "Vehicle Make"}</span>
                   <div className="relative">
                     <select
@@ -851,9 +872,11 @@ function POSPage() {
                     <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                   </div>
                 </label>
+                )}
 
                 {/* 7. Vehicle Models */}
-                <label className="grid gap-1 text-xs text-muted-foreground">
+                {catalogConfig.enableMakesAndModels && (
+                  <label className="grid gap-1 text-xs text-muted-foreground">
                   <span className="font-medium text-foreground/80">{lang === "ar" ? "موديلات المركبات" : "Vehicle Model"}</span>
                   <div className="relative">
                     <select
@@ -871,6 +894,7 @@ function POSPage() {
                     <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                   </div>
                 </label>
+                )}
               </div>
             </div>
           )}
@@ -911,12 +935,12 @@ function POSPage() {
                           {unitLabel}
                         </span>
                       )}
-                      {originLabel && (
+                      {catalogConfig.enableOrigins && originLabel && (
                         <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-muted-foreground">
                           {originLabel}
                         </span>
                       )}
-                      {qualityLabel && (
+                      {catalogConfig.enableQualityGrades && qualityLabel && (
                         <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-muted-foreground">
                           {qualityLabel}
                         </span>
