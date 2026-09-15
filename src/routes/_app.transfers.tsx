@@ -1,3 +1,4 @@
+import { ModuleGuard } from "@/lib/modules";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
@@ -16,7 +17,11 @@ import { Plus, Trash2, ArrowRightLeft } from "lucide-react";
 
 export const Route = createFileRoute("/_app/transfers")({
   head: () => ({ meta: [{ title: "Stock Transfers — Vortex ERP" }] }),
-  component: TransfersPage,
+  component: () => (
+    <ModuleGuard moduleId="multi_warehouse">
+      <TransfersPage />
+    </ModuleGuard>
+  ),
 });
 
 function TransfersPage() {

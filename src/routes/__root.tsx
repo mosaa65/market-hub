@@ -8,6 +8,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { I18nProvider } from "@/lib/i18n";
 import { AuthProvider } from "@/lib/auth";
+import { ModulesProvider } from "@/lib/modules";
 import { Toaster } from "@/components/ui/sonner";
 
 function NotFoundComponent() {
@@ -97,8 +98,10 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <I18nProvider>
         <AuthProvider>
-          <Outlet />
-          <Toaster />
+          <ModulesProvider>
+            <Outlet />
+            <Toaster />
+          </ModulesProvider>
         </AuthProvider>
       </I18nProvider>
     </QueryClientProvider>

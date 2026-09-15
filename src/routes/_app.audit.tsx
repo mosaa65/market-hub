@@ -1,3 +1,4 @@
+import { ModuleGuard } from "@/lib/modules";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { History, Search } from "lucide-react";
@@ -12,7 +13,11 @@ import { Badge } from "@/components/ui/badge";
 
 export const Route = createFileRoute("/_app/audit")({
   head: () => ({ meta: [{ title: "Audit Logs — Vortex ERP" }] }),
-  component: AuditPage,
+  component: () => (
+    <ModuleGuard moduleId="audit">
+      <AuditPage />
+    </ModuleGuard>
+  ),
 });
 
 interface Log {

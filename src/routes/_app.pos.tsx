@@ -1,3 +1,4 @@
+import { ModuleGuard } from "@/lib/modules";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
@@ -33,7 +34,11 @@ import { useCatalogModules } from "@/lib/catalog-modules";
 
 export const Route = createFileRoute("/_app/pos")({
   head: () => ({ meta: [{ title: "نقطة البيع — فورتيكس ERP" }] }),
-  component: POSPage,
+  component: () => (
+    <ModuleGuard moduleId="pos">
+      <POSPage />
+    </ModuleGuard>
+  ),
 });
 
 interface Product {

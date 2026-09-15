@@ -1,3 +1,4 @@
+import { useModules } from "@/lib/modules";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
@@ -39,6 +40,7 @@ type ProductRow = {
 function ProductsPage() {
   const { t, lang } = useI18n();
   const { config } = useCatalogModules();
+  const { isModuleEnabled } = useModules();
   const qc = useQueryClient();
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<ProductRow | null>(null);
@@ -476,13 +478,15 @@ function ProductDialog({
               className={inputCls}
             />
           </Field>
-          <Field label={t("products.barcode")}>
-            <input
-              value={form.barcode}
-              onChange={(e) => setForm({ ...form, barcode: e.target.value })}
-              className={inputCls}
-            />
-          </Field>
+          {isModuleEnabled("barcode") && (
+            <Field label={t("products.barcode")}>
+              <input
+                value={form.barcode}
+                onChange={(e) => setForm({ ...form, barcode: e.target.value })}
+                className={inputCls}
+              />
+            </Field>
+          )}
           <Field label={lang === "ar" ? "موقع الرف / المستودع" : "Shelf location"}>
             <input
               value={form.shelf_location}

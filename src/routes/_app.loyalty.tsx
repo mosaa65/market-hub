@@ -1,3 +1,4 @@
+import { ModuleGuard } from "@/lib/modules";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Gift, Plus, Search, Award } from "lucide-react";
@@ -17,7 +18,11 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/loyalty")({
   head: () => ({ meta: [{ title: "Loyalty — Vortex ERP" }] }),
-  component: LoyaltyPage,
+  component: () => (
+    <ModuleGuard moduleId="loyalty">
+      <LoyaltyPage />
+    </ModuleGuard>
+  ),
 });
 
 interface Customer { id: string; name: string; phone: string | null; loyalty_points: number; balance: number; }

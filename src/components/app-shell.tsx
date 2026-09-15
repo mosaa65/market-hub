@@ -1,5 +1,5 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   LayoutDashboard, ScanBarcode, Package, Warehouse, Receipt, Truck,
   Users, Building2, Wallet, BarChart3, ShieldCheck, Bell, Settings,
@@ -9,74 +9,88 @@ import {
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
+import { useModules } from "@/lib/modules";
 import { CommandPalette } from "@/components/command-palette";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { InamaSoftFooter } from "@/components/inama-soft-footer";
 
-type Item = { to: string; icon: typeof LayoutDashboard; key: string };
+type Item = { to: string; icon: typeof LayoutDashboard; key: string; moduleId?: string };
 type Section = { titleKey: string; items: Item[] };
 
 const sections: Section[] = [
-  { titleKey: "nav.section.overview", items: [
-    { to: "/dashboard", icon: LayoutDashboard, key: "nav.dashboard" },
-    { to: "/analytics", icon: LineChart, key: "nav.analytics" },
-  ] },
+  {
+    titleKey: "nav.section.overview",
+    items: [
+      { to: "/dashboard", icon: LayoutDashboard, key: "nav.dashboard", moduleId: "core" },
+      { to: "/analytics", icon: LineChart, key: "nav.analytics", moduleId: "analytics" },
+    ],
+  },
   {
     titleKey: "nav.section.operations",
     items: [
-      { to: "/pos", icon: ScanBarcode, key: "nav.pos" },
-      { to: "/products", icon: Package, key: "nav.products" },
-      { to: "/catalog", icon: Layers, key: "nav.catalog" },
-      { to: "/inventory", icon: Warehouse, key: "nav.inventory" },
-      { to: "/warehouses", icon: Boxes, key: "nav.warehouses" },
-      { to: "/batches", icon: CalendarClock, key: "nav.batches" },
-      { to: "/sales", icon: Receipt, key: "nav.sales" },
-      { to: "/sales-returns", icon: RotateCcw, key: "nav.sales_returns" },
-      { to: "/purchases", icon: Truck, key: "nav.purchases" },
-      { to: "/purchase-returns", icon: RotateCcw, key: "nav.purchase_returns" },
-      { to: "/transfers", icon: ArrowRightLeft, key: "nav.transfers" },
-      { to: "/barcodes", icon: Barcode, key: "nav.barcodes" },
+      { to: "/pos", icon: ScanBarcode, key: "nav.pos", moduleId: "pos" },
+      { to: "/products", icon: Package, key: "nav.products", moduleId: "core" },
+      { to: "/catalog", icon: Layers, key: "nav.catalog", moduleId: "core" },
+      { to: "/inventory", icon: Warehouse, key: "nav.inventory", moduleId: "core" },
+      { to: "/warehouses", icon: Boxes, key: "nav.warehouses", moduleId: "multi_warehouse" },
+      { to: "/batches", icon: CalendarClock, key: "nav.batches", moduleId: "batches" },
+      { to: "/sales", icon: Receipt, key: "nav.sales", moduleId: "core" },
+      { to: "/sales-returns", icon: RotateCcw, key: "nav.sales_returns", moduleId: "returns" },
+      { to: "/purchases", icon: Truck, key: "nav.purchases", moduleId: "purchases" },
+      { to: "/purchase-returns", icon: RotateCcw, key: "nav.purchase_returns", moduleId: "returns" },
+      { to: "/transfers", icon: ArrowRightLeft, key: "nav.transfers", moduleId: "multi_warehouse" },
+      { to: "/barcodes", icon: Barcode, key: "nav.barcodes", moduleId: "barcode" },
     ],
   },
   {
     titleKey: "nav.section.relations",
     items: [
-      { to: "/customers", icon: Users, key: "nav.customers" },
-      { to: "/suppliers", icon: Building2, key: "nav.suppliers" },
-      { to: "/loyalty", icon: Gift, key: "nav.loyalty" },
+      { to: "/customers", icon: Users, key: "nav.customers", moduleId: "core" },
+      { to: "/suppliers", icon: Building2, key: "nav.suppliers", moduleId: "purchases" },
+      { to: "/loyalty", icon: Gift, key: "nav.loyalty", moduleId: "loyalty" },
     ],
   },
   {
     titleKey: "nav.section.accounting",
     items: [
-      { to: "/payments", icon: HandCoins, key: "nav.payments" },
-      { to: "/debts", icon: AlertTriangle, key: "nav.debts" },
-      { to: "/account-statement", icon: FileText, key: "nav.account_statement" },
-      { to: "/daily-journal", icon: BookOpen, key: "nav.daily_journal" },
-      { to: "/trial-balance", icon: Scale, key: "nav.trial_balance" },
-      { to: "/income-statement", icon: PieChart, key: "nav.income_statement" },
-      { to: "/balance-sheet", icon: Landmark, key: "nav.balance_sheet" },
-      { to: "/finance", icon: Wallet, key: "nav.finance" },
-      { to: "/reports", icon: BarChart3, key: "nav.reports" },
+      { to: "/payments", icon: HandCoins, key: "nav.payments", moduleId: "payments" },
+      { to: "/debts", icon: AlertTriangle, key: "nav.debts", moduleId: "payments" },
+      { to: "/account-statement", icon: FileText, key: "nav.account_statement", moduleId: "payments" },
+      { to: "/daily-journal", icon: BookOpen, key: "nav.daily_journal", moduleId: "advanced_accounting" },
+      { to: "/trial-balance", icon: Scale, key: "nav.trial_balance", moduleId: "advanced_accounting" },
+      { to: "/income-statement", icon: PieChart, key: "nav.income_statement", moduleId: "advanced_accounting" },
+      { to: "/balance-sheet", icon: Landmark, key: "nav.balance_sheet", moduleId: "advanced_accounting" },
+      { to: "/finance", icon: Wallet, key: "nav.finance", moduleId: "expenses" },
+      { to: "/reports", icon: BarChart3, key: "nav.reports", moduleId: "analytics" },
     ],
   },
   {
     titleKey: "nav.section.admin",
     items: [
-      { to: "/users", icon: ShieldCheck, key: "nav.users" },
-      { to: "/audit", icon: History, key: "nav.audit" },
-      { to: "/notifications", icon: Bell, key: "nav.notifications" },
-      { to: "/settings", icon: Settings, key: "nav.settings" },
+      { to: "/users", icon: ShieldCheck, key: "nav.users", moduleId: "core" },
+      { to: "/audit", icon: History, key: "nav.audit", moduleId: "audit" },
+      { to: "/notifications", icon: Bell, key: "nav.notifications", moduleId: "core" },
+      { to: "/settings", icon: Settings, key: "nav.settings", moduleId: "core" },
     ],
   },
 ];
 
 function SidebarContents({ onNavigate }: { onNavigate?: () => void }) {
-  const { t, dir } = useI18n();
+  const { t, dir, lang } = useI18n();
   const { user, signOut } = useAuth();
+  const { isModuleEnabled, currentPlan } = useModules();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  const filteredSections = useMemo(() => {
+    return sections
+      .map((sec) => ({
+        ...sec,
+        items: sec.items.filter((it) => isModuleEnabled(it.moduleId)),
+      }))
+      .filter((sec) => sec.items.length > 0);
+  }, [isModuleEnabled]);
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-sidebar text-sidebar-foreground">
@@ -85,13 +99,18 @@ function SidebarContents({ onNavigate }: { onNavigate?: () => void }) {
           <Sparkles className="h-4 w-4 text-primary-foreground" />
         </div>
         <div className="flex flex-col leading-tight">
-          <span className="text-sm font-semibold tracking-tight text-foreground">{t("app.name")}</span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold tracking-tight text-foreground">{t("app.name")}</span>
+            <span className="inline-flex items-center rounded-full bg-primary/10 border border-primary/25 px-1.5 py-0.2 text-[9px] font-medium text-primary">
+              {lang === "ar" ? currentPlan.name.ar : currentPlan.name.en}
+            </span>
+          </div>
           <span className="text-[10px] text-muted-foreground">ERP · v0.1</span>
         </div>
       </div>
 
       <nav className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3 py-4 space-y-6 overscroll-contain [scrollbar-gutter:stable]">
-        {sections.map((sec) => (
+        {filteredSections.map((sec) => (
           <div key={sec.titleKey}>
             <div className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">
               {t(sec.titleKey)}

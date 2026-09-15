@@ -1,3 +1,4 @@
+import { ModuleGuard } from "@/lib/modules";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
@@ -9,7 +10,11 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/warehouses")({
   head: () => ({ meta: [{ title: "المستودعات — فورتيكس ERP" }] }),
-  component: WarehousesPage,
+  component: () => (
+    <ModuleGuard moduleId="multi_warehouse">
+      <WarehousesPage />
+    </ModuleGuard>
+  ),
 });
 
 type Row = {

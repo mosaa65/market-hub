@@ -1,3 +1,4 @@
+import { ModuleGuard } from "@/lib/modules";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import JsBarcode from "jsbarcode";
@@ -11,7 +12,11 @@ import { BarcodeScanner } from "@/components/barcode-scanner";
 
 export const Route = createFileRoute("/_app/barcodes")({
   head: () => ({ meta: [{ title: "Barcode Labels — Vortex ERP" }] }),
-  component: BarcodesPage,
+  component: () => (
+    <ModuleGuard moduleId="barcode">
+      <BarcodesPage />
+    </ModuleGuard>
+  ),
 });
 
 interface Product {

@@ -1,3 +1,4 @@
+import { ModuleGuard } from "@/lib/modules";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { CalendarClock, Plus, Trash2, AlertTriangle, Search, X } from "lucide-react";
@@ -8,7 +9,11 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/batches")({
   head: () => ({ meta: [{ title: "Batches & Expiry — Vortex ERP" }] }),
-  component: BatchesPage,
+  component: () => (
+    <ModuleGuard moduleId="batches">
+      <BatchesPage />
+    </ModuleGuard>
+  ),
 });
 
 interface Batch {
