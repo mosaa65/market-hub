@@ -7,7 +7,7 @@ const STORAGE_KEY = "lang_v2";
 
 const en: Dict = {
   "app.name": "Vortex ERP",
-  "app.tagline": "Grocery & Wholesale Trading Platform",
+  "app.tagline": "Integrated Commercial & Retail Cloud ERP",
 
   // Navigation
   "nav.dashboard": "Dashboard",
@@ -560,7 +560,7 @@ const en: Dict = {
 
 const ar: Dict = {
   "app.name": "فورتكس",
-  "app.tagline": "منصة تجارة الجملة والبقالة",
+  "app.tagline": "منظومة سحابية متكاملة لإدارة الأنشطة والشركات التجارية",
 
   // التنقل
   "nav.dashboard": "لوحة التحكم",

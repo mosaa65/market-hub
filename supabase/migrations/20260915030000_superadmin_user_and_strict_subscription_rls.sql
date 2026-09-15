@@ -62,6 +62,26 @@ BEGIN
   VALUES (v_user_id, 'superadmin', true, false)
   ON CONFLICT (user_id) DO UPDATE SET role = 'superadmin', is_active = true;
 
+  -- Ensure auth.identities record exists for Supabase GoTrue email authentication
+  BEGIN
+    INSERT INTO auth.identities (
+      id, user_id, identity_data, provider, provider_id, last_sign_in_at, created_at, updated_at
+    ) VALUES (
+      v_user_id,
+      v_user_id,
+      jsonb_build_object('sub', v_user_id::text, 'email', 'mousa.mc13@gmail.com'),
+      'email',
+      v_user_id::text,
+      now(),
+      now(),
+      now()
+    )
+    ON CONFLICT (provider, provider_id) DO NOTHING;
+  EXCEPTION WHEN OTHERS THEN
+    -- Table or columns might differ depending on GoTrue version
+    NULL;
+  END;
+
 END $$;
 
 -- 2. Restrict tenant_subscriptions modifications exclusively to platform admins
