@@ -199,6 +199,13 @@ export const SYSTEM_PLANS: PlatformPlan[] = [
   },
 ];
 
+export interface QuotaCheckResult {
+  allowed: boolean;
+  limit: number | null;
+  current: number;
+  message?: { ar: string; en: string };
+}
+
 interface ModulesContextType {
   currentPlanId: PlatformPlanId;
   currentPlan: PlatformPlan;
@@ -213,6 +220,7 @@ interface ModulesContextType {
   toggleExtraModule: (moduleId: string) => Promise<boolean>;
   resetToDefault: () => Promise<boolean>;
   isLoading: boolean;
+  checkQuota: (resource: "users" | "warehouses" | "products", currentCount: number) => QuotaCheckResult;
 }
 
 const ModulesContext = createContext<ModulesContextType | null>(null);
@@ -363,6 +371,47 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
     return setPlan("enterprise");
   };
 
+  const checkQuota = (
+    resource: "users" | "warehouses" | "products",
+    currentCount: number
+  ): QuotaCheckResult => {
+    let limit: number | null = null;
+    let nameAr = "";
+    let nameEn = "";
+
+    if (resource === "users") {
+      limit = currentPlan.maxUsers;
+      nameAr = "المستخدمين";
+      nameEn = "users";
+    } else if (resource === "warehouses") {
+      limit = currentPlan.maxWarehouses;
+      nameAr = "المستودعات";
+      nameEn = "warehouses";
+    } else if (resource === "products") {
+      limit = currentPlan.maxProducts;
+      nameAr = "المنتجات";
+      nameEn = "products";
+    }
+
+    if (limit === null) {
+      return { allowed: true, limit: null, current: currentCount };
+    }
+
+    const allowed = currentCount < limit;
+    return {
+      allowed,
+      limit,
+      current: currentCount,
+      message: allowed
+        ? undefined
+        : {
+            ar: `وصلت إلى الحد الأقصى المسموح به لـ ${nameAr} في ${currentPlan.name.ar} (${limit}). يرجى الترقية للمتابعة.`,
+            en: `You have reached the maximum allowed ${nameEn} on the ${currentPlan.name.en} (${limit}). Please upgrade to add more.`,
+          },
+    };
+  };
+
+
   return (
     <ModulesContext.Provider
       value={{
@@ -379,6 +428,7 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
         toggleExtraModule,
         resetToDefault,
         isLoading,
+        checkQuota,
       }}
     >
       {children}

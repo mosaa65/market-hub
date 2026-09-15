@@ -1,3 +1,4 @@
+import { useModules } from "@/lib/modules";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/page-header";
@@ -20,6 +21,7 @@ export const Route = createFileRoute("/_app/users")({
 });
 
 function UsersPage() {
+  const { checkQuota } = useModules();
   const { t, lang } = useI18n();
   const { hasRole, user } = useAuth();
   const isOwner = hasRole("owner");
@@ -40,6 +42,10 @@ function UsersPage() {
   useEffect(() => { load(); }, []);
 
   async function assignRole(userId: string, role: string) {
+    const qCheck = checkQuota("users", rows.length);
+    if (!qCheck.allowed) {
+      return toast.error(lang === "ar" ? qCheck.message?.ar : qCheck.message?.en);
+    }
     const { error } = await supabase.from("user_roles").insert({ user_id: userId, role: role as any });
     if (error) return toast.error(error.message);
     toast.success(t("users.role_granted") || (lang === "ar" ? "تم منح الصلاحية" : "Role granted"));

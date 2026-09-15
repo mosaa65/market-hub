@@ -23,6 +23,7 @@ type Row = {
 };
 
 function WarehousesPage() {
+  const { checkQuota } = useModules();
   const { t, lang } = useI18n();
   const qc = useQueryClient();
   const [q, setQ] = useState("");
@@ -83,7 +84,14 @@ function WarehousesPage() {
             <input value={q} onChange={(e) => setQ(e.target.value)} className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground" placeholder={t("common.search")} />
             <span className="hidden sm:inline text-[11px] text-muted-foreground tabular-nums">{filtered.length}</span>
           </div>
-          <button onClick={() => { setEditing(null); setOpen(true); }} className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm shadow-primary/20 hover:opacity-90 transition">
+          <button onClick={() => {
+            const qCheck = checkQuota("warehouses", (data ?? []).length);
+            if (!qCheck.allowed) {
+              toast.error(lang === "ar" ? qCheck.message?.ar : qCheck.message?.en);
+              return;
+            }
+            setEditing(null); setOpen(true);
+          }} className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm shadow-primary/20 hover:opacity-90 transition">
             <Plus className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{t("warehouses.new")}</span>
           </button>
         </div>

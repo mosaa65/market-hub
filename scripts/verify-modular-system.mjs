@@ -84,6 +84,15 @@ assert(fs.existsSync(path.resolve("supabase/migrations/20260915010000_platform_a
 assert(fs.existsSync(path.resolve("supabase/migrations/20260915020000_company_settings_catalog_modules.sql")), "Catalog modules migration exists");
 console.log("✅ 7. All database migrations are verified.");
 
+// 8. Verify Quota Enforcements
+const whContent = fs.readFileSync(path.resolve("src/routes/_app.warehouses.tsx"), "utf8");
+assert(whContent.includes("checkQuota"), "Warehouses route must enforce quotas");
+const prodContent = fs.readFileSync(path.resolve("src/routes/_app.products.tsx"), "utf8");
+assert(prodContent.includes("checkQuota"), "Products route must enforce quotas");
+const usrContent = fs.readFileSync(path.resolve("src/routes/_app.users.tsx"), "utf8");
+assert(usrContent.includes("checkQuota"), "Users route must enforce quotas");
+console.log("✅ 8. Quota enforcement active on warehouses, products, and users.");
+
 console.log("==================================================");
-console.log("🎉 ALL 7 INTEGRATION VERIFICATIONS PASSED SUCCESSFULLY!");
+console.log("🎉 ALL 8 INTEGRATION VERIFICATIONS PASSED SUCCESSFULLY!");
 console.log("==================================================");

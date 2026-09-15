@@ -38,6 +38,7 @@ type ProductRow = {
 };
 
 function ProductsPage() {
+  const { checkQuota } = useModules();
   const { t, lang } = useI18n();
   const { config } = useCatalogModules();
   const { isModuleEnabled } = useModules();
@@ -151,6 +152,11 @@ function ProductsPage() {
 
           <button
             onClick={() => {
+              const qCheck = checkQuota("products", (data ?? []).length);
+              if (!qCheck.allowed) {
+                toast.error(lang === "ar" ? qCheck.message?.ar : qCheck.message?.en);
+                return;
+              }
               setEditing(null);
               setOpen(true);
             }}
