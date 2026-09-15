@@ -6,10 +6,12 @@ import {
   Search, Command as CommandIcon, LogOut, Moon, Sun, Sparkles,
   RotateCcw, ArrowRightLeft, CalendarClock, Barcode, Gift, History, Layers, Boxes,
   Menu, HandCoins, AlertTriangle, LineChart, FileText, BookOpen, Scale, Landmark, PieChart,
+  PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { useModules } from "@/lib/modules";
+import { supabase } from "@/integrations/supabase/client";
 import { CommandPalette } from "@/components/command-palette";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
@@ -76,12 +78,33 @@ const sections: Section[] = [
   },
 ];
 
-function SidebarContents({ onNavigate }: { onNavigate?: () => void }) {
+function SidebarContents({
+  onNavigate,
+  collapsed = false,
+  onToggleCollapse,
+}: {
+  onNavigate?: () => void;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
+}) {
   const { t, dir, lang } = useI18n();
   const { user, signOut } = useAuth();
   const { isModuleEnabled, currentPlan } = useModules();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const [logoUrl, setLogoUrl] = useState<string>("/inama-soft-logo.ico");
+
+  useEffect(() => {
+    supabase
+      .from("company_settings")
+      .select("logo_url")
+      .order("id")
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.logo_url) setLogoUrl(data.logo_url);
+      });
+  }, []);
 
   const filteredSections = useMemo(() => {
     return sections
@@ -94,27 +117,54 @@ function SidebarContents({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-sidebar text-sidebar-foreground">
-      <div className="flex h-16 items-center gap-2.5 px-5 border-b border-sidebar-border/60">
-        <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-primary via-primary to-chart-4 shadow-lg shadow-primary/20 ring-1 ring-white/10">
-          <Sparkles className="h-4 w-4 text-primary-foreground" />
+      {/* Sidebar Header with Brand Logo */}
+      <div className={cn(
+        "flex h-16 items-center border-b border-sidebar-border/60 transition-all duration-300",
+        collapsed ? "justify-center px-2" : "gap-2.5 px-4 justify-between"
+      )}>
+        <div className="flex items-center gap-2.5 min-w-0">
+          <img
+            src={logoUrl}
+            alt={t("app.name")}
+            className="h-9 w-9 shrink-0 rounded-xl object-contain bg-surface-2/90 p-1 border border-border/60 shadow-md ring-1 ring-white/10"
+            onError={() => setLogoUrl("/inama-soft-logo.ico")}
+          />
+          {!collapsed && (
+            <div className="flex flex-col leading-tight min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-bold tracking-tight text-foreground truncate">{t("app.name")}</span>
+                <span className="inline-flex items-center rounded-full bg-primary/10 border border-primary/25 px-1.5 py-0.2 text-[9px] font-medium text-primary shrink-0">
+                  {lang === "ar" ? currentPlan.name.ar : currentPlan.name.en}
+                </span>
+              </div>
+              <span className="text-[10px] text-muted-foreground">ERP · Inama Soft</span>
+            </div>
+          )}
         </div>
-        <div className="flex flex-col leading-tight">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold tracking-tight text-foreground">{t("app.name")}</span>
-            <span className="inline-flex items-center rounded-full bg-primary/10 border border-primary/25 px-1.5 py-0.2 text-[9px] font-medium text-primary">
-              {lang === "ar" ? currentPlan.name.ar : currentPlan.name.en}
-            </span>
-          </div>
-          <span className="text-[10px] text-muted-foreground">ERP · v0.1</span>
-        </div>
+
+        {!collapsed && onToggleCollapse && (
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            className="hidden md:grid h-8 w-8 place-items-center rounded-lg border border-sidebar-border/80 bg-surface-2/60 text-muted-foreground hover:bg-surface-3 hover:text-foreground transition"
+            title={lang === "ar" ? "عرض أيقونات فقط" : "Collapse sidebar"}
+          >
+            <PanelLeftClose className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
-      <nav className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3 py-4 space-y-6 overscroll-contain [scrollbar-gutter:stable]">
+      {/* Navigation Links */}
+      <nav className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-2 py-3 space-y-4 overscroll-contain [scrollbar-gutter:stable]">
         {filteredSections.map((sec) => (
           <div key={sec.titleKey}>
-            <div className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">
-              {t(sec.titleKey)}
-            </div>
+            {!collapsed ? (
+              <div className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70 truncate">
+                {t(sec.titleKey)}
+              </div>
+            ) : (
+              <div className="my-2 border-t border-sidebar-border/40 mx-2" />
+            )}
             <ul className="space-y-0.5">
               {sec.items.map((it) => {
                 const active = pathname === it.to || pathname.startsWith(it.to + "/");
@@ -123,8 +173,10 @@ function SidebarContents({ onNavigate }: { onNavigate?: () => void }) {
                     <Link
                       to={it.to}
                       onClick={onNavigate}
+                      title={t(it.key)}
                       className={cn(
-                        "group relative flex items-center gap-3 rounded-xl px-3 py-2 text-[13px] font-medium transition-all",
+                        "group relative flex items-center rounded-xl text-[13px] font-medium transition-all",
+                        collapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2",
                         active
                           ? "bg-gradient-to-r from-primary/15 to-primary/5 text-foreground shadow-[inset_0_0_0_1px_oklch(1_0_0_/_0.06)]"
                           : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground"
@@ -133,8 +185,8 @@ function SidebarContents({ onNavigate }: { onNavigate?: () => void }) {
                       {active && (
                         <span className={cn("absolute inset-y-2 w-[3px] rounded-full bg-primary", dir === "rtl" ? "right-0" : "left-0")} />
                       )}
-                      <it.icon className={cn("h-4 w-4 shrink-0 transition-colors", active ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
-                      <span className="truncate">{t(it.key)}</span>
+                      <it.icon className={cn("h-4.5 w-4.5 shrink-0 transition-colors", active ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
+                      {!collapsed && <span className="truncate">{t(it.key)}</span>}
                     </Link>
                   </li>
                 );
@@ -144,16 +196,48 @@ function SidebarContents({ onNavigate }: { onNavigate?: () => void }) {
         ))}
       </nav>
 
-      <div className="border-t border-sidebar-border/60 p-3">
+      {/* Footer Profile & Desktop Toggle */}
+      <div className={cn("border-t border-sidebar-border/60 p-2 space-y-1", collapsed && "flex flex-col items-center")}>
+        {onToggleCollapse && (
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            className={cn(
+              "hidden md:flex w-full items-center rounded-xl p-2 text-xs text-muted-foreground hover:bg-sidebar-accent hover:text-foreground transition",
+              collapsed ? "justify-center" : "gap-2.5 px-3"
+            )}
+            title={collapsed
+              ? (lang === "ar" ? "توسيع القائمة (أيقونات وأسماء)" : "Expand sidebar")
+              : (lang === "ar" ? "طي القائمة (أيقونات فقط)" : "Collapse sidebar")}
+          >
+            {collapsed ? (
+              <PanelLeftOpen className="h-4 w-4 text-primary" />
+            ) : (
+              <>
+                <PanelLeftClose className="h-4 w-4" />
+                <span className="truncate">{lang === "ar" ? "عرض أيقونات فقط" : "Collapse sidebar"}</span>
+              </>
+            )}
+          </button>
+        )}
+
         <button
           onClick={async () => { await signOut(); navigate({ to: "/auth", replace: true }); }}
-          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] text-muted-foreground hover:bg-sidebar-accent hover:text-foreground transition-colors"
+          className={cn(
+            "flex w-full items-center rounded-xl p-2 text-[13px] text-muted-foreground hover:bg-sidebar-accent hover:text-foreground transition-colors",
+            collapsed ? "justify-center" : "gap-2.5 px-3"
+          )}
+          title={lang === "ar" ? "تسجيل الخروج" : "Sign out"}
         >
           <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-gradient-to-br from-primary/20 to-chart-4/20 text-[11px] font-semibold text-foreground">
             {(user?.email ?? "?").charAt(0).toUpperCase()}
           </div>
-          <span className="min-w-0 flex-1 truncate text-start">{user?.email}</span>
-          <LogOut className="h-3.5 w-3.5 shrink-0" />
+          {!collapsed && (
+            <>
+              <span className="min-w-0 flex-1 truncate text-start">{user?.email}</span>
+              <LogOut className="h-3.5 w-3.5 shrink-0" />
+            </>
+          )}
         </button>
       </div>
     </div>
@@ -165,6 +249,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("vortex_sidebar_collapsed") === "true";
+    }
+    return false;
+  });
+
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      if (typeof window !== "undefined") {
+        localStorage.setItem("vortex_sidebar_collapsed", String(next));
+      }
+      return next;
+    });
+  };
   const [theme, setTheme] = useState<"dark" | "light">(() =>
     (typeof window !== "undefined" && (localStorage.getItem("theme") as "dark" | "light")) || "dark"
   );
@@ -192,8 +292,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative z-10 flex h-screen w-full overflow-hidden text-foreground">
       {/* Desktop sidebar */}
-      <aside className={cn("hidden md:flex h-full w-64 shrink-0 flex-col overflow-hidden", sideEdge, "border-sidebar-border/60")}>
-        <SidebarContents />
+      <aside className={cn(
+        "hidden md:flex h-full shrink-0 flex-col overflow-hidden transition-all duration-300 ease-in-out",
+        collapsed ? "w-[72px]" : "w-64",
+        sideEdge,
+        "border-sidebar-border/60"
+      )}>
+        <SidebarContents collapsed={collapsed} onToggleCollapse={toggleCollapsed} />
       </aside>
 
       {/* Mobile drawer */}
@@ -213,6 +318,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             aria-label="Open menu"
           >
             <Menu className="h-4.5 w-4.5" />
+          </button>
+
+          {/* Desktop Sidebar Collapse / Expand Toggle */}
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            className="hidden md:grid h-10 w-10 shrink-0 place-items-center rounded-full border border-border/60 bg-surface text-muted-foreground hover:text-foreground hover:border-ring/40 transition-colors"
+            title={collapsed
+              ? (dir === "rtl" ? "توسيع القائمة الجانبية" : "Expand sidebar")
+              : (dir === "rtl" ? "طي القائمة (أيقونات فقط)" : "Collapse sidebar")}
+          >
+            {collapsed ? <PanelLeftOpen className="h-4.5 w-4.5" /> : <PanelLeftClose className="h-4.5 w-4.5" />}
           </button>
 
           <button
