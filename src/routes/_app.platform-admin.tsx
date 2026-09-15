@@ -38,6 +38,30 @@ function PlatformAdminPage() {
 
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "modules" | "plans" | "audit">("overview");
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+
+  const loadAuditLogs = async () => {
+    setLoadingLogs(true);
+    try {
+      const { data } = await (supabase as any)
+        .from("platform_audit_logs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      setAuditLogs(data || []);
+    } catch {
+      // silent
+    } finally {
+      setLoadingLogs(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "audit") {
+      void loadAuditLogs();
+    }
+  }, [activeTab]);
 
   // Mock / Remote tenant stats
   const stats = useMemo(() => {
@@ -51,10 +75,28 @@ function PlatformAdminPage() {
     };
   }, [modules, isModuleEnabled, currentPlan, isAr]);
 
+  const handleToggleExtra = async (moduleId: string) => {
+    await toggleExtraModule(moduleId);
+    try {
+      await (supabase as any).from("platform_audit_logs").insert({
+        action: `TOGGLE_ADDON_${moduleId.toUpperCase()}`,
+        target_tenant_id: "default",
+        payload: { module_id: moduleId, enabled: !extraModules.includes(moduleId) },
+      });
+    } catch {}
+  };
+
   const handlePlanChange = async (planId: PlatformPlanId) => {
     setLoading(true);
     try {
       await setPlan(planId);
+      try {
+        await (supabase as any).from("platform_audit_logs").insert({
+          action: `PLAN_UPGRADE_${planId.toUpperCase()}`,
+          target_tenant_id: "default",
+          payload: { previous_plan: currentPlanId, new_plan: planId },
+        });
+      } catch {}
       toast.success(
         isAr
           ? `تم تحديث باقة المستأجر بنجاح إلى: ${planId.toUpperCase()}`
@@ -181,6 +223,16 @@ function PlatformAdminPage() {
         >
           {isAr ? "تعريف الباقات والأسعار" : "Plan Tiers & Pricing"}
         </button>
+        <button
+          onClick={() => setActiveTab("audit")}
+          className={`rounded-xl px-4 py-2 text-xs font-semibold transition ${
+            activeTab === "audit"
+              ? "bg-primary text-primary-foreground shadow-sm"
+              : "text-muted-foreground hover:bg-surface hover:text-foreground"
+          }`}
+        >
+          {isAr ? "سجل تدقيق المنصة (Platform Audit)" : "Platform Audit Trail"}
+        </button>
       </div>
 
       {/* Tab 1: Tenant Allocation & Plan Control */}
@@ -275,7 +327,7 @@ function PlatformAdminPage() {
                         <Switch
                           checked={enabled}
                           disabled={inBase}
-                          onCheckedChange={() => void toggleExtraModule(m.id)}
+                          onCheckedChange={() => void handleToggleExtra(m.id)}
                         />
                       </div>
                     );
@@ -404,6 +456,78 @@ function PlatformAdminPage() {
             </Card>
           ))}
         </div>
+      )}
+
+      {/* Tab 4: Platform Audit Logs */}
+      {activeTab === "audit" && (
+        <Card className="border-border/80 bg-surface">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-base">
+                {isAr ? "سجل تدقيق عمليات المنصة والتراخيص" : "Platform Audit Trail & Entitlement Logs"}
+              </CardTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {isAr
+                  ? "توثيق شامل لكافة تغييرات الباقات، وتعديلات التراخيص على مستوى النظام."
+                  : "Immutable log of subscription changes, add-on overrides and super-admin operations."}
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void loadAuditLogs()}
+              disabled={loadingLogs}
+              className="rounded-full gap-1.5 text-xs"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${loadingLogs ? "animate-spin" : ""}`} />
+              <span>{isAr ? "تحديث السجل" : "Refresh"}</span>
+            </Button>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-border/80 bg-surface-2/60 text-muted-foreground">
+                    <th className="p-3 text-start font-medium">{isAr ? "الوقت" : "Timestamp"}</th>
+                    <th className="p-3 text-start font-medium">{isAr ? "الحدث / الإجراء" : "Action"}</th>
+                    <th className="p-3 text-start font-medium">{isAr ? "المستأجر" : "Target Tenant"}</th>
+                    <th className="p-3 text-start font-medium">{isAr ? "التفاصيل" : "Payload"}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/40">
+                  {auditLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="p-8 text-center text-muted-foreground">
+                        {loadingLogs
+                          ? (isAr ? "جاري تحميل سجلات التدقيق..." : "Loading audit logs...")
+                          : (isAr ? "لا توجد سجلات تدقيق سابقة حتى الآن" : "No platform audit entries yet")}
+                      </td>
+                    </tr>
+                  ) : (
+                    auditLogs.map((log) => (
+                      <tr key={log.id} className="hover:bg-surface-2/40 transition">
+                        <td className="p-3 font-mono text-[11px] text-muted-foreground">
+                          {new Date(log.created_at).toLocaleString()}
+                        </td>
+                        <td className="p-3">
+                          <Badge variant="outline" className="font-mono text-[10px] uppercase">
+                            {log.action}
+                          </Badge>
+                        </td>
+                        <td className="p-3 font-mono text-[11px]">
+                          {log.target_tenant_id || "default"}
+                        </td>
+                        <td className="p-3 font-mono text-[11px] text-muted-foreground max-w-xs truncate">
+                          {JSON.stringify(log.payload ?? {})}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

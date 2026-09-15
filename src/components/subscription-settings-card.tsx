@@ -1,16 +1,18 @@
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import { useModules, PlatformPlanId } from "@/lib/modules";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { PlanComparisonDialog } from "@/components/plan-comparison-dialog";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
   Crown, Sparkles, CheckCircle2, Boxes, Layers, ScanBarcode, Gift,
   CalendarClock, Truck, RotateCcw, HandCoins, Wallet, BarChart3,
-  History, BookOpen, ShieldCheck,
+  History, BookOpen, ShieldCheck, Users, Package, AlertCircle,
 } from "lucide-react";
 
 export function SubscriptionSettingsCard() {
@@ -28,6 +30,32 @@ export function SubscriptionSettingsCard() {
   } = useModules();
 
   const [switching, setSwitching] = useState<string | null>(null);
+  const [counts, setCounts] = useState<{ users: number; warehouses: number; products: number }>({
+    users: 1,
+    warehouses: 1,
+    products: 0,
+  });
+
+  // Fetch real-time usage metrics
+  useEffect(() => {
+    async function loadUsage() {
+      try {
+        const [uRes, wRes, pRes] = await Promise.all([
+          supabase.from("profiles").select("id", { count: "exact", head: true }),
+          supabase.from("warehouses").select("id", { count: "exact", head: true }),
+          supabase.from("products").select("id", { count: "exact", head: true }),
+        ]);
+        setCounts({
+          users: uRes.count ?? 1,
+          warehouses: wRes.count ?? 1,
+          products: pRes.count ?? 0,
+        });
+      } catch {
+        // Silent fallback
+      }
+    }
+    void loadUsage();
+  }, []);
 
   const handlePlanSelect = async (planId: PlatformPlanId) => {
     if (planId === currentPlanId) return;
@@ -64,15 +92,22 @@ export function SubscriptionSettingsCard() {
     }
   };
 
+  // Quota percentage calculations
+  const userPct = Math.min(100, Math.round((counts.users / currentPlan.maxUsers) * 100));
+  const whPct = Math.min(100, Math.round((counts.warehouses / currentPlan.maxWarehouses) * 100));
+  const prodLimit = currentPlan.maxProducts;
+  const prodPct = prodLimit ? Math.min(100, Math.round((counts.products / prodLimit) * 100)) : 0;
+
   return (
     <Card className="lg:col-span-2 border-primary/40 bg-gradient-to-br from-primary/5 via-surface to-surface-2/80 shadow-lg">
       <CardHeader>
-        <CardTitle className="text-base flex items-center justify-between">
+        <CardTitle className="text-base flex flex-wrap items-center justify-between gap-3">
           <span className="flex items-center gap-2">
             <Crown className="h-5 w-5 text-amber-500" />
             {isAr ? "إدارة باقة النظام والوحدات (Packaging & Modules)" : "Subscription & Modules Packaging"}
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <PlanComparisonDialog />
             <Link
               to="/platform-admin"
               className="inline-flex items-center gap-1.5 rounded-full bg-surface-2/90 border border-border/80 px-3 py-1 text-xs font-medium text-foreground hover:bg-surface-3 transition shadow-xs"
@@ -88,6 +123,86 @@ export function SubscriptionSettingsCard() {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Resource Usage & Quota Meters */}
+        <div className="rounded-2xl border border-border/70 bg-surface/70 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              {isAr ? "استهلاك الموارد والحصص الحالية" : "Resource Consumption & Plan Quotas"}
+            </div>
+            {(userPct >= 80 || whPct >= 80 || (prodLimit && prodPct >= 80)) && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-500">
+                <AlertCircle className="h-3.5 w-3.5" />
+                {isAr ? "تقترب من الحد الأقصى للباقة" : "Near plan quota limit"}
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Users Quota */}
+            <div className="space-y-1.5 rounded-xl border border-border/50 bg-surface-2/50 p-3">
+              <div className="flex items-center justify-between text-xs">
+                <span className="flex items-center gap-1.5 font-medium text-muted-foreground">
+                  <Users className="h-3.5 w-3.5 text-blue-500" />
+                  {isAr ? "المستخدمون" : "Users"}
+                </span>
+                <span className="font-mono font-bold text-foreground">
+                  {counts.users} / {currentPlan.maxUsers}
+                </span>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-surface-3">
+                <div
+                  className={`h-full transition-all duration-500 ${
+                    userPct >= 100 ? "bg-rose-500" : userPct >= 80 ? "bg-amber-500" : "bg-blue-500"
+                  }`}
+                  style={{ width: `${userPct}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Warehouses Quota */}
+            <div className="space-y-1.5 rounded-xl border border-border/50 bg-surface-2/50 p-3">
+              <div className="flex items-center justify-between text-xs">
+                <span className="flex items-center gap-1.5 font-medium text-muted-foreground">
+                  <Boxes className="h-3.5 w-3.5 text-cyan-500" />
+                  {isAr ? "المستودعات" : "Warehouses"}
+                </span>
+                <span className="font-mono font-bold text-foreground">
+                  {counts.warehouses} / {currentPlan.maxWarehouses}
+                </span>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-surface-3">
+                <div
+                  className={`h-full transition-all duration-500 ${
+                    whPct >= 100 ? "bg-rose-500" : whPct >= 80 ? "bg-amber-500" : "bg-cyan-500"
+                  }`}
+                  style={{ width: `${whPct}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Products Quota */}
+            <div className="space-y-1.5 rounded-xl border border-border/50 bg-surface-2/50 p-3">
+              <div className="flex items-center justify-between text-xs">
+                <span className="flex items-center gap-1.5 font-medium text-muted-foreground">
+                  <Package className="h-3.5 w-3.5 text-emerald-500" />
+                  {isAr ? "المنتجات" : "Products"}
+                </span>
+                <span className="font-mono font-bold text-foreground">
+                  {counts.products} / {prodLimit ? prodLimit.toLocaleString() : isAr ? "غير محدود" : "Unlimited"}
+                </span>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-surface-3">
+                <div
+                  className={`h-full transition-all duration-500 ${
+                    prodLimit && prodPct >= 100 ? "bg-rose-500" : prodLimit && prodPct >= 80 ? "bg-amber-500" : "bg-emerald-500"
+                  }`}
+                  style={{ width: prodLimit ? `${prodPct}%` : "10%" }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Plans Selector */}
         <div>
           <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">

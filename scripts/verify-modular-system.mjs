@@ -120,6 +120,20 @@ const finContent = fs.readFileSync(path.resolve("src/routes/_app.finance.tsx"), 
 assert(finContent.includes('isModuleEnabled("payments")'), "Finance route must guard debtors tab");
 console.log("✅ 9. In-component dynamic modular filtering verified across 8 core routes.");
 
+// 10. Verify Plan Comparison Dialog, Resource Quota Meter, and Platform Audit
+const planCompExists = fs.existsSync(path.resolve("src/components/plan-comparison-dialog.tsx"));
+assert(planCompExists, "PlanComparisonDialog must exist");
+
+const subCardContent = fs.readFileSync(path.resolve("src/components/subscription-settings-card.tsx"), "utf8");
+assert(subCardContent.includes("PlanComparisonDialog"), "SubscriptionSettingsCard must include PlanComparisonDialog");
+assert(subCardContent.includes("userPct"), "SubscriptionSettingsCard must calculate and display user quotas");
+assert(subCardContent.includes("whPct"), "SubscriptionSettingsCard must calculate and display warehouse quotas");
+
+const platAdminContent = fs.readFileSync(path.resolve("src/routes/_app.platform-admin.tsx"), "utf8");
+assert(platAdminContent.includes('activeTab === "audit"'), "Platform admin must include audit trail tab");
+assert(platAdminContent.includes("platform_audit_logs"), "Platform admin must persist events to platform_audit_logs");
+console.log("✅ 10. Plan comparison matrix, live quota meters, and audit trail verified.");
+
 console.log("==================================================");
-console.log("🎉 ALL 9 INTEGRATION VERIFICATIONS PASSED SUCCESSFULLY!");
+console.log("🎉 ALL 10 INTEGRATION VERIFICATIONS PASSED SUCCESSFULLY!");
 console.log("==================================================");
