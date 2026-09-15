@@ -1,4 +1,4 @@
-import { ModuleGuard } from "@/lib/modules";
+import { ModuleGuard, useModules } from "@/lib/modules";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
@@ -40,6 +40,7 @@ interface Stats {
 }
 
 function FinancePage() {
+  const { isModuleEnabled } = useModules();
   const { t, lang } = useI18n();
   const [stats, setStats] = useState<Stats | null>(null);
   const [expenses, setExpenses] = useState<any[]>([]);
@@ -181,8 +182,8 @@ function FinancePage() {
       <Tabs defaultValue="expenses">
         <TabsList>
           <TabsTrigger value="expenses">{lang === "ar" ? "المصروفات" : "Expenses"}</TabsTrigger>
-          <TabsTrigger value="debtors">{lang === "ar" ? "العملاء المدينون" : "Debtors"}</TabsTrigger>
-          <TabsTrigger value="creditors">{lang === "ar" ? "الموردون الدائنون" : "Creditors"}</TabsTrigger>
+          {isModuleEnabled("payments") && <TabsTrigger value="debtors">{lang === "ar" ? "العملاء المدينون" : "Debtors"}</TabsTrigger>}
+          {isModuleEnabled("purchases") && <TabsTrigger value="creditors">{lang === "ar" ? "الموردون الدائنون" : "Creditors"}</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="expenses">

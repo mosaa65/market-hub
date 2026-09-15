@@ -352,13 +352,15 @@ function CustomersPage() {
                           className="absolute end-0 top-10 z-50 min-w-[210px] rounded-xl border border-border/60 bg-surface shadow-xl shadow-black/20 backdrop-blur-xl p-1.5 animate-in fade-in slide-in-from-top-2 duration-150"
                           onClick={e => e.stopPropagation()}
                         >
-                          <QuickActionItem
-                            icon={<Wallet className="h-3.5 w-3.5" />}
-                            label={lang === "ar" ? "تحصيل دفعة" : "Collect payment"}
-                            shortcut="F3"
-                            onClick={() => { setMenuOpen(null); goPayment(r); }}
-                          />
-                          {Number(r.balance) > 0 && (
+                          {isModuleEnabled("payments") && (
+                            <QuickActionItem
+                              icon={<Wallet className="h-3.5 w-3.5" />}
+                              label={lang === "ar" ? "تحصيل دفعة" : "Collect payment"}
+                              shortcut="F3"
+                              onClick={() => { setMenuOpen(null); goPayment(r); }}
+                            />
+                          )}
+                          {isModuleEnabled("payments") && Number(r.balance) > 0 && (
                             <QuickActionItem
                               icon={<AlertTriangle className="h-3.5 w-3.5" />}
                               label={lang === "ar" ? "الدين" : "Debt"}
@@ -367,19 +369,21 @@ function CustomersPage() {
                               onClick={() => { setMenuOpen(null); goDebts(r); }}
                             />
                           )}
-                          <QuickActionItem
-                            icon={<FileText className="h-3.5 w-3.5" />}
-                            label={lang === "ar" ? "كشف حساب" : "Account statement"}
-                            shortcut="F5"
-                            onClick={() => { setMenuOpen(null); goStatement(r); }}
-                          />
+                          {isModuleEnabled("payments") && (
+                            <QuickActionItem
+                              icon={<FileText className="h-3.5 w-3.5" />}
+                              label={lang === "ar" ? "كشف حساب" : "Account statement"}
+                              shortcut="F5"
+                              onClick={() => { setMenuOpen(null); goStatement(r); }}
+                            />
+                          )}
                           <div className="my-1 border-t border-border/40" />
                           <QuickActionItem
                             icon={<ShoppingCart className="h-3.5 w-3.5" />}
                             label={lang === "ar" ? "إنشاء فاتورة بيع" : "New sale"}
-                            onClick={() => { setMenuOpen(null); goPOS(r); }}
+                            onClick={() => { setMenuOpen(null); if (isModuleEnabled("pos")) { goPOS(r); } else { navigate({ to: "/sales" }); } }}
                           />
-                          {Number(r.loyalty_points) > 0 && (
+                          {isModuleEnabled("loyalty") && Number(r.loyalty_points) > 0 && (
                             <QuickActionItem
                               icon={<Star className="h-3.5 w-3.5" />}
                               label={lang === "ar" ? "نقاط الولاء" : "Loyalty points"}

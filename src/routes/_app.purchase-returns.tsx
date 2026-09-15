@@ -1,4 +1,4 @@
-import { ModuleGuard } from "@/lib/modules";
+import { ModuleGuard, useModules } from "@/lib/modules";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
@@ -34,6 +34,8 @@ interface Line {
 }
 
 function PurchaseReturnsPage() {
+  const { isModuleEnabled } = useModules();
+  const hasMultiWarehouse = isModuleEnabled("multi_warehouse");
   const { t, lang } = useI18n();
   const [purchaseReturns, setPurchaseReturns] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -91,7 +93,7 @@ function PurchaseReturnsPage() {
                   <TableHead># {lang === "ar" ? "رقم المرتجع" : "Return #"}</TableHead>
                   <TableHead>{lang === "ar" ? "التاريخ" : "Date"}</TableHead>
                   <TableHead>{lang === "ar" ? "المورد" : "Supplier"}</TableHead>
-                  <TableHead>{lang === "ar" ? "المستودع" : "Warehouse"}</TableHead>
+                  {hasMultiWarehouse && <TableHead>{lang === "ar" ? "المستودع" : "Warehouse"}</TableHead>}
                   <TableHead>{lang === "ar" ? "طريقة الاسترداد" : "Refund Method"}</TableHead>
                   <TableHead className="text-end">{lang === "ar" ? "الإجمالي" : "Total"}</TableHead>
                 </TableRow>
@@ -99,13 +101,13 @@ function PurchaseReturnsPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={hasMultiWarehouse ? 6 : 5} className="text-center text-muted-foreground py-8">
                       {t("common.loading")}
                     </TableCell>
                   </TableRow>
                 ) : filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground py-12">
+                    <TableCell colSpan={hasMultiWarehouse ? 6 : 5} className="text-center text-muted-foreground py-12">
                       <RotateCcw className="mx-auto mb-2 h-8 w-8 opacity-40" />
                       {lang === "ar" ? "لا توجد مرتجعات مشتريات" : "No purchase returns"}
                     </TableCell>
@@ -118,7 +120,7 @@ function PurchaseReturnsPage() {
                         {new Date(r.created_at).toLocaleString()}
                       </TableCell>
                       <TableCell>{r.suppliers?.name ?? "—"}</TableCell>
-                      <TableCell>{whName(r.warehouses)}</TableCell>
+                      {hasMultiWarehouse && <TableCell>{whName(r.warehouses)}</TableCell>}
                       <TableCell className="text-xs">{r.refund_method ?? "cash"}</TableCell>
                       <TableCell className="text-end font-mono font-semibold">{money(Number(r.total))}</TableCell>
                     </TableRow>
@@ -133,7 +135,7 @@ function PurchaseReturnsPage() {
   );
 }
 
-function NewPurchaseReturn({ onSaved }: { onSaved: () => void }) {
+function NewPurchaseReturn({ onSaved, hasMultiWarehouse }: { onSaved: () => void; hasMultiWarehouse?: boolean }) {
   const { t, lang } = useI18n();
   const [open, setOpen] = useState(false);
   const [warehouses, setWarehouses] = useState<any[]>([]);
@@ -240,22 +242,24 @@ function NewPurchaseReturn({ onSaved }: { onSaved: () => void }) {
           <DialogTitle>{lang === "ar" ? "إنشاء مرتجع مشتريات" : "New Purchase Return"}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-4 py-2">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="grid gap-1.5">
-              <Label>{lang === "ar" ? "المستودع" : "Warehouse"}</Label>
-              <Select value={warehouseId} onValueChange={setWarehouseId}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {warehouses.map((w) => (
-                    <SelectItem key={w.id} value={w.id}>
-                      {lang === "ar" ? w.name_ar || w.name : w.name || w.name_ar}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className={`grid grid-cols-1 ${hasMultiWarehouse ? "sm:grid-cols-3" : "sm:grid-cols-2"} gap-3`}>
+            {hasMultiWarehouse && (
+              <div className="grid gap-1.5">
+                <Label>{lang === "ar" ? "المستودع" : "Warehouse"}</Label>
+                <Select value={warehouseId} onValueChange={setWarehouseId}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {warehouses.map((w) => (
+                      <SelectItem key={w.id} value={w.id}>
+                        {lang === "ar" ? w.name_ar || w.name : w.name || w.name_ar}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="grid gap-1.5">
               <Label>{lang === "ar" ? "المورد" : "Supplier"}</Label>
               <Select value={supplierId} onValueChange={setSupplierId}>

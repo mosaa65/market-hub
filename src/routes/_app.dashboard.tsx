@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/page-header";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
+import { useModules } from "@/lib/modules";
 import { money, num } from "@/lib/format";
 import {
   ArrowUpRight, ArrowDownRight, DollarSign, ShoppingCart, Users, AlertTriangle,
@@ -21,6 +22,7 @@ export const Route = createFileRoute("/_app/dashboard")({
 const CHART_COLORS = ["oklch(0.62 0.21 260)", "oklch(0.7 0.18 180)", "oklch(0.72 0.18 60)", "oklch(0.68 0.2 340)", "oklch(0.75 0.15 140)"];
 
 function DashboardPage() {
+  const { isModuleEnabled } = useModules();
   const { t, lang } = useI18n();
 
   const { data } = useQuery({
@@ -107,9 +109,11 @@ function DashboardPage() {
         title={t("dash.title")}
         subtitle={t("dash.subtitle")}
         actions={
-          <Link to="/analytics" className="hidden sm:flex h-9 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-4 text-xs font-medium text-primary hover:bg-primary/20 transition">
-            <Sparkles className="h-3.5 w-3.5" /> {lang === "ar" ? "التحليلات المتقدمة" : "Advanced analytics"}
-          </Link>
+          isModuleEnabled("analytics") ? (
+            <Link to="/analytics" className="hidden sm:flex h-9 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-4 text-xs font-medium text-primary hover:bg-primary/20 transition">
+              <Sparkles className="h-3.5 w-3.5" /> {lang === "ar" ? "التحليلات المتقدمة" : "Advanced analytics"}
+            </Link>
+          ) : undefined
         }
       />
 

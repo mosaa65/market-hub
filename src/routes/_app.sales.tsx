@@ -4,6 +4,7 @@ import { Receipt, Search, Eye, X, FileDown, Printer, Sparkles, ScrollText } from
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { useI18n } from "@/lib/i18n";
+import { useModules } from "@/lib/modules";
 import { money } from "@/lib/format";
 import { generateInvoicePDF, type InvoiceDoc } from "@/lib/pdf";
 import { printInvoice, type InvoiceTemplate } from "@/lib/invoice-print";
@@ -34,6 +35,8 @@ interface Line {
 
 function SalesPage() {
   const { t, lang } = useI18n();
+  const { isModuleEnabled } = useModules();
+  const hasMultiWarehouse = isModuleEnabled("multi_warehouse");
   const [rows, setRows] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -53,7 +56,7 @@ function SalesPage() {
       date: new Date(selected.created_at).toLocaleString(),
       partyLabel: t("sales.bill_to"),
       partyName: selected.customers?.name ?? t("pos.walkin"),
-      warehouse: whName(selected.warehouses) ?? undefined,
+      warehouse: hasMultiWarehouse ? (whName(selected.warehouses) ?? undefined) : undefined,
       payment: pmLabel(selected.payment_method),
       status: statusLabel(selected.status),
       lines: lines.map(l => ({ product: l.products?.name ?? "—", qty: Number(l.quantity), price: Number(l.unit_price), total: Number(l.total) })),
@@ -150,7 +153,7 @@ function SalesPage() {
                 <th className="px-3 py-2 text-start font-medium">{t("sales.invoice")}</th>
                 <th className="px-3 py-2 text-start font-medium">{t("common.date")}</th>
                 <th className="px-3 py-2 text-start font-medium">{t("common.customer")}</th>
-                <th className="px-3 py-2 text-start font-medium">{t("common.warehouse")}</th>
+                {hasMultiWarehouse && <th className="px-3 py-2 text-start font-medium">{t("common.warehouse")}</th>}
                 <th className="px-3 py-2 text-start font-medium">{t("sales.payment")}</th>
                 <th className="px-3 py-2 text-start font-medium">{t("common.status")}</th>
                 <th className="px-3 py-2 text-end font-medium">{t("common.total")}</th>
@@ -159,9 +162,9 @@ function SalesPage() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={8} className="py-10 text-center text-muted-foreground">{t("common.loading")}</td></tr>
+                <tr><td colSpan={hasMultiWarehouse ? 8 : 7} className="py-10 text-center text-muted-foreground">{t("common.loading")}</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={8} className="py-12 text-center text-muted-foreground">
+                <tr><td colSpan={hasMultiWarehouse ? 8 : 7} className="py-12 text-center text-muted-foreground">
                   <Receipt className="mx-auto mb-2 h-8 w-8 opacity-50" />
                   {t("sales.no_sales")}
                 </td></tr>
@@ -170,7 +173,7 @@ function SalesPage() {
                   <td className="px-3 py-2.5 font-mono text-xs">{r.invoice_number}</td>
                   <td className="px-3 py-2.5 text-muted-foreground">{new Date(r.created_at).toLocaleString()}</td>
                   <td className="px-3 py-2.5">{r.customers?.name ?? t("pos.walkin")}</td>
-                  <td className="px-3 py-2.5 text-muted-foreground">{whName(r.warehouses) ?? "—"}</td>
+                  {hasMultiWarehouse && <td className="px-3 py-2.5 text-muted-foreground">{whName(r.warehouses) ?? "—"}</td>}
                   <td className="px-3 py-2.5 text-muted-foreground">{pmLabel(r.payment_method)}</td>
                   <td className="px-3 py-2.5">
                     <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] ${statusColor(r.status)}`}>{statusLabel(r.status)}</span>
@@ -198,9 +201,9 @@ function SalesPage() {
               </div>
               <button onClick={() => setSelected(null)} className="rounded p-1 hover:bg-surface-2"><X className="h-4 w-4" /></button>
             </div>
-            <div className="mb-4 grid grid-cols-2 gap-3 text-sm">
+            <div className={`mb-4 grid ${hasMultiWarehouse ? "grid-cols-2" : "grid-cols-1 sm:grid-cols-3"} gap-3 text-sm`}>
               <Field label={t("common.customer")} value={selected.customers?.name ?? t("pos.walkin")} />
-              <Field label={t("common.warehouse")} value={whName(selected.warehouses) ?? "—"} />
+              {hasMultiWarehouse && <Field label={t("common.warehouse")} value={whName(selected.warehouses) ?? "—"} />}
               <Field label={t("sales.payment")} value={pmLabel(selected.payment_method)} />
               <Field label={t("common.status")} value={statusLabel(selected.status)} />
             </div>

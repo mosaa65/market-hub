@@ -1,4 +1,4 @@
-import { ModuleGuard } from "@/lib/modules";
+import { ModuleGuard, useModules } from "@/lib/modules";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { CalendarClock, Plus, Trash2, AlertTriangle, Search, X } from "lucide-react";
@@ -24,6 +24,8 @@ interface Batch {
 }
 
 function BatchesPage() {
+  const { isModuleEnabled } = useModules();
+  const hasMultiWarehouse = isModuleEnabled("multi_warehouse");
   const { lang, t } = useI18n();
   const [rows, setRows] = useState<Batch[]>([]);
   const [search, setSearch] = useState("");
@@ -102,7 +104,7 @@ function BatchesPage() {
               <tr className="border-b border-border">
                 <th className="px-3 py-2 text-start font-medium">{lang === "ar" ? "الدفعة" : "Batch"}</th>
                 <th className="px-3 py-2 text-start font-medium">{lang === "ar" ? "المنتج" : "Product"}</th>
-                <th className="px-3 py-2 text-start font-medium">{lang === "ar" ? "المستودع" : "Warehouse"}</th>
+                {hasMultiWarehouse && <th className="px-3 py-2 text-start font-medium">{lang === "ar" ? "المستودع" : "Warehouse"}</th>}
                 <th className="px-3 py-2 text-end font-medium">{lang === "ar" ? "الكمية" : "Qty"}</th>
                 <th className="px-3 py-2 text-start font-medium">{lang === "ar" ? "تاريخ الانتهاء" : "Expiry"}</th>
                 <th className="px-3 py-2 text-start font-medium">{lang === "ar" ? "الحالة" : "Status"}</th>
@@ -138,12 +140,12 @@ function BatchesPage() {
         </div>
       </div>
 
-      {open && <NewBatchModal onClose={() => setOpen(false)} onSaved={() => { setOpen(false); load(); }} />}
+      {open && <NewBatchModal onClose={() => setOpen(false)} onSaved={() => { setOpen(false); load(); }} hasMultiWarehouse={hasMultiWarehouse} />}
     </>
   );
 }
 
-function NewBatchModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+function NewBatchModal({ onClose, onSaved, hasMultiWarehouse }: { onClose: () => void; onSaved: () => void; hasMultiWarehouse?: boolean }) {
   const { lang, t } = useI18n();
   const [products, setProducts] = useState<any[]>([]);
   const [warehouses, setWarehouses] = useState<any[]>([]);
@@ -153,7 +155,7 @@ function NewBatchModal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
     Promise.all([
       supabase.from("products").select("id,name,name_ar,sku").eq("is_active", true).order("name").limit(500),
       supabase.from("warehouses").select("id,name,name_ar").eq("is_active", true).order("name"),
-    ]).then(([p, w]) => { setProducts(p.data ?? []); setWarehouses(w.data ?? []); });
+    ]).then(([p, w]) => { setProducts(p.data ?? []); setWarehouses(w.data ?? []); if (w.data?.[0]) setForm(f => ({ ...f, warehouse_id: f.warehouse_id || w.data[0].id })); });
   }, []);
 
   async function save() {

@@ -93,6 +93,33 @@ const usrContent = fs.readFileSync(path.resolve("src/routes/_app.users.tsx"), "u
 assert(usrContent.includes("checkQuota"), "Users route must enforce quotas");
 console.log("✅ 8. Quota enforcement active on warehouses, products, and users.");
 
+// 9. Verify In-Component Dynamic Filtering across operations
+const salesContent = fs.readFileSync(path.resolve("src/routes/_app.sales.tsx"), "utf8");
+assert(salesContent.includes("hasMultiWarehouse"), "Sales route must adapt to multi_warehouse module");
+
+const purchContent = fs.readFileSync(path.resolve("src/routes/_app.purchases.tsx"), "utf8");
+assert(purchContent.includes("hasMultiWarehouse"), "Purchases route must adapt to multi_warehouse module");
+
+const sReturnContent = fs.readFileSync(path.resolve("src/routes/_app.sales-returns.tsx"), "utf8");
+assert(sReturnContent.includes("hasMultiWarehouse"), "Sales returns route must adapt to multi_warehouse module");
+
+const pReturnContent = fs.readFileSync(path.resolve("src/routes/_app.purchase-returns.tsx"), "utf8");
+assert(pReturnContent.includes("hasMultiWarehouse"), "Purchase returns route must adapt to multi_warehouse module");
+
+const batchContent = fs.readFileSync(path.resolve("src/routes/_app.batches.tsx"), "utf8");
+assert(batchContent.includes("hasMultiWarehouse"), "Batches route must adapt to multi_warehouse module");
+
+const custContent = fs.readFileSync(path.resolve("src/routes/_app.customers.tsx"), "utf8");
+assert(custContent.includes('isModuleEnabled("payments")'), "Customers route must guard payment actions");
+assert(custContent.includes('isModuleEnabled("loyalty")'), "Customers route must guard loyalty actions");
+
+const dashContent = fs.readFileSync(path.resolve("src/routes/_app.dashboard.tsx"), "utf8");
+assert(dashContent.includes('isModuleEnabled("analytics")'), "Dashboard route must guard analytics link");
+
+const finContent = fs.readFileSync(path.resolve("src/routes/_app.finance.tsx"), "utf8");
+assert(finContent.includes('isModuleEnabled("payments")'), "Finance route must guard debtors tab");
+console.log("✅ 9. In-component dynamic modular filtering verified across 8 core routes.");
+
 console.log("==================================================");
-console.log("🎉 ALL 8 INTEGRATION VERIFICATIONS PASSED SUCCESSFULLY!");
+console.log("🎉 ALL 9 INTEGRATION VERIFICATIONS PASSED SUCCESSFULLY!");
 console.log("==================================================");

@@ -1,4 +1,4 @@
-import { ModuleGuard } from "@/lib/modules";
+import { ModuleGuard, useModules } from "@/lib/modules";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { ShoppingCart, Plus, Search, Eye, X, Loader2, Trash2 } from "lucide-react";
@@ -34,6 +34,8 @@ interface Warehouse { id: string; name: string; name_ar: string | null }
 interface CartLine { product_id: string; name: string; unit_cost: number; tax_rate: number; quantity: number }
 
 function PurchasesPage() {
+  const { isModuleEnabled } = useModules();
+  const hasMultiWarehouse = isModuleEnabled("multi_warehouse");
   const { t, lang } = useI18n();
   const whName = (w?: { name: string; name_ar: string | null } | null) => (!w ? "—" : lang === "ar" ? (w.name_ar || w.name) : (w.name || w.name_ar || "—"));
   const [rows, setRows] = useState<Invoice[]>([]);
@@ -110,7 +112,7 @@ function PurchasesPage() {
                 <th className="px-3 py-2 text-start font-medium">{t("purchases.po")}</th>
                 <th className="px-3 py-2 text-start font-medium">{t("common.date")}</th>
                 <th className="px-3 py-2 text-start font-medium">{t("common.supplier")}</th>
-                <th className="px-3 py-2 text-start font-medium">{t("common.warehouse")}</th>
+                {hasMultiWarehouse && <th className="px-3 py-2 text-start font-medium">{t("common.warehouse")}</th>}
                 <th className="px-3 py-2 text-start font-medium">{t("sales.payment")}</th>
                 <th className="px-3 py-2 text-start font-medium">{t("common.status")}</th>
                 <th className="px-3 py-2 text-end font-medium">{t("common.total")}</th>
@@ -118,9 +120,9 @@ function PurchasesPage() {
               </tr>
             </thead>
             <tbody>
-              {loading ? <tr><td colSpan={8} className="py-10 text-center text-muted-foreground">{t("common.loading")}</td></tr>
+              {loading ? <tr><td colSpan={hasMultiWarehouse ? 8 : 7} className="py-10 text-center text-muted-foreground">{t("common.loading")}</td></tr>
               : filtered.length === 0 ? (
-                <tr><td colSpan={8} className="py-12 text-center text-muted-foreground">
+                <tr><td colSpan={hasMultiWarehouse ? 8 : 7} className="py-12 text-center text-muted-foreground">
                   <ShoppingCart className="mx-auto mb-2 h-8 w-8 opacity-50" />{t("purchases.no_purchases")}
                 </td></tr>
               ) : filtered.map(r => (
@@ -128,7 +130,7 @@ function PurchasesPage() {
                   <td className="px-3 py-2.5 font-mono text-xs">{r.invoice_number}</td>
                   <td className="px-3 py-2.5 text-muted-foreground">{new Date(r.created_at).toLocaleString()}</td>
                   <td className="px-3 py-2.5">{r.suppliers?.name ?? "—"}</td>
-                  <td className="px-3 py-2.5 text-muted-foreground">{whName(r.warehouses)}</td>
+                  {hasMultiWarehouse && <td className="px-3 py-2.5 text-muted-foreground">{whName(r.warehouses)}</td>}
                   <td className="px-3 py-2.5 text-muted-foreground">{pmLabel(r.payment_method)}</td>
                   <td className="px-3 py-2.5">
                     <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] ${statusColor(r.status)}`}>{statusLabel(r.status)}</span>
@@ -144,13 +146,13 @@ function PurchasesPage() {
         </div>
       </div>
 
-      {selected && <ViewDialog invoice={selected} lines={lines} onClose={() => setSelected(null)} pmLabel={pmLabel} statusLabel={statusLabel} />}
-      {creating && <CreateDialog onClose={() => setCreating(false)} onDone={() => { setCreating(false); void load(); }} />}
+      {selected && <ViewDialog invoice={selected} lines={lines} onClose={() => setSelected(null)} pmLabel={pmLabel} statusLabel={statusLabel} hasMultiWarehouse={hasMultiWarehouse} />}
+      {creating && <CreateDialog onClose={() => setCreating(false)} onDone={() => { setCreating(false); void load(); }} hasMultiWarehouse={hasMultiWarehouse} />}
     </>
   );
 }
 
-function ViewDialog({ invoice, lines, onClose, pmLabel, statusLabel }: { invoice: Invoice; lines: Line[]; onClose: () => void; pmLabel: (m: string) => string; statusLabel: (s: string) => string }) {
+function ViewDialog({ invoice, lines, onClose, pmLabel, statusLabel, hasMultiWarehouse }: { invoice: Invoice; lines: Line[]; onClose: () => void; pmLabel: (m: string) => string; statusLabel: (s: string) => string; hasMultiWarehouse?: boolean }) {
   const { t, lang } = useI18n();
   const wh = invoice.warehouses;
   const whLabel = !wh ? "—" : lang === "ar" ? (wh.name_ar || wh.name) : (wh.name || wh.name_ar || "—");
@@ -166,7 +168,7 @@ function ViewDialog({ invoice, lines, onClose, pmLabel, statusLabel }: { invoice
         </div>
         <div className="mb-4 grid grid-cols-2 gap-3 text-sm">
           <Field label={t("common.supplier")} value={invoice.suppliers?.name ?? "—"} />
-          <Field label={t("common.warehouse")} value={whLabel} />
+          {hasMultiWarehouse && <Field label={t("common.warehouse")} value={whLabel} />}
           <Field label={t("sales.payment")} value={pmLabel(invoice.payment_method)} />
           <Field label={t("common.status")} value={statusLabel(invoice.status)} />
         </div>
@@ -208,7 +210,7 @@ function ViewDialog({ invoice, lines, onClose, pmLabel, statusLabel }: { invoice
   );
 }
 
-function CreateDialog({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+function CreateDialog({ onClose, onDone, hasMultiWarehouse }: { onClose: () => void; onDone: () => void; hasMultiWarehouse?: boolean }) {
   const { t, lang } = useI18n();
   const [products, setProducts] = useState<Product[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
