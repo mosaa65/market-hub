@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import { useModules, PlatformPlanId } from "@/lib/modules";
@@ -71,10 +72,19 @@ export function SubscriptionSettingsCard() {
             <Crown className="h-5 w-5 text-amber-500" />
             {isAr ? "إدارة باقة النظام والوحدات (Packaging & Modules)" : "Subscription & Modules Packaging"}
           </span>
-          <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 text-primary border border-primary/30 px-3 py-0.5 text-xs font-bold">
-            <Sparkles className="h-3 w-3" />
-            {isAr ? currentPlan.name.ar : currentPlan.name.en}
-          </span>
+          <div className="flex items-center gap-2">
+            <Link
+              to="/platform-admin"
+              className="inline-flex items-center gap-1.5 rounded-full bg-surface-2/90 border border-border/80 px-3 py-1 text-xs font-medium text-foreground hover:bg-surface-3 transition shadow-xs"
+            >
+              <ShieldCheck className="h-3.5 w-3.5 text-amber-500" />
+              <span>{isAr ? "لوحة إدارة المنصة" : "Platform Admin"}</span>
+            </Link>
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 text-primary border border-primary/30 px-3 py-0.5 text-xs font-bold">
+              <Sparkles className="h-3 w-3" />
+              {isAr ? currentPlan.name.ar : currentPlan.name.en}
+            </span>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">

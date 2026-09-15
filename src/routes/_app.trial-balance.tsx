@@ -1,3 +1,4 @@
+import { ModuleGuard } from "@/lib/modules";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
@@ -12,7 +13,11 @@ import { Printer, Scale, FileSpreadsheet } from "lucide-react";
 
 export const Route = createFileRoute("/_app/trial-balance")({
   head: () => ({ meta: [{ title: "ميزان المراجعة — Vortex ERP" }] }),
-  component: TrialBalancePage,
+  component: () => (
+    <ModuleGuard moduleId="advanced_accounting">
+      <TrialBalancePage />
+    </ModuleGuard>
+  ),
 });
 
 interface TrialBalanceAccount {

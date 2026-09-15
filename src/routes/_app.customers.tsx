@@ -1,3 +1,4 @@
+import { useModules } from "@/lib/modules";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -32,6 +33,7 @@ interface Customer {
 
 function CustomersPage() {
   const { t, lang } = useI18n();
+  const { isModuleEnabled } = useModules();
   const navigate = useNavigate();
   const [rows, setRows] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);

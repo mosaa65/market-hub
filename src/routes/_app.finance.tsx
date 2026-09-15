@@ -1,3 +1,4 @@
+import { ModuleGuard } from "@/lib/modules";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
@@ -19,7 +20,11 @@ import { Plus, TrendingUp, TrendingDown, Wallet, Receipt, Users, Truck, Trash2 }
 
 export const Route = createFileRoute("/_app/finance")({
   head: () => ({ meta: [{ title: "Finance — Vortex ERP" }] }),
-  component: FinancePage,
+  component: () => (
+    <ModuleGuard moduleId="expenses">
+      <FinancePage />
+    </ModuleGuard>
+  ),
 });
 
 interface Stats {

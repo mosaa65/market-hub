@@ -1,3 +1,4 @@
+import { ModuleGuard } from "@/lib/modules";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/page-header";
@@ -13,7 +14,11 @@ import { Printer, Calendar, BookOpen, FileSpreadsheet } from "lucide-react";
 
 export const Route = createFileRoute("/_app/daily-journal")({
   head: () => ({ meta: [{ title: "دفتر اليومية — Vortex ERP" }] }),
-  component: DailyJournalPage,
+  component: () => (
+    <ModuleGuard moduleId="advanced_accounting">
+      <DailyJournalPage />
+    </ModuleGuard>
+  ),
 });
 
 interface JournalEntry {

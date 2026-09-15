@@ -1,3 +1,4 @@
+import { ModuleGuard } from "@/lib/modules";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Search, Users, X, AlertCircle, Printer } from "lucide-react";
@@ -14,7 +15,11 @@ const debtsSearchSchema = z.object({
 export const Route = createFileRoute("/_app/debts")({
   validateSearch: (search: Record<string, unknown>) => debtsSearchSchema.parse(search),
   head: () => ({ meta: [{ title: "Customer Debts — Vortex ERP" }] }),
-  component: DebtsPage,
+  component: () => (
+    <ModuleGuard moduleId="payments">
+      <DebtsPage />
+    </ModuleGuard>
+  ),
 });
 
 interface Customer { id: string; name: string; phone: string | null; email: string | null; balance: number; credit_limit: number }

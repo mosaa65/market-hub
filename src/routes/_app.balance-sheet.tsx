@@ -1,3 +1,4 @@
+import { ModuleGuard } from "@/lib/modules";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/page-header";
@@ -11,7 +12,11 @@ import { Printer, Landmark, Wallet, FileSpreadsheet } from "lucide-react";
 
 export const Route = createFileRoute("/_app/balance-sheet")({
   head: () => ({ meta: [{ title: "الميزانية العمومية — Vortex ERP" }] }),
-  component: BalanceSheetPage,
+  component: () => (
+    <ModuleGuard moduleId="advanced_accounting">
+      <BalanceSheetPage />
+    </ModuleGuard>
+  ),
 });
 
 function BalanceSheetPage() {

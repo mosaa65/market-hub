@@ -1,3 +1,4 @@
+import { ModuleGuard } from "@/lib/modules";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/page-header";
@@ -14,7 +15,11 @@ import { Badge } from "@/components/ui/badge";
 
 export const Route = createFileRoute("/_app/reports")({
   head: () => ({ meta: [{ title: "Reports — Vortex ERP" }] }),
-  component: ReportsPage,
+  component: () => (
+    <ModuleGuard moduleId="analytics">
+      <ReportsPage />
+    </ModuleGuard>
+  ),
 });
 
 function defaultRange() {

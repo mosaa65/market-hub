@@ -1,3 +1,4 @@
+import { ModuleGuard } from "@/lib/modules";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { ShoppingCart, Plus, Search, Eye, X, Loader2, Trash2 } from "lucide-react";
@@ -9,7 +10,11 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/purchases")({
   head: () => ({ meta: [{ title: "Purchases — Vortex ERP" }] }),
-  component: PurchasesPage,
+  component: () => (
+    <ModuleGuard moduleId="purchases">
+      <PurchasesPage />
+    </ModuleGuard>
+  ),
 });
 
 interface Invoice {

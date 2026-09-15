@@ -1,3 +1,4 @@
+import { ModuleGuard } from "@/lib/modules";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { z } from "zod";
@@ -20,7 +21,11 @@ const accountStatementSearchSchema = z.object({
 export const Route = createFileRoute("/_app/account-statement")({
   validateSearch: (search: Record<string, unknown>) => accountStatementSearchSchema.parse(search),
   head: () => ({ meta: [{ title: "كشف حساب — Vortex ERP" }] }),
-  component: AccountStatementPage,
+  component: () => (
+    <ModuleGuard moduleId="payments">
+      <AccountStatementPage />
+    </ModuleGuard>
+  ),
 });
 
 interface StatementItem {

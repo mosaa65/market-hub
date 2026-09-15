@@ -1,3 +1,4 @@
+import { ModuleGuard } from "@/lib/modules";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -16,7 +17,11 @@ import {
 
 export const Route = createFileRoute("/_app/analytics")({
   head: () => ({ meta: [{ title: "Analytics — Vortex ERP" }] }),
-  component: AnalyticsPage,
+  component: () => (
+    <ModuleGuard moduleId="analytics">
+      <AnalyticsPage />
+    </ModuleGuard>
+  ),
 });
 
 const PALETTE = ["oklch(0.62 0.21 260)", "oklch(0.7 0.18 180)", "oklch(0.72 0.18 60)", "oklch(0.68 0.2 340)", "oklch(0.75 0.15 140)", "oklch(0.65 0.2 20)"];

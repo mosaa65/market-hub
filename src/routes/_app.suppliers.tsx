@@ -1,3 +1,4 @@
+import { ModuleGuard } from "@/lib/modules";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Building2, Plus, Search, Edit, Trash2, X } from "lucide-react";
@@ -9,7 +10,11 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/suppliers")({
   head: () => ({ meta: [{ title: "الموردون — فورتيكس ERP" }] }),
-  component: SuppliersPage,
+  component: () => (
+    <ModuleGuard moduleId="purchases">
+      <SuppliersPage />
+    </ModuleGuard>
+  ),
 });
 
 interface Supplier {

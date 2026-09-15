@@ -1,3 +1,4 @@
+import { ModuleGuard } from "@/lib/modules";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/page-header";
@@ -13,7 +14,11 @@ import { Printer, FileSpreadsheet } from "lucide-react";
 
 export const Route = createFileRoute("/_app/income-statement")({
   head: () => ({ meta: [{ title: "قائمة الدخل والأرباح — Vortex ERP" }] }),
-  component: IncomeStatementPage,
+  component: () => (
+    <ModuleGuard moduleId="advanced_accounting">
+      <IncomeStatementPage />
+    </ModuleGuard>
+  ),
 });
 
 function defaultRange() {

@@ -1,4 +1,4 @@
-import { ModuleGuard } from "@/lib/modules";
+import { ModuleGuard, useModules } from "@/lib/modules";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
@@ -97,6 +97,7 @@ interface Compatibility {
 }
 
 function POSPage() {
+  const { isModuleEnabled } = useModules();
   const { t, lang } = useI18n();
   const { config: catalogConfig } = useCatalogModules();
   const [products, setProducts] = useState<Product[]>([]);
@@ -691,18 +692,20 @@ function POSPage() {
               )}
             </button>
 
-            {/* Barcode Camera Scanner (Hidden on Laptops/Desktops >= 1024px, Visible on Mobile & Tablets) */}
-            <button
-              type="button"
-              onClick={() => setScannerOpen(true)}
-              className="grid lg:hidden h-10 w-10 shrink-0 place-items-center rounded-full border border-primary/30 bg-primary/10 text-primary transition hover:bg-primary/20 active:scale-95 shadow-2xs"
-              title={lang === "ar" ? "قراءة الباركود بالكاميرا (F4)" : "Scan with camera (F4)"}
-            >
-              <ScanBarcode className="h-4 w-4" />
-            </button>
+            {/* Barcode Camera Scanner */}
+            {isModuleEnabled("barcode") && (
+              <button
+                type="button"
+                onClick={() => setScannerOpen(true)}
+                className="grid lg:hidden h-10 w-10 shrink-0 place-items-center rounded-full border border-primary/30 bg-primary/10 text-primary transition hover:bg-primary/20 active:scale-95 shadow-2xs"
+                title={lang === "ar" ? "قراءة الباركود بالكاميرا (F4)" : "Scan with camera (F4)"}
+              >
+                <ScanBarcode className="h-4 w-4" />
+              </button>
+            )}
 
-            {/* Warehouse Select (Only shown if more than 1 warehouse exists) */}
-            {warehouses.length > 1 && (
+            {/* Warehouse Select (Only shown if multi_warehouse is enabled & more than 1 exists) */}
+            {isModuleEnabled("multi_warehouse") && warehouses.length > 1 && (
               <div className="relative shrink-0">
                 <select
                   value={warehouseId}
