@@ -24,7 +24,8 @@ export const Route = createFileRoute("/_app/platform-admin")({
 function PlatformAdminPage() {
   const { lang } = useI18n();
   const isAr = lang === "ar";
-  const { user } = useAuth();
+  const { user, isPlatformAdmin, isPlatformSuperadmin, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const {
     currentPlanId,
     currentPlan,
@@ -40,6 +41,39 @@ function PlatformAdminPage() {
   const [activeTab, setActiveTab] = useState<"overview" | "modules" | "plans" | "audit">("overview");
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
+
+  useEffect(() => {
+    if (!authLoading && !isPlatformAdmin) {
+      toast.error(
+        isAr
+          ? "عذراً، هذه الصفحة مخصصة لمدير المنصة فقط (Superadmin)"
+          : "Access denied: Platform Superadmin privileges required"
+      );
+      navigate({ to: "/dashboard" });
+    }
+  }, [authLoading, isPlatformAdmin, navigate, isAr]);
+
+  if (authLoading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (!isPlatformAdmin) {
+    return (
+      <div className="flex min-h-[50vh] flex-col items-center justify-center text-center p-6">
+        <Lock className="h-12 w-12 text-destructive mb-3" />
+        <h2 className="text-xl font-bold">{isAr ? "غير مصرح بالدخول" : "Access Restricted"}</h2>
+        <p className="text-muted-foreground text-sm mt-1 max-w-md">
+          {isAr
+            ? "تحتاج إلى صلاحيات مدير المنصة (Superadmin) للوصول إلى لوحة إدارة الباقات والترخيص."
+            : "You need Platform Superadmin privileges to view and configure platform licensing."}
+        </p>
+      </div>
+    );
+  }
 
   const loadAuditLogs = async () => {
     setLoadingLogs(true);

@@ -3,17 +3,20 @@ import {
 } from "@/components/ui/command";
 import { useNavigate } from "@tanstack/react-router";
 import { useI18n } from "@/lib/i18n";
+import { useAuth } from "@/lib/auth";
 import { useModules } from "@/lib/modules";
 import {
   LayoutDashboard, ScanBarcode, Package, Warehouse, Receipt, Truck,
   Users, Building2, Wallet, BarChart3, Settings, Bell, ShieldCheck,
   RotateCcw, ArrowRightLeft, CalendarClock, Barcode, Gift, History, Layers, Boxes,
   HandCoins, AlertTriangle, FileText, BookOpen, Scale, Landmark, PieChart, LineChart,
+  Crown,
 } from "lucide-react";
 
 export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const navigate = useNavigate();
   const { t } = useI18n();
+  const { isPlatformAdmin } = useAuth();
   const { isModuleEnabled } = useModules();
   const go = (to: string) => { onOpenChange(false); navigate({ to }); };
 
@@ -27,6 +30,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
         <CommandGroup heading={t("common.navigate")}>
           <CommandItem onSelect={() => go("/dashboard")}><LayoutDashboard /> {t("nav.dashboard")}</CommandItem>
           {isModuleEnabled("analytics") && <CommandItem onSelect={() => go("/analytics")}><LineChart /> {t("nav.analytics")}</CommandItem>}
+          <CommandItem onSelect={() => go("/plans")}><Crown className="text-amber-500" /> {t("nav.plans")}</CommandItem>
           {isModuleEnabled("pos") && <CommandItem onSelect={() => go("/pos")}><ScanBarcode /> {t("nav.pos")}</CommandItem>}
           <CommandItem onSelect={() => go("/products")}><Package /> {t("nav.products")}</CommandItem>
           <CommandItem onSelect={() => go("/inventory")}><Warehouse /> {t("nav.inventory")}</CommandItem>
@@ -73,6 +77,9 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
           {isModuleEnabled("audit") && <CommandItem onSelect={() => go("/audit")}><History /> {t("nav.audit")}</CommandItem>}
           <CommandItem onSelect={() => go("/notifications")}><Bell /> {t("nav.notifications")}</CommandItem>
           <CommandItem onSelect={() => go("/settings")}><Settings /> {t("nav.settings")}</CommandItem>
+          {isPlatformAdmin && (
+            <CommandItem onSelect={() => go("/platform-admin")}><Crown className="text-amber-500" /> {t("nav.platform_admin")}</CommandItem>
+          )}
         </CommandGroup>
       </CommandList>
     </CommandDialog>

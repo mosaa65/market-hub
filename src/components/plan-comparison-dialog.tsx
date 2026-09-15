@@ -1,5 +1,6 @@
 import React from "react";
 import { useI18n } from "@/lib/i18n";
+import { useAuth } from "@/lib/auth";
 import { useModules, PlatformPlanId } from "@/lib/modules";
 import {
   Dialog,
@@ -185,11 +186,22 @@ export function PlanComparisonDialog({ trigger }: { trigger?: React.ReactNode })
   const { lang } = useI18n();
   const isAr = lang === "ar";
   const { currentPlanId, plans, setPlan } = useModules();
+  const { isPlatformAdmin } = useAuth();
   const [open, setOpen] = React.useState(false);
   const [loadingPlan, setLoadingPlan] = React.useState<string | null>(null);
 
   const handleSelect = async (planId: PlatformPlanId) => {
     if (planId === currentPlanId) return;
+    if (!isPlatformAdmin) {
+      toast.info(
+        isAr
+          ? "لطلب ترقية الباقة وتفعيل الميزات فوراً، يرجى التواصل مع الإدارة: mousa.mc13@gmail.com"
+          : "To request plan upgrade, contact platform admin: mousa.mc13@gmail.com",
+        { duration: 5000 }
+      );
+      setOpen(false);
+      return;
+    }
     setLoadingPlan(planId);
     try {
       await setPlan(planId);

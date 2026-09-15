@@ -6,7 +6,7 @@ import {
   Search, Command as CommandIcon, LogOut, Moon, Sun, Sparkles,
   RotateCcw, ArrowRightLeft, CalendarClock, Barcode, Gift, History, Layers, Boxes,
   Menu, HandCoins, AlertTriangle, LineChart, FileText, BookOpen, Scale, Landmark, PieChart,
-  PanelLeftClose, PanelLeftOpen,
+  PanelLeftClose, PanelLeftOpen, Crown,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
@@ -17,63 +17,74 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { InamaSoftFooter } from "@/components/inama-soft-footer";
 
-type Item = { to: string; icon: typeof LayoutDashboard; key: string; moduleId?: string };
+type Item = {
+  to: string;
+  icon: typeof LayoutDashboard;
+  key: string;
+  moduleId?: string;
+  superadminOnly?: boolean;
+  color?: string;
+  bg?: string;
+};
+
 type Section = { titleKey: string; items: Item[] };
 
 const sections: Section[] = [
   {
     titleKey: "nav.section.overview",
     items: [
-      { to: "/dashboard", icon: LayoutDashboard, key: "nav.dashboard", moduleId: "core" },
-      { to: "/analytics", icon: LineChart, key: "nav.analytics", moduleId: "analytics" },
+      { to: "/dashboard", icon: LayoutDashboard, key: "nav.dashboard", moduleId: "core", color: "text-sky-500", bg: "bg-sky-500/15" },
+      { to: "/analytics", icon: LineChart, key: "nav.analytics", moduleId: "analytics", color: "text-indigo-500", bg: "bg-indigo-500/15" },
+      { to: "/plans", icon: Crown, key: "nav.plans", moduleId: "core", color: "text-amber-500", bg: "bg-amber-500/15" },
     ],
   },
   {
     titleKey: "nav.section.operations",
     items: [
-      { to: "/pos", icon: ScanBarcode, key: "nav.pos", moduleId: "pos" },
-      { to: "/products", icon: Package, key: "nav.products", moduleId: "core" },
-      { to: "/catalog", icon: Layers, key: "nav.catalog", moduleId: "core" },
-      { to: "/inventory", icon: Warehouse, key: "nav.inventory", moduleId: "core" },
-      { to: "/warehouses", icon: Boxes, key: "nav.warehouses", moduleId: "multi_warehouse" },
-      { to: "/batches", icon: CalendarClock, key: "nav.batches", moduleId: "batches" },
-      { to: "/sales", icon: Receipt, key: "nav.sales", moduleId: "core" },
-      { to: "/sales-returns", icon: RotateCcw, key: "nav.sales_returns", moduleId: "returns" },
-      { to: "/purchases", icon: Truck, key: "nav.purchases", moduleId: "purchases" },
-      { to: "/purchase-returns", icon: RotateCcw, key: "nav.purchase_returns", moduleId: "returns" },
-      { to: "/transfers", icon: ArrowRightLeft, key: "nav.transfers", moduleId: "multi_warehouse" },
-      { to: "/barcodes", icon: Barcode, key: "nav.barcodes", moduleId: "barcode" },
+      { to: "/pos", icon: ScanBarcode, key: "nav.pos", moduleId: "pos", color: "text-emerald-500", bg: "bg-emerald-500/15" },
+      { to: "/products", icon: Package, key: "nav.products", moduleId: "core", color: "text-teal-500", bg: "bg-teal-500/15" },
+      { to: "/catalog", icon: Layers, key: "nav.catalog", moduleId: "core", color: "text-amber-500", bg: "bg-amber-500/15" },
+      { to: "/inventory", icon: Warehouse, key: "nav.inventory", moduleId: "core", color: "text-cyan-500", bg: "bg-cyan-500/15" },
+      { to: "/warehouses", icon: Boxes, key: "nav.warehouses", moduleId: "multi_warehouse", color: "text-blue-500", bg: "bg-blue-500/15" },
+      { to: "/batches", icon: CalendarClock, key: "nav.batches", moduleId: "batches", color: "text-orange-500", bg: "bg-orange-500/15" },
+      { to: "/sales", icon: Receipt, key: "nav.sales", moduleId: "core", color: "text-emerald-400", bg: "bg-emerald-500/15" },
+      { to: "/sales-returns", icon: RotateCcw, key: "nav.sales_returns", moduleId: "returns", color: "text-rose-400", bg: "bg-rose-500/15" },
+      { to: "/purchases", icon: Truck, key: "nav.purchases", moduleId: "purchases", color: "text-blue-400", bg: "bg-blue-500/15" },
+      { to: "/purchase-returns", icon: RotateCcw, key: "nav.purchase_returns", moduleId: "returns", color: "text-rose-500", bg: "bg-rose-500/15" },
+      { to: "/transfers", icon: ArrowRightLeft, key: "nav.transfers", moduleId: "multi_warehouse", color: "text-purple-400", bg: "bg-purple-500/15" },
+      { to: "/barcodes", icon: Barcode, key: "nav.barcodes", moduleId: "barcode", color: "text-violet-500", bg: "bg-violet-500/15" },
     ],
   },
   {
     titleKey: "nav.section.relations",
     items: [
-      { to: "/customers", icon: Users, key: "nav.customers", moduleId: "core" },
-      { to: "/suppliers", icon: Building2, key: "nav.suppliers", moduleId: "purchases" },
-      { to: "/loyalty", icon: Gift, key: "nav.loyalty", moduleId: "loyalty" },
+      { to: "/customers", icon: Users, key: "nav.customers", moduleId: "core", color: "text-teal-400", bg: "bg-teal-500/15" },
+      { to: "/suppliers", icon: Building2, key: "nav.suppliers", moduleId: "purchases", color: "text-blue-500", bg: "bg-blue-500/15" },
+      { to: "/loyalty", icon: Gift, key: "nav.loyalty", moduleId: "loyalty", color: "text-pink-500", bg: "bg-pink-500/15" },
     ],
   },
   {
     titleKey: "nav.section.accounting",
     items: [
-      { to: "/payments", icon: HandCoins, key: "nav.payments", moduleId: "payments" },
-      { to: "/debts", icon: AlertTriangle, key: "nav.debts", moduleId: "payments" },
-      { to: "/account-statement", icon: FileText, key: "nav.account_statement", moduleId: "payments" },
-      { to: "/daily-journal", icon: BookOpen, key: "nav.daily_journal", moduleId: "advanced_accounting" },
-      { to: "/trial-balance", icon: Scale, key: "nav.trial_balance", moduleId: "advanced_accounting" },
-      { to: "/income-statement", icon: PieChart, key: "nav.income_statement", moduleId: "advanced_accounting" },
-      { to: "/balance-sheet", icon: Landmark, key: "nav.balance_sheet", moduleId: "advanced_accounting" },
-      { to: "/finance", icon: Wallet, key: "nav.finance", moduleId: "expenses" },
-      { to: "/reports", icon: BarChart3, key: "nav.reports", moduleId: "analytics" },
+      { to: "/payments", icon: HandCoins, key: "nav.payments", moduleId: "payments", color: "text-amber-500", bg: "bg-amber-500/15" },
+      { to: "/debts", icon: AlertTriangle, key: "nav.debts", moduleId: "payments", color: "text-red-500", bg: "bg-red-500/15" },
+      { to: "/account-statement", icon: FileText, key: "nav.account_statement", moduleId: "payments", color: "text-yellow-500", bg: "bg-yellow-500/15" },
+      { to: "/daily-journal", icon: BookOpen, key: "nav.daily_journal", moduleId: "advanced_accounting", color: "text-emerald-500", bg: "bg-emerald-500/15" },
+      { to: "/trial-balance", icon: Scale, key: "nav.trial_balance", moduleId: "advanced_accounting", color: "text-cyan-400", bg: "bg-cyan-500/15" },
+      { to: "/income-statement", icon: PieChart, key: "nav.income_statement", moduleId: "advanced_accounting", color: "text-lime-500", bg: "bg-lime-500/15" },
+      { to: "/balance-sheet", icon: Landmark, key: "nav.balance_sheet", moduleId: "advanced_accounting", color: "text-indigo-400", bg: "bg-indigo-500/15" },
+      { to: "/finance", icon: Wallet, key: "nav.finance", moduleId: "expenses", color: "text-emerald-500", bg: "bg-emerald-500/15" },
+      { to: "/reports", icon: BarChart3, key: "nav.reports", moduleId: "analytics", color: "text-sky-400", bg: "bg-sky-500/15" },
     ],
   },
   {
     titleKey: "nav.section.admin",
     items: [
-      { to: "/users", icon: ShieldCheck, key: "nav.users", moduleId: "core" },
-      { to: "/audit", icon: History, key: "nav.audit", moduleId: "audit" },
-      { to: "/notifications", icon: Bell, key: "nav.notifications", moduleId: "core" },
-      { to: "/settings", icon: Settings, key: "nav.settings", moduleId: "core" },
+      { to: "/users", icon: ShieldCheck, key: "nav.users", moduleId: "core", color: "text-violet-400", bg: "bg-violet-500/15" },
+      { to: "/audit", icon: History, key: "nav.audit", moduleId: "audit", color: "text-orange-400", bg: "bg-orange-500/15" },
+      { to: "/notifications", icon: Bell, key: "nav.notifications", moduleId: "core", color: "text-yellow-400", bg: "bg-yellow-500/15" },
+      { to: "/settings", icon: Settings, key: "nav.settings", moduleId: "core", color: "text-slate-400", bg: "bg-slate-500/15" },
+      { to: "/platform-admin", icon: Crown, key: "nav.platform_admin", superadminOnly: true, color: "text-amber-500", bg: "bg-amber-500/15" },
     ],
   },
 ];
@@ -88,7 +99,7 @@ function SidebarContents({
   onToggleCollapse?: () => void;
 }) {
   const { t, dir, lang } = useI18n();
-  const { user, signOut } = useAuth();
+  const { user, signOut, isPlatformAdmin } = useAuth();
   const { isModuleEnabled, currentPlan } = useModules();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -110,10 +121,13 @@ function SidebarContents({
     return sections
       .map((sec) => ({
         ...sec,
-        items: sec.items.filter((it) => isModuleEnabled(it.moduleId)),
+        items: sec.items.filter((it) => {
+          if (it.superadminOnly && !isPlatformAdmin) return false;
+          return isModuleEnabled(it.moduleId);
+        }),
       }))
       .filter((sec) => sec.items.length > 0);
-  }, [isModuleEnabled]);
+  }, [isModuleEnabled, isPlatformAdmin]);
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-sidebar text-sidebar-foreground">
@@ -137,7 +151,7 @@ function SidebarContents({
                   {lang === "ar" ? currentPlan.name.ar : currentPlan.name.en}
                 </span>
               </div>
-              <span className="text-[10px] text-muted-foreground">ERP · Inama Soft</span>
+              <span className="text-[11px] text-muted-foreground font-medium">ERP · Inama Soft</span>
             </div>
           )}
         </div>
@@ -155,19 +169,19 @@ function SidebarContents({
       </div>
 
       {/* Navigation Links */}
-      <nav className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-2 py-3 space-y-4 overscroll-contain [scrollbar-gutter:stable]">
+      <nav className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-2.5 py-3.5 space-y-4 overscroll-contain [scrollbar-gutter:stable]">
         {filteredSections.map((sec) => (
           <div key={sec.titleKey}>
             {!collapsed ? (
-              <div className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70 truncate">
+              <div className="px-3 pb-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground/80 truncate">
                 {t(sec.titleKey)}
               </div>
             ) : (
               <div className="my-2 border-t border-sidebar-border/40 mx-2" />
             )}
-            <ul className="space-y-0.5">
+            <ul className="space-y-1">
               {sec.items.map((it) => {
-                const active = pathname === it.to || pathname.startsWith(it.to + "/");
+                const active = pathname === it.to || (it.to !== "/dashboard" && pathname.startsWith(it.to + "/"));
                 return (
                   <li key={it.to}>
                     <Link
@@ -175,18 +189,27 @@ function SidebarContents({
                       onClick={onNavigate}
                       title={t(it.key)}
                       className={cn(
-                        "group relative flex items-center rounded-xl text-[13px] font-medium transition-all",
-                        collapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2",
+                        "group relative flex items-center rounded-xl text-[13.5px] sm:text-sm font-medium transition-all duration-200",
+                        collapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2.5",
                         active
-                          ? "bg-gradient-to-r from-primary/15 to-primary/5 text-foreground shadow-[inset_0_0_0_1px_oklch(1_0_0_/_0.06)]"
-                          : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground"
+                          ? "bg-gradient-to-r from-primary/20 via-primary/10 to-primary/5 text-foreground font-semibold shadow-[inset_0_0_0_1px_oklch(1_0_0_/_0.08)]"
+                          : "text-muted-foreground hover:bg-sidebar-accent/70 hover:text-foreground"
                       )}
                     >
                       {active && (
                         <span className={cn("absolute inset-y-2 w-[3px] rounded-full bg-primary", dir === "rtl" ? "right-0" : "left-0")} />
                       )}
-                      <it.icon className={cn("h-4.5 w-4.5 shrink-0 transition-colors", active ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
-                      {!collapsed && <span className="truncate">{t(it.key)}</span>}
+                      <div className={cn(
+                        "grid h-7 w-7 place-items-center rounded-lg transition-transform duration-200 group-hover:scale-110",
+                        it.bg || "bg-surface-2/60",
+                        active && "ring-1 ring-primary/40 shadow-sm"
+                      )}>
+                        <it.icon className={cn(
+                          "h-4 w-4 shrink-0 transition-colors",
+                          active ? "text-primary stroke-[2.5]" : (it.color || "text-muted-foreground group-hover:text-foreground")
+                        )} />
+                      </div>
+                      {!collapsed && <span className="truncate leading-normal">{t(it.key)}</span>}
                     </Link>
                   </li>
                 );
@@ -197,13 +220,13 @@ function SidebarContents({
       </nav>
 
       {/* Footer Profile & Desktop Toggle */}
-      <div className={cn("border-t border-sidebar-border/60 p-2 space-y-1", collapsed && "flex flex-col items-center")}>
+      <div className={cn("border-t border-sidebar-border/60 p-2.5 space-y-1.5", collapsed && "flex flex-col items-center")}>
         {onToggleCollapse && (
           <button
             type="button"
             onClick={onToggleCollapse}
             className={cn(
-              "hidden md:flex w-full items-center rounded-xl p-2 text-xs text-muted-foreground hover:bg-sidebar-accent hover:text-foreground transition",
+              "hidden md:flex w-full items-center rounded-xl p-2 text-xs font-medium text-muted-foreground hover:bg-sidebar-accent hover:text-foreground transition",
               collapsed ? "justify-center" : "gap-2.5 px-3"
             )}
             title={collapsed
@@ -211,10 +234,10 @@ function SidebarContents({
               : (lang === "ar" ? "طي القائمة (أيقونات فقط)" : "Collapse sidebar")}
           >
             {collapsed ? (
-              <PanelLeftOpen className="h-4 w-4 text-primary" />
+              <PanelLeftOpen className="h-4.5 w-4.5 text-primary" />
             ) : (
               <>
-                <PanelLeftClose className="h-4 w-4" />
+                <PanelLeftClose className="h-4.5 w-4.5" />
                 <span className="truncate">{lang === "ar" ? "عرض أيقونات فقط" : "Collapse sidebar"}</span>
               </>
             )}
@@ -224,7 +247,7 @@ function SidebarContents({
         <button
           onClick={async () => { await signOut(); navigate({ to: "/auth", replace: true }); }}
           className={cn(
-            "flex w-full items-center rounded-xl p-2 text-[13px] text-muted-foreground hover:bg-sidebar-accent hover:text-foreground transition-colors",
+            "flex w-full items-center rounded-xl p-2 text-[13.5px] font-medium text-muted-foreground hover:bg-sidebar-accent hover:text-foreground transition-colors",
             collapsed ? "justify-center" : "gap-2.5 px-3"
           )}
           title={lang === "ar" ? "تسجيل الخروج" : "Sign out"}
@@ -235,7 +258,7 @@ function SidebarContents({
           {!collapsed && (
             <>
               <span className="min-w-0 flex-1 truncate text-start">{user?.email}</span>
-              <LogOut className="h-3.5 w-3.5 shrink-0" />
+              <LogOut className="h-4 w-4 shrink-0" />
             </>
           )}
         </button>

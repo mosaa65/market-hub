@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n";
+import { useAuth } from "@/lib/auth";
 import { useModules, PlatformPlanId } from "@/lib/modules";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -59,6 +60,15 @@ export function SubscriptionSettingsCard() {
 
   const handlePlanSelect = async (planId: PlatformPlanId) => {
     if (planId === currentPlanId) return;
+    if (!isPlatformAdmin) {
+      toast.info(
+        isAr
+          ? "تعديل باقة النظام محصور بمدير المنصة. لطلب ترقية الباقة تواصل مع: mousa.mc13@gmail.com"
+          : "System plan modification is restricted to Platform Superadmin. To request upgrade: mousa.mc13@gmail.com",
+        { duration: 5000 }
+      );
+      return;
+    }
     setSwitching(planId);
     try {
       await setPlan(planId);
@@ -311,7 +321,7 @@ export function SubscriptionSettingsCard() {
 
                     <Switch
                       checked={enabled}
-                      disabled={inBasePlan}
+                      disabled={inBasePlan || !isPlatformAdmin}
                       onCheckedChange={() => void toggleExtraModule(m.id)}
                       title={inBasePlan ? (isAr ? "مضمنة في باقتك الحالية" : "Included in current plan") : undefined}
                     />

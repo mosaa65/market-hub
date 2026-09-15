@@ -27,6 +27,7 @@ import { Route as AppPurchaseReturnsRouteImport } from './routes/_app.purchase-r
 import { Route as AppProductsRouteImport } from './routes/_app.products'
 import { Route as AppPosRouteImport } from './routes/_app.pos'
 import { Route as AppPlatformAdminRouteImport } from './routes/_app.platform-admin'
+import { Route as AppPlansRouteImport } from './routes/_app.plans'
 import { Route as AppPaymentsRouteImport } from './routes/_app.payments'
 import { Route as AppNotificationsRouteImport } from './routes/_app.notifications'
 import { Route as AppLoyaltyRouteImport } from './routes/_app.loyalty'
@@ -132,6 +133,11 @@ const AppPosRoute = AppPosRouteImport.update({
 const AppPlatformAdminRoute = AppPlatformAdminRouteImport.update({
   id: '/platform-admin',
   path: '/platform-admin',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPlansRoute = AppPlansRouteImport.update({
+  id: '/plans',
+  path: '/plans',
   getParentRoute: () => AppRoute,
 } as any)
 const AppPaymentsRoute = AppPaymentsRouteImport.update({
@@ -240,6 +246,7 @@ export interface FileRoutesByFullPath {
   '/loyalty': typeof AppLoyaltyRoute
   '/notifications': typeof AppNotificationsRoute
   '/payments': typeof AppPaymentsRoute
+  '/plans': typeof AppPlansRoute
   '/platform-admin': typeof AppPlatformAdminRoute
   '/pos': typeof AppPosRoute
   '/products': typeof AppProductsRoute
@@ -276,6 +283,7 @@ export interface FileRoutesByTo {
   '/loyalty': typeof AppLoyaltyRoute
   '/notifications': typeof AppNotificationsRoute
   '/payments': typeof AppPaymentsRoute
+  '/plans': typeof AppPlansRoute
   '/platform-admin': typeof AppPlatformAdminRoute
   '/pos': typeof AppPosRoute
   '/products': typeof AppProductsRoute
@@ -314,6 +322,7 @@ export interface FileRoutesById {
   '/_app/loyalty': typeof AppLoyaltyRoute
   '/_app/notifications': typeof AppNotificationsRoute
   '/_app/payments': typeof AppPaymentsRoute
+  '/_app/plans': typeof AppPlansRoute
   '/_app/platform-admin': typeof AppPlatformAdminRoute
   '/_app/pos': typeof AppPosRoute
   '/_app/products': typeof AppProductsRoute
@@ -352,6 +361,7 @@ export interface FileRouteTypes {
     | '/loyalty'
     | '/notifications'
     | '/payments'
+    | '/plans'
     | '/platform-admin'
     | '/pos'
     | '/products'
@@ -388,6 +398,7 @@ export interface FileRouteTypes {
     | '/loyalty'
     | '/notifications'
     | '/payments'
+    | '/plans'
     | '/platform-admin'
     | '/pos'
     | '/products'
@@ -425,6 +436,7 @@ export interface FileRouteTypes {
     | '/_app/loyalty'
     | '/_app/notifications'
     | '/_app/payments'
+    | '/_app/plans'
     | '/_app/platform-admin'
     | '/_app/pos'
     | '/_app/products'
@@ -576,6 +588,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPlatformAdminRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/plans': {
+      id: '/_app/plans'
+      path: '/plans'
+      fullPath: '/plans'
+      preLoaderRoute: typeof AppPlansRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/payments': {
       id: '/_app/payments'
       path: '/payments'
@@ -716,6 +735,7 @@ interface AppRouteChildren {
   AppLoyaltyRoute: typeof AppLoyaltyRoute
   AppNotificationsRoute: typeof AppNotificationsRoute
   AppPaymentsRoute: typeof AppPaymentsRoute
+  AppPlansRoute: typeof AppPlansRoute
   AppPlatformAdminRoute: typeof AppPlatformAdminRoute
   AppPosRoute: typeof AppPosRoute
   AppProductsRoute: typeof AppProductsRoute
@@ -751,6 +771,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppLoyaltyRoute: AppLoyaltyRoute,
   AppNotificationsRoute: AppNotificationsRoute,
   AppPaymentsRoute: AppPaymentsRoute,
+  AppPlansRoute: AppPlansRoute,
   AppPlatformAdminRoute: AppPlatformAdminRoute,
   AppPosRoute: AppPosRoute,
   AppProductsRoute: AppProductsRoute,
