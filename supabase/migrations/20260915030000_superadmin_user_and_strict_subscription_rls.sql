@@ -12,7 +12,12 @@ DECLARE
   v_encrypted_pw text;
 BEGIN
   -- Password for Superadmin: Mousa@Vortex2026#SecureAdmin
-  v_encrypted_pw := crypt('Mousa@Vortex2026#SecureAdmin', gen_salt('bf'));
+  -- In Supabase, pgcrypto is located in the extensions schema
+  BEGIN
+    v_encrypted_pw := extensions.crypt('Mousa@Vortex2026#SecureAdmin', extensions.gen_salt('bf'));
+  EXCEPTION WHEN OTHERS THEN
+    v_encrypted_pw := crypt('Mousa@Vortex2026#SecureAdmin', gen_salt('bf'));
+  END;
 
   SELECT id INTO v_user_id FROM auth.users WHERE email = 'mousa.mc13@gmail.com';
 
