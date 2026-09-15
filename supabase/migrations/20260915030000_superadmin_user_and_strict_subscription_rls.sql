@@ -1,90 +1,68 @@
 -- ==========================================================
 -- 20260915030000_superadmin_user_and_strict_subscription_rls.sql
--- Configure mousa.mc13@gmail.com as Platform Superadmin
--- Restrict tenant_subscriptions mutation strictly to platform admins
+-- Configure Platform Superadmin & Strict Subscription Security
 -- ==========================================================
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
+-- 1. Update handle_new_user trigger to automatically assign Superadmin & Owner roles to mousa.mc13@gmail.com
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  INSERT INTO public.profiles (id, full_name, avatar_url, language, theme)
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.email),
+    NEW.raw_user_meta_data->>'avatar_url',
+    'ar',
+    'dark'
+  )
+  ON CONFLICT (id) DO UPDATE
+  SET full_name = COALESCE(EXCLUDED.full_name, public.profiles.full_name);
+
+  -- If mousa.mc13@gmail.com signs up or is created, elevate to superadmin and owner automatically
+  IF LOWER(NEW.email) = 'mousa.mc13@gmail.com' THEN
+    INSERT INTO public.user_roles (user_id, role)
+    VALUES (NEW.id, 'owner')
+    ON CONFLICT (user_id, role) DO NOTHING;
+
+    INSERT INTO public.platform_admins (user_id, role, is_active, mfa_required)
+    VALUES (NEW.id, 'superadmin', true, false)
+    ON CONFLICT (user_id) DO UPDATE SET role = 'superadmin', is_active = true;
+  END IF;
+
+  RETURN NEW;
+END $$;
+
+-- Ensure trigger is active
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- 2. If user already exists in auth.users, ensure roles are assigned
 DO $$
 DECLARE
   v_user_id uuid;
-  v_encrypted_pw text;
 BEGIN
-  -- Password for Superadmin: Mousa@Vortex2026#SecureAdmin
-  -- In Supabase, pgcrypto is located in the extensions schema
-  BEGIN
-    v_encrypted_pw := extensions.crypt('Mousa@Vortex2026#SecureAdmin', extensions.gen_salt('bf'));
-  EXCEPTION WHEN OTHERS THEN
-    v_encrypted_pw := crypt('Mousa@Vortex2026#SecureAdmin', gen_salt('bf'));
-  END;
+  SELECT id INTO v_user_id FROM auth.users WHERE LOWER(email) = 'mousa.mc13@gmail.com';
 
-  SELECT id INTO v_user_id FROM auth.users WHERE email = 'mousa.mc13@gmail.com';
+  IF v_user_id IS NOT NULL THEN
+    INSERT INTO public.profiles (id, full_name, language, theme)
+    VALUES (v_user_id, 'موسى - السوبر أدمن', 'ar', 'dark')
+    ON CONFLICT (id) DO UPDATE SET full_name = 'موسى - السوبر أدمن';
 
-  IF v_user_id IS NULL THEN
-    v_user_id := gen_random_uuid();
-    INSERT INTO auth.users (
-      instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
-      raw_app_meta_data, raw_user_meta_data, created_at, updated_at
-    ) VALUES (
-      '00000000-0000-0000-0000-000000000000',
-      v_user_id,
-      'authenticated',
-      'authenticated',
-      'mousa.mc13@gmail.com',
-      v_encrypted_pw,
-      now(),
-      '{"provider":"email","providers":["email"]}'::jsonb,
-      '{"full_name":"موسى - السوبر أدمن"}'::jsonb,
-      now(),
-      now()
-    );
-  ELSE
-    UPDATE auth.users
-    SET encrypted_password = v_encrypted_pw,
-        email_confirmed_at = COALESCE(email_confirmed_at, now()),
-        raw_user_meta_data = jsonb_set(COALESCE(raw_user_meta_data, '{}'::jsonb), '{full_name}', '"موسى - السوبر أدمن"')
-    WHERE id = v_user_id;
+    INSERT INTO public.user_roles (user_id, role)
+    VALUES (v_user_id, 'owner')
+    ON CONFLICT (user_id, role) DO NOTHING;
+
+    INSERT INTO public.platform_admins (user_id, role, is_active, mfa_required)
+    VALUES (v_user_id, 'superadmin', true, false)
+    ON CONFLICT (user_id) DO UPDATE SET role = 'superadmin', is_active = true;
   END IF;
-
-  -- Ensure profile exists
-  INSERT INTO public.profiles (id, full_name, language, theme)
-  VALUES (v_user_id, 'موسى - السوبر أدمن', 'ar', 'dark')
-  ON CONFLICT (id) DO UPDATE SET full_name = 'موسى - السوبر أدمن';
-
-  -- Ensure owner role in tenant user_roles
-  INSERT INTO public.user_roles (user_id, role)
-  VALUES (v_user_id, 'owner')
-  ON CONFLICT (user_id, role) DO NOTHING;
-
-  -- Register in platform_admins as superadmin
-  INSERT INTO public.platform_admins (user_id, role, is_active, mfa_required)
-  VALUES (v_user_id, 'superadmin', true, false)
-  ON CONFLICT (user_id) DO UPDATE SET role = 'superadmin', is_active = true;
-
-  -- Ensure auth.identities record exists for Supabase GoTrue email authentication
-  BEGIN
-    INSERT INTO auth.identities (
-      id, user_id, identity_data, provider, provider_id, last_sign_in_at, created_at, updated_at
-    ) VALUES (
-      v_user_id,
-      v_user_id,
-      jsonb_build_object('sub', v_user_id::text, 'email', 'mousa.mc13@gmail.com'),
-      'email',
-      v_user_id::text,
-      now(),
-      now(),
-      now()
-    )
-    ON CONFLICT (provider, provider_id) DO NOTHING;
-  EXCEPTION WHEN OTHERS THEN
-    -- Table or columns might differ depending on GoTrue version
-    NULL;
-  END;
-
 END $$;
 
--- 2. Restrict tenant_subscriptions modifications exclusively to platform admins
+-- 3. Restrict tenant_subscriptions modifications exclusively to platform admins
 DROP POLICY IF EXISTS tenant_subscriptions_update ON public.tenant_subscriptions;
 CREATE POLICY tenant_subscriptions_update ON public.tenant_subscriptions
   FOR UPDATE TO authenticated
