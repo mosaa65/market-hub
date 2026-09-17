@@ -44,6 +44,14 @@ function SettingsPage() {
   const [exists, setExists] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const [enablePosServiceFee, setEnablePosServiceFee] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("pos_enable_service_fee");
+      return saved !== null ? saved === "true" : true;
+    }
+    return true;
+  });
+
   useEffect(() => {
     supabase
       .from("company_settings")
@@ -55,6 +63,9 @@ function SettingsPage() {
         if (data) {
           setForm(data);
           setExists(true);
+          if ((data as any).enable_pos_service_fee !== undefined) {
+            setEnablePosServiceFee(Boolean((data as any).enable_pos_service_fee));
+          }
           setCompanySettingsCache({ currency: data.currency, currency_symbol: data.currency_symbol });
         }
       });
@@ -62,6 +73,9 @@ function SettingsPage() {
 
   async function save() {
     setSaving(true);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("pos_enable_service_fee", String(enablePosServiceFee));
+    }
     const payload = { ...form, id: form.id ?? 1, tax_rate: Number(form.tax_rate) };
     const res = exists
       ? await supabase.from("company_settings").update(payload).eq("id", payload.id)
@@ -88,12 +102,12 @@ function SettingsPage() {
         title={t("settings.title")}
         subtitle={
           lang === "ar"
-            ? "بيانات الشركة، العملة، الضريبة، الفواتير، وتخصيص نشاط الفهرسة"
-            : "Company profile, currency, tax, invoicing, and catalog customization"
+            ? "بيانات الشركة، العملة، الضريبة، إعدادات سلة البيع، وتخصيص نشاط الفهرسة"
+            : "Company profile, currency, tax, POS cart settings, and catalog customization"
         }
         actions={
           canEdit && (
-            <Button onClick={save} disabled={saving}>
+            <Button onClick={save} disabled={saving} className="rounded-full gap-1.5 px-5">
               <Save className="h-4 w-4 me-1" />
               {t("common.save")}
             </Button>
@@ -142,23 +156,23 @@ function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* Company Info */}
-        <Card>
+        {/* 1. Company Info */}
+        <Card className="rounded-3xl border-border/80">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              <Building2 className="h-4 w-4" />
-              {lang === "ar" ? "الشركة" : "Company"}
+              <Building2 className="h-4 w-4 text-primary" />
+              {lang === "ar" ? "معلومات المنشأة والمتجر" : "Company & Store Info"}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <Field
-              label={lang === "ar" ? "الاسم التجاري" : "Trade name"}
+              label={lang === "ar" ? "الاسم التجاري للمتجر" : "Trade name"}
               v={form.name}
               on={(v) => setForm({ ...form, name: v })}
               disabled={!canEdit}
             />
             <Field
-              label={lang === "ar" ? "الاسم القانوني" : "Legal name"}
+              label={lang === "ar" ? "الاسم القانوني / السجل التجاري" : "Legal name"}
               v={form.legal_name ?? ""}
               on={(v) => setForm({ ...form, legal_name: v })}
               disabled={!canEdit}
@@ -177,30 +191,31 @@ function SettingsPage() {
                 disabled={!canEdit}
               />
               <Field
-                label={lang === "ar" ? "البريد" : "Email"}
+                label={lang === "ar" ? "البريد الإلكتروني" : "Email"}
                 v={form.email ?? ""}
                 on={(v) => setForm({ ...form, email: v })}
                 disabled={!canEdit}
               />
             </div>
             <div className="grid gap-1.5">
-              <Label className="text-xs">{lang === "ar" ? "العنوان" : "Address"}</Label>
+              <Label className="text-xs">{lang === "ar" ? "العنوان والموقع" : "Address"}</Label>
               <Textarea
                 rows={2}
                 value={form.address ?? ""}
                 onChange={(e) => setForm({ ...form, address: e.target.value })}
                 disabled={!canEdit}
+                className="rounded-2xl"
               />
             </div>
           </CardContent>
         </Card>
 
-        {/* Invoicing & Tax */}
-        <Card>
+        {/* 2. Invoicing, POS & Cart Settings */}
+        <Card className="rounded-3xl border-border/80">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              <Receipt className="h-4 w-4" />
-              {lang === "ar" ? "الفواتير والضريبة" : "Invoicing & tax"}
+              <Receipt className="h-4 w-4 text-primary" />
+              {lang === "ar" ? "إعدادات الفواتير والسلة ونقطة البيع (POS)" : "Invoicing & POS Cart Settings"}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -233,11 +248,32 @@ function SettingsPage() {
                 disabled={!canEdit}
               />
             </div>
-            <div className="flex items-center justify-between p-3 rounded-md border border-border">
-              <div>
-                <div className="text-sm font-medium">{lang === "ar" ? "تفعيل الباركود" : "Barcode mode"}</div>
+
+            {/* Custom Labor / Service Fee Toggle */}
+            <div className="flex items-center justify-between p-3.5 rounded-2xl border border-border/80 bg-surface/70">
+              <div className="space-y-0.5 pe-3">
+                <div className="text-sm font-semibold text-foreground">
+                  {lang === "ar" ? "خدمة أو أجرة تركيب بسعر متفق عليه" : "Custom Service / Installation Fee"}
+                </div>
                 <div className="text-xs text-muted-foreground">
-                  {lang === "ar" ? "قراءة الباركود من POS" : "Allow barcode scanning at POS"}
+                  {lang === "ar"
+                    ? "إظهار زر مخصص في سلة البيع POS لإضافة بند خدمة سريعة أو أجور عمالة/تركيب دون الحاجة لتعريف منتج مسبق."
+                    : "Enable quick custom service or labor fee entry in POS cart without catalog lookup."}
+                </div>
+              </div>
+              <Switch
+                checked={enablePosServiceFee}
+                onCheckedChange={setEnablePosServiceFee}
+                disabled={!canEdit}
+              />
+            </div>
+
+            {/* Barcode Mode Toggle */}
+            <div className="flex items-center justify-between p-3.5 rounded-2xl border border-border/80 bg-surface/70">
+              <div className="space-y-0.5 pe-3">
+                <div className="text-sm font-semibold text-foreground">{lang === "ar" ? "تفعيل الباركود في POS" : "Barcode mode"}</div>
+                <div className="text-xs text-muted-foreground">
+                  {lang === "ar" ? "السماح بمسح وقراءة الباركود بالكاميرا أو القارئ اليدوي" : "Allow barcode scanning at POS"}
                 </div>
               </div>
               <Switch
@@ -246,8 +282,9 @@ function SettingsPage() {
                 disabled={!canEdit}
               />
             </div>
+
             <Field
-              label={lang === "ar" ? "رابط الشعار" : "Logo URL"}
+              label={lang === "ar" ? "رابط الشعار المطبوع" : "Logo URL"}
               v={form.logo_url ?? ""}
               on={(v) => setForm({ ...form, logo_url: v })}
               disabled={!canEdit}

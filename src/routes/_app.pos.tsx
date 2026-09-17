@@ -136,6 +136,19 @@ function POSPage() {
   const [note, setNote] = useState("");
   const [saleDate, setSaleDate] = useState(() => new Date().toISOString().slice(0, 10));
 
+  // Settings & Split Payment
+  const [enableServiceFeeSetting, setEnableServiceFeeSetting] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("pos_enable_service_fee");
+      return saved !== null ? saved === "true" : true;
+    }
+    return true;
+  });
+  const [isSplitPayment, setIsSplitPayment] = useState(false);
+  const [splitCash, setSplitCash] = useState("");
+  const [splitCard, setSplitCard] = useState("");
+  const [splitBank, setSplitBank] = useState("");
+
   const [newCustomerOpen, setNewCustomerOpen] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState("");
   const [newCustomerPhone, setNewCustomerPhone] = useState("");
@@ -241,6 +254,18 @@ function POSPage() {
       if (loadedWarehouses.length > 0) {
         setWarehouseId((current) => (loadedWarehouses.some((w) => w.id === current) ? current : loadedWarehouses[0].id));
       }
+
+      // Fetch company settings to sync enable_pos_service_fee
+      void supabase
+        .from("company_settings")
+        .select("*")
+        .limit(1)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data && (data as any).enable_pos_service_fee !== undefined) {
+            setEnableServiceFeeSetting(Boolean((data as any).enable_pos_service_fee));
+          }
+        });
     } catch (err: any) {
       console.error("Error loading POS meta:", err);
     }
@@ -473,17 +498,30 @@ function POSPage() {
 
   scanHandlerRef.current = handleCode;
 
-  // Financial Computations
-  const subtotal = cart.reduce((s, l) => s + l.unit_price * l.quantity, 0);
-  const taxTotal = cart.reduce((s, l) => s + l.unit_price * l.quantity * (l.tax_rate / 100), 0);
-  const discountN = Number(discount || 0);
-  const total = Math.max(0, subtotal + taxTotal - discountN);
+  function formatWithCommas(val: number | string): string {
+    const n = typeof val === "number" ? val : Number(val);
+    if (!Number.isFinite(n)) return "0";
+    return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(n);
+  }
+
+  // Financial Computations with strict 2-decimal precision
+  const subtotal = Math.round(cart.reduce((s, l) => s + l.unit_price * l.quantity, 0) * 100) / 100;
+  const taxTotal = Math.round(cart.reduce((s, l) => s + l.unit_price * l.quantity * (l.tax_rate / 100), 0) * 100) / 100;
+  const discountN = Math.round(Number(discount || 0) * 100) / 100;
+  const total = Math.max(0, Math.round((subtotal + taxTotal - discountN) * 100) / 100);
+
+  // Split payment amounts
+  const splitCashN = Math.max(0, Number(splitCash || 0));
+  const splitCardN = Math.max(0, Number(splitCard || 0));
+  const splitBankN = Math.max(0, Number(splitBank || 0));
+  const splitPaidTotal = Math.round((splitCashN + splitCardN + splitBankN) * 100) / 100;
 
   // Auto-Paid & Smart Payment Logic
   const isPaidEmpty = paid.trim() === "";
-  const effectivePaid = isPaidEmpty ? total : Number(paid);
-  const isOverpaid = !isPaidEmpty && Number(paid) > total;
-  const remainingDebt = Math.max(0, total - effectivePaid);
+  const singlePaidNum = isPaidEmpty ? total : Number(paid);
+  const effectivePaid = isSplitPayment ? splitPaidTotal : singlePaidNum;
+  const isOverpaid = isSplitPayment ? splitPaidTotal > total : (!isPaidEmpty && Number(paid) > total);
+  const remainingDebt = Math.max(0, Math.round((total - effectivePaid) * 100) / 100);
 
   // Handle smart payment method switching on paid input change
   function handlePaidChange(val: string) {
@@ -539,7 +577,7 @@ function POSPage() {
     };
     window.addEventListener("keydown", handleGlobalShortcuts);
     return () => window.removeEventListener("keydown", handleGlobalShortcuts);
-  }, [cart, loading, warehouseId, customerId, paymentMethod, paid, discount, isOverpaid, total]);
+  }, [cart, loading, warehouseId, customerId, paymentMethod, paid, discount, isOverpaid, total, isSplitPayment, splitPaidTotal]);
 
   async function checkout() {
     if (!warehouseId) {
@@ -566,13 +604,35 @@ function POSPage() {
 
     setLoading(true);
     try {
+      const finalMethod = isSplitPayment
+        ? (splitCardN > 0 && splitCashN === 0 && splitBankN === 0
+            ? "card"
+            : splitBankN > 0 && splitCashN === 0 && splitCardN === 0
+            ? "bank_transfer"
+            : "cash")
+        : paymentMethod;
+
+      let splitNote = "";
+      if (isSplitPayment) {
+        const parts = [];
+        if (splitCashN > 0) parts.push(`${lang === "ar" ? "نقد" : "Cash"}: ${money(splitCashN)}`);
+        if (splitCardN > 0) parts.push(`${lang === "ar" ? "شبكة/بطاقة" : "Card"}: ${money(splitCardN)}`);
+        if (splitBankN > 0) parts.push(`${lang === "ar" ? "بنك" : "Bank"}: ${money(splitBankN)}`);
+        if (remainingDebt > 0) parts.push(`${lang === "ar" ? "آجل" : "Debt"}: ${money(remainingDebt)}`);
+        splitNote = `[${lang === "ar" ? "دفع مجزأ" : "Split"}: ${parts.join(" | ")}]`;
+      }
+
+      const finalNote = note.trim()
+        ? (splitNote ? `${note.trim()} — ${splitNote}` : note.trim())
+        : (splitNote || null);
+
       const { data, error } = await supabase.rpc("create_sale", {
         _warehouse_id: warehouseId,
         _customer_id: (customerId || null) as any,
-        _payment_method: paymentMethod,
+        _payment_method: finalMethod,
         _paid: Math.min(Math.max(effectivePaid, 0), total),
         _discount: discountN,
-        _note: (note || null) as any,
+        _note: finalNote as any,
         _sale_date: saleDate,
         _items: cart.map((l) => ({
           product_id: l.product_id,
@@ -600,6 +660,10 @@ function POSPage() {
       setPaid("");
       setDiscount("");
       setNote("");
+      setIsSplitPayment(false);
+      setSplitCash("");
+      setSplitCard("");
+      setSplitBank("");
       setSaleDate(new Date().toISOString().slice(0, 10));
       await loadStock(warehouseId);
       searchRef.current?.focus();
@@ -1016,33 +1080,35 @@ function POSPage() {
             )}
           </div>
 
-          {/* Quick Service Banner */}
-          <div className="shrink-0 mb-2.5 flex items-center justify-between rounded-2xl border border-dashed border-violet-500/30 bg-violet-500/5 px-3 py-2 transition hover:bg-violet-500/10">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-violet-500/10 text-violet-600 dark:text-violet-400">
-                <Wrench className="h-3.5 w-3.5" />
+          {/* Quick Service Banner (Controlled from Settings) */}
+          {enableServiceFeeSetting && (
+            <div className="shrink-0 mb-2 flex items-center justify-between rounded-2xl border border-dashed border-violet-500/30 bg-violet-500/5 px-3 py-1.5 transition hover:bg-violet-500/10">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-violet-500/10 text-violet-600 dark:text-violet-400">
+                  <Wrench className="h-3 w-3" />
+                </div>
+                <span className="truncate text-xs font-medium text-muted-foreground">
+                  {lang === "ar" ? "خدمة أو أجرة تركيب بسعر متفق عليه" : "Service or custom labor"}
+                </span>
               </div>
-              <span className="truncate text-xs font-medium text-muted-foreground">
-                {lang === "ar" ? "خدمة أو أجرة تركيب بسعر متفق عليه" : "Service or custom labor"}
-              </span>
+              <button
+                type="button"
+                onClick={() => setServiceOpen(true)}
+                className="shrink-0 h-6.5 rounded-full bg-violet-600 px-3 text-[11px] font-medium text-white shadow-xs shadow-violet-500/20 transition hover:bg-violet-500 active:scale-95"
+              >
+                {lang === "ar" ? "+ خدمة" : "+ Service"}
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => setServiceOpen(true)}
-              className="shrink-0 h-7 rounded-full bg-violet-600 px-3 text-xs font-medium text-white shadow-xs shadow-violet-500/20 transition hover:bg-violet-500 active:scale-95"
-            >
-              {lang === "ar" ? "+ خدمة" : "+ Service"}
-            </button>
-          </div>
+          )}
 
-          {/* Customer Selection - Elegant Rounded Full with 100% Round Add Button */}
-          <div className="shrink-0 mb-2.5 flex items-center gap-2">
+          {/* Customer Selection & Date Header */}
+          <div className="shrink-0 mb-2 flex items-center gap-2">
             <div className="relative min-w-0 flex-1">
               <select
                 aria-label={lang === "ar" ? "العميل" : "Customer"}
                 value={customerId}
                 onChange={(e) => setCustomerId(e.target.value)}
-                className="h-10 w-full appearance-none rounded-full border border-border/80 bg-surface/90 px-4 pl-9 pr-9 text-xs font-medium outline-none transition hover:border-primary/40 focus:border-primary focus:ring-2 focus:ring-primary/20 rtl:pl-9 rtl:pr-4"
+                className="h-9 w-full appearance-none rounded-full border border-border/80 bg-surface/90 px-3.5 pl-8 pr-8 text-xs font-medium outline-none transition hover:border-primary/40 focus:border-primary focus:ring-2 focus:ring-primary/20 rtl:pl-8 rtl:pr-3.5"
               >
                 <option value="">{t("pos.walkin")}</option>
                 {customers.map((c) => (
@@ -1051,21 +1117,35 @@ function POSPage() {
                   </option>
                 ))}
               </select>
-              <ChevronDown className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground rtl:left-3 rtl:right-auto" />
+              <ChevronDown className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground rtl:left-3 rtl:right-auto" />
             </div>
 
             <button
               type="button"
               onClick={() => setNewCustomerOpen(true)}
               title={lang === "ar" ? "إضافة عميل جديد" : "Add new customer"}
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-primary/30 bg-primary/10 text-primary transition hover:bg-primary/20 hover:scale-105 active:scale-95 shadow-xs shadow-primary/10"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-primary/30 bg-primary/10 text-primary transition hover:bg-primary/20 hover:scale-105 active:scale-95 shadow-xs shadow-primary/10"
             >
-              <UserPlus className="h-4 w-4" />
+              <UserPlus className="h-3.5 w-3.5" />
             </button>
+
+            {/* Date input cleanly integrated in customer header */}
+            <label
+              className="flex h-9 items-center gap-1.5 rounded-full border border-border/80 bg-surface/90 px-2.5 text-xs text-muted-foreground shadow-2xs hover:border-primary/40 transition shrink-0"
+              title={lang === "ar" ? "تاريخ الفاتورة" : "Sale Date"}
+            >
+              <CalendarDays className="h-3.5 w-3.5 shrink-0 text-primary" />
+              <input
+                type="date"
+                value={saleDate}
+                onChange={(e) => setSaleDate(e.target.value)}
+                className="w-24 bg-transparent text-[11px] text-foreground outline-none font-mono cursor-pointer"
+              />
+            </label>
           </div>
 
-          {/* Dedicated Internal Scroll Area for Cart Items */}
-          <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-2.5 my-1 custom-scrollbar">
+          {/* Dedicated Internal Scroll Area for Cart Items (Single Row Layout) */}
+          <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-2 my-1 custom-scrollbar">
             {cart.length === 0 ? (
               <div className="grid place-items-center py-14 text-sm text-muted-foreground">
                 <div className="grid h-12 w-12 place-items-center rounded-2xl border border-dashed border-border bg-surface-2/40 mb-3">
@@ -1080,172 +1160,323 @@ function POSPage() {
               cart.map((l) => (
                 <div
                   key={l.product_id}
-                  className={`group relative rounded-2xl border p-3 transition-all duration-200 ${
+                  className={`group relative flex items-center justify-between gap-2 rounded-2xl border px-3 py-2 transition-all duration-150 ${
                     l.is_service
                       ? "border-violet-500/30 bg-violet-500/5 hover:border-violet-500/50"
                       : "border-border/70 bg-surface-2/40 hover:border-primary/40 hover:bg-surface-2/70 shadow-2xs"
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-semibold text-foreground tracking-tight">
-                        {l.name}
-                      </div>
-                      <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground font-mono">
-                        <span className="text-primary font-medium">{money(l.unit_price)}</span>
-                        {l.tax_rate > 0 && (
-                          <span className="rounded bg-muted px-1 py-0.2 text-[9px] text-muted-foreground">
-                            +{l.tax_rate}% {t("pos.tax")}
-                          </span>
-                        )}
-                      </div>
+                  {/* 1. Product Name & Unit Price */}
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-xs font-semibold text-foreground tracking-tight flex items-center gap-1.5" title={l.name}>
+                      {l.is_service && <Wrench className="h-3 w-3 text-violet-500 shrink-0" />}
+                      <span className="truncate">{l.name}</span>
                     </div>
+                    <div className="text-[11px] text-muted-foreground font-mono flex items-center gap-1">
+                      <span>{money(l.unit_price)}</span>
+                      {l.tax_rate > 0 && (
+                        <span className="text-[9px] text-muted-foreground/70">
+                          (+{l.tax_rate}%)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 2. Compact Inline Quantity Control [-] [ 2 ] [+] */}
+                  <div className="inline-flex items-center gap-1 rounded-full border border-border/80 bg-surface/90 p-0.5 shadow-2xs shrink-0">
                     <button
                       type="button"
-                      onClick={() => setQty(l.product_id, 0)}
-                      title={t("common.delete")}
-                      className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive active:scale-90"
+                      onClick={() => setQty(l.product_id, l.quantity - 1)}
+                      className="grid h-6 w-6 place-items-center rounded-full text-muted-foreground transition hover:bg-surface-2 hover:text-foreground active:scale-90"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Minus className="h-3 w-3" />
+                    </button>
+                    <input
+                      type="number"
+                      min="1"
+                      value={l.quantity}
+                      onChange={(e) => setQty(l.product_id, Number(e.target.value))}
+                      className="h-6 w-8 bg-transparent text-center text-xs font-mono font-bold text-foreground outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setQty(l.product_id, l.quantity + 1)}
+                      className="grid h-6 w-6 place-items-center rounded-full text-muted-foreground transition hover:bg-surface-2 hover:text-foreground active:scale-90"
+                    >
+                      <Plus className="h-3 w-3" />
                     </button>
                   </div>
 
-                  <div className="mt-2.5 flex items-center justify-between gap-2 pt-1.5 border-t border-border/40">
-                    <div className="inline-flex items-center gap-1 rounded-full border border-border/80 bg-surface/90 p-0.5 shadow-2xs">
-                      <button
-                        type="button"
-                        onClick={() => setQty(l.product_id, l.quantity - 1)}
-                        className="grid h-6 w-6 place-items-center rounded-full text-muted-foreground transition hover:bg-surface-2 hover:text-foreground active:scale-90"
-                      >
-                        <Minus className="h-3 w-3" />
-                      </button>
-                      <input
-                        type="number"
-                        min="1"
-                        value={l.quantity}
-                        onChange={(e) => setQty(l.product_id, Number(e.target.value))}
-                        className="h-6 w-11 bg-transparent text-center text-xs font-mono font-bold text-foreground outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setQty(l.product_id, l.quantity + 1)}
-                        className="grid h-6 w-6 place-items-center rounded-full text-muted-foreground transition hover:bg-surface-2 hover:text-foreground active:scale-90"
-                      >
-                        <Plus className="h-3 w-3" />
-                      </button>
-                    </div>
-                    <div className="text-end">
-                      <span className="text-sm font-bold font-mono text-foreground">
-                        {money(l.unit_price * l.quantity * (1 + l.tax_rate / 100))}
-                      </span>
-                    </div>
+                  {/* 3. Line Total */}
+                  <div className="w-20 text-end shrink-0 font-mono text-xs font-bold text-foreground">
+                    {money(l.unit_price * l.quantity * (1 + l.tax_rate / 100))}
                   </div>
+
+                  {/* 4. Delete Button */}
+                  <button
+                    type="button"
+                    onClick={() => setQty(l.product_id, 0)}
+                    title={t("common.delete")}
+                    className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-muted-foreground/60 transition hover:bg-destructive/10 hover:text-destructive active:scale-90"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
                 </div>
               ))
             )}
           </div>
 
           {/* Footer Summary & Payment Controls */}
-          <div className="shrink-0 pt-2.5 border-t border-border/70 space-y-2 mt-auto bg-surface/60 backdrop-blur-xs">
-            {/* Financial Rows */}
-            <div className="space-y-1 text-xs">
-              <Row label={t("pos.subtotal")} value={money(subtotal)} />
-              {taxTotal > 0 && <Row label={t("pos.tax")} value={money(taxTotal)} />}
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-muted-foreground">{t("pos.discount")}</span>
-                <input
-                  type="number"
-                  min="0"
-                  value={discount}
-                  onChange={(e) => setDiscount(e.target.value)}
-                  placeholder="0"
-                  className="h-6 w-20 rounded-full border border-border bg-surface px-2.5 text-end text-xs font-mono outline-none focus:border-primary"
-                />
+          <div className="shrink-0 pt-2.5 border-t border-border/70 space-y-2 mt-auto bg-surface/80 backdrop-blur-xs">
+            {/* Financial Summary Card with subtle dividers */}
+            <div className="rounded-2xl border border-border/70 bg-surface-2/30 p-2.5 space-y-1.5">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>{t("pos.subtotal")}</span>
+                <span className="font-mono font-semibold text-foreground">{money(subtotal)}</span>
               </div>
-              <Row label={t("pos.total")} value={money(total)} bold />
-            </div>
 
-            {/* Payment Method Switcher */}
-            <div className="grid grid-cols-4 gap-1 pt-1">
-              {(["cash", "card", "bank_transfer", "credit"] as const).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setPaymentMethod(m)}
-                  className={`h-8 rounded-xl border text-xs font-semibold transition-all duration-150 flex items-center justify-center gap-1 ${
-                    paymentMethod === m
-                      ? "border-primary bg-primary/15 text-primary shadow-2xs ring-1 ring-primary/30"
-                      : "border-border/80 text-muted-foreground hover:bg-surface-2 hover:text-foreground"
-                  }`}
-                >
-                  {m === "cash" && <Banknote className="h-3 w-3" />}
-                  {m === "card" && <CreditCard className="h-3 w-3" />}
-                  {m === "bank_transfer" && <Building2 className="h-3 w-3" />}
-                  {m === "credit" && <Clock className="h-3 w-3" />}
-                  <span>{t(`pos.pm.${m}`)}</span>
-                </button>
-              ))}
-            </div>
+              {taxTotal > 0 && (
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>{t("pos.tax")}</span>
+                  <span className="font-mono font-semibold text-foreground">{money(taxTotal)}</span>
+                </div>
+              )}
 
-            {/* Date & Paid Input */}
-            <div className="space-y-1.5 pt-1">
-              <div className="grid grid-cols-2 gap-2">
-                {/* Sale Date */}
-                <label className="flex h-9 items-center gap-1.5 rounded-full border border-input/80 bg-surface/90 px-3 text-xs text-muted-foreground">
-                  <CalendarDays className="h-3.5 w-3.5 shrink-0 text-primary" />
-                  <input
-                    type="date"
-                    value={saleDate}
-                    onChange={(e) => setSaleDate(e.target.value)}
-                    className="min-w-0 flex-1 bg-transparent text-[11px] text-foreground outline-none font-mono"
-                  />
-                </label>
-
-                {/* Paid Input */}
+              {/* Discount Row */}
+              <div className="flex items-center justify-between gap-2 text-xs">
+                <span className="text-muted-foreground flex items-center gap-1.5">
+                  <span>{t("pos.discount")}</span>
+                  {discountN > 0 && (
+                    <span className="text-[10px] text-primary font-mono font-bold">
+                      (-{money(discountN)})
+                    </span>
+                  )}
+                </span>
                 <div className="relative">
                   <input
                     type="number"
                     min="0"
-                    value={paid}
-                    onChange={(e) => handlePaidChange(e.target.value)}
-                    placeholder={
-                      isPaidEmpty
-                        ? `${lang === "ar" ? "مدفوع بالكامل" : "Full paid"} (${total.toFixed(0)})`
-                        : `${t("pos.paid")}`
-                    }
-                    className={`h-9 w-full rounded-full border px-3 text-xs font-mono outline-none transition ${
-                      isOverpaid
-                        ? "border-destructive bg-destructive/10 text-destructive focus:ring-2 focus:ring-destructive/30"
-                        : "border-input/80 bg-surface/90 text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
-                    }`}
+                    value={discount}
+                    onChange={(e) => setDiscount(e.target.value)}
+                    placeholder="0"
+                    className="h-6 w-24 rounded-full border border-border bg-surface px-2.5 text-end text-xs font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
                   />
                 </div>
               </div>
 
-              {/* Status Badges: Overpaid Alert / Remaining Debt / Auto-Paid Indicator */}
-              {isOverpaid ? (
-                <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-xs font-semibold text-destructive flex items-center gap-1.5 animate-in fade-in duration-200">
-                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate">
-                    {lang === "ar"
-                      ? `المبلغ المدفوع (${money(effectivePaid)}) أكبر من الإجمالي المطلوب (${money(total)})`
-                      : `Paid amount (${money(effectivePaid)}) exceeds total (${money(total)})`}
-                  </span>
+              {/* Final Total Highlight */}
+              <div className="pt-2 border-t border-border/60 flex items-center justify-between">
+                <span className="text-xs font-bold text-foreground uppercase tracking-wider">{t("pos.total")}</span>
+                <span className="text-base font-extrabold font-mono text-primary tracking-tight">
+                  {money(total)}
+                </span>
+              </div>
+            </div>
+
+            {/* Payment Method Switcher: Cash | Card | Bank | Credit | Split */}
+            <div className="space-y-1.5">
+              <div className="grid grid-cols-5 gap-1">
+                {(["cash", "card", "bank_transfer", "credit"] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => {
+                      setIsSplitPayment(false);
+                      setPaymentMethod(m);
+                    }}
+                    className={`h-8 rounded-xl border text-[11px] font-semibold transition-all duration-150 flex items-center justify-center gap-1 ${
+                      !isSplitPayment && paymentMethod === m
+                        ? "border-primary bg-primary/15 text-primary shadow-2xs ring-1 ring-primary/30 font-bold"
+                        : "border-border/80 text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+                    }`}
+                  >
+                    {m === "cash" && <Banknote className="h-3 w-3" />}
+                    {m === "card" && <CreditCard className="h-3 w-3" />}
+                    {m === "bank_transfer" && <Building2 className="h-3 w-3" />}
+                    {m === "credit" && <Clock className="h-3 w-3" />}
+                    <span className="truncate">{t(`pos.pm.${m}`)}</span>
+                  </button>
+                ))}
+
+                {/* Split Payment Switcher */}
+                <button
+                  type="button"
+                  onClick={() => setIsSplitPayment((v) => !v)}
+                  className={`h-8 rounded-xl border text-[11px] font-semibold transition-all duration-150 flex items-center justify-center gap-1 ${
+                    isSplitPayment
+                      ? "border-violet-500 bg-violet-500/15 text-violet-600 dark:text-violet-400 shadow-2xs ring-1 ring-violet-500/30 font-bold"
+                      : "border-border/80 text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+                  }`}
+                >
+                  <Sparkles className="h-3 w-3 text-violet-500" />
+                  <span className="truncate">{lang === "ar" ? "دفع مجزأ" : "Split"}</span>
+                </button>
+              </div>
+
+              {/* Split Payment inputs if enabled */}
+              {isSplitPayment ? (
+                <div className="rounded-2xl border border-violet-500/30 bg-violet-500/5 p-2.5 space-y-2 animate-in fade-in duration-200">
+                  <div className="flex items-center justify-between text-xs font-semibold text-violet-700 dark:text-violet-300">
+                    <span>{lang === "ar" ? "توزيع الدفعات (شبكة / نقد / بنك / آجل):" : "Split Allocation:"}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSplitCash(String(total));
+                        setSplitCard("");
+                        setSplitBank("");
+                      }}
+                      className="text-[10px] text-violet-600 underline"
+                    >
+                      {lang === "ar" ? "نقد كامل" : "All Cash"}
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="text-[10px] text-muted-foreground block mb-0.5">{lang === "ar" ? "نقدًا:" : "Cash:"}</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={splitCash}
+                        onChange={(e) => setSplitCash(e.target.value)}
+                        placeholder="0"
+                        className="h-8 w-full rounded-xl border border-border bg-surface px-2 text-xs font-mono outline-none focus:border-violet-500"
+                      />
+                      {splitCash && Number(splitCash) > 0 && (
+                        <span className="text-[9px] text-muted-foreground font-mono block text-end">
+                          {formatWithCommas(splitCash)}
+                        </span>
+                      )}
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-muted-foreground block mb-0.5">{lang === "ar" ? "شبكة/بطاقة:" : "Card:"}</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={splitCard}
+                        onChange={(e) => setSplitCard(e.target.value)}
+                        placeholder="0"
+                        className="h-8 w-full rounded-xl border border-border bg-surface px-2 text-xs font-mono outline-none focus:border-violet-500"
+                      />
+                      {splitCard && Number(splitCard) > 0 && (
+                        <span className="text-[9px] text-muted-foreground font-mono block text-end">
+                          {formatWithCommas(splitCard)}
+                        </span>
+                      )}
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-muted-foreground block mb-0.5">{lang === "ar" ? "تحويل بنكي:" : "Bank:"}</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={splitBank}
+                        onChange={(e) => setSplitBank(e.target.value)}
+                        placeholder="0"
+                        className="h-8 w-full rounded-xl border border-border bg-surface px-2 text-xs font-mono outline-none focus:border-violet-500"
+                      />
+                      {splitBank && Number(splitBank) > 0 && (
+                        <span className="text-[9px] text-muted-foreground font-mono block text-end">
+                          {formatWithCommas(splitBank)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Split Summary Footer */}
+                  <div className="pt-1.5 border-t border-violet-500/20 flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground font-medium">
+                      {lang === "ar" ? "إجمالي المدفوع الآن:" : "Total Paid Now:"}
+                    </span>
+                    <span className="font-mono font-bold text-foreground">
+                      {money(splitPaidTotal)}
+                    </span>
+                  </div>
+
+                  {remainingDebt > 0 && (
+                    <div className="flex items-center justify-between rounded-xl bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 text-xs font-mono text-amber-600 dark:text-amber-300">
+                      <span>{lang === "ar" ? "المتبقي كدين آجل على العميل:" : "Remaining Debt:"}</span>
+                      <span className="font-bold">{money(remainingDebt)}</span>
+                    </div>
+                  )}
                 </div>
-              ) : paymentMethod === "credit" && remainingDebt > 0 ? (
-                <div className="flex items-center justify-between rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-mono text-amber-600 dark:text-amber-300">
-                  <span>{lang === "ar" ? "المتبقي كدين آجل:" : "Remaining debt:"}</span>
-                  <span className="font-bold">{money(remainingDebt)}</span>
+              ) : (
+                /* Single Payment Paid Input & Live Comma Preview */
+                <div className="space-y-1.5">
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="0"
+                      value={paid}
+                      onChange={(e) => handlePaidChange(e.target.value)}
+                      placeholder={
+                        isPaidEmpty
+                          ? `${lang === "ar" ? "مدفوع بالكامل" : "Full paid"} (${formatWithCommas(total)} ﷼)`
+                          : `${t("pos.paid")}`
+                      }
+                      className={`h-9 w-full rounded-2xl border px-3 text-xs font-mono outline-none transition ${
+                        isOverpaid
+                          ? "border-destructive bg-destructive/10 text-destructive focus:ring-2 focus:ring-destructive/30"
+                          : "border-input/80 bg-surface/90 text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
+                      }`}
+                    />
+                    {paid.trim() !== "" && !isNaN(Number(paid)) && (
+                      <span className="absolute end-3 top-1/2 -translate-y-1/2 text-[11px] font-mono text-muted-foreground pointer-events-none">
+                        = {formatWithCommas(paid)} ﷼
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Quick Shortcuts */}
+                  <div className="flex items-center gap-1.5 text-[10px]">
+                    <button
+                      type="button"
+                      onClick={() => handlePaidChange("")}
+                      className="rounded-full bg-surface-2 px-2.5 py-0.5 text-muted-foreground hover:text-foreground hover:bg-surface-3 transition"
+                    >
+                      {lang === "ar" ? "الكامل" : "Full"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handlePaidChange(String(Math.round(total / 2)))}
+                      className="rounded-full bg-surface-2 px-2.5 py-0.5 text-muted-foreground hover:text-foreground hover:bg-surface-3 transition"
+                    >
+                      {lang === "ar" ? "نصف المبلغ" : "Half"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handlePaidChange("0")}
+                      className="rounded-full bg-surface-2 px-2.5 py-0.5 text-muted-foreground hover:text-foreground hover:bg-surface-3 transition"
+                    >
+                      {lang === "ar" ? "آجل (0)" : "0 (Debt)"}
+                    </button>
+                  </div>
+
+                  {/* Status Badges */}
+                  {isOverpaid ? (
+                    <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-xs font-semibold text-destructive flex items-center gap-1.5 animate-in fade-in duration-200">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">
+                        {lang === "ar"
+                          ? `المبلغ المدفوع (${money(effectivePaid)}) أكبر من الإجمالي المطلوب (${money(total)})`
+                          : `Paid amount (${money(effectivePaid)}) exceeds total (${money(total)})`}
+                      </span>
+                    </div>
+                  ) : paymentMethod === "credit" && remainingDebt > 0 ? (
+                    <div className="flex items-center justify-between rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-mono text-amber-600 dark:text-amber-300">
+                      <span>{lang === "ar" ? "المتبقي كدين آجل على العميل:" : "Remaining debt:"}</span>
+                      <span className="font-bold">{money(remainingDebt)}</span>
+                    </div>
+                  ) : isPaidEmpty ? (
+                    <div className="flex items-center justify-between text-[11px] text-emerald-600 dark:text-emerald-400 font-medium px-2">
+                      <span className="flex items-center gap-1">
+                        <CheckCircle2 className="h-3 w-3" />
+                        {lang === "ar" ? "المدفوع تلقائيًا: كامل الإجمالي" : "Auto paid: Full invoice"}
+                      </span>
+                      <span className="font-mono font-semibold">{money(total)}</span>
+                    </div>
+                  ) : null}
                 </div>
-              ) : isPaidEmpty ? (
-                <div className="flex items-center justify-between text-[11px] text-emerald-600 dark:text-emerald-400 font-medium px-2">
-                  <span className="flex items-center gap-1">
-                    <CheckCircle2 className="h-3 w-3" />
-                    {lang === "ar" ? "المدفوع تلقائيًا: كامل الإجمالي" : "Auto paid: Full invoice"}
-                  </span>
-                  <span className="font-mono font-semibold">{money(total)}</span>
-                </div>
-              ) : null}
+              )}
             </div>
 
             {/* Checkout Button */}

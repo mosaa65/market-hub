@@ -117,38 +117,111 @@ function DashboardPage() {
         }
       />
 
-      {/* Hero banner */}
-      <div className="relative mb-6 overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-br from-primary/20 via-chart-4/10 to-chart-2/10 p-6 sm:p-8">
-        <div className="absolute inset-0 opacity-30 [background-image:radial-gradient(circle_at_20%_20%,oklch(0.62_0.21_260/.5),transparent_50%),radial-gradient(circle_at_80%_80%,oklch(0.7_0.18_180/.4),transparent_50%)]" />
-        <div className="relative grid gap-6 sm:grid-cols-[1fr_auto] sm:items-center">
-          <div>
-            <div className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-medium uppercase tracking-widest text-muted-foreground backdrop-blur">
-              <TrendingUp className="h-3 w-3" /> {lang === "ar" ? "آخر 30 يوم" : "Last 30 days"}
+      {/* Executive Performance Overview */}
+      <div className="relative mb-6 overflow-hidden rounded-3xl border border-border/80 bg-gradient-to-br from-surface via-surface/90 to-primary/5 p-6 sm:p-7 shadow-sm transition-all">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[11px] font-semibold text-primary">
+                <TrendingUp className="h-3 w-3" />
+                {lang === "ar" ? "لوحة الأداء المالي والتشغيلي (30 يوم)" : "Executive Performance (30 Days)"}
+              </span>
+              <span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-[11px] font-mono text-muted-foreground border border-border/60">
+                {lang === "ar" ? `${num(data?.orders ?? 0)} فاتورة مسجلة` : `${num(data?.orders ?? 0)} recorded invoices`}
+              </span>
             </div>
-            <h2 className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
-              {money(data?.revenue ?? 0)}
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {lang === "ar" ? "إجمالي المبيعات مع" : "Total revenue across"} <span className="font-semibold text-foreground">{num(data?.orders ?? 0)}</span> {lang === "ar" ? "فاتورة" : "orders"}
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <MiniBadge label={lang === "ar" ? "المحصّل" : "Collected"} value={money(data?.collected ?? 0)} tone="pos" />
-              <MiniBadge label={lang === "ar" ? "الذمم" : "Receivable"} value={money(data?.receivables ?? 0)} tone="warn" />
-              <MiniBadge label={lang === "ar" ? "صافي نقد" : "Net cash"} value={money(data?.netCash ?? 0)} tone={data?.netCash && data.netCash >= 0 ? "pos" : "neg"} />
+
+            <div>
+              <div className="text-xs font-medium text-muted-foreground">
+                {lang === "ar" ? "إجمالي إيراد المبيعات" : "Gross Revenue"}
+              </div>
+              <div className="mt-1 text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground font-mono">
+                {money(data?.revenue ?? 0)}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <MiniBadge
+                label={lang === "ar" ? "المحصّل نقدًا وبنكًا" : "Collected Cash"}
+                value={money(data?.collected ?? 0)}
+                tone="pos"
+              />
+              <MiniBadge
+                label={lang === "ar" ? "الذمم والديون المتبقية" : "Receivables"}
+                value={money(data?.receivables ?? 0)}
+                tone={data?.receivables && data.receivables > 0 ? "warn" : "pos"}
+              />
+              <MiniBadge
+                label={lang === "ar" ? "متوسط الفاتورة" : "Avg Order"}
+                value={money(data?.orders ? (data.revenue / data.orders) : 0)}
+                tone="neutral"
+              />
+              <MiniBadge
+                label={lang === "ar" ? "صافي التدفق" : "Net Cash"}
+                value={money(data?.netCash ?? 0)}
+                tone={data?.netCash && data.netCash >= 0 ? "pos" : "neg"}
+              />
             </div>
           </div>
-          <div className="hidden sm:block h-32 w-64">
-            <ResponsiveContainer>
-              <AreaChart data={data?.daily ?? []}>
-                <defs>
-                  <linearGradient id="heroG" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="oklch(0.62 0.21 260)" stopOpacity={0.6} />
-                    <stop offset="100%" stopColor="oklch(0.62 0.21 260)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <Area type="monotone" dataKey="revenue" stroke="oklch(0.62 0.21 260)" strokeWidth={2.5} fill="url(#heroG)" />
-              </AreaChart>
-            </ResponsiveContainer>
+
+          {/* Quick Action Buttons & Sparkline */}
+          <div className="flex flex-col sm:flex-row lg:flex-col items-start lg:items-end justify-between gap-4 border-t lg:border-t-0 lg:border-s border-border/60 pt-4 lg:pt-0 lg:ps-6">
+            <div className="flex flex-wrap items-center gap-2">
+              <Link
+                to="/pos"
+                className="inline-flex h-9 items-center gap-2 rounded-2xl bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm shadow-primary/20 hover:bg-primary/90 transition-all active:scale-95"
+              >
+                <ShoppingCart className="h-3.5 w-3.5" />
+                <span>{lang === "ar" ? "نقطة البيع السريعة" : "Open POS"}</span>
+              </Link>
+              <Link
+                to="/sales"
+                className="inline-flex h-9 items-center gap-1.5 rounded-2xl border border-border/80 bg-surface/80 px-3.5 text-xs font-medium text-foreground hover:bg-surface-2 transition-all active:scale-95"
+              >
+                <Receipt className="h-3.5 w-3.5 text-muted-foreground" />
+                <span>{lang === "ar" ? "فواتير المبيعات" : "Sales Invoices"}</span>
+              </Link>
+              {isModuleEnabled("analytics") && (
+                <Link
+                  to="/analytics"
+                  className="inline-flex h-9 items-center gap-1.5 rounded-2xl border border-primary/30 bg-primary/5 px-3.5 text-xs font-medium text-primary hover:bg-primary/10 transition-all active:scale-95"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span>{lang === "ar" ? "التحليلات" : "Analytics"}</span>
+                </Link>
+              )}
+            </div>
+
+            {/* Sparkline mini-chart */}
+            <div className="w-full sm:w-60 h-20 rounded-2xl bg-surface-2/40 border border-border/40 p-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={data?.daily ?? []}>
+                  <defs>
+                    <linearGradient id="heroG" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--primary, #3b82f6)" stopOpacity={0.4} />
+                      <stop offset="100%" stopColor="var(--primary, #3b82f6)" stopOpacity={0.0} />
+                    </linearGradient>
+                  </defs>
+                  <Tooltip
+                    contentStyle={{
+                      background: "rgba(20, 20, 25, 0.95)",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      borderRadius: 10,
+                      fontSize: 11,
+                      color: "#fff",
+                    }}
+                    formatter={(val: any) => [money(Number(val)), lang === "ar" ? "الإيراد" : "Revenue"]}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="revenue"
+                    stroke="var(--primary, #3b82f6)"
+                    strokeWidth={2}
+                    fill="url(#heroG)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
       </div>
@@ -179,20 +252,50 @@ function DashboardPage() {
               <AreaChart data={data?.daily ?? []}>
                 <defs>
                   <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="oklch(0.62 0.21 260)" stopOpacity={0.5} />
-                    <stop offset="100%" stopColor="oklch(0.62 0.21 260)" stopOpacity={0} />
+                    <stop offset="0%" stopColor="var(--primary, #3b82f6)" stopOpacity={0.4} />
+                    <stop offset="100%" stopColor="var(--primary, #3b82f6)" stopOpacity={0.0} />
                   </linearGradient>
                   <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="oklch(0.7 0.18 180)" stopOpacity={0.4} />
-                    <stop offset="100%" stopColor="oklch(0.7 0.18 180)" stopOpacity={0} />
+                    <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.3} />
+                    <stop offset="100%" stopColor="#06b6d4" stopOpacity={0.0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid stroke="oklch(1 0 0 / 0.05)" vertical={false} />
-                <XAxis dataKey="day" stroke="oklch(0.62 0.015 270)" fontSize={11} tickLine={false} axisLine={false} />
-                <YAxis stroke="oklch(0.62 0.015 270)" fontSize={11} tickLine={false} axisLine={false} />
-                <Tooltip contentStyle={{ background: "oklch(0.18 0.007 270)", border: "1px solid oklch(1 0 0 / 0.08)", borderRadius: 12, fontSize: 12 }} />
-                <Area type="monotone" dataKey="revenue" stroke="oklch(0.62 0.21 260)" strokeWidth={2.5} fill="url(#g1)" />
-                <Area type="monotone" dataKey="orders" stroke="oklch(0.7 0.18 180)" strokeWidth={2} fill="url(#g2)" />
+                <CartesianGrid stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="day" stroke="currentColor" className="text-muted-foreground opacity-60" fontSize={11} tickLine={false} axisLine={false} />
+                <YAxis
+                  yAxisId="rev"
+                  stroke="currentColor"
+                  className="text-muted-foreground opacity-60"
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`)}
+                />
+                <YAxis
+                  yAxisId="orders"
+                  orientation="right"
+                  stroke="currentColor"
+                  className="text-muted-foreground opacity-40"
+                  fontSize={10}
+                  tickLine={false}
+                  axisLine={false}
+                  allowDecimals={false}
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: "rgba(20, 20, 25, 0.95)",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    borderRadius: 12,
+                    fontSize: 12,
+                    color: "#fff",
+                  }}
+                  formatter={(val: any, name: any) => [
+                    name === "revenue" ? money(Number(val)) : `${num(Number(val))} ${lang === "ar" ? "طلب" : "orders"}`,
+                    name === "revenue" ? (lang === "ar" ? "الإيراد" : "Revenue") : (lang === "ar" ? "عدد الفواتير" : "Orders"),
+                  ]}
+                />
+                <Area yAxisId="rev" type="monotone" dataKey="revenue" name="revenue" stroke="var(--primary, #3b82f6)" strokeWidth={2.5} fill="url(#g1)" />
+                <Area yAxisId="orders" type="monotone" dataKey="orders" name="orders" stroke="#06b6d4" strokeWidth={2} fill="url(#g2)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -333,9 +436,10 @@ function DashboardPage() {
   );
 }
 
-function MiniBadge({ label, value, tone }: { label: string; value: string; tone: "pos" | "neg" | "warn" }) {
+function MiniBadge({ label, value, tone }: { label: string; value: string; tone: "pos" | "neg" | "warn" | "neutral" }) {
   const cls = tone === "pos" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-500"
     : tone === "neg" ? "border-rose-500/30 bg-rose-500/10 text-rose-500"
+    : tone === "neutral" ? "border-primary/25 bg-primary/5 text-primary"
     : "border-amber-500/30 bg-amber-500/10 text-amber-500";
   return (
     <div className={`rounded-full border px-3 py-1 text-xs backdrop-blur ${cls}`}>
