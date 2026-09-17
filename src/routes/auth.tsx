@@ -61,58 +61,37 @@ function AuthPage() {
     setLoading(true);
 
     try {
-      // 1. Attempt standard password login
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
         email: cleanEmail,
         password,
       });
 
-      if (!signInError && signInData?.session) {
+      if (signInError) {
+        throw signInError;
+      }
+
+      if (signInData?.session) {
         toast.success(t("auth.signin_success"));
         navigate({ to: "/dashboard", replace: true });
         return;
       }
 
-      // 2. If login failed and this is the platform Superadmin email,
-      // attempt auto-bootstrap via GoTrue signUp so Supabase creates the user with correct password hash
-      if (signInError && cleanEmail === "mousa.mc13@gmail.com") {
-        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-          email: cleanEmail,
-          password,
-          options: {
-            data: { full_name: "موسى - السوبر أدمن" },
-          },
-        });
+      // Shouldn't reach here, but handle gracefully
+      throw new Error(isRtl ? "فشل تسجيل الدخول. يرجى المحاولة مرة أخرى." : "Login failed. Please try again.");
+    } catch (err: unknown) {
+      console.error("[Auth] Login error:", err);
 
-        if (!signUpError && signUpData?.user) {
-          // If auto-authenticated
-          if (signUpData.session) {
-            toast.success(isRtl ? "تم تهيئة وتفعيل حساب السوبر أدمن بنجاح!" : "Superadmin account activated!");
-            navigate({ to: "/dashboard", replace: true });
-            return;
-          }
-
-          // If confirmation is off, immediately sign in
-          const retrySignIn = await supabase.auth.signInWithPassword({
-            email: cleanEmail,
-            password,
-          });
-
-          if (!retrySignIn.error && retrySignIn.data?.session) {
-            toast.success(isRtl ? "تم تسجيل الدخول بنجاح!" : "Signed in successfully!");
-            navigate({ to: "/dashboard", replace: true });
-            return;
-          }
-        }
+      // Extract meaningful error message
+      let rawMsg = "";
+      if (err instanceof Error) {
+        rawMsg = err.message;
+      } else if (typeof err === "object" && err !== null) {
+        rawMsg = (err as any).message ?? (err as any).msg ?? (err as any).error_description ?? JSON.stringify(err);
+      } else {
+        rawMsg = String(err);
       }
 
-      // If still error, throw the signInError
-      if (signInError) throw signInError;
-      
-      toast.success(t("auth.signin_success"));
-      navigate({ to: "/dashboard", replace: true });
-    } catch (err: any) {
-      const message = String(err?.message ?? "").toLowerCase();
+      const message = rawMsg.toLowerCase();
       const translatedError =
         message.includes("invalid login credentials") || message.includes("invalid_credentials")
           ? (isRtl ? "بيانات الدخول غير صحيحة. يرجى التحقق من البريد وكلمة المرور." : t("auth.invalid_credentials"))
@@ -120,7 +99,7 @@ function AuthPage() {
             ? (isRtl ? "البريد الإلكتروني بحاجة لتأكيد. يرجى مراجعة بريدك أو التواصل مع الإدارة." : "Email not confirmed yet.")
             : message.includes("network") || message.includes("fetch")
               ? t("auth.network_error")
-              : (err?.message || t("auth.failed"));
+              : rawMsg || (isRtl ? "فشل تسجيل الدخول. يرجى المحاولة لاحقاً." : "Login failed. Please try again later.");
       toast.error(translatedError);
     } finally {
       setLoading(false);
