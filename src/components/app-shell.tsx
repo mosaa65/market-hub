@@ -23,6 +23,7 @@ type Item = {
   key: string;
   moduleId?: string;
   superadminOnly?: boolean;
+  allowedRoles?: ("owner" | "manager" | "accountant" | "cashier" | "warehouse")[];
   color?: string;
   bg?: string;
 };
@@ -34,56 +35,56 @@ const sections: Section[] = [
     titleKey: "nav.section.overview",
     items: [
       { to: "/dashboard", icon: LayoutDashboard, key: "nav.dashboard", moduleId: "core", color: "text-sky-500", bg: "bg-sky-500/15" },
-      { to: "/analytics", icon: LineChart, key: "nav.analytics", moduleId: "analytics", color: "text-indigo-500", bg: "bg-indigo-500/15" },
-      { to: "/plans", icon: Crown, key: "nav.plans", moduleId: "core", color: "text-amber-500", bg: "bg-amber-500/15" },
+      { to: "/analytics", icon: LineChart, key: "nav.analytics", moduleId: "analytics", allowedRoles: ["owner", "manager", "accountant"], color: "text-indigo-500", bg: "bg-indigo-500/15" },
+      { to: "/plans", icon: Crown, key: "nav.plans", moduleId: "core", allowedRoles: ["owner"], color: "text-amber-500", bg: "bg-amber-500/15" },
     ],
   },
   {
     titleKey: "nav.section.operations",
     items: [
-      { to: "/pos", icon: ScanBarcode, key: "nav.pos", moduleId: "pos", color: "text-emerald-500", bg: "bg-emerald-500/15" },
+      { to: "/pos", icon: ScanBarcode, key: "nav.pos", moduleId: "pos", allowedRoles: ["owner", "manager", "cashier"], color: "text-emerald-500", bg: "bg-emerald-500/15" },
       { to: "/products", icon: Package, key: "nav.products", moduleId: "core", color: "text-teal-500", bg: "bg-teal-500/15" },
-      { to: "/catalog", icon: Layers, key: "nav.catalog", moduleId: "core", color: "text-amber-500", bg: "bg-amber-500/15" },
-      { to: "/inventory", icon: Warehouse, key: "nav.inventory", moduleId: "core", color: "text-cyan-500", bg: "bg-cyan-500/15" },
-      { to: "/warehouses", icon: Boxes, key: "nav.warehouses", moduleId: "multi_warehouse", color: "text-blue-500", bg: "bg-blue-500/15" },
-      { to: "/batches", icon: CalendarClock, key: "nav.batches", moduleId: "batches", color: "text-orange-500", bg: "bg-orange-500/15" },
-      { to: "/sales", icon: Receipt, key: "nav.sales", moduleId: "core", color: "text-emerald-400", bg: "bg-emerald-500/15" },
-      { to: "/sales-returns", icon: RotateCcw, key: "nav.sales_returns", moduleId: "returns", color: "text-rose-400", bg: "bg-rose-500/15" },
-      { to: "/purchases", icon: Truck, key: "nav.purchases", moduleId: "purchases", color: "text-blue-400", bg: "bg-blue-500/15" },
-      { to: "/purchase-returns", icon: RotateCcw, key: "nav.purchase_returns", moduleId: "returns", color: "text-rose-500", bg: "bg-rose-500/15" },
-      { to: "/transfers", icon: ArrowRightLeft, key: "nav.transfers", moduleId: "multi_warehouse", color: "text-purple-400", bg: "bg-purple-500/15" },
-      { to: "/barcodes", icon: Barcode, key: "nav.barcodes", moduleId: "barcode", color: "text-violet-500", bg: "bg-violet-500/15" },
+      { to: "/catalog", icon: Layers, key: "nav.catalog", moduleId: "core", allowedRoles: ["owner", "manager", "accountant", "warehouse"], color: "text-amber-500", bg: "bg-amber-500/15" },
+      { to: "/inventory", icon: Warehouse, key: "nav.inventory", moduleId: "core", allowedRoles: ["owner", "manager", "accountant", "warehouse"], color: "text-cyan-500", bg: "bg-cyan-500/15" },
+      { to: "/warehouses", icon: Boxes, key: "nav.warehouses", moduleId: "multi_warehouse", allowedRoles: ["owner", "manager", "warehouse"], color: "text-blue-500", bg: "bg-blue-500/15" },
+      { to: "/batches", icon: CalendarClock, key: "nav.batches", moduleId: "batches", allowedRoles: ["owner", "manager", "warehouse"], color: "text-orange-500", bg: "bg-orange-500/15" },
+      { to: "/sales", icon: Receipt, key: "nav.sales", moduleId: "core", allowedRoles: ["owner", "manager", "accountant", "cashier"], color: "text-emerald-400", bg: "bg-emerald-500/15" },
+      { to: "/sales-returns", icon: RotateCcw, key: "nav.sales_returns", moduleId: "returns", allowedRoles: ["owner", "manager", "accountant", "cashier"], color: "text-rose-400", bg: "bg-rose-500/15" },
+      { to: "/purchases", icon: Truck, key: "nav.purchases", moduleId: "purchases", allowedRoles: ["owner", "manager", "accountant", "warehouse"], color: "text-blue-400", bg: "bg-blue-500/15" },
+      { to: "/purchase-returns", icon: RotateCcw, key: "nav.purchase_returns", moduleId: "returns", allowedRoles: ["owner", "manager", "accountant", "warehouse"], color: "text-rose-500", bg: "bg-rose-500/15" },
+      { to: "/transfers", icon: ArrowRightLeft, key: "nav.transfers", moduleId: "multi_warehouse", allowedRoles: ["owner", "manager", "warehouse"], color: "text-purple-400", bg: "bg-purple-500/15" },
+      { to: "/barcodes", icon: Barcode, key: "nav.barcodes", moduleId: "barcode", allowedRoles: ["owner", "manager", "warehouse", "cashier"], color: "text-violet-500", bg: "bg-violet-500/15" },
     ],
   },
   {
     titleKey: "nav.section.relations",
     items: [
-      { to: "/customers", icon: Users, key: "nav.customers", moduleId: "core", color: "text-teal-400", bg: "bg-teal-500/15" },
-      { to: "/suppliers", icon: Building2, key: "nav.suppliers", moduleId: "purchases", color: "text-blue-500", bg: "bg-blue-500/15" },
-      { to: "/loyalty", icon: Gift, key: "nav.loyalty", moduleId: "loyalty", color: "text-pink-500", bg: "bg-pink-500/15" },
+      { to: "/customers", icon: Users, key: "nav.customers", moduleId: "core", allowedRoles: ["owner", "manager", "accountant", "cashier"], color: "text-teal-400", bg: "bg-teal-500/15" },
+      { to: "/suppliers", icon: Building2, key: "nav.suppliers", moduleId: "purchases", allowedRoles: ["owner", "manager", "accountant", "warehouse"], color: "text-blue-500", bg: "bg-blue-500/15" },
+      { to: "/loyalty", icon: Gift, key: "nav.loyalty", moduleId: "loyalty", allowedRoles: ["owner", "manager", "cashier"], color: "text-pink-500", bg: "bg-pink-500/15" },
     ],
   },
   {
     titleKey: "nav.section.accounting",
     items: [
-      { to: "/payments", icon: HandCoins, key: "nav.payments", moduleId: "payments", color: "text-amber-500", bg: "bg-amber-500/15" },
-      { to: "/debts", icon: AlertTriangle, key: "nav.debts", moduleId: "payments", color: "text-red-500", bg: "bg-red-500/15" },
-      { to: "/account-statement", icon: FileText, key: "nav.account_statement", moduleId: "payments", color: "text-yellow-500", bg: "bg-yellow-500/15" },
-      { to: "/daily-journal", icon: BookOpen, key: "nav.daily_journal", moduleId: "advanced_accounting", color: "text-emerald-500", bg: "bg-emerald-500/15" },
-      { to: "/trial-balance", icon: Scale, key: "nav.trial_balance", moduleId: "advanced_accounting", color: "text-cyan-400", bg: "bg-cyan-500/15" },
-      { to: "/income-statement", icon: PieChart, key: "nav.income_statement", moduleId: "advanced_accounting", color: "text-lime-500", bg: "bg-lime-500/15" },
-      { to: "/balance-sheet", icon: Landmark, key: "nav.balance_sheet", moduleId: "advanced_accounting", color: "text-indigo-400", bg: "bg-indigo-500/15" },
-      { to: "/finance", icon: Wallet, key: "nav.finance", moduleId: "expenses", color: "text-emerald-500", bg: "bg-emerald-500/15" },
-      { to: "/reports", icon: BarChart3, key: "nav.reports", moduleId: "analytics", color: "text-sky-400", bg: "bg-sky-500/15" },
+      { to: "/payments", icon: HandCoins, key: "nav.payments", moduleId: "payments", allowedRoles: ["owner", "manager", "accountant"], color: "text-amber-500", bg: "bg-amber-500/15" },
+      { to: "/debts", icon: AlertTriangle, key: "nav.debts", moduleId: "payments", allowedRoles: ["owner", "manager", "accountant"], color: "text-red-500", bg: "bg-red-500/15" },
+      { to: "/account-statement", icon: FileText, key: "nav.account_statement", moduleId: "payments", allowedRoles: ["owner", "manager", "accountant"], color: "text-yellow-500", bg: "bg-yellow-500/15" },
+      { to: "/daily-journal", icon: BookOpen, key: "nav.daily_journal", moduleId: "advanced_accounting", allowedRoles: ["owner", "manager", "accountant"], color: "text-emerald-500", bg: "bg-emerald-500/15" },
+      { to: "/trial-balance", icon: Scale, key: "nav.trial_balance", moduleId: "advanced_accounting", allowedRoles: ["owner", "manager", "accountant"], color: "text-cyan-400", bg: "bg-cyan-500/15" },
+      { to: "/income-statement", icon: PieChart, key: "nav.income_statement", moduleId: "advanced_accounting", allowedRoles: ["owner", "manager", "accountant"], color: "text-lime-500", bg: "bg-lime-500/15" },
+      { to: "/balance-sheet", icon: Landmark, key: "nav.balance_sheet", moduleId: "advanced_accounting", allowedRoles: ["owner", "manager", "accountant"], color: "text-indigo-400", bg: "bg-indigo-500/15" },
+      { to: "/finance", icon: Wallet, key: "nav.finance", moduleId: "expenses", allowedRoles: ["owner", "manager", "accountant"], color: "text-emerald-500", bg: "bg-emerald-500/15" },
+      { to: "/reports", icon: BarChart3, key: "nav.reports", moduleId: "analytics", allowedRoles: ["owner", "manager", "accountant"], color: "text-sky-400", bg: "bg-sky-500/15" },
     ],
   },
   {
     titleKey: "nav.section.admin",
     items: [
-      { to: "/users", icon: ShieldCheck, key: "nav.users", moduleId: "core", color: "text-violet-400", bg: "bg-violet-500/15" },
-      { to: "/audit", icon: History, key: "nav.audit", moduleId: "audit", color: "text-orange-400", bg: "bg-orange-500/15" },
+      { to: "/users", icon: ShieldCheck, key: "nav.users", moduleId: "core", allowedRoles: ["owner"], color: "text-violet-400", bg: "bg-violet-500/15" },
+      { to: "/audit", icon: History, key: "nav.audit", moduleId: "audit", allowedRoles: ["owner", "manager"], color: "text-orange-400", bg: "bg-orange-500/15" },
       { to: "/notifications", icon: Bell, key: "nav.notifications", moduleId: "core", color: "text-yellow-400", bg: "bg-yellow-500/15" },
-      { to: "/settings", icon: Settings, key: "nav.settings", moduleId: "core", color: "text-slate-400", bg: "bg-slate-500/15" },
+      { to: "/settings", icon: Settings, key: "nav.settings", moduleId: "core", allowedRoles: ["owner", "manager"], color: "text-slate-400", bg: "bg-slate-500/15" },
       { to: "/platform-admin", icon: Crown, key: "nav.platform_admin", superadminOnly: true, color: "text-amber-500", bg: "bg-amber-500/15" },
     ],
   },
@@ -99,7 +100,7 @@ function SidebarContents({
   onToggleCollapse?: () => void;
 }) {
   const { t, dir, lang } = useI18n();
-  const { user, signOut, isPlatformAdmin, isPlatformSuperadmin, hasRole } = useAuth();
+  const { user, signOut, isPlatformAdmin, isPlatformSuperadmin, hasRole, roles } = useAuth();
   const isSuperOrOwner = isPlatformAdmin || isPlatformSuperadmin || hasRole("owner");
   const { isModuleEnabled, currentPlan } = useModules();
   const navigate = useNavigate();
@@ -124,11 +125,15 @@ function SidebarContents({
         ...sec,
         items: sec.items.filter((it) => {
           if (it.superadminOnly && !isSuperOrOwner) return false;
+          // Non-super/owner roles must match allowedRoles if defined
+          if (!isSuperOrOwner && it.allowedRoles && !it.allowedRoles.some((r) => roles.includes(r))) {
+            return false;
+          }
           return isModuleEnabled(it.moduleId);
         }),
       }))
       .filter((sec) => sec.items.length > 0);
-  }, [isModuleEnabled, isSuperOrOwner]);
+  }, [isModuleEnabled, isSuperOrOwner, roles]);
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-sidebar text-sidebar-foreground">

@@ -9,6 +9,7 @@ import { useCatalogModules } from "@/lib/catalog-modules";
 import { CatalogModulesDialog } from "@/components/catalog-modules-dialog";
 import { Plus, Package, Search, Pencil, Trash2, X, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/_app/products")({
   head: () => ({ meta: [{ title: "المنتجات — فورتيكس ERP" }] }),
@@ -42,6 +43,8 @@ function ProductsPage() {
   const { t, lang } = useI18n();
   const { config } = useCatalogModules();
   const { isModuleEnabled } = useModules();
+  const { hasRole, isPlatformAdmin, isPlatformSuperadmin } = useAuth();
+  const canViewCost = isPlatformAdmin || isPlatformSuperadmin || hasRole("owner") || hasRole("manager") || hasRole("accountant");
   const qc = useQueryClient();
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<ProductRow | null>(null);
@@ -177,7 +180,7 @@ function ProductsPage() {
                   <th className="px-4 py-2.5 text-start font-medium">{t("products.brand")}</th>
                 )}
                 <th className="px-4 py-2.5 text-start font-medium">{lang === "ar" ? "موقع الرف" : "Shelf"}</th>
-                <th className="px-4 py-2.5 text-end font-medium">{t("common.cost")}</th>
+                {canViewCost && <th className="px-4 py-2.5 text-end font-medium">{t("common.cost")}</th>}
                 <th className="px-4 py-2.5 text-end font-medium">{t("common.price")}</th>
                 <th className="px-4 py-2.5 text-end font-medium">{t("products.min")}</th>
                 <th className="px-4 py-2.5 text-end font-medium">{t("common.status")}</th>
@@ -188,14 +191,14 @@ function ProductsPage() {
               {isLoading &&
                 Array.from({ length: 6 }).map((_, i) => (
                   <tr key={i} className="border-b border-border/60">
-                    <td colSpan={config.enableBrands ? 10 : 9} className="px-4 py-3">
+                    <td colSpan={(config.enableBrands ? 10 : 9) - (canViewCost ? 0 : 1)} className="px-4 py-3">
                       <div className="h-4 w-full rounded shimmer" />
                     </td>
                   </tr>
                 ))}
               {!isLoading && filtered.length === 0 && (
                 <tr>
-                  <td colSpan={config.enableBrands ? 10 : 9} className="px-4 py-16 text-center">
+                  <td colSpan={(config.enableBrands ? 10 : 9) - (canViewCost ? 0 : 1)} className="px-4 py-16 text-center">
                     <div className="mx-auto grid h-10 w-10 place-items-center rounded-2xl bg-surface border border-border">
                       <Package className="h-5 w-5 text-muted-foreground" />
                     </div>
@@ -235,7 +238,9 @@ function ProductsPage() {
                     <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
                       {p.shelf_location ?? "—"}
                     </td>
-                    <td className="px-4 py-2.5 text-end font-mono">{Number(p.cost_price).toFixed(2)}</td>
+                    {canViewCost && (
+                      <td className="px-4 py-2.5 text-end font-mono">{Number(p.cost_price).toFixed(2)}</td>
+                    )}
                     <td className="px-4 py-2.5 text-end font-mono text-foreground font-semibold">
                       {Number(p.sale_price).toFixed(2)}
                     </td>
@@ -287,6 +292,7 @@ function ProductsPage() {
       {open && (
         <ProductDialog
           initial={editing}
+          canViewCost={canViewCost}
           meta={
             meta ?? {
               categories: [],
@@ -316,11 +322,13 @@ function ProductsPage() {
 
 function ProductDialog({
   initial,
+  canViewCost = true,
   meta,
   onClose,
   onSaved,
 }: {
   initial: ProductRow | null;
+  canViewCost?: boolean;
   meta: {
     categories: { id: string; name: string; name_ar: string | null }[];
     brands: { id: string; name: string; name_ar: string | null }[];
@@ -609,15 +617,17 @@ function ProductDialog({
             </Field>
           )}
 
-          <Field label={t("common.cost")}>
-            <input
-              type="number"
-              step="0.01"
-              value={form.cost_price}
-              onChange={(e) => setForm({ ...form, cost_price: e.target.value })}
-              className={inputCls}
-            />
-          </Field>
+          {canViewCost && (
+            <Field label={t("common.cost")}>
+              <input
+                type="number"
+                step="0.01"
+                value={form.cost_price}
+                onChange={(e) => setForm({ ...form, cost_price: e.target.value })}
+                className={inputCls}
+              />
+            </Field>
+          )}
           <Field label={t("common.price")}>
             <input
               type="number"
