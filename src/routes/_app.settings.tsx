@@ -14,8 +14,9 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Save, Building2, Receipt, Languages, SlidersHorizontal } from "lucide-react";
+import { Save, Building2, Receipt, Languages, SlidersHorizontal, Printer } from "lucide-react";
 import { setCompanySettingsCache } from "@/lib/format";
+import type { InvoiceTemplate } from "@/lib/invoice-print";
 
 export const Route = createFileRoute("/_app/settings")({
   head: () => ({ meta: [{ title: "الإعدادات — فورتيكس ERP" }] }),
@@ -52,6 +53,22 @@ function SettingsPage() {
     return true;
   });
 
+  const [printMode, setPrintMode] = useState<"auto" | "ask" | "off">(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("pos_print_mode");
+      if (saved === "auto" || saved === "ask" || saved === "off") return saved;
+    }
+    return "ask";
+  });
+
+  const [defaultPrintTemplate, setDefaultPrintTemplate] = useState<InvoiceTemplate>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("pos_default_template");
+      if (saved === "thermal" || saved === "standard" || saved === "elegant") return saved;
+    }
+    return "thermal";
+  });
+
   useEffect(() => {
     supabase
       .from("company_settings")
@@ -75,6 +92,8 @@ function SettingsPage() {
     setSaving(true);
     if (typeof window !== "undefined") {
       localStorage.setItem("pos_enable_service_fee", String(enablePosServiceFee));
+      localStorage.setItem("pos_print_mode", printMode);
+      localStorage.setItem("pos_default_template", defaultPrintTemplate);
     }
     const payload = { ...form, id: form.id ?? 1, tax_rate: Number(form.tax_rate) };
     const res = exists
@@ -289,6 +308,84 @@ function SettingsPage() {
               on={(v) => setForm({ ...form, logo_url: v })}
               disabled={!canEdit}
             />
+
+            {/* Print Settings Section */}
+            <div className="pt-1 border-t border-border/60">
+              <div className="flex items-center gap-2 mb-3">
+                <Printer className="h-3.5 w-3.5 text-primary" />
+                <span className="text-xs font-bold text-foreground uppercase tracking-wider">
+                  {lang === "ar" ? "إعدادات الطباعة" : "Print Settings"}
+                </span>
+              </div>
+
+              {/* Print Mode */}
+              <div className="grid gap-1.5 mb-3">
+                <label className="text-xs text-muted-foreground font-medium">
+                  {lang === "ar" ? "وضع الطباعة بعد البيع" : "Print mode after sale"}
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    { val: "ask", ar: "سؤال دائمًا", en: "Always ask" },
+                    { val: "auto", ar: "طباعة تلقائية", en: "Auto print" },
+                    { val: "off", ar: "بدون طباعة", en: "No printing" },
+                  ] as const).map((opt) => (
+                    <button
+                      key={opt.val}
+                      type="button"
+                      disabled={!canEdit}
+                      onClick={() => setPrintMode(opt.val)}
+                      className={`h-9 rounded-xl border text-xs font-semibold transition-all ${
+                        printMode === opt.val
+                          ? "border-primary bg-primary/10 text-primary ring-1 ring-primary/30"
+                          : "border-border/80 text-muted-foreground hover:bg-surface-2 hover:text-foreground disabled:opacity-50"
+                      }`}
+                    >
+                      {lang === "ar" ? opt.ar : opt.en}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  {lang === "ar"
+                    ? printMode === "ask" ? "سيظهر dialog بعد كل عملية بيع لاختيار الطباعة أو التخطي"
+                      : printMode === "auto" ? "ستطبع الفاتورة تلقائيًا بالقالب الافتراضي فور إتمام البيع"
+                      : "لن تُطبع أي فاتورة — بيع مباشر بدون طباعة"
+                    : printMode === "ask" ? "A dialog appears after each sale to choose print or skip"
+                      : printMode === "auto" ? "Invoice prints automatically using default template"
+                      : "No invoice printed — direct sale without printing"
+                  }
+                </p>
+              </div>
+
+              {/* Default Template (shown unless off) */}
+              {printMode !== "off" && (
+                <div className="grid gap-1.5">
+                  <label className="text-xs text-muted-foreground font-medium">
+                    {lang === "ar" ? "قالب الفاتورة الافتراضي" : "Default invoice template"}
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {([
+                      { val: "thermal", ar: "حراري 80mm", en: "Thermal 80mm" },
+                      { val: "standard", ar: "A4 عادي", en: "Standard A4" },
+                      { val: "elegant", ar: "A4 فاخر", en: "Elegant A4" },
+                    ] as const).map((tmpl) => (
+                      <button
+                        key={tmpl.val}
+                        type="button"
+                        disabled={!canEdit}
+                        onClick={() => setDefaultPrintTemplate(tmpl.val)}
+                        className={`h-9 rounded-xl border text-xs font-semibold transition-all ${
+                          defaultPrintTemplate === tmpl.val
+                            ? "border-primary bg-primary/10 text-primary ring-1 ring-primary/30"
+                            : "border-border/80 text-muted-foreground hover:bg-surface-2 hover:text-foreground disabled:opacity-50"
+                        }`}
+                      >
+                        {lang === "ar" ? tmpl.ar : tmpl.en}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 

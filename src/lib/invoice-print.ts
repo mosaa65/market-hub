@@ -264,21 +264,28 @@ export function printInvoice(doc: InvoiceDoc, template: InvoiceTemplate, labels:
     template === "elegant" ? elegantHTML(doc, labels, rtl) :
     standardHTML(doc, labels, rtl);
 
-  const w = window.open("", "_blank", "width=900,height=1000");
-  if (!w) {
-    // popup blocked — fallback to iframe
-    const iframe = document.createElement("iframe");
-    iframe.style.cssText = "position:fixed;inset:0;width:100vw;height:100vh;border:0;z-index:9999;background:#000";
-    document.body.appendChild(iframe);
-    const cw = iframe.contentWindow!;
-    cw.document.open(); cw.document.write(html); cw.document.close();
-    setTimeout(() => {
-      cw.focus(); cw.print();
-      setTimeout(() => document.body.removeChild(iframe), 1000);
-    }, 400);
-    return;
-  }
-  w.document.open();
-  w.document.write(html);
-  w.document.close();
+  // Always use a hidden iframe — never open a new tab/window
+  const iframe = document.createElement("iframe");
+  iframe.style.cssText =
+    "position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:0;visibility:hidden;";
+  document.body.appendChild(iframe);
+
+  const cw = iframe.contentWindow!;
+  cw.document.open();
+  cw.document.write(html);
+  cw.document.close();
+
+  // Wait for fonts / images to load then print silently
+  const delay = template === "elegant" ? 600 : 300;
+  setTimeout(() => {
+    try {
+      cw.focus();
+      cw.print();
+    } finally {
+      // Remove iframe after the print dialog is dismissed
+      setTimeout(() => {
+        try { document.body.removeChild(iframe); } catch { /* already removed */ }
+      }, 2000);
+    }
+  }, delay);
 }

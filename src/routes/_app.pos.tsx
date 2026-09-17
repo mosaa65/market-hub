@@ -23,6 +23,10 @@ import {
   Banknote,
   Building2,
   Clock,
+  Printer,
+  Receipt,
+  FileText,
+  SkipForward,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
@@ -31,6 +35,8 @@ import { PageHeader } from "@/components/page-header";
 import { toast } from "sonner";
 import { BarcodeScanner } from "@/components/barcode-scanner";
 import { useCatalogModules } from "@/lib/catalog-modules";
+import { printInvoice, type InvoiceTemplate } from "@/lib/invoice-print";
+import type { InvoiceDoc } from "@/lib/pdf";
 
 export const Route = createFileRoute("/_app/pos")({
   head: () => ({ meta: [{ title: "نقطة البيع — فورتيكس ERP" }] }),
@@ -144,6 +150,27 @@ function POSPage() {
     }
     return true;
   });
+
+  // Print Settings (persisted in localStorage)
+  const [printMode, setPrintMode] = useState<"auto" | "ask" | "off">(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("pos_print_mode");
+      if (saved === "auto" || saved === "ask" || saved === "off") return saved;
+    }
+    return "ask";
+  });
+  const [defaultTemplate, setDefaultTemplate] = useState<InvoiceTemplate>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("pos_default_template");
+      if (saved === "thermal" || saved === "standard" || saved === "elegant") return saved;
+    }
+    return "thermal";
+  });
+
+  // Post-sale dialog state
+  const [postSaleDoc, setPostSaleDoc] = useState<InvoiceDoc | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<InvoiceTemplate>(defaultTemplate);
+
   const [isSplitPayment, setIsSplitPayment] = useState(false);
   const [splitCash, setSplitCash] = useState("");
   const [splitCard, setSplitCard] = useState("");
@@ -163,11 +190,18 @@ function POSPage() {
   const [lastInvoice, setLastInvoice] = useState<{ id: string; number: string } | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
 
+  // Company settings for invoice generation
+  const [companySettings, setCompanySettings] = useState<any>(null);
+
   const searchRef = useRef<HTMLInputElement>(null);
   const scanHandlerRef = useRef<(code: string) => void>(() => undefined);
 
   useEffect(() => {
     void loadAll();
+    // Load company settings for invoice generation
+    supabase.from("company_settings").select("*").limit(1).maybeSingle().then(({ data }) => {
+      if (data) setCompanySettings(data);
+    });
   }, []);
 
   useEffect(() => {
@@ -656,6 +690,73 @@ function POSPage() {
           ? `تمت عملية البيع بنجاح — فاتورة #${inv?.invoice_number ?? ""}`
           : `${t("pos.sale_complete")} — #${inv?.invoice_number ?? ""}`
       );
+
+      // Build invoice doc for printing
+      const customer = customers.find((c) => c.id === customerId);
+      const warehouse = warehouses.find((w) => w.id === warehouseId);
+      const cur = companySettings?.currency_symbol ?? companySettings?.currency ?? "";
+      const invoiceDoc: InvoiceDoc = {
+        title: lang === "ar" ? "فاتورة بيع" : "Sales Invoice",
+        number: inv?.invoice_number ?? invoiceId.slice(0, 8),
+        date: saleDate,
+        partyLabel: lang === "ar" ? "العميل" : "Bill To",
+        partyName: customer?.name ?? (lang === "ar" ? "عميل نقدي" : "Walk-in Customer"),
+        warehouse: lang === "ar" ? (warehouse as any)?.name_ar || warehouse?.name : warehouse?.name,
+        payment: lang === "ar" ? {
+          cash: "نقدًا", card: "بطاقة", bank_transfer: "تحويل بنكي", credit: "آجل"
+        }[finalMethod] : finalMethod.replace("_", " "),
+        status: remainingDebt > 0 ? (lang === "ar" ? "جزئي" : "Partial") : (lang === "ar" ? "مكتمل" : "Paid"),
+        currency: cur,
+        subtotal,
+        tax: taxTotal,
+        discount: discountN,
+        total,
+        paid: Math.min(Math.max(effectivePaid, 0), total),
+        lines: cart.map((l) => ({
+          product: l.name,
+          qty: l.quantity,
+          price: l.unit_price,
+          total: Math.round(l.unit_price * l.quantity * (1 + l.tax_rate / 100) * 100) / 100,
+        })),
+        company: companySettings ? {
+          name: companySettings.name ?? "",
+          address: companySettings.address ?? undefined,
+          phone: companySettings.phone ?? undefined,
+          vat: companySettings.tax_number ?? undefined,
+        } : undefined,
+      };
+
+      // Handle print mode
+      const labels = {
+        invoice: lang === "ar" ? "فاتورة" : "Invoice",
+        date: lang === "ar" ? "التاريخ" : "Date",
+        billTo: lang === "ar" ? "العميل" : "Bill To",
+        warehouse: lang === "ar" ? "المستودع" : "Warehouse",
+        payment: lang === "ar" ? "الدفع" : "Payment",
+        status: lang === "ar" ? "الحالة" : "Status",
+        product: lang === "ar" ? "المنتج" : "Product",
+        qty: lang === "ar" ? "الكمية" : "Qty",
+        price: lang === "ar" ? "السعر" : "Price",
+        total: lang === "ar" ? "الإجمالي" : "Total",
+        subtotal: lang === "ar" ? "المجموع" : "Subtotal",
+        tax: lang === "ar" ? "الضريبة" : "Tax",
+        discount: lang === "ar" ? "الخصم" : "Discount",
+        grandTotal: lang === "ar" ? "الإجمالي الكلي" : "Grand Total",
+        paid: lang === "ar" ? "المدفوع" : "Paid",
+        balance: lang === "ar" ? "المتبقي" : "Balance",
+        thanks: lang === "ar" ? "شكراً لتعاملكم معنا" : "Thank you for your business",
+        poweredBy: "Vortex ERP",
+      };
+      const rtl = lang === "ar";
+
+      if (printMode === "auto") {
+        printInvoice(invoiceDoc, defaultTemplate, labels, rtl);
+      } else if (printMode === "ask") {
+        setSelectedTemplate(defaultTemplate);
+        setPostSaleDoc(invoiceDoc);
+      }
+      // printMode === "off" → do nothing
+
       setCart([]);
       setPaid("");
       setDiscount("");
@@ -1519,6 +1620,132 @@ function POSPage() {
         continuous
         onDetected={handleCode}
       />
+
+      {/* Post-Sale Print Dialog */}
+      {postSaleDoc && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="panel-elevated w-full max-w-md rounded-3xl p-6 shadow-2xl border border-border/80">
+            {/* Header */}
+            <div className="mb-5 flex items-center justify-between border-b border-border/60 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="grid h-10 w-10 place-items-center rounded-2xl bg-primary/10 text-primary">
+                  <Printer className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-foreground">
+                    {lang === "ar" ? "طباعة الفاتورة" : "Print Invoice"}
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    {lang === "ar" ? `فاتورة #${postSaleDoc.number}` : `Invoice #${postSaleDoc.number}`}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPostSaleDoc(null)}
+                className="rounded-full p-1.5 text-muted-foreground hover:bg-surface-2 hover:text-foreground transition"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Template Selector */}
+            <div className="mb-5">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                {lang === "ar" ? "اختر قالب الطباعة" : "Choose print template"}
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { id: "thermal", icon: Receipt, ar: "فاتورة حرارية", en: "Thermal 80mm", sub_ar: "طابعة مدمجة", sub_en: "Compact printer" },
+                  { id: "standard", icon: FileText, ar: "A4 عادي", en: "Standard A4", sub_ar: "تصميم أعمال", sub_en: "Business format" },
+                  { id: "elegant", icon: Sparkles, ar: "A4 فاخر", en: "Elegant A4", sub_ar: "لمسات ذهبية", sub_en: "Gold accents" },
+                ] as const).map((tmpl) => (
+                  <button
+                    key={tmpl.id}
+                    type="button"
+                    onClick={() => setSelectedTemplate(tmpl.id as InvoiceTemplate)}
+                    className={`flex flex-col items-center gap-1.5 rounded-2xl border p-3 text-center transition-all duration-150 ${
+                      selectedTemplate === tmpl.id
+                        ? "border-primary bg-primary/10 text-primary shadow-sm ring-1 ring-primary/30"
+                        : "border-border/80 hover:border-primary/40 hover:bg-surface-2 text-muted-foreground"
+                    }`}
+                  >
+                    <tmpl.icon className="h-5 w-5" />
+                    <span className="text-xs font-semibold leading-tight">
+                      {lang === "ar" ? tmpl.ar : tmpl.en}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground leading-tight">
+                      {lang === "ar" ? tmpl.sub_ar : tmpl.sub_en}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Save as default */}
+            <label className="flex items-center gap-2 mb-5 cursor-pointer group">
+              <input
+                type="checkbox"
+                className="rounded border-border accent-primary"
+                checked={defaultTemplate === selectedTemplate}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    setDefaultTemplate(selectedTemplate);
+                    localStorage.setItem("pos_default_template", selectedTemplate);
+                  }
+                }}
+              />
+              <span className="text-xs text-muted-foreground group-hover:text-foreground transition">
+                {lang === "ar" ? "حفظ كقالب افتراضي" : "Save as default template"}
+              </span>
+            </label>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setPostSaleDoc(null)}
+                className="flex-1 flex items-center justify-center gap-2 h-10 rounded-2xl border border-border/80 text-sm text-muted-foreground hover:bg-surface-2 hover:text-foreground transition"
+              >
+                <SkipForward className="h-4 w-4" />
+                <span>{lang === "ar" ? "تخطي — بدون طباعة" : "Skip — no print"}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const rtl = lang === "ar";
+                  const labels = {
+                    invoice: rtl ? "فاتورة" : "Invoice",
+                    date: rtl ? "التاريخ" : "Date",
+                    billTo: rtl ? "العميل" : "Bill To",
+                    warehouse: rtl ? "المستودع" : "Warehouse",
+                    payment: rtl ? "الدفع" : "Payment",
+                    status: rtl ? "الحالة" : "Status",
+                    product: rtl ? "المنتج" : "Product",
+                    qty: rtl ? "الكمية" : "Qty",
+                    price: rtl ? "السعر" : "Price",
+                    total: rtl ? "الإجمالي" : "Total",
+                    subtotal: rtl ? "المجموع" : "Subtotal",
+                    tax: rtl ? "الضريبة" : "Tax",
+                    discount: rtl ? "الخصم" : "Discount",
+                    grandTotal: rtl ? "الإجمالي الكلي" : "Grand Total",
+                    paid: rtl ? "المدفوع" : "Paid",
+                    balance: rtl ? "المتبقي" : "Balance",
+                    thanks: rtl ? "شكراً لتعاملكم معنا" : "Thank you for your business",
+                    poweredBy: "Vortex ERP",
+                  };
+                  printInvoice(postSaleDoc!, selectedTemplate, labels, rtl);
+                  setPostSaleDoc(null);
+                }}
+                className="flex-1 flex items-center justify-center gap-2 h-10 rounded-2xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 active:scale-95 transition shadow-md shadow-primary/25"
+              >
+                <Printer className="h-4 w-4" />
+                <span>{lang === "ar" ? "طباعة الآن" : "Print now"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* New Customer Dialog */}
       {newCustomerOpen && (
