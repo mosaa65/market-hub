@@ -99,7 +99,8 @@ function SidebarContents({
   onToggleCollapse?: () => void;
 }) {
   const { t, dir, lang } = useI18n();
-  const { user, signOut, isPlatformAdmin } = useAuth();
+  const { user, signOut, isPlatformAdmin, isPlatformSuperadmin, hasRole } = useAuth();
+  const isSuperOrOwner = isPlatformAdmin || isPlatformSuperadmin || hasRole("owner");
   const { isModuleEnabled, currentPlan } = useModules();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -122,12 +123,12 @@ function SidebarContents({
       .map((sec) => ({
         ...sec,
         items: sec.items.filter((it) => {
-          if (it.superadminOnly && !isPlatformAdmin) return false;
+          if (it.superadminOnly && !isSuperOrOwner) return false;
           return isModuleEnabled(it.moduleId);
         }),
       }))
       .filter((sec) => sec.items.length > 0);
-  }, [isModuleEnabled, isPlatformAdmin]);
+  }, [isModuleEnabled, isSuperOrOwner]);
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-sidebar text-sidebar-foreground">

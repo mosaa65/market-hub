@@ -24,14 +24,15 @@ export const Route = createFileRoute("/_app/plans")({
 function PlansShowcasePage() {
   const { lang } = useI18n();
   const isAr = lang === "ar";
-  const { isPlatformAdmin } = useAuth();
+  const { isPlatformAdmin, isPlatformSuperadmin, hasRole } = useAuth();
+  const canEditPlan = isPlatformAdmin || isPlatformSuperadmin || hasRole("owner");
   const { currentPlanId, plans, setPlan } = useModules();
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
 
   const handlePlanAction = async (planId: PlatformPlanId) => {
     if (planId === currentPlanId) return;
 
-    if (isPlatformAdmin) {
+    if (canEditPlan) {
       setLoadingPlan(planId);
       try {
         await setPlan(planId);
@@ -228,7 +229,7 @@ function PlansShowcasePage() {
                         <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
                         <span>{isAr ? "جاري التفعيل..." : "Activating..."}</span>
                       </span>
-                    ) : isPlatformAdmin ? (
+                    ) : canEditPlan ? (
                       isAr ? "تفعيل هذه الباقة فوراً" : "Activate This Plan"
                     ) : (
                       isAr ? "طلب ترقية لهذه الباقة" : "Request Upgrade"

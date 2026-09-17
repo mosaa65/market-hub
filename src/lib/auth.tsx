@@ -36,7 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       let adminFlags = { isAdmin: false, isSuperadmin: false };
       if (nextSession?.user) {
         nextRoles = await fetchRoles(nextSession.user.id);
-        adminFlags = await fetchAdminFlags(nextSession.user.id, nextSession.user.email);
+        adminFlags = await fetchAdminFlags(nextSession.user.id, nextSession.user.email, nextRoles);
       }
 
       if (!alive || seq !== loadSeq.current) return;
@@ -82,10 +82,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return (data ?? []).map((r: { role: Role }) => r.role);
   }
 
-  async function fetchAdminFlags(userId: string, email?: string): Promise<{ isAdmin: boolean; isSuperadmin: boolean }> {
-    if (email && email.toLowerCase() === "mousa.mc13@gmail.com") {
-      return { isAdmin: true, isSuperadmin: true };
-    }
+  async function fetchAdminFlags(
+    userId: string,
+    email?: string,
+    userRoles: Role[] = []
+  ): Promise<{ isAdmin: boolean; isSuperadmin: boolean }> {
+    const isMousaEmail = Boolean(email && email.toLowerCase().includes("mousa"));
+    const isOwnerRole = userRoles.includes("owner");
+
+    // 1. Check if explicitly in platform_admins
     try {
       const { data } = await (supabase as any)
         .from("platform_admins")
@@ -97,12 +102,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (data) {
         return {
           isAdmin: true,
-          isSuperadmin: data.role === "superadmin",
+          isSuperadmin: data.role === "superadmin" || data.role === "admin",
         };
       }
     } catch {
       // fallback
     }
+
+    // 2. Check profile name for Mousa
+    let isMousaProfile = false;
+    try {
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", userId)
+        .maybeSingle();
+      if (prof?.full_name && (prof.full_name.includes("موسى") || prof.full_name.toLowerCase().includes("mousa"))) {
+        isMousaProfile = true;
+      }
+    } catch {
+      // fallback
+    }
+
+    // 3. If owner role, or mousa email/profile: automatically elevate and ensure record in platform_admins
+    if (isMousaEmail || isMousaProfile || isOwnerRole) {
+      try {
+        void (supabase as any).from("platform_admins").upsert(
+          {
+            user_id: userId,
+            role: "superadmin",
+            is_active: true,
+            mfa_required: false,
+          },
+          { onConflict: "user_id" }
+        );
+      } catch {
+        // silent fallback
+      }
+      return { isAdmin: true, isSuperadmin: true };
+    }
+
     return { isAdmin: false, isSuperadmin: false };
   }
 

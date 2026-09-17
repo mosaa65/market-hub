@@ -19,6 +19,8 @@ import {
 export function SubscriptionSettingsCard() {
   const { lang } = useI18n();
   const isAr = lang === "ar";
+  const { isPlatformAdmin, isPlatformSuperadmin, hasRole } = useAuth();
+  const canEditPlan = isPlatformAdmin || isPlatformSuperadmin || hasRole("owner");
   const {
     currentPlanId,
     currentPlan,
@@ -60,7 +62,7 @@ export function SubscriptionSettingsCard() {
 
   const handlePlanSelect = async (planId: PlatformPlanId) => {
     if (planId === currentPlanId) return;
-    if (!isPlatformAdmin) {
+    if (!canEditPlan) {
       toast.info(
         isAr
           ? "تعديل باقة النظام محصور بمدير المنصة. لطلب ترقية الباقة تواصل مع: mousa.mc13@gmail.com"
@@ -321,7 +323,7 @@ export function SubscriptionSettingsCard() {
 
                     <Switch
                       checked={enabled}
-                      disabled={inBasePlan || !isPlatformAdmin}
+                      disabled={inBasePlan || !canEditPlan}
                       onCheckedChange={() => void toggleExtraModule(m.id)}
                       title={inBasePlan ? (isAr ? "مضمنة في باقتك الحالية" : "Included in current plan") : undefined}
                     />

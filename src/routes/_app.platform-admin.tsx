@@ -24,7 +24,8 @@ export const Route = createFileRoute("/_app/platform-admin")({
 function PlatformAdminPage() {
   const { lang } = useI18n();
   const isAr = lang === "ar";
-  const { user, isPlatformAdmin, isPlatformSuperadmin, loading: authLoading } = useAuth();
+  const { user, isPlatformAdmin, isPlatformSuperadmin, hasRole, loading: authLoading } = useAuth();
+  const canAccess = isPlatformAdmin || isPlatformSuperadmin || hasRole("owner");
   const navigate = useNavigate();
   const {
     currentPlanId,
@@ -43,7 +44,7 @@ function PlatformAdminPage() {
   const [loadingLogs, setLoadingLogs] = useState(false);
 
   useEffect(() => {
-    if (!authLoading && !isPlatformAdmin) {
+    if (!authLoading && !canAccess) {
       toast.error(
         isAr
           ? "عذراً، هذه الصفحة مخصصة لمدير المنصة فقط (Superadmin)"
@@ -51,7 +52,7 @@ function PlatformAdminPage() {
       );
       navigate({ to: "/dashboard" });
     }
-  }, [authLoading, isPlatformAdmin, navigate, isAr]);
+  }, [authLoading, canAccess, navigate, isAr]);
 
   if (authLoading) {
     return (
@@ -61,7 +62,7 @@ function PlatformAdminPage() {
     );
   }
 
-  if (!isPlatformAdmin) {
+  if (!canAccess) {
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center text-center p-6">
         <Lock className="h-12 w-12 text-destructive mb-3" />

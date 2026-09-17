@@ -152,7 +152,7 @@ function ProductsPage() {
 
           <button
             onClick={() => {
-              const qCheck = checkQuota("products", (data ?? []).length);
+              const qCheck = checkQuota("products", (products ?? []).length);
               if (!qCheck.allowed) {
                 toast.error(lang === "ar" ? qCheck.message?.ar : qCheck.message?.en);
                 return;
@@ -334,6 +334,7 @@ function ProductDialog({
 }) {
   const { t, lang } = useI18n();
   const { config } = useCatalogModules();
+  const { isModuleEnabled } = useModules();
   const [form, setForm] = useState({
     name: initial?.name ?? "",
     name_ar: initial?.name_ar ?? "",

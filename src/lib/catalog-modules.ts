@@ -76,8 +76,7 @@ export function saveCatalogModulesConfig(config: CatalogModulesConfig): void {
       .from("company_settings")
       .update({ catalog_modules: config } as any)
       .eq("id", 1)
-      .then(() => {})
-      .catch(() => {});
+      .then(() => {}, () => {});
   } catch (err) {
     console.error("Failed to save catalog modules config:", err);
   }
@@ -121,8 +120,7 @@ export function useCatalogModules() {
             }
           }
         }
-      })
-      .catch(() => {});
+      }, () => {});
   }, []);
 
   const updateConfig = (updates: Partial<CatalogModulesConfig>) => {

@@ -138,7 +138,7 @@ function LoyaltyPage() {
 }
 
 function AdjustDialog({ customers, onSaved }: { customers: Customer[]; onSaved: () => void }) {
-  const { lang } = useI18n();
+  const { t, lang } = useI18n();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ customer_id: "", points: 10, kind: "earn", note: "" });
 

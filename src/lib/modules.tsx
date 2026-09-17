@@ -257,7 +257,7 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
   // Load from Supabase (with graceful offline / fallback behavior)
   const refreshFromRemote = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("tenant_subscriptions")
         .select("plan_id, extra_modules, disabled_modules, status")
         .eq("tenant_id", "default")
@@ -328,7 +328,7 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem(STORAGE_KEY_PLAN, newPlanId);
     }
     try {
-      await supabase
+      await (supabase as any)
         .from("tenant_subscriptions")
         .upsert({
           tenant_id: "default",
@@ -352,7 +352,7 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem(STORAGE_KEY_EXTRAS, JSON.stringify(updated));
     }
     try {
-      await supabase
+      await (supabase as any)
         .from("tenant_subscriptions")
         .upsert({
           tenant_id: "default",
