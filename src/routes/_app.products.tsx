@@ -167,7 +167,7 @@ function ProductsPage() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[850px] text-sm">
             <thead>
               <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
                 <th className="px-4 py-2.5 text-start font-medium">{t("products.product")}</th>
@@ -251,8 +251,8 @@ function ProductsPage() {
                         {p.is_active ? t("common.active") : t("common.inactive")}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5 text-end">
-                      <div className="inline-flex items-center gap-1">
+                    <td className="px-4 py-2.5 text-end whitespace-nowrap">
+                      <div className="inline-flex items-center gap-1.5 shrink-0">
                         <button
                           onClick={() => {
                             setEditing(p);
