@@ -193,6 +193,24 @@ function POSPage() {
   // Company settings for invoice generation
   const [companySettings, setCompanySettings] = useState<any>(null);
 
+  const productCompatMap = useMemo(() => {
+    const modelLookup = new Map(models.map((m) => [m.id, m]));
+    const makeLookup = new Map(makes.map((mk) => [mk.id, mk]));
+    const map = new Map<string, { makeName: string; modelName: string }[]>();
+
+    for (const c of compatibilities) {
+      const m = modelLookup.get(c.vehicle_model_id);
+      if (!m) continue;
+      const mk = m.make_id ? makeLookup.get(m.make_id) : null;
+      const makeName = lang === "ar" ? mk?.name_ar || mk?.name || "" : mk?.name || mk?.name_ar || "";
+      const modelName = lang === "ar" ? m.name_ar || m.name : m.name || m.name_ar || "";
+      const arr = map.get(c.product_id) || [];
+      arr.push({ makeName, modelName });
+      map.set(c.product_id, arr);
+    }
+    return map;
+  }, [compatibilities, models, makes, lang]);
+
   const searchRef = useRef<HTMLInputElement>(null);
   const scanHandlerRef = useRef<(code: string) => void>(() => undefined);
 
@@ -1085,49 +1103,84 @@ function POSPage() {
                 lang === "ar" ? p.origin?.name_ar || p.origin?.name : p.origin?.name || p.origin?.name_ar;
               const qualityLabel =
                 lang === "ar" ? p.quality?.name_ar || p.quality?.name : p.quality?.name || p.quality?.name_ar;
+              const compats = productCompatMap.get(p.id) || [];
+              const uniqueMakes = Array.from(new Set(compats.map((c) => c.makeName).filter(Boolean)));
 
               return (
                 <button
                   key={p.id}
                   onClick={() => addToCart(p)}
                   disabled={low}
-                  className="group relative flex flex-col items-start justify-between gap-1.5 rounded-2xl border border-border/80 bg-surface/90 p-3 text-start transition-all hover:border-primary/50 hover:bg-surface-2 hover:shadow-sm disabled:opacity-40"
+                  className="group relative flex flex-col items-start justify-between gap-1.5 rounded-2xl border border-border/80 bg-surface/90 p-2.5 text-start transition-all hover:border-primary/50 hover:bg-surface-2 hover:shadow-sm disabled:opacity-40"
                 >
                   <div className="w-full">
-                    <div className="line-clamp-2 text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
-                      {lang === "ar" && p.name_ar ? p.name_ar : p.name}
-                    </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground">
-                      {catLabel && (
-                        <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-muted-foreground">
+                    {/* Catalog Index Info Strip ABOVE the product name */}
+                    <div className="mb-1.5 flex flex-wrap items-center gap-1 text-[10px] leading-none">
+                      {/* Quality Grade */}
+                      {catalogConfig.enableQualityGrades && qualityLabel && (
+                        <span
+                          className={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 font-bold border ${
+                            qualityLabel.includes("أصلي") ||
+                            qualityLabel.toLowerCase().includes("genuine") ||
+                            qualityLabel.toLowerCase().includes("oem")
+                              ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                              : "bg-surface-2 text-foreground/80 border-border/70"
+                          }`}
+                        >
+                          <span>{qualityLabel}</span>
+                        </span>
+                      )}
+
+                      {/* Origin */}
+                      {catalogConfig.enableOrigins && originLabel && (
+                        <span className="inline-flex items-center gap-0.5 rounded border border-border/60 bg-surface px-1 py-0.5 text-muted-foreground font-medium">
+                          <span>{originLabel}</span>
+                          {p.origin?.code && <span className="text-[9px] font-mono opacity-70">({p.origin.code})</span>}
+                        </span>
+                      )}
+
+                      {/* Brand or Category */}
+                      {catalogConfig.enableBrands && p.brand ? (
+                        <span className="inline-flex items-center rounded border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-primary font-semibold truncate max-w-[85px]">
+                          {lang === "ar" ? p.brand.name_ar || p.brand.name : p.brand.name || p.brand.name_ar}
+                        </span>
+                      ) : catLabel ? (
+                        <span className="inline-flex items-center rounded bg-surface-2 px-1.5 py-0.5 text-muted-foreground truncate max-w-[85px]">
                           {catLabel}
                         </span>
-                      )}
-                      {unitLabel && (
-                        <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-muted-foreground">
-                          {unitLabel}
-                        </span>
-                      )}
-                      {catalogConfig.enableOrigins && originLabel && (
-                        <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-muted-foreground">
-                          {originLabel}
-                        </span>
-                      )}
-                      {catalogConfig.enableQualityGrades && qualityLabel && (
-                        <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-muted-foreground">
-                          {qualityLabel}
+                      ) : null}
+
+                      {/* Vehicle Fitment / Models */}
+                      {catalogConfig.enableMakesAndModels && compats.length > 0 && (
+                        <span
+                          className="inline-flex items-center gap-0.5 rounded border border-sky-500/25 bg-sky-500/10 px-1.5 py-0.5 text-sky-700 dark:text-sky-300 font-semibold truncate max-w-[120px]"
+                          title={compats.map((c) => `${c.makeName} - ${c.modelName}`).join(" | ")}
+                        >
+                          <span>
+                            🏍️ {uniqueMakes[0] || compats[0].makeName}{" "}
+                            {compats.length > 1
+                              ? `(+${compats.length - 1})`
+                              : compats[0].modelName}
+                          </span>
                         </span>
                       )}
                     </div>
+
+                    {/* Product Name */}
+                    <div className="line-clamp-2 text-xs sm:text-sm font-semibold text-foreground group-hover:text-primary transition-colors leading-snug">
+                      {lang === "ar" && p.name_ar ? p.name_ar : p.name}
+                    </div>
                   </div>
+
+                  {/* Price & Stock */}
                   <div className="mt-2 flex w-full items-center justify-between border-t border-border/40 pt-1.5">
-                    <span className="text-sm font-bold text-primary font-mono">{money(Number(p.sale_price))}</span>
+                    <span className="text-xs sm:text-sm font-bold text-primary font-mono">{money(Number(p.sale_price))}</span>
                     <span
                       className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full ${
                         low ? "bg-destructive/10 text-destructive font-semibold" : "bg-muted text-muted-foreground"
                       }`}
                     >
-                      {low ? (lang === "ar" ? "نفد" : "0") : `${stock}`}
+                      {low ? (lang === "ar" ? "نفد" : "0") : `${stock} ${unitLabel ? `· ${unitLabel}` : ""}`}
                     </span>
                   </div>
                 </button>

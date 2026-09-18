@@ -222,7 +222,9 @@ function CatalogTable({ tab }: { tab: Tab }) {
       toast.success(lang === "ar" ? "تم الحذف بنجاح" : t("common.deleted") || "Deleted");
       qc.invalidateQueries({ queryKey: ["catalog", tab] });
       qc.invalidateQueries({ queryKey: ["products-meta"] });
+      qc.invalidateQueries({ queryKey: ["products"] });
       qc.invalidateQueries({ queryKey: ["pos-live-meta"] });
+      qc.invalidateQueries({ queryKey: ["vehicle-makes-filter"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -405,7 +407,9 @@ function CatalogTable({ tab }: { tab: Tab }) {
             setOpen(false);
             qc.invalidateQueries({ queryKey: ["catalog", tab] });
             qc.invalidateQueries({ queryKey: ["products-meta"] });
+            qc.invalidateQueries({ queryKey: ["products"] });
             qc.invalidateQueries({ queryKey: ["pos-live-meta"] });
+            qc.invalidateQueries({ queryKey: ["vehicle-makes-filter"] });
           }}
         />
       )}

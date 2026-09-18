@@ -7,7 +7,19 @@ import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { useCatalogModules } from "@/lib/catalog-modules";
 import { CatalogModulesDialog } from "@/components/catalog-modules-dialog";
-import { Plus, Package, Search, Pencil, Trash2, X, SlidersHorizontal } from "lucide-react";
+import {
+  Plus,
+  Package,
+  Search,
+  Pencil,
+  Trash2,
+  X,
+  SlidersHorizontal,
+  Car,
+  Globe,
+  Award,
+  ExternalLink,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 
@@ -36,6 +48,9 @@ type ProductRow = {
   category?: { name: string; name_ar: string | null } | null;
   brand?: { name: string; name_ar: string | null } | null;
   unit?: { short_name: string; name_ar: string | null } | null;
+  origin?: { id: string; name: string; name_ar: string | null; code: string } | null;
+  quality?: { id: string; name: string; name_ar: string | null; code: string; sort_order?: number } | null;
+  compatibilities?: { vehicle_model_id: string }[];
 };
 
 function ProductsPage() {
@@ -44,7 +59,8 @@ function ProductsPage() {
   const { config } = useCatalogModules();
   const { isModuleEnabled } = useModules();
   const { hasRole, isPlatformAdmin, isPlatformSuperadmin } = useAuth();
-  const canViewCost = isPlatformAdmin || isPlatformSuperadmin || hasRole("owner") || hasRole("manager") || hasRole("accountant");
+  const canViewCost =
+    isPlatformAdmin || isPlatformSuperadmin || hasRole("owner") || hasRole("manager") || hasRole("accountant");
   const qc = useQueryClient();
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<ProductRow | null>(null);
@@ -54,28 +70,45 @@ function ProductsPage() {
   const { data: products, isLoading } = useQuery({
     queryKey: ["products"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("products")
-        .select(
-          "id, name, name_ar, sku, barcode, sale_price, cost_price, tax_rate, min_stock, shelf_location, origin_id, quality_grade_id, is_active, category_id, brand_id, unit_id, category:categories(name, name_ar), brand:brands(name, name_ar), unit:units(short_name, name_ar)"
-        )
-        .order("created_at", { ascending: false })
-        .limit(500);
-      if (error) throw error;
-      return (data ?? []) as unknown as ProductRow[];
+      const [pRes, compRes] = await Promise.all([
+        supabase
+          .from("products")
+          .select(
+            "id, name, name_ar, sku, barcode, sale_price, cost_price, tax_rate, min_stock, shelf_location, origin_id, quality_grade_id, is_active, category_id, brand_id, unit_id, category:categories(name, name_ar), brand:brands(name, name_ar), unit:units(short_name, name_ar), origin:countries_of_origin(id, name, name_ar, code), quality:quality_grades(id, name, name_ar, code, sort_order)"
+          )
+          .order("created_at", { ascending: false })
+          .limit(500),
+        (supabase as any).from("product_compatibilities").select("product_id, vehicle_model_id"),
+      ]);
+
+      if (pRes.error) throw pRes.error;
+
+      const compMap: Record<string, string[]> = {};
+      for (const row of compRes.data ?? []) {
+        if (!compMap[row.product_id]) compMap[row.product_id] = [];
+        compMap[row.product_id].push(row.vehicle_model_id);
+      }
+
+      const rows = (pRes.data ?? []).map((p: any) => ({
+        ...p,
+        compatibilities: (compMap[p.id] ?? []).map((mid) => ({ vehicle_model_id: mid })),
+      }));
+
+      return rows as ProductRow[];
     },
   });
 
   const { data: meta } = useQuery({
     queryKey: ["products-meta"],
     queryFn: async () => {
-      const [c, b, u, origins, qualities, models] = await Promise.all([
+      const [c, b, u, origins, qualities, vMakes, vModels] = await Promise.all([
         supabase.from("categories").select("id, name, name_ar").order("name"),
         supabase.from("brands").select("id, name, name_ar").order("name"),
         supabase.from("units").select("id, name, name_ar, short_name").order("name"),
-        (supabase as any).from("countries_of_origin").select("id,code,name,name_ar").order("name"),
-        (supabase as any).from("quality_grades").select("id,code,name,name_ar,sort_order").order("sort_order"),
-        (supabase as any).from("vehicle_models").select("id,name,name_ar,vehicle_makes(name,name_ar)").order("name"),
+        (supabase as any).from("countries_of_origin").select("id, code, name, name_ar").order("name"),
+        (supabase as any).from("quality_grades").select("id, code, name, name_ar, sort_order").order("sort_order"),
+        (supabase as any).from("vehicle_makes").select("id, name, name_ar").order("name"),
+        (supabase as any).from("vehicle_models").select("id, name, name_ar, make_id").order("name"),
       ]);
       return {
         categories: c.data ?? [],
@@ -83,7 +116,8 @@ function ProductsPage() {
         units: u.data ?? [],
         origins: origins.data ?? [],
         qualities: qualities.data ?? [],
-        models: models.data ?? [],
+        makes: vMakes.data ?? [],
+        models: vModels.data ?? [],
       };
     },
   });
@@ -117,6 +151,22 @@ function ProductsPage() {
       : config.profile === "retail"
       ? (lang === "ar" ? "تجارة عامة" : "General Retail")
       : (lang === "ar" ? "تخصيص مخصص" : "Custom");
+
+  const modelsMap = useMemo(() => new Map<string, any>((meta?.models ?? []).map((m: any) => [m.id, m])), [meta?.models]);
+  const makesMap = useMemo(() => new Map<string, any>((meta?.makes ?? []).map((mk: any) => [mk.id, mk])), [meta?.makes]);
+
+  const getProductCompats = (compats?: { vehicle_model_id: string }[]) => {
+    if (!compats || compats.length === 0) return [];
+    return compats
+      .map((c) => {
+        const m = modelsMap.get(c.vehicle_model_id);
+        const mk = m ? makesMap.get(m.make_id) : null;
+        const makeName = lang === "ar" ? mk?.name_ar || mk?.name || "" : mk?.name || mk?.name_ar || "";
+        const modelName = lang === "ar" ? m?.name_ar || m?.name || "" : m?.name || m?.name_ar || "";
+        return { makeName, modelName };
+      })
+      .filter((x) => x.makeName || x.modelName);
+  };
 
   return (
     <>
@@ -214,10 +264,58 @@ function ProductsPage() {
                   lang === "ar" ? p.category?.name_ar || p.category?.name : p.category?.name || p.category?.name_ar;
                 const brandLabel =
                   lang === "ar" ? p.brand?.name_ar || p.brand?.name : p.brand?.name || p.brand?.name_ar;
+                const compats = getProductCompats(p.compatibilities);
+                const uniqueMakes = Array.from(new Set(compats.map((c) => c.makeName).filter(Boolean)));
 
                 return (
                   <tr key={p.id} className="border-b border-border/60 hover:bg-accent/40 transition-colors">
                     <td className="px-4 py-2.5">
+                      {/* Catalog Index Micro-badges Above Product Name */}
+                      <div className="mb-1 flex flex-wrap items-center gap-1 text-[10px] leading-none">
+                        {config.enableQualityGrades && p.quality && (
+                          <span
+                            className={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 font-bold border ${
+                              p.quality.code?.toLowerCase() === "genuine" || p.quality.sort_order === 1
+                                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25"
+                                : p.quality.code?.toLowerCase() === "premium" || p.quality.sort_order === 2
+                                ? "bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/25"
+                                : "bg-surface-2 text-foreground/80 border-border/70"
+                            }`}
+                          >
+                            <Award className="h-2.5 w-2.5" />
+                            <span>{lang === "ar" ? p.quality.name_ar || p.quality.name : p.quality.name || p.quality.name_ar}</span>
+                          </span>
+                        )}
+
+                        {config.enableOrigins && p.origin && (
+                          <span className="inline-flex items-center gap-0.5 rounded border border-border/70 bg-surface px-1.5 py-0.5 text-muted-foreground font-medium">
+                            <Globe className="h-2.5 w-2.5 opacity-70" />
+                            <span>{lang === "ar" ? p.origin.name_ar || p.origin.name : p.origin.name || p.origin.name_ar}</span>
+                            {p.origin.code && <span className="font-mono text-[9px] opacity-75">({p.origin.code})</span>}
+                          </span>
+                        )}
+
+                        {config.enableUnits && p.unit && (
+                          <span className="inline-flex items-center rounded border border-border/60 bg-surface-2 px-1.5 py-0.5 text-muted-foreground font-mono">
+                            {lang === "ar" ? p.unit.name_ar || p.unit.short_name : p.unit.short_name || p.unit.name_ar}
+                          </span>
+                        )}
+
+                        {config.enableMakesAndModels && compats.length > 0 && (
+                          <span
+                            className="inline-flex items-center gap-1 rounded border border-sky-500/25 bg-sky-500/10 px-1.5 py-0.5 font-medium text-sky-700 dark:text-sky-300 cursor-help"
+                            title={compats.map((c) => `${c.makeName} - ${c.modelName}`).join(" | ")}
+                          >
+                            <Car className="h-2.5 w-2.5" />
+                            <span>
+                              {uniqueMakes.length > 0 ? uniqueMakes.slice(0, 2).join("، ") : ""}
+                              {uniqueMakes.length > 2 ? ` (+${uniqueMakes.length - 2})` : ""}
+                              <span className="font-mono opacity-80"> ({compats.length})</span>
+                            </span>
+                          </span>
+                        )}
+                      </div>
+
                       <div className="font-medium text-foreground" dir={lang === "ar" ? "rtl" : "ltr"}>
                         {primary}
                       </div>
@@ -300,6 +398,7 @@ function ProductsPage() {
               units: [],
               origins: [],
               qualities: [],
+              makes: [],
               models: [],
             }
           }
@@ -307,6 +406,7 @@ function ProductsPage() {
           onSaved={() => {
             setOpen(false);
             qc.invalidateQueries({ queryKey: ["products"] });
+            qc.invalidateQueries({ queryKey: ["products-meta"] });
           }}
         />
       )}
@@ -334,8 +434,9 @@ function ProductDialog({
     brands: { id: string; name: string; name_ar: string | null }[];
     units: { id: string; name: string; name_ar: string | null; short_name: string }[];
     origins: { id: string; code: string; name: string; name_ar: string }[];
-    qualities: { id: string; name: string; name_ar: string }[];
-    models: any[];
+    qualities: { id: string; name: string; name_ar: string; code?: string; sort_order?: number }[];
+    makes: { id: string; name: string; name_ar: string | null }[];
+    models: { id: string; name: string; name_ar: string | null; make_id: string }[];
   };
   onClose: () => void;
   onSaved: () => void;
@@ -565,37 +666,23 @@ function ProductDialog({
             </Field>
           )}
 
-          {/* Conditional Vehicle Fitment / Models */}
+          {/* Conditional Vehicle Fitment / Models from Database Index */}
           {config.enableMakesAndModels && (
             <Field
-              label={lang === "ar" ? "توافق المركبات والدراجات (متعدد)" : "Vehicle compatibility (multiple)"}
+              label={
+                lang === "ar"
+                  ? "توافق المركبات والدراجات (من جدول الفهرس)"
+                  : "Vehicle compatibility (from catalog)"
+              }
               className="sm:col-span-2 lg:col-span-3"
             >
-              <div className="grid max-h-32 grid-cols-2 gap-1.5 overflow-y-auto rounded-2xl border border-border/80 bg-surface p-2.5 sm:grid-cols-3 custom-scrollbar">
-                {meta.models.map((m: any) => (
-                  <label
-                    key={m.id}
-                    className="flex items-center gap-2 rounded-xl px-2 py-1 text-xs hover:bg-surface-2 cursor-pointer transition"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={compatibleModels.includes(m.id)}
-                      onChange={(e) =>
-                        setCompatibleModels((x) =>
-                          e.target.checked ? [...x, m.id] : x.filter((id) => id !== m.id)
-                        )
-                      }
-                      className="rounded border-border"
-                    />
-                    <span className="truncate">
-                      {lang === "ar"
-                        ? m.vehicle_makes?.name_ar || m.vehicle_makes?.name
-                        : m.vehicle_makes?.name}{" "}
-                      — {lang === "ar" ? m.name_ar || m.name : m.name}
-                    </span>
-                  </label>
-                ))}
-              </div>
+              <VehicleCompatibilityPicker
+                makes={meta.makes}
+                models={meta.models}
+                selectedModelIds={compatibleModels}
+                onChange={setCompatibleModels}
+                lang={lang}
+              />
             </Field>
           )}
 
@@ -706,5 +793,277 @@ function Field({
       <span className="text-[11px] font-semibold tracking-wider text-muted-foreground">{label}</span>
       {children}
     </label>
+  );
+}
+
+interface VehicleCompatibilityPickerProps {
+  makes: { id: string; name: string; name_ar: string | null }[];
+  models: { id: string; name: string; name_ar: string | null; make_id: string }[];
+  selectedModelIds: string[];
+  onChange: (ids: string[]) => void;
+  lang: string;
+}
+
+function VehicleCompatibilityPicker({
+  makes,
+  models,
+  selectedModelIds,
+  onChange,
+  lang,
+}: VehicleCompatibilityPickerProps) {
+  const [activeMakeId, setActiveMakeId] = useState<string>("all");
+  const [search, setSearch] = useState<string>("");
+
+  // Map of makeId -> stats
+  const makeStats = useMemo(() => {
+    const stats: Record<string, { total: number; selected: number }> = {};
+    for (const m of models) {
+      if (!stats[m.make_id]) stats[m.make_id] = { total: 0, selected: 0 };
+      stats[m.make_id].total += 1;
+      if (selectedModelIds.includes(m.id)) {
+        stats[m.make_id].selected += 1;
+      }
+    }
+    return stats;
+  }, [models, selectedModelIds]);
+
+  // Filtered models according to activeMakeId and search
+  const filteredModels = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return models.filter((m) => {
+      if (activeMakeId !== "all" && m.make_id !== activeMakeId) return false;
+      if (!q) return true;
+      const makeObj = makes.find((mk) => mk.id === m.make_id);
+      const makeName = (makeObj?.name ?? "").toLowerCase();
+      const makeNameAr = (makeObj?.name_ar ?? "").toLowerCase();
+      const modelName = (m.name ?? "").toLowerCase();
+      const modelNameAr = (m.name_ar ?? "").toLowerCase();
+      return (
+        makeName.includes(q) ||
+        makeNameAr.includes(q) ||
+        modelName.includes(q) ||
+        modelNameAr.includes(q)
+      );
+    });
+  }, [models, makes, activeMakeId, search]);
+
+  const toggleModel = (id: string) => {
+    if (selectedModelIds.includes(id)) {
+      onChange(selectedModelIds.filter((x) => x !== id));
+    } else {
+      onChange([...selectedModelIds, id]);
+    }
+  };
+
+  const selectAllInActive = () => {
+    const idsToAdd = filteredModels.map((m) => m.id).filter((id) => !selectedModelIds.includes(id));
+    onChange([...selectedModelIds, ...idsToAdd]);
+  };
+
+  const deselectAllInActive = () => {
+    const idsToRemove = new Set(filteredModels.map((m) => m.id));
+    onChange(selectedModelIds.filter((id) => !idsToRemove.has(id)));
+  };
+
+  const clearAll = () => {
+    onChange([]);
+  };
+
+  const makeLookup = useMemo(() => new Map(makes.map((mk) => [mk.id, mk])), [makes]);
+  const modelLookup = useMemo(() => new Map(models.map((m) => [m.id, m])), [models]);
+
+  const allInActiveSelected =
+    filteredModels.length > 0 && filteredModels.every((m) => selectedModelIds.includes(m.id));
+
+  return (
+    <div className="rounded-2xl border border-border/80 bg-surface/80 p-3 shadow-xs">
+      {/* Header controls: Search & Quick actions */}
+      <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-2.5">
+        <div className="relative flex-1 min-w-[160px]">
+          <Search className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground rtl:right-3 rtl:left-auto ltr:left-3 ltr:right-auto" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={lang === "ar" ? "ابحث عن ماركة (علامة) أو موديل..." : "Search make or model..."}
+            className="h-8 w-full rounded-xl border border-border bg-surface px-8 text-xs text-foreground outline-none placeholder:text-muted-foreground focus:border-primary transition"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground rtl:left-2.5 rtl:right-auto ltr:right-2.5 ltr:left-auto"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1.5 text-xs">
+          {filteredModels.length > 0 && (
+            <button
+              type="button"
+              onClick={allInActiveSelected ? deselectAllInActive : selectAllInActive}
+              className="inline-flex h-7 items-center gap-1 rounded-lg border border-border bg-surface px-2.5 text-[11px] font-medium text-foreground hover:bg-surface-2 transition active:scale-95"
+            >
+              {allInActiveSelected ? (
+                <span>{lang === "ar" ? "إلغاء تحديد هذه المجموعة" : "Deselect Group"}</span>
+              ) : (
+                <span>{lang === "ar" ? "تحديد كل المعروض" : "Select All Shown"}</span>
+              )}
+            </button>
+          )}
+
+          {selectedModelIds.length > 0 && (
+            <button
+              type="button"
+              onClick={clearAll}
+              className="inline-flex h-7 items-center rounded-lg border border-destructive/20 bg-destructive/10 px-2 text-[11px] font-semibold text-destructive hover:bg-destructive/20 transition"
+            >
+              {lang === "ar" ? "مسح الكل" : "Clear"}
+            </button>
+          )}
+
+          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary">
+            {lang === "ar"
+              ? `المحدد: ${selectedModelIds.length}`
+              : `Selected: ${selectedModelIds.length}`}
+          </span>
+        </div>
+      </div>
+
+      {/* Makes Horizontal Filter Strip */}
+      <div className="mb-2.5 flex items-center gap-1.5 overflow-x-auto pb-1.5 custom-scrollbar">
+        <button
+          type="button"
+          onClick={() => setActiveMakeId("all")}
+          className={`shrink-0 rounded-xl px-3 py-1 text-xs font-semibold transition ${
+            activeMakeId === "all"
+              ? "bg-primary text-primary-foreground shadow-xs shadow-primary/20"
+              : "border border-border/80 bg-surface text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+          }`}
+        >
+          {lang === "ar" ? "كل الماركات (العلامات)" : "All Makes"}
+        </button>
+
+        {makes.map((mk) => {
+          const stats = makeStats[mk.id];
+          const hasSelected = stats && stats.selected > 0;
+          const makeLabel = lang === "ar" ? mk.name_ar || mk.name : mk.name;
+
+          return (
+            <button
+              key={mk.id}
+              type="button"
+              onClick={() => setActiveMakeId(mk.id)}
+              className={`shrink-0 inline-flex items-center gap-1.5 rounded-xl px-3 py-1 text-xs font-semibold transition ${
+                activeMakeId === mk.id
+                  ? "bg-primary text-primary-foreground shadow-xs shadow-primary/20"
+                  : hasSelected
+                  ? "border border-primary/40 bg-primary/10 text-primary hover:bg-primary/20"
+                  : "border border-border/80 bg-surface text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+              }`}
+            >
+              <span>{makeLabel}</span>
+              {hasSelected && (
+                <span
+                  className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                    activeMakeId === mk.id
+                      ? "bg-primary-foreground/20 text-primary-foreground"
+                      : "bg-primary text-primary-foreground"
+                  }`}
+                >
+                  {stats.selected}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Models Grid */}
+      <div className="grid max-h-44 grid-cols-2 gap-1.5 overflow-y-auto rounded-xl border border-border/70 bg-background/50 p-2 sm:grid-cols-3 custom-scrollbar">
+        {filteredModels.length === 0 ? (
+          <div className="col-span-full py-6 text-center text-xs text-muted-foreground">
+            {models.length === 0 ? (
+              <div className="flex flex-col items-center gap-1">
+                <span>{lang === "ar" ? "لا توجد موديلات مضافة في جدول الفهرس بعد" : "No models found in catalog table"}</span>
+                <span className="text-[11px] text-primary">{lang === "ar" ? "يمكنك إضافة ماركات وموديلات من صفحة الفهرس" : "You can add makes and models in the Catalog page"}</span>
+              </div>
+            ) : (
+              <span>{lang === "ar" ? "لا توجد نتائج مطابقة لبحثك أو لهذه الماركة" : "No matching models for filter"}</span>
+            )}
+          </div>
+        ) : (
+          filteredModels.map((m) => {
+            const isChecked = selectedModelIds.includes(m.id);
+            const mk = makeLookup.get(m.make_id);
+            const makeName = lang === "ar" ? mk?.name_ar || mk?.name : mk?.name;
+            const modelName = lang === "ar" ? m.name_ar || m.name : m.name;
+
+            return (
+              <label
+                key={m.id}
+                className={`flex items-center gap-2 rounded-xl border px-2.5 py-1.5 text-xs cursor-pointer transition select-none ${
+                  isChecked
+                    ? "border-primary/50 bg-primary/10 text-foreground font-semibold shadow-2xs"
+                    : "border-border/60 bg-surface/70 text-muted-foreground hover:border-border hover:bg-surface-2 hover:text-foreground"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={isChecked}
+                  onChange={() => toggleModel(m.id)}
+                  className="rounded border-border text-primary focus:ring-primary h-3.5 w-3.5"
+                />
+                <div className="min-w-0 flex-1 truncate">
+                  <span className="text-[10px] text-muted-foreground font-normal">
+                    {makeName} —{" "}
+                  </span>
+                  <span className="truncate">{modelName}</span>
+                </div>
+              </label>
+            );
+          })
+        )}
+      </div>
+
+      {/* Selected Items Summary Tags (if any) */}
+      {selectedModelIds.length > 0 && (
+        <div className="mt-2.5 flex flex-wrap items-center gap-1 border-t border-border/60 pt-2 text-[10px]">
+          <span className="text-muted-foreground font-medium me-1">
+            {lang === "ar" ? "الموديلات المتوافقة:" : "Compatible:"}
+          </span>
+          {selectedModelIds.slice(0, 8).map((id) => {
+            const m = modelLookup.get(id);
+            if (!m) return null;
+            const mk = makeLookup.get(m.make_id);
+            const makeLabel = lang === "ar" ? mk?.name_ar || mk?.name : mk?.name;
+            const modelLabel = lang === "ar" ? m.name_ar || m.name : m.name;
+
+            return (
+              <span
+                key={id}
+                className="inline-flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-2 py-0.5 font-medium text-primary"
+              >
+                <span>{makeLabel} {modelLabel}</span>
+                <button
+                  type="button"
+                  onClick={() => toggleModel(id)}
+                  className="hover:opacity-75"
+                >
+                  <X className="h-2.5 w-2.5" />
+                </button>
+              </span>
+            );
+          })}
+          {selectedModelIds.length > 8 && (
+            <span className="rounded-md bg-surface-2 px-1.5 py-0.5 text-muted-foreground font-semibold">
+              +{selectedModelIds.length - 8} {lang === "ar" ? "آخرين" : "more"}
+            </span>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
