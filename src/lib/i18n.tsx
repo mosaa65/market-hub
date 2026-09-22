@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
 export type Lang = "en" | "ar";
@@ -25,6 +26,7 @@ const en: Dict = {
   "nav.barcodes": "Barcode Labels",
   "nav.loyalty": "Loyalty",
   "nav.audit": "Audit Logs",
+  "nav.settlements": "Settlements",
   "nav.customers": "Customers",
   "nav.suppliers": "Suppliers",
   "nav.finance": "Finance",
@@ -440,7 +442,8 @@ const en: Dict = {
   "users.joined": "Joined",
   "users.no_role": "no role",
   "users.add_role": "Add role",
-  "users.signup_hint": "To add a new user: have them sign up at /auth, then assign their role here.",
+  "users.signup_hint":
+    "To add a new user: have them sign up at /auth, then assign their role here.",
 
   // Notifications
   "notifications.title": "Notifications",
@@ -578,6 +581,7 @@ const ar: Dict = {
   "nav.barcodes": "ملصقات الباركود",
   "nav.loyalty": "نقاط الولاء",
   "nav.audit": "سجل الأحداث",
+  "nav.settlements": "التسويات",
   "nav.customers": "العملاء",
   "nav.suppliers": "الموردون",
   "nav.finance": "المالية",
@@ -993,7 +997,8 @@ const ar: Dict = {
   "users.joined": "انضم",
   "users.no_role": "بلا دور",
   "users.add_role": "إضافة دور",
-  "users.signup_hint": "لإضافة مستخدم جديد: اطلب منه التسجيل من صفحة /auth، وسيظهر هنا لتعيين دوره.",
+  "users.signup_hint":
+    "لإضافة مستخدم جديد: اطلب منه التسجيل من صفحة /auth، وسيظهر هنا لتعيين دوره.",
 
   // الإشعارات
   "notifications.title": "الإشعارات",
@@ -1142,7 +1147,9 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     dir: lang === "ar" ? "rtl" : "ltr",
     t: (key, ...args) => {
       let s = dicts[lang][key] ?? key;
-      args.forEach((a, i) => { s = s.replace(`{${i}}`, String(a)); });
+      args.forEach((a, i) => {
+        s = s.replace(`{${i}}`, String(a));
+      });
       return s;
     },
   };

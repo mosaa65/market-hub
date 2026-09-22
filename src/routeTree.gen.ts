@@ -17,6 +17,7 @@ import { Route as AppUsersRouteImport } from './routes/_app.users'
 import { Route as AppTrialBalanceRouteImport } from './routes/_app.trial-balance'
 import { Route as AppTransfersRouteImport } from './routes/_app.transfers'
 import { Route as AppSuppliersRouteImport } from './routes/_app.suppliers'
+import { Route as AppSettlementsRouteImport } from './routes/_app.settlements'
 import { Route as AppSettingsRouteImport } from './routes/_app.settings'
 import { Route as AppSalesReturnsRouteImport } from './routes/_app.sales-returns'
 import { Route as AppSalesRouteImport } from './routes/_app.sales'
@@ -83,6 +84,11 @@ const AppTransfersRoute = AppTransfersRouteImport.update({
 const AppSuppliersRoute = AppSuppliersRouteImport.update({
   id: '/suppliers',
   path: '/suppliers',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettlementsRoute = AppSettlementsRouteImport.update({
+  id: '/settlements',
+  path: '/settlements',
   getParentRoute: () => AppRoute,
 } as any)
 const AppSettingsRoute = AppSettingsRouteImport.update({
@@ -257,6 +263,7 @@ export interface FileRoutesByFullPath {
   '/sales': typeof AppSalesRoute
   '/sales-returns': typeof AppSalesReturnsRoute
   '/settings': typeof AppSettingsRoute
+  '/settlements': typeof AppSettlementsRoute
   '/suppliers': typeof AppSuppliersRoute
   '/transfers': typeof AppTransfersRoute
   '/trial-balance': typeof AppTrialBalanceRoute
@@ -294,6 +301,7 @@ export interface FileRoutesByTo {
   '/sales': typeof AppSalesRoute
   '/sales-returns': typeof AppSalesReturnsRoute
   '/settings': typeof AppSettingsRoute
+  '/settlements': typeof AppSettlementsRoute
   '/suppliers': typeof AppSuppliersRoute
   '/transfers': typeof AppTransfersRoute
   '/trial-balance': typeof AppTrialBalanceRoute
@@ -333,6 +341,7 @@ export interface FileRoutesById {
   '/_app/sales': typeof AppSalesRoute
   '/_app/sales-returns': typeof AppSalesReturnsRoute
   '/_app/settings': typeof AppSettingsRoute
+  '/_app/settlements': typeof AppSettlementsRoute
   '/_app/suppliers': typeof AppSuppliersRoute
   '/_app/transfers': typeof AppTransfersRoute
   '/_app/trial-balance': typeof AppTrialBalanceRoute
@@ -372,6 +381,7 @@ export interface FileRouteTypes {
     | '/sales'
     | '/sales-returns'
     | '/settings'
+    | '/settlements'
     | '/suppliers'
     | '/transfers'
     | '/trial-balance'
@@ -409,6 +419,7 @@ export interface FileRouteTypes {
     | '/sales'
     | '/sales-returns'
     | '/settings'
+    | '/settlements'
     | '/suppliers'
     | '/transfers'
     | '/trial-balance'
@@ -447,6 +458,7 @@ export interface FileRouteTypes {
     | '/_app/sales'
     | '/_app/sales-returns'
     | '/_app/settings'
+    | '/_app/settlements'
     | '/_app/suppliers'
     | '/_app/transfers'
     | '/_app/trial-balance'
@@ -516,6 +528,13 @@ declare module '@tanstack/react-router' {
       path: '/suppliers'
       fullPath: '/suppliers'
       preLoaderRoute: typeof AppSuppliersRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/settlements': {
+      id: '/_app/settlements'
+      path: '/settlements'
+      fullPath: '/settlements'
+      preLoaderRoute: typeof AppSettlementsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/settings': {
@@ -746,6 +765,7 @@ interface AppRouteChildren {
   AppSalesRoute: typeof AppSalesRoute
   AppSalesReturnsRoute: typeof AppSalesReturnsRoute
   AppSettingsRoute: typeof AppSettingsRoute
+  AppSettlementsRoute: typeof AppSettlementsRoute
   AppSuppliersRoute: typeof AppSuppliersRoute
   AppTransfersRoute: typeof AppTransfersRoute
   AppTrialBalanceRoute: typeof AppTrialBalanceRoute
@@ -782,6 +802,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppSalesRoute: AppSalesRoute,
   AppSalesReturnsRoute: AppSalesReturnsRoute,
   AppSettingsRoute: AppSettingsRoute,
+  AppSettlementsRoute: AppSettlementsRoute,
   AppSuppliersRoute: AppSuppliersRoute,
   AppTransfersRoute: AppTransfersRoute,
   AppTrialBalanceRoute: AppTrialBalanceRoute,

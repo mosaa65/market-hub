@@ -1,12 +1,12 @@
 /**
  * Arabic PDF & Print System for Vortex ERP
- * 
+ *
  * Since jsPDF doesn't natively support Arabic shaping/RTL well,
  * we use a hybrid approach:
  *   - For invoices: HTML print templates (already excellent Arabic support via browser fonts)
  *   - For PDF downloads: jsPDF with embedded Arabic font for simple text + autoTable
  *   - For reports: HTML print templates with Cairo/Amiri Google Fonts
- * 
+ *
  * This module provides the unified PDF generation with Arabic font embedding.
  */
 import jsPDF from "jspdf";
@@ -69,14 +69,20 @@ export interface ReportPrintData {
 // ---------------------------------------------------------------------------
 
 function fmtMoney(n: number, cur = "") {
-  const formatted = new Intl.NumberFormat("ar-YE", { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(n);
+  const formatted = new Intl.NumberFormat("ar-YE", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(n);
   return cur ? `${formatted} ${cur}` : formatted;
 }
 
 function esc(s: unknown) {
   return String(s ?? "")
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 // ---------------------------------------------------------------------------
@@ -84,76 +90,148 @@ function esc(s: unknown) {
 // ---------------------------------------------------------------------------
 
 export function generateInvoicePDF(doc: InvoiceDoc) {
+  const pdf = generateInvoicePdfDoc(doc);
+  pdf.save(`${doc.number}.pdf`);
+  return pdf;
+}
+
+export function generateInvoicePdfBlob(doc: InvoiceDoc) {
+  const pdf = generateInvoicePdfDoc(doc);
+  return pdf.output("blob");
+}
+
+export function shareInvoicePDF(doc: InvoiceDoc) {
+  const blob = generateInvoicePdfBlob(doc);
+  const file = new File([blob], `${doc.number}.pdf`, { type: "application/pdf" });
+
+  if (navigator.share && typeof navigator.share === "function") {
+    return navigator.share({
+      title: `${doc.title} ${doc.number}`,
+      text: `${doc.title} ${doc.number}`,
+      files: [file],
+    });
+  }
+
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+  link.href = url;
+  link.download = `${doc.number}.pdf`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return Promise.resolve();
+}
+
+function generateInvoicePdfDoc(doc: InvoiceDoc) {
   const pdf = new jsPDF({ unit: "mm", format: "a4" });
   const w = pdf.internal.pageSize.getWidth();
   const cur = doc.currency ?? "";
   const m = (n: number) => `${cur} ${Number(n).toFixed(2)}`;
+  const rtl = true;
 
-  // Header
-  pdf.setFontSize(20).setFont("helvetica", "bold");
-  pdf.text(doc.company?.name ?? "Vortex ERP", 14, 18);
+  pdf.setFontSize(18).setFont("helvetica", "bold");
+  pdf.text(doc.company?.name ?? "Vortex ERP", rtl ? w - 14 : 14, 18, {
+    align: rtl ? "right" : "left",
+  });
   pdf.setFontSize(9).setFont("helvetica", "normal").setTextColor(120);
-  if (doc.company?.address) pdf.text(doc.company.address, 14, 24);
-  if (doc.company?.phone) pdf.text(doc.company.phone, 14, 29);
-  if (doc.company?.vat) pdf.text(`VAT: ${doc.company.vat}`, 14, 34);
+  if (doc.company?.address)
+    pdf.text(doc.company.address, rtl ? w - 14 : 14, 24, { align: rtl ? "right" : "left" });
+  if (doc.company?.phone)
+    pdf.text(doc.company.phone, rtl ? w - 14 : 14, 29, { align: rtl ? "right" : "left" });
+  if (doc.company?.vat)
+    pdf.text(`VAT: ${doc.company.vat}`, rtl ? w - 14 : 14, 34, { align: rtl ? "right" : "left" });
 
   pdf.setFontSize(16).setFont("helvetica", "bold").setTextColor(0);
-  pdf.text(doc.title, w - 14, 18, { align: "right" });
+  pdf.text(doc.title, rtl ? w - 14 : 14, 18, { align: rtl ? "right" : "left" });
   pdf.setFontSize(10).setFont("helvetica", "normal").setTextColor(80);
-  pdf.text(`#${doc.number}`, w - 14, 24, { align: "right" });
-  pdf.text(doc.date, w - 14, 29, { align: "right" });
+  pdf.text(`#${doc.number}`, rtl ? w - 14 : 14, 24, { align: rtl ? "right" : "left" });
+  pdf.text(doc.date, rtl ? w - 14 : 14, 29, { align: rtl ? "right" : "left" });
 
-  // Party block
   pdf.setDrawColor(220).line(14, 42, w - 14, 42);
   pdf.setFontSize(9).setTextColor(120);
-  pdf.text(doc.partyLabel.toUpperCase(), 14, 48);
+  pdf.text(doc.partyLabel.toUpperCase(), rtl ? w - 14 : 14, 48, { align: rtl ? "right" : "left" });
   pdf.setFontSize(11).setTextColor(0).setFont("helvetica", "bold");
-  pdf.text(doc.partyName, 14, 53);
+  pdf.text(doc.partyName, rtl ? w - 14 : 14, 53, { align: rtl ? "right" : "left" });
   pdf.setFont("helvetica", "normal").setFontSize(9).setTextColor(80);
-  if (doc.warehouse) pdf.text(`Warehouse: ${doc.warehouse}`, 14, 59);
-  if (doc.payment) pdf.text(`Payment: ${doc.payment}`, w - 14, 53, { align: "right" });
-  if (doc.status) pdf.text(`Status: ${doc.status}`, w - 14, 59, { align: "right" });
+  if (doc.warehouse)
+    pdf.text(`${rtl ? "المستودع" : "Warehouse"}: ${doc.warehouse}`, rtl ? w - 14 : 14, 59, {
+      align: rtl ? "right" : "left",
+    });
+  if (doc.payment)
+    pdf.text(`${rtl ? "الدفع" : "Payment"}: ${doc.payment}`, rtl ? w - 14 : 14, 66, {
+      align: rtl ? "right" : "left",
+    });
+  if (doc.status)
+    pdf.text(`${rtl ? "الحالة" : "Status"}: ${doc.status}`, rtl ? w - 14 : 14, 73, {
+      align: rtl ? "right" : "left",
+    });
 
-  // Items table
   autoTable(pdf, {
-    startY: 66,
-    head: [["#", "Product", "Qty", "Price", "Total"]],
-    body: doc.lines.map((l, i) => [String(i + 1), l.product, String(l.qty), m(l.price), m(l.total)]),
+    startY: 82,
+    head: [
+      [
+        rtl ? "#" : "#",
+        rtl ? "المنتج" : "Product",
+        rtl ? "الكمية" : "Qty",
+        rtl ? "السعر" : "Price",
+        rtl ? "الإجمالي" : "Total",
+      ],
+    ],
+    body: doc.lines.map((l, i) => [
+      String(i + 1),
+      l.product,
+      String(l.qty),
+      m(l.price),
+      m(l.total),
+    ]),
     theme: "striped",
     headStyles: { fillColor: [30, 30, 35], textColor: 255, fontSize: 9 },
     styles: { fontSize: 9, cellPadding: 2.5 },
-    columnStyles: { 0: { cellWidth: 12 }, 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" } },
+    columnStyles: {
+      0: { cellWidth: 12 },
+      1: { halign: rtl ? "right" : "left" },
+      2: { halign: "right" },
+      3: { halign: "right" },
+      4: { halign: "right" },
+    },
   });
 
-  const endY = (pdf as any).lastAutoTable.finalY ?? 100;
-
-  // Totals
+  const endY = (pdf as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? 100;
   const tx = w - 14;
   const totRows: [string, string][] = [
-    ["Subtotal", m(doc.subtotal)],
-    ["Tax", m(doc.tax)],
-    ["Discount", m(doc.discount)],
-    ["Total", m(doc.total)],
+    [rtl ? "المجموع" : "Subtotal", m(doc.subtotal)],
+    [rtl ? "الضريبة" : "Tax", m(doc.tax)],
+    [rtl ? "الخصم" : "Discount", m(doc.discount)],
+    [rtl ? "الإجمالي" : "Total", m(doc.total)],
   ];
-  if (doc.paid !== undefined) totRows.push(["Paid", m(doc.paid)], ["Balance", m(doc.total - doc.paid)]);
+  if (doc.paid !== undefined)
+    totRows.push(
+      [rtl ? "المدفوع" : "Paid", m(doc.paid)],
+      [rtl ? "المتبقي" : "Balance", m(doc.total - doc.paid)],
+    );
 
   pdf.setFontSize(10);
   totRows.forEach((r, i) => {
     const y = endY + 8 + i * 6;
-    const bold = r[0] === "Total" || r[0] === "Balance";
+    const bold = r[0] === (rtl ? "الإجمالي" : "Total") || r[0] === (rtl ? "المتبقي" : "Balance");
     pdf.setFont("helvetica", bold ? "bold" : "normal");
     pdf.setTextColor(bold ? 0 : 90);
-    pdf.text(r[0], tx - 50, y);
+    pdf.text(r[0], tx - 50, y, { align: "left" });
     pdf.text(r[1], tx, y, { align: "right" });
   });
 
-  // Footer
   const fy = pdf.internal.pageSize.getHeight() - 12;
   pdf.setDrawColor(220).line(14, fy - 4, w - 14, fy - 4);
   pdf.setFontSize(8).setTextColor(140).setFont("helvetica", "normal");
-  pdf.text("Thank you for your business — Generated by Vortex ERP", w / 2, fy, { align: "center" });
+  pdf.text(
+    rtl
+      ? "شكرًا لتعاملكم معنا — تم الإنشاء بواسطة Vortex ERP"
+      : "Thank you for your business — Generated by Vortex ERP",
+    w / 2,
+    fy,
+    { align: "center" },
+  );
 
-  pdf.save(`${doc.number}.pdf`);
+  return pdf;
 }
 
 // ---------------------------------------------------------------------------
@@ -166,36 +244,52 @@ export function printReport(data: ReportPrintData) {
 
   const formatCell = (val: string | number, col: ReportColumn) => {
     if (col.format === "money" && typeof val === "number") return fmtMoney(val, cur);
-    if (col.format === "number" && typeof val === "number") return new Intl.NumberFormat("ar-YE").format(val);
+    if (col.format === "number" && typeof val === "number")
+      return new Intl.NumberFormat("ar-YE").format(val);
     return esc(val);
   };
 
-  const headerCells = data.columns.map(c =>
-    `<th style="text-align:${c.align ?? (rtl ? 'right' : 'left')}; ${c.width ? `width:${c.width}px;` : ''}">${esc(c.header)}</th>`
-  ).join("");
+  const headerCells = data.columns
+    .map(
+      (c) =>
+        `<th style="text-align:${c.align ?? (rtl ? "right" : "left")}; ${c.width ? `width:${c.width}px;` : ""}">${esc(c.header)}</th>`,
+    )
+    .join("");
 
-  const bodyRows = data.rows.map(row =>
-    `<tr>${data.columns.map(c =>
-      `<td style="text-align:${c.align ?? (rtl ? 'right' : 'left')}">${formatCell(row[c.key] ?? "", c)}</td>`
-    ).join("")}</tr>`
-  ).join("");
+  const bodyRows = data.rows
+    .map(
+      (row) =>
+        `<tr>${data.columns
+          .map(
+            (c) =>
+              `<td style="text-align:${c.align ?? (rtl ? "right" : "left")}">${formatCell(row[c.key] ?? "", c)}</td>`,
+          )
+          .join("")}</tr>`,
+    )
+    .join("");
 
   const totalsRowHtml = data.totalsRow
-    ? `<tr class="totals-row">${data.columns.map(c =>
-        `<td style="text-align:${c.align ?? (rtl ? 'right' : 'left')}">${formatCell(data.totalsRow![c.key] ?? "", c)}</td>`
-      ).join("")}</tr>`
+    ? `<tr class="totals-row">${data.columns
+        .map(
+          (c) =>
+            `<td style="text-align:${c.align ?? (rtl ? "right" : "left")}">${formatCell(data.totalsRow![c.key] ?? "", c)}</td>`,
+        )
+        .join("")}</tr>`
     : "";
 
   const summaryHtml = data.summaryCards?.length
-    ? `<div class="summary-cards">${data.summaryCards.map(s =>
-        `<div class="scard" style="border-color:${s.color ?? '#b8935a'}">
+    ? `<div class="summary-cards">${data.summaryCards
+        .map(
+          (s) =>
+            `<div class="scard" style="border-color:${s.color ?? "#b8935a"}">
           <div class="sk">${esc(s.label)}</div>
-          <div class="sv" style="color:${s.color ?? '#0a1128'}">${esc(s.value)}</div>
-        </div>`
-      ).join("")}</div>`
+          <div class="sv" style="color:${s.color ?? "#0a1128"}">${esc(s.value)}</div>
+        </div>`,
+        )
+        .join("")}</div>`
     : "";
 
-  const html = `<!doctype html><html dir="${rtl ? 'rtl' : 'ltr'}" lang="${rtl ? 'ar' : 'en'}"><head><meta charset="utf-8"><title>${esc(data.title)}</title>
+  const html = `<!doctype html><html dir="${rtl ? "rtl" : "ltr"}" lang="${rtl ? "ar" : "en"}"><head><meta charset="utf-8"><title>${esc(data.title)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Amiri:wght@400;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -216,7 +310,7 @@ export function printReport(data: ReportPrintData) {
     padding-bottom: 16px; border-bottom: 2px solid var(--ink); margin-bottom: 20px; }
   .co-info h1 { font-family: 'Amiri', serif; font-size: 28px; font-weight: 700; margin: 0; color: var(--ink); }
   .co-info .sub { color: var(--muted); font-size: 11px; line-height: 1.6; margin-top: 4px; }
-  .report-title { text-align: ${rtl ? 'left' : 'right'}; }
+  .report-title { text-align: ${rtl ? "left" : "right"}; }
   .report-title h2 { font-family: 'Amiri', serif; font-size: 24px; font-weight: 700; margin: 0; color: var(--gold); }
   .report-title .meta { color: var(--muted); font-size: 11px; margin-top: 4px; }
   .report-title .period { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--ink);
@@ -331,18 +425,26 @@ export function printFinancialStatement(data: FinancialStatementData) {
   const renderSection = (sec: FinancialStatementSection) => `
     <div class="fs-section">
       <div class="fs-section-title">${esc(sec.title)}</div>
-      ${sec.items.map(item => `
-        <div class="fs-row ${item.bold ? 'bold' : ''}">
+      ${sec.items
+        .map(
+          (item) => `
+        <div class="fs-row ${item.bold ? "bold" : ""}">
           <span>${esc(item.label)}</span>
-          <span class="mono" style="${item.color ? `color:${item.color}` : ''}">${m(item.value)}</span>
+          <span class="mono" style="${item.color ? `color:${item.color}` : ""}">${m(item.value)}</span>
         </div>
-      `).join("")}
-      ${sec.total ? `
-        <div class="fs-section-total" style="${sec.total.color ? `color:${sec.total.color};border-color:${sec.total.color}` : ''}">
+      `,
+        )
+        .join("")}
+      ${
+        sec.total
+          ? `
+        <div class="fs-section-total" style="${sec.total.color ? `color:${sec.total.color};border-color:${sec.total.color}` : ""}">
           <span>${esc(sec.total.label)}</span>
           <span class="mono">${m(sec.total.value)}</span>
         </div>
-      ` : ""}
+      `
+          : ""
+      }
     </div>
   `;
 
@@ -367,7 +469,7 @@ export function printFinancialStatement(data: FinancialStatementData) {
     bodyContent = data.sections.map(renderSection).join("");
   }
 
-  const html = `<!doctype html><html dir="${rtl ? 'rtl' : 'ltr'}" lang="${rtl ? 'ar' : 'en'}"><head><meta charset="utf-8"><title>${esc(data.title)}</title>
+  const html = `<!doctype html><html dir="${rtl ? "rtl" : "ltr"}" lang="${rtl ? "ar" : "en"}"><head><meta charset="utf-8"><title>${esc(data.title)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Amiri:wght@400;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -432,12 +534,16 @@ export function printFinancialStatement(data: FinancialStatementData) {
 
   ${bodyContent}
 
-  ${data.grandTotal ? `
-    <div class="fs-grand" style="${data.grandTotal.color ? `color:${data.grandTotal.color};border-color:${data.grandTotal.color}` : ''}">
+  ${
+    data.grandTotal
+      ? `
+    <div class="fs-grand" style="${data.grandTotal.color ? `color:${data.grandTotal.color};border-color:${data.grandTotal.color}` : ""}">
       <span>${esc(data.grandTotal.label)}</span>
       <span class="mono">${m(data.grandTotal.value)}</span>
     </div>
-  ` : ""}
+  `
+      : ""
+  }
 
   <div class="signatures">
     <div class="sig"><div style="height:40px"></div><div class="line">${rtl ? "المراجع والمدقق" : "Auditor"}</div></div>
@@ -463,12 +569,16 @@ function openPrintWindow(html: string) {
   if (!w) {
     // popup blocked — fallback to iframe
     const iframe = document.createElement("iframe");
-    iframe.style.cssText = "position:fixed;inset:0;width:100vw;height:100vh;border:0;z-index:9999;background:#000";
+    iframe.style.cssText =
+      "position:fixed;inset:0;width:100vw;height:100vh;border:0;z-index:9999;background:#000";
     document.body.appendChild(iframe);
     const cw = iframe.contentWindow!;
-    cw.document.open(); cw.document.write(html); cw.document.close();
+    cw.document.open();
+    cw.document.write(html);
+    cw.document.close();
     setTimeout(() => {
-      cw.focus(); cw.print();
+      cw.focus();
+      cw.print();
       setTimeout(() => document.body.removeChild(iframe), 1000);
     }, 500);
     return;
