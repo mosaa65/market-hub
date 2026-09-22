@@ -28,7 +28,18 @@ interface Line {
   id: string; quantity: number; unit_cost: number; tax: number; total: number;
   products: { name: string; sku: string | null } | null;
 }
-interface Product { id: string; name: string; sku: string | null; cost_price: number; tax_rate: number }
+interface Product {
+  id: string;
+  name: string;
+  name_ar: string | null;
+  sku: string | null;
+  barcode: string | null;
+  cost_price: number;
+  tax_rate: number;
+  unit?: { short_name?: string | null; name?: string | null; name_ar?: string | null } | null;
+  category?: { name?: string | null; name_ar?: string | null } | null;
+  inventory?: { warehouse_id: string; quantity: number }[] | null;
+}
 interface Supplier { id: string; name: string }
 interface Warehouse { id: string; name: string; name_ar: string | null }
 interface CartLine { product_id: string; name: string; unit_cost: number; tax_rate: number; quantity: number }
@@ -44,6 +55,7 @@ function PurchasesPage() {
   const [selected, setSelected] = useState<Invoice | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
   const [creating, setCreating] = useState(false);
+  const productLabel = (p?: Pick<Product, "name" | "name_ar"> | null) => (!p ? "—" : lang === "ar" ? (p.name_ar || p.name) : (p.name || p.name_ar || "—"));
 
   async function load() {
     setLoading(true);
@@ -218,37 +230,83 @@ function CreateDialog({ onClose, onDone, hasMultiWarehouse }: { onClose: () => v
   const [warehouseId, setWarehouseId] = useState("");
   const [supplierId, setSupplierId] = useState("");
   const [search, setSearch] = useState("");
+  const [stockMap, setStockMap] = useState<Record<string, number>>({});
   const [cart, setCart] = useState<CartLine[]>([]);
   const [paid, setPaid] = useState("");
   const [discount, setDiscount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"cash"|"card"|"bank_transfer"|"credit">("bank_transfer");
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
+  const productLabel = (p?: Pick<Product, "name" | "name_ar"> | null) =>
+    !p ? "—" : lang === "ar" ? (p.name_ar || p.name) : (p.name || p.name_ar || "—");
 
   useEffect(() => {
     void (async () => {
       const [{ data: ps }, { data: ss }, { data: ws }] = await Promise.all([
-        supabase.from("products").select("id,name,sku,cost_price,tax_rate").eq("is_active", true).order("name").limit(500),
+        supabase
+          .from("products")
+          .select("id,name,name_ar,sku,barcode,cost_price,tax_rate,unit:units(short_name,name,name_ar),category:categories(name,name_ar),inventory(warehouse_id,quantity)")
+          .eq("is_active", true)
+          .order("name")
+          .limit(500),
         supabase.from("suppliers").select("id,name").eq("is_active", true).order("name"),
         supabase.from("warehouses").select("id,name,name_ar").eq("is_active", true).order("name"),
       ]);
-      setProducts(ps ?? []); setSuppliers(ss ?? []); setWarehouses(ws ?? []);
+      setProducts((ps ?? []) as Product[]);
+      setSuppliers(ss ?? []);
+      setWarehouses(ws ?? []);
       if (ws?.[0]) setWarehouseId(ws[0].id);
       if (ss?.[0]) setSupplierId(ss[0].id);
     })();
   }, []);
 
+  useEffect(() => {
+    if (!warehouseId) {
+      setStockMap({});
+      return;
+    }
+    void (async () => {
+      const { data, error } = await supabase.from("inventory").select("product_id,quantity").eq("warehouse_id", warehouseId);
+      if (error) return;
+      const next: Record<string, number> = {};
+      for (const row of data ?? []) {
+        next[row.product_id] = Number(row.quantity ?? 0);
+      }
+      setStockMap(next);
+    })();
+  }, [warehouseId]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return (q ? products.filter(p => p.name.toLowerCase().includes(q) || (p.sku ?? "").toLowerCase().includes(q)) : products).slice(0, 30);
+    return (q
+      ? products.filter((p) =>
+          [p.name, p.name_ar, p.sku, p.barcode].some((value) => (value ?? "").toLowerCase().includes(q))
+        )
+      : products
+    ).slice(0, 30);
   }, [products, search]);
 
   function addToCart(p: Product) {
+    const available = Number(stockMap[p.id] ?? 0);
     setCart(prev => {
       const idx = prev.findIndex(l => l.product_id === p.id);
-      if (idx >= 0) { const n = [...prev]; n[idx] = { ...n[idx], quantity: n[idx].quantity + 1 }; return n; }
-      return [...prev, { product_id: p.id, name: p.name, unit_cost: Number(p.cost_price), tax_rate: Number(p.tax_rate ?? 0), quantity: 1 }];
+      if (idx >= 0) {
+        const n = [...prev];
+        const nextQty = n[idx].quantity + 1;
+        n[idx] = { ...n[idx], quantity: nextQty };
+        return n;
+      }
+      return [...prev, {
+        product_id: p.id,
+        name: productLabel(p),
+        unit_cost: Number(p.cost_price),
+        tax_rate: Number(p.tax_rate ?? 0),
+        quantity: 1,
+      }];
     });
+    if (available === 0 && warehouseId) {
+      toast.info(lang === "ar" ? "سيتم إضافة هذا المنتج كإضافة جديدة إلى المخزون في المستودع المحدد" : "This product will be added as a new stock entry in the selected warehouse.");
+    }
   }
   function update(pid: string, patch: Partial<CartLine>) {
     setCart(c => c.map(l => l.product_id === pid ? { ...l, ...patch } : l));
@@ -263,6 +321,12 @@ function CreateDialog({ onClose, onDone, hasMultiWarehouse }: { onClose: () => v
   async function submit() {
     if (!warehouseId || !supplierId) return toast.error(t("purchases.select_ws"));
     if (cart.length === 0) return toast.error(t("purchases.add_items"));
+
+    const invalidLine = cart.find((line) => !Number.isFinite(line.quantity) || line.quantity <= 0 || !Number.isFinite(line.unit_cost) || line.unit_cost < 0 || !Number.isFinite(line.tax_rate) || line.tax_rate < 0);
+    if (invalidLine) {
+      return toast.error(lang === "ar" ? "يجب أن تكون الكمية والسعر والضريبة أرقامًا صحيحة وموجبة" : "Quantity, cost, and tax must be valid positive numbers.");
+    }
+
     setLoading(true);
     try {
       const { error } = await supabase.rpc("create_purchase", {
@@ -273,7 +337,7 @@ function CreateDialog({ onClose, onDone, hasMultiWarehouse }: { onClose: () => v
         _discount: discountN,
         _note: (note || null) as any,
         _items: cart.map(l => ({
-          product_id: l.product_id, quantity: l.quantity, unit_cost: l.unit_cost, tax_rate: l.tax_rate,
+          product_id: l.product_id, quantity: Number(l.quantity), unit_cost: Number(l.unit_cost), tax_rate: Number(l.tax_rate),
         })),
       });
       if (error) throw error;
@@ -313,15 +377,24 @@ function CreateDialog({ onClose, onDone, hasMultiWarehouse }: { onClose: () => v
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t("purchases.search_products")}
               className="mb-2 h-9 rounded-md border border-input bg-surface px-3 text-sm" />
             <div className="flex-1 overflow-y-auto space-y-1 pr-1">
-              {filtered.map(p => (
-                <button key={p.id} onClick={() => addToCart(p)} className="flex w-full items-center justify-between rounded border border-border bg-surface px-3 py-2 text-sm hover:border-ring hover:bg-surface-2">
-                  <div className="min-w-0 flex-1 text-start">
-                    <div className="truncate font-medium">{p.name}</div>
-                    <div className="text-[11px] text-muted-foreground">{p.sku ?? "—"}</div>
-                  </div>
-                  <span className="text-xs text-muted-foreground">{money(Number(p.cost_price))}</span>
-                </button>
-              ))}
+              {filtered.map(p => {
+                const available = Number(stockMap[p.id] ?? 0);
+                return (
+                  <button key={p.id} onClick={() => addToCart(p)} className="flex w-full items-center justify-between gap-3 rounded border border-border bg-surface px-3 py-2 text-sm hover:border-ring hover:bg-surface-2">
+                    <div className="min-w-0 flex-1 text-start">
+                      <div className="truncate font-medium">{productLabel(p)}</div>
+                      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                        <span>{p.sku ?? "—"}</span>
+                        {p.barcode && <span className="font-mono">{p.barcode}</span>}
+                      </div>
+                    </div>
+                    <div className="text-end">
+                      <div className="text-xs text-muted-foreground">{money(Number(p.cost_price))}</div>
+                      <div className="text-[10px] text-muted-foreground">{lang === "ar" ? `المخزون: ${available}` : `Stock: ${available}`}</div>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
