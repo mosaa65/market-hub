@@ -885,32 +885,6 @@ function POSPage() {
     if (!name) {
       return toast.error(lang === "ar" ? "اسم العميل مطلوب" : "Customer name is required");
     }
-<<<<<<< HEAD
-    setCreatingCustomer(true);
-    try {
-      const { data, error } = await supabase
-        .from("customers")
-        .insert({
-          name,
-          phone: newCustomerPhone.trim() || null,
-          credit_limit: Math.max(0, Number(newCustomerCreditLimit || 0)),
-        })
-        .select("id,name")
-        .single();
-      if (error) throw error;
-      setCustomers((current) => [...current, data].sort((a, b) => a.name.localeCompare(b.name)));
-      setCustomerId(data.id);
-      setNewCustomerName("");
-      setNewCustomerPhone("");
-      setNewCustomerCreditLimit("");
-      setNewCustomerOpen(false);
-      toast.success(lang === "ar" ? "تمت إضافة العميل واختياره بنجاح" : "Customer added and selected");
-    } catch (err: any) {
-      toast.error(err.message);
-    } finally {
-      setCreatingCustomer(false);
-    }
-=======
     const { data, error } = await supabase
       .from("customers")
       .insert({
@@ -930,7 +904,6 @@ function POSPage() {
     toast.success(
       lang === "ar" ? "تمت إضافة العميل واختياره بنجاح" : "Customer added and selected",
     );
->>>>>>> 1a3f8605cd8783d3fd08a4cd77dcbe4f0b8745a9
   }
 
   const selectClassName =

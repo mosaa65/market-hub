@@ -360,8 +360,26 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
     void refreshFromRemote();
   }, []);
 
-  const currentPlan = useMemo(() => {
-    return SYSTEM_PLANS.find((p) => p.id === currentPlanId) || SYSTEM_PLANS[2];
+  const currentPlan = useMemo<PlatformPlan>(() => {
+    const found = SYSTEM_PLANS.find((p) => p.id === currentPlanId);
+    if (found) return found;
+    // Never allow an undefined plan: look up the safe built-in fallback by id
+    // instead of by array index, which would return undefined if the list changes.
+    const fallback = SYSTEM_PLANS.find((p) => p.id === "enterprise") ?? SYSTEM_PLANS[0];
+    if (!fallback) {
+      // Absolute last resort so consumers reading `currentPlan.name` never crash.
+      return {
+        id: "starter" as PlatformPlanId,
+        name: { ar: "الباقة الأساسية", en: "Starter Plan" },
+        description: { ar: "", en: "" },
+        modules: ["core"],
+        maxUsers: 1,
+        maxWarehouses: 1,
+        maxProducts: 500,
+        priceMonthly: 0,
+      };
+    }
+    return fallback;
   }, [currentPlanId]);
 
   const enabledModules = useMemo(() => {
@@ -536,7 +554,10 @@ export function ModuleLockedBanner({ moduleId }: { moduleId: string }) {
     routes: [],
   };
 
-  const targetPlan = plans.find((p) => p.modules.includes(moduleId)) || plans[2];
+  const targetPlan =
+    plans.find((p) => p.modules.includes(moduleId)) ??
+    plans.find((p) => p.id === "enterprise") ??
+    plans[0];
 
   return (
     <div className="flex min-h-[70vh] items-center justify-center p-4">

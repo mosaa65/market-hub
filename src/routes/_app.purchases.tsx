@@ -725,16 +725,11 @@ function CreateDialog({
               />
             </div>
             <Row label={t("common.total")} value={money(total)} bold />
-<<<<<<< HEAD
-            <button onClick={submit} disabled={loading || cart.length === 0}
-              className="mt-1 flex h-10 w-full items-center justify-center gap-2 rounded-md bg-primary text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50 disabled:pointer-events-none transition">
-=======
             <button
               onClick={submit}
               disabled={loading || cart.length === 0}
               className="mt-1 flex h-10 w-full items-center justify-center gap-2 rounded-md bg-primary text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
             >
->>>>>>> 1a3f8605cd8783d3fd08a4cd77dcbe4f0b8745a9
               {loading && <Loader2 className="h-4 w-4 animate-spin" />}
               {t("purchases.save")}
             </button>

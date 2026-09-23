@@ -333,29 +333,6 @@ function NewSalesReturn({
       toast.error(t("common.fill_form"));
       return;
     }
-<<<<<<< HEAD
-    setSaving(true);
-    try {
-      const { error } = await supabase.rpc("create_sales_return" as any, {
-        _invoice_id: null,
-        _warehouse_id: warehouseId,
-        _customer_id: customerId || null,
-        _refund_method: refundMethod,
-        _note: note || null,
-        _items: lines as any,
-      });
-      if (error) throw error;
-      toast.success(lang === "ar" ? "تم تسجيل مرتجع المبيعات بنجاح" : "Sales return recorded successfully");
-      setOpen(false);
-      setLines([]);
-      setNote("");
-      onSaved();
-    } catch (err: any) {
-      toast.error(err.message);
-    } finally {
-      setSaving(false);
-    }
-=======
     const { error } = await supabase.rpc("create_sales_return" as any, {
       _invoice_id: customerInvoiceId || null,
       _warehouse_id: warehouseId,
@@ -375,7 +352,6 @@ function NewSalesReturn({
     setLines([]);
     setNote("");
     onSaved();
->>>>>>> 1a3f8605cd8783d3fd08a4cd77dcbe4f0b8745a9
   }
 
   return (

@@ -58,29 +58,6 @@ function SuppliersPage() {
   async function save() {
     if (saving) return;
     if (!edit?.name?.trim()) return toast.error(t("suppliers.name_required"));
-<<<<<<< HEAD
-    setSaving(true);
-    try {
-      const payload = {
-        name: edit.name.trim(),
-        phone: edit.phone || null,
-        email: edit.email || null,
-        address: edit.address || null,
-        is_active: edit.is_active ?? true,
-      };
-      const { error } = edit.id
-        ? await supabase.from("suppliers").update(payload).eq("id", edit.id)
-        : await supabase.from("suppliers").insert(payload);
-      if (error) throw error;
-      toast.success(edit.id ? t("common.updated") : t("common.created"));
-      setEdit(null);
-      await load();
-    } catch (err: any) {
-      toast.error(err.message ?? t("common.failed"));
-    } finally {
-      setSaving(false);
-    }
-=======
     const payload = {
       name: edit.name.trim(),
       phone: edit.phone || null,
@@ -95,30 +72,15 @@ function SuppliersPage() {
     toast.success(edit.id ? t("common.updated") : t("common.created"));
     setEdit(null);
     await load();
->>>>>>> 1a3f8605cd8783d3fd08a4cd77dcbe4f0b8745a9
   }
 
   async function remove(id: string) {
     if (deleting) return;
     if (!confirm(t("suppliers.delete_confirm"))) return;
-<<<<<<< HEAD
-    setDeleting(id);
-    try {
-      const { error } = await supabase.from("suppliers").delete().eq("id", id);
-      if (error) throw error;
-      toast.success(t("common.deleted"));
-      await load();
-    } catch (err: any) {
-      toast.error(err.message ?? t("common.failed"));
-    } finally {
-      setDeleting(null);
-    }
-=======
     const { error } = await supabase.from("suppliers").delete().eq("id", id);
     if (error) return toast.error(error.message);
     toast.success(t("common.deleted"));
     await load();
->>>>>>> 1a3f8605cd8783d3fd08a4cd77dcbe4f0b8745a9
   }
 
   return (
@@ -253,12 +215,6 @@ function SuppliersPage() {
               </label>
             </div>
             <div className="mt-5 flex justify-end gap-2">
-<<<<<<< HEAD
-              <button onClick={() => !saving && setEdit(null)} disabled={saving} className="h-9 rounded-md border border-border px-4 text-sm hover:bg-surface-2 disabled:opacity-50 transition">{t("common.cancel")}</button>
-              <button onClick={save} disabled={saving} className="flex h-9 items-center justify-center gap-1.5 rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50 disabled:pointer-events-none transition">
-                {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                <span>{saving ? (lang === "ar" ? "جاري الحفظ..." : "Saving...") : t("common.save")}</span>
-=======
               <button
                 onClick={() => setEdit(null)}
                 className="h-9 rounded-md border border-border px-4 text-sm hover:bg-surface-2"
@@ -267,10 +223,13 @@ function SuppliersPage() {
               </button>
               <button
                 onClick={save}
-                className="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90"
+                disabled={saving}
+                className="flex h-9 items-center justify-center gap-1.5 rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50 disabled:pointer-events-none transition"
               >
-                {t("common.save")}
->>>>>>> 1a3f8605cd8783d3fd08a4cd77dcbe4f0b8745a9
+                {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                <span>
+                  {saving ? (lang === "ar" ? "جاري الحفظ..." : "Saving...") : t("common.save")}
+                </span>
               </button>
             </div>
           </div>

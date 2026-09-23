@@ -344,12 +344,6 @@ function PaymentsPage() {
                 </div>
               </div>
               <div className="mt-4 flex justify-end">
-<<<<<<< HEAD
-                <button onClick={submit} disabled={saving}
-                  className="flex h-10 items-center gap-1.5 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-sm shadow-primary/20 hover:opacity-90 disabled:opacity-60 disabled:pointer-events-none transition">
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                  {saving ? (lang === "ar" ? "جاري الحفظ..." : "Saving...") : (lang === "ar" ? "حفظ الدفعة" : "Save payment")}
-=======
                 <button
                   onClick={submit}
                   disabled={saving}
@@ -361,7 +355,6 @@ function PaymentsPage() {
                     <Plus className="h-4 w-4" />
                   )}
                   {lang === "ar" ? "حفظ الدفعة" : "Save payment"}
->>>>>>> 1a3f8605cd8783d3fd08a4cd77dcbe4f0b8745a9
                 </button>
               </div>
             </div>

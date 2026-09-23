@@ -7,9 +7,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { useCatalogModules } from "@/lib/catalog-modules";
 import { CatalogModulesDialog } from "@/components/catalog-modules-dialog";
-<<<<<<< HEAD
-import { Plus, Package, Search, Pencil, Trash2, X, SlidersHorizontal, Loader2 } from "lucide-react";
-=======
 import {
   Plus,
   Package,
@@ -18,12 +15,12 @@ import {
   Trash2,
   X,
   SlidersHorizontal,
+  Loader2,
   Car,
   Globe,
   Award,
   ExternalLink,
 } from "lucide-react";
->>>>>>> 1a3f8605cd8783d3fd08a4cd77dcbe4f0b8745a9
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 

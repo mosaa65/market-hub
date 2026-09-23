@@ -425,9 +425,13 @@ function SidebarContents({
 
   const navigate = useNavigate();
 
-  const pathname = useRouterState(
-    ({ location }) => location.pathname,
-  );
+  // Must be passed as an options object with a `select` selector. Passing a bare
+  // function leaves `select` undefined, so the hook returns the whole RouterState
+  // object and `pathname.startsWith(...)` below throws
+  // "TypeError: pathname.startsWith is not a function".
+  const pathname = useRouterState({
+    select: (s) => s.location.pathname,
+  });
 
   const [logoUrl, setLogoUrl] = useState<string>(
     "/inama-soft-logo.ico",
@@ -500,8 +504,8 @@ function SidebarContents({
 
                 <span className="inline-flex items-center rounded-full bg-primary/10 border border-primary/25 px-1.5 py-0.2 text-[9px] font-medium text-primary shrink-0">
                   {lang === "ar"
-                    ? currentPlan.name.ar
-                    : currentPlan.name.en}
+                    ? (currentPlan?.name?.ar ?? "—")
+                    : (currentPlan?.name?.en ?? "—")}
                 </span>
               </div>
 
