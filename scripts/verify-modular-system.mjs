@@ -15,7 +15,10 @@ assert(modulesContent.includes('id: "multi_warehouse"'), "multi_warehouse module
 assert(modulesContent.includes('id: "barcode"'), "barcode module must be present");
 assert(modulesContent.includes('id: "loyalty"'), "loyalty module must be present");
 assert(modulesContent.includes('id: "batches"'), "batches module must be present");
-assert(modulesContent.includes('id: "advanced_accounting"'), "advanced_accounting module must be present");
+assert(
+  modulesContent.includes('id: "advanced_accounting"'),
+  "advanced_accounting module must be present",
+);
 assert(modulesContent.includes('id: "analytics"'), "analytics module must be present");
 assert(modulesContent.includes('id: "purchases"'), "purchases module must be present");
 assert(modulesContent.includes('id: "returns"'), "returns module must be present");
@@ -40,7 +43,10 @@ console.log("✅ 3. Sidebar navigation is fully dynamic and module-filtered.");
 // 4. Verify Command Palette filtering
 const cmdContent = fs.readFileSync(path.resolve("src/components/command-palette.tsx"), "utf8");
 assert(cmdContent.includes("useModules"), "CommandPalette must consume useModules hook");
-assert(cmdContent.includes("isModuleEnabled"), "CommandPalette must filter items by isModuleEnabled");
+assert(
+  cmdContent.includes("isModuleEnabled"),
+  "CommandPalette must filter items by isModuleEnabled",
+);
 console.log("✅ 4. Command Palette search respects module licensing.");
 
 // 5. Verify Route Guards on sensitive pages
@@ -75,13 +81,29 @@ for (const r of guardedRoutes) {
 console.log(`✅ 5. All ${guardedRoutes.length} modular routes are guarded by ModuleGuard.`);
 
 // 6. Verify Platform Admin route exists
-assert(fs.existsSync(path.resolve("src/routes/_app.platform-admin.tsx")), "Platform admin route must exist");
+assert(
+  fs.existsSync(path.resolve("src/routes/_app.platform-admin.tsx")),
+  "Platform admin route must exist",
+);
 console.log("✅ 6. Platform Admin route is implemented and accessible.");
 
 // 7. Verify Migrations
-assert(fs.existsSync(path.resolve("supabase/migrations/20260915000000_platform_modules_and_subscriptions.sql")), "Base subscription migration exists");
-assert(fs.existsSync(path.resolve("supabase/migrations/20260915010000_platform_admins_and_audit.sql")), "Platform admins migration exists");
-assert(fs.existsSync(path.resolve("supabase/migrations/20260915020000_company_settings_catalog_modules.sql")), "Catalog modules migration exists");
+assert(
+  fs.existsSync(
+    path.resolve("supabase/migrations/20260915000000_platform_modules_and_subscriptions.sql"),
+  ),
+  "Base subscription migration exists",
+);
+assert(
+  fs.existsSync(path.resolve("supabase/migrations/20260915010000_platform_admins_and_audit.sql")),
+  "Platform admins migration exists",
+);
+assert(
+  fs.existsSync(
+    path.resolve("supabase/migrations/20260915020000_company_settings_catalog_modules.sql"),
+  ),
+  "Catalog modules migration exists",
+);
 console.log("✅ 7. All database migrations are verified.");
 
 // 8. Verify Quota Enforcements
@@ -95,26 +117,53 @@ console.log("✅ 8. Quota enforcement active on warehouses, products, and users.
 
 // 9. Verify In-Component Dynamic Filtering across operations
 const salesContent = fs.readFileSync(path.resolve("src/routes/_app.sales.tsx"), "utf8");
-assert(salesContent.includes("hasMultiWarehouse"), "Sales route must adapt to multi_warehouse module");
+assert(
+  salesContent.includes("hasMultiWarehouse"),
+  "Sales route must adapt to multi_warehouse module",
+);
 
 const purchContent = fs.readFileSync(path.resolve("src/routes/_app.purchases.tsx"), "utf8");
-assert(purchContent.includes("hasMultiWarehouse"), "Purchases route must adapt to multi_warehouse module");
+assert(
+  purchContent.includes("hasMultiWarehouse"),
+  "Purchases route must adapt to multi_warehouse module",
+);
 
 const sReturnContent = fs.readFileSync(path.resolve("src/routes/_app.sales-returns.tsx"), "utf8");
-assert(sReturnContent.includes("hasMultiWarehouse"), "Sales returns route must adapt to multi_warehouse module");
+assert(
+  sReturnContent.includes("hasMultiWarehouse"),
+  "Sales returns route must adapt to multi_warehouse module",
+);
 
-const pReturnContent = fs.readFileSync(path.resolve("src/routes/_app.purchase-returns.tsx"), "utf8");
-assert(pReturnContent.includes("hasMultiWarehouse"), "Purchase returns route must adapt to multi_warehouse module");
+const pReturnContent = fs.readFileSync(
+  path.resolve("src/routes/_app.purchase-returns.tsx"),
+  "utf8",
+);
+assert(
+  pReturnContent.includes("hasMultiWarehouse"),
+  "Purchase returns route must adapt to multi_warehouse module",
+);
 
 const batchContent = fs.readFileSync(path.resolve("src/routes/_app.batches.tsx"), "utf8");
-assert(batchContent.includes("hasMultiWarehouse"), "Batches route must adapt to multi_warehouse module");
+assert(
+  batchContent.includes("hasMultiWarehouse"),
+  "Batches route must adapt to multi_warehouse module",
+);
 
 const custContent = fs.readFileSync(path.resolve("src/routes/_app.customers.tsx"), "utf8");
-assert(custContent.includes('isModuleEnabled("payments")'), "Customers route must guard payment actions");
-assert(custContent.includes('isModuleEnabled("loyalty")'), "Customers route must guard loyalty actions");
+assert(
+  custContent.includes('isModuleEnabled("payments")'),
+  "Customers route must guard payment actions",
+);
+assert(
+  custContent.includes('isModuleEnabled("loyalty")'),
+  "Customers route must guard loyalty actions",
+);
 
 const dashContent = fs.readFileSync(path.resolve("src/routes/_app.dashboard.tsx"), "utf8");
-assert(dashContent.includes('isModuleEnabled("analytics")'), "Dashboard route must guard analytics link");
+assert(
+  dashContent.includes('isModuleEnabled("analytics")'),
+  "Dashboard route must guard analytics link",
+);
 
 const finContent = fs.readFileSync(path.resolve("src/routes/_app.finance.tsx"), "utf8");
 assert(finContent.includes('isModuleEnabled("payments")'), "Finance route must guard debtors tab");
@@ -124,14 +173,35 @@ console.log("✅ 9. In-component dynamic modular filtering verified across 8 cor
 const planCompExists = fs.existsSync(path.resolve("src/components/plan-comparison-dialog.tsx"));
 assert(planCompExists, "PlanComparisonDialog must exist");
 
-const subCardContent = fs.readFileSync(path.resolve("src/components/subscription-settings-card.tsx"), "utf8");
-assert(subCardContent.includes("PlanComparisonDialog"), "SubscriptionSettingsCard must include PlanComparisonDialog");
-assert(subCardContent.includes("userPct"), "SubscriptionSettingsCard must calculate and display user quotas");
-assert(subCardContent.includes("whPct"), "SubscriptionSettingsCard must calculate and display warehouse quotas");
+const subCardContent = fs.readFileSync(
+  path.resolve("src/components/subscription-settings-card.tsx"),
+  "utf8",
+);
+assert(
+  subCardContent.includes("PlanComparisonDialog"),
+  "SubscriptionSettingsCard must include PlanComparisonDialog",
+);
+assert(
+  subCardContent.includes("userPct"),
+  "SubscriptionSettingsCard must calculate and display user quotas",
+);
+assert(
+  subCardContent.includes("whPct"),
+  "SubscriptionSettingsCard must calculate and display warehouse quotas",
+);
 
-const platAdminContent = fs.readFileSync(path.resolve("src/routes/_app.platform-admin.tsx"), "utf8");
-assert(platAdminContent.includes('activeTab === "audit"'), "Platform admin must include audit trail tab");
-assert(platAdminContent.includes("platform_audit_logs"), "Platform admin must persist events to platform_audit_logs");
+const platAdminContent = fs.readFileSync(
+  path.resolve("src/routes/_app.platform-admin.tsx"),
+  "utf8",
+);
+assert(
+  platAdminContent.includes('activeTab === "audit"'),
+  "Platform admin must include audit trail tab",
+);
+assert(
+  platAdminContent.includes("platform_audit_logs"),
+  "Platform admin must persist events to platform_audit_logs",
+);
 console.log("✅ 10. Plan comparison matrix, live quota meters, and audit trail verified.");
 
 console.log("==================================================");

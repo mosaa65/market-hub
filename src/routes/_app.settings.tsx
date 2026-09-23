@@ -83,7 +83,10 @@ function SettingsPage() {
           if ((data as any).enable_pos_service_fee !== undefined) {
             setEnablePosServiceFee(Boolean((data as any).enable_pos_service_fee));
           }
-          setCompanySettingsCache({ currency: data.currency, currency_symbol: data.currency_symbol });
+          setCompanySettingsCache({
+            currency: data.currency,
+            currency_symbol: data.currency_symbol,
+          });
         }
       });
   }, []);
@@ -101,19 +104,32 @@ function SettingsPage() {
       : await supabase.from("company_settings").insert(payload);
     setSaving(false);
     if (res.error) return toast.error(res.error.message);
-    setCompanySettingsCache({ currency: payload.currency, currency_symbol: payload.currency_symbol });
-    toast.success(lang === "ar" ? "تم حفظ الإعدادات بنجاح" : t("common.saved") || t("common.success"));
+    setCompanySettingsCache({
+      currency: payload.currency,
+      currency_symbol: payload.currency_symbol,
+    });
+    toast.success(
+      lang === "ar" ? "تم حفظ الإعدادات بنجاح" : t("common.saved") || t("common.success"),
+    );
     setExists(true);
   }
 
   const profileLabel =
     config.profile === "spare_parts"
-      ? (lang === "ar" ? "قطع غيار ودراجات ومركبات" : "Spare Parts & Automotive")
+      ? lang === "ar"
+        ? "قطع غيار ودراجات ومركبات"
+        : "Spare Parts & Automotive"
       : config.profile === "grocery"
-      ? (lang === "ar" ? "مواد غذائية وبقالة وسوبرماركت" : "Grocery & Food Market")
-      : config.profile === "retail"
-      ? (lang === "ar" ? "تجارة عامة وملابس وتجزئة" : "General Retail")
-      : (lang === "ar" ? "تخصيص يدوي مخصص" : "Custom Configuration");
+        ? lang === "ar"
+          ? "مواد غذائية وبقالة وسوبرماركت"
+          : "Grocery & Food Market"
+        : config.profile === "retail"
+          ? lang === "ar"
+            ? "تجارة عامة وملابس وتجزئة"
+            : "General Retail"
+          : lang === "ar"
+            ? "تخصيص يدوي مخصص"
+            : "Custom Configuration";
 
   return (
     <>
@@ -141,7 +157,9 @@ function SettingsPage() {
             <CardTitle className="text-base flex items-center justify-between">
               <span className="flex items-center gap-2">
                 <SlidersHorizontal className="h-4 w-4 text-primary" />
-                {lang === "ar" ? "تخصيص النشاط وموديولات الفهرسة" : "Industry Profile & Catalog Modules"}
+                {lang === "ar"
+                  ? "تخصيص النشاط وموديولات الفهرسة"
+                  : "Industry Profile & Catalog Modules"}
               </span>
               <span className="rounded-full bg-primary/15 text-primary border border-primary/30 px-3 py-0.5 text-xs font-bold">
                 {profileLabel}
@@ -234,7 +252,9 @@ function SettingsPage() {
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <Receipt className="h-4 w-4 text-primary" />
-              {lang === "ar" ? "إعدادات الفواتير والسلة ونقطة البيع (POS)" : "Invoicing & POS Cart Settings"}
+              {lang === "ar"
+                ? "إعدادات الفواتير والسلة ونقطة البيع (POS)"
+                : "Invoicing & POS Cart Settings"}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -272,7 +292,9 @@ function SettingsPage() {
             <div className="flex items-center justify-between p-3.5 rounded-2xl border border-border/80 bg-surface/70">
               <div className="space-y-0.5 pe-3">
                 <div className="text-sm font-semibold text-foreground">
-                  {lang === "ar" ? "خدمة أو أجرة تركيب بسعر متفق عليه" : "Custom Service / Installation Fee"}
+                  {lang === "ar"
+                    ? "خدمة أو أجرة تركيب بسعر متفق عليه"
+                    : "Custom Service / Installation Fee"}
                 </div>
                 <div className="text-xs text-muted-foreground">
                   {lang === "ar"
@@ -290,9 +312,13 @@ function SettingsPage() {
             {/* Barcode Mode Toggle */}
             <div className="flex items-center justify-between p-3.5 rounded-2xl border border-border/80 bg-surface/70">
               <div className="space-y-0.5 pe-3">
-                <div className="text-sm font-semibold text-foreground">{lang === "ar" ? "تفعيل الباركود في POS" : "Barcode mode"}</div>
+                <div className="text-sm font-semibold text-foreground">
+                  {lang === "ar" ? "تفعيل الباركود في POS" : "Barcode mode"}
+                </div>
                 <div className="text-xs text-muted-foreground">
-                  {lang === "ar" ? "السماح بمسح وقراءة الباركود بالكاميرا أو القارئ اليدوي" : "Allow barcode scanning at POS"}
+                  {lang === "ar"
+                    ? "السماح بمسح وقراءة الباركود بالكاميرا أو القارئ اليدوي"
+                    : "Allow barcode scanning at POS"}
                 </div>
               </div>
               <Switch
@@ -324,11 +350,13 @@ function SettingsPage() {
                   {lang === "ar" ? "وضع الطباعة بعد البيع" : "Print mode after sale"}
                 </label>
                 <div className="grid grid-cols-3 gap-2">
-                  {([
-                    { val: "ask", ar: "سؤال دائمًا", en: "Always ask" },
-                    { val: "auto", ar: "طباعة تلقائية", en: "Auto print" },
-                    { val: "off", ar: "بدون طباعة", en: "No printing" },
-                  ] as const).map((opt) => (
+                  {(
+                    [
+                      { val: "ask", ar: "سؤال دائمًا", en: "Always ask" },
+                      { val: "auto", ar: "طباعة تلقائية", en: "Auto print" },
+                      { val: "off", ar: "بدون طباعة", en: "No printing" },
+                    ] as const
+                  ).map((opt) => (
                     <button
                       key={opt.val}
                       type="button"
@@ -346,13 +374,16 @@ function SettingsPage() {
                 </div>
                 <p className="text-[11px] text-muted-foreground">
                   {lang === "ar"
-                    ? printMode === "ask" ? "سيظهر dialog بعد كل عملية بيع لاختيار الطباعة أو التخطي"
-                      : printMode === "auto" ? "ستطبع الفاتورة تلقائيًا بالقالب الافتراضي فور إتمام البيع"
-                      : "لن تُطبع أي فاتورة — بيع مباشر بدون طباعة"
-                    : printMode === "ask" ? "A dialog appears after each sale to choose print or skip"
-                      : printMode === "auto" ? "Invoice prints automatically using default template"
-                      : "No invoice printed — direct sale without printing"
-                  }
+                    ? printMode === "ask"
+                      ? "سيظهر dialog بعد كل عملية بيع لاختيار الطباعة أو التخطي"
+                      : printMode === "auto"
+                        ? "ستطبع الفاتورة تلقائيًا بالقالب الافتراضي فور إتمام البيع"
+                        : "لن تُطبع أي فاتورة — بيع مباشر بدون طباعة"
+                    : printMode === "ask"
+                      ? "A dialog appears after each sale to choose print or skip"
+                      : printMode === "auto"
+                        ? "Invoice prints automatically using default template"
+                        : "No invoice printed — direct sale without printing"}
                 </p>
               </div>
 
@@ -363,11 +394,13 @@ function SettingsPage() {
                     {lang === "ar" ? "قالب الفاتورة الافتراضي" : "Default invoice template"}
                   </label>
                   <div className="grid grid-cols-3 gap-2">
-                    {([
-                      { val: "thermal", ar: "حراري 80mm", en: "Thermal 80mm" },
-                      { val: "standard", ar: "A4 عادي", en: "Standard A4" },
-                      { val: "elegant", ar: "A4 فاخر", en: "Elegant A4" },
-                    ] as const).map((tmpl) => (
+                    {(
+                      [
+                        { val: "thermal", ar: "حراري 80mm", en: "Thermal 80mm" },
+                        { val: "standard", ar: "A4 عادي", en: "Standard A4" },
+                        { val: "elegant", ar: "A4 فاخر", en: "Elegant A4" },
+                      ] as const
+                    ).map((tmpl) => (
                       <button
                         key={tmpl.val}
                         type="button"
@@ -436,10 +469,7 @@ function SettingsPage() {
         </Card>
       </div>
 
-      <CatalogModulesDialog
-        open={catalogDialogOpen}
-        onClose={() => setCatalogDialogOpen(false)}
-      />
+      <CatalogModulesDialog open={catalogDialogOpen} onClose={() => setCatalogDialogOpen(false)} />
     </>
   );
 }

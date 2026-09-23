@@ -8,9 +8,28 @@ import { money } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
@@ -42,7 +61,7 @@ function SalesReturnsPage() {
   const [search, setSearch] = useState("");
 
   const whName = (w?: { name: string; name_ar?: string | null } | null) =>
-    !w ? "—" : lang === "ar" ? (w.name_ar || w.name) : (w.name || w.name_ar || "—");
+    !w ? "—" : lang === "ar" ? w.name_ar || w.name : w.name || w.name_ar || "—";
 
   async function load() {
     setLoading(true);
@@ -63,14 +82,16 @@ function SalesReturnsPage() {
     (r) =>
       !search ||
       r.return_number.toLowerCase().includes(search.toLowerCase()) ||
-      (r.customers?.name ?? "").toLowerCase().includes(search.toLowerCase())
+      (r.customers?.name ?? "").toLowerCase().includes(search.toLowerCase()),
   );
 
   return (
     <>
       <PageHeader
         title={lang === "ar" ? "مرتجعات المبيعات" : "Sales Returns"}
-        subtitle={lang === "ar" ? "سجل وأداء مرتجعات المبيعات والعملاء" : "Track customer sales returns"}
+        subtitle={
+          lang === "ar" ? "سجل وأداء مرتجعات المبيعات والعملاء" : "Track customer sales returns"
+        }
         actions={<NewSalesReturn onSaved={load} />}
       />
 
@@ -80,7 +101,11 @@ function SalesReturnsPage() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder={lang === "ar" ? "ابحث برقم المرتجع أو اسم العميل..." : "Search return # or customer..."}
+            placeholder={
+              lang === "ar"
+                ? "ابحث برقم المرتجع أو اسم العميل..."
+                : "Search return # or customer..."
+            }
             className="h-10 w-full rounded-md border border-input bg-surface pl-9 pr-3 text-sm rtl:pl-3 rtl:pr-9 focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
           />
         </div>
@@ -93,7 +118,9 @@ function SalesReturnsPage() {
                   <TableHead># {lang === "ar" ? "رقم المرتجع" : "Return #"}</TableHead>
                   <TableHead>{lang === "ar" ? "التاريخ" : "Date"}</TableHead>
                   <TableHead>{lang === "ar" ? "العميل" : "Customer"}</TableHead>
-                  {hasMultiWarehouse && <TableHead>{lang === "ar" ? "المستودع" : "Warehouse"}</TableHead>}
+                  {hasMultiWarehouse && (
+                    <TableHead>{lang === "ar" ? "المستودع" : "Warehouse"}</TableHead>
+                  )}
                   <TableHead>{lang === "ar" ? "طريقة الاسترداد" : "Refund Method"}</TableHead>
                   <TableHead className="text-end">{lang === "ar" ? "الإجمالي" : "Total"}</TableHead>
                 </TableRow>
@@ -101,13 +128,19 @@ function SalesReturnsPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={hasMultiWarehouse ? 6 : 5} className="text-center text-muted-foreground py-8">
+                    <TableCell
+                      colSpan={hasMultiWarehouse ? 6 : 5}
+                      className="text-center text-muted-foreground py-8"
+                    >
                       {t("common.loading")}
                     </TableCell>
                   </TableRow>
                 ) : filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={hasMultiWarehouse ? 6 : 5} className="text-center text-muted-foreground py-12">
+                    <TableCell
+                      colSpan={hasMultiWarehouse ? 6 : 5}
+                      className="text-center text-muted-foreground py-12"
+                    >
                       <RotateCcw className="mx-auto mb-2 h-8 w-8 opacity-40" />
                       {lang === "ar" ? "لا توجد مرتجعات مبيعات" : "No sales returns"}
                     </TableCell>
@@ -115,14 +148,20 @@ function SalesReturnsPage() {
                 ) : (
                   filtered.map((r) => (
                     <TableRow key={r.id}>
-                      <TableCell className="font-mono text-xs font-semibold">{r.return_number}</TableCell>
+                      <TableCell className="font-mono text-xs font-semibold">
+                        {r.return_number}
+                      </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {new Date(r.created_at).toLocaleString()}
                       </TableCell>
-                      <TableCell>{r.customers?.name ?? (lang === "ar" ? "عميل نقدي" : "Walk-in")}</TableCell>
+                      <TableCell>
+                        {r.customers?.name ?? (lang === "ar" ? "عميل نقدي" : "Walk-in")}
+                      </TableCell>
                       {hasMultiWarehouse && <TableCell>{whName(r.warehouses)}</TableCell>}
                       <TableCell className="text-xs">{r.refund_method ?? "cash"}</TableCell>
-                      <TableCell className="text-end font-mono font-semibold">{money(Number(r.total))}</TableCell>
+                      <TableCell className="text-end font-mono font-semibold">
+                        {money(Number(r.total))}
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -135,7 +174,13 @@ function SalesReturnsPage() {
   );
 }
 
-function NewSalesReturn({ onSaved, hasMultiWarehouse }: { onSaved: () => void; hasMultiWarehouse?: boolean }) {
+function NewSalesReturn({
+  onSaved,
+  hasMultiWarehouse,
+}: {
+  onSaved: () => void;
+  hasMultiWarehouse?: boolean;
+}) {
   const { t, lang } = useI18n();
   const [open, setOpen] = useState(false);
   const [warehouses, setWarehouses] = useState<any[]>([]);
@@ -153,7 +198,12 @@ function NewSalesReturn({ onSaved, hasMultiWarehouse }: { onSaved: () => void; h
     Promise.all([
       supabase.from("warehouses").select("id,name,name_ar").eq("is_active", true).order("name"),
       supabase.from("customers").select("id,name").eq("is_active", true).order("name"),
-      supabase.from("products").select("id,name,name_ar,sku,sale_price,tax_rate").eq("is_active", true).order("name").limit(200),
+      supabase
+        .from("products")
+        .select("id,name,name_ar,sku,sale_price,tax_rate")
+        .eq("is_active", true)
+        .order("name")
+        .limit(200),
     ]).then(([w, c, p]) => {
       setWarehouses(w.data ?? []);
       setCustomers(c.data ?? []);
@@ -170,10 +220,10 @@ function NewSalesReturn({ onSaved, hasMultiWarehouse }: { onSaved: () => void; h
             !search ||
             p.name.toLowerCase().includes(search.toLowerCase()) ||
             (p.name_ar ?? "").includes(search) ||
-            p.sku?.toLowerCase().includes(search.toLowerCase())
+            p.sku?.toLowerCase().includes(search.toLowerCase()),
         )
         .slice(0, 8),
-    [products, search]
+    [products, search],
   );
 
   function addLine(p: any) {
@@ -222,7 +272,9 @@ function NewSalesReturn({ onSaved, hasMultiWarehouse }: { onSaved: () => void; h
       toast.error(error.message);
       return;
     }
-    toast.success(lang === "ar" ? "تم تسجيل مرتجع المبيعات بنجاح" : "Sales return recorded successfully");
+    toast.success(
+      lang === "ar" ? "تم تسجيل مرتجع المبيعات بنجاح" : "Sales return recorded successfully",
+    );
     setOpen(false);
     setLines([]);
     setNote("");
@@ -242,7 +294,9 @@ function NewSalesReturn({ onSaved, hasMultiWarehouse }: { onSaved: () => void; h
           <DialogTitle>{lang === "ar" ? "إنشاء مرتجع مبيعات" : "New Sales Return"}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-4 py-2">
-          <div className={`grid grid-cols-1 ${hasMultiWarehouse ? "sm:grid-cols-3" : "sm:grid-cols-2"} gap-3`}>
+          <div
+            className={`grid grid-cols-1 ${hasMultiWarehouse ? "sm:grid-cols-3" : "sm:grid-cols-2"} gap-3`}
+          >
             {hasMultiWarehouse && (
               <div className="grid gap-1.5">
                 <Label>{lang === "ar" ? "المستودع" : "Warehouse"}</Label>
@@ -264,7 +318,9 @@ function NewSalesReturn({ onSaved, hasMultiWarehouse }: { onSaved: () => void; h
               <Label>{lang === "ar" ? "العميل" : "Customer"}</Label>
               <Select value={customerId} onValueChange={setCustomerId}>
                 <SelectTrigger>
-                  <SelectValue placeholder={lang === "ar" ? "اختر العميل..." : "Select customer..."} />
+                  <SelectValue
+                    placeholder={lang === "ar" ? "اختر العميل..." : "Select customer..."}
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   {customers.map((c) => (
@@ -285,14 +341,18 @@ function NewSalesReturn({ onSaved, hasMultiWarehouse }: { onSaved: () => void; h
                   <SelectItem value="cash">{lang === "ar" ? "نقدًا" : "Cash"}</SelectItem>
                   <SelectItem value="card">{lang === "ar" ? "بطاقة" : "Card"}</SelectItem>
                   <SelectItem value="bank">{lang === "ar" ? "تحويل بنكي" : "Bank"}</SelectItem>
-                  <SelectItem value="credit">{lang === "ar" ? "خصم من الدين" : "Credit Balance"}</SelectItem>
+                  <SelectItem value="credit">
+                    {lang === "ar" ? "خصم من الدين" : "Credit Balance"}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
 
           <div className="relative">
-            <Label className="mb-1.5 block">{lang === "ar" ? "إضافة أصناف المرتجع" : "Add Return Items"}</Label>
+            <Label className="mb-1.5 block">
+              {lang === "ar" ? "إضافة أصناف المرتجع" : "Add Return Items"}
+            </Label>
             <Input
               placeholder={lang === "ar" ? "ابحث بالاسم أو الرمز..." : "Search product or SKU..."}
               value={search}
@@ -308,7 +368,9 @@ function NewSalesReturn({ onSaved, hasMultiWarehouse }: { onSaved: () => void; h
                     onClick={() => addLine(p)}
                   >
                     <span>{lang === "ar" ? p.name_ar || p.name : p.name || p.name_ar}</span>
-                    <span className="font-mono text-xs text-muted-foreground">{money(Number(p.sale_price))}</span>
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {money(Number(p.sale_price))}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -323,7 +385,9 @@ function NewSalesReturn({ onSaved, hasMultiWarehouse }: { onSaved: () => void; h
                     <TableHead>{lang === "ar" ? "المنتج" : "Product"}</TableHead>
                     <TableHead>{lang === "ar" ? "الكمية" : "Qty"}</TableHead>
                     <TableHead>{lang === "ar" ? "السعر" : "Price"}</TableHead>
-                    <TableHead className="text-end">{lang === "ar" ? "الإجمالي" : "Total"}</TableHead>
+                    <TableHead className="text-end">
+                      {lang === "ar" ? "الإجمالي" : "Total"}
+                    </TableHead>
                     <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -345,7 +409,11 @@ function NewSalesReturn({ onSaved, hasMultiWarehouse }: { onSaved: () => void; h
                         {money(l.quantity * l.unit_price * (1 + l.tax_rate / 100))}
                       </TableCell>
                       <TableCell className="text-end">
-                        <button type="button" onClick={() => removeLine(l.product_id)} className="text-destructive hover:opacity-80">
+                        <button
+                          type="button"
+                          onClick={() => removeLine(l.product_id)}
+                          className="text-destructive hover:opacity-80"
+                        >
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </TableCell>
@@ -358,12 +426,18 @@ function NewSalesReturn({ onSaved, hasMultiWarehouse }: { onSaved: () => void; h
 
           <div className="grid gap-1.5">
             <Label>{lang === "ar" ? "ملاحظات" : "Notes"}</Label>
-            <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder={lang === "ar" ? "سبب المرتجع..." : "Reason for return..."} />
+            <Textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder={lang === "ar" ? "سبب المرتجع..." : "Reason for return..."}
+            />
           </div>
 
           <div className="flex items-center justify-between pt-2 border-t border-border">
             <div className="text-sm">
-              <span className="text-muted-foreground">{lang === "ar" ? "إجمالي المرتجع:" : "Total Return:"} </span>
+              <span className="text-muted-foreground">
+                {lang === "ar" ? "إجمالي المرتجع:" : "Total Return:"}{" "}
+              </span>
               <span className="text-lg font-bold font-mono text-primary">{money(total)}</span>
             </div>
             <div className="flex gap-2">

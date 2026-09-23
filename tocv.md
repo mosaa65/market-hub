@@ -24,26 +24,26 @@
 
 # 4. Technical Stack
 
-| Category | Technologies |
-| --- | --- |
-| Programming Languages | TypeScript, SQL |
-| Frontend | React 19, TanStack Start, TanStack Router |
-| Backend Runtime | TanStack Start server runtime, Nitro |
-| Database | PostgreSQL via Supabase |
-| Database Access | Supabase JavaScript client; PostgreSQL RPC functions |
-| Authentication | Supabase Auth |
-| Authorization | PostgreSQL Row Level Security, role helpers, authenticated RPC permissions |
-| State Management | TanStack React Query, React local state |
-| Validation | Zod |
-| UI Libraries | shadcn/ui, Radix UI, Lucide React |
-| Styling | Tailwind CSS v4, CSS custom properties |
-| Charts | Recharts |
-| Printing and Documents | jsPDF, jspdf-autotable, browser print layouts |
-| Barcode and Scanning | JsBarcode, html5-qrcode |
-| Build Tools | Vite, Nitro |
-| Quality Tools | ESLint, Prettier |
-| Cloud / Hosting | Supabase; Vercel live URL configured in application metadata |
-| Developer Tools | npm, Bun configuration, TypeScript, Lovable Vite/TanStack configuration |
+| Category               | Technologies                                                               |
+| ---------------------- | -------------------------------------------------------------------------- |
+| Programming Languages  | TypeScript, SQL                                                            |
+| Frontend               | React 19, TanStack Start, TanStack Router                                  |
+| Backend Runtime        | TanStack Start server runtime, Nitro                                       |
+| Database               | PostgreSQL via Supabase                                                    |
+| Database Access        | Supabase JavaScript client; PostgreSQL RPC functions                       |
+| Authentication         | Supabase Auth                                                              |
+| Authorization          | PostgreSQL Row Level Security, role helpers, authenticated RPC permissions |
+| State Management       | TanStack React Query, React local state                                    |
+| Validation             | Zod                                                                        |
+| UI Libraries           | shadcn/ui, Radix UI, Lucide React                                          |
+| Styling                | Tailwind CSS v4, CSS custom properties                                     |
+| Charts                 | Recharts                                                                   |
+| Printing and Documents | jsPDF, jspdf-autotable, browser print layouts                              |
+| Barcode and Scanning   | JsBarcode, html5-qrcode                                                    |
+| Build Tools            | Vite, Nitro                                                                |
+| Quality Tools          | ESLint, Prettier                                                           |
+| Cloud / Hosting        | Supabase; Vercel live URL configured in application metadata               |
+| Developer Tools        | npm, Bun configuration, TypeScript, Lovable Vite/TanStack configuration    |
 
 # 5. Architecture Analysis
 

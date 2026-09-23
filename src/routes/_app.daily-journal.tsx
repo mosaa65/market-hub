@@ -9,7 +9,14 @@ import { printReport } from "@/lib/pdf";
 import { exportToCSV } from "@/lib/excel-export";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Printer, Calendar, BookOpen, FileSpreadsheet } from "lucide-react";
 
 export const Route = createFileRoute("/_app/daily-journal")({
@@ -63,10 +70,20 @@ function DailyJournalPage() {
         date: s.created_at,
         voucherNo: s.invoice_number,
         source: lang === "ar" ? "قيد فاتورة مبيعات" : "Sales Entry",
-        accountDebit: isCredit ? (lang === "ar" ? `حـ/ العملاء (${s.customers?.name || "نقدي"})` : `Customer: ${s.customers?.name || "Walk-in"}`) : (lang === "ar" ? "حـ/ النقدية / البنك" : "Cash/Bank Account"),
+        accountDebit: isCredit
+          ? lang === "ar"
+            ? `حـ/ العملاء (${s.customers?.name || "نقدي"})`
+            : `Customer: ${s.customers?.name || "Walk-in"}`
+          : lang === "ar"
+            ? "حـ/ النقدية / البنك"
+            : "Cash/Bank Account",
         accountCredit: lang === "ar" ? "حـ/ إيرادات المبيعات" : "Sales Revenue Account",
         amount: Number(s.total),
-        note: s.note || (lang === "ar" ? `إثبات مبيعات فاتورة ${s.invoice_number}` : `Sales Invoice ${s.invoice_number}`),
+        note:
+          s.note ||
+          (lang === "ar"
+            ? `إثبات مبيعات فاتورة ${s.invoice_number}`
+            : `Sales Invoice ${s.invoice_number}`),
       });
     });
 
@@ -84,9 +101,16 @@ function DailyJournalPage() {
         voucherNo: p.invoice_number,
         source: lang === "ar" ? "قيد فاتورة مشتريات" : "Purchase Entry",
         accountDebit: lang === "ar" ? "حـ/ مخزون البضائع" : "Inventory Stock Account",
-        accountCredit: lang === "ar" ? `حـ/ الموردين (${p.suppliers?.name || "مورد"})` : `Supplier: ${p.suppliers?.name || "Supplier"}`,
+        accountCredit:
+          lang === "ar"
+            ? `حـ/ الموردين (${p.suppliers?.name || "مورد"})`
+            : `Supplier: ${p.suppliers?.name || "Supplier"}`,
         amount: Number(p.total),
-        note: p.note || (lang === "ar" ? `إثبات مشتريات امر ${p.invoice_number}` : `Purchase Order ${p.invoice_number}`),
+        note:
+          p.note ||
+          (lang === "ar"
+            ? `إثبات مشتريات امر ${p.invoice_number}`
+            : `Purchase Order ${p.invoice_number}`),
       });
     });
 
@@ -98,13 +122,19 @@ function DailyJournalPage() {
       .lte("created_at", end);
 
     (exp ?? []).forEach((e: any) => {
-      const catName = lang === "ar" ? (e.expense_categories?.name_ar || e.expense_categories?.name) : (e.expense_categories?.name || e.expense_categories?.name_ar);
+      const catName =
+        lang === "ar"
+          ? e.expense_categories?.name_ar || e.expense_categories?.name
+          : e.expense_categories?.name || e.expense_categories?.name_ar;
       journalList.push({
         id: `EXP-${e.id.slice(0, 6)}`,
         date: e.created_at || `${e.expense_date}T12:00:00`,
         voucherNo: `EXP-${e.id.slice(0, 4)}`,
         source: lang === "ar" ? "قيد مصروف تشغيلي" : "Expense Entry",
-        accountDebit: lang === "ar" ? `حـ/ مصروفات (${catName || "عامة"})` : `Expense (${catName || "General"})`,
+        accountDebit:
+          lang === "ar"
+            ? `حـ/ مصروفات (${catName || "عامة"})`
+            : `Expense (${catName || "General"})`,
         accountCredit: lang === "ar" ? "حـ/ الصندوق / الخزينة" : "Cash Fund",
         amount: Number(e.amount),
         note: e.note || (lang === "ar" ? "صرف مصروفات تشغيلية" : "Operating Expense Payment"),
@@ -121,19 +151,37 @@ function DailyJournalPage() {
   function handlePrintPDF() {
     printReport({
       title: lang === "ar" ? "دفتر اليومية العامة والقيود المحاسبية" : "Daily General Journal",
-      subtitle: lang === "ar" ? `قيود وتصفية اليومية لتاريخ: ${selectedDate}` : `Journal Vouchers for Date: ${selectedDate}`,
+      subtitle:
+        lang === "ar"
+          ? `قيود وتصفية اليومية لتاريخ: ${selectedDate}`
+          : `Journal Vouchers for Date: ${selectedDate}`,
       date: selectedDate,
       currency: "﷼",
       summaryCards: [
-        { label: lang === "ar" ? "عدد قيود اليومية" : "Total Entries", value: String(entries.length) },
-        { label: lang === "ar" ? "إجمالي توازن القيود" : "Journal Balanced Total", value: money(grandTotal), color: "#b8935a" },
+        {
+          label: lang === "ar" ? "عدد قيود اليومية" : "Total Entries",
+          value: String(entries.length),
+        },
+        {
+          label: lang === "ar" ? "إجمالي توازن القيود" : "Journal Balanced Total",
+          value: money(grandTotal),
+          color: "#b8935a",
+        },
       ],
       columns: [
         { key: "voucherNo", header: lang === "ar" ? "رقم السند/الفاتورة" : "Voucher #" },
         { key: "source", header: lang === "ar" ? "نوع القيد" : "Source" },
         { key: "accountDebit", header: lang === "ar" ? "الحساب المدين (من حـ/)" : "Debit Account" },
-        { key: "accountCredit", header: lang === "ar" ? "الحساب الدائن (إلى حـ/)" : "Credit Account" },
-        { key: "amount", header: lang === "ar" ? "المبلغ" : "Amount", align: "right", format: "money" },
+        {
+          key: "accountCredit",
+          header: lang === "ar" ? "الحساب الدائن (إلى حـ/)" : "Credit Account",
+        },
+        {
+          key: "amount",
+          header: lang === "ar" ? "المبلغ" : "Amount",
+          align: "right",
+          format: "money",
+        },
         { key: "note", header: lang === "ar" ? "البيان والطلب" : "Note" },
       ],
       rows: entries as any,
@@ -179,10 +227,18 @@ function DailyJournalPage() {
     <>
       <PageHeader
         title={lang === "ar" ? "دفتر اليومية العامة" : "Daily General Journal"}
-        subtitle={lang === "ar" ? "سجل القيود المحاسبية التلقائية وحركات الخزينة والصندوق اليومية" : "Daily automated accounting journal vouchers"}
+        subtitle={
+          lang === "ar"
+            ? "سجل القيود المحاسبية التلقائية وحركات الخزينة والصندوق اليومية"
+            : "Daily automated accounting journal vouchers"
+        }
         actions={
           <div className="flex items-center gap-2">
-            <Button onClick={handleExportExcel} variant="outline" className="gap-2 text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10">
+            <Button
+              onClick={handleExportExcel}
+              variant="outline"
+              className="gap-2 text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10"
+            >
               <FileSpreadsheet className="h-4 w-4" />
               {lang === "ar" ? "تصدير Excel" : "Export Excel"}
             </Button>
@@ -199,7 +255,9 @@ function DailyJournalPage() {
         <div className="panel-elevated p-4 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Calendar className="h-5 w-5 text-primary" />
-            <span className="text-sm font-semibold">{lang === "ar" ? "اختر اليومية:" : "Select Date:"}</span>
+            <span className="text-sm font-semibold">
+              {lang === "ar" ? "اختر اليومية:" : "Select Date:"}
+            </span>
             <Input
               type="date"
               value={selectedDate}
@@ -208,7 +266,9 @@ function DailyJournalPage() {
             />
           </div>
           <div className="text-sm">
-            <span className="text-muted-foreground">{lang === "ar" ? "إجمالي توازن القيود:" : "Journal Balanced Total:"} </span>
+            <span className="text-muted-foreground">
+              {lang === "ar" ? "إجمالي توازن القيود:" : "Journal Balanced Total:"}{" "}
+            </span>
             <span className="font-bold font-mono text-primary text-base">{money(grandTotal)}</span>
           </div>
         </div>
@@ -231,9 +291,15 @@ function DailyJournalPage() {
                   <TableHead>{lang === "ar" ? "الوقت" : "Time"}</TableHead>
                   <TableHead>{lang === "ar" ? "رقم السند/الفاتورة" : "Voucher #"}</TableHead>
                   <TableHead>{lang === "ar" ? "نوع القيد" : "Source"}</TableHead>
-                  <TableHead className="text-rose-500 font-semibold">{lang === "ar" ? "الحساب المدين (من حـ/)" : "Debit Account"}</TableHead>
-                  <TableHead className="text-emerald-500 font-semibold">{lang === "ar" ? "الحساب الدائن (إلى حـ/)" : "Credit Account"}</TableHead>
-                  <TableHead className="text-end font-semibold">{lang === "ar" ? "المبلغ" : "Amount"}</TableHead>
+                  <TableHead className="text-rose-500 font-semibold">
+                    {lang === "ar" ? "الحساب المدين (من حـ/)" : "Debit Account"}
+                  </TableHead>
+                  <TableHead className="text-emerald-500 font-semibold">
+                    {lang === "ar" ? "الحساب الدائن (إلى حـ/)" : "Credit Account"}
+                  </TableHead>
+                  <TableHead className="text-end font-semibold">
+                    {lang === "ar" ? "المبلغ" : "Amount"}
+                  </TableHead>
                   <TableHead>{lang === "ar" ? "البيان والطلب" : "Note"}</TableHead>
                 </TableRow>
               </TableHeader>
@@ -247,7 +313,9 @@ function DailyJournalPage() {
                 ) : entries.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="py-12 text-center text-muted-foreground">
-                      {lang === "ar" ? "لا توجد قيود اليومية لهذا اليوم" : "No journal entries for this date"}
+                      {lang === "ar"
+                        ? "لا توجد قيود اليومية لهذا اليوم"
+                        : "No journal entries for this date"}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -255,13 +323,24 @@ function DailyJournalPage() {
                     <TableRow key={idx} className="hover:bg-surface-2/60">
                       <TableCell className="font-mono text-xs">{idx + 1}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">
-                        {new Date(e.date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        {new Date(e.date).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
                       </TableCell>
-                      <TableCell className="font-mono text-xs font-semibold text-primary">{e.voucherNo}</TableCell>
+                      <TableCell className="font-mono text-xs font-semibold text-primary">
+                        {e.voucherNo}
+                      </TableCell>
                       <TableCell className="text-xs font-medium">{e.source}</TableCell>
-                      <TableCell className="text-xs text-rose-400 font-semibold">{e.accountDebit}</TableCell>
-                      <TableCell className="text-xs text-emerald-400 font-semibold">{e.accountCredit}</TableCell>
-                      <TableCell className="text-end font-mono font-bold">{money(e.amount)}</TableCell>
+                      <TableCell className="text-xs text-rose-400 font-semibold">
+                        {e.accountDebit}
+                      </TableCell>
+                      <TableCell className="text-xs text-emerald-400 font-semibold">
+                        {e.accountCredit}
+                      </TableCell>
+                      <TableCell className="text-end font-mono font-bold">
+                        {money(e.amount)}
+                      </TableCell>
                       <TableCell className="text-xs text-muted-foreground">{e.note}</TableCell>
                     </TableRow>
                   ))

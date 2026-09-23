@@ -138,7 +138,9 @@ function POSPage() {
   const [cart, setCart] = useState<CartLine[]>([]);
   const [paid, setPaid] = useState<string>("");
   const [discount, setDiscount] = useState<string>("");
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "bank_transfer" | "credit">("cash");
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "bank_transfer" | "credit">(
+    "cash",
+  );
   const [note, setNote] = useState("");
   const [saleDate, setSaleDate] = useState(() => new Date().toISOString().slice(0, 10));
 
@@ -202,7 +204,8 @@ function POSPage() {
       const m = modelLookup.get(c.vehicle_model_id);
       if (!m) continue;
       const mk = m.make_id ? makeLookup.get(m.make_id) : null;
-      const makeName = lang === "ar" ? mk?.name_ar || mk?.name || "" : mk?.name || mk?.name_ar || "";
+      const makeName =
+        lang === "ar" ? mk?.name_ar || mk?.name || "" : mk?.name || mk?.name_ar || "";
       const modelName = lang === "ar" ? m.name_ar || m.name : m.name || m.name_ar || "";
       const arr = map.get(c.product_id) || [];
       arr.push({ makeName, modelName });
@@ -217,9 +220,14 @@ function POSPage() {
   useEffect(() => {
     void loadAll();
     // Load company settings for invoice generation
-    supabase.from("company_settings").select("*").limit(1).maybeSingle().then(({ data }) => {
-      if (data) setCompanySettings(data);
-    });
+    supabase
+      .from("company_settings")
+      .select("*")
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) setCompanySettings(data);
+      });
   }, []);
 
   useEffect(() => {
@@ -274,7 +282,7 @@ function POSPage() {
         supabase
           .from("products")
           .select(
-            "id,sku,barcode,name,name_ar,sale_price,tax_rate,image_url,category_id,brand_id,unit_id,origin_id,quality_grade_id,unit:units(short_name,name,name_ar),category:categories(name,name_ar),brand:brands(name,name_ar),origin:countries_of_origin(name,name_ar,code),quality:quality_grades(name,name_ar,code)"
+            "id,sku,barcode,name,name_ar,sale_price,tax_rate,image_url,category_id,brand_id,unit_id,origin_id,quality_grade_id,unit:units(short_name,name,name_ar),category:categories(name,name_ar),brand:brands(name,name_ar),origin:countries_of_origin(name,name_ar,code),quality:quality_grades(name,name_ar,code)",
           )
           .eq("is_active", true)
           .order("name")
@@ -283,7 +291,10 @@ function POSPage() {
         supabase.from("brands").select("id,name,name_ar").order("name"),
         supabase.from("units").select("id,name,name_ar,short_name").order("name"),
         (supabase as any).from("countries_of_origin").select("id,name,name_ar,code").order("name"),
-        (supabase as any).from("quality_grades").select("id,name,name_ar,code,sort_order").order("sort_order"),
+        (supabase as any)
+          .from("quality_grades")
+          .select("id,name,name_ar,code,sort_order")
+          .order("sort_order"),
         (supabase as any).from("vehicle_makes").select("id,name,name_ar").order("name"),
         (supabase as any).from("vehicle_models").select("id,name,name_ar,make_id").order("name"),
         (supabase as any).from("product_compatibilities").select("product_id,vehicle_model_id"),
@@ -304,7 +315,9 @@ function POSPage() {
 
       // Auto-select warehouse if not set or if current one not in list
       if (loadedWarehouses.length > 0) {
-        setWarehouseId((current) => (loadedWarehouses.some((w) => w.id === current) ? current : loadedWarehouses[0].id));
+        setWarehouseId((current) =>
+          loadedWarehouses.some((w) => w.id === current) ? current : loadedWarehouses[0].id,
+        );
       }
 
       // Fetch company settings to sync enable_pos_service_fee
@@ -324,7 +337,10 @@ function POSPage() {
   }
 
   async function loadStock(whId: string) {
-    const { data } = await supabase.from("inventory").select("product_id,quantity").eq("warehouse_id", whId);
+    const { data } = await supabase
+      .from("inventory")
+      .select("product_id,quantity")
+      .eq("warehouse_id", whId);
     const map: Record<string, number> = {};
     (data ?? []).forEach((r) => {
       map[r.product_id] = Number(r.quantity);
@@ -385,7 +401,11 @@ function POSPage() {
   const filtered = useMemo(() => {
     // Model compatibility set
     const compatibleWithModel = selectedModel
-      ? new Set(compatibilities.filter((c) => c.vehicle_model_id === selectedModel).map((c) => c.product_id))
+      ? new Set(
+          compatibilities
+            .filter((c) => c.vehicle_model_id === selectedModel)
+            .map((c) => c.product_id),
+        )
       : null;
 
     // Make compatibility set
@@ -393,7 +413,11 @@ function POSPage() {
       ? new Set(models.filter((m) => m.make_id === selectedMake).map((m) => m.id))
       : null;
     const compatibleWithMake = makeModelIds
-      ? new Set(compatibilities.filter((c) => makeModelIds.has(c.vehicle_model_id)).map((c) => c.product_id))
+      ? new Set(
+          compatibilities
+            .filter((c) => makeModelIds.has(c.vehicle_model_id))
+            .map((c) => c.product_id),
+        )
       : null;
 
     return products.filter((p) => {
@@ -406,12 +430,21 @@ function POSPage() {
         (p.barcode ?? "").toLowerCase().includes(q);
 
       const matchesCat = !selectedCategory || p.category_id === selectedCategory;
-      const matchesBrand = !catalogConfig.enableBrands || !selectedBrand || p.brand_id === selectedBrand;
+      const matchesBrand =
+        !catalogConfig.enableBrands || !selectedBrand || p.brand_id === selectedBrand;
       const matchesUnit = !catalogConfig.enableUnits || !selectedUnit || p.unit_id === selectedUnit;
-      const matchesOrigin = !catalogConfig.enableOrigins || !selectedOrigin || p.origin_id === selectedOrigin;
-      const matchesQuality = !catalogConfig.enableQualityGrades || !selectedQuality || p.quality_grade_id === selectedQuality;
-      const matchesMake = !catalogConfig.enableMakesAndModels || !compatibleWithMake || compatibleWithMake.has(p.id);
-      const matchesModel = !catalogConfig.enableMakesAndModels || !compatibleWithModel || compatibleWithModel.has(p.id);
+      const matchesOrigin =
+        !catalogConfig.enableOrigins || !selectedOrigin || p.origin_id === selectedOrigin;
+      const matchesQuality =
+        !catalogConfig.enableQualityGrades ||
+        !selectedQuality ||
+        p.quality_grade_id === selectedQuality;
+      const matchesMake =
+        !catalogConfig.enableMakesAndModels || !compatibleWithMake || compatibleWithMake.has(p.id);
+      const matchesModel =
+        !catalogConfig.enableMakesAndModels ||
+        !compatibleWithModel ||
+        compatibleWithModel.has(p.id);
 
       return (
         matchesSearch &&
@@ -443,14 +476,18 @@ function POSPage() {
     const stock = stockMap[p.id] ?? 0;
     const prodName = lang === "ar" && p.name_ar ? p.name_ar : p.name;
     if (stock <= 0) {
-      return toast.error(lang === "ar" ? `نفد المخزون من: ${prodName}` : `${p.name} ${t("pos.out_of_stock")}`);
+      return toast.error(
+        lang === "ar" ? `نفد المخزون من: ${prodName}` : `${p.name} ${t("pos.out_of_stock")}`,
+      );
     }
     setCart((c) => {
       const existing = c.find((l) => l.product_id === p.id);
       if (existing) {
         if (existing.quantity >= stock) {
           toast.error(
-            lang === "ar" ? `الحد الأقصى المتاح في المخزون: ${stock}` : `${t("pos.max_stock")}: ${stock}`
+            lang === "ar"
+              ? `الحد الأقصى المتاح في المخزون: ${stock}`
+              : `${t("pos.max_stock")}: ${stock}`,
           );
           return c;
         }
@@ -480,7 +517,9 @@ function POSPage() {
     if (qty < 1) return setCart((c) => c.filter((l) => l.product_id !== pid));
     if (qty > stock) {
       toast.error(
-        lang === "ar" ? `الحد الأقصى المتاح في المخزون: ${stock}` : `${t("pos.max_stock")}: ${stock}`
+        lang === "ar"
+          ? `الحد الأقصى المتاح في المخزون: ${stock}`
+          : `${t("pos.max_stock")}: ${stock}`,
       );
       return;
     }
@@ -490,14 +529,20 @@ function POSPage() {
   function addService() {
     const price = Number(servicePrice);
     if (!serviceName.trim() || !Number.isFinite(price) || price < 0) {
-      return toast.error(lang === "ar" ? "يرجى إدخال اسم الخدمة وسعرها المتفق عليه" : "Enter a service name and price");
+      return toast.error(
+        lang === "ar"
+          ? "يرجى إدخال اسم الخدمة وسعرها المتفق عليه"
+          : "Enter a service name and price",
+      );
     }
     const id = `service-${crypto.randomUUID()}`;
     setCart((c) => [
       ...c,
       {
         product_id: id,
-        name: serviceNote.trim() ? `${serviceName.trim()} — ${serviceNote.trim()}` : serviceName.trim(),
+        name: serviceNote.trim()
+          ? `${serviceName.trim()} — ${serviceNote.trim()}`
+          : serviceName.trim(),
         unit_price: price,
         tax_rate: 0,
         quantity: 1,
@@ -533,7 +578,7 @@ function POSPage() {
         p.name.toLowerCase().includes(q.toLowerCase()) ||
         (p.name_ar ?? "").includes(q) ||
         (p.sku ?? "").toLowerCase().includes(q.toLowerCase()) ||
-        (p.barcode ?? "").toLowerCase().includes(q.toLowerCase())
+        (p.barcode ?? "").toLowerCase().includes(q.toLowerCase()),
     );
     if (partial.length === 1) {
       addToCart(partial[0]);
@@ -558,7 +603,9 @@ function POSPage() {
 
   // Financial Computations with strict 2-decimal precision
   const subtotal = Math.round(cart.reduce((s, l) => s + l.unit_price * l.quantity, 0) * 100) / 100;
-  const taxTotal = Math.round(cart.reduce((s, l) => s + l.unit_price * l.quantity * (l.tax_rate / 100), 0) * 100) / 100;
+  const taxTotal =
+    Math.round(cart.reduce((s, l) => s + l.unit_price * l.quantity * (l.tax_rate / 100), 0) * 100) /
+    100;
   const discountN = Math.round(Number(discount || 0) * 100) / 100;
   const total = Math.max(0, Math.round((subtotal + taxTotal - discountN) * 100) / 100);
 
@@ -572,7 +619,7 @@ function POSPage() {
   const isPaidEmpty = paid.trim() === "";
   const singlePaidNum = isPaidEmpty ? total : Number(paid);
   const effectivePaid = isSplitPayment ? splitPaidTotal : singlePaidNum;
-  const isOverpaid = isSplitPayment ? splitPaidTotal > total : (!isPaidEmpty && Number(paid) > total);
+  const isOverpaid = isSplitPayment ? splitPaidTotal > total : !isPaidEmpty && Number(paid) > total;
   const remainingDebt = Math.max(0, Math.round((total - effectivePaid) * 100) / 100);
 
   // Handle smart payment method switching on paid input change
@@ -629,54 +676,76 @@ function POSPage() {
     };
     window.addEventListener("keydown", handleGlobalShortcuts);
     return () => window.removeEventListener("keydown", handleGlobalShortcuts);
-  }, [cart, loading, warehouseId, customerId, paymentMethod, paid, discount, isOverpaid, total, isSplitPayment, splitPaidTotal]);
+  }, [
+    cart,
+    loading,
+    warehouseId,
+    customerId,
+    paymentMethod,
+    paid,
+    discount,
+    isOverpaid,
+    total,
+    isSplitPayment,
+    splitPaidTotal,
+  ]);
 
   async function checkout() {
     if (!warehouseId) {
       return toast.error(lang === "ar" ? "يرجى اختيار المستودع أولاً" : t("pos.select_warehouse"));
     }
     if (cart.length === 0) {
-      return toast.error(lang === "ar" ? "السلة فارغة، يرجى إضافة منتجات أولاً" : t("pos.cart_empty"));
+      return toast.error(
+        lang === "ar" ? "السلة فارغة، يرجى إضافة منتجات أولاً" : t("pos.cart_empty"),
+      );
     }
     if (isOverpaid) {
       return toast.error(
-        lang === "ar" ? "المبلغ المدفوع أكبر من إجمالي الفاتورة المطلوب!" : "Paid amount cannot exceed invoice total!"
+        lang === "ar"
+          ? "المبلغ المدفوع أكبر من إجمالي الفاتورة المطلوب!"
+          : "Paid amount cannot exceed invoice total!",
       );
     }
     if (effectivePaid < 0) {
-      return toast.error(lang === "ar" ? "المبلغ المدفوع لا يمكن أن يكون سالبًا" : "Paid amount cannot be negative");
+      return toast.error(
+        lang === "ar" ? "المبلغ المدفوع لا يمكن أن يكون سالبًا" : "Paid amount cannot be negative",
+      );
     }
     if (effectivePaid < total && !customerId) {
       return toast.error(
         lang === "ar"
           ? "يرجى اختيار العميل لتسجيل المبلغ المتبقي كدين آجل"
-          : "Select a customer so the unpaid balance can be recorded as debt"
+          : "Select a customer so the unpaid balance can be recorded as debt",
       );
     }
 
     setLoading(true);
     try {
       const finalMethod = isSplitPayment
-        ? (splitCardN > 0 && splitCashN === 0 && splitBankN === 0
-            ? "card"
-            : splitBankN > 0 && splitCashN === 0 && splitCardN === 0
+        ? splitCardN > 0 && splitCashN === 0 && splitBankN === 0
+          ? "card"
+          : splitBankN > 0 && splitCashN === 0 && splitCardN === 0
             ? "bank_transfer"
-            : "cash")
+            : "cash"
         : paymentMethod;
 
       let splitNote = "";
       if (isSplitPayment) {
         const parts = [];
         if (splitCashN > 0) parts.push(`${lang === "ar" ? "نقد" : "Cash"}: ${money(splitCashN)}`);
-        if (splitCardN > 0) parts.push(`${lang === "ar" ? "شبكة/بطاقة" : "Card"}: ${money(splitCardN)}`);
+        if (splitCardN > 0)
+          parts.push(`${lang === "ar" ? "شبكة/بطاقة" : "Card"}: ${money(splitCardN)}`);
         if (splitBankN > 0) parts.push(`${lang === "ar" ? "بنك" : "Bank"}: ${money(splitBankN)}`);
-        if (remainingDebt > 0) parts.push(`${lang === "ar" ? "آجل" : "Debt"}: ${money(remainingDebt)}`);
+        if (remainingDebt > 0)
+          parts.push(`${lang === "ar" ? "آجل" : "Debt"}: ${money(remainingDebt)}`);
         splitNote = `[${lang === "ar" ? "دفع مجزأ" : "Split"}: ${parts.join(" | ")}]`;
       }
 
       const finalNote = note.trim()
-        ? (splitNote ? `${note.trim()} — ${splitNote}` : note.trim())
-        : (splitNote || null);
+        ? splitNote
+          ? `${note.trim()} — ${splitNote}`
+          : note.trim()
+        : splitNote || null;
 
       const { data, error } = await supabase.rpc("create_sale", {
         _warehouse_id: warehouseId,
@@ -706,7 +775,7 @@ function POSPage() {
       toast.success(
         lang === "ar"
           ? `تمت عملية البيع بنجاح — فاتورة #${inv?.invoice_number ?? ""}`
-          : `${t("pos.sale_complete")} — #${inv?.invoice_number ?? ""}`
+          : `${t("pos.sale_complete")} — #${inv?.invoice_number ?? ""}`,
       );
 
       // Build invoice doc for printing
@@ -720,10 +789,23 @@ function POSPage() {
         partyLabel: lang === "ar" ? "العميل" : "Bill To",
         partyName: customer?.name ?? (lang === "ar" ? "عميل نقدي" : "Walk-in Customer"),
         warehouse: lang === "ar" ? (warehouse as any)?.name_ar || warehouse?.name : warehouse?.name,
-        payment: lang === "ar" ? {
-          cash: "نقدًا", card: "بطاقة", bank_transfer: "تحويل بنكي", credit: "آجل"
-        }[finalMethod] : finalMethod.replace("_", " "),
-        status: remainingDebt > 0 ? (lang === "ar" ? "جزئي" : "Partial") : (lang === "ar" ? "مكتمل" : "Paid"),
+        payment:
+          lang === "ar"
+            ? {
+                cash: "نقدًا",
+                card: "بطاقة",
+                bank_transfer: "تحويل بنكي",
+                credit: "آجل",
+              }[finalMethod]
+            : finalMethod.replace("_", " "),
+        status:
+          remainingDebt > 0
+            ? lang === "ar"
+              ? "جزئي"
+              : "Partial"
+            : lang === "ar"
+              ? "مكتمل"
+              : "Paid",
         currency: cur,
         subtotal,
         tax: taxTotal,
@@ -736,12 +818,14 @@ function POSPage() {
           price: l.unit_price,
           total: Math.round(l.unit_price * l.quantity * (1 + l.tax_rate / 100) * 100) / 100,
         })),
-        company: companySettings ? {
-          name: companySettings.name ?? "",
-          address: companySettings.address ?? undefined,
-          phone: companySettings.phone ?? undefined,
-          vat: companySettings.tax_number ?? undefined,
-        } : undefined,
+        company: companySettings
+          ? {
+              name: companySettings.name ?? "",
+              address: companySettings.address ?? undefined,
+              phone: companySettings.phone ?? undefined,
+              vat: companySettings.tax_number ?? undefined,
+            }
+          : undefined,
       };
 
       // Handle print mode
@@ -814,7 +898,9 @@ function POSPage() {
     setNewCustomerPhone("");
     setNewCustomerCreditLimit("");
     setNewCustomerOpen(false);
-    toast.success(lang === "ar" ? "تمت إضافة العميل واختياره بنجاح" : "Customer added and selected");
+    toast.success(
+      lang === "ar" ? "تمت إضافة العميل واختياره بنجاح" : "Customer added and selected",
+    );
   }
 
   const selectClassName =
@@ -957,134 +1043,144 @@ function POSPage() {
                 {/* 2. Brands */}
                 {catalogConfig.enableBrands && (
                   <label className="grid gap-1 text-xs text-muted-foreground">
-                  <span className="font-medium text-foreground/80">{t("common.brands")}</span>
-                  <div className="relative">
-                    <select
-                      value={selectedBrand}
-                      onChange={(e) => setSelectedBrand(e.target.value)}
-                      className={selectClassName}
-                    >
-                      <option value="">{t("common.all")}</option>
-                      {brands.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {lang === "ar" ? b.name_ar || b.name : b.name || b.name_ar || ""}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                  </div>
-                </label>
+                    <span className="font-medium text-foreground/80">{t("common.brands")}</span>
+                    <div className="relative">
+                      <select
+                        value={selectedBrand}
+                        onChange={(e) => setSelectedBrand(e.target.value)}
+                        className={selectClassName}
+                      >
+                        <option value="">{t("common.all")}</option>
+                        {brands.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {lang === "ar" ? b.name_ar || b.name : b.name || b.name_ar || ""}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                    </div>
+                  </label>
                 )}
 
                 {/* 3. Units */}
                 {catalogConfig.enableUnits && (
                   <label className="grid gap-1 text-xs text-muted-foreground">
-                  <span className="font-medium text-foreground/80">{t("common.units")}</span>
-                  <div className="relative">
-                    <select
-                      value={selectedUnit}
-                      onChange={(e) => setSelectedUnit(e.target.value)}
-                      className={selectClassName}
-                    >
-                      <option value="">{t("common.all")}</option>
-                      {units.map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {lang === "ar" ? u.name_ar || u.short_name || u.name : u.short_name || u.name || u.name_ar || ""}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                  </div>
-                </label>
+                    <span className="font-medium text-foreground/80">{t("common.units")}</span>
+                    <div className="relative">
+                      <select
+                        value={selectedUnit}
+                        onChange={(e) => setSelectedUnit(e.target.value)}
+                        className={selectClassName}
+                      >
+                        <option value="">{t("common.all")}</option>
+                        {units.map((u) => (
+                          <option key={u.id} value={u.id}>
+                            {lang === "ar"
+                              ? u.name_ar || u.short_name || u.name
+                              : u.short_name || u.name || u.name_ar || ""}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                    </div>
+                  </label>
                 )}
 
                 {/* 4. Countries of Origin */}
                 {catalogConfig.enableOrigins && (
                   <label className="grid gap-1 text-xs text-muted-foreground">
-                  <span className="font-medium text-foreground/80">{lang === "ar" ? "بلدان المنشأ" : "Country of Origin"}</span>
-                  <div className="relative">
-                    <select
-                      value={selectedOrigin}
-                      onChange={(e) => setSelectedOrigin(e.target.value)}
-                      className={selectClassName}
-                    >
-                      <option value="">{t("common.all")}</option>
-                      {origins.map((o) => (
-                        <option key={o.id} value={o.id}>
-                          {lang === "ar" ? o.name_ar || o.name : o.name || o.name_ar || ""}
-                          {o.code ? ` (${o.code})` : ""}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                  </div>
-                </label>
+                    <span className="font-medium text-foreground/80">
+                      {lang === "ar" ? "بلدان المنشأ" : "Country of Origin"}
+                    </span>
+                    <div className="relative">
+                      <select
+                        value={selectedOrigin}
+                        onChange={(e) => setSelectedOrigin(e.target.value)}
+                        className={selectClassName}
+                      >
+                        <option value="">{t("common.all")}</option>
+                        {origins.map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {lang === "ar" ? o.name_ar || o.name : o.name || o.name_ar || ""}
+                            {o.code ? ` (${o.code})` : ""}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                    </div>
+                  </label>
                 )}
 
                 {/* 5. Quality Grades */}
                 {catalogConfig.enableQualityGrades && (
                   <label className="grid gap-1 text-xs text-muted-foreground">
-                  <span className="font-medium text-foreground/80">{lang === "ar" ? "درجات الجودة" : "Quality Grade"}</span>
-                  <div className="relative">
-                    <select
-                      value={selectedQuality}
-                      onChange={(e) => setSelectedQuality(e.target.value)}
-                      className={selectClassName}
-                    >
-                      <option value="">{t("common.all")}</option>
-                      {qualities.map((q) => (
-                        <option key={q.id} value={q.id}>
-                          {lang === "ar" ? q.name_ar || q.name : q.name || q.name_ar || ""}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                  </div>
-                </label>
+                    <span className="font-medium text-foreground/80">
+                      {lang === "ar" ? "درجات الجودة" : "Quality Grade"}
+                    </span>
+                    <div className="relative">
+                      <select
+                        value={selectedQuality}
+                        onChange={(e) => setSelectedQuality(e.target.value)}
+                        className={selectClassName}
+                      >
+                        <option value="">{t("common.all")}</option>
+                        {qualities.map((q) => (
+                          <option key={q.id} value={q.id}>
+                            {lang === "ar" ? q.name_ar || q.name : q.name || q.name_ar || ""}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                    </div>
+                  </label>
                 )}
 
                 {/* 6. Vehicle Makes */}
                 {catalogConfig.enableMakesAndModels && (
                   <label className="grid gap-1 text-xs text-muted-foreground">
-                  <span className="font-medium text-foreground/80">{lang === "ar" ? "ماركات المركبات" : "Vehicle Make"}</span>
-                  <div className="relative">
-                    <select
-                      value={selectedMake}
-                      onChange={(e) => handleMakeChange(e.target.value)}
-                      className={selectClassName}
-                    >
-                      <option value="">{t("common.all")}</option>
-                      {makes.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {lang === "ar" ? m.name_ar || m.name : m.name || m.name_ar || ""}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                  </div>
-                </label>
+                    <span className="font-medium text-foreground/80">
+                      {lang === "ar" ? "ماركات المركبات" : "Vehicle Make"}
+                    </span>
+                    <div className="relative">
+                      <select
+                        value={selectedMake}
+                        onChange={(e) => handleMakeChange(e.target.value)}
+                        className={selectClassName}
+                      >
+                        <option value="">{t("common.all")}</option>
+                        {makes.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {lang === "ar" ? m.name_ar || m.name : m.name || m.name_ar || ""}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                    </div>
+                  </label>
                 )}
 
                 {/* 7. Vehicle Models */}
                 {catalogConfig.enableMakesAndModels && (
                   <label className="grid gap-1 text-xs text-muted-foreground">
-                  <span className="font-medium text-foreground/80">{lang === "ar" ? "موديلات المركبات" : "Vehicle Model"}</span>
-                  <div className="relative">
-                    <select
-                      value={selectedModel}
-                      onChange={(e) => setSelectedModel(e.target.value)}
-                      className={selectClassName}
-                    >
-                      <option value="">{t("common.all")}</option>
-                      {availableModels.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {lang === "ar" ? m.name_ar || m.name : m.name || m.name_ar || ""}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                  </div>
-                </label>
+                    <span className="font-medium text-foreground/80">
+                      {lang === "ar" ? "موديلات المركبات" : "Vehicle Model"}
+                    </span>
+                    <div className="relative">
+                      <select
+                        value={selectedModel}
+                        onChange={(e) => setSelectedModel(e.target.value)}
+                        className={selectClassName}
+                      >
+                        <option value="">{t("common.all")}</option>
+                        {availableModels.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {lang === "ar" ? m.name_ar || m.name : m.name || m.name_ar || ""}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                    </div>
+                  </label>
                 )}
               </div>
             </div>
@@ -1096,15 +1192,25 @@ function POSPage() {
               const stock = stockMap[p.id] ?? 0;
               const low = stock <= 0;
               const catLabel =
-                lang === "ar" ? p.category?.name_ar || p.category?.name : p.category?.name || p.category?.name_ar;
+                lang === "ar"
+                  ? p.category?.name_ar || p.category?.name
+                  : p.category?.name || p.category?.name_ar;
               const unitLabel =
-                lang === "ar" ? p.unit?.name_ar || p.unit?.short_name : p.unit?.short_name || p.unit?.name_ar;
+                lang === "ar"
+                  ? p.unit?.name_ar || p.unit?.short_name
+                  : p.unit?.short_name || p.unit?.name_ar;
               const originLabel =
-                lang === "ar" ? p.origin?.name_ar || p.origin?.name : p.origin?.name || p.origin?.name_ar;
+                lang === "ar"
+                  ? p.origin?.name_ar || p.origin?.name
+                  : p.origin?.name || p.origin?.name_ar;
               const qualityLabel =
-                lang === "ar" ? p.quality?.name_ar || p.quality?.name : p.quality?.name || p.quality?.name_ar;
+                lang === "ar"
+                  ? p.quality?.name_ar || p.quality?.name
+                  : p.quality?.name || p.quality?.name_ar;
               const compats = productCompatMap.get(p.id) || [];
-              const uniqueMakes = Array.from(new Set(compats.map((c) => c.makeName).filter(Boolean)));
+              const uniqueMakes = Array.from(
+                new Set(compats.map((c) => c.makeName).filter(Boolean)),
+              );
 
               return (
                 <button
@@ -1135,14 +1241,20 @@ function POSPage() {
                       {catalogConfig.enableOrigins && originLabel && (
                         <span className="inline-flex items-center gap-0.5 rounded border border-border/60 bg-surface px-1 py-0.5 text-muted-foreground font-medium">
                           <span>{originLabel}</span>
-                          {p.origin?.code && <span className="text-[9px] font-mono opacity-70">({p.origin.code})</span>}
+                          {p.origin?.code && (
+                            <span className="text-[9px] font-mono opacity-70">
+                              ({p.origin.code})
+                            </span>
+                          )}
                         </span>
                       )}
 
                       {/* Brand or Category */}
                       {catalogConfig.enableBrands && p.brand ? (
                         <span className="inline-flex items-center rounded border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-primary font-semibold truncate max-w-[85px]">
-                          {lang === "ar" ? p.brand.name_ar || p.brand.name : p.brand.name || p.brand.name_ar}
+                          {lang === "ar"
+                            ? p.brand.name_ar || p.brand.name
+                            : p.brand.name || p.brand.name_ar}
                         </span>
                       ) : catLabel ? (
                         <span className="inline-flex items-center rounded bg-surface-2 px-1.5 py-0.5 text-muted-foreground truncate max-w-[85px]">
@@ -1158,9 +1270,7 @@ function POSPage() {
                         >
                           <span>
                             🏍️ {uniqueMakes[0] || compats[0].makeName}{" "}
-                            {compats.length > 1
-                              ? `(+${compats.length - 1})`
-                              : compats[0].modelName}
+                            {compats.length > 1 ? `(+${compats.length - 1})` : compats[0].modelName}
                           </span>
                         </span>
                       )}
@@ -1174,13 +1284,21 @@ function POSPage() {
 
                   {/* Price & Stock */}
                   <div className="mt-2 flex w-full items-center justify-between border-t border-border/40 pt-1.5">
-                    <span className="text-xs sm:text-sm font-bold text-primary font-mono">{money(Number(p.sale_price))}</span>
+                    <span className="text-xs sm:text-sm font-bold text-primary font-mono">
+                      {money(Number(p.sale_price))}
+                    </span>
                     <span
                       className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full ${
-                        low ? "bg-destructive/10 text-destructive font-semibold" : "bg-muted text-muted-foreground"
+                        low
+                          ? "bg-destructive/10 text-destructive font-semibold"
+                          : "bg-muted text-muted-foreground"
                       }`}
                     >
-                      {low ? (lang === "ar" ? "نفد" : "0") : `${stock} ${unitLabel ? `· ${unitLabel}` : ""}`}
+                      {low
+                        ? lang === "ar"
+                          ? "نفد"
+                          : "0"
+                        : `${stock} ${unitLabel ? `· ${unitLabel}` : ""}`}
                     </span>
                   </div>
                 </button>
@@ -1307,7 +1425,9 @@ function POSPage() {
                 </div>
                 <div className="font-medium">{t("pos.empty_cart")}</div>
                 <p className="mt-1 text-xs text-muted-foreground/80">
-                  {lang === "ar" ? "انقر على أي منتج أو امسح الباركود لإضافته" : "Click any product or scan to add"}
+                  {lang === "ar"
+                    ? "انقر على أي منتج أو امسح الباركود لإضافته"
+                    : "Click any product or scan to add"}
                 </p>
               </div>
             ) : (
@@ -1322,7 +1442,10 @@ function POSPage() {
                 >
                   {/* 1. Product Name & Unit Price */}
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-xs font-semibold text-foreground tracking-tight flex items-center gap-1.5" title={l.name}>
+                    <div
+                      className="truncate text-xs font-semibold text-foreground tracking-tight flex items-center gap-1.5"
+                      title={l.name}
+                    >
                       {l.is_service && <Wrench className="h-3 w-3 text-violet-500 shrink-0" />}
                       <span className="truncate">{l.name}</span>
                     </div>
@@ -1420,7 +1543,9 @@ function POSPage() {
 
               {/* Final Total Highlight */}
               <div className="pt-2 border-t border-border/60 flex items-center justify-between">
-                <span className="text-xs font-bold text-foreground uppercase tracking-wider">{t("pos.total")}</span>
+                <span className="text-xs font-bold text-foreground uppercase tracking-wider">
+                  {t("pos.total")}
+                </span>
                 <span className="text-base font-extrabold font-mono text-primary tracking-tight">
                   {money(total)}
                 </span>
@@ -1471,7 +1596,11 @@ function POSPage() {
               {isSplitPayment ? (
                 <div className="rounded-2xl border border-violet-500/30 bg-violet-500/5 p-2.5 space-y-2 animate-in fade-in duration-200">
                   <div className="flex items-center justify-between text-xs font-semibold text-violet-700 dark:text-violet-300">
-                    <span>{lang === "ar" ? "توزيع الدفعات (شبكة / نقد / بنك / آجل):" : "Split Allocation:"}</span>
+                    <span>
+                      {lang === "ar"
+                        ? "توزيع الدفعات (شبكة / نقد / بنك / آجل):"
+                        : "Split Allocation:"}
+                    </span>
                     <button
                       type="button"
                       onClick={() => {
@@ -1487,7 +1616,9 @@ function POSPage() {
 
                   <div className="grid grid-cols-3 gap-2">
                     <div>
-                      <label className="text-[10px] text-muted-foreground block mb-0.5">{lang === "ar" ? "نقدًا:" : "Cash:"}</label>
+                      <label className="text-[10px] text-muted-foreground block mb-0.5">
+                        {lang === "ar" ? "نقدًا:" : "Cash:"}
+                      </label>
                       <input
                         type="number"
                         min="0"
@@ -1503,7 +1634,9 @@ function POSPage() {
                       )}
                     </div>
                     <div>
-                      <label className="text-[10px] text-muted-foreground block mb-0.5">{lang === "ar" ? "شبكة/بطاقة:" : "Card:"}</label>
+                      <label className="text-[10px] text-muted-foreground block mb-0.5">
+                        {lang === "ar" ? "شبكة/بطاقة:" : "Card:"}
+                      </label>
                       <input
                         type="number"
                         min="0"
@@ -1519,7 +1652,9 @@ function POSPage() {
                       )}
                     </div>
                     <div>
-                      <label className="text-[10px] text-muted-foreground block mb-0.5">{lang === "ar" ? "تحويل بنكي:" : "Bank:"}</label>
+                      <label className="text-[10px] text-muted-foreground block mb-0.5">
+                        {lang === "ar" ? "تحويل بنكي:" : "Bank:"}
+                      </label>
                       <input
                         type="number"
                         min="0"
@@ -1548,7 +1683,9 @@ function POSPage() {
 
                   {remainingDebt > 0 && (
                     <div className="flex items-center justify-between rounded-xl bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 text-xs font-mono text-amber-600 dark:text-amber-300">
-                      <span>{lang === "ar" ? "المتبقي كدين آجل على العميل:" : "Remaining Debt:"}</span>
+                      <span>
+                        {lang === "ar" ? "المتبقي كدين آجل على العميل:" : "Remaining Debt:"}
+                      </span>
                       <span className="font-bold">{money(remainingDebt)}</span>
                     </div>
                   )}
@@ -1617,14 +1754,18 @@ function POSPage() {
                     </div>
                   ) : paymentMethod === "credit" && remainingDebt > 0 ? (
                     <div className="flex items-center justify-between rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-mono text-amber-600 dark:text-amber-300">
-                      <span>{lang === "ar" ? "المتبقي كدين آجل على العميل:" : "Remaining debt:"}</span>
+                      <span>
+                        {lang === "ar" ? "المتبقي كدين آجل على العميل:" : "Remaining debt:"}
+                      </span>
                       <span className="font-bold">{money(remainingDebt)}</span>
                     </div>
                   ) : isPaidEmpty ? (
                     <div className="flex items-center justify-between text-[11px] text-emerald-600 dark:text-emerald-400 font-medium px-2">
                       <span className="flex items-center gap-1">
                         <CheckCircle2 className="h-3 w-3" />
-                        {lang === "ar" ? "المدفوع تلقائيًا: كامل الإجمالي" : "Auto paid: Full invoice"}
+                        {lang === "ar"
+                          ? "المدفوع تلقائيًا: كامل الإجمالي"
+                          : "Auto paid: Full invoice"}
                       </span>
                       <span className="font-mono font-semibold">{money(total)}</span>
                     </div>
@@ -1641,7 +1782,11 @@ function POSPage() {
                 className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-destructive text-sm font-bold text-destructive-foreground border border-destructive/60 cursor-not-allowed opacity-90 shadow-lg shadow-destructive/20 ring-2 ring-destructive/30"
               >
                 <AlertCircle className="h-4 w-4" />
-                <span>{lang === "ar" ? "المبلغ المدفوع أكبر من الإجمالي!" : "Paid amount exceeds total!"}</span>
+                <span>
+                  {lang === "ar"
+                    ? "المبلغ المدفوع أكبر من الإجمالي!"
+                    : "Paid amount exceeds total!"}
+                </span>
               </button>
             ) : (
               <button
@@ -1651,7 +1796,11 @@ function POSPage() {
                 className="mt-2 flex h-11 w-full items-center justify-between px-4 rounded-2xl bg-gradient-to-r from-primary to-primary/90 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 hover:shadow-primary/35 hover:scale-[1.01] active:scale-[0.99] transition disabled:opacity-50 disabled:pointer-events-none"
               >
                 <div className="flex items-center gap-2">
-                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                  {loading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4" />
+                  )}
                   <span>{t("pos.checkout")}</span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1689,7 +1838,9 @@ function POSPage() {
                     {lang === "ar" ? "طباعة الفاتورة" : "Print Invoice"}
                   </h3>
                   <p className="text-xs text-muted-foreground">
-                    {lang === "ar" ? `فاتورة #${postSaleDoc.number}` : `Invoice #${postSaleDoc.number}`}
+                    {lang === "ar"
+                      ? `فاتورة #${postSaleDoc.number}`
+                      : `Invoice #${postSaleDoc.number}`}
                   </p>
                 </div>
               </div>
@@ -1708,11 +1859,34 @@ function POSPage() {
                 {lang === "ar" ? "اختر قالب الطباعة" : "Choose print template"}
               </p>
               <div className="grid grid-cols-3 gap-2">
-                {([
-                  { id: "thermal", icon: Receipt, ar: "فاتورة حرارية", en: "Thermal 80mm", sub_ar: "طابعة مدمجة", sub_en: "Compact printer" },
-                  { id: "standard", icon: FileText, ar: "A4 عادي", en: "Standard A4", sub_ar: "تصميم أعمال", sub_en: "Business format" },
-                  { id: "elegant", icon: Sparkles, ar: "A4 فاخر", en: "Elegant A4", sub_ar: "لمسات ذهبية", sub_en: "Gold accents" },
-                ] as const).map((tmpl) => (
+                {(
+                  [
+                    {
+                      id: "thermal",
+                      icon: Receipt,
+                      ar: "فاتورة حرارية",
+                      en: "Thermal 80mm",
+                      sub_ar: "طابعة مدمجة",
+                      sub_en: "Compact printer",
+                    },
+                    {
+                      id: "standard",
+                      icon: FileText,
+                      ar: "A4 عادي",
+                      en: "Standard A4",
+                      sub_ar: "تصميم أعمال",
+                      sub_en: "Business format",
+                    },
+                    {
+                      id: "elegant",
+                      icon: Sparkles,
+                      ar: "A4 فاخر",
+                      en: "Elegant A4",
+                      sub_ar: "لمسات ذهبية",
+                      sub_en: "Gold accents",
+                    },
+                  ] as const
+                ).map((tmpl) => (
                   <button
                     key={tmpl.id}
                     type="button"
@@ -1842,11 +2016,17 @@ function POSPage() {
                   min="0"
                   value={newCustomerCreditLimit}
                   onChange={(e) => setNewCustomerCreditLimit(e.target.value)}
-                  placeholder={lang === "ar" ? "حد الائتمان — صفر = بلا سقف" : "Credit limit — zero means unlimited"}
+                  placeholder={
+                    lang === "ar"
+                      ? "حد الائتمان — صفر = بلا سقف"
+                      : "Credit limit — zero means unlimited"
+                  }
                   className="h-10 w-full rounded-2xl border border-input bg-surface px-3.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                 />
                 <p className="mt-1 text-[11px] text-muted-foreground">
-                  {lang === "ar" ? "يمكن تركه صفرًا للسماح بالبيع الآجل بلا حد." : "Leave zero to allow unlimited credit."}
+                  {lang === "ar"
+                    ? "يمكن تركه صفرًا للسماح بالبيع الآجل بلا حد."
+                    : "Leave zero to allow unlimited credit."}
                 </p>
               </div>
             </div>
@@ -1877,7 +2057,9 @@ function POSPage() {
             className="panel-elevated w-full max-w-sm rounded-3xl p-5 shadow-2xl border border-border/80"
           >
             <div className="mb-4 flex items-center justify-between border-b border-border/60 pb-3">
-              <h3 className="font-bold text-foreground">{lang === "ar" ? "إضافة خدمة أو أجرة" : "Add service"}</h3>
+              <h3 className="font-bold text-foreground">
+                {lang === "ar" ? "إضافة خدمة أو أجرة" : "Add service"}
+              </h3>
               <button
                 type="button"
                 onClick={() => setServiceOpen(false)}
@@ -1891,7 +2073,9 @@ function POSPage() {
                 autoFocus
                 value={serviceName}
                 onChange={(e) => setServiceName(e.target.value)}
-                placeholder={lang === "ar" ? "اسم الخدمة (مثال: تغيير زيت أو صيانة)" : "Service name"}
+                placeholder={
+                  lang === "ar" ? "اسم الخدمة (مثال: تغيير زيت أو صيانة)" : "Service name"
+                }
                 className="h-10 w-full rounded-2xl border border-input bg-surface px-3.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
               />
               <input
@@ -1932,7 +2116,9 @@ function Row({ label, value, bold }: { label: string; value: string; bold?: bool
   return (
     <div
       className={`flex items-center justify-between ${
-        bold ? "font-bold text-sm text-foreground pt-1 border-t border-border/40" : "text-muted-foreground"
+        bold
+          ? "font-bold text-sm text-foreground pt-1 border-t border-border/40"
+          : "text-muted-foreground"
       }`}
     >
       <span>{label}</span>

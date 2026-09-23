@@ -70,17 +70,17 @@
 /* Default = dark (Linear style). Light variant available via .light on html */
 :root,
 .dark {
-  --background: oklch(0.13 0.005 270);          /* #0A0A0B */
-  --foreground: oklch(0.96 0.005 270);          /* near white */
-  --surface: oklch(0.16 0.006 270);             /* #131316 */
-  --surface-elevated: oklch(0.185 0.007 270);   /* #18181C */
+  --background: oklch(0.13 0.005 270); /* #0A0A0B */
+  --foreground: oklch(0.96 0.005 270); /* near white */
+  --surface: oklch(0.16 0.006 270); /* #131316 */
+  --surface-elevated: oklch(0.185 0.007 270); /* #18181C */
 
   --card: oklch(0.16 0.006 270);
   --card-foreground: oklch(0.96 0.005 270);
   --popover: oklch(0.18 0.007 270);
   --popover-foreground: oklch(0.96 0.005 270);
 
-  --primary: oklch(0.62 0.21 260);              /* electric blue #3B82F6 */
+  --primary: oklch(0.62 0.21 260); /* electric blue #3B82F6 */
   --primary-foreground: oklch(1 0 0);
 
   --secondary: oklch(0.22 0.008 270);
@@ -153,15 +153,21 @@
 }
 
 @layer base {
-  * { border-color: var(--color-border); }
+  * {
+    border-color: var(--color-border);
+  }
 
-  html, body, #root { height: 100%; }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
 
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: "IBM Plex Sans Arabic", "Cairo", "Tajawal", "Noto Sans Arabic", var(--font-sans);
-    font-feature-settings: "cv11","ss01","ss03";
+    font-feature-settings: "cv11", "ss01", "ss03";
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     letter-spacing: -0.01em;
@@ -169,17 +175,23 @@
 
   html[dir="rtl"] body,
   html[dir="rtl"] body * {
-    font-family: "IBM Plex Sans Arabic", "Cairo", "Tajawal", "Noto Sans Arabic", var(--font-arabic) !important;
+    font-family:
+      "IBM Plex Sans Arabic", "Cairo", "Tajawal", "Noto Sans Arabic", var(--font-arabic) !important;
   }
 
-  h1, h2, h3, h4, .font-display {
+  h1,
+  h2,
+  h3,
+  h4,
+  .font-display {
     font-family: var(--font-display);
   }
 
   /* Subtle radial backdrop — Linear-ish ambient glow */
   body::before {
     content: "";
-    position: fixed; inset: 0;
+    position: fixed;
+    inset: 0;
     pointer-events: none;
     z-index: 0;
     background:
@@ -187,18 +199,28 @@
       radial-gradient(50rem 30rem at -10% 100%, oklch(0.7 0.18 180 / 0.06), transparent 60%);
   }
 
-  ::selection { background: oklch(0.62 0.21 260 / 0.35); }
+  ::selection {
+    background: oklch(0.62 0.21 260 / 0.35);
+  }
 
   /* Scrollbar */
-  ::-webkit-scrollbar { width: 10px; height: 10px; }
-  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
   ::-webkit-scrollbar-thumb {
     background: oklch(1 0 0 / 0.06);
     border-radius: 8px;
     border: 2px solid transparent;
     background-clip: padding-box;
   }
-  ::-webkit-scrollbar-thumb:hover { background: oklch(1 0 0 / 0.12); background-clip: padding-box; }
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(1 0 0 / 0.12);
+    background-clip: padding-box;
+  }
 }
 
 @layer utilities {
@@ -227,7 +249,9 @@
   }
   .ring-focus:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px var(--color-background), 0 0 0 4px var(--color-ring);
+    box-shadow:
+      0 0 0 2px var(--color-background),
+      0 0 0 4px var(--color-ring);
   }
 }
 
@@ -243,8 +267,12 @@
 }
 
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 .shimmer {
   background: linear-gradient(90deg, transparent, oklch(1 0 0 / 0.05), transparent);

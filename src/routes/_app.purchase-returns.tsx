@@ -8,9 +8,28 @@ import { money } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
@@ -42,7 +61,7 @@ function PurchaseReturnsPage() {
   const [search, setSearch] = useState("");
 
   const whName = (w?: { name: string; name_ar?: string | null } | null) =>
-    !w ? "—" : lang === "ar" ? (w.name_ar || w.name) : (w.name || w.name_ar || "—");
+    !w ? "—" : lang === "ar" ? w.name_ar || w.name : w.name || w.name_ar || "—";
 
   async function load() {
     setLoading(true);
@@ -63,14 +82,18 @@ function PurchaseReturnsPage() {
     (r) =>
       !search ||
       r.return_number.toLowerCase().includes(search.toLowerCase()) ||
-      (r.suppliers?.name ?? "").toLowerCase().includes(search.toLowerCase())
+      (r.suppliers?.name ?? "").toLowerCase().includes(search.toLowerCase()),
   );
 
   return (
     <>
       <PageHeader
         title={lang === "ar" ? "مرتجعات المشتريات" : "Purchase Returns"}
-        subtitle={lang === "ar" ? "سجل وأداء مرتجعات المشتريات إلى الموردين" : "Track supplier purchase returns"}
+        subtitle={
+          lang === "ar"
+            ? "سجل وأداء مرتجعات المشتريات إلى الموردين"
+            : "Track supplier purchase returns"
+        }
         actions={<NewPurchaseReturn onSaved={load} />}
       />
 
@@ -80,7 +103,11 @@ function PurchaseReturnsPage() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder={lang === "ar" ? "ابحث برقم المرتجع أو اسم المورد..." : "Search return # or supplier..."}
+            placeholder={
+              lang === "ar"
+                ? "ابحث برقم المرتجع أو اسم المورد..."
+                : "Search return # or supplier..."
+            }
             className="h-10 w-full rounded-md border border-input bg-surface pl-9 pr-3 text-sm rtl:pl-3 rtl:pr-9 focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
           />
         </div>
@@ -93,7 +120,9 @@ function PurchaseReturnsPage() {
                   <TableHead># {lang === "ar" ? "رقم المرتجع" : "Return #"}</TableHead>
                   <TableHead>{lang === "ar" ? "التاريخ" : "Date"}</TableHead>
                   <TableHead>{lang === "ar" ? "المورد" : "Supplier"}</TableHead>
-                  {hasMultiWarehouse && <TableHead>{lang === "ar" ? "المستودع" : "Warehouse"}</TableHead>}
+                  {hasMultiWarehouse && (
+                    <TableHead>{lang === "ar" ? "المستودع" : "Warehouse"}</TableHead>
+                  )}
                   <TableHead>{lang === "ar" ? "طريقة الاسترداد" : "Refund Method"}</TableHead>
                   <TableHead className="text-end">{lang === "ar" ? "الإجمالي" : "Total"}</TableHead>
                 </TableRow>
@@ -101,13 +130,19 @@ function PurchaseReturnsPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={hasMultiWarehouse ? 6 : 5} className="text-center text-muted-foreground py-8">
+                    <TableCell
+                      colSpan={hasMultiWarehouse ? 6 : 5}
+                      className="text-center text-muted-foreground py-8"
+                    >
                       {t("common.loading")}
                     </TableCell>
                   </TableRow>
                 ) : filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={hasMultiWarehouse ? 6 : 5} className="text-center text-muted-foreground py-12">
+                    <TableCell
+                      colSpan={hasMultiWarehouse ? 6 : 5}
+                      className="text-center text-muted-foreground py-12"
+                    >
                       <RotateCcw className="mx-auto mb-2 h-8 w-8 opacity-40" />
                       {lang === "ar" ? "لا توجد مرتجعات مشتريات" : "No purchase returns"}
                     </TableCell>
@@ -115,14 +150,18 @@ function PurchaseReturnsPage() {
                 ) : (
                   filtered.map((r) => (
                     <TableRow key={r.id}>
-                      <TableCell className="font-mono text-xs font-semibold">{r.return_number}</TableCell>
+                      <TableCell className="font-mono text-xs font-semibold">
+                        {r.return_number}
+                      </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {new Date(r.created_at).toLocaleString()}
                       </TableCell>
                       <TableCell>{r.suppliers?.name ?? "—"}</TableCell>
                       {hasMultiWarehouse && <TableCell>{whName(r.warehouses)}</TableCell>}
                       <TableCell className="text-xs">{r.refund_method ?? "cash"}</TableCell>
-                      <TableCell className="text-end font-mono font-semibold">{money(Number(r.total))}</TableCell>
+                      <TableCell className="text-end font-mono font-semibold">
+                        {money(Number(r.total))}
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -135,7 +174,13 @@ function PurchaseReturnsPage() {
   );
 }
 
-function NewPurchaseReturn({ onSaved, hasMultiWarehouse }: { onSaved: () => void; hasMultiWarehouse?: boolean }) {
+function NewPurchaseReturn({
+  onSaved,
+  hasMultiWarehouse,
+}: {
+  onSaved: () => void;
+  hasMultiWarehouse?: boolean;
+}) {
   const { t, lang } = useI18n();
   const [open, setOpen] = useState(false);
   const [warehouses, setWarehouses] = useState<any[]>([]);
@@ -153,7 +198,12 @@ function NewPurchaseReturn({ onSaved, hasMultiWarehouse }: { onSaved: () => void
     Promise.all([
       supabase.from("warehouses").select("id,name,name_ar").eq("is_active", true).order("name"),
       supabase.from("suppliers").select("id,name").eq("is_active", true).order("name"),
-      supabase.from("products").select("id,name,name_ar,sku,cost_price,tax_rate").eq("is_active", true).order("name").limit(200),
+      supabase
+        .from("products")
+        .select("id,name,name_ar,sku,cost_price,tax_rate")
+        .eq("is_active", true)
+        .order("name")
+        .limit(200),
     ]).then(([w, s, p]) => {
       setWarehouses(w.data ?? []);
       setSuppliers(s.data ?? []);
@@ -170,10 +220,10 @@ function NewPurchaseReturn({ onSaved, hasMultiWarehouse }: { onSaved: () => void
             !search ||
             p.name.toLowerCase().includes(search.toLowerCase()) ||
             (p.name_ar ?? "").includes(search) ||
-            p.sku?.toLowerCase().includes(search.toLowerCase())
+            p.sku?.toLowerCase().includes(search.toLowerCase()),
         )
         .slice(0, 8),
-    [products, search]
+    [products, search],
   );
 
   function addLine(p: any) {
@@ -222,7 +272,9 @@ function NewPurchaseReturn({ onSaved, hasMultiWarehouse }: { onSaved: () => void
       toast.error(error.message);
       return;
     }
-    toast.success(lang === "ar" ? "تم تسجيل مرتجع المشتريات بنجاح" : "Purchase return recorded successfully");
+    toast.success(
+      lang === "ar" ? "تم تسجيل مرتجع المشتريات بنجاح" : "Purchase return recorded successfully",
+    );
     setOpen(false);
     setLines([]);
     setNote("");
@@ -242,7 +294,9 @@ function NewPurchaseReturn({ onSaved, hasMultiWarehouse }: { onSaved: () => void
           <DialogTitle>{lang === "ar" ? "إنشاء مرتجع مشتريات" : "New Purchase Return"}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-4 py-2">
-          <div className={`grid grid-cols-1 ${hasMultiWarehouse ? "sm:grid-cols-3" : "sm:grid-cols-2"} gap-3`}>
+          <div
+            className={`grid grid-cols-1 ${hasMultiWarehouse ? "sm:grid-cols-3" : "sm:grid-cols-2"} gap-3`}
+          >
             {hasMultiWarehouse && (
               <div className="grid gap-1.5">
                 <Label>{lang === "ar" ? "المستودع" : "Warehouse"}</Label>
@@ -264,7 +318,9 @@ function NewPurchaseReturn({ onSaved, hasMultiWarehouse }: { onSaved: () => void
               <Label>{lang === "ar" ? "المورد" : "Supplier"}</Label>
               <Select value={supplierId} onValueChange={setSupplierId}>
                 <SelectTrigger>
-                  <SelectValue placeholder={lang === "ar" ? "اختر المورد..." : "Select supplier..."} />
+                  <SelectValue
+                    placeholder={lang === "ar" ? "اختر المورد..." : "Select supplier..."}
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   {suppliers.map((s) => (
@@ -285,14 +341,18 @@ function NewPurchaseReturn({ onSaved, hasMultiWarehouse }: { onSaved: () => void
                   <SelectItem value="cash">{lang === "ar" ? "نقدًا" : "Cash"}</SelectItem>
                   <SelectItem value="card">{lang === "ar" ? "بطاقة" : "Card"}</SelectItem>
                   <SelectItem value="bank">{lang === "ar" ? "تحويل بنكي" : "Bank"}</SelectItem>
-                  <SelectItem value="credit">{lang === "ar" ? "خصم من رصيد المورد" : "Deduct Balance"}</SelectItem>
+                  <SelectItem value="credit">
+                    {lang === "ar" ? "خصم من رصيد المورد" : "Deduct Balance"}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
 
           <div className="relative">
-            <Label className="mb-1.5 block">{lang === "ar" ? "إضافة أصناف المرتجع" : "Add Return Items"}</Label>
+            <Label className="mb-1.5 block">
+              {lang === "ar" ? "إضافة أصناف المرتجع" : "Add Return Items"}
+            </Label>
             <Input
               placeholder={lang === "ar" ? "ابحث بالاسم أو الرمز..." : "Search product or SKU..."}
               value={search}
@@ -308,7 +368,9 @@ function NewPurchaseReturn({ onSaved, hasMultiWarehouse }: { onSaved: () => void
                     onClick={() => addLine(p)}
                   >
                     <span>{lang === "ar" ? p.name_ar || p.name : p.name || p.name_ar}</span>
-                    <span className="font-mono text-xs text-muted-foreground">{money(Number(p.cost_price))}</span>
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {money(Number(p.cost_price))}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -323,7 +385,9 @@ function NewPurchaseReturn({ onSaved, hasMultiWarehouse }: { onSaved: () => void
                     <TableHead>{lang === "ar" ? "المنتج" : "Product"}</TableHead>
                     <TableHead>{lang === "ar" ? "الكمية" : "Qty"}</TableHead>
                     <TableHead>{lang === "ar" ? "التكلفة" : "Cost"}</TableHead>
-                    <TableHead className="text-end">{lang === "ar" ? "الإجمالي" : "Total"}</TableHead>
+                    <TableHead className="text-end">
+                      {lang === "ar" ? "الإجمالي" : "Total"}
+                    </TableHead>
                     <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -345,7 +409,11 @@ function NewPurchaseReturn({ onSaved, hasMultiWarehouse }: { onSaved: () => void
                         {money(l.quantity * l.unit_cost * (1 + l.tax_rate / 100))}
                       </TableCell>
                       <TableCell className="text-end">
-                        <button type="button" onClick={() => removeLine(l.product_id)} className="text-destructive hover:opacity-80">
+                        <button
+                          type="button"
+                          onClick={() => removeLine(l.product_id)}
+                          className="text-destructive hover:opacity-80"
+                        >
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </TableCell>
@@ -358,12 +426,18 @@ function NewPurchaseReturn({ onSaved, hasMultiWarehouse }: { onSaved: () => void
 
           <div className="grid gap-1.5">
             <Label>{lang === "ar" ? "ملاحظات" : "Notes"}</Label>
-            <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder={lang === "ar" ? "سبب المرتجع..." : "Reason for return..."} />
+            <Textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder={lang === "ar" ? "سبب المرتجع..." : "Reason for return..."}
+            />
           </div>
 
           <div className="flex items-center justify-between pt-2 border-t border-border">
             <div className="text-sm">
-              <span className="text-muted-foreground">{lang === "ar" ? "إجمالي المرتجع:" : "Total Return:"} </span>
+              <span className="text-muted-foreground">
+                {lang === "ar" ? "إجمالي المرتجع:" : "Total Return:"}{" "}
+              </span>
               <span className="text-lg font-bold font-mono text-primary">{money(total)}</span>
             </div>
             <div className="flex gap-2">

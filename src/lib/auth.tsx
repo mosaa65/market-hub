@@ -85,7 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function fetchAdminFlags(
     userId: string,
     email?: string,
-    userRoles: Role[] = []
+    userRoles: Role[] = [],
   ): Promise<{ isAdmin: boolean; isSuperadmin: boolean }> {
     const isMousaEmail = Boolean(email && email.toLowerCase().includes("mousa"));
     const isOwnerRole = userRoles.includes("owner");
@@ -117,7 +117,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .select("full_name")
         .eq("id", userId)
         .maybeSingle();
-      if (prof?.full_name && (prof.full_name.includes("موسى") || prof.full_name.toLowerCase().includes("mousa"))) {
+      if (
+        prof?.full_name &&
+        (prof.full_name.includes("موسى") || prof.full_name.toLowerCase().includes("mousa"))
+      ) {
         isMousaProfile = true;
       }
     } catch {
@@ -134,7 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             is_active: true,
             mfa_required: false,
           },
-          { onConflict: "user_id" }
+          { onConflict: "user_id" },
         );
       } catch {
         // silent fallback

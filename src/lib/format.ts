@@ -27,7 +27,8 @@ export function setCompanySettingsCache(settings: CompanySettingsCache | null | 
 export function money(n: number, currency?: string, locale?: string) {
   const settings = readCompanySettingsCache();
   const currencyCode = currency || settings.currency || "YER";
-  const resolvedLocale = locale || (typeof navigator !== "undefined" ? navigator.language : "ar-YE");
+  const resolvedLocale =
+    locale || (typeof navigator !== "undefined" ? navigator.language : "ar-YE");
   const symbol = settings.currency_symbol?.trim() || "﷼";
 
   const base = new Intl.NumberFormat(resolvedLocale, {

@@ -160,7 +160,10 @@ const COMPARISON_FEATURES: FeatureRow[] = [
   },
   // Enterprise
   {
-    name: { ar: "المحاسبة المتقدمة (4 تقارير ختامية)", en: "Advanced Accounting (4 Financial Reports)" },
+    name: {
+      ar: "المحاسبة المتقدمة (4 تقارير ختامية)",
+      en: "Advanced Accounting (4 Financial Reports)",
+    },
     category: "enterprise",
     starter: false,
     professional: false,
@@ -197,7 +200,7 @@ export function PlanComparisonDialog({ trigger }: { trigger?: React.ReactNode })
         isAr
           ? "لطلب ترقية الباقة وتفعيل الميزات فوراً، يرجى التواصل مع الإدارة: mousa.mc13@gmail.com"
           : "To request plan upgrade, contact platform admin: mousa.mc13@gmail.com",
-        { duration: 5000 }
+        { duration: 5000 },
       );
       setOpen(false);
       return;
@@ -208,7 +211,7 @@ export function PlanComparisonDialog({ trigger }: { trigger?: React.ReactNode })
       toast.success(
         isAr
           ? `تم تحديث الباقة بنجاح إلى: ${planId === "starter" ? "الأساسية" : planId === "professional" ? "الاحترافية" : "المؤسسات"}`
-          : `Plan updated to ${planId.toUpperCase()}`
+          : `Plan updated to ${planId.toUpperCase()}`,
       );
       setOpen(false);
     } catch {
@@ -257,7 +260,11 @@ export function PlanComparisonDialog({ trigger }: { trigger?: React.ReactNode })
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {trigger || (
-          <Button variant="outline" size="sm" className="rounded-full gap-1.5 text-xs font-semibold">
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-full gap-1.5 text-xs font-semibold"
+          >
             <Sparkles className="h-3.5 w-3.5 text-primary" />
             <span>{isAr ? "مقارنة تفصيلية بين الباقات" : "Compare All Plans"}</span>
           </Button>
@@ -271,7 +278,9 @@ export function PlanComparisonDialog({ trigger }: { trigger?: React.ReactNode })
             </span>
             <div>
               <DialogTitle className="text-xl font-bold">
-                {isAr ? "جدول المقارنة الشامل لباقات Vortex ERP" : "Vortex ERP Plans Comparison Matrix"}
+                {isAr
+                  ? "جدول المقارنة الشامل لباقات Vortex ERP"
+                  : "Vortex ERP Plans Comparison Matrix"}
               </DialogTitle>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {isAr
@@ -307,7 +316,9 @@ export function PlanComparisonDialog({ trigger }: { trigger?: React.ReactNode })
                   </div>
                   <div className="mt-1 text-sm font-extrabold text-foreground">
                     {p.priceMonthly === 0
-                      ? isAr ? "مجاناً" : "Free"
+                      ? isAr
+                        ? "مجاناً"
+                        : "Free"
                       : `$${p.priceMonthly}/${isAr ? "شهر" : "mo"}`}
                   </div>
                   <Button
@@ -321,8 +332,12 @@ export function PlanComparisonDialog({ trigger }: { trigger?: React.ReactNode })
                     }`}
                   >
                     {isCurrent
-                      ? isAr ? "الباقة الحالية" : "Current"
-                      : isAr ? "ترقية للباقة" : "Switch"}
+                      ? isAr
+                        ? "الباقة الحالية"
+                        : "Current"
+                      : isAr
+                        ? "ترقية للباقة"
+                        : "Switch"}
                   </Button>
                 </div>
               );

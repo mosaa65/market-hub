@@ -6,20 +6,23 @@
 ## الوضع الحالي
 
 ### التقنيات المستخدمة
-| التقنية | الوصف |
-|---------|-------|
-| **Frontend** | React 19 + TypeScript + Vite 8 |
-| **Router** | TanStack Router + React Query |
-| **UI Library** | Radix UI + Tailwind CSS 4 + shadcn/ui |
-| **Backend** | Supabase (PostgreSQL + Auth + Realtime) |
-| **PDF** | jsPDF + jspdf-autotable |
-| **Charts** | Recharts |
-| **i18n** | Custom context-based (en/ar) |
+
+| التقنية        | الوصف                                   |
+| -------------- | --------------------------------------- |
+| **Frontend**   | React 19 + TypeScript + Vite 8          |
+| **Router**     | TanStack Router + React Query           |
+| **UI Library** | Radix UI + Tailwind CSS 4 + shadcn/ui   |
+| **Backend**    | Supabase (PostgreSQL + Auth + Realtime) |
+| **PDF**        | jsPDF + jspdf-autotable                 |
+| **Charts**     | Recharts                                |
+| **i18n**       | Custom context-based (en/ar)            |
 
 ### الجداول الموجودة في قاعدة البيانات (18 جدول)
+
 `audit_logs` · `brands` · `categories` · `company_settings` · `customer_payments` · `customers` · `expense_categories` · `expenses` · `inventory` · `loyalty_transactions` · `product_batches` · `products` · `profiles` · `purchase_invoice_items` · `purchase_invoices` · `purchase_return_items` · `purchase_returns` · `sales_invoice_items` · `sales_invoices` · `sales_return_items` · `sales_returns` · `suppliers` · `units` · `user_roles` · `warehouses`
 
 ### الصفحات الموجودة (18 صفحة)
+
 Dashboard · Analytics · POS · Products · Catalog · Inventory · Warehouses · Batches · Sales · Purchases · Returns · Transfers · Barcodes · Customers · Suppliers · Loyalty · Finance · Reports · Payments · Debts · Users · Audit · Notifications · Settings
 
 ---
@@ -27,6 +30,7 @@ Dashboard · Analytics · POS · Products · Catalog · Inventory · Warehouses 
 ## المشاكل المكتشفة
 
 ### 🔴 أخطاء حرجة
+
 1. **فواتير الآجل تظهر "جزئية"** بدل "غير مدفوعة" — المبلغ لا يُضاف لرصيد العميل بشكل صحيح
 2. **PDF بالإنجليزي فقط** — لا يدعم العربية (jsPDF لا يدعم خطوط عربية بشكل افتراضي)
 3. **تصدير Excel بالإنجليزي** — الأعمدة والبيانات غير مترجمة
@@ -34,6 +38,7 @@ Dashboard · Analytics · POS · Products · Catalog · Inventory · Warehouses 
 5. **الصلاحيات** — لا يوجد حماية حقيقية على مستوى الصفحات (أي مستخدم يقدر يدخل أي صفحة)
 
 ### 🟠 نقص في الوحدات المحاسبية
+
 1. **لا يوجد كشف حساب عميل** (Customer Statement)
 2. **لا يوجد كشف حساب مورد** (Supplier Statement)
 3. **لا يوجد تقرير مبيعات شهري/يومي** مفصل
@@ -45,6 +50,7 @@ Dashboard · Analytics · POS · Products · Catalog · Inventory · Warehouses 
 9. **لا يوجد تقرير أعمار الديون** (Aging Report)
 
 ### 🟡 مشاكل واجهة المستخدم
+
 1. **نصوص غير مترجمة** — بعض الأماكن فيها `lang === "ar" ? "..." : "..."` مباشرة بدل استخدام `t()`
 2. **لا توجد اختصارات لوحة مفاتيح** — ما عدا Command Palette الأساسي
 3. **تصميم بسيط نسبياً** — يحتاج تحسينات في الأزرار والجداول والكروت
@@ -63,27 +69,33 @@ Dashboard · Analytics · POS · Products · Catalog · Inventory · Warehouses 
 ## المرحلة 1: إصلاح الأخطاء الحرجة 🔧
 
 ### الأهداف
+
 إصلاح المشاكل التي تمنع الاستخدام الفعلي للنظام
 
 ### التغييرات
 
 #### [MODIFY] [_app.pos.tsx](file:///c:/Users/mousa/Desktop/project/market-hup/src/routes/_app.pos.tsx)
+
 - إصلاح منطق فواتير الآجل: عند `payment_method === "credit"` يجب أن يكون `paid = 0` و `status = "unpaid"` وتُحدث `customers.balance` بقيمة الفاتورة
 
 #### [MODIFY] [_app.sales.tsx](file:///c:/Users/mousa/Desktop/project/market-hup/src/routes/_app.sales.tsx)
+
 - عرض حالة الفاتورة بالعربي مترجمة (حالياً تعرض `status` خام بالإنجليزي)
 - إصلاح عرض المبلغ المتبقي على العميل
 
 #### [MODIFY] [_app.returns.tsx](file:///c:/Users/mousa/Desktop/project/market-hup/src/routes/_app.returns.tsx)
+
 - فصل صفحة المرتجعات إلى صفحتين مستقلتين في القائمة الجانبية:
   - `/sales-returns` — مرتجعات المبيعات
   - `/purchase-returns` — مرتجعات المشتريات
 - إزالة نظام الـ Tabs المزعج
 
 #### [MODIFY] [auth.tsx](file:///c:/Users/mousa/Desktop/project/market-hup/src/lib/auth.tsx)
+
 - إضافة middleware حقيقي للصلاحيات: كل صفحة تحدد الأدوار المسموح لها
 
 #### [MODIFY] [app-shell.tsx](file:///c:/Users/mousa/Desktop/project/market-hup/src/components/app-shell.tsx)
+
 - إخفاء عناصر القائمة الجانبية حسب صلاحيات المستخدم
 - تحديث القائمة لتشمل الصفحتين الجديدتين (مرتجعات المبيعات/المشتريات)
 
@@ -92,11 +104,13 @@ Dashboard · Analytics · POS · Products · Catalog · Inventory · Warehouses 
 ## المرحلة 2: الترجمة الشاملة للعربية 🌍
 
 ### الأهداف
+
 كل نص في النظام يظهر بالعربية — بما في ذلك PDF والتقارير والأدوار
 
 ### التغييرات
 
 #### [MODIFY] [i18n.tsx](file:///c:/Users/mousa/Desktop/project/market-hup/src/lib/i18n.tsx)
+
 - إضافة **مئات** المفاتيح الناقصة للترجمة:
   - ترجمة أسماء الأدوار (مالك، مدير، محاسب، كاشير، مستودعات)
   - ترجمة طرق الدفع (نقداً، بطاقة، تحويل بنكي، آجل)
@@ -105,6 +119,7 @@ Dashboard · Analytics · POS · Products · Catalog · Inventory · Warehouses 
   - ترجمة كل `lang === "ar" ? "..." : "..."` المبعثرة في الكود واستبدالها بـ `t("key")`
 
 #### [MODIFY] جميع ملفات الصفحات
+
 - استبدال كل نص hardcoded عربي/إنجليزي بمفاتيح i18n
 - توحيد أسلوب الترجمة عبر النظام
 
@@ -113,11 +128,13 @@ Dashboard · Analytics · POS · Products · Catalog · Inventory · Warehouses 
 ## المرحلة 3: تحسين واجهة المستخدم (UI/UX) 🎨
 
 ### الأهداف
+
 واجهة احترافية ممتازة تليق بنظام ERP لتاجر كبير (سأستخدم مهارة UI UX Pro Max)
 
 ### التغييرات
 
 #### [MODIFY] [styles.css](file:///c:/Users/mousa/Desktop/project/market-hup/src/styles.css)
+
 - تحسين نظام الألوان — ألوان أغنى وأكثر تناسقاً
 - تحسين الخطوط العربية — خط أكبر وأوضح
 - إضافة micro-animations وتأثيرات hover احترافية
@@ -126,6 +143,7 @@ Dashboard · Analytics · POS · Products · Catalog · Inventory · Warehouses 
 - تحسين Cards والنماذج
 
 #### [MODIFY] [command-palette.tsx](file:///c:/Users/mousa/Desktop/project/market-hup/src/components/command-palette.tsx)
+
 - إضافة اختصارات لوحة مفاتيح شاملة:
   - `Ctrl+N` = فاتورة جديدة (في POS)
   - `Ctrl+P` = طباعة
@@ -135,10 +153,12 @@ Dashboard · Analytics · POS · Products · Catalog · Inventory · Warehouses 
   - أرقام 1-9 للتنقل السريع بين الأقسام
 
 #### [MODIFY] [app-shell.tsx](file:///c:/Users/mousa/Desktop/project/market-hup/src/components/app-shell.tsx)
+
 - تحسين القائمة الجانبية — أيقونات أكبر، تباعد أفضل، حركات سلسة
 - إضافة شريط الحالة السفلي (اسم المستخدم، الدور، آخر مزامنة)
 
 #### [MODIFY] كل صفحات النظام
+
 - تحسين تصميم الجداول (لون الصفوف، الحدود، أزرار الإجراءات)
 - تحسين الأزرار والنماذج (أحجام مناسبة، ألوان واضحة)
 - إضافة Empty States جميلة وأيقونات واضحة
@@ -149,26 +169,31 @@ Dashboard · Analytics · POS · Products · Catalog · Inventory · Warehouses 
 ## المرحلة 4: الوحدات المحاسبية الناقصة 📊
 
 ### الأهداف
+
 إضافة كل الكشوفات والتقارير المحاسبية الأساسية
 
 ### التغييرات الجديدة
 
 #### [NEW] _app.account-statement.tsx
+
 - **كشف حساب العميل**: جميع الحركات (فواتير + مدفوعات + مرتجعات) مع رصيد تراكمي
 - **كشف حساب المورد**: نفس الشيء للموردين
 - فلترة بالتاريخ + تصدير PDF عربي + تصدير Excel عربي
 
 #### [NEW] _app.daily-journal.tsx
+
 - **دفتر اليومية**: جميع العمليات المالية في يوم معين
 - القيود المحاسبية التلقائية (مدين/دائن)
 - فلترة بالتاريخ + طباعة
 
 #### [NEW] _app.trial-balance.tsx
+
 - **ميزان المراجعة**: ملخص أرصدة جميع الحسابات
 - مدين/دائن مع التوازن
 - فلترة بالفترة + تصدير PDF
 
 #### [NEW] _app.income-statement.tsx
+
 - **قائمة الدخل** (الأرباح والخسائر):
   - الإيرادات (مبيعات)
   - تكلفة البضاعة المباعة
@@ -178,6 +203,7 @@ Dashboard · Analytics · POS · Products · Catalog · Inventory · Warehouses 
 - فلترة بالفترة + تصدير PDF
 
 #### [NEW] _app.balance-sheet.tsx
+
 - **الميزانية العمومية**:
   - الأصول (نقدية + ذمم مدينة + مخزون)
   - الخصوم (ذمم دائنة)
@@ -185,14 +211,17 @@ Dashboard · Analytics · POS · Products · Catalog · Inventory · Warehouses 
 - PDF عربي
 
 #### [NEW] _app.stock-report.tsx
+
 - **تقرير حركة المخزون**: إدخالات/إخراجات/تحويلات لكل منتج
 - فلترة بالمنتج والمستودع والفترة
 
 #### [NEW] _app.aging-report.tsx
+
 - **تقرير أعمار الديون**: تصنيف ديون العملاء حسب العمر
   - 0-30 يوم · 31-60 يوم · 61-90 يوم · أكثر من 90 يوم
 
 #### [MODIFY] _app.reports.tsx
+
 - تحسين التقارير الحالية:
   - إضافة فلترة بالعميل والمنتج والمستودع
   - إضافة تقرير مبيعات يومي/أسبوعي/شهري
@@ -203,11 +232,13 @@ Dashboard · Analytics · POS · Products · Catalog · Inventory · Warehouses 
 ## المرحلة 5: نظام PDF العربي الأنيق 📄
 
 ### الأهداف
+
 ملفات PDF احترافية بالعربية لجميع الفواتير والكشوفات والتقارير
 
 ### التغييرات
 
 #### [MODIFY] [pdf.ts](file:///c:/Users/mousa/Desktop/project/market-hup/src/lib/pdf.ts)
+
 - إعادة بناء كامل لمولد PDF:
   - دعم الخط العربي (تضمين font عربي في jsPDF)
   - تنسيق RTL
@@ -218,6 +249,7 @@ Dashboard · Analytics · POS · Products · Catalog · Inventory · Warehouses 
   - ألوان متناسقة مع هوية النظام
 
 #### [NEW] pdf-reports.ts
+
 - قوالب PDF جديدة:
   - كشف حساب عميل/مورد
   - تقرير المبيعات
@@ -229,6 +261,7 @@ Dashboard · Analytics · POS · Products · Catalog · Inventory · Warehouses 
   - كل قالب بالعربي مع header/footer الشركة
 
 #### [NEW] excel-export.ts
+
 - تصدير Excel بالعربية:
   - أسماء الأعمدة بالعربي
   - اتجاه RTL
@@ -239,17 +272,20 @@ Dashboard · Analytics · POS · Products · Catalog · Inventory · Warehouses 
 ## المرحلة 6: إشعارات SMS/WhatsApp 📱
 
 ### الأهداف
+
 إرسال رسائل تلقائية للعملاء عند عمليات البيع الآجل وتذكيرات السداد
 
 ### التغييرات
 
 #### [NEW] _app.messaging.tsx
+
 - صفحة إدارة الرسائل:
   - إعداد قوالب الرسائل (فاتورة جديدة، تذكير سداد، شكر)
   - سجل الرسائل المرسلة
   - إحصائيات الإرسال
 
 #### [MODIFY] [settings.tsx](file:///c:/Users/mousa/Desktop/project/market-hup/src/routes/_app.settings.tsx)
+
 - إضافة إعدادات الرسائل:
   - مفتاح API لـ WhatsApp Business / SMS provider
   - تفعيل/تعطيل الرسائل التلقائية
@@ -263,11 +299,13 @@ Dashboard · Analytics · POS · Products · Catalog · Inventory · Warehouses 
 ## المرحلة 7: تحسين الأداء والتحديث اللحظي ⚡
 
 ### الأهداف
+
 سرعة النظام وتحديث البيانات في الوقت الحقيقي
 
 ### التغييرات
 
 #### [MODIFY] كل الصفحات
+
 - استبدال `useState + useEffect` بـ `useQuery` مع `staleTime` و `refetchInterval` مناسب
 - إضافة Supabase Realtime subscriptions لتحديث فوري:
   - المبيعات: تظهر فوراً عند إنشاء فاتورة من POS آخر
@@ -277,6 +315,7 @@ Dashboard · Analytics · POS · Products · Catalog · Inventory · Warehouses 
 - إضافة Optimistic Updates للعمليات (حذف/إضافة/تعديل)
 
 #### [MODIFY] [_app.dashboard.tsx](file:///c:/Users/mousa/Desktop/project/market-hup/src/routes/_app.dashboard.tsx)
+
 - تحسين استعلامات لوحة التحكم (تقليل عدد الطلبات)
 - تحديث لحظي عبر Realtime
 
@@ -285,11 +324,13 @@ Dashboard · Analytics · POS · Products · Catalog · Inventory · Warehouses 
 ## المرحلة 8: الصلاحيات والأمان والتنظيف النهائي 🔒
 
 ### الأهداف
+
 نظام صلاحيات متكامل وتنظيف نهائي شامل
 
 ### التغييرات
 
 #### [MODIFY] [auth.tsx](file:///c:/Users/mousa/Desktop/project/market-hup/src/lib/auth.tsx)
+
 - نظام صلاحيات متكامل:
   - **مالك**: كل شيء
   - **مدير**: كل شيء ما عدا إعدادات النظام وإدارة المستخدمين
@@ -298,11 +339,13 @@ Dashboard · Analytics · POS · Products · Catalog · Inventory · Warehouses 
   - **مستودعات**: المخزون + التحويلات + الدفعات فقط
 
 #### [MODIFY] [_app.users.tsx](file:///c:/Users/mousa/Desktop/project/market-hup/src/routes/_app.users.tsx)
+
 - تحسين واجهة إدارة المستخدمين
 - ترجمة أسماء الأدوار
 - إمكانية إضافة أدوار مخصصة
 
 #### تنظيف نهائي
+
 - مراجعة كل الكود للتأكد من عدم وجود أخطاء
 - اختبار كل السيناريوهات
 - تحسين الأداء النهائي
@@ -329,6 +372,7 @@ Dashboard · Analytics · POS · Products · Catalog · Inventory · Warehouses 
 ## خطة التحقق
 
 ### اختبارات يدوية
+
 - إنشاء فاتورة آجل ← التحقق من رصيد العميل
 - طباعة PDF بالعربي ← التحقق من التنسيق
 - تجربة كل كشف وتقرير
@@ -336,7 +380,9 @@ Dashboard · Analytics · POS · Products · Catalog · Inventory · Warehouses 
 - اختبار التحديث اللحظي
 
 ### بناء المشروع
+
 ```bash
 npm run build
 ```
+
 التأكد من عدم وجود أخطاء TypeScript أو تحذيرات

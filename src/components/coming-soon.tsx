@@ -1,7 +1,13 @@
 import { useI18n } from "@/lib/i18n";
 import { Sparkles } from "lucide-react";
 
-export function ComingSoon({ title, icon: Icon = Sparkles }: { title: string; icon?: typeof Sparkles }) {
+export function ComingSoon({
+  title,
+  icon: Icon = Sparkles,
+}: {
+  title: string;
+  icon?: typeof Sparkles;
+}) {
   const { t } = useI18n();
   return (
     <div className="panel-elevated flex flex-col items-center justify-center px-8 py-20 text-center">
