@@ -17,6 +17,7 @@ import { Route as AppUsersRouteImport } from './routes/_app.users'
 import { Route as AppTrialBalanceRouteImport } from './routes/_app.trial-balance'
 import { Route as AppTransfersRouteImport } from './routes/_app.transfers'
 import { Route as AppSuppliersRouteImport } from './routes/_app.suppliers'
+import { Route as AppSettlementsRouteImport } from './routes/_app.settlements'
 import { Route as AppSettingsRouteImport } from './routes/_app.settings'
 import { Route as AppSalesReturnsRouteImport } from './routes/_app.sales-returns'
 import { Route as AppSalesRouteImport } from './routes/_app.sales'
@@ -26,6 +27,8 @@ import { Route as AppPurchasesRouteImport } from './routes/_app.purchases'
 import { Route as AppPurchaseReturnsRouteImport } from './routes/_app.purchase-returns'
 import { Route as AppProductsRouteImport } from './routes/_app.products'
 import { Route as AppPosRouteImport } from './routes/_app.pos'
+import { Route as AppPlatformAdminRouteImport } from './routes/_app.platform-admin'
+import { Route as AppPlansRouteImport } from './routes/_app.plans'
 import { Route as AppPaymentsRouteImport } from './routes/_app.payments'
 import { Route as AppNotificationsRouteImport } from './routes/_app.notifications'
 import { Route as AppLoyaltyRouteImport } from './routes/_app.loyalty'
@@ -83,6 +86,11 @@ const AppSuppliersRoute = AppSuppliersRouteImport.update({
   path: '/suppliers',
   getParentRoute: () => AppRoute,
 } as any)
+const AppSettlementsRoute = AppSettlementsRouteImport.update({
+  id: '/settlements',
+  path: '/settlements',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppSettingsRoute = AppSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -126,6 +134,16 @@ const AppProductsRoute = AppProductsRouteImport.update({
 const AppPosRoute = AppPosRouteImport.update({
   id: '/pos',
   path: '/pos',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPlatformAdminRoute = AppPlatformAdminRouteImport.update({
+  id: '/platform-admin',
+  path: '/platform-admin',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPlansRoute = AppPlansRouteImport.update({
+  id: '/plans',
+  path: '/plans',
   getParentRoute: () => AppRoute,
 } as any)
 const AppPaymentsRoute = AppPaymentsRouteImport.update({
@@ -234,6 +252,8 @@ export interface FileRoutesByFullPath {
   '/loyalty': typeof AppLoyaltyRoute
   '/notifications': typeof AppNotificationsRoute
   '/payments': typeof AppPaymentsRoute
+  '/plans': typeof AppPlansRoute
+  '/platform-admin': typeof AppPlatformAdminRoute
   '/pos': typeof AppPosRoute
   '/products': typeof AppProductsRoute
   '/purchase-returns': typeof AppPurchaseReturnsRoute
@@ -243,6 +263,7 @@ export interface FileRoutesByFullPath {
   '/sales': typeof AppSalesRoute
   '/sales-returns': typeof AppSalesReturnsRoute
   '/settings': typeof AppSettingsRoute
+  '/settlements': typeof AppSettlementsRoute
   '/suppliers': typeof AppSuppliersRoute
   '/transfers': typeof AppTransfersRoute
   '/trial-balance': typeof AppTrialBalanceRoute
@@ -269,6 +290,8 @@ export interface FileRoutesByTo {
   '/loyalty': typeof AppLoyaltyRoute
   '/notifications': typeof AppNotificationsRoute
   '/payments': typeof AppPaymentsRoute
+  '/plans': typeof AppPlansRoute
+  '/platform-admin': typeof AppPlatformAdminRoute
   '/pos': typeof AppPosRoute
   '/products': typeof AppProductsRoute
   '/purchase-returns': typeof AppPurchaseReturnsRoute
@@ -278,6 +301,7 @@ export interface FileRoutesByTo {
   '/sales': typeof AppSalesRoute
   '/sales-returns': typeof AppSalesReturnsRoute
   '/settings': typeof AppSettingsRoute
+  '/settlements': typeof AppSettlementsRoute
   '/suppliers': typeof AppSuppliersRoute
   '/transfers': typeof AppTransfersRoute
   '/trial-balance': typeof AppTrialBalanceRoute
@@ -306,6 +330,8 @@ export interface FileRoutesById {
   '/_app/loyalty': typeof AppLoyaltyRoute
   '/_app/notifications': typeof AppNotificationsRoute
   '/_app/payments': typeof AppPaymentsRoute
+  '/_app/plans': typeof AppPlansRoute
+  '/_app/platform-admin': typeof AppPlatformAdminRoute
   '/_app/pos': typeof AppPosRoute
   '/_app/products': typeof AppProductsRoute
   '/_app/purchase-returns': typeof AppPurchaseReturnsRoute
@@ -315,6 +341,7 @@ export interface FileRoutesById {
   '/_app/sales': typeof AppSalesRoute
   '/_app/sales-returns': typeof AppSalesReturnsRoute
   '/_app/settings': typeof AppSettingsRoute
+  '/_app/settlements': typeof AppSettlementsRoute
   '/_app/suppliers': typeof AppSuppliersRoute
   '/_app/transfers': typeof AppTransfersRoute
   '/_app/trial-balance': typeof AppTrialBalanceRoute
@@ -343,6 +370,8 @@ export interface FileRouteTypes {
     | '/loyalty'
     | '/notifications'
     | '/payments'
+    | '/plans'
+    | '/platform-admin'
     | '/pos'
     | '/products'
     | '/purchase-returns'
@@ -352,6 +381,7 @@ export interface FileRouteTypes {
     | '/sales'
     | '/sales-returns'
     | '/settings'
+    | '/settlements'
     | '/suppliers'
     | '/transfers'
     | '/trial-balance'
@@ -378,6 +408,8 @@ export interface FileRouteTypes {
     | '/loyalty'
     | '/notifications'
     | '/payments'
+    | '/plans'
+    | '/platform-admin'
     | '/pos'
     | '/products'
     | '/purchase-returns'
@@ -387,6 +419,7 @@ export interface FileRouteTypes {
     | '/sales'
     | '/sales-returns'
     | '/settings'
+    | '/settlements'
     | '/suppliers'
     | '/transfers'
     | '/trial-balance'
@@ -414,6 +447,8 @@ export interface FileRouteTypes {
     | '/_app/loyalty'
     | '/_app/notifications'
     | '/_app/payments'
+    | '/_app/plans'
+    | '/_app/platform-admin'
     | '/_app/pos'
     | '/_app/products'
     | '/_app/purchase-returns'
@@ -423,6 +458,7 @@ export interface FileRouteTypes {
     | '/_app/sales'
     | '/_app/sales-returns'
     | '/_app/settings'
+    | '/_app/settlements'
     | '/_app/suppliers'
     | '/_app/transfers'
     | '/_app/trial-balance'
@@ -494,6 +530,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSuppliersRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/settlements': {
+      id: '/_app/settlements'
+      path: '/settlements'
+      fullPath: '/settlements'
+      preLoaderRoute: typeof AppSettlementsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/settings': {
       id: '/_app/settings'
       path: '/settings'
@@ -555,6 +598,20 @@ declare module '@tanstack/react-router' {
       path: '/pos'
       fullPath: '/pos'
       preLoaderRoute: typeof AppPosRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/platform-admin': {
+      id: '/_app/platform-admin'
+      path: '/platform-admin'
+      fullPath: '/platform-admin'
+      preLoaderRoute: typeof AppPlatformAdminRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/plans': {
+      id: '/_app/plans'
+      path: '/plans'
+      fullPath: '/plans'
+      preLoaderRoute: typeof AppPlansRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/payments': {
@@ -697,6 +754,8 @@ interface AppRouteChildren {
   AppLoyaltyRoute: typeof AppLoyaltyRoute
   AppNotificationsRoute: typeof AppNotificationsRoute
   AppPaymentsRoute: typeof AppPaymentsRoute
+  AppPlansRoute: typeof AppPlansRoute
+  AppPlatformAdminRoute: typeof AppPlatformAdminRoute
   AppPosRoute: typeof AppPosRoute
   AppProductsRoute: typeof AppProductsRoute
   AppPurchaseReturnsRoute: typeof AppPurchaseReturnsRoute
@@ -706,6 +765,7 @@ interface AppRouteChildren {
   AppSalesRoute: typeof AppSalesRoute
   AppSalesReturnsRoute: typeof AppSalesReturnsRoute
   AppSettingsRoute: typeof AppSettingsRoute
+  AppSettlementsRoute: typeof AppSettlementsRoute
   AppSuppliersRoute: typeof AppSuppliersRoute
   AppTransfersRoute: typeof AppTransfersRoute
   AppTrialBalanceRoute: typeof AppTrialBalanceRoute
@@ -731,6 +791,8 @@ const AppRouteChildren: AppRouteChildren = {
   AppLoyaltyRoute: AppLoyaltyRoute,
   AppNotificationsRoute: AppNotificationsRoute,
   AppPaymentsRoute: AppPaymentsRoute,
+  AppPlansRoute: AppPlansRoute,
+  AppPlatformAdminRoute: AppPlatformAdminRoute,
   AppPosRoute: AppPosRoute,
   AppProductsRoute: AppProductsRoute,
   AppPurchaseReturnsRoute: AppPurchaseReturnsRoute,
@@ -740,6 +802,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppSalesRoute: AppSalesRoute,
   AppSalesReturnsRoute: AppSalesReturnsRoute,
   AppSettingsRoute: AppSettingsRoute,
+  AppSettlementsRoute: AppSettlementsRoute,
   AppSuppliersRoute: AppSuppliersRoute,
   AppTransfersRoute: AppTransfersRoute,
   AppTrialBalanceRoute: AppTrialBalanceRoute,

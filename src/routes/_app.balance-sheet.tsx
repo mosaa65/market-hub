@@ -1,3 +1,4 @@
+import { ModuleGuard } from "@/lib/modules";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/page-header";
@@ -11,7 +12,11 @@ import { Printer, Landmark, Wallet, FileSpreadsheet } from "lucide-react";
 
 export const Route = createFileRoute("/_app/balance-sheet")({
   head: () => ({ meta: [{ title: "الميزانية العمومية — Vortex ERP" }] }),
-  component: BalanceSheetPage,
+  component: () => (
+    <ModuleGuard moduleId="advanced_accounting">
+      <BalanceSheetPage />
+    </ModuleGuard>
+  ),
 });
 
 function BalanceSheetPage() {
@@ -48,11 +53,20 @@ function BalanceSheetPage() {
     const expensesTotal = (expenses.data ?? []).reduce((a, r) => a + Number(r.amount), 0);
 
     const cashOnHand = Math.max(0, salesPaidCash - purchasePaidCash - expensesTotal);
-    const receivables = (customers.data ?? []).reduce((a, c) => a + Math.max(0, Number(c.balance || 0)), 0);
-    const inventoryValue = (inv.data ?? []).reduce((a, i: any) => a + (Number(i.quantity) * Number(i.products?.cost_price || 0)), 0);
+    const receivables = (customers.data ?? []).reduce(
+      (a, c) => a + Math.max(0, Number(c.balance || 0)),
+      0,
+    );
+    const inventoryValue = (inv.data ?? []).reduce(
+      (a, i: any) => a + Number(i.quantity) * Number(i.products?.cost_price || 0),
+      0,
+    );
     const totalAssets = cashOnHand + receivables + inventoryValue;
 
-    const payables = (suppliers.data ?? []).reduce((a, s) => a + Math.max(0, Number(s.balance || 0)), 0);
+    const payables = (suppliers.data ?? []).reduce(
+      (a, s) => a + Math.max(0, Number(s.balance || 0)),
+      0,
+    );
     const totalLiabilities = payables;
 
     const equity = totalAssets - totalLiabilities;
@@ -74,8 +88,14 @@ function BalanceSheetPage() {
   function handlePrintPDF() {
     printFinancialStatement({
       title: lang === "ar" ? "الميزانية العمومية والمركز المالي" : "Balance Sheet Statement",
-      subtitle: lang === "ar" ? "تجميع وتقييم الأصول مقابل الخصوم وحقوق الملكية للمؤسسة" : "Assets, Liabilities, and Owner's Equity",
-      periodLabel: lang === "ar" ? `بتاريخ: ${new Date().toLocaleDateString("ar-YE")}` : `As of ${new Date().toLocaleDateString()}`,
+      subtitle:
+        lang === "ar"
+          ? "تجميع وتقييم الأصول مقابل الخصوم وحقوق الملكية للمؤسسة"
+          : "Assets, Liabilities, and Owner's Equity",
+      periodLabel:
+        lang === "ar"
+          ? `بتاريخ: ${new Date().toLocaleDateString("ar-YE")}`
+          : `As of ${new Date().toLocaleDateString()}`,
       currency: "﷼",
       twoColumn: true,
       columnTitles: [
@@ -86,24 +106,49 @@ function BalanceSheetPage() {
         {
           title: lang === "ar" ? "الأصول المتداولة" : "Current Assets",
           items: [
-            { label: lang === "ar" ? "النقدية بالصندوق والبنك" : "Cash & Bank Balances", value: bs.cashOnHand },
-            { label: lang === "ar" ? "ذمم مدينة (حقوق لدى العملاء)" : "Accounts Receivable", value: bs.receivables },
-            { label: lang === "ar" ? "مخزون البضائع والسلع (بالتكلفة)" : "Merchandise Inventory", value: bs.inventoryValue },
+            {
+              label: lang === "ar" ? "النقدية بالصندوق والبنك" : "Cash & Bank Balances",
+              value: bs.cashOnHand,
+            },
+            {
+              label: lang === "ar" ? "ذمم مدينة (حقوق لدى العملاء)" : "Accounts Receivable",
+              value: bs.receivables,
+            },
+            {
+              label: lang === "ar" ? "مخزون البضائع والسلع (بالتكلفة)" : "Merchandise Inventory",
+              value: bs.inventoryValue,
+            },
           ],
-          total: { label: lang === "ar" ? "إجمالي الأصول (Total Assets)" : "Total Assets", value: bs.totalAssets, color: "#10b981" },
+          total: {
+            label: lang === "ar" ? "إجمالي الأصول (Total Assets)" : "Total Assets",
+            value: bs.totalAssets,
+            color: "#10b981",
+          },
         },
         {
           title: lang === "ar" ? "أولاً: الخصوم (الالتزامات)" : "1. Liabilities",
           items: [
-            { label: lang === "ar" ? "ذمم دائنة (مستحقات للموردين)" : "Accounts Payable", value: bs.payables, color: "#f43f5e" },
+            {
+              label: lang === "ar" ? "ذمم دائنة (مستحقات للموردين)" : "Accounts Payable",
+              value: bs.payables,
+              color: "#f43f5e",
+            },
           ],
         },
         {
           title: lang === "ar" ? "ثانياً: حقوق الملكية" : "2. Owner's Equity",
           items: [
-            { label: lang === "ar" ? "صافي حقوق الملكية ورأس المال" : "Owner's Net Equity", value: bs.equity, color: "#10b981" },
+            {
+              label: lang === "ar" ? "صافي حقوق الملكية ورأس المال" : "Owner's Net Equity",
+              value: bs.equity,
+              color: "#10b981",
+            },
           ],
-          total: { label: lang === "ar" ? "إجمالي الخصوم وحقوق الملكية" : "Total Liabilities & Equity", value: bs.totalLiabilitiesAndEquity, color: "#b8935a" },
+          total: {
+            label: lang === "ar" ? "إجمالي الخصوم وحقوق الملكية" : "Total Liabilities & Equity",
+            value: bs.totalLiabilitiesAndEquity,
+            color: "#b8935a",
+          },
         },
       ],
       rtl: lang === "ar",
@@ -125,7 +170,11 @@ function BalanceSheetPage() {
         { category: "الأصول", item: "ذمم مدينة (حقوق لدى العملاء)", amount: bs.receivables },
         { category: "الأصول", item: "مخزون البضائع والسلع (بالتكلفة)", amount: bs.inventoryValue },
         { category: "الخصوم", item: "ذمم دائنة (مستحقات للموردين)", amount: bs.payables },
-        { category: "حقوق الملكية", item: "صافي حقوق الملكية ورأس المال الأسمي", amount: bs.equity },
+        {
+          category: "حقوق الملكية",
+          item: "صافي حقوق الملكية ورأس المال الأسمي",
+          amount: bs.equity,
+        },
       ],
       totalsRow: {
         category: "التوازن",
@@ -140,10 +189,18 @@ function BalanceSheetPage() {
     <>
       <PageHeader
         title={lang === "ar" ? "الميزانية العمومية والمركز المالي" : "Balance Sheet Statement"}
-        subtitle={lang === "ar" ? "تجميع وتقييم الأصول والخصوم وحقوق الملكية للمؤسسة" : "Assets, Liabilities, and Owner's Equity statement"}
+        subtitle={
+          lang === "ar"
+            ? "تجميع وتقييم الأصول والخصوم وحقوق الملكية للمؤسسة"
+            : "Assets, Liabilities, and Owner's Equity statement"
+        }
         actions={
           <div className="flex items-center gap-2">
-            <Button onClick={handleExportExcel} variant="outline" className="gap-2 text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10">
+            <Button
+              onClick={handleExportExcel}
+              variant="outline"
+              className="gap-2 text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10"
+            >
               <FileSpreadsheet className="h-4 w-4" />
               {lang === "ar" ? "تصدير Excel" : "Export Excel"}
             </Button>
@@ -165,7 +222,9 @@ function BalanceSheetPage() {
                 <Wallet className="h-5 w-5" />
                 {lang === "ar" ? "الأصول والموجودات (Assets)" : "Assets"}
               </h3>
-              <span className="text-xs text-muted-foreground">{lang === "ar" ? "الموجودات الحالية" : "Current Assets"}</span>
+              <span className="text-xs text-muted-foreground">
+                {lang === "ar" ? "الموجودات الحالية" : "Current Assets"}
+              </span>
             </div>
 
             <div className="space-y-3 text-sm">
@@ -174,11 +233,17 @@ function BalanceSheetPage() {
                 <span className="font-mono font-semibold">{money(bs.cashOnHand)}</span>
               </div>
               <div className="flex justify-between py-2 border-b border-border/40">
-                <span>{lang === "ar" ? "ذمم مدينة (حقوق لدى العملاء)" : "Accounts Receivable (Customers)"}</span>
+                <span>
+                  {lang === "ar"
+                    ? "ذمم مدينة (حقوق لدى العملاء)"
+                    : "Accounts Receivable (Customers)"}
+                </span>
                 <span className="font-mono font-semibold">{money(bs.receivables)}</span>
               </div>
               <div className="flex justify-between py-2 border-b border-border/40">
-                <span>{lang === "ar" ? "مخزون البضائع والسلع (بالتكلفة)" : "Merchandise Inventory"}</span>
+                <span>
+                  {lang === "ar" ? "مخزون البضائع والسلع (بالتكلفة)" : "Merchandise Inventory"}
+                </span>
                 <span className="font-mono font-semibold">{money(bs.inventoryValue)}</span>
               </div>
 
@@ -196,27 +261,41 @@ function BalanceSheetPage() {
             <div className="flex items-center justify-between border-b border-border pb-3">
               <h3 className="font-bold text-base flex items-center gap-2 text-amber-400">
                 <Landmark className="h-5 w-5" />
-                {lang === "ar" ? "الخصوم وحقوق الملكية (Liabilities & Equity)" : "Liabilities & Equity"}
+                {lang === "ar"
+                  ? "الخصوم وحقوق الملكية (Liabilities & Equity)"
+                  : "Liabilities & Equity"}
               </h3>
-              <span className="text-xs text-muted-foreground">{lang === "ar" ? "الالتزامات وحقوق التاجر" : "Claims & Equity"}</span>
+              <span className="text-xs text-muted-foreground">
+                {lang === "ar" ? "الالتزامات وحقوق التاجر" : "Claims & Equity"}
+              </span>
             </div>
 
             <div className="space-y-3 text-sm">
-              <div className="font-semibold text-xs text-muted-foreground uppercase">{lang === "ar" ? "أولاً: الخصوم (الالتزامات)" : "1. Liabilities"}</div>
+              <div className="font-semibold text-xs text-muted-foreground uppercase">
+                {lang === "ar" ? "أولاً: الخصوم (الالتزامات)" : "1. Liabilities"}
+              </div>
               <div className="flex justify-between py-2 border-b border-border/40 text-rose-400">
-                <span>{lang === "ar" ? "ذمم دائنة (مستحقات للموردين)" : "Accounts Payable (Suppliers)"}</span>
+                <span>
+                  {lang === "ar" ? "ذمم دائنة (مستحقات للموردين)" : "Accounts Payable (Suppliers)"}
+                </span>
                 <span className="font-mono font-semibold">{money(bs.payables)}</span>
               </div>
 
-              <div className="pt-2 font-semibold text-xs text-muted-foreground uppercase">{lang === "ar" ? "ثانياً: حقوق الملكية" : "2. Owner's Equity"}</div>
+              <div className="pt-2 font-semibold text-xs text-muted-foreground uppercase">
+                {lang === "ar" ? "ثانياً: حقوق الملكية" : "2. Owner's Equity"}
+              </div>
               <div className="flex justify-between py-2 border-b border-border/40 text-emerald-400">
-                <span>{lang === "ar" ? "صافي حقوق الملكية ورأس المال الأسمي" : "Owner's Net Equity"}</span>
+                <span>
+                  {lang === "ar" ? "صافي حقوق الملكية ورأس المال الأسمي" : "Owner's Net Equity"}
+                </span>
                 <span className="font-mono font-semibold">{money(bs.equity)}</span>
               </div>
 
               <div className="pt-4">
                 <div className="flex justify-between py-3 px-4 rounded-xl bg-amber-500/15 border border-amber-500/30 font-bold text-base text-amber-400">
-                  <span>{lang === "ar" ? "إجمالي الخصوم وحقوق الملكية" : "Total Liabilities & Equity"}</span>
+                  <span>
+                    {lang === "ar" ? "إجمالي الخصوم وحقوق الملكية" : "Total Liabilities & Equity"}
+                  </span>
                   <span className="font-mono">{money(bs.totalLiabilitiesAndEquity)}</span>
                 </div>
               </div>

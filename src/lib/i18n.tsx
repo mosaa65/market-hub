@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
 export type Lang = "en" | "ar";
@@ -7,7 +8,7 @@ const STORAGE_KEY = "lang_v2";
 
 const en: Dict = {
   "app.name": "Vortex ERP",
-  "app.tagline": "Grocery & Wholesale Trading Platform",
+  "app.tagline": "Integrated Commercial & Retail Cloud ERP",
 
   // Navigation
   "nav.dashboard": "Dashboard",
@@ -16,7 +17,7 @@ const en: Dict = {
   "nav.products": "Products",
   "nav.inventory": "Inventory",
   "nav.warehouses": "Warehouses",
-  "nav.catalog": "Catalog (Categories/Brands/Units)",
+  "nav.catalog": "Catalog",
   "nav.sales": "Sales",
   "nav.purchases": "Purchases",
   "nav.returns": "Returns",
@@ -25,6 +26,7 @@ const en: Dict = {
   "nav.barcodes": "Barcode Labels",
   "nav.loyalty": "Loyalty",
   "nav.audit": "Audit Logs",
+  "nav.settlements": "Settlements",
   "nav.customers": "Customers",
   "nav.suppliers": "Suppliers",
   "nav.finance": "Finance",
@@ -41,6 +43,8 @@ const en: Dict = {
   "nav.users": "Users & Roles",
   "nav.notifications": "Notifications",
   "nav.settings": "Settings",
+  "nav.plans": "Plans and Subscriptions",
+  "nav.platform_admin": "Platform Admin",
   "nav.section.overview": "Overview",
   "nav.section.operations": "Operations",
   "nav.section.relations": "Relations",
@@ -438,7 +442,8 @@ const en: Dict = {
   "users.joined": "Joined",
   "users.no_role": "no role",
   "users.add_role": "Add role",
-  "users.signup_hint": "To add a new user: have them sign up at /auth, then assign their role here.",
+  "users.signup_hint":
+    "To add a new user: have them sign up at /auth, then assign their role here.",
 
   // Notifications
   "notifications.title": "Notifications",
@@ -558,7 +563,7 @@ const en: Dict = {
 
 const ar: Dict = {
   "app.name": "فورتكس",
-  "app.tagline": "منصة تجارة الجملة والبقالة",
+  "app.tagline": "منظومة سحابية متكاملة لإدارة الأنشطة والشركات التجارية",
 
   // التنقل
   "nav.dashboard": "لوحة التحكم",
@@ -567,7 +572,7 @@ const ar: Dict = {
   "nav.products": "المنتجات",
   "nav.inventory": "المخزون",
   "nav.warehouses": "المستودعات",
-  "nav.catalog": "الفهرس (تصنيفات/علامات/وحدات)",
+  "nav.catalog": "الفهرس",
   "nav.sales": "المبيعات",
   "nav.purchases": "المشتريات",
   "nav.returns": "المرتجعات",
@@ -576,6 +581,7 @@ const ar: Dict = {
   "nav.barcodes": "ملصقات الباركود",
   "nav.loyalty": "نقاط الولاء",
   "nav.audit": "سجل الأحداث",
+  "nav.settlements": "التسويات",
   "nav.customers": "العملاء",
   "nav.suppliers": "الموردون",
   "nav.finance": "المالية",
@@ -592,6 +598,8 @@ const ar: Dict = {
   "nav.users": "المستخدمون والصلاحيات",
   "nav.notifications": "الإشعارات",
   "nav.settings": "الإعدادات",
+  "nav.plans": "باقات واشتراكات النظام",
+  "nav.platform_admin": "إدارة المنصة والباقات",
   "nav.section.overview": "نظرة عامة",
   "nav.section.operations": "العمليات",
   "nav.section.relations": "العلاقات",
@@ -989,7 +997,8 @@ const ar: Dict = {
   "users.joined": "انضم",
   "users.no_role": "بلا دور",
   "users.add_role": "إضافة دور",
-  "users.signup_hint": "لإضافة مستخدم جديد: اطلب منه التسجيل من صفحة /auth، وسيظهر هنا لتعيين دوره.",
+  "users.signup_hint":
+    "لإضافة مستخدم جديد: اطلب منه التسجيل من صفحة /auth، وسيظهر هنا لتعيين دوره.",
 
   // الإشعارات
   "notifications.title": "الإشعارات",
@@ -1138,7 +1147,9 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     dir: lang === "ar" ? "rtl" : "ltr",
     t: (key, ...args) => {
       let s = dicts[lang][key] ?? key;
-      args.forEach((a, i) => { s = s.replace(`{${i}}`, String(a)); });
+      args.forEach((a, i) => {
+        s = s.replace(`{${i}}`, String(a));
+      });
       return s;
     },
   };

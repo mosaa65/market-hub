@@ -76,15 +76,15 @@ Configure the required environment variables before starting the development ser
 
 ## Quick Facts | حقائق سريعة
 
-| Item | Value |
-| --- | --- |
-| Project type | Web-based ERP for grocery, wholesale, and retail operations |
+| Item         | Value                                                                          |
+| ------------ | ------------------------------------------------------------------------------ |
+| Project type | Web-based ERP for grocery, wholesale, and retail operations                    |
 | Architecture | Modular TanStack Start application with Supabase-backed PostgreSQL RPC and RLS |
-| Frontend | React, TypeScript, TanStack Start, TanStack Router, Tailwind CSS |
-| Backend | TanStack Start server runtime, Supabase Auth, and PostgreSQL RPC functions |
-| Database | PostgreSQL via Supabase |
-| Deployment | [Vercel — live preview](https://market-hub-two-theta.vercel.app/) |
-| License | Not specified in the repository |
+| Frontend     | React, TypeScript, TanStack Start, TanStack Router, Tailwind CSS               |
+| Backend      | TanStack Start server runtime, Supabase Auth, and PostgreSQL RPC functions     |
+| Database     | PostgreSQL via Supabase                                                        |
+| Deployment   | [Vercel — live preview](https://market-hub-two-theta.vercel.app/)              |
+| License      | Not specified in the repository                                                |
 
 ---
 
@@ -136,41 +136,41 @@ Select any image to view it at full size. The verified UI captures live in `scre
 
 ### Commerce | التجارة
 
-| Point of sale | Sales |
-| --- | --- |
+| Point of sale                                                                                                               | Sales                                                                                                                            |
+| --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | [![Vortex ERP point of sale](screenshots/003-pos.png)](screenshots/003-pos.png)<br><sub>Commerce — checkout workspace</sub> | [![Vortex ERP sales screen](screenshots/032-sales.png)](screenshots/032-sales.png)<br><sub>Commerce — sales-invoice review</sub> |
 
-| Purchases | Returns |
-| --- | --- |
+| Purchases                                                                                                                               | Returns                                                                                                                                      |
+| --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | [![Vortex ERP purchases screen](screenshots/030-purchases.png)](screenshots/030-purchases.png)<br><sub>Commerce — goods receiving</sub> | [![Vortex ERP returns screen](screenshots/048-returns.png)](screenshots/048-returns.png)<br><sub>Commerce — sales and purchase returns</sub> |
 
 ### Catalog and Inventory | الفهرس والمخزون
 
-| Products | Inventory | Barcode labels |
-| --- | --- | --- |
+| Products                                                                                                                                               | Inventory                                                                                                                                              | Barcode labels                                                                                                                                            |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [![Vortex ERP products screen](screenshots/005-products.png)](screenshots/005-products.png)<br><sub>Catalog — products, pricing, and identifiers</sub> | [![Vortex ERP inventory screen](screenshots/024-inventory.png)](screenshots/024-inventory.png)<br><sub>Inventory — stock on hand and adjustments</sub> | [![Vortex ERP barcode labels screen](screenshots/049-barcodes.png)](screenshots/049-barcodes.png)<br><sub>Catalog — barcode generation and printing</sub> |
 
 ### Finance and Insight | المالية والرؤى
 
-| Finance | Loyalty |
-| --- | --- |
+| Finance                                                                                                                                | Loyalty                                                                                                                                   |
+| -------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | [![Vortex ERP finance screen](screenshots/035-finance.png)](screenshots/035-finance.png)<br><sub>Finance — expenses and balances</sub> | [![Vortex ERP loyalty screen](screenshots/041-loyalty.png)](screenshots/041-loyalty.png)<br><sub>Customers — loyalty administration</sub> |
 
-| Advanced analytics | Reports |
-| --- | --- |
+| Advanced analytics                                                                                                                                                                         | Reports                                                                                                                                |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
 | [![Vortex ERP advanced analytics screen](screenshots/052-analytics.png)](screenshots/052-analytics.png)<br><sub>Insight — revenue, profit, product, category, and warehouse analysis</sub> | [![Vortex ERP reports screen](screenshots/043-reports.png)](screenshots/043-reports.png)<br><sub>Insight — operational reporting</sub> |
 
 ### Administration | الإدارة
 
-| Users and roles | Notifications | Audit log |
-| --- | --- | --- |
+| Users and roles                                                                                                                   | Notifications                                                                                                                                                      | Audit log                                                                                                                                   |
+| --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | [![Vortex ERP users screen](screenshots/046-users.png)](screenshots/046-users.png)<br><sub>Administration — role assignment</sub> | [![Vortex ERP notifications screen](screenshots/050-notifications.png)](screenshots/050-notifications.png)<br><sub>Administration — stock and balance alerts</sub> | [![Vortex ERP audit screen](screenshots/051-audit.png)](screenshots/051-audit.png)<br><sub>Administration — operational event history</sub> |
 
 ### Mobile Experience | تجربة الجوال
 
-| POS catalog | Checkout | Dashboard |
-| --- | --- | --- |
-| [![Vortex ERP mobile POS catalog](<screenshots/WhatsApp%20Image%202026-07-08%20at%2011.46.21%20PM.jpeg>)](<screenshots/WhatsApp%20Image%202026-07-08%20at%2011.46.21%20PM.jpeg>)<br><sub>Mobile — product browsing</sub> | [![Vortex ERP mobile checkout](<screenshots/WhatsApp%20Image%202026-07-08%20at%2011.46.21%20PM%20(1).jpeg>)](<screenshots/WhatsApp%20Image%202026-07-08%20at%2011.46.21%20PM%20(1).jpeg>)<br><sub>Mobile — payment and invoice issue</sub> | [![Vortex ERP mobile dashboard](<screenshots/WhatsApp%20Image%202026-07-08%20at%2011.46.21%20PM%20(2).jpeg>)](<screenshots/WhatsApp%20Image%202026-07-08%20at%2011.46.21%20PM%20(2).jpeg>)<br><sub>Mobile — revenue insight</sub> |
+| POS catalog                                                                                                                                                                                                          | Checkout                                                                                                                                                                                                                                   | Dashboard                                                                                                                                                                                                                         |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [![Vortex ERP mobile POS catalog](screenshots/WhatsApp%20Image%202026-07-08%20at%2011.46.21%20PM.jpeg)](screenshots/WhatsApp%20Image%202026-07-08%20at%2011.46.21%20PM.jpeg)<br><sub>Mobile — product browsing</sub> | [![Vortex ERP mobile checkout](<screenshots/WhatsApp%20Image%202026-07-08%20at%2011.46.21%20PM%20(1).jpeg>)](<screenshots/WhatsApp%20Image%202026-07-08%20at%2011.46.21%20PM%20(1).jpeg>)<br><sub>Mobile — payment and invoice issue</sub> | [![Vortex ERP mobile dashboard](<screenshots/WhatsApp%20Image%202026-07-08%20at%2011.46.21%20PM%20(2).jpeg>)](<screenshots/WhatsApp%20Image%202026-07-08%20at%2011.46.21%20PM%20(2).jpeg>)<br><sub>Mobile — revenue insight</sub> |
 
 ---
 
@@ -204,17 +204,17 @@ The modules below are organized around operational responsibilities rather than 
 
 تُنظَّم الوحدات التالية وفق مسؤولياتها التشغيلية، وليس وفق تسميات التنقل فقط.
 
-| Module | Purpose | Responsibilities and Main Capabilities |
-| --- | --- | --- |
-| Dashboard and Analytics | Provide a current operational view. | Aggregates sales, products, inventory, customers, expenses, and purchase data into KPI cards and charts. |
-| POS and Sales | Process customer-facing sales activity. | Searches or scans products, manages carts and payment methods, creates sales invoices, and produces printable/PDF documents. |
-| Products and Catalog | Maintain sellable product data. | Manages products, bilingual names, SKU/barcodes, pricing, tax, minimum stock, categories, brands, and units. |
-| Inventory, Warehouses, and Batches | Control physical stock. | Tracks quantities per warehouse, stock movements, manual adjustments, transfers, batches, and expiry dates. |
-| Purchases and Returns | Record inbound stock and reversals. | Creates purchase invoices, increases inventory, records sales/purchase returns, and adjusts related balances. |
-| Customers, Payments, and Loyalty | Manage customer relationships and collections. | Stores contact/credit data, exposes debt statements, records payments, and maintains loyalty transactions. |
-| Suppliers and Finance | Support supplier and expense oversight. | Maintains supplier balances, expense categories and entries, receivables/payables, and finance summaries. |
-| Reports and Documents | Turn operating data into reviewable output. | Produces report datasets, CSV exports, invoice PDFs, customer statements, barcode labels, and print layouts. |
-| Administration | Govern access and configuration. | Handles authentication, roles, company settings, notifications, audit-log review, language direction, and themes. |
+| Module                             | Purpose                                        | Responsibilities and Main Capabilities                                                                                       |
+| ---------------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Dashboard and Analytics            | Provide a current operational view.            | Aggregates sales, products, inventory, customers, expenses, and purchase data into KPI cards and charts.                     |
+| POS and Sales                      | Process customer-facing sales activity.        | Searches or scans products, manages carts and payment methods, creates sales invoices, and produces printable/PDF documents. |
+| Products and Catalog               | Maintain sellable product data.                | Manages products, bilingual names, SKU/barcodes, pricing, tax, minimum stock, categories, brands, and units.                 |
+| Inventory, Warehouses, and Batches | Control physical stock.                        | Tracks quantities per warehouse, stock movements, manual adjustments, transfers, batches, and expiry dates.                  |
+| Purchases and Returns              | Record inbound stock and reversals.            | Creates purchase invoices, increases inventory, records sales/purchase returns, and adjusts related balances.                |
+| Customers, Payments, and Loyalty   | Manage customer relationships and collections. | Stores contact/credit data, exposes debt statements, records payments, and maintains loyalty transactions.                   |
+| Suppliers and Finance              | Support supplier and expense oversight.        | Maintains supplier balances, expense categories and entries, receivables/payables, and finance summaries.                    |
+| Reports and Documents              | Turn operating data into reviewable output.    | Produces report datasets, CSV exports, invoice PDFs, customer statements, barcode labels, and print layouts.                 |
+| Administration                     | Govern access and configuration.               | Handles authentication, roles, company settings, notifications, audit-log review, language direction, and themes.            |
 
 ## System Workflow | سير العمل
 
@@ -259,45 +259,45 @@ flowchart LR
 
 ## Technology Stack
 
-| Category | Technology | Version / Evidence |
-| --- | --- | --- |
-| Programming Languages | TypeScript | ^5.8.3 |
+| Category              | Technology | Version / Evidence |
+| --------------------- | ---------- | ------------------ |
+| Programming Languages | TypeScript | ^5.8.3             |
 
 ### Frontend and UI
 
-| Category | Technology | Version / Evidence |
-| --- | --- | --- |
-| Frontend | React | ^19.2.0 |
-| Frontend | TanStack Start and TanStack Router | ^1.167.50 / ^1.168.25 |
+| Category      | Technology                                                   | Version / Evidence                                        |
+| ------------- | ------------------------------------------------------------ | --------------------------------------------------------- |
+| Frontend      | React                                                        | ^19.2.0                                                   |
+| Frontend      | TanStack Start and TanStack Router                           | ^1.167.50 / ^1.168.25                                     |
 | UI Components | Tailwind CSS, shadcn/ui New York configuration, and Radix UI | Tailwind ^4.2.1; Radix packages are declared individually |
-| Charts | Recharts | ^2.15.4 |
+| Charts        | Recharts                                                     | ^2.15.4                                                   |
 
 ### Backend, Database, and Authentication
 
-| Category | Technology | Version / Evidence |
-| --- | --- | --- |
-| Backend | TanStack Start server runtime and Nitro | ^1.167.50 / 3.0.260603-beta |
-| Database | PostgreSQL through Supabase | Database version not declared |
-| Authentication | Supabase Auth | Used for sign-up, password sign-in, session refresh, and sign-out |
-| ORM | No ORM identified | Supabase JavaScript client issues table and RPC calls directly |
-| Cloud | Supabase project configuration | `supabase/config.toml` and Supabase environment variables are present |
+| Category       | Technology                              | Version / Evidence                                                    |
+| -------------- | --------------------------------------- | --------------------------------------------------------------------- |
+| Backend        | TanStack Start server runtime and Nitro | ^1.167.50 / 3.0.260603-beta                                           |
+| Database       | PostgreSQL through Supabase             | Database version not declared                                         |
+| Authentication | Supabase Auth                           | Used for sign-up, password sign-in, session refresh, and sign-out     |
+| ORM            | No ORM identified                       | Supabase JavaScript client issues table and RPC calls directly        |
+| Cloud          | Supabase project configuration          | `supabase/config.toml` and Supabase environment variables are present |
 
 ### State, Validation, and Operations
 
-| Category | Technology | Version / Evidence |
-| --- | --- | --- |
-| State Management | React local state and TanStack React Query | React Query ^5.83.0; queries and mutations are used in multiple routes |
-| Validation | Zod | ^3.24.2; used for authentication input validation |
-| Printing | jsPDF, jspdf-autotable, and browser print layouts | ^4.2.1 / ^5.0.8 |
-| QR & Barcode | html5-qrcode and JsBarcode | ^2.3.8 / ^3.12.3 |
+| Category         | Technology                                        | Version / Evidence                                                     |
+| ---------------- | ------------------------------------------------- | ---------------------------------------------------------------------- |
+| State Management | React local state and TanStack React Query        | React Query ^5.83.0; queries and mutations are used in multiple routes |
+| Validation       | Zod                                               | ^3.24.2; used for authentication input validation                      |
+| Printing         | jsPDF, jspdf-autotable, and browser print layouts | ^4.2.1 / ^5.0.8                                                        |
+| QR & Barcode     | html5-qrcode and JsBarcode                        | ^2.3.8 / ^3.12.3                                                       |
 
 ### Build, Quality, and Delivery
 
-| Category | Technology | Version / Evidence |
-| --- | --- | --- |
-| Build Tools | Vite | ^8.0.16 |
-| Testing | No automated test framework or test files found | Not documented in the repository |
-| DevOps | No Dockerfile, Compose file, or CI workflow found | Not documented in the repository |
+| Category          | Technology                                                                   | Version / Evidence                              |
+| ----------------- | ---------------------------------------------------------------------------- | ----------------------------------------------- |
+| Build Tools       | Vite                                                                         | ^8.0.16                                         |
+| Testing           | No automated test framework or test files found                              | Not documented in the repository                |
+| DevOps            | No Dockerfile, Compose file, or CI workflow found                            | Not documented in the repository                |
 | Development Tools | ESLint, Prettier, Bun configuration, and Lovable Vite/TanStack configuration | ^9.32.0 / ^3.7.3 / version not declared / 2.7.1 |
 
 ## Architecture Overview | نظرة عامة على المعمارية
@@ -338,14 +338,14 @@ The rationale below is inferred from the implementation, not from undocumented p
 
 التبرير التالي مستنتج من التنفيذ الفعلي وليس من قرارات منتج غير موثقة.
 
-| Decision | Repository Evidence | Engineering Rationale |
-| --- | --- | --- |
-| PostgreSQL RPC for business transactions | `create_sale`, `create_purchase`, return, transfer, payment, and loyalty functions are defined in migrations and invoked from routes. | The relevant operation can validate inputs and coordinate its invoice, line-item, inventory, movement, and/or balance writes without relying on a sequence of unrelated browser calls. |
-| Row Level Security with role helpers | Business tables enable RLS and policies use `has_role` and `is_staff`. | Authorization is enforced next to the data, so a client-side role display is not the sole security boundary. |
-| Supabase Auth linked to public profiles | Sign-up/sign-in use Supabase Auth; database triggers create profiles and bootstrap the first owner. | Identity, session claims, profile data, and RLS checks are connected through the same managed user identity. |
-| TanStack Start file-based routing | Operational modules are split across `src/routes/_app.*.tsx`; a custom server entry is configured. | The route structure keeps a broad ERP surface area navigable while retaining one app shell and one deployment unit. |
-| React Query for selected data-heavy modules | Dashboard, analytics, products, inventory, warehouses, and catalog use `useQuery`; CRUD paths use mutations and query invalidation. | Query state, loading states, mutation lifecycle, and cache invalidation are centralized where the UI performs repeated reads and writes. |
-| Normalized relational schema | Catalog entities, document headers/items, inventory by product/warehouse, and separate payment/loyalty/audit tables are present. | Separating master data from transaction headers and line items reduces duplicated attributes and keeps reports tied to primary operational records. |
+| Decision                                    | Repository Evidence                                                                                                                   | Engineering Rationale                                                                                                                                                                  |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PostgreSQL RPC for business transactions    | `create_sale`, `create_purchase`, return, transfer, payment, and loyalty functions are defined in migrations and invoked from routes. | The relevant operation can validate inputs and coordinate its invoice, line-item, inventory, movement, and/or balance writes without relying on a sequence of unrelated browser calls. |
+| Row Level Security with role helpers        | Business tables enable RLS and policies use `has_role` and `is_staff`.                                                                | Authorization is enforced next to the data, so a client-side role display is not the sole security boundary.                                                                           |
+| Supabase Auth linked to public profiles     | Sign-up/sign-in use Supabase Auth; database triggers create profiles and bootstrap the first owner.                                   | Identity, session claims, profile data, and RLS checks are connected through the same managed user identity.                                                                           |
+| TanStack Start file-based routing           | Operational modules are split across `src/routes/_app.*.tsx`; a custom server entry is configured.                                    | The route structure keeps a broad ERP surface area navigable while retaining one app shell and one deployment unit.                                                                    |
+| React Query for selected data-heavy modules | Dashboard, analytics, products, inventory, warehouses, and catalog use `useQuery`; CRUD paths use mutations and query invalidation.   | Query state, loading states, mutation lifecycle, and cache invalidation are centralized where the UI performs repeated reads and writes.                                               |
+| Normalized relational schema                | Catalog entities, document headers/items, inventory by product/warehouse, and separate payment/loyalty/audit tables are present.      | Separating master data from transaction headers and line items reduces duplicated attributes and keeps reports tied to primary operational records.                                    |
 
 ## Performance Considerations | اعتبارات الأداء
 
@@ -357,13 +357,13 @@ The following points describe implemented behavior and its boundaries; the repos
 
 تصف النقاط التالية السلوك المنفذ وحدوده؛ ولا ينشر المستودع قياسات معيارية للأداء.
 
-| Evidence | Implementation Detail | Practical Effect / Boundary |
-| --- | --- | --- |
-| Parallel reads | Many route loaders use `Promise.all` for independent Supabase queries. | Reduces avoidable serial waiting when a screen needs several datasets. |
-| Query management | React Query powers dashboard, analytics, products, catalog, inventory, and warehouses; mutations invalidate affected queries. | Keeps these modules synchronized after CRUD operations. No project-specific React Query cache duration is configured. |
-| Bounded reads | Several routes apply explicit `limit` values, such as recent invoices, reports, audit logs, products, payments, and returns. | Prevents those views from unbounded result retrieval; the selected limits remain domain-specific implementation choices. |
-| Database indexes | The schema includes a GIN product search index and indexes for batches, audit logs, loyalty, customer payments, and stock-movement references. | Provides indexed paths for the indexed fields; the repository does not include benchmark results. |
-| SSR boundary | A custom SSR server entry is configured. Several routes also fetch data in client effects. | SSR error handling is explicit, while the repository does not document server-side data preloading, lazy-loading policy, or performance targets. |
+| Evidence         | Implementation Detail                                                                                                                          | Practical Effect / Boundary                                                                                                                      |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Parallel reads   | Many route loaders use `Promise.all` for independent Supabase queries.                                                                         | Reduces avoidable serial waiting when a screen needs several datasets.                                                                           |
+| Query management | React Query powers dashboard, analytics, products, catalog, inventory, and warehouses; mutations invalidate affected queries.                  | Keeps these modules synchronized after CRUD operations. No project-specific React Query cache duration is configured.                            |
+| Bounded reads    | Several routes apply explicit `limit` values, such as recent invoices, reports, audit logs, products, payments, and returns.                   | Prevents those views from unbounded result retrieval; the selected limits remain domain-specific implementation choices.                         |
+| Database indexes | The schema includes a GIN product search index and indexes for batches, audit logs, loyalty, customer payments, and stock-movement references. | Provides indexed paths for the indexed fields; the repository does not include benchmark results.                                                |
+| SSR boundary     | A custom SSR server entry is configured. Several routes also fetch data in client effects.                                                     | SSR error handling is explicit, while the repository does not document server-side data preloading, lazy-loading policy, or performance targets. |
 
 ## Technical Challenges | التحديات التقنية
 
@@ -383,17 +383,17 @@ The following points describe implemented behavior and its boundaries; the repos
 
 ## UI/UX Design
 
-| Element | Tool/Library |
-| --- | --- |
-| Color system | Tailwind CSS v4 tokens and CSS custom properties using OKLCH values |
-| Typography | Inter, IBM Plex Sans Arabic, and JetBrains Mono |
-| Design system | shadcn/ui New York configuration with Radix UI primitives |
-| Icons | Lucide React |
-| Charts | Recharts |
-| Feedback and notifications | Sonner |
-| Layout and responsiveness | Tailwind responsive utilities, Radix Sheet, and a mobile navigation drawer |
+| Element                    | Tool/Library                                                                                 |
+| -------------------------- | -------------------------------------------------------------------------------------------- |
+| Color system               | Tailwind CSS v4 tokens and CSS custom properties using OKLCH values                          |
+| Typography                 | Inter, IBM Plex Sans Arabic, and JetBrains Mono                                              |
+| Design system              | shadcn/ui New York configuration with Radix UI primitives                                    |
+| Icons                      | Lucide React                                                                                 |
+| Charts                     | Recharts                                                                                     |
+| Feedback and notifications | Sonner                                                                                       |
+| Layout and responsiveness  | Tailwind responsive utilities, Radix Sheet, and a mobile navigation drawer                   |
 | Direction and localization | Custom i18n provider with Arabic/English dictionaries and runtime RTL/LTR document direction |
-| Theme | Persistent light/dark preference stored in browser local storage |
+| Theme                      | Persistent light/dark preference stored in browser local storage                             |
 
 ## Installation & Configuration
 
@@ -439,30 +439,30 @@ market-hub/
 
 ## Services Provided
 
-| Service | Value Delivered |
-| --- | --- |
-| Sales operations | Gives cashiers and sales teams a POS workflow, invoice history, payment handling, and printable sales documents. |
-| Stock and warehouse operations | Helps warehouse teams track inventory, adjustments, expiry batches, and transfers across storage locations. |
-| Procurement and supplier management | Supports goods receiving, supplier records, supplier balances, and purchase returns. |
-| Customer relationship management | Maintains customer data, credit limits, balances, statements, loyalty points, and collections. |
-| Financial oversight | Consolidates expenses, receivables, payables, and finance-oriented summaries. |
-| Business intelligence | Gives managers dashboards, analytics, low-stock visibility, reports, and CSV exports. |
-| Administrative governance | Provides user-role administration, company settings, operational alerts, and audit-log review. |
+| Service                             | Value Delivered                                                                                                  |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Sales operations                    | Gives cashiers and sales teams a POS workflow, invoice history, payment handling, and printable sales documents. |
+| Stock and warehouse operations      | Helps warehouse teams track inventory, adjustments, expiry batches, and transfers across storage locations.      |
+| Procurement and supplier management | Supports goods receiving, supplier records, supplier balances, and purchase returns.                             |
+| Customer relationship management    | Maintains customer data, credit limits, balances, statements, loyalty points, and collections.                   |
+| Financial oversight                 | Consolidates expenses, receivables, payables, and finance-oriented summaries.                                    |
+| Business intelligence               | Gives managers dashboards, analytics, low-stock visibility, reports, and CSV exports.                            |
+| Administrative governance           | Provides user-role administration, company settings, operational alerts, and audit-log review.                   |
 
 ## API Overview
 
 > **Integration boundary:** the repository does not define an application-owned REST or GraphQL API. The UI communicates through Supabase Auth, typed table queries, and authenticated PostgreSQL RPC functions.
 
-| Area | Supabase Integration | Responsibility |
-| --- | --- | --- |
-| Authentication | Supabase Auth | Email/password sign-up, password sign-in, session retrieval/refresh, sign-out, and a server-side bearer-token claim-validation helper. |
-| Products and Catalog | Table queries for products, categories, brands, and units | Product data, prices, stock thresholds, SKU/barcode identifiers, and catalog metadata. |
-| Inventory | Inventory and stock-movement tables; transaction RPC functions | Per-warehouse stock, adjustments, movements, batches, expiry, and stock transfers. |
-| Sales | `create_sale` RPC with sales invoice tables | Validates the sale, creates invoice records, decrements inventory, and records stock movements. |
-| Purchases | `create_purchase` RPC with purchase invoice tables | Creates purchase records, increases inventory, records movements, and updates supplier balance when applicable. |
-| Finance | Expense tables and `record_customer_payment` RPC | Expense entry, customer collection, invoice payment status, and customer balance updates. |
-| Reports | Read queries over operational tables | Client-side report aggregation, dashboard data, analytics, and CSV export. |
-| Administration | Profiles, roles, settings, notifications, and audit-log tables | Access control, company configuration, operational alerts, and history review. |
+| Area                 | Supabase Integration                                           | Responsibility                                                                                                                         |
+| -------------------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Authentication       | Supabase Auth                                                  | Email/password sign-up, password sign-in, session retrieval/refresh, sign-out, and a server-side bearer-token claim-validation helper. |
+| Products and Catalog | Table queries for products, categories, brands, and units      | Product data, prices, stock thresholds, SKU/barcode identifiers, and catalog metadata.                                                 |
+| Inventory            | Inventory and stock-movement tables; transaction RPC functions | Per-warehouse stock, adjustments, movements, batches, expiry, and stock transfers.                                                     |
+| Sales                | `create_sale` RPC with sales invoice tables                    | Validates the sale, creates invoice records, decrements inventory, and records stock movements.                                        |
+| Purchases            | `create_purchase` RPC with purchase invoice tables             | Creates purchase records, increases inventory, records movements, and updates supplier balance when applicable.                        |
+| Finance              | Expense tables and `record_customer_payment` RPC               | Expense entry, customer collection, invoice payment status, and customer balance updates.                                              |
+| Reports              | Read queries over operational tables                           | Client-side report aggregation, dashboard data, analytics, and CSV export.                                                             |
+| Administration       | Profiles, roles, settings, notifications, and audit-log tables | Access control, company configuration, operational alerts, and history review.                                                         |
 
 ## Database Overview | نظرة عامة على قاعدة البيانات
 
@@ -563,8 +563,8 @@ The following owner-proposed priorities are intentionally separated from the imp
 
 ## Development Team
 
-| Name | Responsibilities |
-| --- | --- |
+| Name             | Responsibilities                  |
+| ---------------- | --------------------------------- |
 | **المهندس موسى** | المسؤول التقني في فريق Inama Soft |
 
 ---

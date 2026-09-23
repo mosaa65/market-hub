@@ -1,7 +1,17 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { z } from "zod";
-import { Sparkles, Loader2, ShieldCheck, Building2, ArrowLeftRight, Mail, Lock } from "lucide-react";
+import {
+  Loader2,
+  ShieldCheck,
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  CheckCircle2,
+  LogIn,
+  Sparkles,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
@@ -13,23 +23,41 @@ export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
 
-const buildSchema = (t: (key: string) => string) =>
+const loginSchema = (t: (key: string) => string) =>
   z.object({
-    email: z.string().trim().email({ message: t("auth.invalid_email") }).max(255, { message: t("auth.email_too_long") }),
-    password: z.string().min(6, { message: t("auth.password_short") }).max(72, { message: t("auth.password_too_long") }),
-    fullName: z.string().trim().min(1, { message: t("auth.fullname_required") }).max(100, { message: t("auth.fullname_too_long") }).optional(),
+    email: z
+      .string()
+      .trim()
+      .email({ message: t("auth.invalid_email") })
+      .max(255, { message: t("auth.email_too_long") }),
+    password: z
+      .string()
+      .min(6, { message: t("auth.password_short") })
+      .max(72, { message: t("auth.password_too_long") }),
   });
 
 function AuthPage() {
   const { t, dir } = useI18n();
   const { session } = useAuth();
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string>("/inama-soft-logo.ico");
   const isRtl = dir === "rtl";
+
+  useEffect(() => {
+    supabase
+      .from("company_settings")
+      .select("logo_url")
+      .order("id")
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.logo_url) setLogoUrl(data.logo_url);
+      });
+  }, []);
 
   useEffect(() => {
     if (session) navigate({ to: "/dashboard", replace: true });
@@ -37,38 +65,68 @@ function AuthPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const parsed = buildSchema(t).safeParse({ email, password, fullName: mode === "signup" ? fullName : undefined });
+    const parsed = loginSchema(t).safeParse({ email, password });
     if (!parsed.success) {
       toast.error(parsed.error.issues[0].message);
       return;
     }
+
+    const cleanEmail = email.trim().toLowerCase();
     setLoading(true);
+
     try {
-      if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
-          email, password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/dashboard`,
-            data: { full_name: fullName },
-          },
-        });
-        if (error) throw error;
-        toast.success(t("auth.signup_success"));
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        toast.success(t("auth.signin_success"));
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password,
+      });
+
+      if (signInError) {
+        throw signInError;
       }
-    } catch (err: any) {
-      const message = String(err?.message ?? "").toLowerCase();
+
+      if (signInData?.session) {
+        toast.success(t("auth.signin_success"));
+        navigate({ to: "/dashboard", replace: true });
+        return;
+      }
+
+      // Shouldn't reach here, but handle gracefully
+      throw new Error(
+        isRtl ? "فشل تسجيل الدخول. يرجى المحاولة مرة أخرى." : "Login failed. Please try again.",
+      );
+    } catch (err: unknown) {
+      console.error("[Auth] Login error:", err);
+
+      // Extract meaningful error message
+      let rawMsg = "";
+      if (err instanceof Error) {
+        rawMsg = err.message;
+      } else if (typeof err === "object" && err !== null) {
+        rawMsg =
+          (err as any).message ??
+          (err as any).msg ??
+          (err as any).error_description ??
+          JSON.stringify(err);
+      } else {
+        rawMsg = String(err);
+      }
+
+      const message = rawMsg.toLowerCase();
       const translatedError =
         message.includes("invalid login credentials") || message.includes("invalid_credentials")
-          ? t("auth.invalid_credentials")
-          : message.includes("email") && message.includes("already")
-            ? t("auth.email_exists")
+          ? isRtl
+            ? "بيانات الدخول غير صحيحة. يرجى التحقق من البريد وكلمة المرور."
+            : t("auth.invalid_credentials")
+          : message.includes("email not confirmed")
+            ? isRtl
+              ? "البريد الإلكتروني بحاجة لتأكيد. يرجى مراجعة بريدك أو التواصل مع الإدارة."
+              : "Email not confirmed yet."
             : message.includes("network") || message.includes("fetch")
               ? t("auth.network_error")
-              : t("auth.failed");
+              : rawMsg ||
+                (isRtl
+                  ? "فشل تسجيل الدخول. يرجى المحاولة لاحقاً."
+                  : "Login failed. Please try again later.");
       toast.error(translatedError);
     } finally {
       setLoading(false);
@@ -76,154 +134,232 @@ function AuthPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-x-hidden overflow-y-auto bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.18),_transparent_34%),radial-gradient(circle_at_bottom_right,_rgba(16,185,129,0.16),_transparent_30%)] px-4 py-10 sm:px-6 lg:px-8" dir={dir}>
-      <div className="absolute inset-0 -z-10 overflow-hidden">
-        <div className="absolute left-1/2 top-[-10rem] h-[30rem] w-[30rem] -translate-x-1/2 rounded-full bg-primary/20 blur-[140px]" />
-        <div className="absolute bottom-[-8rem] right-[-4rem] h-[24rem] w-[24rem] rounded-full bg-chart-4/20 blur-[140px]" />
+    <div
+      className="relative flex min-h-screen flex-col justify-between overflow-x-hidden bg-[radial-gradient(ellipse_at_top,_rgba(59,130,246,0.14),_transparent_50%),radial-gradient(ellipse_at_bottom,_rgba(16,185,129,0.12),_transparent_50%)] text-foreground"
+      dir={dir}
+    >
+      {/* Background ambient light */}
+      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+        <div className="absolute -top-40 start-1/4 h-[32rem] w-[32rem] rounded-full bg-primary/20 blur-[150px]" />
+        <div className="absolute -bottom-40 end-1/4 h-[28rem] w-[28rem] rounded-full bg-emerald-500/15 blur-[150px]" />
       </div>
 
-      <div className="w-full max-w-6xl rounded-[32px] border border-white/20 bg-background/80 p-3 shadow-[0_30px_80px_rgba(15,23,42,0.18)] backdrop-blur-xl">
-        <div className="grid gap-6 lg:grid-cols-[1.02fr_0.98fr]">
-          <div className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-primary via-primary/90 to-chart-4 p-8 text-primary-foreground shadow-lg sm:p-10">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.24),_transparent_32%)]" />
-            <div className="relative z-10">
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/15 px-3 py-1.5 text-xs font-medium backdrop-blur-sm">
-                <Building2 className="h-4 w-4" />
-                {t("app.name")}
+      <div className="h-4 sm:h-8" />
+
+      {/* Main Container */}
+      <main className="mx-auto w-full max-w-4xl px-4 sm:px-6">
+        <div className="overflow-hidden rounded-[28px] border border-border/70 bg-card/85 shadow-[0_25px_70px_rgba(0,0,0,0.16)] backdrop-blur-2xl transition-all">
+          <div className="grid lg:grid-cols-[1fr_1fr]">
+            {/* Visual Branding Column */}
+            <div className="relative flex flex-col justify-between overflow-hidden bg-gradient-to-br from-primary via-primary/95 to-chart-4 p-8 text-primary-foreground sm:p-10">
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.25),_transparent_40%)]" />
+
+              <div className="relative z-10">
+                <div className="inline-flex items-center gap-2.5 rounded-full border border-white/25 bg-white/15 px-3.5 py-1.5 text-xs font-semibold backdrop-blur-md shadow-sm">
+                  <img
+                    src={logoUrl}
+                    alt={t("app.name")}
+                    className="h-4.5 w-4.5 rounded-md object-contain bg-white/90 p-0.5"
+                    onError={() => setLogoUrl("/inama-soft-logo.ico")}
+                  />
+                  <span>{t("app.name")} ERP</span>
+                </div>
+
+                <h1 className="mt-6 text-2xl sm:text-3xl font-extrabold tracking-tight leading-snug">
+                  {isRtl
+                    ? "منظومة فورتيكس السحابية لإدارة المؤسسات"
+                    : "Vortex ERP Enterprise Cloud Platform"}
+                </h1>
+
+                <p className="mt-3 text-xs sm:text-sm leading-relaxed text-primary-foreground/90">
+                  {t("app.tagline")}
+                </p>
+
+                {/* Core Advantages */}
+                <div className="mt-6 space-y-2.5 text-xs sm:text-[13px] text-primary-foreground/95">
+                  <div className="flex items-center gap-2.5">
+                    <div className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white/20">
+                      <CheckCircle2 className="h-3 w-3 text-white" />
+                    </div>
+                    <span>
+                      {isRtl
+                        ? "نقاط بيع سريعة، باركود، وإدارة المخزون"
+                        : "Fast POS, Barcode & Stock Management"}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2.5">
+                    <div className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white/20">
+                      <CheckCircle2 className="h-3 w-3 text-white" />
+                    </div>
+                    <span>
+                      {isRtl
+                        ? "تعدد الفروع، الدفعات وتواريخ الصلاحية"
+                        : "Multi-warehouse, Batches & Expiry Dates"}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2.5">
+                    <div className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white/20">
+                      <CheckCircle2 className="h-3 w-3 text-white" />
+                    </div>
+                    <span>
+                      {isRtl
+                        ? "محاسبة مالية متقدمة وكشوفات حساب تفصيلية"
+                        : "Advanced Accounting & Financial Statements"}
+                    </span>
+                  </div>
+                </div>
               </div>
 
-              <h2 className="mt-6 text-3xl font-semibold tracking-tight sm:text-4xl">
-                {isRtl ? "بوابتك الرقمية لإدارة الأعمال" : "Your digital gateway to smarter operations"}
-              </h2>
-              <p className="mt-3 max-w-md text-sm leading-7 text-primary-foreground/85 sm:text-base">
-                {isRtl
-                  ? "تابع المبيعات، المخزون، والعمليات من مكان واحد مع واجهة حديثة وأداء سريع."
-                  : "Run sales, stock, and daily operations from one elegant workspace with fast, reliable performance."}
-              </p>
-
-              <div className="mt-8 rounded-[24px] border border-white/20 bg-white/10 p-4 backdrop-blur-sm">
-                <div className="flex items-start gap-3">
-                  <div className="mt-0.5 grid h-10 w-10 place-items-center rounded-2xl bg-white/15">
-                    <ShieldCheck className="h-5 w-5" />
+              {/* Security Badge */}
+              <div className="relative z-10 mt-8 rounded-xl border border-white/20 bg-white/10 p-3 backdrop-blur-md">
+                <div className="flex items-center gap-2.5">
+                  <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white/20">
+                    <ShieldCheck className="h-4 w-4 text-white" />
                   </div>
-                  <div>
-                    <p className="font-semibold">{isRtl ? "أمان موثوق" : "Trusted security"}</p>
-                    <p className="mt-1 text-sm text-primary-foreground/80">
-                      {isRtl ? "بياناتك محفوظة داخل بيئة آمنة ومهيأة للعمل اليومي." : "Your data stays protected in a secure environment built for daily operations."}
+                  <div className="text-xs">
+                    <p className="font-bold">
+                      {isRtl ? "نظام آمن ومشفر بالكامل" : "Fully Secure & Encrypted"}
+                    </p>
+                    <p className="text-primary-foreground/80 text-[11px]">
+                      {isRtl
+                        ? "إدارة الصلاحيات والمستخدمين تتم مركزياً عبر إدارة النظام."
+                        : "User access is strictly managed by system administrators."}
                     </p>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="rounded-[28px] border border-border/70 bg-card/80 p-6 shadow-sm sm:p-8">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-primary to-chart-4 text-primary-foreground shadow-sm">
-                  <Sparkles className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-foreground">{t("app.name")}</p>
-                  <p className="text-xs text-muted-foreground">{t("app.tagline")}</p>
-                </div>
-              </div>
-              <div className="rounded-full border border-border/70 bg-background/70 px-3 py-1 text-[11px] font-medium text-muted-foreground">
-                {mode === "signin" ? t("common.signin") : t("common.signup")}
-              </div>
-            </div>
-
-            <div className="mt-6 rounded-[24px] border border-border/70 bg-background/70 p-4 shadow-sm">
-              <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-                {mode === "signin" ? t("auth.signin_title") : t("auth.signup_title")}
-              </h1>
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                {mode === "signin" ? t("auth.signin_sub") : t("auth.signup_sub")}
-              </p>
-            </div>
-
-            <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-              {mode === "signup" && (
-                <div>
-                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                    {t("common.fullname")}
-                  </label>
-                  <div className="flex items-center gap-3 rounded-2xl border border-border/70 bg-background/70 px-3 py-2 shadow-sm">
-                    <Sparkles className="h-4 w-4 text-muted-foreground" />
-                    <input
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      type="text"
-                      autoComplete="name"
-                      required
-                      className="h-10 w-full border-0 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
-                      placeholder={t("auth.name_placeholder")}
-                    />
+            {/* Login Form Column */}
+            <div className="flex flex-col justify-between p-8 sm:p-10">
+              <div>
+                {/* Brand Header */}
+                <div className="flex items-center gap-3 pb-5 border-b border-border/60">
+                  <img
+                    src={logoUrl}
+                    alt={t("app.name")}
+                    className="h-9 w-9 shrink-0 rounded-xl object-contain bg-surface-2 p-1 border border-border/70 shadow-sm"
+                    onError={() => setLogoUrl("/inama-soft-logo.ico")}
+                  />
+                  <div>
+                    <h2 className="text-base font-bold text-foreground">{t("app.name")}</h2>
+                    <p className="text-xs text-muted-foreground">{t("app.tagline")}</p>
                   </div>
                 </div>
-              )}
 
-              <div>
-                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                  {t("common.email")}
-                </label>
-                <div className="flex items-center gap-3 rounded-2xl border border-border/70 bg-background/70 px-3 py-2 shadow-sm">
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  <input
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    type="email"
-                    autoComplete="email"
-                    required
-                    className="h-10 w-full border-0 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
-                    placeholder={t("auth.email_placeholder")}
-                  />
+                {/* Subtitle */}
+                <div className="mt-5">
+                  <h3 className="text-xl font-bold tracking-tight text-foreground">
+                    {isRtl ? "تسجيل الدخول للنظام" : "Sign In to ERP"}
+                  </h3>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {isRtl
+                      ? "أدخل بيانات حسابك للمتابعة إلى لوحة التحكم"
+                      : "Enter your credentials to access your dashboard"}
+                  </p>
                 </div>
+
+                {/* Authentication Form */}
+                <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold text-foreground/80">
+                      {t("common.email")}
+                    </label>
+                    <div className="relative flex items-center">
+                      <Mail className="absolute start-3.5 h-4 w-4 text-muted-foreground" />
+                      <input
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        type="email"
+                        autoComplete="email"
+                        required
+                        className="h-11 w-full rounded-xl border border-border/80 bg-surface-1 ps-10 pe-4 text-sm text-foreground placeholder:text-muted-foreground/60 transition focus:border-primary focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        placeholder="example@domain.com"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold text-foreground/80">
+                      {t("common.password")}
+                    </label>
+                    <div className="relative flex items-center">
+                      <Lock className="absolute start-3.5 h-4 w-4 text-muted-foreground" />
+                      <input
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        type={showPassword ? "text" : "password"}
+                        autoComplete="current-password"
+                        required
+                        minLength={6}
+                        className="h-11 w-full rounded-xl border border-border/80 bg-surface-1 ps-10 pe-11 text-sm text-foreground placeholder:text-muted-foreground/60 transition focus:border-primary focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        placeholder="••••••••"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute end-3 grid h-7 w-7 place-items-center text-muted-foreground hover:text-foreground transition"
+                        title={
+                          showPassword
+                            ? isRtl
+                              ? "إخفاء كلمة المرور"
+                              : "Hide password"
+                            : isRtl
+                              ? "إظهار كلمة المرور"
+                              : "Show password"
+                        }
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-primary/90 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:brightness-110 active:scale-[0.99] disabled:opacity-60"
+                  >
+                    {loading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <LogIn className="h-4 w-4" />
+                    )}
+                    <span>
+                      {loading
+                        ? isRtl
+                          ? "جاري التحقق..."
+                          : "Signing in..."
+                        : isRtl
+                          ? "دخول إلى النظام"
+                          : "Sign In"}
+                    </span>
+                  </button>
+                </form>
               </div>
 
-              <div>
-                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                  {t("common.password")}
-                </label>
-                <div className="flex items-center gap-3 rounded-2xl border border-border/70 bg-background/70 px-3 py-2 shadow-sm">
-                  <Lock className="h-4 w-4 text-muted-foreground" />
-                  <input
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    type="password"
-                    autoComplete={mode === "signin" ? "current-password" : "new-password"}
-                    required
-                    minLength={6}
-                    className="h-10 w-full border-0 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
-                    placeholder="••••••••"
-                  />
-                </div>
+              {/* Administrative Notice */}
+              <div className="mt-6 pt-3 border-t border-border/50 text-center text-[11px] text-muted-foreground">
+                <span>
+                  {isRtl
+                    ? "إنشاء وتعيين الحسابات يتم حصراً عبر إدارة النظام والمشرفين."
+                    : "Account provisioning is restricted to authorized administrators."}
+                </span>
               </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition hover:opacity-90 disabled:opacity-60"
-              >
-                {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-                {mode === "signin" ? t("common.signin") : t("common.signup")}
-              </button>
-            </form>
-
-            <div className="mt-6 flex items-center justify-center gap-2 text-sm text-muted-foreground">
-              <span>{mode === "signin" ? t("auth.no_account") : t("auth.have_account")}</span>
-              <button
-                onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-                className="inline-flex items-center gap-1 font-semibold text-primary transition hover:underline"
-              >
-                <ArrowLeftRight className="h-3.5 w-3.5" />
-                {mode === "signin" ? t("common.signup") : t("common.signin")}
-              </button>
             </div>
           </div>
         </div>
-      </div>
-      <InamaSoftFooter className="relative z-10 mx-auto mt-6 w-full max-w-6xl rounded-[24px] border border-white/20 bg-background/80 shadow-[0_20px_60px_rgba(15,23,42,0.12)] backdrop-blur-xl" />
+      </main>
+
+      {/* Company Branding Footer - Positioned strictly UNDER the card */}
+      <footer className="mt-8 w-full">
+        <InamaSoftFooter className="border-t border-border/60 bg-surface/60 backdrop-blur-md" />
+      </footer>
     </div>
   );
 }

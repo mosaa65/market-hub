@@ -1,14 +1,15 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 export type BusinessProfile = "spare_parts" | "grocery" | "retail" | "custom";
 
 export interface CatalogModulesConfig {
   profile: BusinessProfile;
   enableMakesAndModels: boolean; // ماركات وموديلات المركبات وتوافق القطع
-  enableOrigins: boolean;        // بلدان المنشأ
-  enableQualityGrades: boolean;  // درجات الجودة (أصلي / تجاري / وكالة)
-  enableBrands: boolean;         // العلامات التجارية
-  enableUnits: boolean;          // الوحدات
+  enableOrigins: boolean; // بلدان المنشأ
+  enableQualityGrades: boolean; // درجات الجودة (أصلي / تجاري / وكالة)
+  enableBrands: boolean; // العلامات التجارية
+  enableUnits: boolean; // الوحدات
 }
 
 const STORAGE_KEY = "vortex_catalog_modules_v1";
@@ -69,6 +70,16 @@ export function saveCatalogModulesConfig(config: CatalogModulesConfig): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
     window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail: config }));
+
+    // Cloud sync to company_settings
+    void supabase
+      .from("company_settings")
+      .update({ catalog_modules: config } as any)
+      .eq("id", 1)
+      .then(
+        () => {},
+        () => {},
+      );
   } catch (err) {
     console.error("Failed to save catalog modules config:", err);
   }
@@ -77,6 +88,7 @@ export function saveCatalogModulesConfig(config: CatalogModulesConfig): void {
 export function useCatalogModules() {
   const [config, setConfigState] = useState<CatalogModulesConfig>(() => getCatalogModulesConfig());
 
+  // Listen to local changes
   useEffect(() => {
     const handler = (e: Event) => {
       const customEvent = e as CustomEvent<CatalogModulesConfig>;
@@ -92,6 +104,29 @@ export function useCatalogModules() {
       window.removeEventListener(EVENT_NAME, handler);
       window.removeEventListener("storage", handler);
     };
+  }, []);
+
+  // Fetch initial config from database to ensure multi-device sync
+  useEffect(() => {
+    supabase
+      .from("company_settings")
+      .select("catalog_modules" as any)
+      .eq("id", 1)
+      .maybeSingle()
+      .then(
+        ({ data, error }) => {
+          if (!error && data && (data as any).catalog_modules) {
+            const remote = (data as any).catalog_modules as CatalogModulesConfig;
+            if (remote && remote.profile) {
+              setConfigState(remote);
+              if (typeof window !== "undefined") {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(remote));
+              }
+            }
+          }
+        },
+        () => {},
+      );
   }, []);
 
   const updateConfig = (updates: Partial<CatalogModulesConfig>) => {
@@ -110,7 +145,9 @@ export function useCatalogModules() {
     saveCatalogModulesConfig(preset);
   };
 
-  const isTabEnabled = (tab: "categories" | "brands" | "units" | "origins" | "qualities" | "makes" | "models"): boolean => {
+  const isTabEnabled = (
+    tab: "categories" | "brands" | "units" | "origins" | "qualities" | "makes" | "models",
+  ): boolean => {
     switch (tab) {
       case "categories":
         return true; // Always enabled

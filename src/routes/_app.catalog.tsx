@@ -68,12 +68,20 @@ function CatalogPage() {
 
   const profileLabel =
     config.profile === "spare_parts"
-      ? (lang === "ar" ? "قطع غيار ومركبات" : "Spare Parts")
+      ? lang === "ar"
+        ? "قطع غيار ومركبات"
+        : "Spare Parts"
       : config.profile === "grocery"
-      ? (lang === "ar" ? "مواد غذائية وبقالة" : "Grocery")
-      : config.profile === "retail"
-      ? (lang === "ar" ? "تجارة عامة" : "General Retail")
-      : (lang === "ar" ? "تخصيص مخصص" : "Custom");
+        ? lang === "ar"
+          ? "مواد غذائية وبقالة"
+          : "Grocery"
+        : config.profile === "retail"
+          ? lang === "ar"
+            ? "تجارة عامة"
+            : "General Retail"
+          : lang === "ar"
+            ? "تخصيص مخصص"
+            : "Custom";
 
   return (
     <>
@@ -130,10 +138,7 @@ function CatalogPage() {
       <CatalogTable tab={tab} />
 
       {/* Catalog Modules Customization Dialog */}
-      <CatalogModulesDialog
-        open={modulesDialogOpen}
-        onClose={() => setModulesDialogOpen(false)}
-      />
+      <CatalogModulesDialog open={modulesDialogOpen} onClose={() => setModulesDialogOpen(false)} />
     </>
   );
 }
@@ -150,27 +155,27 @@ function CatalogTable({ tab }: { tab: Tab }) {
     tab === "categories"
       ? "categories"
       : tab === "brands"
-      ? "brands"
-      : tab === "units"
-      ? "units"
-      : tab === "origins"
-      ? "countries_of_origin"
-      : tab === "qualities"
-      ? "quality_grades"
-      : tab === "makes"
-      ? "vehicle_makes"
-      : "vehicle_models";
+        ? "brands"
+        : tab === "units"
+          ? "units"
+          : tab === "origins"
+            ? "countries_of_origin"
+            : tab === "qualities"
+              ? "quality_grades"
+              : tab === "makes"
+                ? "vehicle_makes"
+                : "vehicle_models";
 
   const cols =
     tab === "units"
       ? "id, name, name_ar, short_name"
       : tab === "origins"
-      ? "id, name, name_ar, code"
-      : tab === "qualities"
-      ? "id, name, name_ar, code, sort_order"
-      : tab === "models"
-      ? "id, name, name_ar, make_id, vehicle_makes(id, name, name_ar)"
-      : "id, name, name_ar";
+        ? "id, name, name_ar, code"
+        : tab === "qualities"
+          ? "id, name, name_ar, code, sort_order"
+          : tab === "models"
+            ? "id, name, name_ar, make_id, vehicle_makes(id, name, name_ar)"
+            : "id, name, name_ar";
 
   const { data, isLoading } = useQuery({
     queryKey: ["catalog", tab],
@@ -189,7 +194,10 @@ function CatalogTable({ tab }: { tab: Tab }) {
     queryKey: ["vehicle-makes-filter"],
     enabled: tab === "models",
     queryFn: async () => {
-      const { data } = await (supabase as any).from("vehicle_makes").select("id, name, name_ar").order("name");
+      const { data } = await (supabase as any)
+        .from("vehicle_makes")
+        .select("id, name, name_ar")
+        .order("name");
       return (data ?? []) as { id: string; name: string; name_ar: string | null }[];
     },
   });
@@ -209,7 +217,7 @@ function CatalogTable({ tab }: { tab: Tab }) {
         r.code,
         r.vehicle_makes?.name,
         r.vehicle_makes?.name_ar,
-      ].some((x) => (x ?? "").toLowerCase().includes(s))
+      ].some((x) => (x ?? "").toLowerCase().includes(s)),
     );
   }, [data, q, tab, filterMakeId]);
 
@@ -222,7 +230,9 @@ function CatalogTable({ tab }: { tab: Tab }) {
       toast.success(lang === "ar" ? "تم الحذف بنجاح" : t("common.deleted") || "Deleted");
       qc.invalidateQueries({ queryKey: ["catalog", tab] });
       qc.invalidateQueries({ queryKey: ["products-meta"] });
+      qc.invalidateQueries({ queryKey: ["products"] });
       qc.invalidateQueries({ queryKey: ["pos-live-meta"] });
+      qc.invalidateQueries({ queryKey: ["vehicle-makes-filter"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -231,16 +241,24 @@ function CatalogTable({ tab }: { tab: Tab }) {
     tab === "categories"
       ? t("catalog.new_category")
       : tab === "brands"
-      ? t("catalog.new_brand")
-      : tab === "units"
-      ? t("catalog.new_unit")
-      : tab === "origins"
-      ? (lang === "ar" ? "إضافة دولة منشأ" : "Add Origin")
-      : tab === "qualities"
-      ? (lang === "ar" ? "إضافة درجة جودة" : "Add Quality Grade")
-      : tab === "makes"
-      ? (lang === "ar" ? "إضافة ماركة مركبة" : "Add Vehicle Make")
-      : (lang === "ar" ? "إضافة موديل مركبة" : "Add Vehicle Model");
+        ? t("catalog.new_brand")
+        : tab === "units"
+          ? t("catalog.new_unit")
+          : tab === "origins"
+            ? lang === "ar"
+              ? "إضافة دولة منشأ"
+              : "Add Origin"
+            : tab === "qualities"
+              ? lang === "ar"
+                ? "إضافة درجة جودة"
+                : "Add Quality Grade"
+              : tab === "makes"
+                ? lang === "ar"
+                  ? "إضافة ماركة مركبة"
+                  : "Add Vehicle Make"
+                : lang === "ar"
+                  ? "إضافة موديل مركبة"
+                  : "Add Vehicle Model";
 
   return (
     <div className="panel-elevated overflow-hidden rounded-3xl border border-border/80 bg-surface/90 shadow-sm">
@@ -294,16 +312,22 @@ function CatalogTable({ tab }: { tab: Tab }) {
               <th className="px-4 py-2.5 text-start font-medium">{t("catalog.name_ar")}</th>
               <th className="px-4 py-2.5 text-start font-medium">{t("catalog.name_en")}</th>
               {tab === "models" && (
-                <th className="px-4 py-2.5 text-start font-medium">{lang === "ar" ? "الماركة التابعة" : "Make"}</th>
+                <th className="px-4 py-2.5 text-start font-medium">
+                  {lang === "ar" ? "الماركة التابعة" : "Make"}
+                </th>
               )}
               {tab === "units" && (
                 <th className="px-4 py-2.5 text-start font-medium">{t("catalog.short_name")}</th>
               )}
               {(tab === "origins" || tab === "qualities") && (
-                <th className="px-4 py-2.5 text-start font-medium">{lang === "ar" ? "الكود" : "Code"}</th>
+                <th className="px-4 py-2.5 text-start font-medium">
+                  {lang === "ar" ? "الكود" : "Code"}
+                </th>
               )}
               {tab === "qualities" && (
-                <th className="px-4 py-2.5 text-start font-medium">{lang === "ar" ? "الترتيب" : "Sort Order"}</th>
+                <th className="px-4 py-2.5 text-start font-medium">
+                  {lang === "ar" ? "الترتيب" : "Sort Order"}
+                </th>
               )}
               <th className="px-4 py-2.5 text-end font-medium">{t("common.actions")}</th>
             </tr>
@@ -312,14 +336,20 @@ function CatalogTable({ tab }: { tab: Tab }) {
             {isLoading &&
               Array.from({ length: 4 }).map((_, i) => (
                 <tr key={i} className="border-b border-border/60">
-                  <td colSpan={tab === "models" || tab === "qualities" ? 5 : 4} className="px-4 py-3">
+                  <td
+                    colSpan={tab === "models" || tab === "qualities" ? 5 : 4}
+                    className="px-4 py-3"
+                  >
                     <div className="h-4 w-full rounded shimmer" />
                   </td>
                 </tr>
               ))}
             {!isLoading && filtered.length === 0 && (
               <tr>
-                <td colSpan={tab === "models" || tab === "qualities" ? 5 : 4} className="px-4 py-16 text-center">
+                <td
+                  colSpan={tab === "models" || tab === "qualities" ? 5 : 4}
+                  className="px-4 py-16 text-center"
+                >
                   <div className="mx-auto grid h-10 w-10 place-items-center rounded-2xl bg-surface border border-border">
                     <Layers className="h-5 w-5 text-muted-foreground" />
                   </div>
@@ -328,7 +358,10 @@ function CatalogTable({ tab }: { tab: Tab }) {
               </tr>
             )}
             {filtered.map((r) => (
-              <tr key={r.id} className="border-b border-border/60 hover:bg-accent/40 transition-colors">
+              <tr
+                key={r.id}
+                className="border-b border-border/60 hover:bg-accent/40 transition-colors"
+              >
                 <td className="px-4 py-2.5 font-medium text-foreground" dir="rtl">
                   {r.name_ar || "—"}
                 </td>
@@ -379,7 +412,11 @@ function CatalogTable({ tab }: { tab: Tab }) {
                     </button>
                     <button
                       onClick={() => {
-                        if (confirm(lang === "ar" ? "هل أنت متأكد من الحذف؟" : t("catalog.confirm_delete"))) {
+                        if (
+                          confirm(
+                            lang === "ar" ? "هل أنت متأكد من الحذف؟" : t("catalog.confirm_delete"),
+                          )
+                        ) {
                           remove.mutate(r.id);
                         }
                       }}
@@ -405,7 +442,9 @@ function CatalogTable({ tab }: { tab: Tab }) {
             setOpen(false);
             qc.invalidateQueries({ queryKey: ["catalog", tab] });
             qc.invalidateQueries({ queryKey: ["products-meta"] });
+            qc.invalidateQueries({ queryKey: ["products"] });
             qc.invalidateQueries({ queryKey: ["pos-live-meta"] });
+            qc.invalidateQueries({ queryKey: ["vehicle-makes-filter"] });
           }}
         />
       )}
@@ -441,7 +480,8 @@ function CatalogDialog({
     queryKey: ["vehicle-makes-dialog"],
     enabled: tab === "models",
     queryFn: async () =>
-      ((await (supabase as any).from("vehicle_makes").select("id,name,name_ar").order("name")).data ?? []),
+      (await (supabase as any).from("vehicle_makes").select("id,name,name_ar").order("name"))
+        .data ?? [],
   });
   const [saving, setSaving] = useState(false);
 
@@ -451,28 +491,44 @@ function CatalogDialog({
         ? t("catalog.edit_category")
         : t("catalog.new_category")
       : tab === "brands"
-      ? initial
-        ? t("catalog.edit_brand")
-        : t("catalog.new_brand")
-      : tab === "units"
-      ? initial
-        ? t("catalog.edit_unit")
-        : t("catalog.new_unit")
-      : tab === "origins"
-      ? initial
-        ? (lang === "ar" ? "تعديل بلد المنشأ" : "Edit Origin")
-        : (lang === "ar" ? "إضافة بلد منشأ" : "New Origin")
-      : tab === "qualities"
-      ? initial
-        ? (lang === "ar" ? "تعديل درجة الجودة" : "Edit Quality Grade")
-        : (lang === "ar" ? "إضافة درجة جودة" : "New Quality Grade")
-      : tab === "makes"
-      ? initial
-        ? (lang === "ar" ? "تعديل ماركة المركبة" : "Edit Vehicle Make")
-        : (lang === "ar" ? "إضافة ماركة مركبة" : "New Vehicle Make")
-      : initial
-      ? (lang === "ar" ? "تعديل موديل المركبة" : "Edit Vehicle Model")
-      : (lang === "ar" ? "إضافة موديل مركبة" : "New Vehicle Model");
+        ? initial
+          ? t("catalog.edit_brand")
+          : t("catalog.new_brand")
+        : tab === "units"
+          ? initial
+            ? t("catalog.edit_unit")
+            : t("catalog.new_unit")
+          : tab === "origins"
+            ? initial
+              ? lang === "ar"
+                ? "تعديل بلد المنشأ"
+                : "Edit Origin"
+              : lang === "ar"
+                ? "إضافة بلد منشأ"
+                : "New Origin"
+            : tab === "qualities"
+              ? initial
+                ? lang === "ar"
+                  ? "تعديل درجة الجودة"
+                  : "Edit Quality Grade"
+                : lang === "ar"
+                  ? "إضافة درجة جودة"
+                  : "New Quality Grade"
+              : tab === "makes"
+                ? initial
+                  ? lang === "ar"
+                    ? "تعديل ماركة المركبة"
+                    : "Edit Vehicle Make"
+                  : lang === "ar"
+                    ? "إضافة ماركة مركبة"
+                    : "New Vehicle Make"
+                : initial
+                  ? lang === "ar"
+                    ? "تعديل موديل المركبة"
+                    : "Edit Vehicle Model"
+                  : lang === "ar"
+                    ? "إضافة موديل مركبة"
+                    : "New Vehicle Model";
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -485,16 +541,16 @@ function CatalogDialog({
       tab === "categories"
         ? "categories"
         : tab === "brands"
-        ? "brands"
-        : tab === "units"
-        ? "units"
-        : tab === "origins"
-        ? "countries_of_origin"
-        : tab === "qualities"
-        ? "quality_grades"
-        : tab === "makes"
-        ? "vehicle_makes"
-        : "vehicle_models";
+          ? "brands"
+          : tab === "units"
+            ? "units"
+            : tab === "origins"
+              ? "countries_of_origin"
+              : tab === "qualities"
+                ? "quality_grades"
+                : tab === "makes"
+                  ? "vehicle_makes"
+                  : "vehicle_models";
 
     const base = {
       name: form.name.trim() || form.name_ar.trim(),
@@ -512,15 +568,17 @@ function CatalogDialog({
       tab === "units"
         ? { ...base, short_name: form.short_name.trim() || form.name.trim().slice(0, 4) || "unit" }
         : tab === "origins"
-        ? { ...base, code: baseCode }
-        : tab === "qualities"
-        ? { ...base, code: baseCode, sort_order: Number(form.sort_order) || 0 }
-        : tab === "models"
-        ? { ...base, make_id: form.make_id }
-        : base;
+          ? { ...base, code: baseCode }
+          : tab === "qualities"
+            ? { ...base, code: baseCode, sort_order: Number(form.sort_order) || 0 }
+            : tab === "models"
+              ? { ...base, make_id: form.make_id }
+              : base;
 
     const q: any = supabase.from(table as "categories");
-    const { error } = initial ? await q.update(payload).eq("id", initial.id) : await q.insert(payload);
+    const { error } = initial
+      ? await q.update(payload).eq("id", initial.id)
+      : await q.insert(payload);
     setSaving(false);
     if (error) {
       toast.error(error.message);
@@ -648,7 +706,9 @@ function Field({
 }) {
   return (
     <label className={`flex flex-col gap-1.5 ${className}`}>
-      <span className="text-[11px] font-semibold tracking-wider text-muted-foreground">{label}</span>
+      <span className="text-[11px] font-semibold tracking-wider text-muted-foreground">
+        {label}
+      </span>
       {children}
     </label>
   );
