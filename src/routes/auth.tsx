@@ -2,8 +2,15 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { z } from "zod";
 import {
-  Loader2, ShieldCheck, Mail, Lock, Eye, EyeOff,
-  CheckCircle2, LogIn, Sparkles,
+  Loader2,
+  ShieldCheck,
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  CheckCircle2,
+  LogIn,
+  Sparkles,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -18,8 +25,15 @@ export const Route = createFileRoute("/auth")({
 
 const loginSchema = (t: (key: string) => string) =>
   z.object({
-    email: z.string().trim().email({ message: t("auth.invalid_email") }).max(255, { message: t("auth.email_too_long") }),
-    password: z.string().min(6, { message: t("auth.password_short") }).max(72, { message: t("auth.password_too_long") }),
+    email: z
+      .string()
+      .trim()
+      .email({ message: t("auth.invalid_email") })
+      .max(255, { message: t("auth.email_too_long") }),
+    password: z
+      .string()
+      .min(6, { message: t("auth.password_short") })
+      .max(72, { message: t("auth.password_too_long") }),
   });
 
 function AuthPage() {
@@ -77,7 +91,9 @@ function AuthPage() {
       }
 
       // Shouldn't reach here, but handle gracefully
-      throw new Error(isRtl ? "فشل تسجيل الدخول. يرجى المحاولة مرة أخرى." : "Login failed. Please try again.");
+      throw new Error(
+        isRtl ? "فشل تسجيل الدخول. يرجى المحاولة مرة أخرى." : "Login failed. Please try again.",
+      );
     } catch (err: unknown) {
       console.error("[Auth] Login error:", err);
 
@@ -86,7 +102,11 @@ function AuthPage() {
       if (err instanceof Error) {
         rawMsg = err.message;
       } else if (typeof err === "object" && err !== null) {
-        rawMsg = (err as any).message ?? (err as any).msg ?? (err as any).error_description ?? JSON.stringify(err);
+        rawMsg =
+          (err as any).message ??
+          (err as any).msg ??
+          (err as any).error_description ??
+          JSON.stringify(err);
       } else {
         rawMsg = String(err);
       }
@@ -94,12 +114,19 @@ function AuthPage() {
       const message = rawMsg.toLowerCase();
       const translatedError =
         message.includes("invalid login credentials") || message.includes("invalid_credentials")
-          ? (isRtl ? "بيانات الدخول غير صحيحة. يرجى التحقق من البريد وكلمة المرور." : t("auth.invalid_credentials"))
+          ? isRtl
+            ? "بيانات الدخول غير صحيحة. يرجى التحقق من البريد وكلمة المرور."
+            : t("auth.invalid_credentials")
           : message.includes("email not confirmed")
-            ? (isRtl ? "البريد الإلكتروني بحاجة لتأكيد. يرجى مراجعة بريدك أو التواصل مع الإدارة." : "Email not confirmed yet.")
+            ? isRtl
+              ? "البريد الإلكتروني بحاجة لتأكيد. يرجى مراجعة بريدك أو التواصل مع الإدارة."
+              : "Email not confirmed yet."
             : message.includes("network") || message.includes("fetch")
               ? t("auth.network_error")
-              : rawMsg || (isRtl ? "فشل تسجيل الدخول. يرجى المحاولة لاحقاً." : "Login failed. Please try again later.");
+              : rawMsg ||
+                (isRtl
+                  ? "فشل تسجيل الدخول. يرجى المحاولة لاحقاً."
+                  : "Login failed. Please try again later.");
       toast.error(translatedError);
     } finally {
       setLoading(false);
@@ -139,7 +166,9 @@ function AuthPage() {
                 </div>
 
                 <h1 className="mt-6 text-2xl sm:text-3xl font-extrabold tracking-tight leading-snug">
-                  {isRtl ? "منظومة فورتيكس السحابية لإدارة المؤسسات" : "Vortex ERP Enterprise Cloud Platform"}
+                  {isRtl
+                    ? "منظومة فورتيكس السحابية لإدارة المؤسسات"
+                    : "Vortex ERP Enterprise Cloud Platform"}
                 </h1>
 
                 <p className="mt-3 text-xs sm:text-sm leading-relaxed text-primary-foreground/90">
@@ -152,21 +181,33 @@ function AuthPage() {
                     <div className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white/20">
                       <CheckCircle2 className="h-3 w-3 text-white" />
                     </div>
-                    <span>{isRtl ? "نقاط بيع سريعة، باركود، وإدارة المخزون" : "Fast POS, Barcode & Stock Management"}</span>
+                    <span>
+                      {isRtl
+                        ? "نقاط بيع سريعة، باركود، وإدارة المخزون"
+                        : "Fast POS, Barcode & Stock Management"}
+                    </span>
                   </div>
 
                   <div className="flex items-center gap-2.5">
                     <div className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white/20">
                       <CheckCircle2 className="h-3 w-3 text-white" />
                     </div>
-                    <span>{isRtl ? "تعدد الفروع، الدفعات وتواريخ الصلاحية" : "Multi-warehouse, Batches & Expiry Dates"}</span>
+                    <span>
+                      {isRtl
+                        ? "تعدد الفروع، الدفعات وتواريخ الصلاحية"
+                        : "Multi-warehouse, Batches & Expiry Dates"}
+                    </span>
                   </div>
 
                   <div className="flex items-center gap-2.5">
                     <div className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white/20">
                       <CheckCircle2 className="h-3 w-3 text-white" />
                     </div>
-                    <span>{isRtl ? "محاسبة مالية متقدمة وكشوفات حساب تفصيلية" : "Advanced Accounting & Financial Statements"}</span>
+                    <span>
+                      {isRtl
+                        ? "محاسبة مالية متقدمة وكشوفات حساب تفصيلية"
+                        : "Advanced Accounting & Financial Statements"}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -178,9 +219,13 @@ function AuthPage() {
                     <ShieldCheck className="h-4 w-4 text-white" />
                   </div>
                   <div className="text-xs">
-                    <p className="font-bold">{isRtl ? "نظام آمن ومشفر بالكامل" : "Fully Secure & Encrypted"}</p>
+                    <p className="font-bold">
+                      {isRtl ? "نظام آمن ومشفر بالكامل" : "Fully Secure & Encrypted"}
+                    </p>
                     <p className="text-primary-foreground/80 text-[11px]">
-                      {isRtl ? "إدارة الصلاحيات والمستخدمين تتم مركزياً عبر إدارة النظام." : "User access is strictly managed by system administrators."}
+                      {isRtl
+                        ? "إدارة الصلاحيات والمستخدمين تتم مركزياً عبر إدارة النظام."
+                        : "User access is strictly managed by system administrators."}
                     </p>
                   </div>
                 </div>
@@ -210,7 +255,9 @@ function AuthPage() {
                     {isRtl ? "تسجيل الدخول للنظام" : "Sign In to ERP"}
                   </h3>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {isRtl ? "أدخل بيانات حسابك للمتابعة إلى لوحة التحكم" : "Enter your credentials to access your dashboard"}
+                    {isRtl
+                      ? "أدخل بيانات حسابك للمتابعة إلى لوحة التحكم"
+                      : "Enter your credentials to access your dashboard"}
                   </p>
                 </div>
 
@@ -254,9 +301,21 @@ function AuthPage() {
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
                         className="absolute end-3 grid h-7 w-7 place-items-center text-muted-foreground hover:text-foreground transition"
-                        title={showPassword ? (isRtl ? "إخفاء كلمة المرور" : "Hide password") : (isRtl ? "إظهار كلمة المرور" : "Show password")}
+                        title={
+                          showPassword
+                            ? isRtl
+                              ? "إخفاء كلمة المرور"
+                              : "Hide password"
+                            : isRtl
+                              ? "إظهار كلمة المرور"
+                              : "Show password"
+                        }
                       >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
                       </button>
                     </div>
                   </div>
@@ -271,14 +330,26 @@ function AuthPage() {
                     ) : (
                       <LogIn className="h-4 w-4" />
                     )}
-                    <span>{loading ? (isRtl ? "جاري التحقق..." : "Signing in...") : (isRtl ? "دخول إلى النظام" : "Sign In")}</span>
+                    <span>
+                      {loading
+                        ? isRtl
+                          ? "جاري التحقق..."
+                          : "Signing in..."
+                        : isRtl
+                          ? "دخول إلى النظام"
+                          : "Sign In"}
+                    </span>
                   </button>
                 </form>
               </div>
 
               {/* Administrative Notice */}
               <div className="mt-6 pt-3 border-t border-border/50 text-center text-[11px] text-muted-foreground">
-                <span>{isRtl ? "إنشاء وتعيين الحسابات يتم حصراً عبر إدارة النظام والمشرفين." : "Account provisioning is restricted to authorized administrators."}</span>
+                <span>
+                  {isRtl
+                    ? "إنشاء وتعيين الحسابات يتم حصراً عبر إدارة النظام والمشرفين."
+                    : "Account provisioning is restricted to authorized administrators."}
+                </span>
               </div>
             </div>
           </div>

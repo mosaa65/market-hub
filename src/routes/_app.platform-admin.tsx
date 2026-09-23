@@ -1,9 +1,22 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ShieldCheck, Crown, Layers, Sparkles, CheckCircle2, Lock,
-  RefreshCw, SlidersHorizontal, Users, Boxes, Activity, ArrowRight,
-  TrendingUp, AlertCircle, Search, ExternalLink,
+  ShieldCheck,
+  Crown,
+  Layers,
+  Sparkles,
+  CheckCircle2,
+  Lock,
+  RefreshCw,
+  SlidersHorizontal,
+  Users,
+  Boxes,
+  Activity,
+  ArrowRight,
+  TrendingUp,
+  AlertCircle,
+  Search,
+  ExternalLink,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
@@ -39,20 +52,55 @@ function PlatformAdminPage() {
   } = useModules();
 
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"overview" | "modules" | "plans" | "audit">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "modules" | "plans" | "audit">(
+    "overview",
+  );
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
+
+  const loadAuditLogs = useCallback(async () => {
+    setLoadingLogs(true);
+    try {
+      const { data } = await (supabase as any)
+        .from("platform_audit_logs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      setAuditLogs(data || []);
+    } catch (error) {
+      console.warn("Failed to load platform audit logs", error);
+    } finally {
+      setLoadingLogs(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!authLoading && !canAccess) {
       toast.error(
         isAr
           ? "عذراً، هذه الصفحة مخصصة لمدير المنصة فقط (Superadmin)"
-          : "Access denied: Platform Superadmin privileges required"
+          : "Access denied: Platform Superadmin privileges required",
       );
       navigate({ to: "/dashboard" });
     }
   }, [authLoading, canAccess, navigate, isAr]);
+
+  useEffect(() => {
+    if (activeTab === "audit") {
+      void loadAuditLogs();
+    }
+  }, [activeTab, loadAuditLogs]);
+
+  const stats = useMemo(() => {
+    return {
+      activeModulesCount: modules.filter((m) => isModuleEnabled(m.id)).length,
+      totalModulesCount: modules.length,
+      currentPlanName: isAr ? currentPlan.name.ar : currentPlan.name.en,
+      planMaxWarehouses: currentPlan.maxWarehouses,
+      planMaxUsers: currentPlan.maxUsers,
+      planPrice: currentPlan.priceMonthly,
+    };
+  }, [modules, isModuleEnabled, currentPlan, isAr]);
 
   if (authLoading) {
     return (
@@ -76,40 +124,6 @@ function PlatformAdminPage() {
     );
   }
 
-  const loadAuditLogs = async () => {
-    setLoadingLogs(true);
-    try {
-      const { data } = await (supabase as any)
-        .from("platform_audit_logs")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(50);
-      setAuditLogs(data || []);
-    } catch {
-      // silent
-    } finally {
-      setLoadingLogs(false);
-    }
-  };
-
-  useEffect(() => {
-    if (activeTab === "audit") {
-      void loadAuditLogs();
-    }
-  }, [activeTab]);
-
-  // Mock / Remote tenant stats
-  const stats = useMemo(() => {
-    return {
-      activeModulesCount: modules.filter((m) => isModuleEnabled(m.id)).length,
-      totalModulesCount: modules.length,
-      currentPlanName: isAr ? currentPlan.name.ar : currentPlan.name.en,
-      planMaxWarehouses: currentPlan.maxWarehouses,
-      planMaxUsers: currentPlan.maxUsers,
-      planPrice: currentPlan.priceMonthly,
-    };
-  }, [modules, isModuleEnabled, currentPlan, isAr]);
-
   const handleToggleExtra = async (moduleId: string) => {
     await toggleExtraModule(moduleId);
     try {
@@ -118,7 +132,9 @@ function PlatformAdminPage() {
         target_tenant_id: "default",
         payload: { module_id: moduleId, enabled: !extraModules.includes(moduleId) },
       });
-    } catch {}
+    } catch (error) {
+      console.warn("Platform audit log insert failed for module toggle", error);
+    }
   };
 
   const handlePlanChange = async (planId: PlatformPlanId) => {
@@ -131,11 +147,13 @@ function PlatformAdminPage() {
           target_tenant_id: "default",
           payload: { previous_plan: currentPlanId, new_plan: planId },
         });
-      } catch {}
+      } catch (error) {
+        console.warn("Platform audit log insert failed for plan switch", error);
+      }
       toast.success(
         isAr
           ? `تم تحديث باقة المستأجر بنجاح إلى: ${planId.toUpperCase()}`
-          : `Tenant plan updated to: ${planId.toUpperCase()}`
+          : `Tenant plan updated to: ${planId.toUpperCase()}`,
       );
     } catch {
       toast.error(isAr ? "حدث خطأ أثناء تحديث الباقة" : "Error updating plan");
@@ -147,7 +165,11 @@ function PlatformAdminPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={isAr ? "لوحة إدارة المنصة والباقات (Platform Administration)" : "Platform Administration & Licensing"}
+        title={
+          isAr
+            ? "لوحة إدارة المنصة والباقات (Platform Administration)"
+            : "Platform Administration & Licensing"
+        }
         subtitle={
           isAr
             ? "التحكم المركزي في باقات المستأجرين، تراخيص الوحدات، وإدارة الـ Add-ons على مستوى المنصة."
@@ -166,7 +188,9 @@ function PlatformAdminPage() {
         <Card className="border-primary/30 bg-gradient-to-br from-primary/10 to-surface">
           <CardContent className="p-5 flex items-center justify-between">
             <div>
-              <div className="text-xs text-muted-foreground">{isAr ? "الباقة الفعالة" : "Active Plan"}</div>
+              <div className="text-xs text-muted-foreground">
+                {isAr ? "الباقة الفعالة" : "Active Plan"}
+              </div>
               <div className="mt-1 text-2xl font-bold text-foreground">{stats.currentPlanName}</div>
               <div className="mt-0.5 text-[11px] text-primary">
                 ${stats.planPrice} / {isAr ? "شهر" : "month"}
@@ -181,12 +205,18 @@ function PlatformAdminPage() {
         <Card className="border-border/70 bg-surface">
           <CardContent className="p-5 flex items-center justify-between">
             <div>
-              <div className="text-xs text-muted-foreground">{isAr ? "الوحدات النشطة" : "Active Modules"}</div>
+              <div className="text-xs text-muted-foreground">
+                {isAr ? "الوحدات النشطة" : "Active Modules"}
+              </div>
               <div className="mt-1 text-2xl font-bold text-foreground">
-                {stats.activeModulesCount} <span className="text-sm font-normal text-muted-foreground">/ {stats.totalModulesCount}</span>
+                {stats.activeModulesCount}{" "}
+                <span className="text-sm font-normal text-muted-foreground">
+                  / {stats.totalModulesCount}
+                </span>
               </div>
               <div className="mt-0.5 text-[11px] text-emerald-500">
-                {Math.round((stats.activeModulesCount / stats.totalModulesCount) * 100)}% {isAr ? "مفعل" : "enabled"}
+                {Math.round((stats.activeModulesCount / stats.totalModulesCount) * 100)}%{" "}
+                {isAr ? "مفعل" : "enabled"}
               </div>
             </div>
             <div className="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-500/10 text-emerald-500">
@@ -198,10 +228,20 @@ function PlatformAdminPage() {
         <Card className="border-border/70 bg-surface">
           <CardContent className="p-5 flex items-center justify-between">
             <div>
-              <div className="text-xs text-muted-foreground">{isAr ? "سقف الفروع والمستودعات" : "Max Warehouses"}</div>
-              <div className="mt-1 text-2xl font-bold text-foreground">{stats.planMaxWarehouses}</div>
+              <div className="text-xs text-muted-foreground">
+                {isAr ? "سقف الفروع والمستودعات" : "Max Warehouses"}
+              </div>
+              <div className="mt-1 text-2xl font-bold text-foreground">
+                {stats.planMaxWarehouses}
+              </div>
               <div className="mt-0.5 text-[11px] text-muted-foreground">
-                {stats.planMaxWarehouses > 1 ? (isAr ? "متعدد المستودعات" : "Multi-location") : (isAr ? "مستودع واحد" : "Single warehouse")}
+                {stats.planMaxWarehouses > 1
+                  ? isAr
+                    ? "متعدد المستودعات"
+                    : "Multi-location"
+                  : isAr
+                    ? "مستودع واحد"
+                    : "Single warehouse"}
               </div>
             </div>
             <div className="grid h-12 w-12 place-items-center rounded-2xl bg-cyan-500/10 text-cyan-500">
@@ -213,7 +253,9 @@ function PlatformAdminPage() {
         <Card className="border-border/70 bg-surface">
           <CardContent className="p-5 flex items-center justify-between">
             <div>
-              <div className="text-xs text-muted-foreground">{isAr ? "سقف المستخدمين" : "User Seat Limit"}</div>
+              <div className="text-xs text-muted-foreground">
+                {isAr ? "سقف المستخدمين" : "User Seat Limit"}
+              </div>
               <div className="mt-1 text-2xl font-bold text-foreground">{stats.planMaxUsers}</div>
               <div className="mt-0.5 text-[11px] text-muted-foreground">
                 {isAr ? "مستخدم مصرح به" : "Authorized seats"}
@@ -302,7 +344,8 @@ function PlatformAdminPage() {
                         </span>
                         {active && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-primary text-primary-foreground px-2 py-0.5 text-[10px] font-bold">
-                            <CheckCircle2 className="h-3 w-3" /> {isAr ? "مفعّلة حالياً" : "Current"}
+                            <CheckCircle2 className="h-3 w-3" />{" "}
+                            {isAr ? "مفعّلة حالياً" : "Current"}
                           </span>
                         )}
                       </div>
@@ -310,7 +353,9 @@ function PlatformAdminPage() {
                         {isAr ? p.description.ar : p.description.en}
                       </p>
                       <div className="mt-4 pt-3 border-t border-border/60 flex items-center justify-between text-xs font-mono">
-                        <span className="text-muted-foreground">{isAr ? "الوحدات:" : "Modules:"} {p.modules.length}</span>
+                        <span className="text-muted-foreground">
+                          {isAr ? "الوحدات:" : "Modules:"} {p.modules.length}
+                        </span>
                         <span className="font-bold text-foreground">${p.priceMonthly}/mo</span>
                       </div>
                     </div>
@@ -324,7 +369,11 @@ function PlatformAdminPage() {
           <Card className="border-border/80 bg-surface/80">
             <CardHeader>
               <CardTitle className="text-base flex items-center justify-between">
-                <span>{isAr ? "إدارة التراخيص الإضافية الممنوحة (Add-on Entitlements)" : "Add-on Entitlements Override"}</span>
+                <span>
+                  {isAr
+                    ? "إدارة التراخيص الإضافية الممنوحة (Add-on Entitlements)"
+                    : "Add-on Entitlements Override"}
+                </span>
                 <span className="text-xs text-muted-foreground">
                   {extraModules.length} {isAr ? "إضافات مفعلة خارج الباقة" : "extra add-ons active"}
                 </span>
@@ -352,10 +401,16 @@ function PlatformAdminPage() {
                           </div>
                           <div className="text-[10px] text-muted-foreground truncate mt-0.5">
                             {inBase
-                              ? (isAr ? "مضمنة في الباقة الأساسية" : "Included in Base Plan")
+                              ? isAr
+                                ? "مضمنة في الباقة الأساسية"
+                                : "Included in Base Plan"
                               : isExtra
-                              ? (isAr ? "مرخصة كإضافة مستقلة" : "Granted as Add-on")
-                              : (isAr ? "غير مفعلة" : "Not Enabled")}
+                                ? isAr
+                                  ? "مرخصة كإضافة مستقلة"
+                                  : "Granted as Add-on"
+                                : isAr
+                                  ? "غير مفعلة"
+                                  : "Not Enabled"}
                           </div>
                         </div>
 
@@ -387,11 +442,17 @@ function PlatformAdminPage() {
                 <thead>
                   <tr className="border-b border-border bg-surface-2/40 text-start text-muted-foreground uppercase">
                     <th className="p-3 font-semibold">{isAr ? "الوحدة" : "Module ID"}</th>
-                    <th className="p-3 font-semibold">{isAr ? "الاسم العربي / الإنجليزي" : "Display Names"}</th>
+                    <th className="p-3 font-semibold">
+                      {isAr ? "الاسم العربي / الإنجليزي" : "Display Names"}
+                    </th>
                     <th className="p-3 font-semibold">{isAr ? "التصنيف" : "Category"}</th>
                     <th className="p-3 font-semibold">{isAr ? "التبعيات" : "Dependencies"}</th>
-                    <th className="p-3 font-semibold">{isAr ? "المسارات المحمية" : "Guarded Routes"}</th>
-                    <th className="p-3 text-end font-semibold">{isAr ? "الحالة الحالية" : "Current Status"}</th>
+                    <th className="p-3 font-semibold">
+                      {isAr ? "المسارات المحمية" : "Guarded Routes"}
+                    </th>
+                    <th className="p-3 text-end font-semibold">
+                      {isAr ? "الحالة الحالية" : "Current Status"}
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/60">
@@ -410,10 +471,10 @@ function PlatformAdminPage() {
                               m.category === "core"
                                 ? "bg-blue-500/15 text-blue-500"
                                 : m.category === "module"
-                                ? "bg-emerald-500/15 text-emerald-500"
-                                : m.category === "addon"
-                                ? "bg-amber-500/15 text-amber-500"
-                                : "bg-purple-500/15 text-purple-500"
+                                  ? "bg-emerald-500/15 text-emerald-500"
+                                  : m.category === "addon"
+                                    ? "bg-amber-500/15 text-amber-500"
+                                    : "bg-purple-500/15 text-purple-500"
                             }`}
                           >
                             {m.category}
@@ -459,26 +520,38 @@ function PlatformAdminPage() {
                     <span className="text-xs text-muted-foreground font-normal">/mo</span>
                   </span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">{isAr ? p.description.ar : p.description.en}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {isAr ? p.description.ar : p.description.en}
+                </p>
               </CardHeader>
               <CardContent className="space-y-4 flex-1">
                 <div className="space-y-2 text-xs">
                   <div className="flex justify-between border-b border-border/50 py-1.5">
-                    <span className="text-muted-foreground">{isAr ? "المستخدمين المسموحين:" : "Max Users:"}</span>
+                    <span className="text-muted-foreground">
+                      {isAr ? "المستخدمين المسموحين:" : "Max Users:"}
+                    </span>
                     <span className="font-semibold text-foreground">{p.maxUsers}</span>
                   </div>
                   <div className="flex justify-between border-b border-border/50 py-1.5">
-                    <span className="text-muted-foreground">{isAr ? "المستودعات:" : "Max Warehouses:"}</span>
+                    <span className="text-muted-foreground">
+                      {isAr ? "المستودعات:" : "Max Warehouses:"}
+                    </span>
                     <span className="font-semibold text-foreground">{p.maxWarehouses}</span>
                   </div>
                   <div className="flex justify-between border-b border-border/50 py-1.5">
-                    <span className="text-muted-foreground">{isAr ? "المنتجات القصوى:" : "Max Products:"}</span>
-                    <span className="font-semibold text-foreground">{p.maxProducts ? p.maxProducts : (isAr ? "غير محدود" : "Unlimited")}</span>
+                    <span className="text-muted-foreground">
+                      {isAr ? "المنتجات القصوى:" : "Max Products:"}
+                    </span>
+                    <span className="font-semibold text-foreground">
+                      {p.maxProducts ? p.maxProducts : isAr ? "غير محدود" : "Unlimited"}
+                    </span>
                   </div>
                 </div>
 
                 <div>
-                  <div className="text-xs font-semibold mb-2">{isAr ? "الوحدات المضمنة:" : "Included Modules:"}</div>
+                  <div className="text-xs font-semibold mb-2">
+                    {isAr ? "الوحدات المضمنة:" : "Included Modules:"}
+                  </div>
                   <div className="flex flex-wrap gap-1">
                     {p.modules.map((mid) => (
                       <Badge key={mid} variant="secondary" className="text-[10px] font-mono">
@@ -499,7 +572,9 @@ function PlatformAdminPage() {
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle className="text-base">
-                {isAr ? "سجل تدقيق عمليات المنصة والتراخيص" : "Platform Audit Trail & Entitlement Logs"}
+                {isAr
+                  ? "سجل تدقيق عمليات المنصة والتراخيص"
+                  : "Platform Audit Trail & Entitlement Logs"}
               </CardTitle>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {isAr
@@ -524,8 +599,12 @@ function PlatformAdminPage() {
                 <thead>
                   <tr className="border-b border-border/80 bg-surface-2/60 text-muted-foreground">
                     <th className="p-3 text-start font-medium">{isAr ? "الوقت" : "Timestamp"}</th>
-                    <th className="p-3 text-start font-medium">{isAr ? "الحدث / الإجراء" : "Action"}</th>
-                    <th className="p-3 text-start font-medium">{isAr ? "المستأجر" : "Target Tenant"}</th>
+                    <th className="p-3 text-start font-medium">
+                      {isAr ? "الحدث / الإجراء" : "Action"}
+                    </th>
+                    <th className="p-3 text-start font-medium">
+                      {isAr ? "المستأجر" : "Target Tenant"}
+                    </th>
                     <th className="p-3 text-start font-medium">{isAr ? "التفاصيل" : "Payload"}</th>
                   </tr>
                 </thead>
@@ -534,8 +613,12 @@ function PlatformAdminPage() {
                     <tr>
                       <td colSpan={4} className="p-8 text-center text-muted-foreground">
                         {loadingLogs
-                          ? (isAr ? "جاري تحميل سجلات التدقيق..." : "Loading audit logs...")
-                          : (isAr ? "لا توجد سجلات تدقيق سابقة حتى الآن" : "No platform audit entries yet")}
+                          ? isAr
+                            ? "جاري تحميل سجلات التدقيق..."
+                            : "Loading audit logs..."
+                          : isAr
+                            ? "لا توجد سجلات تدقيق سابقة حتى الآن"
+                            : "No platform audit entries yet"}
                       </td>
                     </tr>
                   ) : (

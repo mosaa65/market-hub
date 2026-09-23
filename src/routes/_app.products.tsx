@@ -49,7 +49,13 @@ type ProductRow = {
   brand?: { name: string; name_ar: string | null } | null;
   unit?: { short_name: string; name_ar: string | null } | null;
   origin?: { id: string; name: string; name_ar: string | null; code: string } | null;
-  quality?: { id: string; name: string; name_ar: string | null; code: string; sort_order?: number } | null;
+  quality?: {
+    id: string;
+    name: string;
+    name_ar: string | null;
+    code: string;
+    sort_order?: number;
+  } | null;
   compatibilities?: { vehicle_model_id: string }[];
 };
 
@@ -60,7 +66,11 @@ function ProductsPage() {
   const { isModuleEnabled } = useModules();
   const { hasRole, isPlatformAdmin, isPlatformSuperadmin } = useAuth();
   const canViewCost =
-    isPlatformAdmin || isPlatformSuperadmin || hasRole("owner") || hasRole("manager") || hasRole("accountant");
+    isPlatformAdmin ||
+    isPlatformSuperadmin ||
+    hasRole("owner") ||
+    hasRole("manager") ||
+    hasRole("accountant");
   const qc = useQueryClient();
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<ProductRow | null>(null);
@@ -74,7 +84,7 @@ function ProductsPage() {
         supabase
           .from("products")
           .select(
-            "id, name, name_ar, sku, barcode, sale_price, cost_price, tax_rate, min_stock, shelf_location, origin_id, quality_grade_id, is_active, category_id, brand_id, unit_id, category:categories(name, name_ar), brand:brands(name, name_ar), unit:units(short_name, name_ar), origin:countries_of_origin(id, name, name_ar, code), quality:quality_grades(id, name, name_ar, code, sort_order)"
+            "id, name, name_ar, sku, barcode, sale_price, cost_price, tax_rate, min_stock, shelf_location, origin_id, quality_grade_id, is_active, category_id, brand_id, unit_id, category:categories(name, name_ar), brand:brands(name, name_ar), unit:units(short_name, name_ar), origin:countries_of_origin(id, name, name_ar, code), quality:quality_grades(id, name, name_ar, code, sort_order)",
           )
           .order("created_at", { ascending: false })
           .limit(500),
@@ -105,8 +115,14 @@ function ProductsPage() {
         supabase.from("categories").select("id, name, name_ar").order("name"),
         supabase.from("brands").select("id, name, name_ar").order("name"),
         supabase.from("units").select("id, name, name_ar, short_name").order("name"),
-        (supabase as any).from("countries_of_origin").select("id, code, name, name_ar").order("name"),
-        (supabase as any).from("quality_grades").select("id, code, name, name_ar, sort_order").order("sort_order"),
+        (supabase as any)
+          .from("countries_of_origin")
+          .select("id, code, name, name_ar")
+          .order("name"),
+        (supabase as any)
+          .from("quality_grades")
+          .select("id, code, name, name_ar, sort_order")
+          .order("sort_order"),
         (supabase as any).from("vehicle_makes").select("id, name, name_ar").order("name"),
         (supabase as any).from("vehicle_models").select("id, name, name_ar, make_id").order("name"),
       ]);
@@ -127,7 +143,7 @@ function ProductsPage() {
     const q = query.trim().toLowerCase();
     if (!q) return products;
     return products.filter((p) =>
-      [p.name, p.name_ar, p.sku, p.barcode].some((x) => (x ?? "").toLowerCase().includes(q))
+      [p.name, p.name_ar, p.sku, p.barcode].some((x) => (x ?? "").toLowerCase().includes(q)),
     );
   }, [products, query]);
 
@@ -145,15 +161,29 @@ function ProductsPage() {
 
   const profileLabel =
     config.profile === "spare_parts"
-      ? (lang === "ar" ? "قطع غيار ومركبات" : "Spare Parts")
+      ? lang === "ar"
+        ? "قطع غيار ومركبات"
+        : "Spare Parts"
       : config.profile === "grocery"
-      ? (lang === "ar" ? "مواد غذائية وبقالة" : "Grocery")
-      : config.profile === "retail"
-      ? (lang === "ar" ? "تجارة عامة" : "General Retail")
-      : (lang === "ar" ? "تخصيص مخصص" : "Custom");
+        ? lang === "ar"
+          ? "مواد غذائية وبقالة"
+          : "Grocery"
+        : config.profile === "retail"
+          ? lang === "ar"
+            ? "تجارة عامة"
+            : "General Retail"
+          : lang === "ar"
+            ? "تخصيص مخصص"
+            : "Custom";
 
-  const modelsMap = useMemo(() => new Map<string, any>((meta?.models ?? []).map((m: any) => [m.id, m])), [meta?.models]);
-  const makesMap = useMemo(() => new Map<string, any>((meta?.makes ?? []).map((mk: any) => [mk.id, mk])), [meta?.makes]);
+  const modelsMap = useMemo(
+    () => new Map<string, any>((meta?.models ?? []).map((m: any) => [m.id, m])),
+    [meta?.models],
+  );
+  const makesMap = useMemo(
+    () => new Map<string, any>((meta?.makes ?? []).map((mk: any) => [mk.id, mk])),
+    [meta?.makes],
+  );
 
   const getProductCompats = (compats?: { vehicle_model_id: string }[]) => {
     if (!compats || compats.length === 0) return [];
@@ -161,7 +191,8 @@ function ProductsPage() {
       .map((c) => {
         const m = modelsMap.get(c.vehicle_model_id);
         const mk = m ? makesMap.get(m.make_id) : null;
-        const makeName = lang === "ar" ? mk?.name_ar || mk?.name || "" : mk?.name || mk?.name_ar || "";
+        const makeName =
+          lang === "ar" ? mk?.name_ar || mk?.name || "" : mk?.name || mk?.name_ar || "";
         const modelName = lang === "ar" ? m?.name_ar || m?.name || "" : m?.name || m?.name_ar || "";
         return { makeName, modelName };
       })
@@ -215,7 +246,8 @@ function ProductsPage() {
             }}
             className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm shadow-primary/20 hover:opacity-90 transition active:scale-95"
           >
-            <Plus className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{t("common.new")}</span>
+            <Plus className="h-3.5 w-3.5" />{" "}
+            <span className="hidden sm:inline">{t("common.new")}</span>
           </button>
         </div>
 
@@ -229,8 +261,12 @@ function ProductsPage() {
                 {config.enableBrands && (
                   <th className="px-4 py-2.5 text-start font-medium">{t("products.brand")}</th>
                 )}
-                <th className="px-4 py-2.5 text-start font-medium">{lang === "ar" ? "موقع الرف" : "Shelf"}</th>
-                {canViewCost && <th className="px-4 py-2.5 text-end font-medium">{t("common.cost")}</th>}
+                <th className="px-4 py-2.5 text-start font-medium">
+                  {lang === "ar" ? "موقع الرف" : "Shelf"}
+                </th>
+                {canViewCost && (
+                  <th className="px-4 py-2.5 text-end font-medium">{t("common.cost")}</th>
+                )}
                 <th className="px-4 py-2.5 text-end font-medium">{t("common.price")}</th>
                 <th className="px-4 py-2.5 text-end font-medium">{t("products.min")}</th>
                 <th className="px-4 py-2.5 text-end font-medium">{t("common.status")}</th>
@@ -241,14 +277,20 @@ function ProductsPage() {
               {isLoading &&
                 Array.from({ length: 6 }).map((_, i) => (
                   <tr key={i} className="border-b border-border/60">
-                    <td colSpan={(config.enableBrands ? 10 : 9) - (canViewCost ? 0 : 1)} className="px-4 py-3">
+                    <td
+                      colSpan={(config.enableBrands ? 10 : 9) - (canViewCost ? 0 : 1)}
+                      className="px-4 py-3"
+                    >
                       <div className="h-4 w-full rounded shimmer" />
                     </td>
                   </tr>
                 ))}
               {!isLoading && filtered.length === 0 && (
                 <tr>
-                  <td colSpan={(config.enableBrands ? 10 : 9) - (canViewCost ? 0 : 1)} className="px-4 py-16 text-center">
+                  <td
+                    colSpan={(config.enableBrands ? 10 : 9) - (canViewCost ? 0 : 1)}
+                    className="px-4 py-16 text-center"
+                  >
                     <div className="mx-auto grid h-10 w-10 place-items-center rounded-2xl bg-surface border border-border">
                       <Package className="h-5 w-5 text-muted-foreground" />
                     </div>
@@ -261,43 +303,68 @@ function ProductsPage() {
                 const primary = lang === "ar" ? p.name_ar || p.name : p.name || p.name_ar || "—";
                 const secondary = lang === "ar" ? p.name : p.name_ar;
                 const catLabel =
-                  lang === "ar" ? p.category?.name_ar || p.category?.name : p.category?.name || p.category?.name_ar;
+                  lang === "ar"
+                    ? p.category?.name_ar || p.category?.name
+                    : p.category?.name || p.category?.name_ar;
                 const brandLabel =
-                  lang === "ar" ? p.brand?.name_ar || p.brand?.name : p.brand?.name || p.brand?.name_ar;
+                  lang === "ar"
+                    ? p.brand?.name_ar || p.brand?.name
+                    : p.brand?.name || p.brand?.name_ar;
                 const compats = getProductCompats(p.compatibilities);
-                const uniqueMakes = Array.from(new Set(compats.map((c) => c.makeName).filter(Boolean)));
+                const uniqueMakes = Array.from(
+                  new Set(compats.map((c) => c.makeName).filter(Boolean)),
+                );
 
                 return (
-                  <tr key={p.id} className="border-b border-border/60 hover:bg-accent/40 transition-colors">
+                  <tr
+                    key={p.id}
+                    className="border-b border-border/60 hover:bg-accent/40 transition-colors"
+                  >
                     <td className="px-4 py-2.5">
                       {/* Catalog Index Micro-badges Above Product Name */}
                       <div className="mb-1 flex flex-wrap items-center gap-1 text-[10px] leading-none">
                         {config.enableQualityGrades && p.quality && (
                           <span
                             className={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 font-bold border ${
-                              p.quality.code?.toLowerCase() === "genuine" || p.quality.sort_order === 1
+                              p.quality.code?.toLowerCase() === "genuine" ||
+                              p.quality.sort_order === 1
                                 ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25"
-                                : p.quality.code?.toLowerCase() === "premium" || p.quality.sort_order === 2
-                                ? "bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/25"
-                                : "bg-surface-2 text-foreground/80 border-border/70"
+                                : p.quality.code?.toLowerCase() === "premium" ||
+                                    p.quality.sort_order === 2
+                                  ? "bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/25"
+                                  : "bg-surface-2 text-foreground/80 border-border/70"
                             }`}
                           >
                             <Award className="h-2.5 w-2.5" />
-                            <span>{lang === "ar" ? p.quality.name_ar || p.quality.name : p.quality.name || p.quality.name_ar}</span>
+                            <span>
+                              {lang === "ar"
+                                ? p.quality.name_ar || p.quality.name
+                                : p.quality.name || p.quality.name_ar}
+                            </span>
                           </span>
                         )}
 
                         {config.enableOrigins && p.origin && (
                           <span className="inline-flex items-center gap-0.5 rounded border border-border/70 bg-surface px-1.5 py-0.5 text-muted-foreground font-medium">
                             <Globe className="h-2.5 w-2.5 opacity-70" />
-                            <span>{lang === "ar" ? p.origin.name_ar || p.origin.name : p.origin.name || p.origin.name_ar}</span>
-                            {p.origin.code && <span className="font-mono text-[9px] opacity-75">({p.origin.code})</span>}
+                            <span>
+                              {lang === "ar"
+                                ? p.origin.name_ar || p.origin.name
+                                : p.origin.name || p.origin.name_ar}
+                            </span>
+                            {p.origin.code && (
+                              <span className="font-mono text-[9px] opacity-75">
+                                ({p.origin.code})
+                              </span>
+                            )}
                           </span>
                         )}
 
                         {config.enableUnits && p.unit && (
                           <span className="inline-flex items-center rounded border border-border/60 bg-surface-2 px-1.5 py-0.5 text-muted-foreground font-mono">
-                            {lang === "ar" ? p.unit.name_ar || p.unit.short_name : p.unit.short_name || p.unit.name_ar}
+                            {lang === "ar"
+                              ? p.unit.name_ar || p.unit.short_name
+                              : p.unit.short_name || p.unit.name_ar}
                           </span>
                         )}
 
@@ -316,7 +383,10 @@ function ProductsPage() {
                         )}
                       </div>
 
-                      <div className="font-medium text-foreground" dir={lang === "ar" ? "rtl" : "ltr"}>
+                      <div
+                        className="font-medium text-foreground"
+                        dir={lang === "ar" ? "rtl" : "ltr"}
+                      >
                         {primary}
                       </div>
                       {secondary && (
@@ -328,7 +398,9 @@ function ProductsPage() {
                         </div>
                       )}
                     </td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">{p.sku ?? "—"}</td>
+                    <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
+                      {p.sku ?? "—"}
+                    </td>
                     <td className="px-4 py-2.5 text-muted-foreground">{catLabel ?? "—"}</td>
                     {config.enableBrands && (
                       <td className="px-4 py-2.5 text-muted-foreground">{brandLabel ?? "—"}</td>
@@ -337,7 +409,9 @@ function ProductsPage() {
                       {p.shelf_location ?? "—"}
                     </td>
                     {canViewCost && (
-                      <td className="px-4 py-2.5 text-end font-mono">{Number(p.cost_price).toFixed(2)}</td>
+                      <td className="px-4 py-2.5 text-end font-mono">
+                        {Number(p.cost_price).toFixed(2)}
+                      </td>
                     )}
                     <td className="px-4 py-2.5 text-end font-mono text-foreground font-semibold">
                       {Number(p.sale_price).toFixed(2)}
@@ -348,7 +422,9 @@ function ProductsPage() {
                     <td className="px-4 py-2.5 text-end">
                       <span
                         className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                          p.is_active ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"
+                          p.is_active
+                            ? "bg-success/10 text-success"
+                            : "bg-muted text-muted-foreground"
                         }`}
                       >
                         {p.is_active ? t("common.active") : t("common.inactive")}
@@ -368,7 +444,13 @@ function ProductsPage() {
                         </button>
                         <button
                           onClick={() => {
-                            if (confirm(lang === "ar" ? `هل أنت متأكد من حذف "${primary}"؟` : `${t("common.delete")} "${primary}"?`)) {
+                            if (
+                              confirm(
+                                lang === "ar"
+                                  ? `هل أنت متأكد من حذف "${primary}"؟`
+                                  : `${t("common.delete")} "${primary}"?`,
+                              )
+                            ) {
                               remove.mutate(p.id);
                             }
                           }}
@@ -412,10 +494,7 @@ function ProductsPage() {
       )}
 
       {/* Catalog Modules Customization Dialog */}
-      <CatalogModulesDialog
-        open={modulesDialogOpen}
-        onClose={() => setModulesDialogOpen(false)}
-      />
+      <CatalogModulesDialog open={modulesDialogOpen} onClose={() => setModulesDialogOpen(false)} />
     </>
   );
 }
@@ -471,7 +550,7 @@ function ProductDialog({
         .select("vehicle_model_id")
         .eq("product_id", initial.id)
         .then(({ data }: any) =>
-          setCompatibleModels((data ?? []).map((r: any) => r.vehicle_model_id))
+          setCompatibleModels((data ?? []).map((r: any) => r.vehicle_model_id)),
         );
     }
   }, [initial?.id, config.enableMakesAndModels]);
@@ -501,7 +580,11 @@ function ProductDialog({
       is_active: form.is_active,
     };
     const request: any = initial
-      ? (supabase.from("products") as any).update(payload).eq("id", initial.id).select("id").single()
+      ? (supabase.from("products") as any)
+          .update(payload)
+          .eq("id", initial.id)
+          .select("id")
+          .single()
       : (supabase.from("products") as any).insert(payload).select("id").single();
     const { data, error } = await request;
     if (!error) {
@@ -509,7 +592,10 @@ function ProductDialog({
         await (supabase as any).from("product_compatibilities").delete().eq("product_id", data.id);
         if (compatibleModels.length) {
           await (supabase as any).from("product_compatibilities").insert(
-            compatibleModels.map((vehicle_model_id) => ({ product_id: data.id, vehicle_model_id }))
+            compatibleModels.map((vehicle_model_id) => ({
+              product_id: data.id,
+              vehicle_model_id,
+            })),
           );
         }
       }
@@ -525,8 +611,8 @@ function ProductDialog({
           ? "تم تحديث المنتج بنجاح"
           : "تم إنشاء المنتج بنجاح"
         : initial
-        ? t("products.updated")
-        : t("products.created")
+          ? t("products.updated")
+          : t("products.created"),
     );
     onSaved();
   }
@@ -750,7 +836,9 @@ function ProductDialog({
                 onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
                 className="rounded border-border"
               />
-              <span className="text-muted-foreground text-xs font-medium">{t("common.active")}</span>
+              <span className="text-muted-foreground text-xs font-medium">
+                {t("common.active")}
+              </span>
             </label>
           </Field>
         </div>
@@ -790,7 +878,9 @@ function Field({
 }) {
   return (
     <label className={`flex flex-col gap-1.5 ${className}`}>
-      <span className="text-[11px] font-semibold tracking-wider text-muted-foreground">{label}</span>
+      <span className="text-[11px] font-semibold tracking-wider text-muted-foreground">
+        {label}
+      </span>
       {children}
     </label>
   );
@@ -885,7 +975,9 @@ function VehicleCompatibilityPicker({
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder={lang === "ar" ? "ابحث عن ماركة (علامة) أو موديل..." : "Search make or model..."}
+            placeholder={
+              lang === "ar" ? "ابحث عن ماركة (علامة) أو موديل..." : "Search make or model..."
+            }
             className="h-8 w-full rounded-xl border border-border bg-surface px-8 text-xs text-foreground outline-none placeholder:text-muted-foreground focus:border-primary transition"
           />
           {search && (
@@ -960,8 +1052,8 @@ function VehicleCompatibilityPicker({
                 activeMakeId === mk.id
                   ? "bg-primary text-primary-foreground shadow-xs shadow-primary/20"
                   : hasSelected
-                  ? "border border-primary/40 bg-primary/10 text-primary hover:bg-primary/20"
-                  : "border border-border/80 bg-surface text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+                    ? "border border-primary/40 bg-primary/10 text-primary hover:bg-primary/20"
+                    : "border border-border/80 bg-surface text-muted-foreground hover:bg-surface-2 hover:text-foreground"
               }`}
             >
               <span>{makeLabel}</span>
@@ -987,11 +1079,23 @@ function VehicleCompatibilityPicker({
           <div className="col-span-full py-6 text-center text-xs text-muted-foreground">
             {models.length === 0 ? (
               <div className="flex flex-col items-center gap-1">
-                <span>{lang === "ar" ? "لا توجد موديلات مضافة في جدول الفهرس بعد" : "No models found in catalog table"}</span>
-                <span className="text-[11px] text-primary">{lang === "ar" ? "يمكنك إضافة ماركات وموديلات من صفحة الفهرس" : "You can add makes and models in the Catalog page"}</span>
+                <span>
+                  {lang === "ar"
+                    ? "لا توجد موديلات مضافة في جدول الفهرس بعد"
+                    : "No models found in catalog table"}
+                </span>
+                <span className="text-[11px] text-primary">
+                  {lang === "ar"
+                    ? "يمكنك إضافة ماركات وموديلات من صفحة الفهرس"
+                    : "You can add makes and models in the Catalog page"}
+                </span>
               </div>
             ) : (
-              <span>{lang === "ar" ? "لا توجد نتائج مطابقة لبحثك أو لهذه الماركة" : "No matching models for filter"}</span>
+              <span>
+                {lang === "ar"
+                  ? "لا توجد نتائج مطابقة لبحثك أو لهذه الماركة"
+                  : "No matching models for filter"}
+              </span>
             )}
           </div>
         ) : (
@@ -1046,12 +1150,10 @@ function VehicleCompatibilityPicker({
                 key={id}
                 className="inline-flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-2 py-0.5 font-medium text-primary"
               >
-                <span>{makeLabel} {modelLabel}</span>
-                <button
-                  type="button"
-                  onClick={() => toggleModel(id)}
-                  className="hover:opacity-75"
-                >
+                <span>
+                  {makeLabel} {modelLabel}
+                </span>
+                <button type="button" onClick={() => toggleModel(id)} className="hover:opacity-75">
                   <X className="h-2.5 w-2.5" />
                 </button>
               </span>

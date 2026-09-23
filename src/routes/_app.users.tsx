@@ -6,12 +6,35 @@ import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
-import { ShieldCheck, Trash2, Crown, Users, Lock, ShieldAlert, Sparkles, Plus, Key } from "lucide-react";
+import {
+  ShieldCheck,
+  Trash2,
+  Crown,
+  Users,
+  Lock,
+  ShieldAlert,
+  Sparkles,
+  Plus,
+  Key,
+} from "lucide-react";
 import { RolePermissionsDialog } from "@/components/role-permissions-dialog";
 import { cn } from "@/lib/utils";
 
@@ -42,7 +65,9 @@ function UsersPage() {
       const [{ data: profiles }, { data: roles }, { data: platformAdmins }] = await Promise.all([
         supabase.from("profiles").select("id, full_name, avatar_url, created_at"),
         supabase.from("user_roles").select("id, user_id, role"),
-        (supabase as any).from("platform_admins").select("id, user_id, role, is_active, created_at"),
+        (supabase as any)
+          .from("platform_admins")
+          .select("id, user_id, role, is_active, created_at"),
       ]);
 
       const byUser = new Map<string, any[]>();
@@ -106,7 +131,9 @@ function UsersPage() {
     if (!qCheck.allowed) {
       return toast.error(isAr ? qCheck.message?.ar : qCheck.message?.en);
     }
-    const { error } = await supabase.from("user_roles").insert({ user_id: userId, role: role as any });
+    const { error } = await supabase
+      .from("user_roles")
+      .insert({ user_id: userId, role: role as any });
     if (error) return toast.error(error.message);
     toast.success(t("users.role_granted") || (isAr ? "تم منح الدور بنجاح" : "Role granted"));
     void load();
@@ -121,8 +148,18 @@ function UsersPage() {
   }
 
   async function revokePlatformAdmin(adminRecordId: string) {
-    if (!confirm(isAr ? "هل أنت متأكد من إلغاء صلاحية مدير المنصة لهذا المستخدم؟" : "Revoke Platform Admin privileges?")) return;
-    const { error } = await (supabase as any).from("platform_admins").delete().eq("id", adminRecordId);
+    if (
+      !confirm(
+        isAr
+          ? "هل أنت متأكد من إلغاء صلاحية مدير المنصة لهذا المستخدم؟"
+          : "Revoke Platform Admin privileges?",
+      )
+    )
+      return;
+    const { error } = await (supabase as any)
+      .from("platform_admins")
+      .delete()
+      .eq("id", adminRecordId);
     if (error) return toast.error(error.message);
     toast.success(isAr ? "تم إلغاء صلاحية مدير المنصة" : "Platform admin revoked");
     void load();
@@ -148,7 +185,11 @@ function UsersPage() {
       {!canManageStore && (
         <div className="p-3.5 rounded-2xl border border-amber-500/30 bg-amber-500/5 text-xs text-amber-600 dark:text-amber-400 flex items-center gap-2">
           <Lock className="h-4 w-4 shrink-0" />
-          <span>{isAr ? "صلاحية المالك فقط هي المخولة بتعيين أو تعديل أدوار الموظفين." : "Only the Owner has privilege to assign or modify roles."}</span>
+          <span>
+            {isAr
+              ? "صلاحية المالك فقط هي المخولة بتعيين أو تعديل أدوار الموظفين."
+              : "Only the Owner has privilege to assign or modify roles."}
+          </span>
         </div>
       )}
 
@@ -161,7 +202,7 @@ function UsersPage() {
               "flex items-center gap-2 rounded-full px-4 py-2 text-xs font-bold transition-all",
               activeTab === "store"
                 ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
-                : "bg-surface hover:bg-surface-2 text-muted-foreground hover:text-foreground border border-border"
+                : "bg-surface hover:bg-surface-2 text-muted-foreground hover:text-foreground border border-border",
             )}
           >
             <Users className="h-4 w-4" />
@@ -177,7 +218,7 @@ function UsersPage() {
               "flex items-center gap-2 rounded-full px-4 py-2 text-xs font-bold transition-all",
               activeTab === "platform"
                 ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md shadow-amber-500/20"
-                : "bg-surface hover:bg-surface-2 text-muted-foreground hover:text-foreground border border-border"
+                : "bg-surface hover:bg-surface-2 text-muted-foreground hover:text-foreground border border-border",
             )}
           >
             <Crown className="h-4 w-4 text-amber-400" />
@@ -197,7 +238,11 @@ function UsersPage() {
               <div>
                 <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
                   <Users className="h-4 w-4 text-primary" />
-                  <span>{isAr ? "كشف موظفي المتجر والأدوار التشغيلية" : "Store Personnel & Role Allocations"}</span>
+                  <span>
+                    {isAr
+                      ? "كشف موظفي المتجر والأدوار التشغيلية"
+                      : "Store Personnel & Role Allocations"}
+                  </span>
                 </CardTitle>
                 <CardDescription className="text-xs text-muted-foreground mt-0.5">
                   {isAr
@@ -216,9 +261,17 @@ function UsersPage() {
                 <TableHeader>
                   <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
                     <TableHead className="px-4 py-3">{isAr ? "الموظف" : "Employee"}</TableHead>
-                    <TableHead className="px-4 py-3">{isAr ? "الأدوار والصلاحيات بالمتجر" : "Store Roles"}</TableHead>
-                    <TableHead className="px-4 py-3">{isAr ? "تاريخ التسجيل" : "Joined Date"}</TableHead>
-                    {canManageStore && <TableHead className="px-4 py-3 text-end">{isAr ? "الإجراءات وتعيين الأدوار" : "Actions"}</TableHead>}
+                    <TableHead className="px-4 py-3">
+                      {isAr ? "الأدوار والصلاحيات بالمتجر" : "Store Roles"}
+                    </TableHead>
+                    <TableHead className="px-4 py-3">
+                      {isAr ? "تاريخ التسجيل" : "Joined Date"}
+                    </TableHead>
+                    {canManageStore && (
+                      <TableHead className="px-4 py-3 text-end">
+                        {isAr ? "الإجراءات وتعيين الأدوار" : "Actions"}
+                      </TableHead>
+                    )}
                   </tr>
                 </TableHeader>
                 <TableBody>
@@ -242,7 +295,10 @@ function UsersPage() {
                       const hasOwner = r.roles.some((ro: any) => ro.role === "owner");
 
                       return (
-                        <TableRow key={r.id} className="border-b border-border/60 hover:bg-accent/25 transition-colors">
+                        <TableRow
+                          key={r.id}
+                          className="border-b border-border/60 hover:bg-accent/25 transition-colors"
+                        >
                           <TableCell className="px-4 py-3">
                             <div className="flex items-center gap-3">
                               <div className="h-9 w-9 rounded-2xl bg-primary/10 text-primary grid place-items-center text-xs font-bold border border-primary/20 shadow-2xs">
@@ -301,10 +357,14 @@ function UsersPage() {
                               <div className="inline-flex items-center gap-2 justify-end">
                                 <Select onValueChange={(v) => assignStoreRole(r.id, v)}>
                                   <SelectTrigger className="w-36 h-8 text-xs rounded-xl">
-                                    <SelectValue placeholder={isAr ? "إسناد دور جديد..." : "Add role..."} />
+                                    <SelectValue
+                                      placeholder={isAr ? "إسناد دور جديد..." : "Add role..."}
+                                    />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    {STORE_ROLES.filter((ro) => !r.roles.find((x: any) => x.role === ro)).map((ro) => (
+                                    {STORE_ROLES.filter(
+                                      (ro) => !r.roles.find((x: any) => x.role === ro),
+                                    ).map((ro) => (
                                       <SelectItem key={ro} value={ro} className="text-xs">
                                         {t(`role.${ro}`)}
                                       </SelectItem>
@@ -333,7 +393,11 @@ function UsersPage() {
               <div>
                 <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
                   <Crown className="h-4.5 w-4.5 text-amber-500" />
-                  <span>{isAr ? "مدراء المنصة السحابية (جدول platform_admins)" : "Platform Superadmins Registry"}</span>
+                  <span>
+                    {isAr
+                      ? "مدراء المنصة السحابية (جدول platform_admins)"
+                      : "Platform Superadmins Registry"}
+                  </span>
                 </CardTitle>
                 <CardDescription className="text-xs text-muted-foreground mt-0.5">
                   {isAr
@@ -351,15 +415,26 @@ function UsersPage() {
               <Table>
                 <TableHeader>
                   <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-                    <TableHead className="px-4 py-3">{isAr ? "مدير المنصة" : "Platform Admin"}</TableHead>
-                    <TableHead className="px-4 py-3">{isAr ? "مستوى الصلاحية" : "Privilege Tier"}</TableHead>
-                    <TableHead className="px-4 py-3">{isAr ? "تاريخ التعيين" : "Appointed"}</TableHead>
-                    <TableHead className="px-4 py-3 text-end">{isAr ? "إجراءات" : "Actions"}</TableHead>
+                    <TableHead className="px-4 py-3">
+                      {isAr ? "مدير المنصة" : "Platform Admin"}
+                    </TableHead>
+                    <TableHead className="px-4 py-3">
+                      {isAr ? "مستوى الصلاحية" : "Privilege Tier"}
+                    </TableHead>
+                    <TableHead className="px-4 py-3">
+                      {isAr ? "تاريخ التعيين" : "Appointed"}
+                    </TableHead>
+                    <TableHead className="px-4 py-3 text-end">
+                      {isAr ? "إجراءات" : "Actions"}
+                    </TableHead>
                   </tr>
                 </TableHeader>
                 <TableBody>
                   {platformAdminRows.map((pa) => (
-                    <TableRow key={pa.id} className="border-b border-border/60 hover:bg-accent/25 transition-colors">
+                    <TableRow
+                      key={pa.id}
+                      className="border-b border-border/60 hover:bg-accent/25 transition-colors"
+                    >
                       <TableCell className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <div className="h-9 w-9 rounded-2xl bg-amber-500/15 text-amber-600 dark:text-amber-400 grid place-items-center text-xs font-bold border border-amber-500/30">
@@ -428,7 +503,11 @@ function UsersPage() {
         </div>
         <RolePermissionsDialog
           trigger={
-            <Button variant="outline" size="sm" className="rounded-full text-xs gap-1.5 border-primary/30 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-full text-xs gap-1.5 border-primary/30 shrink-0"
+            >
               <Sparkles className="h-3.5 w-3.5 text-primary" />
               <span>{isAr ? "استعراض مصفوفة الصلاحيات" : "View Matrix"}</span>
             </Button>
