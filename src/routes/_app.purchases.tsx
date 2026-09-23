@@ -378,6 +378,13 @@ function CreateDialog({
   const [loading, setLoading] = useState(false);
   const productLabel = (p?: Pick<Product, "name" | "name_ar"> | null) =>
     !p ? "—" : lang === "ar" ? (p.name_ar || p.name) : (p.name || p.name_ar || "—");
+  const lowStockSuggestions = useMemo(
+    () =>
+      products
+        .filter((p) => Number(stockMap[p.id] ?? 0) <= 10)
+        .slice(0, 6),
+    [products, stockMap],
+  );
 
   useEffect(() => {
     void (async () => {
@@ -458,6 +465,13 @@ function CreateDialog({
       );
     }
   }
+
+  function clearCart() {
+    setCart([]);
+    setPaid("");
+    setDiscount("");
+  }
+
   function update(pid: string, patch: Partial<CartLine>) {
     setCart((c) => c.map((l) => (l.product_id === pid ? { ...l, ...patch } : l)));
   }
@@ -550,6 +564,24 @@ function CreateDialog({
           </div>
         </div>
 
+        <div className="mb-3 flex items-center justify-between gap-2 rounded-xl border border-border/70 bg-surface/80 px-3 py-2 text-[11px] text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex rounded-full bg-primary/10 px-2 py-1 font-medium text-primary">
+              {cart.length} {t("purchases.items")}
+            </span>
+            <span>{money(total)}</span>
+          </div>
+          {cart.length > 0 && (
+            <button
+              type="button"
+              onClick={clearCart}
+              className="rounded-md border border-border px-2 py-1 text-[10px] font-medium hover:bg-surface-2"
+            >
+              {lang === "ar" ? "مسح السلة" : "Clear cart"}
+            </button>
+          )}
+        </div>
+
         <div className="grid flex-1 grid-cols-1 gap-4 overflow-hidden md:grid-cols-2">
           <div className="flex flex-col overflow-hidden">
             <input
@@ -558,6 +590,21 @@ function CreateDialog({
               placeholder={t("purchases.search_products")}
               className="mb-2 h-9 rounded-md border border-input bg-surface px-3 text-sm"
             />
+            {!search && lowStockSuggestions.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {lowStockSuggestions.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => addToCart(p)}
+                    className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[10px] font-medium text-amber-700 dark:text-amber-300"
+                  >
+                    {productLabel(p)}
+                    <span className="font-mono">({Number(stockMap[p.id] ?? 0)})</span>
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="flex-1 overflow-y-auto space-y-1 pr-1">
               {filtered.map((p) => {
                 const available = Number(stockMap[p.id] ?? 0);

@@ -155,11 +155,13 @@ function AccountStatementPage() {
     } else {
       const { data: purchases } = await supabase
         .from("purchase_invoices")
-        .select("id, invoice_number, total, paid, created_at, note")
+        .select(
+          "id, invoice_number, total, paid, created_at, note, purchase_invoice_items(quantity,products(name,name_ar))",
+        )
         .eq("supplier_id", partyId)
         .order("created_at", { ascending: true });
 
-      (purchases ?? []).forEach((p) => {
+      (purchases ?? []).forEach((p: any) => {
         items.push({
           id: p.id,
           date: p.created_at,
@@ -168,7 +170,15 @@ function AccountStatementPage() {
           debit: Number(p.paid || 0),
           credit: Number(p.total),
           balance: 0,
-          note: p.note || (lang === "ar" ? "توريد كميات بضائع ومواد غذائية" : "Purchase Order"),
+          note:
+            p.note ||
+            (p.purchase_invoice_items ?? [])
+              .map(
+                (line: any) =>
+                  `${lang === "ar" ? line.products?.name_ar || line.products?.name : line.products?.name} × ${line.quantity}`,
+              )
+              .join("، ") ||
+            (lang === "ar" ? "توريد كميات بضائع ومواد غذائية" : "Purchase Order"),
         });
       });
     }
