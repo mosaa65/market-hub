@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Building2, Plus, Search, Edit, Trash2, X } from "lucide-react";
+import { Building2, Plus, Search, Edit, Trash2, X, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { useI18n } from "@/lib/i18n";
@@ -18,11 +18,13 @@ interface Supplier {
 }
 
 function SuppliersPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [rows, setRows] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [edit, setEdit] = useState<Partial<Supplier> | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -38,26 +40,45 @@ function SuppliersPage() {
   );
 
   async function save() {
+    if (saving) return;
     if (!edit?.name?.trim()) return toast.error(t("suppliers.name_required"));
-    const payload = {
-      name: edit.name.trim(),
-      phone: edit.phone || null,
-      email: edit.email || null,
-      address: edit.address || null,
-      is_active: edit.is_active ?? true,
-    };
-    const { error } = edit.id
-      ? await supabase.from("suppliers").update(payload).eq("id", edit.id)
-      : await supabase.from("suppliers").insert(payload);
-    if (error) return toast.error(error.message);
-    toast.success(edit.id ? t("common.updated") : t("common.created"));
-    setEdit(null); await load();
+    setSaving(true);
+    try {
+      const payload = {
+        name: edit.name.trim(),
+        phone: edit.phone || null,
+        email: edit.email || null,
+        address: edit.address || null,
+        is_active: edit.is_active ?? true,
+      };
+      const { error } = edit.id
+        ? await supabase.from("suppliers").update(payload).eq("id", edit.id)
+        : await supabase.from("suppliers").insert(payload);
+      if (error) throw error;
+      toast.success(edit.id ? t("common.updated") : t("common.created"));
+      setEdit(null);
+      await load();
+    } catch (err: any) {
+      toast.error(err.message ?? t("common.failed"));
+    } finally {
+      setSaving(false);
+    }
   }
+
   async function remove(id: string) {
+    if (deleting) return;
     if (!confirm(t("suppliers.delete_confirm"))) return;
-    const { error } = await supabase.from("suppliers").delete().eq("id", id);
-    if (error) return toast.error(error.message);
-    toast.success(t("common.deleted")); await load();
+    setDeleting(id);
+    try {
+      const { error } = await supabase.from("suppliers").delete().eq("id", id);
+      if (error) throw error;
+      toast.success(t("common.deleted"));
+      await load();
+    } catch (err: any) {
+      toast.error(err.message ?? t("common.failed"));
+    } finally {
+      setDeleting(null);
+    }
   }
 
   return (
@@ -134,8 +155,11 @@ function SuppliersPage() {
               </label>
             </div>
             <div className="mt-5 flex justify-end gap-2">
-              <button onClick={() => setEdit(null)} className="h-9 rounded-md border border-border px-4 text-sm hover:bg-surface-2">{t("common.cancel")}</button>
-              <button onClick={save} className="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90">{t("common.save")}</button>
+              <button onClick={() => !saving && setEdit(null)} disabled={saving} className="h-9 rounded-md border border-border px-4 text-sm hover:bg-surface-2 disabled:opacity-50 transition">{t("common.cancel")}</button>
+              <button onClick={save} disabled={saving} className="flex h-9 items-center justify-center gap-1.5 rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50 disabled:pointer-events-none transition">
+                {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                <span>{saving ? (lang === "ar" ? "جاري الحفظ..." : "Saving...") : t("common.save")}</span>
+              </button>
             </div>
           </div>
         </div>

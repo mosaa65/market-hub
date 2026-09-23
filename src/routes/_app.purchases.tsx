@@ -254,6 +254,7 @@ function CreateDialog({ onClose, onDone }: { onClose: () => void; onDone: () => 
   const paidN = Number(paid || 0);
 
   async function submit() {
+    if (loading) return;
     if (!warehouseId || !supplierId) return toast.error(t("purchases.select_ws"));
     if (cart.length === 0) return toast.error(t("purchases.add_items"));
     setLoading(true);
@@ -366,7 +367,7 @@ function CreateDialog({ onClose, onDone }: { onClose: () => void; onDone: () => 
             </div>
             <Row label={t("common.total")} value={money(total)} bold />
             <button onClick={submit} disabled={loading || cart.length === 0}
-              className="mt-1 flex h-10 w-full items-center justify-center gap-2 rounded-md bg-primary text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50">
+              className="mt-1 flex h-10 w-full items-center justify-center gap-2 rounded-md bg-primary text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50 disabled:pointer-events-none transition">
               {loading && <Loader2 className="h-4 w-4 animate-spin" />}
               {t("purchases.save")}
             </button>

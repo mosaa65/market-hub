@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { useCatalogModules } from "@/lib/catalog-modules";
 import { CatalogModulesDialog } from "@/components/catalog-modules-dialog";
-import { Plus, Package, Search, Pencil, Trash2, X, SlidersHorizontal } from "lucide-react";
+import { Plus, Package, Search, Pencil, Trash2, X, SlidersHorizontal, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/products")({
@@ -360,6 +360,7 @@ function ProductDialog({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (saving) return;
     if (!form.name_ar.trim() && !form.name.trim()) {
       toast.error(lang === "ar" ? "اسم المنتج مطلوب" : t("products.name_required"));
       return;
@@ -658,9 +659,10 @@ function ProductDialog({
           <button
             type="submit"
             disabled={saving}
-            className="flex h-9 items-center rounded-full bg-primary px-5 text-xs font-semibold text-primary-foreground hover:opacity-90 transition disabled:opacity-50 active:scale-95"
+            className="flex h-9 items-center justify-center gap-1.5 rounded-full bg-primary px-5 text-xs font-semibold text-primary-foreground hover:opacity-90 transition disabled:opacity-50 disabled:pointer-events-none active:scale-95"
           >
-            {saving ? t("common.saving") : initial ? t("common.save") : t("products.new_product")}
+            {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            <span>{saving ? t("common.saving") : initial ? t("common.save") : t("products.new_product")}</span>
           </button>
         </div>
       </form>

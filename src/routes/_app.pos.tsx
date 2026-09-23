@@ -131,6 +131,7 @@ function POSPage() {
   const [saleDate, setSaleDate] = useState(() => new Date().toISOString().slice(0, 10));
 
   const [newCustomerOpen, setNewCustomerOpen] = useState(false);
+  const [creatingCustomer, setCreatingCustomer] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState("");
   const [newCustomerPhone, setNewCustomerPhone] = useState("");
   const [newCustomerCreditLimit, setNewCustomerCreditLimit] = useState("");
@@ -536,6 +537,7 @@ function POSPage() {
   }, [cart, loading, warehouseId, customerId, paymentMethod, paid, discount, isOverpaid, total]);
 
   async function checkout() {
+    if (loading) return;
     if (!warehouseId) {
       return toast.error(lang === "ar" ? "يرجى اختيار المستودع أولاً" : t("pos.select_warehouse"));
     }
@@ -605,27 +607,35 @@ function POSPage() {
   }
 
   async function createCustomer() {
+    if (creatingCustomer) return;
     const name = newCustomerName.trim();
     if (!name) {
       return toast.error(lang === "ar" ? "اسم العميل مطلوب" : "Customer name is required");
     }
-    const { data, error } = await supabase
-      .from("customers")
-      .insert({
-        name,
-        phone: newCustomerPhone.trim() || null,
-        credit_limit: Math.max(0, Number(newCustomerCreditLimit || 0)),
-      })
-      .select("id,name")
-      .single();
-    if (error) return toast.error(error.message);
-    setCustomers((current) => [...current, data].sort((a, b) => a.name.localeCompare(b.name)));
-    setCustomerId(data.id);
-    setNewCustomerName("");
-    setNewCustomerPhone("");
-    setNewCustomerCreditLimit("");
-    setNewCustomerOpen(false);
-    toast.success(lang === "ar" ? "تمت إضافة العميل واختياره بنجاح" : "Customer added and selected");
+    setCreatingCustomer(true);
+    try {
+      const { data, error } = await supabase
+        .from("customers")
+        .insert({
+          name,
+          phone: newCustomerPhone.trim() || null,
+          credit_limit: Math.max(0, Number(newCustomerCreditLimit || 0)),
+        })
+        .select("id,name")
+        .single();
+      if (error) throw error;
+      setCustomers((current) => [...current, data].sort((a, b) => a.name.localeCompare(b.name)));
+      setCustomerId(data.id);
+      setNewCustomerName("");
+      setNewCustomerPhone("");
+      setNewCustomerCreditLimit("");
+      setNewCustomerOpen(false);
+      toast.success(lang === "ar" ? "تمت إضافة العميل واختياره بنجاح" : "Customer added and selected");
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setCreatingCustomer(false);
+    }
   }
 
   const selectClassName =
@@ -1334,13 +1344,19 @@ function POSPage() {
             <div className="mt-5 flex justify-end gap-2">
               <button
                 type="button"
+                disabled={creatingCustomer}
                 onClick={() => setNewCustomerOpen(false)}
-                className="h-9 rounded-full border border-border px-4 text-xs font-medium hover:bg-surface-2"
+                className="h-9 rounded-full border border-border px-4 text-xs font-medium hover:bg-surface-2 disabled:opacity-50 transition"
               >
                 {t("common.cancel")}
               </button>
-              <button className="h-9 rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground hover:opacity-90">
-                {lang === "ar" ? "إضافة واختيار" : "Add & select"}
+              <button
+                type="submit"
+                disabled={creatingCustomer}
+                className="flex items-center gap-1.5 h-9 rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50 disabled:pointer-events-none transition"
+              >
+                {creatingCustomer && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                <span>{creatingCustomer ? (lang === "ar" ? "جاري الإضافة..." : "Adding...") : (lang === "ar" ? "إضافة واختيار" : "Add & select")}</span>
               </button>
             </div>
           </form>

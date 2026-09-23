@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Plus, Trash2, RotateCcw, Search } from "lucide-react";
+import { Plus, Trash2, RotateCcw, Search, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/_app/sales-returns")({
   head: () => ({ meta: [{ title: "مرتجعات المبيعات — Vortex ERP" }] }),
@@ -140,6 +140,7 @@ function NewSalesReturn({ onSaved }: { onSaved: () => void }) {
   const [note, setNote] = useState("");
   const [search, setSearch] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -199,27 +200,32 @@ function NewSalesReturn({ onSaved }: { onSaved: () => void }) {
   const total = lines.reduce((a, l) => a + l.quantity * l.unit_price * (1 + l.tax_rate / 100), 0);
 
   async function save() {
+    if (saving) return;
     if (!warehouseId || lines.length === 0) {
       toast.error(t("common.fill_form"));
       return;
     }
-    const { error } = await supabase.rpc("create_sales_return" as any, {
-      _invoice_id: null,
-      _warehouse_id: warehouseId,
-      _customer_id: customerId || null,
-      _refund_method: refundMethod,
-      _note: note || null,
-      _items: lines as any,
-    });
-    if (error) {
-      toast.error(error.message);
-      return;
+    setSaving(true);
+    try {
+      const { error } = await supabase.rpc("create_sales_return" as any, {
+        _invoice_id: null,
+        _warehouse_id: warehouseId,
+        _customer_id: customerId || null,
+        _refund_method: refundMethod,
+        _note: note || null,
+        _items: lines as any,
+      });
+      if (error) throw error;
+      toast.success(lang === "ar" ? "تم تسجيل مرتجع المبيعات بنجاح" : "Sales return recorded successfully");
+      setOpen(false);
+      setLines([]);
+      setNote("");
+      onSaved();
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setSaving(false);
     }
-    toast.success(lang === "ar" ? "تم تسجيل مرتجع المبيعات بنجاح" : "Sales return recorded successfully");
-    setOpen(false);
-    setLines([]);
-    setNote("");
-    onSaved();
   }
 
   return (
@@ -358,10 +364,13 @@ function NewSalesReturn({ onSaved }: { onSaved: () => void }) {
               <span className="text-lg font-bold font-mono text-primary">{money(total)}</span>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setOpen(false)}>
+              <Button variant="outline" disabled={saving} onClick={() => setOpen(false)}>
                 {t("common.cancel")}
               </Button>
-              <Button onClick={save}>{t("common.save")}</Button>
+              <Button onClick={save} disabled={saving} className="disabled:opacity-50">
+                {saving && <Loader2 className="h-4 w-4 me-1.5 animate-spin" />}
+                {saving ? (lang === "ar" ? "جاري الحفظ..." : "Saving...") : t("common.save")}
+              </Button>
             </div>
           </div>
         </div>
