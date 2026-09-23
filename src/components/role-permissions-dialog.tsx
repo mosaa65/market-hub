@@ -11,9 +11,23 @@ import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import {
-  ShieldCheck, Crown, ShieldAlert, Sparkles, CheckCircle2,
-  XCircle, AlertCircle, Info, Lock, ShoppingCart, Package,
-  Boxes, Truck, Wallet, BarChart3, Settings, Users,
+  ShieldCheck,
+  Crown,
+  ShieldAlert,
+  Sparkles,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  Info,
+  Lock,
+  ShoppingCart,
+  Package,
+  Boxes,
+  Truck,
+  Wallet,
+  BarChart3,
+  Settings,
+  Users,
 } from "lucide-react";
 
 export type RoleDefinition = {
@@ -57,10 +71,7 @@ export const ROLE_DEFINITIONS: RoleDefinition[] = [
         "لا يختلط بجدول موظفي المتجر المحلي العاديين",
         "صلاحياته سيادية على مستوى المنصة السحابية بالكامل",
       ],
-      en: [
-        "Isolated from normal tenant staff roster",
-        "Sovereign platform-level permissions",
-      ],
+      en: ["Isolated from normal tenant staff roster", "Sovereign platform-level permissions"],
     },
   },
   {
@@ -271,17 +282,26 @@ export const CAPABILITY_MATRIX: CapabilityGroup[] = [
     category: { ar: "إدارة المنصة والتراخيص (Platform & Licensing)", en: "Platform & Licensing" },
     features: [
       {
-        name: { ar: "تعديل باقات النظام وترقية التراخيص", en: "Modify Platform Plans & Subscriptions" },
+        name: {
+          ar: "تعديل باقات النظام وترقية التراخيص",
+          en: "Modify Platform Plans & Subscriptions",
+        },
         superadmin: "full",
         owner: "full",
         manager: "none",
         accountant: "none",
         cashier: "none",
         warehouse: "none",
-        notes: { ar: "السوبر أدمن يمتلك التحكم بالمنصة والمالك يمتلك ترقية اشتراكه", en: "Superadmin manages SaaS tier; Owner manages tenant upgrade" },
+        notes: {
+          ar: "السوبر أدمن يمتلك التحكم بالمنصة والمالك يمتلك ترقية اشتراكه",
+          en: "Superadmin manages SaaS tier; Owner manages tenant upgrade",
+        },
       },
       {
-        name: { ar: "التحكم بالوحدات الموديلية والـ Add-ons", en: "Toggle System Modules & Add-ons" },
+        name: {
+          ar: "التحكم بالوحدات الموديلية والـ Add-ons",
+          en: "Toggle System Modules & Add-ons",
+        },
         superadmin: "full",
         owner: "full",
         manager: "none",
@@ -311,7 +331,10 @@ export const CAPABILITY_MATRIX: CapabilityGroup[] = [
         accountant: "none",
         cashier: "none",
         warehouse: "none",
-        notes: { ar: "حصري للمالك (والسوبر أدمن في حالات الدعم)", en: "Restricted to Owner (and Superadmin for support)" },
+        notes: {
+          ar: "حصري للمالك (والسوبر أدمن في حالات الدعم)",
+          en: "Restricted to Owner (and Superadmin for support)",
+        },
       },
       {
         name: { ar: "حذف أو تعديل حساب المالك", en: "Modify or Demote Owner Account" },
@@ -321,7 +344,10 @@ export const CAPABILITY_MATRIX: CapabilityGroup[] = [
         accountant: "none",
         cashier: "none",
         warehouse: "none",
-        notes: { ar: "مستحيل على أي دور تشغيلي آخر", en: "Strictly protected from operational staff" },
+        notes: {
+          ar: "مستحيل على أي دور تشغيلي آخر",
+          en: "Strictly protected from operational staff",
+        },
       },
     ],
   },
@@ -345,7 +371,10 @@ export const CAPABILITY_MATRIX: CapabilityGroup[] = [
         accountant: "full",
         cashier: "partial",
         warehouse: "none",
-        notes: { ar: "الكاشير يرجع الفاتورة المباشرة فقط، المحاسب والمدير يسويان الحساب", en: "Cashier processes direct return; Accountant adjusts ledger" },
+        notes: {
+          ar: "الكاشير يرجع الفاتورة المباشرة فقط، المحاسب والمدير يسويان الحساب",
+          en: "Cashier processes direct return; Accountant adjusts ledger",
+        },
       },
     ],
   },
@@ -353,7 +382,10 @@ export const CAPABILITY_MATRIX: CapabilityGroup[] = [
     category: { ar: "إدارة المنتجات والتسعير (Products & Pricing)", en: "Products & Pricing" },
     features: [
       {
-        name: { ar: "إضافة وتعديل بيانات المنتجات وسعر البيع", en: "Create & Update Product Retail Prices" },
+        name: {
+          ar: "إضافة وتعديل بيانات المنتجات وسعر البيع",
+          en: "Create & Update Product Retail Prices",
+        },
         superadmin: "full",
         owner: "full",
         manager: "full",
@@ -362,14 +394,20 @@ export const CAPABILITY_MATRIX: CapabilityGroup[] = [
         warehouse: "none",
       },
       {
-        name: { ar: "الاطلاع على سعر التكلفة (Cost Price) وهامش الربح", en: "View Purchase Cost & Profit Margins" },
+        name: {
+          ar: "الاطلاع على سعر التكلفة (Cost Price) وهامش الربح",
+          en: "View Purchase Cost & Profit Margins",
+        },
         superadmin: "full",
         owner: "full",
         manager: "full",
         accountant: "full",
         cashier: "none",
         warehouse: "none",
-        notes: { ar: "سري للغاية: محجوب تماماً عن الكاشير وأمين المستودع", en: "Strictly hidden from Cashiers and Warehouse Keepers" },
+        notes: {
+          ar: "سري للغاية: محجوب تماماً عن الكاشير وأمين المستودع",
+          en: "Strictly hidden from Cashiers and Warehouse Keepers",
+        },
       },
     ],
   },
@@ -377,7 +415,10 @@ export const CAPABILITY_MATRIX: CapabilityGroup[] = [
     category: { ar: "المستودعات والمخزون (Inventory & Logistics)", en: "Inventory & Logistics" },
     features: [
       {
-        name: { ar: "الجرد المخزني وتعديل الأرصدة الفعلية", en: "Cycle Counts & Stock Adjustments" },
+        name: {
+          ar: "الجرد المخزني وتعديل الأرصدة الفعلية",
+          en: "Cycle Counts & Stock Adjustments",
+        },
         superadmin: "full",
         owner: "full",
         manager: "full",
@@ -395,7 +436,10 @@ export const CAPABILITY_MATRIX: CapabilityGroup[] = [
         warehouse: "full",
       },
       {
-        name: { ar: "تتبع الدفعات وتواريخ الصلاحية والباركود", en: "Batches, Expiry Tracking & Barcode Labels" },
+        name: {
+          ar: "تتبع الدفعات وتواريخ الصلاحية والباركود",
+          en: "Batches, Expiry Tracking & Barcode Labels",
+        },
         superadmin: "full",
         owner: "full",
         manager: "full",
@@ -416,7 +460,10 @@ export const CAPABILITY_MATRIX: CapabilityGroup[] = [
         accountant: "full",
         cashier: "none",
         warehouse: "partial",
-        notes: { ar: "أمين المستودع يؤكد استلام الأصناف فقط", en: "Warehouse confirms physical receipt only" },
+        notes: {
+          ar: "أمين المستودع يؤكد استلام الأصناف فقط",
+          en: "Warehouse confirms physical receipt only",
+        },
       },
       {
         name: { ar: "إدارة حسابات الموردين والدفعات", en: "Vendor Accounts & Disbursements" },
@@ -430,7 +477,10 @@ export const CAPABILITY_MATRIX: CapabilityGroup[] = [
     ],
   },
   {
-    category: { ar: "المالية والمحاسبة المتقدمة (Accounting & Reports)", en: "Accounting & Financials" },
+    category: {
+      ar: "المالية والمحاسبة المتقدمة (Accounting & Reports)",
+      en: "Accounting & Financials",
+    },
     features: [
       {
         name: { ar: "سندات القبض ومتابعة ديون العملاء", en: "Receivables & Debt Aging Ledger" },
@@ -451,14 +501,20 @@ export const CAPABILITY_MATRIX: CapabilityGroup[] = [
         warehouse: "none",
       },
       {
-        name: { ar: "دفتر اليومية، ميزان المراجعة، والقوائم المالية", en: "Journal, Trial Balance & Income Statement" },
+        name: {
+          ar: "دفتر اليومية، ميزان المراجعة، والقوائم المالية",
+          en: "Journal, Trial Balance & Income Statement",
+        },
         superadmin: "full",
         owner: "full",
         manager: "partial",
         accountant: "full",
         cashier: "none",
         warehouse: "none",
-        notes: { ar: "محجوب عن الكاشير وأمين المخزن تماماً", en: "Strictly hidden from Cashiers & Warehouse" },
+        notes: {
+          ar: "محجوب عن الكاشير وأمين المخزن تماماً",
+          en: "Strictly hidden from Cashiers & Warehouse",
+        },
       },
     ],
   },
@@ -495,9 +551,14 @@ export function RolePermissionsDialog({ trigger }: { trigger?: React.ReactNode }
     <Dialog>
       <DialogTrigger asChild>
         {trigger || (
-          <Button variant="outline" className="gap-2 rounded-full border-primary/40 text-xs font-semibold">
+          <Button
+            variant="outline"
+            className="gap-2 rounded-full border-primary/40 text-xs font-semibold"
+          >
             <ShieldCheck className="h-4 w-4 text-primary" />
-            <span>{isAr ? "دليل ومصفوفة مقارنة الصلاحيات والأدوار" : "Role Permissions Matrix & Guide"}</span>
+            <span>
+              {isAr ? "دليل ومصفوفة مقارنة الصلاحيات والأدوار" : "Role Permissions Matrix & Guide"}
+            </span>
           </Button>
         )}
       </DialogTrigger>
@@ -509,8 +570,15 @@ export function RolePermissionsDialog({ trigger }: { trigger?: React.ReactNode }
             </div>
             <div>
               <DialogTitle className="text-lg font-bold text-foreground flex items-center gap-2">
-                <span>{isAr ? "دليل ومصفوفة مقارنة صلاحيات أدوار النظام" : "System Roles & Permissions Matrix"}</span>
-                <Badge variant="outline" className="text-[10px] font-mono border-primary/30 text-primary">
+                <span>
+                  {isAr
+                    ? "دليل ومصفوفة مقارنة صلاحيات أدوار النظام"
+                    : "System Roles & Permissions Matrix"}
+                </span>
+                <Badge
+                  variant="outline"
+                  className="text-[10px] font-mono border-primary/30 text-primary"
+                >
                   Vortex RBAC Matrix
                 </Badge>
               </DialogTitle>
@@ -530,7 +598,7 @@ export function RolePermissionsDialog({ trigger }: { trigger?: React.ReactNode }
                 "rounded-full px-4 py-1.5 text-xs font-semibold transition",
                 activeTab === "matrix"
                   ? "bg-primary text-primary-foreground shadow-sm"
-                  : "bg-surface text-muted-foreground hover:text-foreground border border-border"
+                  : "bg-surface text-muted-foreground hover:text-foreground border border-border",
               )}
             >
               {isAr ? "مصفوفة الصلاحيات المقارنة (Matrix)" : "Permissions Matrix"}
@@ -541,7 +609,7 @@ export function RolePermissionsDialog({ trigger }: { trigger?: React.ReactNode }
                 "rounded-full px-4 py-1.5 text-xs font-semibold transition",
                 activeTab === "cards"
                   ? "bg-primary text-primary-foreground shadow-sm"
-                  : "bg-surface text-muted-foreground hover:text-foreground border border-border"
+                  : "bg-surface text-muted-foreground hover:text-foreground border border-border",
               )}
             >
               {isAr ? "البطاقات التعريفية للأدوار" : "Role Profiles"}
@@ -552,7 +620,7 @@ export function RolePermissionsDialog({ trigger }: { trigger?: React.ReactNode }
                 "rounded-full px-4 py-1.5 text-xs font-semibold transition",
                 activeTab === "rules"
                   ? "bg-primary text-primary-foreground shadow-sm"
-                  : "bg-surface text-muted-foreground hover:text-foreground border border-border"
+                  : "bg-surface text-muted-foreground hover:text-foreground border border-border",
               )}
             >
               {isAr ? "الضوابط والمحظورات الأمنية" : "Security Rules"}
@@ -566,16 +634,28 @@ export function RolePermissionsDialog({ trigger }: { trigger?: React.ReactNode }
             {/* Legend */}
             <div className="flex flex-wrap items-center gap-4 p-3 rounded-2xl bg-surface border border-border/70 text-xs">
               <div className="flex items-center gap-1.5">
-                <span className="h-5 w-5 rounded-full bg-emerald-500/15 text-emerald-600 flex items-center justify-center font-bold">✓</span>
-                <span className="text-foreground font-medium">{isAr ? "صلاحية كاملة (Full Access)" : "Full Access"}</span>
+                <span className="h-5 w-5 rounded-full bg-emerald-500/15 text-emerald-600 flex items-center justify-center font-bold">
+                  ✓
+                </span>
+                <span className="text-foreground font-medium">
+                  {isAr ? "صلاحية كاملة (Full Access)" : "Full Access"}
+                </span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="h-5 w-5 rounded-full bg-amber-500/15 text-amber-600 flex items-center justify-center font-bold">!</span>
-                <span className="text-foreground font-medium">{isAr ? "صلاحية مقيدة / قراءة فقط (Partial / View)" : "Partial / View"}</span>
+                <span className="h-5 w-5 rounded-full bg-amber-500/15 text-amber-600 flex items-center justify-center font-bold">
+                  !
+                </span>
+                <span className="text-foreground font-medium">
+                  {isAr ? "صلاحية مقيدة / قراءة فقط (Partial / View)" : "Partial / View"}
+                </span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="h-5 w-5 rounded-full bg-muted text-muted-foreground flex items-center justify-center font-bold">✕</span>
-                <span className="text-muted-foreground">{isAr ? "محظور تماماً (Forbidden)" : "Restricted / None"}</span>
+                <span className="h-5 w-5 rounded-full bg-muted text-muted-foreground flex items-center justify-center font-bold">
+                  ✕
+                </span>
+                <span className="text-muted-foreground">
+                  {isAr ? "محظور تماماً (Forbidden)" : "Restricted / None"}
+                </span>
               </div>
             </div>
 
@@ -583,25 +663,45 @@ export function RolePermissionsDialog({ trigger }: { trigger?: React.ReactNode }
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-border/80 bg-surface/80 text-[11px] uppercase tracking-wider text-muted-foreground">
-                    <th className="px-4 py-3 text-start font-bold min-w-[220px]">{isAr ? "الوظيفة / الصلاحية" : "Module / Capability"}</th>
-                    <th className="px-3 py-3 text-center font-bold text-amber-500">{isAr ? "السوبر أدمن" : "Superadmin"}</th>
-                    <th className="px-3 py-3 text-center font-bold text-primary">{isAr ? "المالك" : "Owner"}</th>
-                    <th className="px-3 py-3 text-center font-bold text-blue-500">{isAr ? "المدير" : "Manager"}</th>
-                    <th className="px-3 py-3 text-center font-bold text-emerald-500">{isAr ? "المحاسب" : "Accountant"}</th>
-                    <th className="px-3 py-3 text-center font-bold text-cyan-500">{isAr ? "الكاشير" : "Cashier"}</th>
-                    <th className="px-3 py-3 text-center font-bold text-orange-500">{isAr ? "المستودع" : "Warehouse"}</th>
+                    <th className="px-4 py-3 text-start font-bold min-w-[220px]">
+                      {isAr ? "الوظيفة / الصلاحية" : "Module / Capability"}
+                    </th>
+                    <th className="px-3 py-3 text-center font-bold text-amber-500">
+                      {isAr ? "السوبر أدمن" : "Superadmin"}
+                    </th>
+                    <th className="px-3 py-3 text-center font-bold text-primary">
+                      {isAr ? "المالك" : "Owner"}
+                    </th>
+                    <th className="px-3 py-3 text-center font-bold text-blue-500">
+                      {isAr ? "المدير" : "Manager"}
+                    </th>
+                    <th className="px-3 py-3 text-center font-bold text-emerald-500">
+                      {isAr ? "المحاسب" : "Accountant"}
+                    </th>
+                    <th className="px-3 py-3 text-center font-bold text-cyan-500">
+                      {isAr ? "الكاشير" : "Cashier"}
+                    </th>
+                    <th className="px-3 py-3 text-center font-bold text-orange-500">
+                      {isAr ? "المستودع" : "Warehouse"}
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/50">
                   {CAPABILITY_MATRIX.map((group, gIdx) => (
                     <>
-                      <tr key={`group-${gIdx}`} className="bg-surface/90 font-bold text-foreground/90">
+                      <tr
+                        key={`group-${gIdx}`}
+                        className="bg-surface/90 font-bold text-foreground/90"
+                      >
                         <td colSpan={7} className="px-4 py-2 text-[11px] text-primary">
                           {isAr ? group.category.ar : group.category.en}
                         </td>
                       </tr>
                       {group.features.map((f, fIdx) => (
-                        <tr key={`feat-${gIdx}-${fIdx}`} className="hover:bg-accent/30 transition-colors">
+                        <tr
+                          key={`feat-${gIdx}-${fIdx}`}
+                          className="hover:bg-accent/30 transition-colors"
+                        >
                           <td className="px-4 py-2.5 font-medium text-foreground">
                             <div>{isAr ? f.name.ar : f.name.en}</div>
                             {f.notes && (
@@ -638,15 +738,27 @@ export function RolePermissionsDialog({ trigger }: { trigger?: React.ReactNode }
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                      <div className={cn("grid h-9 w-9 place-items-center rounded-xl border", r.badgeClass)}>
+                      <div
+                        className={cn(
+                          "grid h-9 w-9 place-items-center rounded-xl border",
+                          r.badgeClass,
+                        )}
+                      >
                         <Icon className="h-4.5 w-4.5" />
                       </div>
                       <div>
-                        <div className="font-bold text-sm text-foreground">{isAr ? r.title.ar : r.title.en}</div>
-                        <div className="text-[10px] text-muted-foreground">{isAr ? r.scope.ar : r.scope.en}</div>
+                        <div className="font-bold text-sm text-foreground">
+                          {isAr ? r.title.ar : r.title.en}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">
+                          {isAr ? r.scope.ar : r.scope.en}
+                        </div>
                       </div>
                     </div>
-                    <Badge variant="outline" className={cn("text-[10px] font-semibold", r.badgeClass)}>
+                    <Badge
+                      variant="outline"
+                      className={cn("text-[10px] font-semibold", r.badgeClass)}
+                    >
                       {r.id.toUpperCase()}
                     </Badge>
                   </div>
@@ -663,7 +775,9 @@ export function RolePermissionsDialog({ trigger }: { trigger?: React.ReactNode }
                     </div>
                     <ul className="space-y-1 text-xs text-muted-foreground list-disc list-inside ps-1">
                       {(isAr ? r.primaryDuties.ar : r.primaryDuties.en).map((duty, dIdx) => (
-                        <li key={dIdx} className="leading-snug">{duty}</li>
+                        <li key={dIdx} className="leading-snug">
+                          {duty}
+                        </li>
                       ))}
                     </ul>
                   </div>
@@ -675,9 +789,13 @@ export function RolePermissionsDialog({ trigger }: { trigger?: React.ReactNode }
                       <span>{isAr ? "الحدود والمحظورات الأمنية:" : "Security Boundaries:"}</span>
                     </div>
                     <ul className="space-y-1 text-xs text-destructive/80 list-disc list-inside ps-1">
-                      {(isAr ? r.criticalRestrictions.ar : r.criticalRestrictions.en).map((rest, rIdx) => (
-                        <li key={rIdx} className="leading-snug">{rest}</li>
-                      ))}
+                      {(isAr ? r.criticalRestrictions.ar : r.criticalRestrictions.en).map(
+                        (rest, rIdx) => (
+                          <li key={rIdx} className="leading-snug">
+                            {rest}
+                          </li>
+                        ),
+                      )}
                     </ul>
                   </div>
                 </div>
@@ -692,7 +810,11 @@ export function RolePermissionsDialog({ trigger }: { trigger?: React.ReactNode }
             <div className="p-4 rounded-2xl border border-amber-500/30 bg-amber-500/5 space-y-2">
               <div className="flex items-center gap-2 font-bold text-amber-600 dark:text-amber-400 text-sm">
                 <ShieldAlert className="h-4 w-4" />
-                <span>{isAr ? "1. الفصل الحاسم بين السوبر أدمن والمالك" : "1. Separation of Superadmin & Tenant Owner"}</span>
+                <span>
+                  {isAr
+                    ? "1. الفصل الحاسم بين السوبر أدمن والمالك"
+                    : "1. Separation of Superadmin & Tenant Owner"}
+                </span>
               </div>
               <p className="text-muted-foreground">
                 {isAr
@@ -704,7 +826,11 @@ export function RolePermissionsDialog({ trigger }: { trigger?: React.ReactNode }
             <div className="p-4 rounded-2xl border border-destructive/30 bg-destructive/5 space-y-2">
               <div className="flex items-center gap-2 font-bold text-destructive text-sm">
                 <Lock className="h-4 w-4" />
-                <span>{isAr ? "2. حجب تكلفة الشراء (Cost Price) وهوامش الربح عن الكاشير والمستودع" : "2. Cost Price Secrecy"}</span>
+                <span>
+                  {isAr
+                    ? "2. حجب تكلفة الشراء (Cost Price) وهوامش الربح عن الكاشير والمستودع"
+                    : "2. Cost Price Secrecy"}
+                </span>
               </div>
               <p className="text-muted-foreground">
                 {isAr
@@ -716,7 +842,11 @@ export function RolePermissionsDialog({ trigger }: { trigger?: React.ReactNode }
             <div className="p-4 rounded-2xl border border-blue-500/30 bg-blue-500/5 space-y-2">
               <div className="flex items-center gap-2 font-bold text-blue-600 dark:text-blue-400 text-sm">
                 <Users className="h-4 w-4" />
-                <span>{isAr ? "3. حصرية إدارة وتوزيع الأدوار للمالك فقط" : "3. Role Governance Exclusivity"}</span>
+                <span>
+                  {isAr
+                    ? "3. حصرية إدارة وتوزيع الأدوار للمالك فقط"
+                    : "3. Role Governance Exclusivity"}
+                </span>
               </div>
               <p className="text-muted-foreground">
                 {isAr

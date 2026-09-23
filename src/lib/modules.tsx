@@ -34,16 +34,42 @@ export const SYSTEM_MODULES: PlatformModule[] = [
   {
     id: "core",
     name: { ar: "النظام الأساسي", en: "Core ERP" },
-    description: { ar: "المنتجات، المبيعات الأساسية، العملاء، المخزون، الإعدادات", en: "Products, Sales, Customers, Inventory, Settings" },
+    description: {
+      ar: "المنتجات، المبيعات الأساسية، العملاء، المخزون، الإعدادات",
+      en: "Products, Sales, Customers, Inventory, Settings",
+    },
     category: "core",
     dependencies: [],
-    navItems: ["/dashboard", "/products", "/catalog", "/inventory", "/sales", "/customers", "/settings", "/notifications", "/users"],
-    routes: ["/_app/dashboard", "/_app/products", "/_app/catalog", "/_app/inventory", "/_app/sales", "/_app/customers", "/_app/settings", "/_app/notifications", "/_app/users"],
+    navItems: [
+      "/dashboard",
+      "/products",
+      "/catalog",
+      "/inventory",
+      "/sales",
+      "/customers",
+      "/settings",
+      "/notifications",
+      "/users",
+    ],
+    routes: [
+      "/_app/dashboard",
+      "/_app/products",
+      "/_app/catalog",
+      "/_app/inventory",
+      "/_app/sales",
+      "/_app/customers",
+      "/_app/settings",
+      "/_app/notifications",
+      "/_app/users",
+    ],
   },
   {
     id: "pos",
     name: { ar: "نقطة البيع السريعة (POS)", en: "Point of Sale (POS)" },
-    description: { ar: "واجهة الكاشير السريعة مع دعم الباركود والطباعة الحرارية", en: "Fast cashier checkout interface with thermal printing" },
+    description: {
+      ar: "واجهة الكاشير السريعة مع دعم الباركود والطباعة الحرارية",
+      en: "Fast cashier checkout interface with thermal printing",
+    },
     category: "module",
     dependencies: ["core"],
     navItems: ["/pos"],
@@ -52,7 +78,10 @@ export const SYSTEM_MODULES: PlatformModule[] = [
   {
     id: "purchases",
     name: { ar: "المشتريات والموردون", en: "Purchases & Suppliers" },
-    description: { ar: "فواتير المشتريات، حسابات الموردين، وإدخال بضائع المخازن", en: "Purchase orders, vendor accounts and stock receiving" },
+    description: {
+      ar: "فواتير المشتريات، حسابات الموردين، وإدخال بضائع المخازن",
+      en: "Purchase orders, vendor accounts and stock receiving",
+    },
     category: "module",
     dependencies: ["core"],
     navItems: ["/purchases", "/suppliers"],
@@ -61,7 +90,10 @@ export const SYSTEM_MODULES: PlatformModule[] = [
   {
     id: "returns",
     name: { ar: "إدارة المرتجعات", en: "Returns Management" },
-    description: { ar: "مرتجعات المبيعات والمشتريات وتسوية الذمم تلقائياً", en: "Customer and supplier returns with automatic balances adjustment" },
+    description: {
+      ar: "مرتجعات المبيعات والمشتريات وتسوية الذمم تلقائياً",
+      en: "Customer and supplier returns with automatic balances adjustment",
+    },
     category: "module",
     dependencies: ["core"],
     navItems: ["/sales-returns", "/purchase-returns"],
@@ -70,7 +102,10 @@ export const SYSTEM_MODULES: PlatformModule[] = [
   {
     id: "payments",
     name: { ar: "التحصيلات والديون وكشف الحساب", en: "Receivables & Payments" },
-    description: { ar: "سندات القبض، متابعة الذمم والديون، وكشف حساب تفصيلي للعميل", en: "Receipt vouchers, receivables tracking and customer statements" },
+    description: {
+      ar: "سندات القبض، متابعة الذمم والديون، وكشف حساب تفصيلي للعميل",
+      en: "Receipt vouchers, receivables tracking and customer statements",
+    },
     category: "module",
     dependencies: ["core"],
     navItems: ["/payments", "/debts", "/account-statement"],
@@ -79,7 +114,10 @@ export const SYSTEM_MODULES: PlatformModule[] = [
   {
     id: "expenses",
     name: { ar: "المصروفات والمالية", en: "Expenses & Cashflow" },
-    description: { ar: "تسجيل المصروفات التشغيلية والإدارية والتدفق المالي", en: "Track operational expenses and basic cashflow" },
+    description: {
+      ar: "تسجيل المصروفات التشغيلية والإدارية والتدفق المالي",
+      en: "Track operational expenses and basic cashflow",
+    },
     category: "module",
     dependencies: ["core"],
     navItems: ["/finance"],
@@ -88,7 +126,10 @@ export const SYSTEM_MODULES: PlatformModule[] = [
   {
     id: "multi_warehouse",
     name: { ar: "تعدد المستودعات والتحويلات", en: "Multi-Warehouse & Transfers" },
-    description: { ar: "إدارة فروع ومستودعات متعددة والتحويلات المخزنية بينها", en: "Multiple warehouses and inter-branch stock transfers" },
+    description: {
+      ar: "إدارة فروع ومستودعات متعددة والتحويلات المخزنية بينها",
+      en: "Multiple warehouses and inter-branch stock transfers",
+    },
     category: "addon",
     dependencies: ["core"],
     navItems: ["/warehouses", "/transfers"],
@@ -97,7 +138,10 @@ export const SYSTEM_MODULES: PlatformModule[] = [
   {
     id: "barcode",
     name: { ar: "الباركود والملصقات", en: "Barcode & Labels" },
-    description: { ar: "توليد ملصقات الباركود والطباعة والقراءة بالماسح والكاميرا", en: "Barcode generation, thermal barcode printing and scanning" },
+    description: {
+      ar: "توليد ملصقات الباركود والطباعة والقراءة بالماسح والكاميرا",
+      en: "Barcode generation, thermal barcode printing and scanning",
+    },
     category: "addon",
     dependencies: ["core"],
     navItems: ["/barcodes"],
@@ -106,7 +150,10 @@ export const SYSTEM_MODULES: PlatformModule[] = [
   {
     id: "loyalty",
     name: { ar: "برنامج ولاء العملاء", en: "Loyalty Program" },
-    description: { ar: "منح نقاط عند الشراء ومكافأة العملاء واستبدال النقاط", en: "Customer reward points and redemption program" },
+    description: {
+      ar: "منح نقاط عند الشراء ومكافأة العملاء واستبدال النقاط",
+      en: "Customer reward points and redemption program",
+    },
     category: "addon",
     dependencies: ["core"],
     navItems: ["/loyalty"],
@@ -115,7 +162,10 @@ export const SYSTEM_MODULES: PlatformModule[] = [
   {
     id: "batches",
     name: { ar: "الدفعات وتواريخ الصلاحية", en: "Batch & Expiry Tracking" },
-    description: { ar: "تتبع أرقام التشغيلات (Lot/Batch) وتواريخ انتهاء الصلاحية", en: "Lot tracking and shelf-life expiration alerts" },
+    description: {
+      ar: "تتبع أرقام التشغيلات (Lot/Batch) وتواريخ انتهاء الصلاحية",
+      en: "Lot tracking and shelf-life expiration alerts",
+    },
     category: "addon",
     dependencies: ["core"],
     navItems: ["/batches"],
@@ -124,16 +174,27 @@ export const SYSTEM_MODULES: PlatformModule[] = [
   {
     id: "advanced_accounting",
     name: { ar: "المحاسبة المتقدمة والتقارير الختامية", en: "Advanced Accounting" },
-    description: { ar: "دفتر اليومية، ميزان المراجعة، قائمة الدخل، والميزانية العمومية", en: "Daily Journal, Trial Balance, Income Statement, and Balance Sheet" },
+    description: {
+      ar: "دفتر اليومية، ميزان المراجعة، قائمة الدخل، والميزانية العمومية",
+      en: "Daily Journal, Trial Balance, Income Statement, and Balance Sheet",
+    },
     category: "enterprise",
     dependencies: ["core", "expenses"],
     navItems: ["/daily-journal", "/trial-balance", "/income-statement", "/balance-sheet"],
-    routes: ["/_app/daily-journal", "/_app/trial-balance", "/_app/income-statement", "/_app/balance-sheet"],
+    routes: [
+      "/_app/daily-journal",
+      "/_app/trial-balance",
+      "/_app/income-statement",
+      "/_app/balance-sheet",
+    ],
   },
   {
     id: "analytics",
     name: { ar: "التحليلات المتقدمة والتقارير", en: "Advanced Analytics" },
-    description: { ar: "رسوم بيانية تفاعلية، تحليل الربحية، والتقارير التشغيلية الموسعة", en: "In-depth visual charts, profitability insights and analytical reports" },
+    description: {
+      ar: "رسوم بيانية تفاعلية، تحليل الربحية، والتقارير التشغيلية الموسعة",
+      en: "In-depth visual charts, profitability insights and analytical reports",
+    },
     category: "enterprise",
     dependencies: ["core"],
     navItems: ["/analytics", "/reports"],
@@ -142,7 +203,10 @@ export const SYSTEM_MODULES: PlatformModule[] = [
   {
     id: "audit",
     name: { ar: "سجل تدقيق العمليات (Audit Logs)", en: "Audit Trail Viewer" },
-    description: { ar: "مراقبة كافة الحركات الإدارية والمالية مع هوية المستخدم والوقت", en: "Complete operational activity and security audit trail" },
+    description: {
+      ar: "مراقبة كافة الحركات الإدارية والمالية مع هوية المستخدم والوقت",
+      en: "Complete operational activity and security audit trail",
+    },
     category: "enterprise",
     dependencies: ["core"],
     navItems: ["/audit"],
@@ -155,7 +219,10 @@ export const SYSTEM_PLANS: PlatformPlan[] = [
   {
     id: "starter",
     name: { ar: "الباقة الأساسية", en: "Starter Plan" },
-    description: { ar: "للأنشطة الصغيرة: مبيعات ومخزون مبسط ومستودع واحد", en: "Essential single-location sales, products and inventory" },
+    description: {
+      ar: "للأنشطة الصغيرة: مبيعات ومخزون مبسط ومستودع واحد",
+      en: "Essential single-location sales, products and inventory",
+    },
     modules: ["core"],
     maxUsers: 1,
     maxWarehouses: 1,
@@ -165,7 +232,10 @@ export const SYSTEM_PLANS: PlatformPlan[] = [
   {
     id: "professional",
     name: { ar: "الباقة الاحترافية", en: "Professional Plan" },
-    description: { ar: "للمتاجر ومحلات التجزئة: نقطة بيع، مشتريات، تحصيلات ومصروفات", en: "For growing stores: POS, purchases, returns, payments & expenses" },
+    description: {
+      ar: "للمتاجر ومحلات التجزئة: نقطة بيع، مشتريات، تحصيلات ومصروفات",
+      en: "For growing stores: POS, purchases, returns, payments & expenses",
+    },
     modules: ["core", "pos", "purchases", "returns", "payments", "expenses"],
     maxUsers: 5,
     maxWarehouses: 1,
@@ -176,7 +246,10 @@ export const SYSTEM_PLANS: PlatformPlan[] = [
   {
     id: "enterprise",
     name: { ar: "باقة المؤسسات المتكاملة", en: "Enterprise Suite" },
-    description: { ar: "نظام ERP متكامل يشمل كافة الوحدات والمستودعات والمحاسبة والتحليلات", en: "Full ERP power: multi-warehouse, accounting, analytics, loyalty and audit" },
+    description: {
+      ar: "نظام ERP متكامل يشمل كافة الوحدات والمستودعات والمحاسبة والتحليلات",
+      en: "Full ERP power: multi-warehouse, accounting, analytics, loyalty and audit",
+    },
     modules: [
       "core",
       "pos",
@@ -220,7 +293,10 @@ interface ModulesContextType {
   toggleExtraModule: (moduleId: string) => Promise<boolean>;
   resetToDefault: () => Promise<boolean>;
   isLoading: boolean;
-  checkQuota: (resource: "users" | "warehouses" | "products", currentCount: number) => QuotaCheckResult;
+  checkQuota: (
+    resource: "users" | "warehouses" | "products",
+    currentCount: number,
+  ) => QuotaCheckResult;
 }
 
 const ModulesContext = createContext<ModulesContextType | null>(null);
@@ -328,15 +404,13 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem(STORAGE_KEY_PLAN, newPlanId);
     }
     try {
-      await (supabase as any)
-        .from("tenant_subscriptions")
-        .upsert({
-          tenant_id: "default",
-          plan_id: newPlanId,
-          extra_modules: extraModules,
-          status: "active",
-          updated_at: new Date().toISOString(),
-        });
+      await (supabase as any).from("tenant_subscriptions").upsert({
+        tenant_id: "default",
+        plan_id: newPlanId,
+        extra_modules: extraModules,
+        status: "active",
+        updated_at: new Date().toISOString(),
+      });
     } catch {
       // Handled via local storage
     }
@@ -352,15 +426,13 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem(STORAGE_KEY_EXTRAS, JSON.stringify(updated));
     }
     try {
-      await (supabase as any)
-        .from("tenant_subscriptions")
-        .upsert({
-          tenant_id: "default",
-          plan_id: currentPlanId,
-          extra_modules: updated,
-          status: "active",
-          updated_at: new Date().toISOString(),
-        });
+      await (supabase as any).from("tenant_subscriptions").upsert({
+        tenant_id: "default",
+        plan_id: currentPlanId,
+        extra_modules: updated,
+        status: "active",
+        updated_at: new Date().toISOString(),
+      });
     } catch {
       // Handled via local storage
     }
@@ -373,7 +445,7 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
 
   const checkQuota = (
     resource: "users" | "warehouses" | "products",
-    currentCount: number
+    currentCount: number,
   ): QuotaCheckResult => {
     let limit: number | null = null;
     let nameAr = "";
@@ -410,7 +482,6 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
           },
     };
   };
-
 
   return (
     <ModulesContext.Provider
@@ -455,7 +526,10 @@ export function ModuleLockedBanner({ moduleId }: { moduleId: string }) {
   const mod = modules.find((m) => m.id === moduleId) || {
     id: moduleId,
     name: { ar: "هذه الميزة", en: "This Feature" },
-    description: { ar: "هذه الوحدة غير مفعّلة في باقتك الحالية.", en: "This module is not enabled in your current plan." },
+    description: {
+      ar: "هذه الوحدة غير مفعّلة في باقتك الحالية.",
+      en: "This module is not enabled in your current plan.",
+    },
     category: "module" as ModuleCategory,
     dependencies: [],
     navItems: [],
@@ -477,10 +551,16 @@ export function ModuleLockedBanner({ moduleId }: { moduleId: string }) {
             <Lock className="h-3.5 w-3.5" />
             <span>
               {mod.category === "addon"
-                ? isAr ? "إضافة اختيارية (Add-on)" : "Optional Add-on"
+                ? isAr
+                  ? "إضافة اختيارية (Add-on)"
+                  : "Optional Add-on"
                 : mod.category === "enterprise"
-                ? isAr ? "باقة المؤسسات (Enterprise)" : "Enterprise Suite"
-                : isAr ? "باقة متقدمة" : "Advanced Plan"}
+                  ? isAr
+                    ? "باقة المؤسسات (Enterprise)"
+                    : "Enterprise Suite"
+                  : isAr
+                    ? "باقة متقدمة"
+                    : "Advanced Plan"}
             </span>
           </div>
 
@@ -504,9 +584,7 @@ export function ModuleLockedBanner({ moduleId }: { moduleId: string }) {
               </span>
             </div>
             <div className="mt-2 flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">
-                {isAr ? "متاحة ضمن:" : "Available in:"}
-              </span>
+              <span className="text-muted-foreground">{isAr ? "متاحة ضمن:" : "Available in:"}</span>
               <span className="font-semibold text-primary">
                 {isAr ? targetPlan.name.ar : targetPlan.name.en}
               </span>

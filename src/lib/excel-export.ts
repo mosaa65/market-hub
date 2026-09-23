@@ -1,9 +1,9 @@
 /**
  * Excel / CSV Export Module for Vortex ERP
- * 
+ *
  * Lightweight CSV export with full Arabic support and RTL column ordering.
  * Uses UTF-8 BOM for proper Arabic rendering in Excel.
- * 
+ *
  * Architecture designed so a future XLSX library (e.g. ExcelJS, SheetJS)
  * can be dropped in by simply replacing the internal `generateFile` method.
  */
@@ -53,17 +53,17 @@ export function exportToCSV(options: ExportOptions) {
   }
 
   // Header row
-  csvLines.push(columns.map(c => `"${c.header.replace(/"/g, '""')}"`).join(","));
+  csvLines.push(columns.map((c) => `"${c.header.replace(/"/g, '""')}"`).join(","));
 
   // Data rows
   for (const row of rows) {
-    csvLines.push(columns.map(c => `"${formatCell(row[c.key], c)}"`).join(","));
+    csvLines.push(columns.map((c) => `"${formatCell(row[c.key], c)}"`).join(","));
   }
 
   // Totals row
   if (totalsRow) {
     csvLines.push(""); // Empty separator
-    csvLines.push(columns.map(c => `"${formatCell(totalsRow[c.key], c)}"`).join(","));
+    csvLines.push(columns.map((c) => `"${formatCell(totalsRow[c.key], c)}"`).join(","));
   }
 
   // UTF-8 BOM + CSV content
@@ -106,15 +106,18 @@ export function exportToHTMLTable(options: ExportOptions) {
 
   const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-  const headerCells = columns.map(c => `<th>${esc(c.header)}</th>`).join("");
-  const bodyRows = rows.map(row =>
-    `<tr>${columns.map(c => `<td>${esc(formatCell(row[c.key], c))}</td>`).join("")}</tr>`
-  ).join("");
+  const headerCells = columns.map((c) => `<th>${esc(c.header)}</th>`).join("");
+  const bodyRows = rows
+    .map(
+      (row) =>
+        `<tr>${columns.map((c) => `<td>${esc(formatCell(row[c.key], c))}</td>`).join("")}</tr>`,
+    )
+    .join("");
   const totalsHtml = totalsRow
-    ? `<tr class="total">${columns.map(c => `<td>${esc(formatCell(totalsRow[c.key], c))}</td>`).join("")}</tr>`
+    ? `<tr class="total">${columns.map((c) => `<td>${esc(formatCell(totalsRow[c.key], c))}</td>`).join("")}</tr>`
     : "";
 
-  const html = `<!doctype html><html dir="${rtl ? 'rtl' : 'ltr'}" lang="${rtl ? 'ar' : 'en'}"><head><meta charset="utf-8">
+  const html = `<!doctype html><html dir="${rtl ? "rtl" : "ltr"}" lang="${rtl ? "ar" : "en"}"><head><meta charset="utf-8">
 <title>${esc(title ?? options.filename)}</title>
 <style>
   * { box-sizing: border-box; }
@@ -131,8 +134,8 @@ export function exportToHTMLTable(options: ExportOptions) {
   .btn-copy { background: #333; color: #fff; }
 </style></head><body>
 <div class="actions">
-  <button class="btn-print" onclick="window.print()">🖨️ ${rtl ? 'طباعة' : 'Print'}</button>
-  <button class="btn-copy" onclick="copyTable()">📋 ${rtl ? 'نسخ الجدول' : 'Copy Table'}</button>
+  <button class="btn-print" onclick="window.print()">🖨️ ${rtl ? "طباعة" : "Print"}</button>
+  <button class="btn-copy" onclick="copyTable()">📋 ${rtl ? "نسخ الجدول" : "Copy Table"}</button>
 </div>
 ${title ? `<h1>${esc(title)}</h1>` : ""}
 <table id="export-table">

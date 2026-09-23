@@ -11,16 +11,32 @@ import { PlanComparisonDialog } from "@/components/plan-comparison-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
-  Crown, Sparkles, CheckCircle2, Boxes, Layers, ScanBarcode, Gift,
-  CalendarClock, Truck, RotateCcw, HandCoins, Wallet, BarChart3,
-  History, BookOpen, ShieldCheck, Users, Package, AlertCircle,
+  Crown,
+  Sparkles,
+  CheckCircle2,
+  Boxes,
+  Layers,
+  ScanBarcode,
+  Gift,
+  CalendarClock,
+  Truck,
+  RotateCcw,
+  HandCoins,
+  Wallet,
+  BarChart3,
+  History,
+  BookOpen,
+  ShieldCheck,
+  Users,
+  Package,
+  AlertCircle,
 } from "lucide-react";
 
 export function SubscriptionSettingsCard() {
   const { lang } = useI18n();
   const isAr = lang === "ar";
-  const { isPlatformAdmin, isPlatformSuperadmin, hasRole } = useAuth();
-  const canEditPlan = isPlatformAdmin || isPlatformSuperadmin || hasRole("owner");
+  const { isPlatformAdmin, isPlatformSuperadmin } = useAuth();
+  const canEditPlan = isPlatformAdmin || isPlatformSuperadmin;
   const {
     currentPlanId,
     currentPlan,
@@ -67,7 +83,7 @@ export function SubscriptionSettingsCard() {
         isAr
           ? "تعديل باقة النظام محصور بمدير المنصة. لطلب ترقية الباقة تواصل مع: mousa.mc13@gmail.com"
           : "System plan modification is restricted to Platform Superadmin. To request upgrade: mousa.mc13@gmail.com",
-        { duration: 5000 }
+        { duration: 5000 },
       );
       return;
     }
@@ -77,7 +93,7 @@ export function SubscriptionSettingsCard() {
       toast.success(
         isAr
           ? `تم تفعيل ${planId === "starter" ? "الباقة الأساسية" : planId === "professional" ? "الباقة الاحترافية" : "باقة المؤسسات"} بنجاح`
-          : `Plan switched to ${planId.toUpperCase()} successfully`
+          : `Plan switched to ${planId.toUpperCase()} successfully`,
       );
     } catch {
       toast.error(isAr ? "حدث خطأ أثناء تغيير الباقة" : "Error changing plan");
@@ -88,19 +104,32 @@ export function SubscriptionSettingsCard() {
 
   const getModuleIcon = (id: string) => {
     switch (id) {
-      case "pos": return <ScanBarcode className="h-4 w-4 text-emerald-500" />;
-      case "purchases": return <Truck className="h-4 w-4 text-blue-500" />;
-      case "returns": return <RotateCcw className="h-4 w-4 text-rose-500" />;
-      case "payments": return <HandCoins className="h-4 w-4 text-amber-500" />;
-      case "expenses": return <Wallet className="h-4 w-4 text-indigo-500" />;
-      case "multi_warehouse": return <Boxes className="h-4 w-4 text-cyan-500" />;
-      case "barcode": return <ScanBarcode className="h-4 w-4 text-violet-500" />;
-      case "loyalty": return <Gift className="h-4 w-4 text-pink-500" />;
-      case "batches": return <CalendarClock className="h-4 w-4 text-orange-500" />;
-      case "advanced_accounting": return <BookOpen className="h-4 w-4 text-teal-500" />;
-      case "analytics": return <BarChart3 className="h-4 w-4 text-sky-500" />;
-      case "audit": return <History className="h-4 w-4 text-purple-500" />;
-      default: return <Layers className="h-4 w-4 text-primary" />;
+      case "pos":
+        return <ScanBarcode className="h-4 w-4 text-emerald-500" />;
+      case "purchases":
+        return <Truck className="h-4 w-4 text-blue-500" />;
+      case "returns":
+        return <RotateCcw className="h-4 w-4 text-rose-500" />;
+      case "payments":
+        return <HandCoins className="h-4 w-4 text-amber-500" />;
+      case "expenses":
+        return <Wallet className="h-4 w-4 text-indigo-500" />;
+      case "multi_warehouse":
+        return <Boxes className="h-4 w-4 text-cyan-500" />;
+      case "barcode":
+        return <ScanBarcode className="h-4 w-4 text-violet-500" />;
+      case "loyalty":
+        return <Gift className="h-4 w-4 text-pink-500" />;
+      case "batches":
+        return <CalendarClock className="h-4 w-4 text-orange-500" />;
+      case "advanced_accounting":
+        return <BookOpen className="h-4 w-4 text-teal-500" />;
+      case "analytics":
+        return <BarChart3 className="h-4 w-4 text-sky-500" />;
+      case "audit":
+        return <History className="h-4 w-4 text-purple-500" />;
+      default:
+        return <Layers className="h-4 w-4 text-primary" />;
     }
   };
 
@@ -116,7 +145,9 @@ export function SubscriptionSettingsCard() {
         <CardTitle className="text-base flex flex-wrap items-center justify-between gap-3">
           <span className="flex items-center gap-2">
             <Crown className="h-5 w-5 text-amber-500" />
-            {isAr ? "إدارة باقة النظام والوحدات (Packaging & Modules)" : "Subscription & Modules Packaging"}
+            {isAr
+              ? "إدارة باقة النظام والوحدات (Packaging & Modules)"
+              : "Subscription & Modules Packaging"}
           </span>
           <div className="flex flex-wrap items-center gap-2">
             <PlanComparisonDialog />
@@ -200,13 +231,18 @@ export function SubscriptionSettingsCard() {
                   {isAr ? "المنتجات" : "Products"}
                 </span>
                 <span className="font-mono font-bold text-foreground">
-                  {counts.products} / {prodLimit ? prodLimit.toLocaleString() : isAr ? "غير محدود" : "Unlimited"}
+                  {counts.products} /{" "}
+                  {prodLimit ? prodLimit.toLocaleString() : isAr ? "غير محدود" : "Unlimited"}
                 </span>
               </div>
               <div className="h-2 w-full overflow-hidden rounded-full bg-surface-3">
                 <div
                   className={`h-full transition-all duration-500 ${
-                    prodLimit && prodPct >= 100 ? "bg-rose-500" : prodLimit && prodPct >= 80 ? "bg-amber-500" : "bg-emerald-500"
+                    prodLimit && prodPct >= 100
+                      ? "bg-rose-500"
+                      : prodLimit && prodPct >= 80
+                        ? "bg-amber-500"
+                        : "bg-emerald-500"
                   }`}
                   style={{ width: prodLimit ? `${prodPct}%` : "10%" }}
                 />
@@ -257,7 +293,9 @@ export function SubscriptionSettingsCard() {
                     </span>
                     <span>
                       {p.priceMonthly === 0
-                        ? isAr ? "مجاناً" : "Free"
+                        ? isAr
+                          ? "مجاناً"
+                          : "Free"
                         : `$${p.priceMonthly}/${isAr ? "شهر" : "mo"}`}
                     </span>
                   </div>
@@ -272,7 +310,9 @@ export function SubscriptionSettingsCard() {
           <div className="flex items-center justify-between mb-3">
             <div>
               <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                {isAr ? "الوحدات والإضافات الاختيارية (Modules & Add-ons)" : "Modules & Add-ons Management"}
+                {isAr
+                  ? "الوحدات والإضافات الاختيارية (Modules & Add-ons)"
+                  : "Modules & Add-ons Management"}
               </div>
               <div className="text-[11px] text-muted-foreground mt-0.5">
                 {isAr
@@ -325,7 +365,13 @@ export function SubscriptionSettingsCard() {
                       checked={enabled}
                       disabled={inBasePlan || !canEditPlan}
                       onCheckedChange={() => void toggleExtraModule(m.id)}
-                      title={inBasePlan ? (isAr ? "مضمنة في باقتك الحالية" : "Included in current plan") : undefined}
+                      title={
+                        inBasePlan
+                          ? isAr
+                            ? "مضمنة في باقتك الحالية"
+                            : "Included in current plan"
+                          : undefined
+                      }
                     />
                   </div>
                 );

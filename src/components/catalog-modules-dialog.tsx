@@ -82,8 +82,10 @@ export function CatalogModulesDialog({ open, onClose }: CatalogModulesDialogProp
       key: "enableMakesAndModels" as const,
       titleAr: "ماركات وموديلات المركبات وتوافق القطع",
       titleEn: "Vehicle Makes, Models & Part Fitment",
-      descAr: "إدارة ماركات وموديلات الدراجات والمركبات وتحديد توافق القطعة مع موديلات متعددة في كرت الصنف والـ POS.",
-      descEn: "Manage vehicle makes/models and match parts with specific models in products and POS.",
+      descAr:
+        "إدارة ماركات وموديلات الدراجات والمركبات وتحديد توافق القطعة مع موديلات متعددة في كرت الصنف والـ POS.",
+      descEn:
+        "Manage vehicle makes/models and match parts with specific models in products and POS.",
       icon: Car,
       current: config.enableMakesAndModels,
     },
@@ -142,7 +144,9 @@ export function CatalogModulesDialog({ open, onClose }: CatalogModulesDialogProp
             </div>
             <div>
               <h2 className="text-base font-bold text-foreground">
-                {lang === "ar" ? "إدارة موديولات الفهرسة وتخصيص النشاط" : "Catalog Modules & Business Profile"}
+                {lang === "ar"
+                  ? "إدارة موديولات الفهرسة وتخصيص النشاط"
+                  : "Catalog Modules & Business Profile"}
               </h2>
               <p className="text-xs text-muted-foreground">
                 {lang === "ar"
@@ -169,7 +173,9 @@ export function CatalogModulesDialog({ open, onClose }: CatalogModulesDialogProp
                 {lang === "ar" ? "اختر نمط النشاط المناسب لمشروعك" : "Select Business Profile"}
               </span>
               <span className="text-[11px] text-muted-foreground">
-                {lang === "ar" ? "يضبط الموديولات تلقائيًا بنقرة واحدة" : "Auto-configures modules in 1 click"}
+                {lang === "ar"
+                  ? "يضبط الموديولات تلقائيًا بنقرة واحدة"
+                  : "Auto-configures modules in 1 click"}
               </span>
             </div>
 
@@ -186,7 +192,7 @@ export function CatalogModulesDialog({ open, onClose }: CatalogModulesDialogProp
                       toast.success(
                         lang === "ar"
                           ? `تم تطبيق نمط: ${p.titleAr}`
-                          : `Applied profile: ${p.titleEn}`
+                          : `Applied profile: ${p.titleEn}`,
                       );
                     }}
                     className={`group relative flex flex-col items-start gap-1.5 rounded-2xl border p-3.5 text-start transition-all duration-200 ${
@@ -225,7 +231,9 @@ export function CatalogModulesDialog({ open, onClose }: CatalogModulesDialogProp
           <div>
             <div className="mb-2.5 flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                {lang === "ar" ? "التحكم التفصيلي في موديولات الفهرسة" : "Individual Module Switches"}
+                {lang === "ar"
+                  ? "التحكم التفصيلي في موديولات الفهرسة"
+                  : "Individual Module Switches"}
               </span>
               <span className="text-[11px] text-muted-foreground">
                 {lang === "ar" ? "تفعيل أو إلغاء فوري" : "Instant enable / disable"}
@@ -261,7 +269,7 @@ export function CatalogModulesDialog({ open, onClose }: CatalogModulesDialogProp
                           toast.success(
                             lang === "ar"
                               ? `${val ? "تم تفعيل" : "تم تعطيل"}: ${m.titleAr}`
-                              : `${val ? "Enabled" : "Disabled"}: ${m.titleEn}`
+                              : `${val ? "Enabled" : "Disabled"}: ${m.titleEn}`,
                           );
                         }}
                       />

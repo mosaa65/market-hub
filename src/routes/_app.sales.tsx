@@ -29,7 +29,11 @@ interface Invoice {
   warehouses: { name: string; name_ar: string | null } | null;
 }
 interface Line {
-  id: string; quantity: number; unit_price: number; tax: number; total: number;
+  id: string;
+  quantity: number;
+  unit_price: number;
+  tax: number;
+  total: number;
   products: { name: string; sku: string | null } | null;
 }
 
@@ -45,7 +49,7 @@ function SalesPage() {
   const [printOpen, setPrintOpen] = useState(false);
 
   const whName = (w: { name: string; name_ar: string | null } | null | undefined) =>
-    !w ? undefined : (lang === "ar" ? (w.name_ar || w.name) : (w.name || w.name_ar || undefined));
+    !w ? undefined : lang === "ar" ? w.name_ar || w.name : w.name || w.name_ar || undefined;
 
   async function buildDoc(): Promise<InvoiceDoc | null> {
     if (!selected) return null;
@@ -59,10 +63,25 @@ function SalesPage() {
       warehouse: hasMultiWarehouse ? (whName(selected.warehouses) ?? undefined) : undefined,
       payment: pmLabel(selected.payment_method),
       status: statusLabel(selected.status),
-      lines: lines.map(l => ({ product: l.products?.name ?? "—", qty: Number(l.quantity), price: Number(l.unit_price), total: Number(l.total) })),
-      subtotal: Number(selected.subtotal), tax: Number(selected.tax), discount: Number(selected.discount),
-      total: Number(selected.total), paid: Number(selected.paid),
-      company: cs ? { name: (cs as any).company_name, address: (cs as any).address, phone: (cs as any).phone, vat: (cs as any).vat_number } : undefined,
+      lines: lines.map((l) => ({
+        product: l.products?.name ?? "—",
+        qty: Number(l.quantity),
+        price: Number(l.unit_price),
+        total: Number(l.total),
+      })),
+      subtotal: Number(selected.subtotal),
+      tax: Number(selected.tax),
+      discount: Number(selected.discount),
+      total: Number(selected.total),
+      paid: Number(selected.paid),
+      company: cs
+        ? {
+            name: (cs as any).company_name,
+            address: (cs as any).address,
+            phone: (cs as any).phone,
+            vat: (cs as any).vat_number,
+          }
+        : undefined,
       currency: (cs as any)?.currency ?? "",
     };
   }
@@ -70,14 +89,31 @@ function SalesPage() {
   async function doPrint(template: InvoiceTemplate) {
     const doc = await buildDoc();
     if (!doc) return;
-    printInvoice(doc, template, {
-      invoice: t("sales.invoice"), date: t("common.date"), billTo: t("sales.bill_to"),
-      warehouse: t("common.warehouse"), payment: t("sales.payment"), status: t("common.status"),
-      product: t("common.product"), qty: t("common.qty"), price: t("common.price"), total: t("common.total"),
-      subtotal: t("common.subtotal"), tax: t("common.tax"), discount: t("common.discount"),
-      grandTotal: t("common.total"), paid: t("common.paid"), balance: t("common.balance"),
-      thanks: t("print.thanks"), poweredBy: t("print.powered"),
-    }, lang === "ar");
+    printInvoice(
+      doc,
+      template,
+      {
+        invoice: t("sales.invoice"),
+        date: t("common.date"),
+        billTo: t("sales.bill_to"),
+        warehouse: t("common.warehouse"),
+        payment: t("sales.payment"),
+        status: t("common.status"),
+        product: t("common.product"),
+        qty: t("common.qty"),
+        price: t("common.price"),
+        total: t("common.total"),
+        subtotal: t("common.subtotal"),
+        tax: t("common.tax"),
+        discount: t("common.discount"),
+        grandTotal: t("common.total"),
+        paid: t("common.paid"),
+        balance: t("common.balance"),
+        thanks: t("print.thanks"),
+        poweredBy: t("print.powered"),
+      },
+      lang === "ar",
+    );
     setPrintOpen(false);
   }
 
@@ -90,13 +126,17 @@ function SalesPage() {
     setLoading(true);
     const { data } = await supabase
       .from("sales_invoices")
-      .select("id,invoice_number,status,subtotal,discount,tax,total,paid,payment_method,created_at,customers(name),warehouses(name,name_ar)")
+      .select(
+        "id,invoice_number,status,subtotal,discount,tax,total,paid,payment_method,created_at,customers(name),warehouses(name,name_ar)",
+      )
       .order("created_at", { ascending: false })
       .limit(200);
     setRows((data ?? []) as any);
     setLoading(false);
   }
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    void load();
+  }, []);
 
   async function openInvoice(inv: Invoice) {
     setSelected(inv);
@@ -107,31 +147,40 @@ function SalesPage() {
     setLines((data ?? []) as any);
   }
 
-  const filtered = rows.filter(r =>
-    !search ||
-    r.invoice_number.toLowerCase().includes(search.toLowerCase()) ||
-    (r.customers?.name ?? "").toLowerCase().includes(search.toLowerCase())
+  const filtered = rows.filter(
+    (r) =>
+      !search ||
+      r.invoice_number.toLowerCase().includes(search.toLowerCase()) ||
+      (r.customers?.name ?? "").toLowerCase().includes(search.toLowerCase()),
   );
 
   const pmLabel = (m: string) => {
     const map: Record<string, string> = {
-      cash: t("pos.pm.cash"), card: t("pos.pm.card"),
-      bank_transfer: t("pos.pm.bank"), bank: t("pos.pm.bank"), credit: t("pos.pm.credit"),
+      cash: t("pos.pm.cash"),
+      card: t("pos.pm.card"),
+      bank_transfer: t("pos.pm.bank"),
+      bank: t("pos.pm.bank"),
+      credit: t("pos.pm.credit"),
     };
     return map[m] ?? m;
   };
   const statusLabel = (s: string) => {
     const map: Record<string, string> = {
-      paid: t("sales.status.paid"), partial: t("sales.status.partial"),
-      unpaid: t("sales.status.unpaid"), cancelled: t("sales.status.cancelled"),
+      paid: t("sales.status.paid"),
+      partial: t("sales.status.partial"),
+      unpaid: t("sales.status.unpaid"),
+      cancelled: t("sales.status.cancelled"),
     };
     return map[s] ?? s;
   };
   const statusColor = (s: string) =>
-    s === "paid" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
-    s === "partial" ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
-    s === "cancelled" ? "bg-red-500/10 text-red-400 border-red-500/20" :
-    "bg-muted text-muted-foreground border-border";
+    s === "paid"
+      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+      : s === "partial"
+        ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+        : s === "cancelled"
+          ? "bg-red-500/10 text-red-400 border-red-500/20"
+          : "bg-muted text-muted-foreground border-border";
 
   return (
     <>
@@ -140,7 +189,8 @@ function SalesPage() {
         <div className="relative mb-4">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground rtl:left-auto rtl:right-3" />
           <input
-            value={search} onChange={e => setSearch(e.target.value)}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder={t("sales.search")}
             className="h-10 w-full rounded-md border border-input bg-surface pl-9 pr-3 text-sm rtl:pl-3 rtl:pr-9 focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
           />
@@ -153,7 +203,9 @@ function SalesPage() {
                 <th className="px-3 py-2 text-start font-medium">{t("sales.invoice")}</th>
                 <th className="px-3 py-2 text-start font-medium">{t("common.date")}</th>
                 <th className="px-3 py-2 text-start font-medium">{t("common.customer")}</th>
-                {hasMultiWarehouse && <th className="px-3 py-2 text-start font-medium">{t("common.warehouse")}</th>}
+                {hasMultiWarehouse && (
+                  <th className="px-3 py-2 text-start font-medium">{t("common.warehouse")}</th>
+                )}
                 <th className="px-3 py-2 text-start font-medium">{t("sales.payment")}</th>
                 <th className="px-3 py-2 text-start font-medium">{t("common.status")}</th>
                 <th className="px-3 py-2 text-end font-medium">{t("common.total")}</th>
@@ -162,30 +214,59 @@ function SalesPage() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={hasMultiWarehouse ? 8 : 7} className="py-10 text-center text-muted-foreground">{t("common.loading")}</td></tr>
-              ) : filtered.length === 0 ? (
-                <tr><td colSpan={hasMultiWarehouse ? 8 : 7} className="py-12 text-center text-muted-foreground">
-                  <Receipt className="mx-auto mb-2 h-8 w-8 opacity-50" />
-                  {t("sales.no_sales")}
-                </td></tr>
-              ) : filtered.map(r => (
-                <tr key={r.id} className="border-b border-border/50 hover:bg-surface-2/50">
-                  <td className="px-3 py-2.5 font-mono text-xs">{r.invoice_number}</td>
-                  <td className="px-3 py-2.5 text-muted-foreground">{new Date(r.created_at).toLocaleString()}</td>
-                  <td className="px-3 py-2.5">{r.customers?.name ?? t("pos.walkin")}</td>
-                  {hasMultiWarehouse && <td className="px-3 py-2.5 text-muted-foreground">{whName(r.warehouses) ?? "—"}</td>}
-                  <td className="px-3 py-2.5 text-muted-foreground">{pmLabel(r.payment_method)}</td>
-                  <td className="px-3 py-2.5">
-                    <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] ${statusColor(r.status)}`}>{statusLabel(r.status)}</span>
-                  </td>
-                  <td className="px-3 py-2.5 text-end font-semibold">{money(Number(r.total))}</td>
-                  <td className="px-3 py-2.5 text-end">
-                    <button onClick={() => openInvoice(r)} className="rounded p-1.5 text-muted-foreground hover:bg-surface-2 hover:text-foreground">
-                      <Eye className="h-4 w-4" />
-                    </button>
+                <tr>
+                  <td
+                    colSpan={hasMultiWarehouse ? 8 : 7}
+                    className="py-10 text-center text-muted-foreground"
+                  >
+                    {t("common.loading")}
                   </td>
                 </tr>
-              ))}
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={hasMultiWarehouse ? 8 : 7}
+                    className="py-12 text-center text-muted-foreground"
+                  >
+                    <Receipt className="mx-auto mb-2 h-8 w-8 opacity-50" />
+                    {t("sales.no_sales")}
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((r) => (
+                  <tr key={r.id} className="border-b border-border/50 hover:bg-surface-2/50">
+                    <td className="px-3 py-2.5 font-mono text-xs">{r.invoice_number}</td>
+                    <td className="px-3 py-2.5 text-muted-foreground">
+                      {new Date(r.created_at).toLocaleString()}
+                    </td>
+                    <td className="px-3 py-2.5">{r.customers?.name ?? t("pos.walkin")}</td>
+                    {hasMultiWarehouse && (
+                      <td className="px-3 py-2.5 text-muted-foreground">
+                        {whName(r.warehouses) ?? "—"}
+                      </td>
+                    )}
+                    <td className="px-3 py-2.5 text-muted-foreground">
+                      {pmLabel(r.payment_method)}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <span
+                        className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] ${statusColor(r.status)}`}
+                      >
+                        {statusLabel(r.status)}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 text-end font-semibold">{money(Number(r.total))}</td>
+                    <td className="px-3 py-2.5 text-end">
+                      <button
+                        onClick={() => openInvoice(r)}
+                        className="rounded p-1.5 text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -197,13 +278,24 @@ function SalesPage() {
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <h3 className="font-mono text-lg font-semibold">{selected.invoice_number}</h3>
-                <p className="text-xs text-muted-foreground">{new Date(selected.created_at).toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">
+                  {new Date(selected.created_at).toLocaleString()}
+                </p>
               </div>
-              <button onClick={() => setSelected(null)} className="rounded p-1 hover:bg-surface-2"><X className="h-4 w-4" /></button>
+              <button onClick={() => setSelected(null)} className="rounded p-1 hover:bg-surface-2">
+                <X className="h-4 w-4" />
+              </button>
             </div>
-            <div className={`mb-4 grid ${hasMultiWarehouse ? "grid-cols-2" : "grid-cols-1 sm:grid-cols-3"} gap-3 text-sm`}>
-              <Field label={t("common.customer")} value={selected.customers?.name ?? t("pos.walkin")} />
-              {hasMultiWarehouse && <Field label={t("common.warehouse")} value={whName(selected.warehouses) ?? "—"} />}
+            <div
+              className={`mb-4 grid ${hasMultiWarehouse ? "grid-cols-2" : "grid-cols-1 sm:grid-cols-3"} gap-3 text-sm`}
+            >
+              <Field
+                label={t("common.customer")}
+                value={selected.customers?.name ?? t("pos.walkin")}
+              />
+              {hasMultiWarehouse && (
+                <Field label={t("common.warehouse")} value={whName(selected.warehouses) ?? "—"} />
+              )}
               <Field label={t("sales.payment")} value={pmLabel(selected.payment_method)} />
               <Field label={t("common.status")} value={statusLabel(selected.status)} />
             </div>
@@ -218,7 +310,7 @@ function SalesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {lines.map(l => (
+                  {lines.map((l) => (
                     <tr key={l.id} className="border-t border-border">
                       <td className="px-3 py-2">{l.products?.name ?? "—"}</td>
                       <td className="px-3 py-2 text-end">{l.quantity}</td>
@@ -237,27 +329,46 @@ function SalesPage() {
               <Row label={t("common.paid")} value={money(Number(selected.paid))} />
             </div>
             <div className="mt-4 flex justify-end gap-2">
-              <button onClick={doPDF} className="flex items-center gap-1.5 h-9 rounded-md border border-border px-4 text-sm hover:bg-surface-2">
+              <button
+                onClick={doPDF}
+                className="flex items-center gap-1.5 h-9 rounded-md border border-border px-4 text-sm hover:bg-surface-2"
+              >
                 <FileDown className="h-4 w-4" /> {t("print.download_pdf")}
               </button>
-              <button onClick={() => setPrintOpen(true)} className="flex items-center gap-1.5 h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90">
+              <button
+                onClick={() => setPrintOpen(true)}
+                className="flex items-center gap-1.5 h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90"
+              >
                 <Printer className="h-4 w-4" /> {t("common.print")}
               </button>
-              <button onClick={() => setSelected(null)} className="h-9 rounded-md border border-border px-4 text-sm hover:bg-surface-2">{t("common.close")}</button>
+              <button
+                onClick={() => setSelected(null)}
+                className="h-9 rounded-md border border-border px-4 text-sm hover:bg-surface-2"
+              >
+                {t("common.close")}
+              </button>
             </div>
           </div>
         </div>
       )}
 
       {printOpen && selected && (
-        <div className="fixed inset-0 z-[60] grid place-items-center bg-background/80 backdrop-blur-sm p-4" onClick={() => setPrintOpen(false)}>
-          <div className="panel-elevated w-full max-w-2xl p-6" onClick={e => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 z-[60] grid place-items-center bg-background/80 backdrop-blur-sm p-4"
+          onClick={() => setPrintOpen(false)}
+        >
+          <div className="panel-elevated w-full max-w-2xl p-6" onClick={(e) => e.stopPropagation()}>
             <div className="mb-5 flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-semibold">{t("print.title")}</h3>
                 <p className="text-xs text-muted-foreground">{t("print.subtitle")}</p>
               </div>
-              <button onClick={() => setPrintOpen(false)} className="rounded p-1 hover:bg-surface-2"><X className="h-4 w-4" /></button>
+              <button
+                onClick={() => setPrintOpen(false)}
+                className="rounded p-1 hover:bg-surface-2"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
               <TemplateCard
@@ -283,7 +394,10 @@ function SalesPage() {
               />
             </div>
             <div className="mt-5 flex justify-end">
-              <button onClick={doPDF} className="flex items-center gap-1.5 h-9 rounded-md border border-border px-4 text-sm hover:bg-surface-2">
+              <button
+                onClick={doPDF}
+                className="flex items-center gap-1.5 h-9 rounded-md border border-border px-4 text-sm hover:bg-surface-2"
+              >
                 <FileDown className="h-4 w-4" /> {t("print.download_pdf")}
               </button>
             </div>
@@ -304,14 +418,28 @@ function Field({ label, value }: { label: string; value: string }) {
 }
 function Row({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
   return (
-    <div className={`flex items-center justify-between ${bold ? "text-base font-semibold" : "text-muted-foreground"}`}>
+    <div
+      className={`flex items-center justify-between ${bold ? "text-base font-semibold" : "text-muted-foreground"}`}
+    >
       <span>{label}</span>
       <span className={bold ? "text-foreground" : ""}>{value}</span>
     </div>
   );
 }
 
-function TemplateCard({ icon, title, desc, accent, onClick }: { icon: ReactNode; title: string; desc: string; accent: string; onClick: () => void }) {
+function TemplateCard({
+  icon,
+  title,
+  desc,
+  accent,
+  onClick,
+}: {
+  icon: ReactNode;
+  title: string;
+  desc: string;
+  accent: string;
+  onClick: () => void;
+}) {
   return (
     <button
       onClick={onClick}

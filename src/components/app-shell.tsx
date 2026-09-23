@@ -57,12 +57,21 @@ type Item = {
   key: string;
   moduleId?: string;
   superadminOnly?: boolean;
-  allowedRoles?: ("owner" | "manager" | "accountant" | "cashier" | "warehouse")[];
+  allowedRoles?: (
+    | "owner"
+    | "manager"
+    | "accountant"
+    | "cashier"
+    | "warehouse"
+  )[];
   color?: string;
   bg?: string;
 };
 
-type Section = { titleKey: string; items: Item[] };
+type Section = {
+  titleKey: string;
+  items: Item[];
+};
 
 const sections: Section[] = [
   {
@@ -96,6 +105,7 @@ const sections: Section[] = [
       },
     ],
   },
+
   {
     titleKey: "nav.section.operations",
     items: [
@@ -133,6 +143,15 @@ const sections: Section[] = [
         allowedRoles: ["owner", "manager", "accountant", "warehouse"],
         color: "text-cyan-500",
         bg: "bg-cyan-500/15",
+      },
+      {
+        to: "/settlements",
+        icon: ClipboardList,
+        key: "nav.settlements",
+        moduleId: "core",
+        allowedRoles: ["owner", "manager", "warehouse", "accountant"],
+        color: "text-amber-500",
+        bg: "bg-amber-500/15",
       },
       {
         to: "/warehouses",
@@ -208,6 +227,7 @@ const sections: Section[] = [
       },
     ],
   },
+
   {
     titleKey: "nav.section.relations",
     items: [
@@ -240,6 +260,7 @@ const sections: Section[] = [
       },
     ],
   },
+
   {
     titleKey: "nav.section.accounting",
     items: [
@@ -326,6 +347,7 @@ const sections: Section[] = [
       },
     ],
   },
+
   {
     titleKey: "nav.section.admin",
     items: [
@@ -346,15 +368,6 @@ const sections: Section[] = [
         allowedRoles: ["owner", "manager"],
         color: "text-orange-400",
         bg: "bg-orange-500/15",
-      },
-      {
-        to: "/settlements",
-        icon: ClipboardList,
-        key: "nav.settlements",
-        moduleId: "core",
-        allowedRoles: ["owner", "manager", "warehouse", "accountant"],
-        color: "text-amber-500",
-        bg: "bg-amber-500/15",
       },
       {
         to: "/notifications",
@@ -395,12 +408,30 @@ function SidebarContents({
   onToggleCollapse?: () => void;
 }) {
   const { t, dir, lang } = useI18n();
-  const { user, signOut, isPlatformAdmin, isPlatformSuperadmin, hasRole, roles } = useAuth();
-  const isSuperOrOwner = isPlatformAdmin || isPlatformSuperadmin || hasRole("owner");
+
+  const {
+    user,
+    signOut,
+    isPlatformAdmin,
+    isPlatformSuperadmin,
+    hasRole,
+    roles,
+  } = useAuth();
+
+  const isSuperOrOwner =
+    isPlatformAdmin || isPlatformSuperadmin || hasRole("owner");
+
   const { isModuleEnabled, currentPlan } = useModules();
+
   const navigate = useNavigate();
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const [logoUrl, setLogoUrl] = useState<string>("/inama-soft-logo.ico");
+
+  const pathname = useRouterState(
+    ({ location }) => location.pathname,
+  );
+
+  const [logoUrl, setLogoUrl] = useState<string>(
+    "/inama-soft-logo.ico",
+  );
 
   useEffect(() => {
     supabase
@@ -410,7 +441,9 @@ function SidebarContents({
       .limit(1)
       .maybeSingle()
       .then(({ data }) => {
-        if (data?.logo_url) setLogoUrl(data.logo_url);
+        if (data?.logo_url) {
+          setLogoUrl(data.logo_url);
+        }
       });
   }, []);
 
@@ -419,15 +452,20 @@ function SidebarContents({
       .map((sec) => ({
         ...sec,
         items: sec.items.filter((it) => {
-          if (it.superadminOnly && !isSuperOrOwner) return false;
-          // Non-super/owner roles must match allowedRoles if defined
+          if (it.superadminOnly && !isSuperOrOwner) {
+            return false;
+          }
+
           if (
             !isSuperOrOwner &&
             it.allowedRoles &&
-            !it.allowedRoles.some((r) => roles.includes(r))
+            !it.allowedRoles.some((role) =>
+              roles.includes(role),
+            )
           ) {
             return false;
           }
+
           return isModuleEnabled(it.moduleId);
         }),
       }))
@@ -440,7 +478,9 @@ function SidebarContents({
       <div
         className={cn(
           "flex h-16 items-center border-b border-sidebar-border/60 transition-all duration-300",
-          collapsed ? "justify-center px-2" : "gap-2.5 px-4 justify-between",
+          collapsed
+            ? "justify-center px-2"
+            : "gap-2.5 px-4 justify-between",
         )}
       >
         <div className="flex items-center gap-2.5 min-w-0">
@@ -450,16 +490,21 @@ function SidebarContents({
             className="h-9 w-9 shrink-0 rounded-xl object-contain bg-surface-2/90 p-1 border border-border/60 shadow-md ring-1 ring-white/10"
             onError={() => setLogoUrl("/inama-soft-logo.ico")}
           />
+
           {!collapsed && (
             <div className="flex flex-col leading-tight min-w-0">
               <div className="flex items-center gap-1.5">
                 <span className="text-sm font-bold tracking-tight text-foreground truncate">
                   {t("app.name")}
                 </span>
+
                 <span className="inline-flex items-center rounded-full bg-primary/10 border border-primary/25 px-1.5 py-0.2 text-[9px] font-medium text-primary shrink-0">
-                  {lang === "ar" ? currentPlan.name.ar : currentPlan.name.en}
+                  {lang === "ar"
+                    ? currentPlan.name.ar
+                    : currentPlan.name.en}
                 </span>
               </div>
+
               <span className="text-[11px] text-muted-foreground font-medium">
                 ERP · Inama Soft
               </span>
@@ -472,7 +517,9 @@ function SidebarContents({
       <nav
         className={cn(
           "flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-gutter:stable] custom-scrollbar",
-          collapsed ? "px-2 py-3 space-y-2" : "px-3 py-3.5 space-y-4",
+          collapsed
+            ? "px-2 py-3 space-y-2"
+            : "px-3 py-3.5 space-y-4",
         )}
       >
         {filteredSections.map((sec, secIdx) => (
@@ -482,13 +529,22 @@ function SidebarContents({
                 {t(sec.titleKey)}
               </div>
             ) : (
-              secIdx > 0 && <div className="my-2 h-px w-7 mx-auto bg-sidebar-border/60" />
+              secIdx > 0 && (
+                <div className="my-2 h-px w-7 mx-auto bg-sidebar-border/60" />
+              )
             )}
-            <ul className={cn(collapsed ? "space-y-1.5" : "space-y-1")}>
+
+            <ul
+              className={cn(
+                collapsed ? "space-y-1.5" : "space-y-1",
+              )}
+            >
               {sec.items.map((it) => {
                 const active =
                   pathname === it.to ||
-                  (it.to !== "/dashboard" && pathname.startsWith(it.to + "/"));
+                  (it.to !== "/dashboard" &&
+                    pathname.startsWith(`${it.to}/`));
+
                 return (
                   <li key={it.to} className="relative">
                     <Link
@@ -496,9 +552,11 @@ function SidebarContents({
                       onClick={onNavigate}
                       className={cn(
                         "group relative flex items-center transition-all duration-200",
+
                         collapsed
                           ? "h-10 w-10 mx-auto justify-center rounded-xl p-0"
                           : "gap-3 px-3 py-2.5 rounded-xl text-[13.5px] sm:text-sm font-medium",
+
                         active
                           ? collapsed
                             ? "bg-primary text-primary-foreground shadow-md shadow-primary/25 ring-2 ring-primary/40"
@@ -512,58 +570,74 @@ function SidebarContents({
                         <span
                           className={cn(
                             "absolute inset-y-2 w-[3px] rounded-full bg-primary",
-                            dir === "rtl" ? "right-0" : "left-0",
+                            dir === "rtl"
+                              ? "right-0"
+                              : "left-0",
                           )}
                         />
                       )}
+
                       <div
                         className={cn(
                           "grid place-items-center transition-transform duration-200",
+
                           collapsed
                             ? "h-full w-full"
                             : cn(
                                 "h-7 w-7 rounded-lg group-hover:scale-110",
                                 it.bg || "bg-surface-2/60",
-                                active && "ring-1 ring-primary/40 shadow-sm",
+                                active &&
+                                  "ring-1 ring-primary/40 shadow-sm",
                               ),
                         )}
                       >
                         <it.icon
                           className={cn(
                             "shrink-0 transition-colors",
+
                             collapsed
                               ? active
                                 ? "h-5 w-5 text-primary-foreground stroke-[2.2]"
                                 : cn(
                                     "h-5 w-5",
-                                    it.color || "text-muted-foreground group-hover:text-foreground",
+                                    it.color ||
+                                      "text-muted-foreground group-hover:text-foreground",
                                   )
                               : active
                                 ? "h-4 w-4 text-primary stroke-[2.5]"
                                 : cn(
                                     "h-4 w-4",
-                                    it.color || "text-muted-foreground group-hover:text-foreground",
+                                    it.color ||
+                                      "text-muted-foreground group-hover:text-foreground",
                                   ),
                           )}
                         />
                       </div>
-                      {!collapsed && <span className="truncate leading-normal">{t(it.key)}</span>}
+
+                      {!collapsed && (
+                        <span className="truncate leading-normal">
+                          {t(it.key)}
+                        </span>
+                      )}
 
                       {/* Tooltip in Icon-only mode */}
                       {collapsed && (
                         <div
                           className={cn(
                             "pointer-events-none absolute z-50 whitespace-nowrap rounded-xl bg-popover/95 backdrop-blur-md px-3 py-1.5 text-xs font-semibold text-popover-foreground shadow-xl border border-border/80 transition-all duration-150 scale-95 opacity-0 group-hover:scale-100 group-hover:opacity-100",
-                            dir === "rtl" ? "right-full me-3.5" : "left-full ms-3.5",
+                            dir === "rtl"
+                              ? "right-full me-3.5"
+                              : "left-full ms-3.5",
                           )}
                         >
                           <div className="flex items-center gap-1.5">
                             <span>{t(it.key)}</span>
+
                             {it.superadminOnly && (
                               <Crown className="h-3 w-3 text-amber-500 shrink-0" />
                             )}
                           </div>
-                          {/* Mini Arrow */}
+
                           <div
                             className={cn(
                               "absolute top-1/2 -translate-y-1/2 border-[5px] border-transparent",
@@ -593,22 +667,33 @@ function SidebarContents({
         <button
           onClick={async () => {
             await signOut();
-            navigate({ to: "/auth", replace: true });
+            navigate({
+              to: "/auth",
+              replace: true,
+            });
           }}
           className={cn(
             "group relative flex items-center rounded-xl text-[13.5px] font-medium text-muted-foreground hover:bg-sidebar-accent hover:text-foreground transition-colors",
-            collapsed ? "h-10 w-10 justify-center p-0" : "w-full gap-2.5 px-3 p-2",
+            collapsed
+              ? "h-10 w-10 justify-center p-0"
+              : "w-full gap-2.5 px-3 p-2",
           )}
-          title={lang === "ar" ? "تسجيل الخروج" : "Sign out"}
+          title={
+            lang === "ar"
+              ? "تسجيل الخروج"
+              : "Sign out"
+          }
         >
           <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-gradient-to-br from-primary/20 to-chart-4/20 text-[11px] font-bold text-foreground border border-primary/20">
             {(user?.email ?? "?").charAt(0).toUpperCase()}
           </div>
+
           {!collapsed && (
             <>
               <span className="min-w-0 flex-1 truncate text-start text-xs font-medium">
                 {user?.email}
               </span>
+
               <LogOut className="h-4 w-4 shrink-0 opacity-60 group-hover:opacity-100 transition" />
             </>
           )}
@@ -617,12 +702,18 @@ function SidebarContents({
             <div
               className={cn(
                 "pointer-events-none absolute z-50 whitespace-nowrap rounded-xl bg-popover/95 backdrop-blur-md px-3 py-1.5 text-xs font-semibold text-popover-foreground shadow-xl border border-border/80 transition-all duration-150 scale-95 opacity-0 group-hover:scale-100 group-hover:opacity-100",
-                dir === "rtl" ? "right-full me-3.5" : "left-full ms-3.5",
+                dir === "rtl"
+                  ? "right-full me-3.5"
+                  : "left-full ms-3.5",
               )}
             >
               <span>
-                {lang === "ar" ? "تسجيل الخروج" : "Sign out"} ({user?.email})
+                {lang === "ar"
+                  ? "تسجيل الخروج"
+                  : "Sign out"}{" "}
+                ({user?.email})
               </span>
+
               <div
                 className={cn(
                   "absolute top-1/2 -translate-y-1/2 border-[5px] border-transparent",
@@ -639,52 +730,103 @@ function SidebarContents({
   );
 }
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const { t, dir } = useI18n();
+
   const navigate = useNavigate();
-  const [paletteOpen, setPaletteOpen] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("vortex_sidebar_collapsed") === "true";
-    }
-    return false;
-  });
+
+  const [paletteOpen, setPaletteOpen] =
+    useState(false);
+
+  const [mobileOpen, setMobileOpen] =
+    useState(false);
+
+  const [collapsed, setCollapsed] =
+    useState<boolean>(() => {
+      if (typeof window !== "undefined") {
+        return (
+          localStorage.getItem(
+            "vortex_sidebar_collapsed",
+          ) === "true"
+        );
+      }
+
+      return false;
+    });
 
   const toggleCollapsed = () => {
     setCollapsed((prev) => {
       const next = !prev;
+
       if (typeof window !== "undefined") {
-        localStorage.setItem("vortex_sidebar_collapsed", String(next));
+        localStorage.setItem(
+          "vortex_sidebar_collapsed",
+          String(next),
+        );
       }
+
       return next;
     });
   };
-  const [theme, setTheme] = useState<"dark" | "light">(
-    () =>
-      (typeof window !== "undefined" && (localStorage.getItem("theme") as "dark" | "light")) ||
-      "dark",
-  );
+
+  const [theme, setTheme] =
+    useState<"dark" | "light">(
+      () =>
+        (typeof window !== "undefined" &&
+          (localStorage.getItem("theme") as
+            | "dark"
+            | "light")) ||
+        "dark",
+    );
 
   useEffect(() => {
     const root = document.documentElement;
-    root.classList.toggle("dark", theme === "dark");
-    root.classList.toggle("light", theme === "light");
+
+    root.classList.toggle(
+      "dark",
+      theme === "dark",
+    );
+
+    root.classList.toggle(
+      "light",
+      theme === "light",
+    );
+
     localStorage.setItem("theme", theme);
   }, [theme]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        e.key.toLowerCase() === "k"
+      ) {
         e.preventDefault();
+
         setPaletteOpen((x) => !x);
       }
     };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+
+    window.addEventListener(
+      "keydown",
+      handler,
+    );
+
+    return () =>
+      window.removeEventListener(
+        "keydown",
+        handler,
+      );
   }, []);
 
-  const sideEdge = dir === "rtl" ? "border-l" : "border-r";
+  const sideEdge =
+    dir === "rtl"
+      ? "border-l"
+      : "border-r";
 
   return (
     <div className="relative z-10 flex h-screen w-full overflow-hidden text-foreground">
@@ -692,21 +834,39 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <aside
         className={cn(
           "hidden md:flex h-full shrink-0 flex-col overflow-hidden transition-all duration-300 ease-in-out",
-          collapsed ? "w-[72px]" : "w-64",
+
+          collapsed
+            ? "w-[72px]"
+            : "w-64",
+
           sideEdge,
           "border-sidebar-border/60",
         )}
       >
-        <SidebarContents collapsed={collapsed} onToggleCollapse={toggleCollapsed} />
+        <SidebarContents
+          collapsed={collapsed}
+          onToggleCollapse={toggleCollapsed}
+        />
       </aside>
 
       {/* Mobile drawer */}
-      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+      <Sheet
+        open={mobileOpen}
+        onOpenChange={setMobileOpen}
+      >
         <SheetContent
-          side={dir === "rtl" ? "right" : "left"}
+          side={
+            dir === "rtl"
+              ? "right"
+              : "left"
+          }
           className="w-72 p-0 bg-sidebar border-sidebar-border/60 overflow-hidden"
         >
-          <SidebarContents onNavigate={() => setMobileOpen(false)} />
+          <SidebarContents
+            onNavigate={() =>
+              setMobileOpen(false)
+            }
+          />
         </SheetContent>
       </Sheet>
 
@@ -715,7 +875,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {/* Top bar */}
         <header className="sticky top-0 z-30 flex h-16 items-center gap-2.5 border-b border-border/60 bg-background/70 px-4 backdrop-blur-xl sm:px-6">
           <button
-            onClick={() => setMobileOpen(true)}
+            onClick={() =>
+              setMobileOpen(true)
+            }
             className="md:hidden grid h-10 w-10 place-items-center rounded-full border border-border/60 bg-surface text-muted-foreground hover:text-foreground transition-colors"
             aria-label="Open menu"
           >
@@ -745,11 +907,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </button>
 
           <button
-            onClick={() => setPaletteOpen(true)}
+            onClick={() =>
+              setPaletteOpen(true)
+            }
             className="group flex h-10 flex-1 max-w-xl items-center gap-2.5 rounded-full border border-border/60 bg-surface/80 px-4 text-sm text-muted-foreground transition-all hover:border-ring/40 hover:bg-surface hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
           >
             <Search className="h-4 w-4" />
-            <span className="flex-1 text-start truncate">{t("common.search")}</span>
+
+            <span className="flex-1 text-start truncate">
+              {t("common.search")}
+            </span>
+
             <kbd className="hidden sm:inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/60 px-2 py-0.5 text-[10px] font-mono text-muted-foreground">
               <CommandIcon className="h-3 w-3" /> K
             </kbd>
@@ -757,32 +925,54 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
           <div className="ms-auto flex items-center gap-2">
             <button
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              onClick={() =>
+                setTheme(
+                  theme === "dark"
+                    ? "light"
+                    : "dark",
+                )
+              }
               className="grid h-10 w-10 place-items-center rounded-full border border-border/60 bg-surface text-muted-foreground hover:text-foreground hover:border-ring/40 transition-colors"
               title={t("common.theme")}
               aria-label={t("common.theme")}
             >
-              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              {theme === "dark" ? (
+                <Sun className="h-4 w-4" />
+              ) : (
+                <Moon className="h-4 w-4" />
+              )}
             </button>
+
             <button
               className="relative grid h-10 w-10 place-items-center rounded-full border border-border/60 bg-surface text-muted-foreground hover:text-foreground hover:border-ring/40 transition-colors"
               title={t("nav.notifications")}
               aria-label={t("nav.notifications")}
-              onClick={() => navigate({ to: "/notifications" })}
+              onClick={() =>
+                navigate({
+                  to: "/notifications",
+                })
+              }
             >
               <Bell className="h-4 w-4" />
+
               <span className="absolute top-2 end-2 h-1.5 w-1.5 rounded-full bg-primary ring-2 ring-background" />
             </button>
           </div>
         </header>
 
         <main className="flex-1 min-h-0 overflow-y-auto">
-          <div className="mx-auto w-full max-w-[1400px] p-4 sm:p-6">{children}</div>
+          <div className="mx-auto w-full max-w-[1400px] p-4 sm:p-6">
+            {children}
+          </div>
+
           <InamaSoftFooter />
         </main>
       </div>
 
-      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+      <CommandPalette
+        open={paletteOpen}
+        onOpenChange={setPaletteOpen}
+      />
     </div>
   );
 }

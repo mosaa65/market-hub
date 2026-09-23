@@ -5,18 +5,19 @@ content = content.replace(/\r\n/g, "\n");
 
 // Add PanelLeftClose, PanelLeftOpen to imports
 content = content.replace(
-  '  Menu, HandCoins, AlertTriangle, LineChart, FileText, BookOpen, Scale, Landmark, PieChart,',
-  '  Menu, HandCoins, AlertTriangle, LineChart, FileText, BookOpen, Scale, Landmark, PieChart,\n  PanelLeftClose, PanelLeftOpen,'
+  "  Menu, HandCoins, AlertTriangle, LineChart, FileText, BookOpen, Scale, Landmark, PieChart,",
+  "  Menu, HandCoins, AlertTriangle, LineChart, FileText, BookOpen, Scale, Landmark, PieChart,\n  PanelLeftClose, PanelLeftOpen,",
 );
 
 // Add supabase import
 content = content.replace(
   'import { useModules } from "@/lib/modules";',
-  'import { useModules } from "@/lib/modules";\nimport { supabase } from "@/integrations/supabase/client";'
+  'import { useModules } from "@/lib/modules";\nimport { supabase } from "@/integrations/supabase/client";',
 );
 
 // Replace SidebarContents component signature and body
-const oldSidebarContentsSignature = 'function SidebarContents({ onNavigate }: { onNavigate?: () => void }) {';
+const oldSidebarContentsSignature =
+  "function SidebarContents({ onNavigate }: { onNavigate?: () => void }) {";
 const newSidebarContents = `function SidebarContents({
   onNavigate,
   collapsed = false,
@@ -184,12 +185,13 @@ const newSidebarContents = `function SidebarContents({
 }`;
 
 // Replace SidebarContents
-const oldSectionRegex = /function SidebarContents\(\{ onNavigate \}: \{ onNavigate\?: \(\) => void \}\) \{[\s\S]*?export function AppShell/;
+const oldSectionRegex =
+  /function SidebarContents\(\{ onNavigate \}: \{ onNavigate\?: \(\) => void \}\) \{[\s\S]*?export function AppShell/;
 content = content.replace(oldSectionRegex, `${newSidebarContents}\n\nexport function AppShell`);
 
 // Now update AppShell implementation
 content = content.replace(
-  '  const [mobileOpen, setMobileOpen] = useState(false);',
+  "  const [mobileOpen, setMobileOpen] = useState(false);",
   `  const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
@@ -206,7 +208,7 @@ content = content.replace(
       }
       return next;
     });
-  };`
+  };`,
 );
 
 // Update Desktop sidebar aside
@@ -221,7 +223,7 @@ content = content.replace(
         "border-sidebar-border/60"
       )}>
         <SidebarContents collapsed={collapsed} onToggleCollapse={toggleCollapsed} />
-      </aside>`
+      </aside>`,
 );
 
 // Add toggle button to Header next to search bar
@@ -243,7 +245,7 @@ content = content.replace(
 
           <button
             onClick={() => setPaletteOpen(true)}
-            className="group flex h-10 flex-1 max-w-xl`
+            className="group flex h-10 flex-1 max-w-xl`,
 );
 
 fs.writeFileSync("src/components/app-shell.tsx", content, "utf8");

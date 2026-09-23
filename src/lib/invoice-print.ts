@@ -4,27 +4,48 @@ export type InvoiceTemplate = "thermal" | "standard" | "elegant";
 
 const esc = (s: unknown) =>
   String(s ?? "")
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 
 function money(n: number, cur = "") {
   return `${cur ? cur + " " : ""}${Number(n || 0).toFixed(2)}`;
 }
 
 interface Labels {
-  invoice: string; date: string; billTo: string; warehouse: string; payment: string; status: string;
-  product: string; qty: string; price: string; total: string;
-  subtotal: string; tax: string; discount: string; grandTotal: string; paid: string; balance: string;
-  thanks: string; poweredBy: string;
+  invoice: string;
+  date: string;
+  billTo: string;
+  warehouse: string;
+  payment: string;
+  status: string;
+  product: string;
+  qty: string;
+  price: string;
+  total: string;
+  subtotal: string;
+  tax: string;
+  discount: string;
+  grandTotal: string;
+  paid: string;
+  balance: string;
+  thanks: string;
+  poweredBy: string;
 }
 
 function thermalHTML(doc: InvoiceDoc, L: Labels, rtl: boolean) {
   const c = doc.currency ?? "";
-  const rows = doc.lines.map(l => `
+  const rows = doc.lines
+    .map(
+      (l) => `
     <div class="li">
       <div class="ln">${esc(l.product)}</div>
       <div class="lr"><span>${l.qty} × ${money(l.price, c)}</span><span>${money(l.total, c)}</span></div>
-    </div>`).join("");
+    </div>`,
+    )
+    .join("");
   return `<!doctype html><html dir="${rtl ? "rtl" : "ltr"}" lang="${rtl ? "ar" : "en"}"><head><meta charset="utf-8"><title>${esc(doc.number)}</title>
 <style>
   @page { size: 80mm auto; margin: 0; }
@@ -64,9 +85,13 @@ function thermalHTML(doc: InvoiceDoc, L: Labels, rtl: boolean) {
   <div class="tot"><span>${L.discount}</span><span>${money(doc.discount, c)}</span></div>
   <div class="hr"></div>
   <div class="tot grand"><span>${L.grandTotal}</span><span>${money(doc.total, c)}</span></div>
-  ${doc.paid !== undefined ? `
+  ${
+    doc.paid !== undefined
+      ? `
   <div class="tot"><span>${L.paid}</span><span>${money(doc.paid, c)}</span></div>
-  <div class="tot"><span>${L.balance}</span><span>${money(doc.total - doc.paid, c)}</span></div>` : ""}
+  <div class="tot"><span>${L.balance}</span><span>${money(doc.total - doc.paid, c)}</span></div>`
+      : ""
+  }
   <div class="hr"></div>
   <div class="foot">${L.thanks}<br>${L.poweredBy}</div>
 </div></body></html>`;
@@ -74,14 +99,18 @@ function thermalHTML(doc: InvoiceDoc, L: Labels, rtl: boolean) {
 
 function standardHTML(doc: InvoiceDoc, L: Labels, rtl: boolean) {
   const c = doc.currency ?? "";
-  const rows = doc.lines.map((l, i) => `
+  const rows = doc.lines
+    .map(
+      (l, i) => `
     <tr>
       <td class="c">${i + 1}</td>
       <td>${esc(l.product)}</td>
       <td class="e">${l.qty}</td>
       <td class="e">${money(l.price, c)}</td>
       <td class="e">${money(l.total, c)}</td>
-    </tr>`).join("");
+    </tr>`,
+    )
+    .join("");
   return `<!doctype html><html dir="${rtl ? "rtl" : "ltr"}" lang="${rtl ? "ar" : "en"}"><head><meta charset="utf-8"><title>${esc(doc.number)}</title>
 <style>
   @page { size: A4; margin: 15mm; }
@@ -137,9 +166,13 @@ function standardHTML(doc: InvoiceDoc, L: Labels, rtl: boolean) {
     <div class="r"><span>${L.tax}</span><span>${money(doc.tax, c)}</span></div>
     <div class="r"><span>${L.discount}</span><span>${money(doc.discount, c)}</span></div>
     <div class="r g"><span>${L.grandTotal}</span><span>${money(doc.total, c)}</span></div>
-    ${doc.paid !== undefined ? `
+    ${
+      doc.paid !== undefined
+        ? `
     <div class="r"><span>${L.paid}</span><span>${money(doc.paid, c)}</span></div>
-    <div class="r"><span>${L.balance}</span><span>${money(doc.total - doc.paid, c)}</span></div>` : ""}
+    <div class="r"><span>${L.balance}</span><span>${money(doc.total - doc.paid, c)}</span></div>`
+        : ""
+    }
   </div>
   <footer>${L.thanks} — ${L.poweredBy}</footer>
 </div></body></html>`;
@@ -147,14 +180,18 @@ function standardHTML(doc: InvoiceDoc, L: Labels, rtl: boolean) {
 
 function elegantHTML(doc: InvoiceDoc, L: Labels, rtl: boolean) {
   const c = doc.currency ?? "";
-  const rows = doc.lines.map((l, i) => `
+  const rows = doc.lines
+    .map(
+      (l, i) => `
     <tr>
       <td class="c muted">${String(i + 1).padStart(2, "0")}</td>
       <td><b>${esc(l.product)}</b></td>
       <td class="e">${l.qty}</td>
       <td class="e">${money(l.price, c)}</td>
       <td class="e"><b>${money(l.total, c)}</b></td>
-    </tr>`).join("");
+    </tr>`,
+    )
+    .join("");
   return `<!doctype html><html dir="${rtl ? "rtl" : "ltr"}" lang="${rtl ? "ar" : "en"}"><head><meta charset="utf-8"><title>${esc(doc.number)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -245,9 +282,13 @@ function elegantHTML(doc: InvoiceDoc, L: Labels, rtl: boolean) {
       <div class="r"><span>${L.tax}</span><span>${money(doc.tax, c)}</span></div>
       <div class="r"><span>${L.discount}</span><span>${money(doc.discount, c)}</span></div>
       <div class="r g"><span>${L.grandTotal}</span><span>${money(doc.total, c)}</span></div>
-      ${doc.paid !== undefined ? `
+      ${
+        doc.paid !== undefined
+          ? `
       <div class="r"><span>${L.paid}</span><span>${money(doc.paid, c)}</span></div>
-      <div class="r"><span>${L.balance}</span><span>${money(doc.total - doc.paid, c)}</span></div>` : ""}
+      <div class="r"><span>${L.balance}</span><span>${money(doc.total - doc.paid, c)}</span></div>`
+          : ""
+      }
     </div>
   </div>
   <div class="sign">
@@ -258,11 +299,18 @@ function elegantHTML(doc: InvoiceDoc, L: Labels, rtl: boolean) {
 </div></body></html>`;
 }
 
-export function printInvoice(doc: InvoiceDoc, template: InvoiceTemplate, labels: Labels, rtl: boolean) {
+export function printInvoice(
+  doc: InvoiceDoc,
+  template: InvoiceTemplate,
+  labels: Labels,
+  rtl: boolean,
+) {
   const html =
-    template === "thermal" ? thermalHTML(doc, labels, rtl) :
-    template === "elegant" ? elegantHTML(doc, labels, rtl) :
-    standardHTML(doc, labels, rtl);
+    template === "thermal"
+      ? thermalHTML(doc, labels, rtl)
+      : template === "elegant"
+        ? elegantHTML(doc, labels, rtl)
+        : standardHTML(doc, labels, rtl);
 
   // Always use a hidden iframe — never open a new tab/window
   const iframe = document.createElement("iframe");
@@ -284,7 +332,11 @@ export function printInvoice(doc: InvoiceDoc, template: InvoiceTemplate, labels:
     } finally {
       // Remove iframe after the print dialog is dismissed
       setTimeout(() => {
-        try { document.body.removeChild(iframe); } catch { /* already removed */ }
+        try {
+          document.body.removeChild(iframe);
+        } catch {
+          /* already removed */
+        }
       }, 2000);
     }
   }, delay);

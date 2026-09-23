@@ -10,8 +10,21 @@ import { printReport } from "@/lib/pdf";
 import { exportToCSV } from "@/lib/excel-export";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Printer, Download, UserCheck, Building2, Calendar, FileSpreadsheet } from "lucide-react";
 
 const accountStatementSearchSchema = z.object({
@@ -67,7 +80,7 @@ function AccountStatementPage() {
       const { data } = await supabase.from("customers").select("id, name, balance").order("name");
       const list = data ?? [];
       setPartyList(list);
-      if (customerId && list.some(c => c.id === customerId)) {
+      if (customerId && list.some((c) => c.id === customerId)) {
         setPartyId(customerId);
       } else if (list.length > 0) {
         setPartyId(list[0].id);
@@ -88,7 +101,9 @@ function AccountStatementPage() {
     if (partyType === "customer") {
       const { data: sales } = await supabase
         .from("sales_invoices")
-        .select("id, invoice_number, total, created_at, note, sales_invoice_items(quantity,products(name,name_ar))")
+        .select(
+          "id, invoice_number, total, created_at, note, sales_invoice_items(quantity,products(name,name_ar))",
+        )
         .eq("customer_id", partyId)
         .order("created_at", { ascending: true });
 
@@ -101,13 +116,23 @@ function AccountStatementPage() {
           debit: Number(s.total),
           credit: 0,
           balance: 0,
-          note: s.note || (s.sales_invoice_items ?? []).map((line: any) => `${lang === "ar" ? (line.products?.name_ar || line.products?.name) : line.products?.name} × ${line.quantity}`).join("، ") || (lang === "ar" ? "مبيعات للعميل" : "Customer sale"),
+          note:
+            s.note ||
+            (s.sales_invoice_items ?? [])
+              .map(
+                (line: any) =>
+                  `${lang === "ar" ? line.products?.name_ar || line.products?.name : line.products?.name} × ${line.quantity}`,
+              )
+              .join("، ") ||
+            (lang === "ar" ? "مبيعات للعميل" : "Customer sale"),
         });
       });
 
       const { data: payments } = await supabase
         .from("customer_payments")
-        .select("id, amount, payment_date, note, payment_method, invoice_id, sales_invoices(invoice_number)")
+        .select(
+          "id, amount, payment_date, note, payment_method, invoice_id, sales_invoices(invoice_number)",
+        )
         .eq("customer_id", partyId)
         .order("payment_date", { ascending: true });
 
@@ -120,17 +145,23 @@ function AccountStatementPage() {
           debit: 0,
           credit: Number(p.amount),
           balance: 0,
-          note: p.note || (lang === "ar" ? `تحصيل ${p.payment_method === "cash" ? "نقدًا" : "دفعة"}` : `Payment (${p.payment_method})`),
+          note:
+            p.note ||
+            (lang === "ar"
+              ? `تحصيل ${p.payment_method === "cash" ? "نقدًا" : "دفعة"}`
+              : `Payment (${p.payment_method})`),
         });
       });
     } else {
       const { data: purchases } = await supabase
         .from("purchase_invoices")
-        .select("id, invoice_number, total, paid, created_at, note")
+        .select(
+          "id, invoice_number, total, paid, created_at, note, purchase_invoice_items(quantity,products(name,name_ar))",
+        )
         .eq("supplier_id", partyId)
         .order("created_at", { ascending: true });
 
-      (purchases ?? []).forEach((p) => {
+      (purchases ?? []).forEach((p: any) => {
         items.push({
           id: p.id,
           date: p.created_at,
@@ -139,7 +170,15 @@ function AccountStatementPage() {
           debit: Number(p.paid || 0),
           credit: Number(p.total),
           balance: 0,
-          note: p.note || (lang === "ar" ? "توريد كميات بضائع ومواد غذائية" : "Purchase Order"),
+          note:
+            p.note ||
+            (p.purchase_invoice_items ?? [])
+              .map(
+                (line: any) =>
+                  `${lang === "ar" ? line.products?.name_ar || line.products?.name : line.products?.name} × ${line.quantity}`,
+              )
+              .join("، ") ||
+            (lang === "ar" ? "توريد كميات بضائع ومواد غذائية" : "Purchase Order"),
         });
       });
     }
@@ -163,24 +202,60 @@ function AccountStatementPage() {
 
   function handlePrintPDF() {
     printReport({
-      title: lang === "ar" ? `كشف حساب تفصيلي — ${selectedParty?.name || ""}` : `Detailed Account Statement — ${selectedParty?.name || ""}`,
-      subtitle: lang === "ar" ? `نوع الحساب: ${partyType === "customer" ? "عميل" : "مورد"}` : `Account Type: ${partyType}`,
+      title:
+        lang === "ar"
+          ? `كشف حساب تفصيلي — ${selectedParty?.name || ""}`
+          : `Detailed Account Statement — ${selectedParty?.name || ""}`,
+      subtitle:
+        lang === "ar"
+          ? `نوع الحساب: ${partyType === "customer" ? "عميل" : "مورد"}`
+          : `Account Type: ${partyType}`,
       date: new Date().toLocaleDateString(lang === "ar" ? "ar-YE" : "en-US"),
       periodLabel: lang === "ar" ? "كشف حركة حقيقي ومباشر" : "Live Running Account Statement",
       currency: "﷼",
       summaryCards: [
-        { label: lang === "ar" ? "إجمالي الحركات الحسابية" : "Total Movements", value: String(statement.length) },
-        { label: lang === "ar" ? "إجمالي المدين (له)" : "Total Debit", value: money(totalDebit), color: "#f43f5e" },
-        { label: lang === "ar" ? "إجمالي الدائن (عليه)" : "Total Credit", value: money(totalCredit), color: "#10b981" },
-        { label: lang === "ar" ? "الرصيد المتبقي النهائى" : "Net Balance", value: money(netBalance), color: netBalance > 0 ? "#f43f5e" : "#10b981" },
+        {
+          label: lang === "ar" ? "إجمالي الحركات الحسابية" : "Total Movements",
+          value: String(statement.length),
+        },
+        {
+          label: lang === "ar" ? "إجمالي المدين (له)" : "Total Debit",
+          value: money(totalDebit),
+          color: "#f43f5e",
+        },
+        {
+          label: lang === "ar" ? "إجمالي الدائن (عليه)" : "Total Credit",
+          value: money(totalCredit),
+          color: "#10b981",
+        },
+        {
+          label: lang === "ar" ? "الرصيد المتبقي النهائى" : "Net Balance",
+          value: money(netBalance),
+          color: netBalance > 0 ? "#f43f5e" : "#10b981",
+        },
       ],
       columns: [
         { key: "date", header: lang === "ar" ? "التاريخ والوقت" : "Date & Time" },
         { key: "type", header: lang === "ar" ? "نوع الحركة" : "Type" },
         { key: "reference", header: lang === "ar" ? "رقم المرجع" : "Ref #" },
-        { key: "debit", header: lang === "ar" ? "مدين (له)" : "Debit", align: "right", format: "money" },
-        { key: "credit", header: lang === "ar" ? "دائن (عليه)" : "Credit", align: "right", format: "money" },
-        { key: "balance", header: lang === "ar" ? "الرصيد التراكمي" : "Balance", align: "right", format: "money" },
+        {
+          key: "debit",
+          header: lang === "ar" ? "مدين (له)" : "Debit",
+          align: "right",
+          format: "money",
+        },
+        {
+          key: "credit",
+          header: lang === "ar" ? "دائن (عليه)" : "Credit",
+          align: "right",
+          format: "money",
+        },
+        {
+          key: "balance",
+          header: lang === "ar" ? "الرصيد التراكمي" : "Balance",
+          align: "right",
+          format: "money",
+        },
         { key: "note", header: lang === "ar" ? "البيان" : "Note" },
       ],
       rows: statement as any,
@@ -229,10 +304,18 @@ function AccountStatementPage() {
     <>
       <PageHeader
         title={lang === "ar" ? "كشف حساب تفصيلي (عميل / مورد)" : "Account Statement"}
-        subtitle={lang === "ar" ? "تتبع وحساب الأرصدة التراكمية والفواتير والتحصيلات خطوة بخطوة" : "Live customer & supplier account statement with running balance"}
+        subtitle={
+          lang === "ar"
+            ? "تتبع وحساب الأرصدة التراكمية والفواتير والتحصيلات خطوة بخطوة"
+            : "Live customer & supplier account statement with running balance"
+        }
         actions={
           <div className="flex items-center gap-2">
-            <Button onClick={handleExportExcel} variant="outline" className="gap-2 text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10">
+            <Button
+              onClick={handleExportExcel}
+              variant="outline"
+              className="gap-2 text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10"
+            >
               <FileSpreadsheet className="h-4 w-4" />
               {lang === "ar" ? "تصدير Excel" : "Export Excel"}
             </Button>
@@ -286,16 +369,28 @@ function AccountStatementPage() {
           {selectedParty && (
             <div className="flex items-center gap-6">
               <div className="text-end">
-                <span className="text-xs text-muted-foreground">{lang === "ar" ? "إجمالي المدين (له):" : "Total Debit:"} </span>
-                <span className="font-bold font-mono text-rose-500 text-sm block">{money(totalDebit)}</span>
+                <span className="text-xs text-muted-foreground">
+                  {lang === "ar" ? "إجمالي المدين (له):" : "Total Debit:"}{" "}
+                </span>
+                <span className="font-bold font-mono text-rose-500 text-sm block">
+                  {money(totalDebit)}
+                </span>
               </div>
               <div className="text-end">
-                <span className="text-xs text-muted-foreground">{lang === "ar" ? "إجمالي الدائن (عليه):" : "Total Credit:"} </span>
-                <span className="font-bold font-mono text-emerald-500 text-sm block">{money(totalCredit)}</span>
+                <span className="text-xs text-muted-foreground">
+                  {lang === "ar" ? "إجمالي الدائن (عليه):" : "Total Credit:"}{" "}
+                </span>
+                <span className="font-bold font-mono text-emerald-500 text-sm block">
+                  {money(totalCredit)}
+                </span>
               </div>
               <div className="text-end border-r pr-6 border-border">
-                <span className="text-xs text-muted-foreground">{lang === "ar" ? "الرصيد المتبقي الحالي:" : "Net Balance:"} </span>
-                <span className="font-bold font-mono text-primary text-base block">{money(netBalance)}</span>
+                <span className="text-xs text-muted-foreground">
+                  {lang === "ar" ? "الرصيد المتبقي الحالي:" : "Net Balance:"}{" "}
+                </span>
+                <span className="font-bold font-mono text-primary text-base block">
+                  {money(netBalance)}
+                </span>
               </div>
             </div>
           )}
@@ -311,9 +406,15 @@ function AccountStatementPage() {
                   <TableHead>{lang === "ar" ? "التاريخ والوقت" : "Date & Time"}</TableHead>
                   <TableHead>{lang === "ar" ? "نوع الحركة" : "Type"}</TableHead>
                   <TableHead>{lang === "ar" ? "رقم المرجع" : "Ref #"}</TableHead>
-                  <TableHead className="text-end text-rose-500 font-semibold">{lang === "ar" ? "مدين (له)" : "Debit"}</TableHead>
-                  <TableHead className="text-end text-emerald-500 font-semibold">{lang === "ar" ? "دائن (عليه)" : "Credit"}</TableHead>
-                  <TableHead className="text-end font-semibold">{lang === "ar" ? "الرصيد التراكمي" : "Balance"}</TableHead>
+                  <TableHead className="text-end text-rose-500 font-semibold">
+                    {lang === "ar" ? "مدين (له)" : "Debit"}
+                  </TableHead>
+                  <TableHead className="text-end text-emerald-500 font-semibold">
+                    {lang === "ar" ? "دائن (عليه)" : "Credit"}
+                  </TableHead>
+                  <TableHead className="text-end font-semibold">
+                    {lang === "ar" ? "الرصيد التراكمي" : "Balance"}
+                  </TableHead>
                   <TableHead>{lang === "ar" ? "البيان والتفاصيل" : "Note"}</TableHead>
                 </TableRow>
               </TableHeader>
@@ -327,19 +428,33 @@ function AccountStatementPage() {
                 ) : statement.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="py-12 text-center text-muted-foreground">
-                      {lang === "ar" ? "لا توجد حركات حسابية مسجلة لهذا الحساب" : "No statement records for this account"}
+                      {lang === "ar"
+                        ? "لا توجد حركات حسابية مسجلة لهذا الحساب"
+                        : "No statement records for this account"}
                     </TableCell>
                   </TableRow>
                 ) : (
                   statement.map((item, idx) => (
                     <TableRow key={item.id} className="hover:bg-surface-2/60">
-                      <TableCell className="font-mono text-xs text-muted-foreground">{idx + 1}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{new Date(item.date).toLocaleString()}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">
+                        {idx + 1}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {new Date(item.date).toLocaleString()}
+                      </TableCell>
                       <TableCell className="text-xs font-semibold">{item.type}</TableCell>
-                      <TableCell className="font-mono text-xs text-primary">{item.reference}</TableCell>
-                      <TableCell className="text-end font-mono text-rose-500">{item.debit > 0 ? money(item.debit) : "—"}</TableCell>
-                      <TableCell className="text-end font-mono text-emerald-500">{item.credit > 0 ? money(item.credit) : "—"}</TableCell>
-                      <TableCell className="text-end font-mono font-bold">{money(item.balance)}</TableCell>
+                      <TableCell className="font-mono text-xs text-primary">
+                        {item.reference}
+                      </TableCell>
+                      <TableCell className="text-end font-mono text-rose-500">
+                        {item.debit > 0 ? money(item.debit) : "—"}
+                      </TableCell>
+                      <TableCell className="text-end font-mono text-emerald-500">
+                        {item.credit > 0 ? money(item.credit) : "—"}
+                      </TableCell>
+                      <TableCell className="text-end font-mono font-bold">
+                        {money(item.balance)}
+                      </TableCell>
                       <TableCell className="text-xs text-muted-foreground">{item.note}</TableCell>
                     </TableRow>
                   ))
@@ -349,9 +464,15 @@ function AccountStatementPage() {
                     <TableCell colSpan={4} className="text-end text-sm">
                       {lang === "ar" ? "الإجمالي الكلي:" : "Total:"}
                     </TableCell>
-                    <TableCell className="text-end font-mono text-rose-500">{money(totalDebit)}</TableCell>
-                    <TableCell className="text-end font-mono text-emerald-500">{money(totalCredit)}</TableCell>
-                    <TableCell className="text-end font-mono text-primary text-base">{money(netBalance)}</TableCell>
+                    <TableCell className="text-end font-mono text-rose-500">
+                      {money(totalDebit)}
+                    </TableCell>
+                    <TableCell className="text-end font-mono text-emerald-500">
+                      {money(totalCredit)}
+                    </TableCell>
+                    <TableCell className="text-end font-mono text-primary text-base">
+                      {money(netBalance)}
+                    </TableCell>
                     <TableCell></TableCell>
                   </TableRow>
                 )}

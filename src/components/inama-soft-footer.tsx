@@ -10,7 +10,7 @@ export function InamaSoftFooter({ className }: InamaSoftFooterProps) {
     <footer
       className={cn(
         "border-t border-border/40 bg-background/50 px-4 py-2 sm:px-6 text-[11px] text-muted-foreground/60 transition-colors",
-        className
+        className,
       )}
     >
       <div className="mx-auto flex w-full max-w-[1400px] flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
