@@ -191,6 +191,9 @@ function NewPurchaseReturn({
   const [refundMethod, setRefundMethod] = useState("cash");
   const [note, setNote] = useState("");
   const [search, setSearch] = useState("");
+  const [supplierInvoiceId, setSupplierInvoiceId] = useState<string>("");
+  const [supplierInvoices, setSupplierInvoices] = useState<any[]>([]);
+  const [invoiceItems, setInvoiceItems] = useState<any[]>([]);
   const [lines, setLines] = useState<Line[]>([]);
 
   useEffect(() => {
@@ -211,6 +214,74 @@ function NewPurchaseReturn({
       if (!warehouseId && w.data?.[0]) setWarehouseId(w.data[0].id);
     });
   }, [open]);
+
+  useEffect(() => {
+    if (!supplierId) {
+      setSupplierInvoices([]);
+      setSupplierInvoiceId("");
+      setInvoiceItems([]);
+      setLines([]);
+      return;
+    }
+    void (async () => {
+      const { data, error } = await supabase
+        .from("purchase_invoices")
+        .select(
+          "id,invoice_number,total,created_at,purchase_invoice_items(quantity,unit_cost,tax_rate,product_id,products(id,name,name_ar,sku))",
+        )
+        .eq("supplier_id", supplierId)
+        .order("created_at", { ascending: false });
+      if (error) return;
+      const rows = data ?? [];
+      setSupplierInvoices(rows);
+      const firstId = rows[0]?.id ?? "";
+      setSupplierInvoiceId(firstId);
+      const nextItems = (rows[0]?.purchase_invoice_items ?? []) as any[];
+      setInvoiceItems(nextItems);
+      const selectedItems = nextItems.map((item) => ({
+        product_id: item.product_id ?? item.products?.id ?? "",
+        name:
+          lang === "ar"
+            ? item.products?.name_ar || item.products?.name
+            : item.products?.name || item.products?.name_ar,
+        quantity: 1,
+        unit_cost: Number(item.unit_cost ?? 0),
+        tax_rate: Number(item.tax_rate ?? 0),
+      }));
+      setLines(selectedItems.filter((item) => item.product_id));
+    })();
+  }, [supplierId, lang]);
+
+  useEffect(() => {
+    if (!supplierInvoiceId) {
+      setInvoiceItems([]);
+      setLines([]);
+      return;
+    }
+    void (async () => {
+      const { data, error } = await supabase
+        .from("purchase_invoices")
+        .select(
+          "id,invoice_number,purchase_invoice_items(quantity,unit_cost,tax_rate,product_id,products(id,name,name_ar,sku))",
+        )
+        .eq("id", supplierInvoiceId)
+        .maybeSingle();
+      if (error || !data) return;
+      const nextItems = (data.purchase_invoice_items ?? []) as any[];
+      setInvoiceItems(nextItems);
+      const selectedItems = nextItems.map((item) => ({
+        product_id: item.product_id ?? item.products?.id ?? "",
+        name:
+          lang === "ar"
+            ? item.products?.name_ar || item.products?.name
+            : item.products?.name || item.products?.name_ar,
+        quantity: 1,
+        unit_cost: Number(item.unit_cost ?? 0),
+        tax_rate: Number(item.tax_rate ?? 0),
+      }));
+      setLines(selectedItems.filter((item) => item.product_id));
+    })();
+  }, [supplierInvoiceId, lang]);
 
   const filtered = useMemo(
     () =>
@@ -261,7 +332,7 @@ function NewPurchaseReturn({
       return;
     }
     const { error } = await supabase.rpc("create_purchase_return" as any, {
-      _invoice_id: null,
+      _invoice_id: supplierInvoiceId || null,
       _warehouse_id: warehouseId,
       _supplier_id: supplierId,
       _refund_method: refundMethod,
@@ -332,6 +403,26 @@ function NewPurchaseReturn({
               </Select>
             </div>
             <div className="grid gap-1.5">
+              <Label>{lang === "ar" ? "الفاتورة" : "Invoice"}</Label>
+              <Select value={supplierInvoiceId} onValueChange={setSupplierInvoiceId}>
+                <SelectTrigger>
+                  <SelectValue placeholder={lang === "ar" ? "اختر الفاتورة..." : "Select invoice..."} />
+                </SelectTrigger>
+                <SelectContent>
+                  {!supplierId && (
+                    <div className="px-3 py-2 text-xs text-muted-foreground">
+                      {lang === "ar" ? "اختر المورد أولاً" : "Choose a supplier first"}
+                    </div>
+                  )}
+                  {supplierInvoices.map((inv) => (
+                    <SelectItem key={inv.id} value={inv.id}>
+                      {inv.invoice_number} · {money(Number(inv.total))}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1.5">
               <Label>{lang === "ar" ? "طريقة الاسترداد" : "Refund method"}</Label>
               <Select value={refundMethod} onValueChange={setRefundMethod}>
                 <SelectTrigger>
@@ -373,6 +464,34 @@ function NewPurchaseReturn({
                     </span>
                   </button>
                 ))}
+              </div>
+            )}
+            {invoiceItems.length > 0 && !search && (
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                {invoiceItems.map((item: any) => {
+                  const productId = item.product_id ?? item.products?.id ?? "";
+                  const label = lang === "ar" ? item.products?.name_ar || item.products?.name : item.products?.name || item.products?.name_ar;
+                  return (
+                    <button
+                      key={productId}
+                      type="button"
+                      onClick={() => addLine({
+                        id: productId,
+                        name: label,
+                        sku: item.products?.sku,
+                        cost_price: Number(item.unit_cost ?? 0),
+                        tax_rate: Number(item.tax_rate ?? 0),
+                      })}
+                      className="rounded-xl border border-border bg-surface px-3 py-2 text-left text-sm hover:border-primary/40 hover:bg-primary/5"
+                    >
+                      <div className="font-medium">{label}</div>
+                      <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
+                        <span>{item.products?.sku ?? "—"}</span>
+                        <span>{item.quantity} {lang === "ar" ? "قطعة" : "pcs"}</span>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>

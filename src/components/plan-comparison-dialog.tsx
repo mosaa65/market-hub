@@ -189,13 +189,14 @@ export function PlanComparisonDialog({ trigger }: { trigger?: React.ReactNode })
   const { lang } = useI18n();
   const isAr = lang === "ar";
   const { currentPlanId, plans, setPlan } = useModules();
-  const { isPlatformAdmin } = useAuth();
+  const { isPlatformAdmin, isPlatformSuperadmin } = useAuth();
+  const canEditPlan = isPlatformAdmin || isPlatformSuperadmin;
   const [open, setOpen] = React.useState(false);
   const [loadingPlan, setLoadingPlan] = React.useState<string | null>(null);
 
   const handleSelect = async (planId: PlatformPlanId) => {
     if (planId === currentPlanId) return;
-    if (!isPlatformAdmin) {
+    if (!canEditPlan) {
       toast.info(
         isAr
           ? "لطلب ترقية الباقة وتفعيل الميزات فوراً، يرجى التواصل مع الإدارة: mousa.mc13@gmail.com"

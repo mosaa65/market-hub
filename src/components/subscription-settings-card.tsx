@@ -35,8 +35,8 @@ import {
 export function SubscriptionSettingsCard() {
   const { lang } = useI18n();
   const isAr = lang === "ar";
-  const { isPlatformAdmin, isPlatformSuperadmin, hasRole } = useAuth();
-  const canEditPlan = isPlatformAdmin || isPlatformSuperadmin || hasRole("owner");
+  const { isPlatformAdmin, isPlatformSuperadmin } = useAuth();
+  const canEditPlan = isPlatformAdmin || isPlatformSuperadmin;
   const {
     currentPlanId,
     currentPlan,

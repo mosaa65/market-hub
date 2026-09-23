@@ -191,6 +191,9 @@ function NewSalesReturn({
   const [refundMethod, setRefundMethod] = useState("cash");
   const [note, setNote] = useState("");
   const [search, setSearch] = useState("");
+  const [customerInvoiceId, setCustomerInvoiceId] = useState<string>("");
+  const [customerInvoices, setCustomerInvoices] = useState<any[]>([]);
+  const [invoiceItems, setInvoiceItems] = useState<any[]>([]);
   const [lines, setLines] = useState<Line[]>([]);
 
   useEffect(() => {
@@ -211,6 +214,74 @@ function NewSalesReturn({
       if (!warehouseId && w.data?.[0]) setWarehouseId(w.data[0].id);
     });
   }, [open]);
+
+  useEffect(() => {
+    if (!customerId) {
+      setCustomerInvoices([]);
+      setCustomerInvoiceId("");
+      setInvoiceItems([]);
+      setLines([]);
+      return;
+    }
+    void (async () => {
+      const { data, error } = await supabase
+        .from("sales_invoices")
+        .select(
+          "id,invoice_number,total,created_at,sales_invoice_items(quantity,unit_price,tax_rate,product_id,products(id,name,name_ar,sku))",
+        )
+        .eq("customer_id", customerId)
+        .order("created_at", { ascending: false });
+      if (error) return;
+      const rows = data ?? [];
+      setCustomerInvoices(rows);
+      const firstId = rows[0]?.id ?? "";
+      setCustomerInvoiceId(firstId);
+      const nextItems = (rows[0]?.sales_invoice_items ?? []) as any[];
+      setInvoiceItems(nextItems);
+      const selectedItems = nextItems.map((item) => ({
+        product_id: item.product_id ?? item.products?.id ?? "",
+        name:
+          lang === "ar"
+            ? item.products?.name_ar || item.products?.name
+            : item.products?.name || item.products?.name_ar,
+        quantity: 1,
+        unit_price: Number(item.unit_price ?? 0),
+        tax_rate: Number(item.tax_rate ?? 0),
+      }));
+      setLines(selectedItems.filter((item) => item.product_id));
+    })();
+  }, [customerId, lang]);
+
+  useEffect(() => {
+    if (!customerInvoiceId) {
+      setInvoiceItems([]);
+      setLines([]);
+      return;
+    }
+    void (async () => {
+      const { data, error } = await supabase
+        .from("sales_invoices")
+        .select(
+          "id,invoice_number,sales_invoice_items(quantity,unit_price,tax_rate,product_id,products(id,name,name_ar,sku))",
+        )
+        .eq("id", customerInvoiceId)
+        .maybeSingle();
+      if (error || !data) return;
+      const nextItems = (data.sales_invoice_items ?? []) as any[];
+      setInvoiceItems(nextItems);
+      const selectedItems = nextItems.map((item) => ({
+        product_id: item.product_id ?? item.products?.id ?? "",
+        name:
+          lang === "ar"
+            ? item.products?.name_ar || item.products?.name
+            : item.products?.name || item.products?.name_ar,
+        quantity: 1,
+        unit_price: Number(item.unit_price ?? 0),
+        tax_rate: Number(item.tax_rate ?? 0),
+      }));
+      setLines(selectedItems.filter((item) => item.product_id));
+    })();
+  }, [customerInvoiceId, lang]);
 
   const filtered = useMemo(
     () =>
@@ -261,7 +332,7 @@ function NewSalesReturn({
       return;
     }
     const { error } = await supabase.rpc("create_sales_return" as any, {
-      _invoice_id: null,
+      _invoice_id: customerInvoiceId || null,
       _warehouse_id: warehouseId,
       _customer_id: customerId || null,
       _refund_method: refundMethod,
@@ -295,7 +366,7 @@ function NewSalesReturn({
         </DialogHeader>
         <div className="grid gap-4 py-2">
           <div
-            className={`grid grid-cols-1 ${hasMultiWarehouse ? "sm:grid-cols-3" : "sm:grid-cols-2"} gap-3`}
+            className={`grid grid-cols-1 ${hasMultiWarehouse ? "sm:grid-cols-4" : "sm:grid-cols-3"} gap-3`}
           >
             {hasMultiWarehouse && (
               <div className="grid gap-1.5">
@@ -326,6 +397,26 @@ function NewSalesReturn({
                   {customers.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1.5">
+              <Label>{lang === "ar" ? "الفاتورة" : "Invoice"}</Label>
+              <Select value={customerInvoiceId} onValueChange={setCustomerInvoiceId}>
+                <SelectTrigger>
+                  <SelectValue placeholder={lang === "ar" ? "اختر الفاتورة..." : "Select invoice..."} />
+                </SelectTrigger>
+                <SelectContent>
+                  {!customerId && (
+                    <div className="px-3 py-2 text-xs text-muted-foreground">
+                      {lang === "ar" ? "اختر العميل أولاً" : "Choose a customer first"}
+                    </div>
+                  )}
+                  {customerInvoices.map((inv) => (
+                    <SelectItem key={inv.id} value={inv.id}>
+                      {inv.invoice_number} · {money(Number(inv.total))}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -373,6 +464,34 @@ function NewSalesReturn({
                     </span>
                   </button>
                 ))}
+              </div>
+            )}
+            {invoiceItems.length > 0 && !search && (
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                {invoiceItems.map((item: any) => {
+                  const productId = item.product_id ?? item.products?.id ?? "";
+                  const label = lang === "ar" ? item.products?.name_ar || item.products?.name : item.products?.name || item.products?.name_ar;
+                  return (
+                    <button
+                      key={productId}
+                      type="button"
+                      onClick={() => addLine({
+                        id: productId,
+                        name: label,
+                        sku: item.products?.sku,
+                        sale_price: Number(item.unit_price ?? 0),
+                        tax_rate: Number(item.tax_rate ?? 0),
+                      })}
+                      className="rounded-xl border border-border bg-surface px-3 py-2 text-left text-sm hover:border-primary/40 hover:bg-primary/5"
+                    >
+                      <div className="font-medium">{label}</div>
+                      <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
+                        <span>{item.products?.sku ?? "—"}</span>
+                        <span>{item.quantity} {lang === "ar" ? "قطعة" : "pcs"}</span>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>

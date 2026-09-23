@@ -36,8 +36,8 @@ export const Route = createFileRoute("/_app/plans")({
 function PlansShowcasePage() {
   const { lang } = useI18n();
   const isAr = lang === "ar";
-  const { isPlatformAdmin, isPlatformSuperadmin, hasRole } = useAuth();
-  const canEditPlan = isPlatformAdmin || isPlatformSuperadmin || hasRole("owner");
+  const { isPlatformAdmin, isPlatformSuperadmin } = useAuth();
+  const canEditPlan = isPlatformAdmin || isPlatformSuperadmin;
   const { currentPlanId, plans, setPlan } = useModules();
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
 
@@ -75,8 +75,8 @@ function PlansShowcasePage() {
         title={isAr ? "باقات واشتراكات نظام فورتيكس ERP" : "Vortex ERP Plans & Subscriptions"}
         subtitle={
           isAr
-            ? "اختر الباقة المناسبة لحجم نشاطك التجاري. يمكنك الترقية أو إضافة ميزات مستقلة في أي وقت."
-            : "Choose the ideal plan for your business scale. Upgrade or add custom modules anytime."
+            ? "استخدم هذه الصفحة لمراجعة باقتك الحالية، ومعرفة ما يتضمنه النظام، ومتى يمكن تغييرها. التعديل مسموح فقط لمسؤول النظام أو السوبر أدمن."
+            : "Use this page to review your current package and understand the included features. Plan changes are restricted to the system admin or platform superadmin."
         }
         actions={
           <PlanComparisonDialog
@@ -89,6 +89,26 @@ function PlansShowcasePage() {
           />
         }
       />
+
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary/25 bg-primary/5 p-3 text-sm">
+        <div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+            {isAr ? "باقتك الحالية" : "Current package"}
+          </div>
+          <div className="mt-1 font-semibold text-foreground">
+            {isAr ? plans.find((p) => p.id === currentPlanId)?.name.ar : plans.find((p) => p.id === currentPlanId)?.name.en}
+          </div>
+        </div>
+        <div className="rounded-full border border-border/60 bg-surface px-3 py-1 text-xs text-muted-foreground">
+          {canEditPlan
+            ? isAr
+              ? "التعديل متاح لمسؤول النظام"
+              : "Admin-controlled plan changes"
+            : isAr
+              ? "للطلب أو الترقية، تواصل مع مسؤول النظام"
+              : "Contact the system admin to request an upgrade"}
+        </div>
+      </div>
 
       {/* Pricing Cards Grid - Mobile Friendly */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 items-stretch">
