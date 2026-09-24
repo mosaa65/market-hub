@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -23,6 +24,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import {
   ShieldCheck,
@@ -30,15 +39,31 @@ import {
   Crown,
   Users,
   Lock,
-  ShieldAlert,
   Sparkles,
-  Plus,
-  Key,
+  UserPlus,
+  UserX,
+  UserCheck,
+  Copy,
+  Check,
+  KeyRound,
+  Loader2,
 } from "lucide-react";
 import { RolePermissionsDialog } from "@/components/role-permissions-dialog";
 import { cn } from "@/lib/utils";
 
 const STORE_ROLES = ["owner", "manager", "accountant", "cashier", "warehouse"] as const;
+type StoreRole = (typeof STORE_ROLES)[number];
+
+/** Default role offered for a brand-new staff account. */
+const DEFAULT_NEW_ROLE: StoreRole = "cashier";
+
+/** Credentials shown exactly once after a successful provisioning. */
+type IssuedCredentials = {
+  email: string;
+  password: string;
+  full_name: string;
+  role: string;
+};
 
 export const Route = createFileRoute("/_app/users")({
   head: () => ({ meta: [{ title: "المستخدمين وإدارة الصلاحيات — Vortex ERP" }] }),
@@ -59,16 +84,36 @@ function UsersPage() {
   const [platformAdminRows, setPlatformAdminRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Create-user dialog state
+  const [addOpen, setAddOpen] = useState(false);
+  const [addName, setAddName] = useState("");
+  const [addEmail, setAddEmail] = useState("");
+  const [addPhone, setAddPhone] = useState("");
+  const [addRole, setAddRole] = useState<StoreRole>(DEFAULT_NEW_ROLE);
+  const [addSaving, setAddSaving] = useState(false);
+  // Populated only on success; holds the one-time credentials for hand-off.
+  const [issued, setIssued] = useState<IssuedCredentials | null>(null);
+  const [copiedField, setCopiedField] = useState<"password" | "all" | null>(null);
+
   async function load() {
     setLoading(true);
     try {
-      const [{ data: profiles }, { data: roles }, { data: platformAdmins }] = await Promise.all([
-        supabase.from("profiles").select("id, full_name, avatar_url, created_at"),
+      // The platform_admins table is admin-only at the RLS layer now. Non-admins
+      // must not even attempt the query (it would return zero rows) and must not
+      // receive any Super Admin data in the client payload.
+      const [profilesRes, rolesRes, platformRes] = await Promise.all([
+        supabase.from("profiles").select("id, full_name, avatar_url, created_at, is_active"),
         supabase.from("user_roles").select("id, user_id, role"),
-        (supabase as any)
-          .from("platform_admins")
-          .select("id, user_id, role, is_active, created_at"),
+        isSuper
+          ? (supabase as any)
+              .from("platform_admins")
+              .select("id, user_id, role, is_active, created_at")
+          : Promise.resolve({ data: [] as any[] }),
       ]);
+
+      const profiles = profilesRes.data;
+      const roles = rolesRes.data;
+      const platformAdmins = platformRes.data;
 
       const byUser = new Map<string, any[]>();
       (roles ?? []).forEach((r) => {
@@ -77,36 +122,30 @@ function UsersPage() {
         byUser.set(r.user_id, arr);
       });
 
-      const superadminIds = new Set<string>();
-      (platformAdmins ?? []).forEach((pa: any) => {
-        if (pa.is_active && (pa.role === "superadmin" || pa.role === "admin")) {
-          superadminIds.add(pa.user_id);
-        }
-      });
-
       const profileMap = new Map<string, any>();
       (profiles ?? []).forEach((p) => profileMap.set(p.id, p));
 
-      // 1. Store Staff: Users with tenant roles (owner, manager, etc.)
+      // 1. Store Staff: tenant users who hold at least one store role.
+      //    Platform superadmins are never listed here, so the Super Admin
+      //    identity is never exposed to unauthorised viewers.
       const storeUsers: any[] = [];
       (profiles ?? []).forEach((p) => {
         const uRoles = byUser.get(p.id) ?? [];
-        // Only include in store staff if they have store roles or are the store owner
-        if (uRoles.length > 0 || !superadminIds.has(p.id)) {
-          storeUsers.push({
-            ...p,
-            roles: uRoles,
-          });
-        }
+        // Accounts with no store role yet are deliberately not listed here:
+        // store staff are created from this page, which provisions the role
+        // atomically. A profile left without a role is a failed provisioning
+        // attempt and must not be presented as a team member.
+        if (uRoles.length === 0) return;
+        storeUsers.push({ ...p, roles: uRoles });
       });
 
-      // 2. Platform Admins: Strictly from platform_admins table
+      // 2. Platform Admins: strictly from platform_admins table (admins only).
       const platformUsers: any[] = (platformAdmins ?? []).map((pa: any) => {
         const prof = profileMap.get(pa.user_id);
         return {
           id: pa.id,
           user_id: pa.user_id,
-          full_name: prof?.full_name ?? "مدير منصة سحابية",
+          full_name: prof?.full_name ?? (isAr ? "مسؤول منصة" : "Platform admin"),
           role: pa.role,
           is_active: pa.is_active,
           created_at: pa.created_at,
@@ -124,7 +163,8 @@ function UsersPage() {
 
   useEffect(() => {
     void load();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSuper]);
 
   async function assignStoreRole(userId: string, role: string) {
     const qCheck = checkQuota("users", storeRows.length);
@@ -145,6 +185,147 @@ function UsersPage() {
     if (error) return toast.error(error.message);
     toast.success(isAr ? "تم حذف الدور" : "Role removed");
     void load();
+  }
+
+  // Account-level deactivation. The auth user, profile, roles and every
+  // historical record are preserved untouched — only profiles.is_active flips.
+  // Access is actually revoked by RLS (migration 20260918000200).
+  async function setUserActive(userId: string, active: boolean) {
+    if (userId === user?.id && !active) {
+      return toast.error(
+        isAr ? "لا يمكنك تعطيل حسابك الخاص." : "You cannot disable your own account.",
+      );
+    }
+    if (
+      !confirm(
+        active
+          ? isAr
+            ? "إعادة تفعيل هذا المستخدم؟ سيستعيد وصوله بنفس الحساب وبياناته."
+            : "Reactivate this user? They regain access with the same account."
+          : isAr
+            ? "تعطيل هذا المستخدم؟ سيتم إيقاف وصوله مع الاحتفاظ ببياناته وسجلاته بالكامل."
+            : "Disable this user? Access is revoked but all data and history is kept.",
+      )
+    )
+      return;
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({ is_active: active } as any)
+      .eq("id", userId);
+
+    if (error) return toast.error(error.message);
+    toast.success(
+      active
+        ? isAr
+          ? "تمت إعادة تفعيل المستخدم"
+          : "User reactivated"
+        : isAr
+          ? "تم تعطيل المستخدم مع الاحتفاظ ببياناته"
+          : "User disabled (data preserved)",
+    );
+    void load();
+  }
+
+  // Creates a BRAND-NEW staff account via the `admin-create-user` Edge
+  // Function: Auth user + profile + store role are provisioned server-side.
+  //
+  // SECURITY: the browser never sees a service/secret key. The function
+  // re-derives the caller's permissions from the database, validates the role
+  // against a hard allow-list, and refuses platform/super admin tiers. The
+  // quota check is repeated there too, so it cannot be bypassed by calling the
+  // function directly (bypassing this dialog).
+  async function createStoreUser() {
+    const name = addName.trim();
+    const email = addEmail.trim().toLowerCase();
+    const phone = addPhone.trim();
+
+    if (name.length < 2) {
+      return toast.error(isAr ? "يرجى إدخال اسم المستخدم." : "Please enter the user's name.");
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+      return toast.error(
+        isAr ? "يرجى إدخال بريد إلكتروني صحيح." : "Please enter a valid email address.",
+      );
+    }
+    if (STORE_ROLES.indexOf(addRole) === -1) {
+      return toast.error(isAr ? "الدور المحدد غير مسموح." : "The selected role is not allowed.");
+    }
+
+    setAddSaving(true);
+    try {
+      // The bearer token must be attached explicitly: without it the function
+      // cannot tell who is calling and every request would be rejected.
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        toast.error(isAr ? "انتهت جلسة الدخول. يرجى إعادة تسجيل الدخول." : "Session expired.");
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke("admin-create-user", {
+        body: { email, full_name: name, phone, role: addRole, language: lang },
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      if (error) {
+        // Supabase attaches the raw response body to `context` for non-2xx
+        // replies; prefer the server's Arabic message over the generic one.
+        let payload: any = data;
+        const ctx = (error as any).context;
+        if (!payload && ctx && typeof ctx.json === "function") {
+          payload = await ctx.json().catch(() => null);
+        }
+        throw new Error(
+          payload?.message ??
+            (isAr ? "تعذر إنشاء المستخدم. يرجى المحاولة مرة أخرى." : "Failed to create user."),
+        );
+      }
+
+      if (!data?.ok) {
+        throw new Error(
+          data?.message ??
+            (isAr ? "تعذر إنشاء المستخدم. يرجى المحاولة مرة أخرى." : "Failed to create user."),
+        );
+      }
+
+      // The password exists only in this response. It is never persisted, so
+      // it is handed to the admin once and never fetched again.
+      setIssued({
+        email: data.email,
+        password: data.password,
+        full_name: data.full_name,
+        role: data.role,
+      });
+      setCopiedField(null);
+      toast.success(isAr ? "تم إنشاء حساب المستخدم بنجاح" : "User account created successfully");
+      void load();
+    } catch (err: any) {
+      toast.error(err?.message ?? (isAr ? "تعذر إنشاء المستخدم" : "Failed to create user"));
+    } finally {
+      setAddSaving(false);
+    }
+  }
+
+  /** Clears the one-time credentials and closes the create dialog. */
+  function resetCreateDialog() {
+    setIssued(null);
+    setCopiedField(null);
+    setAddName("");
+    setAddEmail("");
+    setAddPhone("");
+    setAddRole(DEFAULT_NEW_ROLE);
+  }
+
+  async function copyToClipboard(text: string, field: "password" | "all") {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(field);
+      toast.success(isAr ? "تم النسخ" : "Copied");
+      setTimeout(() => setCopiedField(null), 2000);
+    } catch {
+      toast.error(isAr ? "تعذر النسخ تلقائيًا. انسخ البيانات يدويًا." : "Copy failed.");
+    }
   }
 
   async function revokePlatformAdmin(adminRecordId: string) {
@@ -250,9 +431,21 @@ function UsersPage() {
                     : "Standard operational roles: Owner, Manager, Accountant, Cashier, Warehouse."}
                 </CardDescription>
               </div>
-              <Badge variant="outline" className="text-xs font-mono">
-                {isAr ? `${storeRows.length} موظف` : `${storeRows.length} Staff`}
-              </Badge>
+              <div className="flex items-center gap-2">
+                {canManageStore && (
+                  <Button
+                    size="sm"
+                    onClick={() => setAddOpen(true)}
+                    className="rounded-full text-xs gap-1.5"
+                  >
+                    <UserPlus className="h-3.5 w-3.5" />
+                    <span>{isAr ? "إضافة مستخدم" : "Add User"}</span>
+                  </Button>
+                )}
+                <Badge variant="outline" className="text-xs font-mono">
+                  {isAr ? `${storeRows.length} موظف` : `${storeRows.length} Staff`}
+                </Badge>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="p-0">
@@ -264,6 +457,7 @@ function UsersPage() {
                     <TableHead className="px-4 py-3">
                       {isAr ? "الأدوار والصلاحيات بالمتجر" : "Store Roles"}
                     </TableHead>
+                    <TableHead className="px-4 py-3">{isAr ? "الحالة" : "Status"}</TableHead>
                     <TableHead className="px-4 py-3">
                       {isAr ? "تاريخ التسجيل" : "Joined Date"}
                     </TableHead>
@@ -278,14 +472,14 @@ function UsersPage() {
                   {loading ? (
                     Array.from({ length: 3 }).map((_, i) => (
                       <TableRow key={i} className="border-b border-border/60">
-                        <TableCell colSpan={4} className="px-4 py-4">
+                        <TableCell colSpan={5} className="px-4 py-4">
                           <div className="h-5 w-full rounded shimmer" />
                         </TableCell>
                       </TableRow>
                     ))
                   ) : storeRows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center text-muted-foreground py-12">
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-12">
                         {isAr ? "لا يوجد موظفون مسجلون حالياً" : "No store employees found"}
                       </TableCell>
                     </TableRow>
@@ -332,7 +526,7 @@ function UsersPage() {
                                   >
                                     <ShieldCheck className="h-3.5 w-3.5" />
                                     <span>{t(`role.${ro.role}`)}</span>
-                                    {canManageStore && !isCurrentUser && (
+                                    {canManageStore && !isCurrentUser && !hasOwner && (
                                       <button
                                         type="button"
                                         onClick={() => removeStoreRole(ro.id)}
@@ -348,6 +542,26 @@ function UsersPage() {
                             </div>
                           </TableCell>
 
+                          <TableCell className="px-4 py-3">
+                            {r.is_active === false ? (
+                              <Badge
+                                variant="outline"
+                                className="gap-1.5 py-1 px-2.5 text-xs font-semibold border-rose-500/40 text-rose-600 dark:text-rose-400"
+                              >
+                                <UserX className="h-3.5 w-3.5" />
+                                <span>{isAr ? "معطّل" : "Disabled"}</span>
+                              </Badge>
+                            ) : (
+                              <Badge
+                                variant="outline"
+                                className="gap-1.5 py-1 px-2.5 text-xs font-semibold border-emerald-500/40 text-emerald-600 dark:text-emerald-400"
+                              >
+                                <UserCheck className="h-3.5 w-3.5" />
+                                <span>{isAr ? "نشط" : "Active"}</span>
+                              </Badge>
+                            )}
+                          </TableCell>
+
                           <TableCell className="px-4 py-3 text-xs text-muted-foreground font-mono">
                             {new Date(r.created_at).toLocaleDateString()}
                           </TableCell>
@@ -355,22 +569,51 @@ function UsersPage() {
                           {canManageStore && (
                             <TableCell className="px-4 py-3 text-end">
                               <div className="inline-flex items-center gap-2 justify-end">
-                                <Select onValueChange={(v) => assignStoreRole(r.id, v)}>
-                                  <SelectTrigger className="w-36 h-8 text-xs rounded-xl">
-                                    <SelectValue
-                                      placeholder={isAr ? "إسناد دور جديد..." : "Add role..."}
-                                    />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {STORE_ROLES.filter(
-                                      (ro) => !r.roles.find((x: any) => x.role === ro),
-                                    ).map((ro) => (
-                                      <SelectItem key={ro} value={ro} className="text-xs">
-                                        {t(`role.${ro}`)}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
+                                {/* Owner rows are protected: no role removal and no
+                                    disable, mirroring the existing ownership rule. */}
+                                {!hasOwner &&
+                                  !isCurrentUser &&
+                                  (r.is_active === false ? (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => setUserActive(r.id, true)}
+                                      className="h-8 text-xs gap-1.5 rounded-xl border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
+                                    >
+                                      <UserCheck className="h-3.5 w-3.5" />
+                                      <span>{isAr ? "إعادة التفعيل" : "Reactivate"}</span>
+                                    </Button>
+                                  ) : (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => setUserActive(r.id, false)}
+                                      className="h-8 text-xs gap-1.5 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                    >
+                                      <UserX className="h-3.5 w-3.5" />
+                                      <span>{isAr ? "تعطيل المستخدم" : "Disable"}</span>
+                                    </Button>
+                                  ))}
+                                {!hasOwner && (
+                                  <Select onValueChange={(v) => assignStoreRole(r.id, v)}>
+                                    <SelectTrigger className="w-36 h-8 text-xs rounded-xl">
+                                      <SelectValue
+                                        placeholder={isAr ? "إسناد دور جديد..." : "Add role..."}
+                                      />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {STORE_ROLES.filter(
+                                        (ro) => !r.roles.find((x: any) => x.role === ro),
+                                      ).map((ro) => (
+                                        <SelectItem key={ro} value={ro} className="text-xs">
+                                          {t(`role.${ro}`)}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                )}
                               </div>
                             </TableCell>
                           )}
@@ -493,12 +736,12 @@ function UsersPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-4 rounded-2xl border border-border/70 bg-surface/60 text-xs text-muted-foreground">
         <div>
           <p className="font-semibold text-foreground">
-            {isAr ? "ملاحظة أمنية حول إضافة الموظفين:" : "Staff Onboarding Notice:"}
+            {isAr ? "ملاحظة حول إضافة الموظفين:" : "Staff Onboarding Notice:"}
           </p>
           <p className="mt-0.5">
             {isAr
-              ? "لتسجيل موظف جديد: اطلب منه تسجيل الدخول عبر شاشة /auth أولاً، وسيظهر اسمه فوراً في هذا الكشف لإسناد دوره المناسب."
-              : "To onboard a staff member: have them log in via /auth, then grant their specific role here."}
+              ? "تُنشأ حسابات الموظفين من هنا مباشرة دون حاجة الموظف للتسجيل مسبقًا: أدخل اسمه وبريده ودوره، وسيُولَّد له حساب جاهز ومُفعّل مع كلمة مرور تُعرض لك مرة واحدة لتسليمها له. التعطيل يوقف وصول المستخدم فورًا مع الاحتفاظ بكل بياناته وسجلاته، ويمكن إعادة تفعيله في أي وقت."
+              : "Staff accounts are created directly from here with no prior sign-up: enter a name, email and role, and an active account is provisioned with a password shown to you once for hand-off. Disabling revokes access immediately while keeping all data and history, and can be reversed anytime."}
           </p>
         </div>
         <RolePermissionsDialog
@@ -514,6 +757,251 @@ function UsersPage() {
           }
         />
       </div>
+
+      {/* Create-user dialog: provisions a new account server-side.
+          It deliberately offers only store roles — no Platform/Super Admin. */}
+      <Dialog
+        open={addOpen}
+        onOpenChange={(open) => {
+          // Once the account exists, the one-time password lives only in this
+          // dialog's state. Escape / outside-click / the X button must NOT be
+          // able to discard it: they would leave a real account behind whose
+          // password nobody knows. Closing is therefore allowed only through
+          // the explicit "Done" button below while `issued` is set.
+          if (!open && issued) return;
+          setAddOpen(open);
+          if (!open) resetCreateDialog();
+        }}
+      >
+        <DialogContent
+          className="max-w-md"
+          onEscapeKeyDown={(e) => {
+            if (issued) e.preventDefault();
+          }}
+          onPointerDownOutside={(e) => {
+            if (issued) e.preventDefault();
+          }}
+          onInteractOutside={(e) => {
+            if (issued) e.preventDefault();
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <UserPlus className="h-4 w-4 text-primary" />
+              <span>
+                {issued
+                  ? isAr
+                    ? "بيانات دخول المستخدم"
+                    : "User Sign-in Credentials"
+                  : isAr
+                    ? "إضافة مستخدم جديد"
+                    : "Add New User"}
+              </span>
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              {issued
+                ? isAr
+                  ? "انسخ بيانات الدخول وسلّمها للمستخدم. لن تُعرض كلمة المرور مرة أخرى."
+                  : "Copy these credentials and hand them to the user. The password is not shown again."
+                : isAr
+                  ? "سيتم إنشاء الحساب ودوره في المتجر فورًا، ويستطيع المستخدم تسجيل الدخول بحسابه متى شاء."
+                  : "The account and its store role are created immediately. The user can sign in whenever they are ready."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {issued ? (
+            /* ---------- Success: one-time credentials ---------- */
+            <div className="space-y-4 py-1">
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs text-emerald-700 dark:text-emerald-400 flex items-start gap-2">
+                <Check className="h-4 w-4 shrink-0 mt-0.5" />
+                <span>
+                  {isAr
+                    ? "تم إنشاء الحساب بنجاح وإسناد الدور. سلّم البيانات التالية للمستخدم الآن."
+                    : "Account created and role assigned. Hand the credentials below to the user now."}
+                </span>
+              </div>
+
+              <div className="space-y-2.5 rounded-xl border border-border/70 bg-surface/60 p-3">
+                <CredentialRow label={isAr ? "الاسم" : "Name"} value={issued.full_name} />
+                <CredentialRow label={isAr ? "البريد الإلكتروني" : "Email"} value={issued.email} />
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[11px] font-semibold text-muted-foreground">
+                    {isAr ? "كلمة المرور" : "Password"}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <code className="rounded-lg bg-background px-2 py-1 font-mono text-xs text-foreground border border-border/70">
+                      {issued.password}
+                    </code>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-7 gap-1.5 rounded-lg px-2 text-[11px]"
+                      onClick={() => void copyToClipboard(issued.password, "password")}
+                    >
+                      {copiedField === "password" ? (
+                        <Check className="h-3 w-3" />
+                      ) : (
+                        <Copy className="h-3 w-3" />
+                      )}
+                      <span>{isAr ? "نسخ كلمة المرور" : "Copy password"}</span>
+                    </Button>
+                  </div>
+                </div>
+                <CredentialRow label={isAr ? "الدور" : "Role"} value={t(`role.${issued.role}`)} />
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full gap-2 rounded-xl text-xs"
+                onClick={() =>
+                  void copyToClipboard(
+                    isAr
+                      ? `بيانات الدخول إلى ${t("app.name")}:\nالبريد الإلكتروني: ${issued.email}\nكلمة المرور: ${issued.password}\nالرابط: ${window.location.origin}/auth`
+                      : `Your ${t("app.name")} sign-in details:\nEmail: ${issued.email}\nPassword: ${issued.password}\nLink: ${window.location.origin}/auth`,
+                    "all",
+                  )
+                }
+              >
+                {copiedField === "all" ? (
+                  <Check className="h-3.5 w-3.5" />
+                ) : (
+                  <KeyRound className="h-3.5 w-3.5" />
+                )}
+                <span>{isAr ? "نسخ بيانات الدخول كاملة" : "Copy full sign-in details"}</span>
+              </Button>
+            </div>
+          ) : (
+            /* ---------- Form ---------- */
+            <div className="space-y-4 py-1">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground">
+                  {isAr ? "الاسم الكامل" : "Full name"}
+                </label>
+                <Input
+                  value={addName}
+                  onChange={(e) => setAddName(e.target.value)}
+                  placeholder={isAr ? "مثال: أحمد علي" : "e.g. Ahmed Ali"}
+                  className="h-9 text-xs rounded-xl"
+                  maxLength={120}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground">
+                  {isAr ? "البريد الإلكتروني" : "Email"}
+                </label>
+                <Input
+                  type="email"
+                  value={addEmail}
+                  onChange={(e) => setAddEmail(e.target.value)}
+                  placeholder="user@example.com"
+                  className="h-9 text-xs rounded-xl"
+                  dir="ltr"
+                  maxLength={255}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground">
+                  {isAr ? "رقم الهاتف (اختياري)" : "Phone (optional)"}
+                </label>
+                <Input
+                  type="tel"
+                  value={addPhone}
+                  onChange={(e) => setAddPhone(e.target.value)}
+                  placeholder={isAr ? "7xxxxxxxx" : "7xxxxxxxx"}
+                  className="h-9 text-xs rounded-xl"
+                  dir="ltr"
+                  maxLength={40}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground">
+                  {isAr ? "الدور في المتجر" : "Store Role"}
+                </label>
+                <Select value={addRole} onValueChange={(v) => setAddRole(v as StoreRole)}>
+                  <SelectTrigger className="w-full h-9 text-xs rounded-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STORE_ROLES.map((ro) => (
+                      <SelectItem key={ro} value={ro} className="text-xs">
+                        {t(`role.${ro}`)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <p className="rounded-xl border border-border/70 bg-surface/60 p-3 text-[11px] leading-relaxed text-muted-foreground">
+                {isAr
+                  ? "يتم توليد كلمة مرور قوية تلقائيًا على السيرفر وتُعرض لك مرة واحدة فقط بعد الإنشاء. يبدأ الحساب نشطًا ويستطيع الدخول مباشرة من شاشة تسجيل الدخول."
+                  : "A strong password is generated server-side and shown to you once after creation. The account starts active and can sign in immediately."}
+              </p>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            {issued ? (
+              /* The only way out of the issued-credentials view: closes the
+                 dialog and clears the password from memory in one step. */
+              <Button
+                size="sm"
+                className="rounded-xl"
+                onClick={() => {
+                  setAddOpen(false);
+                  resetCreateDialog();
+                }}
+              >
+                {isAr ? "تم، إغلاق" : "Done"}
+              </Button>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-xl"
+                  onClick={() => setAddOpen(false)}
+                >
+                  {isAr ? "إلغاء" : "Cancel"}
+                </Button>
+                <Button
+                  size="sm"
+                  className="rounded-xl gap-1.5"
+                  disabled={addSaving || !addName.trim() || !addEmail.trim()}
+                  onClick={() => void createStoreUser()}
+                >
+                  {addSaving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  <span>
+                    {addSaving
+                      ? isAr
+                        ? "جارٍ الإنشاء..."
+                        : "Creating..."
+                      : isAr
+                        ? "إنشاء الحساب"
+                        : "Create account"}
+                  </span>
+                </Button>
+              </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+/** Read-only label/value pair used in the one-time credentials panel. */
+function CredentialRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-[11px] font-semibold text-muted-foreground">{label}</span>
+      <code className="rounded-lg bg-background px-2 py-1 font-mono text-xs text-foreground border border-border/70 break-all">
+        {value}
+      </code>
     </div>
   );
 }
