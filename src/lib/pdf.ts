@@ -86,13 +86,39 @@ function esc(s: unknown) {
 }
 
 // ---------------------------------------------------------------------------
-// Generate Invoice PDF (jsPDF - for basic LTR/mixed, fallback)
+// Generate Invoice PDF & Print
 // ---------------------------------------------------------------------------
 
+import { printInvoice, DEFAULT_BRANDING, Labels } from "./invoice-print";
+
+export { DEFAULT_BRANDING };
+
+export function getDefaultArabicLabels(): Labels {
+  return {
+    invoice: "فاتورة",
+    date: "التاريخ",
+    billTo: "العميل",
+    warehouse: "المستودع",
+    payment: "طريقة الدفع",
+    status: "الحالة",
+    product: "المنتج",
+    qty: "الكمية",
+    price: "السعر",
+    total: "الإجمالي",
+    subtotal: "المجموع الفرعي",
+    tax: "الضريبة",
+    discount: "الخصم",
+    grandTotal: "الإجمالي النهائي",
+    paid: "المدفوع",
+    balance: "المتبقي",
+    thanks: "شكرًا لتعاملكم معنا",
+    poweredBy: DEFAULT_BRANDING,
+  };
+}
+
 export function generateInvoicePDF(doc: InvoiceDoc) {
-  const pdf = generateInvoicePdfDoc(doc);
-  pdf.save(`${doc.number}.pdf`);
-  return pdf;
+  const labels = getDefaultArabicLabels();
+  printInvoice(doc, "standard", labels, true);
 }
 
 export function generateInvoicePdfBlob(doc: InvoiceDoc) {
@@ -112,12 +138,8 @@ export function shareInvoicePDF(doc: InvoiceDoc) {
     });
   }
 
-  const link = document.createElement("a");
-  const url = URL.createObjectURL(blob);
-  link.href = url;
-  link.download = `${doc.number}.pdf`;
-  link.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  const labels = getDefaultArabicLabels();
+  printInvoice(doc, "standard", labels, true);
   return Promise.resolve();
 }
 
@@ -386,7 +408,7 @@ export function printReport(data: ReportPrintData) {
   </div>
 
   <div class="report-footer">
-    <div class="stamp">${rtl ? "طُبع بواسطة نظام فورتكس المحاسبي" : "Printed by Vortex ERP"} — ${new Date().toLocaleString(rtl ? "ar-YE" : "en-US")}</div>
+    <div class="stamp">${rtl ? "طُبع بواسطة نظام فورتكس المحاسبي" : "Printed by Vortex ERP"} — ${new Date().toLocaleString(rtl ? "ar-YE" : "en-US")} — ${DEFAULT_BRANDING}</div>
     <div class="branding">VORTEX ERP</div>
   </div>
 </div></body></html>`;
@@ -552,7 +574,7 @@ export function printFinancialStatement(data: FinancialStatementData) {
   </div>
 
   <div class="fs-footer">
-    <div class="stamp">${rtl ? "طُبع بواسطة نظام فورتكس المحاسبي" : "Printed by Vortex ERP"} — ${new Date().toLocaleString(rtl ? "ar-YE" : "en-US")}</div>
+    <div class="stamp">${rtl ? "طُبع بواسطة نظام فورتكس المحاسبي" : "Printed by Vortex ERP"} — ${new Date().toLocaleString(rtl ? "ar-YE" : "en-US")} — ${DEFAULT_BRANDING}</div>
     <div class="branding">VORTEX ERP</div>
   </div>
 </div></body></html>`;
