@@ -4,6 +4,46 @@ import { supabase } from "@/integrations/supabase/client";
 
 type Role = "owner" | "manager" | "accountant" | "cashier" | "warehouse";
 
+interface CachedAuthData {
+  userId: string;
+  roles: Role[];
+  isAdmin: boolean;
+  isSuperadmin: boolean;
+  isActive: boolean;
+  cachedAt: number;
+}
+
+const AUTH_CACHE_KEY = "vortex_auth_permissions_cache";
+const CACHE_TTL_MS = 1000 * 60 * 60 * 24; // 24 hours
+
+function readCachedAuth(userId: string): CachedAuthData | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(AUTH_CACHE_KEY);
+    if (!raw) return null;
+    const parsed: CachedAuthData = JSON.parse(raw);
+    if (parsed.userId !== userId) return null;
+    if (Date.now() - parsed.cachedAt > CACHE_TTL_MS) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedAuth(data: CachedAuthData) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(AUTH_CACHE_KEY, JSON.stringify(data));
+  } catch {}
+}
+
+function clearCachedAuth() {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(AUTH_CACHE_KEY);
+  } catch {}
+}
+
 interface AuthCtx {
   session: Session | null;
   user: User | null;
@@ -12,6 +52,7 @@ interface AuthCtx {
   isPlatformSuperadmin: boolean;
   isActive: boolean;
   loading: boolean;
+  isRefreshingPermissions: boolean;
   hasRole: (r: Role) => boolean;
   signOut: () => Promise<void>;
 }
@@ -25,56 +66,86 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isPlatformSuperadmin, setIsPlatformSuperadmin] = useState(false);
   const [isActive, setIsActive] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [isRefreshingPermissions, setIsRefreshingPermissions] = useState(false);
   const loadSeq = useRef(0);
 
   useEffect(() => {
     let alive = true;
 
-    async function applySession(nextSession: Session | null) {
+    async function applySession(nextSession: Session | null, isInitial = false) {
       const seq = ++loadSeq.current;
-      // Only show the spinner when there are permission lookups to do; a
-      // sign-out event carries no user and must resolve instantly.
-      if (nextSession?.user) setLoading(true);
+
+      if (!nextSession?.user) {
+        clearCachedAuth();
+        if (alive && seq === loadSeq.current) {
+          setSession(null);
+          setRoles([]);
+          setIsPlatformAdmin(false);
+          setIsPlatformSuperadmin(false);
+          setIsActive(true);
+          setLoading(false);
+          setIsRefreshingPermissions(false);
+        }
+        return;
+      }
+
+      const userId = nextSession.user.id;
+      const cached = readCachedAuth(userId);
+
+      if (cached) {
+        setSession(nextSession);
+        setRoles(cached.roles);
+        setIsPlatformAdmin(cached.isAdmin);
+        setIsPlatformSuperadmin(cached.isSuperadmin);
+        setIsActive(cached.isActive);
+        setLoading(false);
+        setIsRefreshingPermissions(true);
+      } else if (isInitial) {
+        setLoading(true);
+      }
 
       let nextRoles: Role[] = [];
       let adminFlags = { isAdmin: false, isSuperadmin: false };
       let nextIsActive = true;
+
       try {
-        if (nextSession?.user) {
-          // Fetch roles, admin flags and active status concurrently — they are
-          // independent and running them in series doubled the wait before the
-          // shell could render.
-          [nextRoles, adminFlags, nextIsActive] = await Promise.all([
-            fetchRoles(nextSession.user.id),
-            fetchAdminFlags(nextSession.user.id, nextSession.user.email),
-            fetchIsActive(nextSession.user.id),
-          ]);
-        }
+        [nextRoles, adminFlags, nextIsActive] = await Promise.all([
+          fetchRoles(userId),
+          fetchAdminFlags(userId),
+          fetchIsActive(userId),
+        ]);
       } catch (err) {
-        // Never leave the app stuck on the loading spinner if permission
-        // lookups fail: fall through with empty permissions instead.
         console.error("Failed to resolve session permissions", err);
-        nextRoles = [];
-        adminFlags = { isAdmin: false, isSuperadmin: false };
-        nextIsActive = true;
+        if (cached) {
+          nextRoles = cached.roles;
+          adminFlags = { isAdmin: cached.isAdmin, isSuperadmin: cached.isSuperadmin };
+          nextIsActive = cached.isActive;
+        }
       }
 
       if (!alive || seq !== loadSeq.current) return;
 
-      // A deactivated store account is already blocked by RLS, but signing it
-      // out here gives an explicit, immediate signal instead of a shell that
-      // silently fails every query. Platform superadmins are exempt because
-      // they live in the separate platform_admins system.
-      if (nextSession?.user && !nextIsActive && !adminFlags.isAdmin) {
+      if (!nextIsActive && !adminFlags.isAdmin) {
+        clearCachedAuth();
         setSession(null);
         setRoles([]);
         setIsPlatformAdmin(false);
         setIsPlatformSuperadmin(false);
         setIsActive(false);
         setLoading(false);
+        setIsRefreshingPermissions(false);
         void supabase.auth.signOut();
         return;
       }
+
+      writeCachedAuth({
+        userId,
+        roles: nextRoles,
+        isAdmin: adminFlags.isAdmin,
+        isSuperadmin: adminFlags.isSuperadmin,
+        isActive: nextIsActive,
+        cachedAt: Date.now(),
+      });
 
       setSession(nextSession);
       setRoles(nextRoles);
@@ -82,20 +153,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsPlatformSuperadmin(adminFlags.isSuperadmin);
       setIsActive(nextIsActive);
       setLoading(false);
+      setIsRefreshingPermissions(false);
     }
 
-    // 1) set up listener FIRST (avoid missed events)
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
-      // Defer so we never call back into Supabase from inside its own auth
-      // callback (that deadlocks), while still resolving permissions before
-      // the protected shell is allowed to render.
-      setTimeout(() => void applySession(s), 0);
+    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
+      setTimeout(() => void applySession(s, event === "INITIAL_SESSION"), 0);
     });
 
-    // 2) get current session
     supabase.auth
       .getSession()
-      .then(({ data }) => applySession(data.session))
+      .then(({ data }) => applySession(data.session, true))
       .catch(() => {
         if (!alive) return;
         setSession(null);
@@ -120,9 +187,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return (data ?? []).map((r: { role: Role }) => r.role);
   }
 
-  // A disabled account (profiles.is_active = false) is blocked at the RLS layer
-  // (see migration 20260918000200). This client check is defence-in-depth so the
-  // shell does not render for a disabled user even before any query fails.
   async function fetchIsActive(userId: string): Promise<boolean> {
     try {
       const { data, error } = await supabase
@@ -133,22 +197,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error || !data) return true;
       return (data as { is_active?: boolean }).is_active !== false;
     } catch {
-      // Never lock a user out because of a transient read failure.
       return true;
     }
   }
 
   async function fetchAdminFlags(
     userId: string,
-    _email?: string,
-    _userRoles: Role[] = [],
   ): Promise<{ isAdmin: boolean; isSuperadmin: boolean }> {
-    // Platform-admin status comes ONLY from the platform_admins table, which is
-    // populated by the SQL migrations / an explicit administrator action.
-    // NOTE: this used to auto-escalate any account whose email or profile name
-    // contained "mousa"/"موسى" and write to platform_admins during login. That
-    // was both a privilege-escalation hole and a source of render-time races,
-    // so it has been removed.
     try {
       const { data, error } = await (supabase as any)
         .from("platform_admins")
@@ -176,8 +231,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isPlatformSuperadmin,
     isActive,
     loading,
+    isRefreshingPermissions,
     hasRole: (r) => roles.includes(r),
     signOut: async () => {
+      clearCachedAuth();
       await supabase.auth.signOut();
     },
   };

@@ -237,33 +237,84 @@ function POSPage() {
     if (warehouseId) void loadStock(warehouseId);
   }, [warehouseId]);
 
+  // Granular Realtime sync: updates specific state without triggering full-page reload or re-fetching 11 tables
   useEffect(() => {
-    const channel = supabase.channel("pos-live-meta");
-    const tables = [
-      "categories",
-      "brands",
-      "units",
-      "products",
-      "warehouses",
-      "customers",
-      "countries_of_origin",
-      "quality_grades",
-      "vehicle_makes",
-      "vehicle_models",
-      "product_compatibilities",
-    ] as const;
+    const channel = supabase.channel("pos-live-meta-optimized");
 
-    tables.forEach((table) => {
-      channel.on("postgres_changes", { event: "*", schema: "public", table }, () => {
-        void loadAll();
-      });
-    });
+    // Granular updates for products without re-running loadAll
+    channel.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "products" },
+      (payload) => {
+        if (payload.eventType === "UPDATE") {
+          const updated = payload.new as any;
+          setProducts((prev) =>
+            prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p))
+          );
+        } else if (payload.eventType === "INSERT") {
+          const inserted = payload.new as any;
+          setProducts((prev) => [inserted, ...prev]);
+        } else if (payload.eventType === "DELETE") {
+          const deleted = payload.old as any;
+          setProducts((prev) => prev.filter((p) => p.id !== deleted.id));
+        }
+      }
+    );
+
+    // Granular updates for customers
+    channel.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "customers" },
+      (payload) => {
+        if (payload.eventType === "UPDATE") {
+          const updated = payload.new as any;
+          setCustomers((prev) =>
+            prev.map((c) => (c.id === updated.id ? { ...c, ...updated } : c))
+          );
+        } else if (payload.eventType === "INSERT") {
+          setCustomers((prev) => [payload.new as any, ...prev]);
+        } else if (payload.eventType === "DELETE") {
+          setCustomers((prev) => prev.filter((c) => c.id !== (payload.old as any).id));
+        }
+      }
+    );
+
+    // Granular updates for warehouses
+    channel.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "warehouses" },
+      (payload) => {
+        if (payload.eventType === "UPDATE") {
+          const updated = payload.new as any;
+          setWarehouses((prev) =>
+            prev.map((w) => (w.id === updated.id ? { ...w, ...updated } : w))
+          );
+        } else if (payload.eventType === "INSERT") {
+          setWarehouses((prev) => [...prev, payload.new as any]);
+        }
+      }
+    );
+
+    // Granular updates for stock levels (inventory)
+    channel.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "inventory_balances" },
+      (payload) => {
+        const row = (payload.new || payload.old) as any;
+        if (row && row.product_id && (!warehouseId || row.warehouse_id === warehouseId)) {
+          setStockMap((prev) => ({
+            ...prev,
+            [row.product_id]: Number(row.balance ?? row.available_quantity ?? 0),
+          }));
+        }
+      }
+    );
 
     channel.subscribe();
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, []);
+  }, [warehouseId]);
 
   async function loadAll() {
     try {

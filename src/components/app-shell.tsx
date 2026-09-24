@@ -964,12 +964,24 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="flex-1 min-h-0 overflow-y-auto">
-          <div className="mx-auto w-full max-w-[1400px] p-4 sm:p-6">
-            {children}
-          </div>
-
-          <InamaSoftFooter />
+        <main
+          className={cn(
+            "flex-1 min-h-0",
+            isPosRoute
+              ? "overflow-hidden flex flex-col"
+              : "overflow-y-auto custom-scrollbar stable-scrollbar"
+          )}
+        >
+          {isPosRoute ? (
+            <div className="flex-1 min-h-0 flex flex-col">{children}</div>
+          ) : (
+            <>
+              <div className="mx-auto w-full max-w-[1400px] p-4 sm:p-6">
+                {children}
+              </div>
+              <InamaSoftFooter />
+            </>
+          )}
         </main>
       </div>
 
