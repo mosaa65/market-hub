@@ -743,6 +743,16 @@ export function AppShell({
 
   const navigate = useNavigate();
 
+  const pathname = useRouterState({
+    select: (s) => s.location.pathname,
+  });
+
+  const isPosRoute =
+    pathname === "/pos" ||
+    pathname.startsWith("/pos/") ||
+    pathname === "/purchase-pos" ||
+    pathname.startsWith("/purchase-pos/");
+
   const [paletteOpen, setPaletteOpen] =
     useState(false);
 
