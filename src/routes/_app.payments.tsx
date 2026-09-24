@@ -189,12 +189,11 @@ function PaymentsPage() {
     }
   }
 
-  /** الانتقال المباشر إلى مستند الكشف النهائي — بلا منطق حسابي محلي */
+  /** الانتقال إلى شاشة كشف الحساب — بلا منطق حسابي محلي */
   function goStatement(customerId: string) {
     void navigate({
-      to: "/statements/$entityType/$entityId",
-      params: { entityType: "customer", entityId: customerId },
-      search: { template: "customer" } as never,
+      to: "/account-statement",
+      search: { customerId } as never,
     });
   }
 

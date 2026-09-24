@@ -203,17 +203,13 @@ function CustomersPage() {
   );
 
   /**
-   * الانتقال المباشر إلى مستند الكشف النهائي.
+   * الانتقال إلى شاشة كشف الحساب مع تمرير العميل.
    * استبدل هذا الدالة `printCustomerStatement()` القديمة التي كانت تبني
    * قالب HTML ثالثًا داخل الصفحة بمجاميع ومنطق مختلف عن باقي الشاشات.
    */
   const goStatement = useCallback(
     (c: Customer) => {
-      void navigate({
-        to: "/statements/$entityType/$entityId",
-        params: { entityType: "customer", entityId: c.id },
-        search: { template: "customer" } as never,
-      });
+      void navigate({ to: "/account-statement", search: { customerId: c.id } as never });
     },
     [navigate],
   );

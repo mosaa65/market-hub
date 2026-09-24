@@ -187,12 +187,11 @@ function DebtsPage() {
       }
     : null;
 
-  /** ينتقل مباشرة إلى مستند الكشف النهائي — بلا قالب محلي مكرر */
+  /** ينتقل إلى شاشة كشف الحساب — بلا قالب محلي مكرر */
   function goStatement(customerIdToOpen: string) {
     void navigate({
-      to: "/statements/$entityType/$entityId",
-      params: { entityType: "customer", entityId: customerIdToOpen },
-      search: { template: "customer" } as never,
+      to: "/account-statement",
+      search: { customerId: customerIdToOpen } as never,
     });
   }
   return (
