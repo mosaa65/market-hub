@@ -9,6 +9,7 @@ import {
 
 export type { InvoiceLabels as Labels };
 export type InvoiceTemplate = InvoiceTemplateId;
+export { DEFAULT_BRANDING };
 
 export function printInvoice(
   doc: InvoiceDoc | UnifiedInvoiceData,
@@ -19,7 +20,7 @@ export function printInvoice(
   // Ensure default branding is present
   const fullDoc: UnifiedInvoiceData = {
     ...doc,
-    brandingText: doc.brandingText || DEFAULT_BRANDING,
+    brandingText: ("brandingText" in doc && doc.brandingText) ? doc.brandingText : DEFAULT_BRANDING,
   };
 
   const html = renderInvoiceHTML(template, fullDoc, labels, rtl);

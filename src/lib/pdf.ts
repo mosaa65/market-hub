@@ -40,6 +40,7 @@ export interface InvoiceDoc {
   paid?: number;
   company?: { name?: string; address?: string; phone?: string; vat?: string };
   currency?: string;
+  brandingText?: string;
 }
 
 export interface ReportColumn {
