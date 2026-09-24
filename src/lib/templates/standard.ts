@@ -1,10 +1,30 @@
-import { UnifiedInvoiceData, InvoiceLabels, escapeHtml, formatMoney, DEFAULT_BRANDING } from "./types";
+import { UnifiedDocumentData, InvoiceLabels, escapeHtml, formatMoney, DEFAULT_BRANDING, CustomFieldOptions } from "./types";
 
-export function renderStandardTemplate(doc: UnifiedInvoiceData, L: InvoiceLabels, rtl: boolean): string {
+export function renderStandardTemplate(
+  doc: UnifiedDocumentData,
+  L: InvoiceLabels,
+  rtl: boolean,
+  options?: CustomFieldOptions
+): string {
   const c = doc.currency ?? "";
   const esc = escapeHtml;
-  const money = (n: number) => formatMoney(n, c);
+  const money = (n?: number) => formatMoney(n, c);
   const branding = doc.brandingText || DEFAULT_BRANDING;
+  const opts = {
+    showLogo: true,
+    showCompanyInfo: true,
+    showCustomerInfo: true,
+    showDocNumberDate: true,
+    showMovementInfo: true,
+    showFinancialDetails: true,
+    showPaymentInfo: true,
+    showNotes: true,
+    showSignatures: true,
+    showFooter: true,
+    showBranding: true,
+    ...options,
+    ...doc.options,
+  };
 
   const rows = doc.lines
     .map(
@@ -12,7 +32,7 @@ export function renderStandardTemplate(doc: UnifiedInvoiceData, L: InvoiceLabels
     <tr>
       <td class="c">${i + 1}</td>
       <td>${esc(l.product)}</td>
-      <td class="e">${l.qty}</td>
+      <td class="e">${l.qty} ${l.unit ? esc(l.unit) : ""}</td>
       <td class="e">${money(l.price)}</td>
       <td class="e">${money(l.total)}</td>
     </tr>`,
@@ -51,27 +71,30 @@ export function renderStandardTemplate(doc: UnifiedInvoiceData, L: InvoiceLabels
   <div class="content">
     <header>
       <div class="co">
-        <h1>${esc(doc.company?.name ?? "")}</h1>
-        ${doc.company?.address ? `<div>${esc(doc.company.address)}</div>` : ""}
-        ${doc.company?.phone ? `<div>${esc(doc.company.phone)}</div>` : ""}
-        ${doc.company?.vat ? `<div>VAT: ${esc(doc.company.vat)}</div>` : ""}
+        ${opts.showCompanyInfo && doc.company?.name ? `<h1>${esc(doc.company.name)}</h1>` : "<h1>الفاتورة</h1>"}
+        ${opts.showCompanyInfo && doc.company?.address ? `<div>${esc(doc.company.address)}</div>` : ""}
+        ${opts.showCompanyInfo && doc.company?.phone ? `<div>${esc(doc.company.phone)}</div>` : ""}
+        ${opts.showCompanyInfo && doc.company?.vat ? `<div>VAT: ${esc(doc.company.vat)}</div>` : ""}
       </div>
       <div class="inv">
         <h2>${esc(doc.title)}</h2>
+        ${opts.showDocNumberDate ? `
         <div class="n">#${esc(doc.number)}</div>
         <div class="n">${esc(doc.date)}</div>
+        ` : ""}
       </div>
     </header>
     <div class="meta">
-      <div class="card"><div class="k">${L.billTo}</div><div class="v">${esc(doc.partyName)}</div></div>
-      <div class="card"><div class="k">${L.warehouse}</div><div class="v">${esc(doc.warehouse ?? "—")}</div></div>
-      <div class="card"><div class="k">${L.payment}</div><div class="v">${esc(doc.payment ?? "—")}</div></div>
+      ${opts.showCustomerInfo ? `<div class="card"><div class="k">${L.billTo}</div><div class="v">${esc(doc.partyName)}</div></div>` : ""}
+      ${opts.showMovementInfo ? `<div class="card"><div class="k">${L.warehouse}</div><div class="v">${esc(doc.warehouse ?? "—")}</div></div>` : ""}
+      ${opts.showPaymentInfo ? `<div class="card"><div class="k">${L.payment}</div><div class="v">${esc(doc.payment ?? "—")}</div></div>` : ""}
       <div class="card"><div class="k">${L.status}</div><div class="v">${esc(doc.status ?? "—")}</div></div>
     </div>
     <table>
       <thead><tr><th class="c">#</th><th>${L.product}</th><th class="e">${L.qty}</th><th class="e">${L.price}</th><th class="e">${L.total}</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
+    ${opts.showFinancialDetails ? `
     <div class="totals">
       <div class="r"><span>${L.subtotal}</span><span>${money(doc.subtotal)}</span></div>
       <div class="r"><span>${L.tax}</span><span>${money(doc.tax)}</span></div>
@@ -81,14 +104,17 @@ export function renderStandardTemplate(doc: UnifiedInvoiceData, L: InvoiceLabels
         doc.paid !== undefined
           ? `
       <div class="r"><span>${L.paid}</span><span>${money(doc.paid)}</span></div>
-      <div class="r"><span>${L.balance}</span><span>${money(doc.total - doc.paid)}</span></div>`
+      <div class="r"><span>${L.balance}</span><span>${money((doc.total ?? 0) - doc.paid)}</span></div>`
           : ""
       }
     </div>
+    ` : ""}
   </div>
+  ${opts.showFooter ? `
   <footer>
     <div>${L.thanks}</div>
-    <div class="branding">${esc(branding)}</div>
+    ${opts.showBranding ? `<div class="branding">${esc(branding)}</div>` : ""}
   </footer>
+  ` : ""}
 </div></body></html>`;
 }

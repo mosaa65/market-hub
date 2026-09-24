@@ -1,17 +1,37 @@
-import { UnifiedInvoiceData, InvoiceLabels, escapeHtml, formatMoney, DEFAULT_BRANDING } from "./types";
+import { UnifiedDocumentData, InvoiceLabels, escapeHtml, formatMoney, DEFAULT_BRANDING, CustomFieldOptions } from "./types";
 
-export function renderThermalTemplate(doc: UnifiedInvoiceData, L: InvoiceLabels, rtl: boolean): string {
+export function renderThermalTemplate(
+  doc: UnifiedDocumentData,
+  L: InvoiceLabels,
+  rtl: boolean,
+  options?: CustomFieldOptions
+): string {
   const c = doc.currency ?? "";
   const esc = escapeHtml;
-  const money = (n: number) => formatMoney(n, c);
+  const money = (n?: number) => formatMoney(n, c);
   const branding = doc.brandingText || DEFAULT_BRANDING;
+  const opts = {
+    showLogo: true,
+    showCompanyInfo: true,
+    showCustomerInfo: true,
+    showDocNumberDate: true,
+    showMovementInfo: true,
+    showFinancialDetails: true,
+    showPaymentInfo: true,
+    showNotes: true,
+    showSignatures: false,
+    showFooter: true,
+    showBranding: true,
+    ...options,
+    ...doc.options,
+  };
 
   const rows = doc.lines
     .map(
       (l) => `
     <div class="li">
       <div class="ln">${esc(l.product)}</div>
-      <div class="lr"><span>${l.qty} × ${money(l.price)}</span><span>${money(l.total)}</span></div>
+      <div class="lr"><span>${l.qty} ${l.unit ? esc(l.unit) : ""} × ${money(l.price)}</span><span>${money(l.total)}</span></div>
     </div>`,
     )
     .join("");
@@ -38,19 +58,22 @@ export function renderThermalTemplate(doc: UnifiedInvoiceData, L: InvoiceLabels,
 </style></head><body onload="window.print()">
 <div class="r">
   <div class="c">
-    <h1>${esc(doc.company?.name ?? "")}</h1>
-    ${doc.company?.address ? `<div class="muted">${esc(doc.company.address)}</div>` : ""}
-    ${doc.company?.phone ? `<div class="muted">${esc(doc.company.phone)}</div>` : ""}
-    ${doc.company?.vat ? `<div class="muted">VAT: ${esc(doc.company.vat)}</div>` : ""}
+    ${opts.showCompanyInfo && doc.company?.name ? `<h1>${esc(doc.company.name)}</h1>` : ""}
+    ${opts.showCompanyInfo && doc.company?.address ? `<div class="muted">${esc(doc.company.address)}</div>` : ""}
+    ${opts.showCompanyInfo && doc.company?.phone ? `<div class="muted">${esc(doc.company.phone)}</div>` : ""}
+    ${opts.showCompanyInfo && doc.company?.vat ? `<div class="muted">VAT: ${esc(doc.company.vat)}</div>` : ""}
   </div>
   <div class="hr"></div>
-  <div class="row"><span>${L.invoice}</span><b>${esc(doc.number)}</b></div>
+  ${opts.showDocNumberDate ? `
+  <div class="row"><span>${L.invoice}</span><b>#${esc(doc.number)}</b></div>
   <div class="row"><span>${L.date}</span><span>${esc(doc.date)}</span></div>
-  <div class="row"><span>${L.billTo}</span><span>${esc(doc.partyName)}</span></div>
-  ${doc.payment ? `<div class="row"><span>${L.payment}</span><span>${esc(doc.payment)}</span></div>` : ""}
+  ` : ""}
+  ${opts.showCustomerInfo && doc.partyName ? `<div class="row"><span>${L.billTo}</span><span>${esc(doc.partyName)}</span></div>` : ""}
+  ${opts.showPaymentInfo && doc.payment ? `<div class="row"><span>${L.payment}</span><span>${esc(doc.payment)}</span></div>` : ""}
   <div class="hr"></div>
   ${rows}
   <div class="hr"></div>
+  ${opts.showFinancialDetails ? `
   <div class="tot"><span>${L.subtotal}</span><span>${money(doc.subtotal)}</span></div>
   <div class="tot"><span>${L.tax}</span><span>${money(doc.tax)}</span></div>
   <div class="tot"><span>${L.discount}</span><span>${money(doc.discount)}</span></div>
@@ -60,11 +83,12 @@ export function renderThermalTemplate(doc: UnifiedInvoiceData, L: InvoiceLabels,
     doc.paid !== undefined
       ? `
   <div class="tot"><span>${L.paid}</span><span>${money(doc.paid)}</span></div>
-  <div class="tot"><span>${L.balance}</span><span>${money(doc.total - doc.paid)}</span></div>`
+  <div class="tot"><span>${L.balance}</span><span>${money((doc.total ?? 0) - doc.paid)}</span></div>`
       : ""
   }
   <div class="hr"></div>
-  <div class="foot">${L.thanks}</div>
-  <div class="branding">${esc(branding)}</div>
+  ` : ""}
+  ${opts.showFooter ? `<div class="foot">${L.thanks}</div>` : ""}
+  ${opts.showBranding ? `<div class="branding">${esc(branding)}</div>` : ""}
 </div></body></html>`;
 }
