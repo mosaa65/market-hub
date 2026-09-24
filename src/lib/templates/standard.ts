@@ -6,6 +6,7 @@ import {
   DEFAULT_BRANDING,
   CustomFieldOptions,
 } from "./types";
+import { numberToArabicWords } from "./tafqeet";
 
 export function renderStandardTemplate(
   doc: UnifiedDocumentData,
@@ -358,6 +359,20 @@ export function renderStandardTemplate(
       height: 100%;
     }
 
+    .tafqeet-banner {
+      background: #eff6ff;
+      border: 1px solid #dbeafe;
+      border-radius: 8px;
+      padding: 8px 12px;
+      margin-bottom: 10px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--blue-primary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
     .notes-header-title {
       font-size: 11px;
       font-weight: 800;
@@ -646,8 +661,14 @@ export function renderStandardTemplate(
 
     <!-- Bottom Section: Notes & Totals -->
     <div class="bottom-grid">
-      <!-- Notes Box -->
+      <!-- Notes Box & Tafqeet -->
       <div class="notes-card">
+        ${opts.showFinancialDetails ? `
+        <div class="tafqeet-banner">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3"/><path d="M4 17v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/><rect width="20" height="10" x="2" y="7" rx="2"/><circle cx="12" cy="12" r="2"/></svg>
+          <span><b>${rtl ? "المبلغ كتابةً" : "Amount in words"}:</b> ${esc(numberToArabicWords(doc.total ?? 0, doc.currency))}</span>
+        </div>` : ""}
+
         ${opts.showNotes && doc.notes ? `
         <div class="notes-header-title">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
