@@ -41,7 +41,7 @@ const SAMPLE_CUSTOMER_INVOICE: UnifiedDocumentData = {
     phone: "01-234567 / 772217218",
     vat: "100987654",
   },
-  brandingText: "Powered by Inama Soft - 772217218",
+  brandingText: "العمل بواسطة إنما سوفت - 772217218",
 };
 
 const SAMPLE_INVENTORY_DOC: UnifiedDocumentData = {
@@ -63,7 +63,7 @@ const SAMPLE_INVENTORY_DOC: UnifiedDocumentData = {
     name: "مؤسسة فورتكس للتجارة والمحركات",
     address: "صنعاء - شارع الستين",
   },
-  brandingText: "Powered by Inama Soft - 772217218",
+  brandingText: "العمل بواسطة إنما سوفت - 772217218",
 };
 
 interface PrintPreviewModalProps {

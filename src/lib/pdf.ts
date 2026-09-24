@@ -96,7 +96,7 @@ export { DEFAULT_BRANDING };
 
 export function getDefaultArabicLabels(): Labels {
   return {
-    invoice: "فاتورة",
+    invoice: "فاتورة مبيعات",
     date: "التاريخ",
     billTo: "العميل",
     warehouse: "المستودع",

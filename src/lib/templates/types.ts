@@ -159,7 +159,7 @@ export interface PrintJobItem {
   templateId?: InvoiceTemplateId;
 }
 
-export const DEFAULT_BRANDING = "مشغل بواسطة إنما سوفت للحلول البرمجية - 772217218";
+export const DEFAULT_BRANDING = "العمل بواسطة إنما سوفت - 772217218";
 
 export function escapeHtml(s: unknown): string {
   return String(s ?? "")
