@@ -7,6 +7,7 @@ import {
   DocumentType,
   PrintJobItem,
   CustomFieldOptions,
+  DEFAULT_BRANDING,
 } from "./types";
 import { renderThermalTemplate } from "./thermal";
 import { renderStandardTemplate } from "./standard";
@@ -141,7 +142,7 @@ export function renderDocumentHTML(
     paid: rtl ? "المدفوع" : "Paid",
     balance: rtl ? "المتبقي" : "Balance",
     thanks: rtl ? "شكرًا لتعاملكم معنا" : "Thank you for your business",
-    poweredBy: doc.brandingText || "Powered by Inama Soft - 772217218",
+    poweredBy: doc.brandingText || DEFAULT_BRANDING,
     ...labels,
   };
 
