@@ -4,6 +4,8 @@ import {
   escapeHtml,
   formatMoney,
   DEFAULT_BRANDING,
+  DEFAULT_COMPANY_LOGO,
+  getCompanyLogo,
   CustomFieldOptions,
 } from "./types";
 import { numberToArabicWords } from "./tafqeet";
@@ -18,6 +20,7 @@ export function renderElegantTemplate(
   const esc = escapeHtml;
   const money = (n?: number) => formatMoney(n ?? 0, c);
   const branding = doc.brandingText || DEFAULT_BRANDING;
+  const logoUrl = getCompanyLogo(doc);
 
   const opts = {
     showLogo: true,
@@ -157,16 +160,24 @@ export function renderElegantTemplate(
       gap: 12px;
     }
 
-    .logo-badge {
+    .logo-container {
       width: 48px;
       height: 48px;
-      border-radius: 50%;
-      background: var(--gold-gradient);
+      border-radius: 10px;
+      background: var(--gold-light);
+      border: 1px solid var(--gold-border);
       display: flex;
       align-items: center;
       justify-content: center;
-      color: #fff;
-      box-shadow: 0 3px 8px rgba(168, 122, 34, 0.25);
+      overflow: hidden;
+      padding: 3px;
+      box-shadow: 0 2px 6px rgba(168, 122, 34, 0.2);
+    }
+    .company-logo-img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      border-radius: 6px;
     }
 
     .company-title-group h1 {
@@ -559,10 +570,13 @@ export function renderElegantTemplate(
     <header>
       <div class="brand-section">
         ${opts.showLogo ? `
-        <div class="logo-badge">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-          </svg>
+        <div class="logo-container">
+          <img
+            src="${esc(logoUrl)}"
+            alt="Company Logo"
+            class="company-logo-img"
+            onerror="this.onerror=null; this.src='${DEFAULT_COMPANY_LOGO}';"
+          />
         </div>` : ""}
         <div class="company-title-group">
           <h1>${esc(companyName)}</h1>

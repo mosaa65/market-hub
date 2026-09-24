@@ -4,6 +4,8 @@ import {
   escapeHtml,
   formatMoney,
   DEFAULT_BRANDING,
+  DEFAULT_COMPANY_LOGO,
+  getCompanyLogo,
   CustomFieldOptions,
 } from "./types";
 import { numberToArabicWords } from "./tafqeet";
@@ -18,6 +20,7 @@ export function renderStandardTemplate(
   const esc = escapeHtml;
   const money = (n?: number) => formatMoney(n ?? 0, c);
   const branding = doc.brandingText || DEFAULT_BRANDING;
+  const logoUrl = getCompanyLogo(doc);
 
   const opts = {
     showLogo: true,
@@ -137,16 +140,24 @@ export function renderStandardTemplate(
       gap: 12px;
     }
 
-    .logo-badge {
-      width: 46px;
-      height: 46px;
-      border-radius: 12px;
-      background: linear-gradient(135deg, var(--blue-dark), var(--blue-primary));
+    .logo-container {
+      width: 48px;
+      height: 48px;
+      border-radius: 10px;
+      background: var(--blue-light);
+      border: 1px solid #dbeafe;
       display: flex;
       align-items: center;
       justify-content: center;
-      color: #fff;
-      box-shadow: 0 4px 10px rgba(29, 78, 216, 0.25);
+      overflow: hidden;
+      padding: 3px;
+      box-shadow: 0 2px 6px rgba(29, 78, 216, 0.2);
+    }
+    .company-logo-img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      border-radius: 6px;
     }
 
     .company-title-group h1 {
@@ -541,13 +552,13 @@ export function renderStandardTemplate(
     <header>
       <div class="brand-section">
         ${opts.showLogo ? `
-        <div class="logo-badge">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/>
-            <circle cx="7" cy="17" r="2"/>
-            <path d="M9 17h6"/>
-            <circle cx="17" cy="17" r="2"/>
-          </svg>
+        <div class="logo-container">
+          <img
+            src="${esc(logoUrl)}"
+            alt="Company Logo"
+            class="company-logo-img"
+            onerror="this.onerror=null; this.src='${DEFAULT_COMPANY_LOGO}';"
+          />
         </div>` : ""}
         <div class="company-title-group">
           <h1>${esc(companyName)}</h1>
