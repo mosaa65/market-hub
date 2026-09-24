@@ -1,4 +1,5 @@
 import { SubscriptionSettingsCard } from "@/components/subscription-settings-card";
+import { PrintSettingsCard } from "@/components/print-settings-card";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/page-header";
@@ -421,6 +422,9 @@ function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Dedicated Printing & Document Architecture Settings */}
+        <PrintSettingsCard canEdit={canEdit} />
 
         {/* Appearance & Language */}
         <Card className="lg:col-span-2">
