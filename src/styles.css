@@ -266,6 +266,45 @@
   }
 }
 
+/* ============================================================
+ * Barcode label preview (screen only)
+ * Keeps the printable label sheet inside its viewport container
+ * without affecting the standalone print window (which rebuilds
+ * its own markup from the DOM via outerHTML).
+ * The printed sheet geometry (A4 / label sizes / inline styles)
+ * is intentionally left untouched.
+ * ========================================================== */
+.barcode-preview-scroll {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media screen {
+  .barcode-preview-scroll .sheet {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  /* `minmax(0, 1fr)` stops the fixed-width JsBarcode SVG from
+   * forcing each label column (and the whole page) wider than
+   * the viewport. Print output keeps the original `1fr` inline
+   * grid definition, so label geometry is unchanged. */
+  .barcode-preview-sheet {
+    grid-template-columns: repeat(var(--barcode-cols, 4), minmax(0, 1fr)) !important;
+  }
+
+  .barcode-preview-sheet > .lbl {
+    min-width: 0;
+  }
+
+  .barcode-preview-sheet > .lbl > svg {
+    max-width: 100%;
+    height: auto;
+  }
+}
+
 @keyframes shimmer {
   0% {
     background-position: -200% 0;

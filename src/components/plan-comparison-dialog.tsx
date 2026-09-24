@@ -89,7 +89,7 @@ const COMPARISON_FEATURES: FeatureRow[] = [
   {
     name: { ar: "نقطة البيع السريعة (POS)", en: "High-Speed Point of Sale (POS)" },
     category: "ops",
-    starter: false,
+    starter: true,
     professional: true,
     enterprise: true,
   },

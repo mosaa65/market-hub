@@ -1,5 +1,5 @@
 import { ModuleGuard, useModules } from "@/lib/modules";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Search,
@@ -34,6 +34,7 @@ import { money } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
 import { toast } from "sonner";
 import { BarcodeScanner } from "@/components/barcode-scanner";
+import { useKeyboardWedge } from "@/hooks/use-keyboard-wedge";
 import { useCatalogModules } from "@/lib/catalog-modules";
 import { printInvoice, type InvoiceTemplate } from "@/lib/invoice-print";
 import type { InvoiceDoc } from "@/lib/pdf";
@@ -106,6 +107,7 @@ function POSPage() {
   const { isModuleEnabled } = useModules();
   const { t, lang } = useI18n();
   const { config: catalogConfig } = useCatalogModules();
+  const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
   const [stockMap, setStockMap] = useState<Record<string, number>>({});
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -564,15 +566,15 @@ function POSPage() {
     handleCode(q);
   }
 
-  function handleCode(code: string) {
+  function handleCode(code: string): boolean {
     const q = code.trim();
-    if (!q) return;
+    if (!q) return false;
     const exact = products.find((p) => p.barcode === q || p.sku === q);
     if (exact) {
       addToCart(exact);
       confirmScan();
       setSearch("");
-      return;
+      return true;
     }
     const partial = products.filter(
       (p) =>
@@ -585,9 +587,30 @@ function POSPage() {
       addToCart(partial[0]);
       confirmScan();
       setSearch("");
-      return;
+      return true;
     }
-    toast.error(lang === "ar" ? `لم يُعثر على منتج مطابق للرمز: ${q}` : `No product for: ${q}`);
+    // No matching product: keep the raw scanned code and offer a clear next step.
+    // Nothing is created automatically; the user chooses to open the product form.
+    const isAr = lang === "ar";
+    toast.error(isAr ? `لا يوجد منتج مطابق للباركود: ${q}` : `No product for barcode: ${q}`, {
+      duration: 8000,
+      action: {
+        label: isAr ? "إنشاء منتج بهذا الباركود" : "Create product with this barcode",
+        onClick: () => navigate({ to: "/products", search: { barcode: q } as any }),
+      },
+    });
+    return false;
+  }
+
+  // Wedge scans go through handleCode, then report a brief "received" feedback.
+  function handleWedgeCode(code: string) {
+    const matched = handleCode(code);
+    if (matched) {
+      navigator.vibrate?.(35);
+      toast.success(lang === "ar" ? "تم استقبال الباركود" : "Barcode received", {
+        duration: 1500,
+      });
+    }
   }
 
   function confirmScan() {
@@ -595,6 +618,12 @@ function POSPage() {
   }
 
   scanHandlerRef.current = handleCode;
+
+  // Global USB/Bluetooth keyboard-wedge support: a scanner connected to a
+  // desktop/laptop can type a barcode even when no field is focused. It is
+  // routed through the same `handleCode` used by the search field and camera,
+  // and is disabled while the camera dialog is open to avoid double reads.
+  useKeyboardWedge({ onScan: handleWedgeCode, disabled: scannerOpen });
 
   function formatWithCommas(val: number | string): string {
     const n = typeof val === "number" ? val : Number(val);
@@ -995,7 +1024,26 @@ function POSPage() {
             )}
           </div>
 
-          {/* Comprehensive Elegant Catalog Filter Form */}
+          {/* Scan mode indicator — honest about what is actually known.
+              Never claims a scanner is "connected". */}
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border/70 bg-surface-2/50 px-3 py-2 text-[11px] text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <ScanBarcode className="h-3.5 w-3.5 text-primary" />
+              <span className="hidden md:inline">{t("scan.ready")}</span>
+              <span className="md:hidden">{t("scan.use_device_camera")}</span>
+            </span>
+            {isModuleEnabled("barcode") && (
+              <button
+                type="button"
+                onClick={() => setScannerOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-full border-primary/30 bg-primary/10 px-2.5 py-1 font-medium text-primary transition hover:bg-primary/20"
+              >
+                <ScanBarcode className="h-3 w-3" />
+                <span>{t("scan.use_camera")}</span>
+              </button>
+            )}
+          </div>
+
           {filterOpen && (
             <div className="mb-4 rounded-3xl border border-border/80 bg-surface/95 p-4 shadow-lg backdrop-blur-md transition-all duration-200">
               <div className="mb-3 flex items-center justify-between gap-2 border-b border-border/60 pb-2.5">

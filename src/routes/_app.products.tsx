@@ -7,6 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { useCatalogModules } from "@/lib/catalog-modules";
 import { CatalogModulesDialog } from "@/components/catalog-modules-dialog";
+import { BarcodeScanner } from "@/components/barcode-scanner";
+import { useKeyboardWedge } from "@/hooks/use-keyboard-wedge";
 import {
   Plus,
   Package,
@@ -20,12 +22,17 @@ import {
   Globe,
   Award,
   ExternalLink,
+  Camera,
+  ScanBarcode,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/_app/products")({
   head: () => ({ meta: [{ title: "المنتجات — فورتيكس ERP" }] }),
+  validateSearch: (search: Record<string, unknown>) => ({
+    barcode: typeof search.barcode === "string" ? search.barcode : undefined,
+  }),
   component: ProductsPage,
 });
 
@@ -73,9 +80,11 @@ function ProductsPage() {
     hasRole("manager") ||
     hasRole("accountant");
   const qc = useQueryClient();
+  const searchParams = Route.useSearch();
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<ProductRow | null>(null);
   const [open, setOpen] = useState(false);
+  const [prefillBarcode, setPrefillBarcode] = useState<string | undefined>(undefined);
   const [modulesDialogOpen, setModulesDialogOpen] = useState(false);
 
   const { data: products, isLoading } = useQuery({
@@ -147,6 +156,17 @@ function ProductsPage() {
       [p.name, p.name_ar, p.sku, p.barcode].some((x) => (x ?? "").toLowerCase().includes(q)),
     );
   }, [products, query]);
+
+  // Open the create-product dialog pre-filled with a scanned barcode
+  // (e.g. from the POS "create product with this barcode" action).
+  // No product record is created here — the user still reviews and saves.
+  useEffect(() => {
+    if (searchParams.barcode) {
+      setEditing(null);
+      setPrefillBarcode(searchParams.barcode);
+      setOpen(true);
+    }
+  }, [searchParams.barcode]);
 
   const remove = useMutation({
     mutationFn: async (id: string) => {
@@ -243,6 +263,7 @@ function ProductsPage() {
                 return;
               }
               setEditing(null);
+              setPrefillBarcode(undefined);
               setOpen(true);
             }}
             className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm shadow-primary/20 hover:opacity-90 transition active:scale-95"
@@ -436,6 +457,7 @@ function ProductsPage() {
                         <button
                           onClick={() => {
                             setEditing(p);
+                            setPrefillBarcode(undefined);
                             setOpen(true);
                           }}
                           className="grid h-8 w-8 place-items-center rounded-full border border-border bg-surface text-muted-foreground hover:bg-surface-2 hover:text-foreground transition active:scale-95"
@@ -473,6 +495,7 @@ function ProductsPage() {
       {open && (
         <ProductDialog
           initial={editing}
+          initialBarcode={prefillBarcode}
           canViewCost={canViewCost}
           meta={
             meta ?? {
@@ -485,9 +508,13 @@ function ProductsPage() {
               models: [],
             }
           }
-          onClose={() => setOpen(false)}
+          onClose={() => {
+            setOpen(false);
+            setPrefillBarcode(undefined);
+          }}
           onSaved={() => {
             setOpen(false);
+            setPrefillBarcode(undefined);
             qc.invalidateQueries({ queryKey: ["products"] });
             qc.invalidateQueries({ queryKey: ["products-meta"] });
           }}
@@ -502,12 +529,14 @@ function ProductsPage() {
 
 function ProductDialog({
   initial,
+  initialBarcode,
   canViewCost = true,
   meta,
   onClose,
   onSaved,
 }: {
   initial: ProductRow | null;
+  initialBarcode?: string;
   canViewCost?: boolean;
   meta: {
     categories: { id: string; name: string; name_ar: string | null }[];
@@ -524,11 +553,12 @@ function ProductDialog({
   const { t, lang } = useI18n();
   const { config } = useCatalogModules();
   const { isModuleEnabled } = useModules();
+  const [scannerOpen, setScannerOpen] = useState(false);
   const [form, setForm] = useState({
     name: initial?.name ?? "",
     name_ar: initial?.name_ar ?? "",
     sku: initial?.sku ?? "",
-    barcode: initial?.barcode ?? "",
+    barcode: initial?.barcode ?? initialBarcode ?? "",
     category_id: initial?.category_id ?? "",
     brand_id: initial?.brand_id ?? "",
     unit_id: initial?.unit_id ?? "",
@@ -543,6 +573,17 @@ function ProductDialog({
   });
   const [saving, setSaving] = useState(false);
   const [compatibleModels, setCompatibleModels] = useState<string[]>([]);
+
+  // USB/Bluetooth keyboard-wedge support: a scanner can fill the barcode field
+  // without the user focusing it first. Routed into the same form state used by
+  // manual entry and the camera, and disabled while the camera dialog is open.
+  useKeyboardWedge({
+    onScan: (code) => {
+      setForm((f) => ({ ...f, barcode: code }));
+      toast.success(lang === "ar" ? "تم استقبال الباركود" : "Barcode received", { duration: 1500 });
+    },
+    disabled: !isModuleEnabled("barcode") || scannerOpen,
+  });
 
   useEffect(() => {
     if (initial?.id && config.enableMakesAndModels) {
@@ -604,6 +645,21 @@ function ProductDialog({
     }
     setSaving(false);
     if (error) {
+      // products.barcode is UNIQUE in the database. Surface a clear, friendly
+      // message for a duplicate barcode instead of the raw PostgreSQL text.
+      const err = error as { code?: string; message?: string; details?: string };
+      const isDuplicate =
+        err.code === "23505" ||
+        /duplicate key/i.test(err.message ?? "") ||
+        /products_barcode_key/i.test(err.message ?? "");
+      if (isDuplicate) {
+        toast.error(
+          lang === "ar"
+            ? "هذا الباركود مستخدم بالفعل لمنتج آخر."
+            : "This barcode is already used by another product.",
+        );
+        return;
+      }
       toast.error(error.message);
       return;
     }
@@ -684,11 +740,31 @@ function ProductDialog({
           </Field>
           {isModuleEnabled("barcode") && (
             <Field label={t("products.barcode")}>
-              <input
-                value={form.barcode}
-                onChange={(e) => setForm({ ...form, barcode: e.target.value })}
-                className={inputCls}
-              />
+              <div className="flex items-center gap-2">
+                <input
+                  value={form.barcode}
+                  onChange={(e) => setForm({ ...form, barcode: e.target.value })}
+                  className={inputCls}
+                  dir="ltr"
+                  inputMode="numeric"
+                  autoComplete="off"
+                />
+                <button
+                  type="button"
+                  onClick={() => setScannerOpen(true)}
+                  title={lang === "ar" ? "تصوير/مسح الباركود بالكاميرا" : "Scan barcode with camera"}
+                  aria-label={lang === "ar" ? "تصوير/مسح الباركود بالكاميرا" : "Scan barcode with camera"}
+                  className="grid h-10 w-11 shrink-0 place-items-center rounded-2xl border-primary/30 bg-primary/10 text-primary transition hover:bg-primary/20 active:scale-95"
+                >
+                  <Camera className="h-4 w-4" />
+                </button>
+              </div>
+              {/* Honest scan hint: never claims a scanner is connected. */}
+              <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                <ScanBarcode className="h-3 w-3 text-primary" />
+                <span className="hidden md:inline">{t("scan.ready")}</span>
+                <span className="md:hidden">{t("scan.use_device_camera")}</span>
+              </div>
             </Field>
           )}
           <Field label={lang === "ar" ? "موقع الرف / المستودع" : "Shelf location"}>
@@ -863,6 +939,14 @@ function ProductDialog({
           </button>
         </div>
       </form>
+
+      {/* Camera barcode scanner — fills the barcode field with the raw value.
+          Works for any barcode; the product does not need to exist yet. */}
+      <BarcodeScanner
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onDetected={(code) => setForm((f) => ({ ...f, barcode: code }))}
+      />
     </div>
   );
 }

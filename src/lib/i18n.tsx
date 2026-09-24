@@ -254,6 +254,12 @@ const en: Dict = {
   "pos.remaining_debt": "Remaining debt",
   "pos.all_catalog_filters": "Catalog filters",
 
+  // Scanning (device-agnostic, honest labels)
+  "scan.ready": "Ready to receive barcode",
+  "scan.received": "Barcode received",
+  "scan.use_camera": "Use camera",
+  "scan.use_device_camera": "Use your device camera to scan the barcode",
+
   // Inventory
   "inventory.title": "Inventory",
   "inventory.subtitle": "Stock on hand, low-stock alerts and adjustments.",
@@ -808,6 +814,12 @@ const ar: Dict = {
   "pos.overpaid_warning": "المبلغ المدفوع أكبر من إجمالي الفاتورة",
   "pos.remaining_debt": "المتبقي كدين",
   "pos.all_catalog_filters": "تصفية الفهرس الشامل",
+
+  // المسح (بدون ادّعاء اتصال جهاز)
+  "scan.ready": "جاهز لاستقبال الباركود",
+  "scan.received": "تم استقبال الباركود",
+  "scan.use_camera": "استخدام الكاميرا",
+  "scan.use_device_camera": "استخدم كاميرا الجهاز لمسح الباركود",
 
   // المخزون
   "inventory.title": "المخزون",
