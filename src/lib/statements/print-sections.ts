@@ -87,24 +87,21 @@ function renderHeader(
   if (layout.header.customLine) lines.push(esc(layout.header.customLine));
 
   return `
-  <div class="rpt-head">
-    <div class="co">
+  <div class="rpt-head legacy-head">
+    <div class="legacy-brand">
       ${logoBlock}
-      <div>
-        <h1 class="co-name">${esc(company.name)}</h1>
-        ${
-          layout.header.showLegalName && company.legalName
-            ? `<div class="co-legal">${esc(company.legalName)}</div>`
-            : ""
-        }
-        ${lines.length ? `<div class="co-lines">${lines.join(" · ")}</div>` : ""}
-      </div>
+      <div class="legacy-brand-name">${esc(company.brand.name)}</div>
     </div>
-    <div class="rpt-title">
-      <h2>${esc(title)}</h2>
+    <div class="rpt-title legacy-title">
+      <h2>${esc(title || (ar ? "كشف حساب" : "Account Statement"))}</h2>
       <div class="sub">${esc(layout.subtitle)}</div>
       <div class="period">${esc(periodLabel)}</div>
-      <div class="stamp">${ar ? "تاريخ الإصدار" : "Issued"}: ${esc(fmtDate(generatedAt, lang))}</div>
+    </div>
+    <div class="legacy-branch">
+      <b>${ar ? "الفرع الرئيسي" : "Main Branch"}</b>
+      ${company.name ? `<span>${esc(company.name)}</span>` : ""}
+      ${layout.header.showPhone && company.phone ? `<span dir="ltr">${esc(company.phone)}</span>` : ""}
+      <small>${ar ? "تاريخ الإصدار" : "Issued"}: ${esc(fmtDate(generatedAt, lang))}</small>
     </div>
   </div>`;
 }
@@ -277,6 +274,119 @@ function cellText(
   }
 }
 
+function renderLegacyStatementTable(
+  result: StatementResult,
+  lang: "ar" | "en",
+  currencySymbol: string,
+  includeOpeningRow: boolean,
+): string {
+  const ar = lang === "ar";
+  const headers = ar
+    ? ["#", "البيان", "نوع المستند", "تاريخ المستند", "مدين", "دائن", "رصيد مدين", "رصيد دائن"]
+    : [
+        "#",
+        "Description",
+        "Document type",
+        "Document date",
+        "Debit",
+        "Credit",
+        "Debit balance",
+        "Credit balance",
+      ];
+  const header = headers.map((h, i) => `<th class="legacy-col-${i}">${esc(h)}</th>`).join("");
+  const rows: string[] = [];
+  let currentMonth = "";
+  let monthDebit = 0;
+  let monthCredit = 0;
+  let monthLastBalance = 0;
+  let index = 0;
+
+  const monthLabel = (key: string) => {
+    const [year, month] = key.split("-");
+    return ar ? `إجمالي ${year}/${Number(month)}` : `Total ${year}/${Number(month)}`;
+  };
+  const flushMonth = () => {
+    if (!currentMonth) return;
+    rows.push(`<tr class="month-total">
+      <td colspan="4">${esc(monthLabel(currentMonth))}</td>
+      <td>${fmtAmount(monthDebit)}</td>
+      <td>${fmtAmount(monthCredit)}</td>
+      <td>${monthLastBalance >= 0 ? fmtAmount(monthLastBalance) : "0.00"}</td>
+      <td>${monthLastBalance < 0 ? fmtAmount(Math.abs(monthLastBalance)) : "0.00"}</td>
+    </tr>`);
+    monthDebit = 0;
+    monthCredit = 0;
+  };
+  const addRow = (
+    description: string,
+    kind: string,
+    date: string,
+    debit: number,
+    credit: number,
+    balance: number,
+    rowClass = "",
+  ) => {
+    rows.push(`<tr class="${rowClass}">
+      <td>${rowClass ? "" : ++index}</td>
+      <td class="legacy-description">${esc(description)}</td>
+      <td>${esc(kind)}</td>
+      <td dir="ltr">${esc(date)}</td>
+      <td class="debit">${debit ? fmtAmount(debit) : "0.00"}</td>
+      <td class="credit">${credit ? fmtAmount(credit) : "0.00"}</td>
+      <td class="balance-debit">${balance >= 0 ? fmtAmount(balance) : "0.00"}</td>
+      <td class="balance-credit">${balance < 0 ? fmtAmount(Math.abs(balance)) : "0.00"}</td>
+    </tr>`);
+  };
+
+  if (includeOpeningRow) {
+    const openingDate = result.period.from ? fmtDate(`${result.period.from}T00:00:00Z`, lang) : "—";
+    addRow(
+      ar ? "رصيد أول المدة" : "Opening balance",
+      kindLabel("opening", result.entityType, lang),
+      openingDate,
+      0,
+      0,
+      result.openingBalance,
+      "opening",
+    );
+  }
+
+  for (const row of result.transactions) {
+    const month = row.occurredAt.slice(0, 7);
+    if (currentMonth && month !== currentMonth) flushMonth();
+    currentMonth = month;
+    monthDebit += row.debit;
+    monthCredit += row.credit;
+    monthLastBalance = row.runningBalance;
+    addRow(
+      row.description || kindLabel(row.kind, result.entityType, lang),
+      kindLabel(row.kind, result.entityType, lang),
+      fmtDate(row.occurredAt, lang),
+      row.debit,
+      row.credit,
+      row.runningBalance,
+    );
+  }
+  flushMonth();
+
+  if (!result.transactions.length) {
+    rows.push(
+      `<tr><td colspan="8" class="empty">${ar ? "لا توجد حركات خلال الفترة المحددة" : "No movements in the selected period"}</td></tr>`,
+    );
+  }
+
+  rows.push(`<tr class="grand-total">
+    <td colspan="4">${ar ? "الإجمالي النهائي" : "Grand total"}</td>
+    <td>${fmtAmount(result.totalDebit)}</td>
+    <td>${fmtAmount(result.totalCredit)}</td>
+    <td>${result.closingBalance >= 0 ? fmtAmount(result.closingBalance) : "0.00"}</td>
+    <td>${result.closingBalance < 0 ? fmtAmount(Math.abs(result.closingBalance)) : "0.00"}</td>
+  </tr>`);
+
+  return `<table class="legacy-statement-table"><thead><tr>${header}</tr></thead><tbody>${rows.join("")}</tbody></table>
+  <div class="legacy-currency">${ar ? "العملة" : "Currency"}: ${esc(currencySymbol)}</div>`;
+}
+
 function renderTransactionsTable(
   result: StatementResult,
   layout: StatementLayout,
@@ -355,6 +465,7 @@ export {
   renderHeader,
   renderEntityAndSummary,
   renderIntegrityWarning,
+  renderLegacyStatementTable,
   renderTransactionsTable,
   alignStyle,
 };

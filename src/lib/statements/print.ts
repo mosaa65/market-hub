@@ -14,6 +14,7 @@ import {
   renderEntityAndSummary,
   renderHeader,
   renderIntegrityWarning,
+  renderLegacyStatementTable,
   renderTransactionsTable,
 } from "./print-sections";
 import { statementPrintStyles } from "./print-styles";
@@ -177,7 +178,7 @@ export function buildStatementHtml(options: StatementPrintOptions): string {
 
   const body = isDebtsMode
     ? renderDebtsTable(debtsSummary as DebtsSummaryRow[], lang, currencySymbol)
-    : renderTransactionsTable(result, layout, lang, includeOpeningRow);
+    : renderLegacyStatementTable(result, lang, currencySymbol, includeOpeningRow);
 
   return `<!doctype html><html dir="${lang === "ar" ? "rtl" : "ltr"}" lang="${lang}">
 <head><meta charset="utf-8">
@@ -190,7 +191,6 @@ export function buildStatementHtml(options: StatementPrintOptions): string {
 <body onload="setTimeout(function(){window.print()},450)">
 <div class="page">
   ${renderHeader(layout, company, title, result.period.label, result.generatedAt, lang)}
-  ${isDebtsMode ? "" : renderEntityAndSummary(result, currencySymbol, lang)}
   ${isDebtsMode ? "" : renderIntegrityWarning(result, lang)}
   ${body}
   ${

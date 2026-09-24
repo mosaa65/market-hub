@@ -40,6 +40,35 @@ html, body { margin:0; padding:0; background:var(--bg); color:var(--ink);
   display:inline-block; margin-top:5px; }
 .rpt-title .stamp { font-size:9.5px; color:var(--muted); margin-top:4px; }
 
+/* ── Reference report layout ── */
+.legacy-head { min-height:78px; align-items:center; border-bottom:1px solid #777; padding:4px 0 8px; }
+.legacy-brand { display:flex; flex-direction:column; align-items:center; width:145px; color:#111; }
+.legacy-brand .co-logo, .legacy-brand .co-logo-fallback { width:58px; height:58px; border:0; border-radius:0; padding:0; }
+.legacy-brand-name { font-size:10px; font-weight:700; margin-top:3px; }
+.legacy-title { flex:1; text-align:center !important; min-width:0; }
+.legacy-title h2 { color:#404040; font-family:'Cairo','Segoe UI',Tahoma,sans-serif; font-size:23px; margin:0; }
+.legacy-title .sub { color:#555; font-size:10px; }
+.legacy-title .period { background:transparent; border:0; font-family:'Cairo','Segoe UI',Tahoma,sans-serif; font-size:10px; margin-top:2px; padding:0; }
+.legacy-branch { width:145px; display:flex; flex-direction:column; gap:2px; text-align:right; font-size:10px; color:#222; }
+.legacy-branch span, .legacy-branch small { color:#555; font-size:9px; }
+.legacy-statement-table { table-layout:fixed; margin-top:8px; border:1px solid #777; font-size:10px; }
+.legacy-statement-table th, .legacy-statement-table td { border:1px solid #aaa; padding:4px 5px; text-align:center; }
+.legacy-statement-table th { background:#f2f2f2; color:#111; font-size:10px; font-weight:700; }
+.legacy-statement-table .legacy-col-0 { width:4%; }
+.legacy-statement-table .legacy-col-1 { width:25%; text-align:right; }
+.legacy-statement-table .legacy-col-2 { width:13%; }
+.legacy-statement-table .legacy-col-3 { width:13%; }
+.legacy-statement-table .legacy-col-4, .legacy-statement-table .legacy-col-5,
+.legacy-statement-table .legacy-col-6, .legacy-statement-table .legacy-col-7 { width:11.25%; }
+.legacy-statement-table .legacy-description { text-align:right; }
+.legacy-statement-table td { color:#333; font-family:'Tahoma','Segoe UI',sans-serif; }
+.legacy-statement-table td.debit, .legacy-statement-table td.balance-debit { color:#233b76; }
+.legacy-statement-table td.credit, .legacy-statement-table td.balance-credit { color:#5c2130; }
+.legacy-statement-table tr.opening td { background:#fafafa; color:#333; }
+.legacy-statement-table tr.month-total td { background:#bdbd; color:#111; font-weight:700; border-top:2px solid #333; }
+.legacy-statement-table tr.grand-total td { background:#a9a9a9; color:#fff; font-weight:700; border-top:2px solid #222; }
+.legacy-currency { margin-top:4px; font-size:9px; color:#666; text-align:left; }
+
 /* ── Entity + Summary ── */
 .meta-grid { display:grid; grid-template-columns:1.05fr 1.35fr; gap:12px; margin:12px 0 10px; }
 .box { border:1px solid var(--line); border-radius:8px; overflow:hidden; background:#fff; }
