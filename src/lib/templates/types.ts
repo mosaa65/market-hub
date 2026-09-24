@@ -52,7 +52,7 @@ export interface CustomFieldOptions {
 }
 
 export interface UnifiedDocumentData {
-  docType: DocumentType;
+  docType?: DocumentType;
   title: string;
   number: string;
   relatedRef?: string; // رقم الفاتورة أو العملية المرتبطة

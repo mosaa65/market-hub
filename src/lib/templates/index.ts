@@ -156,6 +156,29 @@ export function renderDocumentHTML(
 }
 
 /**
+ * Backward compatible renderInvoiceHTML
+ */
+export function renderInvoiceHTML(
+  firstArg: InvoiceTemplateId | UnifiedDocumentData,
+  secondArg?: UnifiedDocumentData | InvoiceTemplateId,
+  labels?: Partial<InvoiceLabels>,
+  rtl = true,
+  options?: CustomFieldOptions,
+): string {
+  if (typeof firstArg === "string") {
+    // Legacy signature: renderInvoiceHTML(templateId, doc, labels, rtl)
+    const templateId = firstArg;
+    const doc = secondArg as UnifiedDocumentData;
+    return renderDocumentHTML(doc, templateId, labels, rtl, options);
+  } else {
+    // New signature: renderInvoiceHTML(doc, templateId, labels, rtl, options)
+    const doc = firstArg;
+    const templateId = secondArg as InvoiceTemplateId;
+    return renderDocumentHTML(doc, templateId, labels, rtl, options);
+  }
+}
+
+/**
  * Dispatch a single document print task via a hidden iframe
  */
 export function printDocument(
