@@ -159,7 +159,16 @@ export interface PrintJobItem {
   templateId?: InvoiceTemplateId;
 }
 
-export const DEFAULT_BRANDING = "مشغل بواسطة إنما سوفت للحلول البرمجية - 772217218";
+export const DEFAULT_BRANDING = "العمل بواسطة إنما سوفت - 772217218";
+export const DEFAULT_COMPANY_LOGO = "/inama-soft-logo.ico";
+
+export function getCompanyLogo(doc: UnifiedDocumentData): string {
+  const logo = doc.company?.logo || (doc.company as Record<string, any>)?.logo_url;
+  if (logo && typeof logo === "string" && logo.trim().length > 0) {
+    return logo.trim();
+  }
+  return DEFAULT_COMPANY_LOGO;
+}
 
 export function escapeHtml(s: unknown): string {
   return String(s ?? "")

@@ -21,6 +21,7 @@ export { renderThermalTemplate } from "./thermal";
 export { renderStandardTemplate } from "./standard";
 export { renderElegantTemplate } from "./elegant";
 export { renderInventoryThermalTemplate, renderInventoryStandardTemplate } from "./inventory";
+export { numberToArabicWords } from "./tafqeet";
 
 interface RegisteredTemplate {
   meta: PrintTemplateMeta;
