@@ -250,9 +250,9 @@ function BarcodesPage() {
         }
       />
 
-      <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
+      <div className="grid gap-4 lg:grid-cols-[360px_minmax(0,1fr)]">
         {/* Config panel */}
-        <div className="panel-elevated p-4 space-y-4">
+        <div className="panel-elevated p-4 space-y-4 min-w-0">
           {/* Search */}
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground rtl:left-auto rtl:right-3" />
@@ -394,7 +394,7 @@ function BarcodesPage() {
         </div>
 
         {/* Preview */}
-        <div className="panel-elevated p-4">
+        <div className="panel-elevated p-4 min-w-0">
           {!product ? (
             <div className="grid place-items-center py-24 text-center text-muted-foreground">
               <div className="grid h-16 w-16 place-items-center rounded-2xl bg-primary/10 text-primary mb-3">
@@ -417,14 +417,15 @@ function BarcodesPage() {
                 </span>
                 <span className="font-mono">{code}</span>
               </div>
-              <div className="rounded-xl border border-border bg-white p-3 overflow-x-auto">
+              <div className="barcode-preview-scroll rounded-xl border border-border bg-white p-3 overflow-x-auto">
                 <div
                   ref={previewRef}
-                  className="sheet"
+                  className="sheet barcode-preview-sheet"
                   style={{
                     display: "grid",
                     gridTemplateColumns: `repeat(${L.cols}, 1fr)`,
                     gap: "2mm",
+                    ["--barcode-cols" as any]: L.cols,
                   }}
                 >
                   {Array.from({ length: copies }).map((_, i) => (

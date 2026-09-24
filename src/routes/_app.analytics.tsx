@@ -16,6 +16,7 @@ import {
   ShoppingCart,
   Calendar,
   Activity,
+  AlertTriangle,
 } from "lucide-react";
 import {
   AreaChart,
@@ -61,15 +62,49 @@ const PALETTE = [
   "oklch(0.65 0.2 20)",
 ];
 
+// Theme-aware tooltip styling shared by every chart on this page.
+// Recharts paints each payload item with the series colour, so itemStyle is
+// explicit to stop tooltip text from inheriting a dark/ambiguous series colour.
+const TOOLTIP_STYLE = {
+  background: "var(--popover)",
+  color: "var(--popover-foreground)",
+  border: "1px solid var(--border)",
+  borderRadius: 12,
+  fontSize: 12,
+  boxShadow: "var(--shadow-elegant)",
+} as const;
+const TOOLTIP_ITEM_STYLE = { color: "var(--popover-foreground)" } as const;
+const TOOLTIP_LABEL_STYLE = { color: "var(--muted-foreground)", marginBottom: 4 } as const;
+
+// Axis/grid ink derives from theme tokens so light mode stays legible.
+const CHART_GRID_STROKE = "var(--border)";
+const CHART_AXIS_STROKE = "var(--muted-foreground)";
+const CHART_POLAR_GRID_STROKE = "var(--border)";
+
 function AnalyticsPage() {
   const { t, lang } = useI18n();
+  const isAr = lang === "ar";
   const [days, setDays] = useState(30);
 
-  const { data } = useQuery({
+  // Chart labels resolved once so Arabic/English stay in sync with the charts.
+  const chartLabels = useMemo(
+    () => ({
+      revenue: isAr ? "الإيرادات" : "Revenue",
+      expenses: isAr ? "المصروفات" : "Expenses",
+      profit: isAr ? "الأرباح" : "Profit",
+      orders: isAr ? "عدد الطلبات" : "Orders",
+      customers: isAr ? "عدد العملاء" : "Customers",
+      quantity: isAr ? "الكمية" : "Quantity",
+      day: isAr ? "اليوم" : "Day",
+    }),
+    [isAr],
+  );
+
+  const { data, isLoading, isError } = useQuery({
     queryKey: ["analytics", days],
     queryFn: async () => {
       const since = new Date(Date.now() - days * 86400_000).toISOString();
-      const [sales, items, products, inv, customers, expenses, purchases] = await Promise.all([
+      const [sales, items, products, inv, expenses, purchases] = await Promise.all([
         supabase
           .from("sales_invoices")
           .select("id,total,paid,payment_method,status,created_at,customer_id")
@@ -88,7 +123,6 @@ function AnalyticsPage() {
         supabase
           .from("inventory")
           .select("product_id,quantity,warehouse_id,warehouses(name,name_ar)"),
-        supabase.from("customers").select("id,name,balance,created_at"),
         supabase
           .from("expenses")
           .select("amount,created_at,category:expense_categories(name,name_ar)")
@@ -100,7 +134,6 @@ function AnalyticsPage() {
         items: items.data ?? [],
         products: products.data ?? [],
         inv: inv.data ?? [],
-        customers: customers.data ?? [],
         expenses: expenses.data ?? [],
         purchases: purchases.data ?? [],
       };
@@ -119,29 +152,31 @@ function AnalyticsPage() {
       { revenue: number; profit: number; orders: number; expenses: number; purchases: number }
     > = {};
     for (let i = days - 1; i >= 0; i--) {
-      const key = new Date(Date.now() - i * 86400_000).toISOString().slice(0, 10);
+      const key = localDayKey(new Date(Date.now() - i * 86400_000));
       daily[key] = { revenue: 0, profit: 0, orders: 0, expenses: 0, purchases: 0 };
     }
     sales.forEach((s) => {
-      const key = s.created_at.slice(0, 10);
+      const key = localDayKey(s.created_at);
       if (!daily[key]) return;
       daily[key].revenue += Number(s.total);
       daily[key].orders += 1;
     });
     items.forEach((it: any) => {
-      const key = it.sales_invoices?.created_at?.slice(0, 10);
+      const key = it.sales_invoices?.created_at
+        ? localDayKey(it.sales_invoices.created_at)
+        : null;
       if (!key || !daily[key]) return;
       const p = prodMap.get(it.product_id) as any;
       const cost = p ? Number(p.cost ?? 0) : 0;
       daily[key].profit += Number(it.total) - cost * Number(it.quantity);
     });
     data.expenses.forEach((e: any) => {
-      const key = e.created_at.slice(0, 10);
+      const key = localDayKey(e.created_at);
       if (!daily[key]) return;
       daily[key].expenses += Number(e.amount);
     });
     data.purchases.forEach((p: any) => {
-      const key = p.created_at.slice(0, 10);
+      const key = localDayKey(p.created_at);
       if (!daily[key]) return;
       daily[key].purchases += Number(p.total);
     });
@@ -153,7 +188,7 @@ function AnalyticsPage() {
       const p = prodMap.get(it.product_id) as any;
       const cat = p?.categories;
       const key = cat?.name ?? "—";
-      const label = lang === "ar" ? cat?.name_ar || cat?.name || "—" : cat?.name || "—";
+      const label = isAr ? cat?.name_ar || cat?.name || "—" : cat?.name || "—";
       const cur = catAgg.get(key) ?? { name: label, revenue: 0 };
       cur.revenue += Number(it.total);
       catAgg.set(key, cur);
@@ -166,7 +201,7 @@ function AnalyticsPage() {
       const p = prodMap.get(it.product_id) as any;
       const b = p?.brands;
       const key = b?.name ?? "—";
-      const label = lang === "ar" ? b?.name_ar || b?.name || "—" : b?.name || "—";
+      const label = isAr ? b?.name_ar || b?.name || "—" : b?.name || "—";
       const cur = brandAgg.get(key) ?? { name: label, qty: 0 };
       cur.qty += Number(it.quantity);
       brandAgg.set(key, cur);
@@ -191,16 +226,17 @@ function AnalyticsPage() {
       dowAgg[d] += Number(s.total);
       dowCount[d] += 1;
     });
-    const dowLabels =
-      lang === "ar"
-        ? ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"]
-        : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const dowLabels = isAr
+      ? ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"]
+      : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const weekday = dowAgg.map((v, i) => ({ day: dowLabels[i], revenue: v, orders: dowCount[i] }));
 
-    // Payment mix
+    // Payment mix — resolved through the existing pos.pm.* keys so raw enum values
+    // (cash / card / bank_transfer / credit) never reach the user.
     const paySplit: Record<string, number> = {};
     sales.forEach((s) => {
-      paySplit[s.payment_method] = (paySplit[s.payment_method] ?? 0) + Number(s.paid);
+      const label = paymentMethodLabel(s.payment_method, isAr);
+      paySplit[label] = (paySplit[label] ?? 0) + Number(s.paid);
     });
     const payment = Object.entries(paySplit).map(([name, value]) => ({ name, value }));
 
@@ -219,6 +255,7 @@ function AnalyticsPage() {
       .slice(0, 10);
 
     // Inventory value
+    // Total inventory at cost (cost × on-hand qty) — not a sale-value figure.
     let invValue = 0;
     (data.inv as any[]).forEach((r) => {
       const p = prodMap.get(r.product_id) as any;
@@ -229,7 +266,7 @@ function AnalyticsPage() {
     const whAgg = new Map<string, { name: string; qty: number }>();
     (data.inv as any[]).forEach((r) => {
       const w = r.warehouses;
-      const label = lang === "ar" ? w?.name_ar || w?.name || "—" : w?.name || "—";
+      const label = isAr ? w?.name_ar || w?.name || "—" : w?.name || "—";
       const cur = whAgg.get(label) ?? { name: label, qty: 0 };
       cur.qty += Number(r.quantity);
       whAgg.set(label, cur);
@@ -257,10 +294,10 @@ function AnalyticsPage() {
       else segments.occasional += 1;
     });
     const segData = [
-      { name: lang === "ar" ? "VIP" : "VIP", value: segments.vip },
-      { name: lang === "ar" ? "منتظمون" : "Regular", value: segments.regular },
-      { name: lang === "ar" ? "متقطعون" : "Occasional", value: segments.occasional },
-      { name: lang === "ar" ? "عابرون" : "Walk-in", value: segments.walkin },
+      { name: "VIP", value: segments.vip },
+      { name: isAr ? "منتظمون" : "Regular", value: segments.regular },
+      { name: isAr ? "متقطعون" : "Occasional", value: segments.occasional },
+      { name: isAr ? "عابرون" : "Walk-in", value: segments.walkin },
     ];
 
     // Totals
@@ -273,8 +310,7 @@ function AnalyticsPage() {
     // Expense categories
     const expAgg = new Map<string, number>();
     data.expenses.forEach((e: any) => {
-      const label =
-        lang === "ar" ? e.category?.name_ar || e.category?.name || "—" : e.category?.name || "—";
+      const label = isAr ? e.category?.name_ar || e.category?.name || "—" : e.category?.name || "—";
       expAgg.set(label, (expAgg.get(label) ?? 0) + Number(e.amount));
     });
     const expByCat = Array.from(expAgg.entries())
@@ -300,16 +336,16 @@ function AnalyticsPage() {
       expByCat,
       totalOrders: sales.length,
     };
-  }, [data, days, lang]);
+  }, [data, days, lang, isAr]);
 
   const dayRanges = [7, 14, 30, 90];
 
   return (
     <>
       <PageHeader
-        title={lang === "ar" ? "التحليلات المتقدمة" : "Advanced Analytics"}
+        title={isAr ? "التحليلات المتقدمة" : "Advanced Analytics"}
         subtitle={
-          lang === "ar"
+          isAr
             ? "رؤى عميقة حول الأداء، العملاء، والمخزون"
             : "Deep insights into performance, customers, and inventory"
         }
@@ -319,33 +355,48 @@ function AnalyticsPage() {
               <button
                 key={d}
                 onClick={() => setDays(d)}
+                aria-pressed={days === d}
                 className={`h-7 rounded-full px-3 text-[11px] font-medium transition ${days === d ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
               >
                 {d}
-                {lang === "ar" ? "ي" : "d"}
+                {isAr ? "ي" : "d"}
               </button>
             ))}
           </div>
         }
       />
 
+      {isError && (
+        <div
+          role="alert"
+          className="mb-4 flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-xs text-destructive"
+        >
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>
+            {isAr
+              ? "تعذّر تحميل بيانات التحليلات. حدّث الصفحة للمحاولة مجددًا."
+              : "Could not load analytics data. Refresh the page to try again."}
+          </span>
+        </div>
+      )}
+
       {/* Hero KPI grid */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 mb-6">
         <HeroKpi
           icon={TrendingUp}
-          label={lang === "ar" ? "إجمالي المبيعات" : "Total Revenue"}
+          label={isAr ? "إجمالي المبيعات" : "Total Revenue"}
           value={money(insights?.totalRev ?? 0)}
-          sub={`${num(insights?.totalOrders ?? 0)} ${lang === "ar" ? "طلب" : "orders"}`}
+          sub={`${num(insights?.totalOrders ?? 0)} ${isAr ? "طلب" : "orders"}`}
           color="from-primary/30 to-primary/5"
           iconColor="text-primary"
         />
         <HeroKpi
           icon={Sparkles}
-          label={lang === "ar" ? "صافي الربح" : "Gross Profit"}
+          label={isAr ? "صافي الربح" : "Gross Profit"}
           value={money(insights?.totalProfit ?? 0)}
           sub={
             insights && insights.totalRev > 0
-              ? `${((insights.totalProfit / insights.totalRev) * 100).toFixed(1)}% ${lang === "ar" ? "هامش" : "margin"}`
+              ? `${((insights.totalProfit / insights.totalRev) * 100).toFixed(1)}% ${isAr ? "هامش" : "margin"}`
               : "—"
           }
           color="from-emerald-500/30 to-emerald-500/5"
@@ -353,17 +404,17 @@ function AnalyticsPage() {
         />
         <HeroKpi
           icon={ShoppingCart}
-          label={lang === "ar" ? "متوسط الفاتورة" : "Avg. Order"}
+          label={isAr ? "متوسط الفاتورة" : "Avg. Order"}
           value={money(insights?.avgOrder ?? 0)}
-          sub={lang === "ar" ? "لكل معاملة" : "per transaction"}
+          sub={isAr ? "لكل معاملة" : "per transaction"}
           color="from-chart-2/30 to-chart-2/5"
           iconColor="text-chart-2"
         />
         <HeroKpi
           icon={Users}
-          label={lang === "ar" ? "عملاء نشطون" : "Active Customers"}
+          label={isAr ? "عملاء نشطون" : "Active Customers"}
           value={num(insights?.uniqueCustomers ?? 0)}
-          sub={`${money(insights?.invValue ?? 0)} ${lang === "ar" ? "قيمة المخزون" : "stock value"}`}
+          sub={`${money(insights?.invValue ?? 0)} ${isAr ? "تكلفة المخزون" : "inventory cost"}`}
           color="from-chart-4/30 to-chart-4/5"
           iconColor="text-chart-4"
         />
@@ -375,70 +426,72 @@ function AnalyticsPage() {
           <div>
             <h3 className="text-sm font-semibold flex items-center gap-1.5">
               <Activity className="h-4 w-4 text-primary" />{" "}
-              {lang === "ar" ? "تدفق الإيرادات والأرباح" : "Revenue & Profit flow"}
+              {isAr ? "تدفق الإيرادات والأرباح" : "Revenue & Profit flow"}
             </h3>
             <p className="text-xs text-muted-foreground">
-              {lang === "ar" ? `آخر ${days} يوم` : `Last ${days} days`}
+              {isAr ? `آخر ${days} يوم` : `Last ${days} days`}
             </p>
           </div>
         </div>
         <div className="h-72">
-          <ResponsiveContainer>
-            <ComposedChart data={insights?.dailyArr ?? []}>
-              <defs>
-                <linearGradient id="rev" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="oklch(0.62 0.21 260)" stopOpacity={0.5} />
-                  <stop offset="100%" stopColor="oklch(0.62 0.21 260)" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid stroke="oklch(1 0 0 / 0.05)" vertical={false} />
-              <XAxis
-                dataKey="date"
-                stroke="oklch(0.62 0.015 270)"
-                fontSize={11}
-                tickLine={false}
-                axisLine={false}
-              />
-              <YAxis
-                stroke="oklch(0.62 0.015 270)"
-                fontSize={11}
-                tickLine={false}
-                axisLine={false}
-              />
-              <Tooltip
-                contentStyle={{
-                  background: "oklch(0.18 0.007 270)",
-                  border: "1px solid oklch(1 0 0 / 0.08)",
-                  borderRadius: 12,
-                  fontSize: 12,
-                }}
-              />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Area
-                type="monotone"
-                dataKey="revenue"
-                stroke="oklch(0.62 0.21 260)"
-                strokeWidth={2.5}
-                fill="url(#rev)"
-                name={lang === "ar" ? "الإيراد" : "Revenue"}
-              />
-              <Bar
-                dataKey="expenses"
-                fill="oklch(0.65 0.2 20)"
-                radius={[4, 4, 0, 0]}
-                opacity={0.7}
-                name={lang === "ar" ? "المصروفات" : "Expenses"}
-              />
-              <Line
-                type="monotone"
-                dataKey="profit"
-                stroke="oklch(0.7 0.18 140)"
-                strokeWidth={2.5}
-                dot={false}
-                name={lang === "ar" ? "الربح" : "Profit"}
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
+          {isLoading && !insights ? (
+            chartSkeleton()
+          ) : (
+            <ResponsiveContainer>
+              <ComposedChart data={insights?.dailyArr ?? []} accessibilityLayer>
+                <defs>
+                  <linearGradient id="rev" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="oklch(0.62 0.21 260)" stopOpacity={0.5} />
+                    <stop offset="100%" stopColor="oklch(0.62 0.21 260)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid stroke={CHART_GRID_STROKE} vertical={false} />
+                <XAxis
+                  dataKey="date"
+                  stroke={CHART_AXIS_STROKE}
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis
+                  stroke={CHART_AXIS_STROKE}
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <Tooltip
+                  contentStyle={TOOLTIP_STYLE}
+                  itemStyle={TOOLTIP_ITEM_STYLE}
+                  labelStyle={TOOLTIP_LABEL_STYLE}
+                  formatter={(val: any, name: any) => [money(Number(val)), name]}
+                />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Area
+                  type="monotone"
+                  dataKey="revenue"
+                  stroke="oklch(0.62 0.21 260)"
+                  strokeWidth={2.5}
+                  fill="url(#rev)"
+                  name={chartLabels.revenue}
+                />
+                <Bar
+                  dataKey="expenses"
+                  fill="oklch(0.65 0.2 20)"
+                  radius={[4, 4, 0, 0]}
+                  opacity={0.7}
+                  name={chartLabels.expenses}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="profit"
+                  stroke="oklch(0.7 0.18 140)"
+                  strokeWidth={2.5}
+                  dot={false}
+                  name={chartLabels.profit}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
 
@@ -446,10 +499,10 @@ function AnalyticsPage() {
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3 mb-6">
         <div className="panel-elevated p-5">
           <h3 className="text-sm font-semibold mb-1">
-            {lang === "ar" ? "الإيراد حسب التصنيف" : "Revenue by Category"}
+            {isAr ? "الإيراد حسب التصنيف" : "Revenue by Category"}
           </h3>
           <p className="text-xs text-muted-foreground mb-3">
-            {lang === "ar" ? "أعلى التصنيفات أداءً" : "Top performing categories"}
+            {isAr ? "أعلى التصنيفات أداءً" : "Top performing categories"}
           </p>
           <div className="h-56">
             {(insights?.byCategory.length ?? 0) === 0 ? (
@@ -461,10 +514,10 @@ function AnalyticsPage() {
                   layout="vertical"
                   margin={{ left: 40 }}
                 >
-                  <CartesianGrid stroke="oklch(1 0 0 / 0.05)" horizontal={false} />
+                  <CartesianGrid stroke={CHART_GRID_STROKE} horizontal={false} />
                   <XAxis
                     type="number"
-                    stroke="oklch(0.62 0.015 270)"
+                    stroke={CHART_AXIS_STROKE}
                     fontSize={10}
                     tickLine={false}
                     axisLine={false}
@@ -472,19 +525,17 @@ function AnalyticsPage() {
                   <YAxis
                     type="category"
                     dataKey="name"
-                    stroke="oklch(0.62 0.015 270)"
+                    stroke={CHART_AXIS_STROKE}
                     fontSize={10}
                     tickLine={false}
                     axisLine={false}
                     width={80}
                   />
                   <Tooltip
-                    contentStyle={{
-                      background: "oklch(0.18 0.007 270)",
-                      border: "1px solid oklch(1 0 0 / 0.08)",
-                      borderRadius: 12,
-                      fontSize: 12,
-                    }}
+                    contentStyle={TOOLTIP_STYLE}
+                    itemStyle={TOOLTIP_ITEM_STYLE}
+                    labelStyle={TOOLTIP_LABEL_STYLE}
+                    formatter={(val: any) => [money(Number(val)), chartLabels.revenue]}
                   />
                   <Bar dataKey="revenue" fill="oklch(0.62 0.21 260)" radius={[0, 6, 6, 0]} />
                 </BarChart>
@@ -495,10 +546,10 @@ function AnalyticsPage() {
 
         <div className="panel-elevated p-5">
           <h3 className="text-sm font-semibold mb-1">
-            {lang === "ar" ? "شرائح العملاء" : "Customer Segments"}
+            {isAr ? "شرائح العملاء" : "Customer Segments"}
           </h3>
           <p className="text-xs text-muted-foreground mb-3">
-            {lang === "ar" ? "توزيع ولاء العملاء" : "Loyalty distribution"}
+            {isAr ? "توزيع ولاء العملاء" : "Loyalty distribution"}
           </p>
           <div className="h-56">
             {(insights?.segData.reduce((a, s) => a + s.value, 0) ?? 0) === 0 ? (
@@ -518,12 +569,13 @@ function AnalyticsPage() {
                     ))}
                   </RadialBar>
                   <Tooltip
-                    contentStyle={{
-                      background: "oklch(0.18 0.007 270)",
-                      border: "1px solid oklch(1 0 0 / 0.08)",
-                      borderRadius: 12,
-                      fontSize: 12,
-                    }}
+                    contentStyle={TOOLTIP_STYLE}
+                    itemStyle={TOOLTIP_ITEM_STYLE}
+                    labelStyle={TOOLTIP_LABEL_STYLE}
+                    formatter={(val: any, name: any) => [
+                      `${num(Number(val))} ${chartLabels.customers}`,
+                      name,
+                    ]}
                   />
                   <Legend iconSize={8} wrapperStyle={{ fontSize: 10 }} />
                 </RadialBarChart>
@@ -534,36 +586,35 @@ function AnalyticsPage() {
 
         <div className="panel-elevated p-5">
           <h3 className="text-sm font-semibold mb-1">
-            {lang === "ar" ? "أفضل العلامات التجارية" : "Top Brands"}
+            {isAr ? "أفضل العلامات التجارية" : "Top Brands"}
           </h3>
           <p className="text-xs text-muted-foreground mb-3">
-            {lang === "ar" ? "الأكثر مبيعاً بالكمية" : "Best-selling by quantity"}
+            {isAr ? "الأكثر مبيعاً بالكمية" : "Best-selling by quantity"}
           </p>
           <div className="h-56">
             {(insights?.byBrand.length ?? 0) === 0 ? (
               emptyState(lang)
             ) : (
               <ResponsiveContainer>
-                <RadarChart data={insights?.byBrand ?? []}>
-                  <PolarGrid stroke="oklch(1 0 0 / 0.08)" />
+                <RadarChart data={insights?.byBrand ?? []} accessibilityLayer>
+                  <PolarGrid stroke={CHART_POLAR_GRID_STROKE} />
                   <PolarAngleAxis
                     dataKey="name"
-                    tick={{ fill: "oklch(0.62 0.015 270)", fontSize: 10 }}
+                    tick={{ fill: "var(--muted-foreground)", fontSize: 10 }}
                   />
-                  <PolarRadiusAxis tick={{ fill: "oklch(0.62 0.015 270)", fontSize: 9 }} />
+                  <PolarRadiusAxis tick={{ fill: "var(--muted-foreground)", fontSize: 9 }} />
                   <Radar
                     dataKey="qty"
+                    name={chartLabels.quantity}
                     stroke="oklch(0.68 0.2 340)"
                     fill="oklch(0.68 0.2 340)"
                     fillOpacity={0.5}
                   />
                   <Tooltip
-                    contentStyle={{
-                      background: "oklch(0.18 0.007 270)",
-                      border: "1px solid oklch(1 0 0 / 0.08)",
-                      borderRadius: 12,
-                      fontSize: 12,
-                    }}
+                    contentStyle={TOOLTIP_STYLE}
+                    itemStyle={TOOLTIP_ITEM_STYLE}
+                    labelStyle={TOOLTIP_LABEL_STYLE}
+                    formatter={(val: any, name: any) => [num(Number(val)), name]}
                   />
                 </RadarChart>
               </ResponsiveContainer>
@@ -577,40 +628,46 @@ function AnalyticsPage() {
         <div className="panel-elevated p-5">
           <h3 className="text-sm font-semibold mb-1 flex items-center gap-1.5">
             <Calendar className="h-4 w-4 text-chart-2" />{" "}
-            {lang === "ar" ? "نمط أيام الأسبوع" : "Weekday Pattern"}
+            {isAr ? "نمط أيام الأسبوع" : "Weekday Pattern"}
           </h3>
           <p className="text-xs text-muted-foreground mb-3">
-            {lang === "ar" ? "الإيراد حسب اليوم" : "Revenue distribution by day"}
+            {isAr ? "الإيراد حسب اليوم" : "Revenue distribution by day"}
           </p>
           <div className="h-64">
             {(insights?.weekday.reduce((a, d) => a + d.revenue, 0) ?? 0) === 0 ? (
               emptyState(lang)
             ) : (
               <ResponsiveContainer>
-                <BarChart data={insights?.weekday ?? []}>
-                  <CartesianGrid stroke="oklch(1 0 0 / 0.05)" vertical={false} />
+                <BarChart data={insights?.weekday ?? []} accessibilityLayer>
+                  <CartesianGrid stroke={CHART_GRID_STROKE} vertical={false} />
                   <XAxis
                     dataKey="day"
-                    stroke="oklch(0.62 0.015 270)"
+                    stroke={CHART_AXIS_STROKE}
                     fontSize={11}
                     tickLine={false}
                     axisLine={false}
                   />
                   <YAxis
-                    stroke="oklch(0.62 0.015 270)"
+                    stroke={CHART_AXIS_STROKE}
                     fontSize={11}
                     tickLine={false}
                     axisLine={false}
                   />
                   <Tooltip
-                    contentStyle={{
-                      background: "oklch(0.18 0.007 270)",
-                      border: "1px solid oklch(1 0 0 / 0.08)",
-                      borderRadius: 12,
-                      fontSize: 12,
-                    }}
+                    contentStyle={TOOLTIP_STYLE}
+                    itemStyle={TOOLTIP_ITEM_STYLE}
+                    labelStyle={TOOLTIP_LABEL_STYLE}
+                    formatter={(val: any, name: any) =>
+                      name === chartLabels.revenue
+                        ? [money(Number(val)), name]
+                        : [`${num(Number(val))} ${chartLabels.orders}`, name]
+                    }
                   />
-                  <Bar dataKey="revenue" radius={[8, 8, 0, 0]}>
+                  <Bar
+                    dataKey="revenue"
+                    name={chartLabels.revenue}
+                    radius={[8, 8, 0, 0]}
+                  >
                     {(insights?.weekday ?? []).map((_, i) => (
                       <Cell key={i} fill={PALETTE[i % PALETTE.length]} />
                     ))}
@@ -624,49 +681,48 @@ function AnalyticsPage() {
         <div className="panel-elevated p-5">
           <h3 className="text-sm font-semibold mb-1 flex items-center gap-1.5">
             <Activity className="h-4 w-4 text-chart-4" />{" "}
-            {lang === "ar" ? "الساعات الذروة" : "Peak Hours"}
+            {isAr ? "الساعات الذروة" : "Peak Hours"}
           </h3>
           <p className="text-xs text-muted-foreground mb-3">
-            {lang === "ar" ? "الإيراد خلال اليوم" : "Revenue throughout the day"}
+            {isAr ? "الإيراد خلال اليوم" : "Revenue throughout the day"}
           </p>
           <div className="h-64">
             {(insights?.hourly.reduce((a, h) => a + h.revenue, 0) ?? 0) === 0 ? (
               emptyState(lang)
             ) : (
               <ResponsiveContainer>
-                <AreaChart data={insights?.hourly ?? []}>
+                <AreaChart data={insights?.hourly ?? []} accessibilityLayer>
                   <defs>
                     <linearGradient id="hg" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="oklch(0.68 0.2 340)" stopOpacity={0.6} />
                       <stop offset="100%" stopColor="oklch(0.68 0.2 340)" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid stroke="oklch(1 0 0 / 0.05)" vertical={false} />
+                  <CartesianGrid stroke={CHART_GRID_STROKE} vertical={false} />
                   <XAxis
                     dataKey="hour"
-                    stroke="oklch(0.62 0.015 270)"
+                    stroke={CHART_AXIS_STROKE}
                     fontSize={10}
                     tickLine={false}
                     axisLine={false}
                     interval={2}
                   />
                   <YAxis
-                    stroke="oklch(0.62 0.015 270)"
+                    stroke={CHART_AXIS_STROKE}
                     fontSize={11}
                     tickLine={false}
                     axisLine={false}
                   />
                   <Tooltip
-                    contentStyle={{
-                      background: "oklch(0.18 0.007 270)",
-                      border: "1px solid oklch(1 0 0 / 0.08)",
-                      borderRadius: 12,
-                      fontSize: 12,
-                    }}
+                    contentStyle={TOOLTIP_STYLE}
+                    itemStyle={TOOLTIP_ITEM_STYLE}
+                    labelStyle={TOOLTIP_LABEL_STYLE}
+                    formatter={(val: any) => [money(Number(val)), chartLabels.revenue]}
                   />
                   <Area
                     type="monotone"
                     dataKey="revenue"
+                    name={chartLabels.revenue}
                     stroke="oklch(0.68 0.2 340)"
                     strokeWidth={2.5}
                     fill="url(#hg)"
@@ -683,10 +739,10 @@ function AnalyticsPage() {
         <div className="panel-elevated p-5 lg:col-span-2">
           <h3 className="text-sm font-semibold mb-1 flex items-center gap-1.5">
             <Package className="h-4 w-4 text-primary" />{" "}
-            {lang === "ar" ? "أفضل 10 منتجات" : "Top 10 Products"}
+            {isAr ? "أفضل 10 منتجات" : "Top 10 Products"}
           </h3>
           <p className="text-xs text-muted-foreground mb-4">
-            {lang === "ar" ? "المرتّبة حسب الإيراد" : "Ranked by revenue"}
+            {isAr ? "المرتّبة حسب الإيراد" : "Ranked by revenue"}
           </p>
           <div className="space-y-2.5">
             {(insights?.topProducts.length ?? 0) === 0 ? (
@@ -697,10 +753,9 @@ function AnalyticsPage() {
               insights!.topProducts.map((tp, i) => {
                 const max = insights!.topProducts[0].total || 1;
                 const pct = (tp.total / max) * 100;
-                const name =
-                  lang === "ar"
-                    ? tp.product?.name_ar || tp.product?.name
-                    : tp.product?.name || tp.product?.name_ar;
+                const name = isAr
+                  ? tp.product?.name_ar || tp.product?.name
+                  : tp.product?.name || tp.product?.name_ar;
                 return (
                   <div key={i} className="rounded-xl border border-border bg-surface p-3">
                     <div className="mb-2 flex items-center justify-between text-xs">
@@ -731,17 +786,17 @@ function AnalyticsPage() {
 
         <div className="panel-elevated p-5">
           <h3 className="text-sm font-semibold mb-1">
-            {lang === "ar" ? "توزيع المستودعات" : "Warehouse Distribution"}
+            {isAr ? "توزيع المستودعات" : "Warehouse Distribution"}
           </h3>
           <p className="text-xs text-muted-foreground mb-3">
-            {lang === "ar" ? "كمية المخزون" : "Stock quantity split"}
+            {isAr ? "كمية المخزون" : "Stock quantity split"}
           </p>
           <div className="h-56">
             {(insights?.warehouses.length ?? 0) === 0 ? (
               emptyState(lang)
             ) : (
               <ResponsiveContainer>
-                <PieChart>
+                <PieChart accessibilityLayer>
                   <Pie
                     data={insights?.warehouses ?? []}
                     dataKey="qty"
@@ -755,12 +810,10 @@ function AnalyticsPage() {
                     ))}
                   </Pie>
                   <Tooltip
-                    contentStyle={{
-                      background: "oklch(0.18 0.007 270)",
-                      border: "1px solid oklch(1 0 0 / 0.08)",
-                      borderRadius: 12,
-                      fontSize: 12,
-                    }}
+                    contentStyle={TOOLTIP_STYLE}
+                    itemStyle={TOOLTIP_ITEM_STYLE}
+                    labelStyle={TOOLTIP_LABEL_STYLE}
+                    formatter={(val: any, name: any) => [`${num(Number(val))} ${chartLabels.quantity}`, name]}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -788,77 +841,90 @@ function AnalyticsPage() {
         <div className="panel-elevated p-5">
           <h3 className="text-sm font-semibold mb-1 flex items-center gap-1.5">
             <Wallet className="h-4 w-4 text-chart-3" />{" "}
-            {lang === "ar" ? "طرق الدفع" : "Payment Methods"}
+            {isAr ? "طرق الدفع" : "Payment Methods"}
           </h3>
           <p className="text-xs text-muted-foreground mb-3">
-            {lang === "ar" ? "توزيع المحصّلات" : "Collected split"}
+            {isAr ? "توزيع المحصّلات" : "Collected split"}
           </p>
           <div className="h-56">
             {(insights?.payment.length ?? 0) === 0 ? (
               emptyState(lang)
             ) : (
               <ResponsiveContainer>
-                <PieChart>
+                <PieChart accessibilityLayer>
                   <Pie
                     data={insights?.payment ?? []}
                     dataKey="value"
                     nameKey="name"
-                    outerRadius={90}
-                    label={{ fontSize: 10 }}
+                    outerRadius={80}
+                    labelLine={false}
+                    label={(entry: any) => entry.name}
                   >
                     {(insights?.payment ?? []).map((_, i) => (
                       <Cell key={i} fill={PALETTE[i % PALETTE.length]} />
                     ))}
                   </Pie>
                   <Tooltip
-                    contentStyle={{
-                      background: "oklch(0.18 0.007 270)",
-                      border: "1px solid oklch(1 0 0 / 0.08)",
-                      borderRadius: 12,
-                      fontSize: 12,
-                    }}
+                    contentStyle={TOOLTIP_STYLE}
+                    itemStyle={TOOLTIP_ITEM_STYLE}
+                    labelStyle={TOOLTIP_LABEL_STYLE}
+                    formatter={(val: any, name: any) => [money(Number(val)), name]}
                   />
                 </PieChart>
               </ResponsiveContainer>
             )}
           </div>
+          {(insights?.payment.length ?? 0) > 0 && (
+            <div className="mt-2 space-y-1.5">
+              {(insights?.payment ?? []).map((p, i) => (
+                <div key={p.name} className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-2 text-muted-foreground">
+                    <span
+                      className="h-2 w-2 rounded-full"
+                      style={{ background: PALETTE[i % PALETTE.length] }}
+                    />
+                    {p.name}
+                  </span>
+                  <span className="font-mono">{money(p.value)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="panel-elevated p-5">
           <h3 className="text-sm font-semibold mb-1 flex items-center gap-1.5">
             <TrendingDown className="h-4 w-4 text-rose-500" />{" "}
-            {lang === "ar" ? "المصروفات حسب التصنيف" : "Expenses by Category"}
+            {isAr ? "المصروفات حسب التصنيف" : "Expenses by Category"}
           </h3>
           <p className="text-xs text-muted-foreground mb-3">
-            {money(insights?.totalExp ?? 0)} {lang === "ar" ? "إجمالي" : "total"}
+            {money(insights?.totalExp ?? 0)} {isAr ? "إجمالي" : "total"}
           </p>
           <div className="h-56">
             {(insights?.expByCat.length ?? 0) === 0 ? (
               emptyState(lang)
             ) : (
               <ResponsiveContainer>
-                <BarChart data={insights?.expByCat.slice(0, 6) ?? []}>
-                  <CartesianGrid stroke="oklch(1 0 0 / 0.05)" vertical={false} />
+                <BarChart data={insights?.expByCat.slice(0, 6) ?? []} accessibilityLayer>
+                  <CartesianGrid stroke={CHART_GRID_STROKE} vertical={false} />
                   <XAxis
                     dataKey="name"
-                    stroke="oklch(0.62 0.015 270)"
+                    stroke={CHART_AXIS_STROKE}
                     fontSize={10}
                     tickLine={false}
                     axisLine={false}
                   />
                   <YAxis
-                    stroke="oklch(0.62 0.015 270)"
+                    stroke={CHART_AXIS_STROKE}
                     fontSize={11}
                     tickLine={false}
                     axisLine={false}
                   />
                   <Tooltip
-                    contentStyle={{
-                      background: "oklch(0.18 0.007 270)",
-                      border: "1px solid oklch(1 0 0 / 0.08)",
-                      borderRadius: 12,
-                      fontSize: 12,
-                    }}
+                    contentStyle={TOOLTIP_STYLE}
+                    itemStyle={TOOLTIP_ITEM_STYLE}
+                    labelStyle={TOOLTIP_LABEL_STYLE}
+                    formatter={(val: any) => [money(Number(val)), chartLabels.expenses]}
                   />
                   <Bar dataKey="value" fill="oklch(0.65 0.2 20)" radius={[8, 8, 0, 0]} />
                 </BarChart>
@@ -875,6 +941,41 @@ function emptyState(lang: string) {
   return (
     <div className="grid h-full place-items-center text-xs text-muted-foreground">
       {lang === "ar" ? "لا توجد بيانات" : "No data"}
+    </div>
+  );
+}
+
+// Local-calendar YYYY-MM-DD key. Keeps daily bucketing aligned with the local-time
+// hour aggregation below (the old code mixed UTC slicing with local getHours()).
+function localDayKey(input: string | Date): string {
+  const d = typeof input === "string" ? new Date(input) : input;
+  if (Number.isNaN(d.getTime())) return "";
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
+// Reuses the app-wide pos.pm.* strings; no new i18n keys introduced.
+function paymentMethodLabel(method: string | null | undefined, isAr: boolean): string {
+  const map: Record<string, string> = {
+    cash: isAr ? "نقدًا" : "Cash",
+    card: isAr ? "بطاقة" : "Card",
+    bank_transfer: isAr ? "تحويل بنكي" : "Bank transfer",
+    bank: isAr ? "تحويل بنكي" : "Bank",
+    credit: isAr ? "آجل" : "Credit",
+  };
+  if (!method) return isAr ? "غير محدد" : "Unspecified";
+  return map[method] ?? method;
+}
+
+function chartSkeleton() {
+  return (
+    <div
+      className="grid h-full place-items-center gap-2 text-xs text-muted-foreground"
+      aria-busy="true"
+    >
+      <div className="h-6 w-6 animate-spin rounded-full border-2 border-border border-t-primary" />
+      <span>…</span>
     </div>
   );
 }

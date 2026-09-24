@@ -89,7 +89,7 @@ const COMPARISON_FEATURES: FeatureRow[] = [
   {
     name: { ar: "نقطة البيع السريعة (POS)", en: "High-Speed Point of Sale (POS)" },
     category: "ops",
-    starter: false,
+    starter: true,
     professional: true,
     enterprise: true,
   },
@@ -271,8 +271,8 @@ export function PlanComparisonDialog({ trigger }: { trigger?: React.ReactNode })
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden bg-surface-1 border-border/80">
-        <DialogHeader className="p-6 pb-4 border-b border-border/60">
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden rounded-2xl bg-popover text-popover-foreground border-border shadow-2xl">
+        <DialogHeader className="p-6 pb-4 border-b border-border bg-popover">
           <div className="flex items-center gap-2">
             <span className="grid h-8 w-8 place-items-center rounded-xl bg-primary/10 text-primary">
               <Layers className="h-4 w-4" />
@@ -292,9 +292,9 @@ export function PlanComparisonDialog({ trigger }: { trigger?: React.ReactNode })
           </div>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto p-6 pt-2">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 pt-2">
           {/* Plan Header Cards */}
-          <div className="grid grid-cols-4 gap-2 mb-4 sticky top-0 bg-surface-1/95 backdrop-blur-md py-3 z-20 border-b border-border/60">
+          <div className="grid grid-cols-4 gap-2 mb-4 sticky top-0 z-20 bg-popover py-3 border-b border-border">
             <div className="flex items-end pb-2">
               <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                 {isAr ? "الميزات والقدرات" : "Features & Limits"}
@@ -309,7 +309,7 @@ export function PlanComparisonDialog({ trigger }: { trigger?: React.ReactNode })
                   className={`rounded-2xl p-3 border text-center transition ${
                     isCurrent
                       ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/40"
-                      : "border-border/60 bg-surface-2/60"
+                      : "border-border bg-muted/50"
                   }`}
                 >
                   <div className="text-xs font-bold text-foreground">
@@ -350,7 +350,7 @@ export function PlanComparisonDialog({ trigger }: { trigger?: React.ReactNode })
             {COMPARISON_FEATURES.map((feat, idx) => (
               <div
                 key={idx}
-                className="grid grid-cols-4 items-center gap-2 px-3 py-2.5 rounded-xl text-xs hover:bg-surface-2/60 transition border-b border-border/30 last:border-0"
+                className="grid grid-cols-4 items-center gap-2 px-3 py-2.5 rounded-xl text-xs hover:bg-muted/60 transition border-b border-border/60 last:border-0"
               >
                 <div className="font-medium text-foreground pe-2">
                   {isAr ? feat.name.ar : feat.name.en}

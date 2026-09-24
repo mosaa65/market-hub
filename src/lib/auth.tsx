@@ -10,6 +10,7 @@ interface AuthCtx {
   roles: Role[];
   isPlatformAdmin: boolean;
   isPlatformSuperadmin: boolean;
+  isActive: boolean;
   loading: boolean;
   hasRole: (r: Role) => boolean;
   signOut: () => Promise<void>;
@@ -22,6 +23,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [roles, setRoles] = useState<Role[]>([]);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [isPlatformSuperadmin, setIsPlatformSuperadmin] = useState(false);
+  const [isActive, setIsActive] = useState(true);
   const [loading, setLoading] = useState(true);
   const loadSeq = useRef(0);
 
@@ -36,13 +38,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       let nextRoles: Role[] = [];
       let adminFlags = { isAdmin: false, isSuperadmin: false };
+      let nextIsActive = true;
       try {
         if (nextSession?.user) {
-          // Fetch roles and admin flags concurrently — they are independent and
-          // running them in series doubled the wait before the shell could render.
-          [nextRoles, adminFlags] = await Promise.all([
+          // Fetch roles, admin flags and active status concurrently — they are
+          // independent and running them in series doubled the wait before the
+          // shell could render.
+          [nextRoles, adminFlags, nextIsActive] = await Promise.all([
             fetchRoles(nextSession.user.id),
             fetchAdminFlags(nextSession.user.id, nextSession.user.email),
+            fetchIsActive(nextSession.user.id),
           ]);
         }
       } catch (err) {
@@ -51,13 +56,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error("Failed to resolve session permissions", err);
         nextRoles = [];
         adminFlags = { isAdmin: false, isSuperadmin: false };
+        nextIsActive = true;
       }
 
       if (!alive || seq !== loadSeq.current) return;
+
+      // A deactivated store account is already blocked by RLS, but signing it
+      // out here gives an explicit, immediate signal instead of a shell that
+      // silently fails every query. Platform superadmins are exempt because
+      // they live in the separate platform_admins system.
+      if (nextSession?.user && !nextIsActive && !adminFlags.isAdmin) {
+        setSession(null);
+        setRoles([]);
+        setIsPlatformAdmin(false);
+        setIsPlatformSuperadmin(false);
+        setIsActive(false);
+        setLoading(false);
+        void supabase.auth.signOut();
+        return;
+      }
+
       setSession(nextSession);
       setRoles(nextRoles);
       setIsPlatformAdmin(adminFlags.isAdmin);
       setIsPlatformSuperadmin(adminFlags.isSuperadmin);
+      setIsActive(nextIsActive);
       setLoading(false);
     }
 
@@ -97,6 +120,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return (data ?? []).map((r: { role: Role }) => r.role);
   }
 
+  // A disabled account (profiles.is_active = false) is blocked at the RLS layer
+  // (see migration 20260918000200). This client check is defence-in-depth so the
+  // shell does not render for a disabled user even before any query fails.
+  async function fetchIsActive(userId: string): Promise<boolean> {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("is_active")
+        .eq("id", userId)
+        .maybeSingle();
+      if (error || !data) return true;
+      return (data as { is_active?: boolean }).is_active !== false;
+    } catch {
+      // Never lock a user out because of a transient read failure.
+      return true;
+    }
+  }
+
   async function fetchAdminFlags(
     userId: string,
     _email?: string,
@@ -133,6 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     roles,
     isPlatformAdmin,
     isPlatformSuperadmin,
+    isActive,
     loading,
     hasRole: (r) => roles.includes(r),
     signOut: async () => {

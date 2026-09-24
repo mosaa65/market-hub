@@ -254,6 +254,12 @@ const en: Dict = {
   "pos.remaining_debt": "Remaining debt",
   "pos.all_catalog_filters": "Catalog filters",
 
+  // Scanning (device-agnostic, honest labels)
+  "scan.ready": "Ready to receive barcode",
+  "scan.received": "Barcode received",
+  "scan.use_camera": "Use camera",
+  "scan.use_device_camera": "Use your device camera to scan the barcode",
+
   // Inventory
   "inventory.title": "Inventory",
   "inventory.subtitle": "Stock on hand, low-stock alerts and adjustments.",
@@ -442,8 +448,10 @@ const en: Dict = {
   "users.joined": "Joined",
   "users.no_role": "no role",
   "users.add_role": "Add role",
+  // Staff accounts are now provisioned from this page; the user no longer
+  // needs to sign up first.
   "users.signup_hint":
-    "To add a new user: have them sign up at /auth, then assign their role here.",
+    "Staff accounts are created from this page: enter a name, email and role, and an active account is provisioned with a one-time password for hand-off.",
 
   // Notifications
   "notifications.title": "Notifications",
@@ -559,6 +567,14 @@ const en: Dict = {
   "catalog.empty": "No items yet",
   "catalog.name_required": "Arabic name is required",
   "catalog.confirm_delete": "Delete this item?",
+
+  // Roles (store staff) — shown next to every role badge
+  "role.superadmin": "Platform Admin",
+  "role.owner": "Owner",
+  "role.manager": "Manager",
+  "role.accountant": "Accountant",
+  "role.cashier": "Cashier",
+  "role.warehouse": "Warehouse Keeper",
 };
 
 const ar: Dict = {
@@ -808,6 +824,12 @@ const ar: Dict = {
   "pos.overpaid_warning": "المبلغ المدفوع أكبر من إجمالي الفاتورة",
   "pos.remaining_debt": "المتبقي كدين",
   "pos.all_catalog_filters": "تصفية الفهرس الشامل",
+
+  // المسح (بدون ادّعاء اتصال جهاز)
+  "scan.ready": "جاهز لاستقبال الباركود",
+  "scan.received": "تم استقبال الباركود",
+  "scan.use_camera": "استخدام الكاميرا",
+  "scan.use_device_camera": "استخدم كاميرا الجهاز لمسح الباركود",
 
   // المخزون
   "inventory.title": "المخزون",
@@ -1114,6 +1136,14 @@ const ar: Dict = {
   "catalog.empty": "لا توجد عناصر بعد",
   "catalog.name_required": "الاسم بالعربي مطلوب",
   "catalog.confirm_delete": "حذف هذا العنصر؟",
+
+  // Roles (store staff) — shown next to every role badge
+  "role.superadmin": "مسؤول المنصة",
+  "role.owner": "المالك",
+  "role.manager": "المدير",
+  "role.accountant": "المحاسب",
+  "role.cashier": "الكاشير",
+  "role.warehouse": "أمين المستودع",
 };
 
 const dicts: Record<Lang, Dict> = { en, ar };
