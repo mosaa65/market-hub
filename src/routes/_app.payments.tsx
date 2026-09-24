@@ -1,7 +1,7 @@
 import { ModuleGuard } from "@/lib/modules";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Search, Plus, Wallet, X, Loader2, User } from "lucide-react";
+import { Search, Plus, Wallet, X, Loader2, User, FileText } from "lucide-react";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
@@ -49,6 +49,7 @@ interface Payment {
 
 function PaymentsPage() {
   const { t, lang } = useI18n();
+  const navigate = useNavigate();
   const searchParams = Route.useSearch();
   const customerId = searchParams?.customerId;
   const [customerSearch, setCustomerSearch] = useState("");
@@ -168,11 +169,33 @@ function PaymentsPage() {
         t("payments.recorded") || (lang === "ar" ? "تم تسجيل الدفعة" : "Payment recorded"),
       );
       await refresh();
+      // المستخدم يريد رؤية أثر الدفعة فورًا على الرصيد
+      toast.success(
+        lang === "ar"
+          ? "يمكنك الآن عرض كشف الحساب المُحدَّث"
+          : "You can now view the updated statement",
+        {
+          action: {
+            label: lang === "ar" ? "عرض الكشف" : "View statement",
+            onClick: () => selected && goStatement(selected.id),
+          },
+          duration: 6000,
+        },
+      );
     } catch (e: any) {
       toast.error(e.message ?? t("common.failed"));
     } finally {
       setSaving(false);
     }
+  }
+
+  /** الانتقال المباشر إلى مستند الكشف النهائي — بلا منطق حسابي محلي */
+  function goStatement(customerId: string) {
+    void navigate({
+      to: "/statements/$entityType/$entityId",
+      params: { entityType: "customer", entityId: customerId },
+      search: { template: "customer" } as never,
+    });
   }
 
   const pmLabel = (m: string) =>
@@ -277,6 +300,14 @@ function PaymentsPage() {
                   {money(Number(selected.balance))}
                 </div>
               </div>
+              <button
+                type="button"
+                onClick={() => goStatement(selected.id)}
+                className="flex h-9 items-center gap-1.5 rounded-full border border-border px-4 text-xs font-medium text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
+              >
+                <FileText className="h-3.5 w-3.5" />
+                {lang === "ar" ? "كشف الحساب" : "Statement"}
+              </button>
             </div>
 
             {/* Record payment */}

@@ -46,6 +46,7 @@ import { Route as AppBalanceSheetRouteImport } from './routes/_app.balance-sheet
 import { Route as AppAuditRouteImport } from './routes/_app.audit'
 import { Route as AppAnalyticsRouteImport } from './routes/_app.analytics'
 import { Route as AppAccountStatementRouteImport } from './routes/_app.account-statement'
+import { Route as AppStatementsEntityTypeEntityIdRouteImport } from './routes/_app.statements.$entityType.$entityId'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -231,6 +232,12 @@ const AppAccountStatementRoute = AppAccountStatementRouteImport.update({
   path: '/account-statement',
   getParentRoute: () => AppRoute,
 } as any)
+const AppStatementsEntityTypeEntityIdRoute =
+  AppStatementsEntityTypeEntityIdRouteImport.update({
+    id: '/statements/$entityType/$entityId',
+    path: '/statements/$entityType/$entityId',
+    getParentRoute: () => AppRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -269,6 +276,7 @@ export interface FileRoutesByFullPath {
   '/trial-balance': typeof AppTrialBalanceRoute
   '/users': typeof AppUsersRoute
   '/warehouses': typeof AppWarehousesRoute
+  '/statements/$entityType/$entityId': typeof AppStatementsEntityTypeEntityIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -307,6 +315,7 @@ export interface FileRoutesByTo {
   '/trial-balance': typeof AppTrialBalanceRoute
   '/users': typeof AppUsersRoute
   '/warehouses': typeof AppWarehousesRoute
+  '/statements/$entityType/$entityId': typeof AppStatementsEntityTypeEntityIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -347,6 +356,7 @@ export interface FileRoutesById {
   '/_app/trial-balance': typeof AppTrialBalanceRoute
   '/_app/users': typeof AppUsersRoute
   '/_app/warehouses': typeof AppWarehousesRoute
+  '/_app/statements/$entityType/$entityId': typeof AppStatementsEntityTypeEntityIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -387,6 +397,7 @@ export interface FileRouteTypes {
     | '/trial-balance'
     | '/users'
     | '/warehouses'
+    | '/statements/$entityType/$entityId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -425,6 +436,7 @@ export interface FileRouteTypes {
     | '/trial-balance'
     | '/users'
     | '/warehouses'
+    | '/statements/$entityType/$entityId'
   id:
     | '__root__'
     | '/'
@@ -464,6 +476,7 @@ export interface FileRouteTypes {
     | '/_app/trial-balance'
     | '/_app/users'
     | '/_app/warehouses'
+    | '/_app/statements/$entityType/$entityId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -733,6 +746,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAccountStatementRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/statements/$entityType/$entityId': {
+      id: '/_app/statements/$entityType/$entityId'
+      path: '/statements/$entityType/$entityId'
+      fullPath: '/statements/$entityType/$entityId'
+      preLoaderRoute: typeof AppStatementsEntityTypeEntityIdRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
@@ -771,6 +791,7 @@ interface AppRouteChildren {
   AppTrialBalanceRoute: typeof AppTrialBalanceRoute
   AppUsersRoute: typeof AppUsersRoute
   AppWarehousesRoute: typeof AppWarehousesRoute
+  AppStatementsEntityTypeEntityIdRoute: typeof AppStatementsEntityTypeEntityIdRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -808,6 +829,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppTrialBalanceRoute: AppTrialBalanceRoute,
   AppUsersRoute: AppUsersRoute,
   AppWarehousesRoute: AppWarehousesRoute,
+  AppStatementsEntityTypeEntityIdRoute: AppStatementsEntityTypeEntityIdRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

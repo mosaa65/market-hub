@@ -24,6 +24,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { useI18n } from "@/lib/i18n";
 import { money } from "@/lib/format";
+import { useDebtIndex } from "@/hooks/use-debts-overview";
+import { StatementIntegrityBadge } from "@/components/statements/statement-integrity-badge";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/customers")({
@@ -62,6 +64,9 @@ function CustomersPage() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // أرصدة مؤكَّدة من الدفتر — مصدر واحد لكل الشاشات
+  const { index: ledgerIndex } = useDebtIndex("customer");
 
   async function load() {
     setLoading(true);
@@ -184,12 +189,6 @@ function CustomersPage() {
     },
     [navigate],
   );
-  const goStatement = useCallback(
-    (c: Customer) => {
-      navigate({ to: "/account-statement", search: { customerId: c.id } as any });
-    },
-    [navigate],
-  );
   const goPOS = useCallback(
     (c: Customer) => {
       navigate({ to: "/pos", search: { customerId: c.id } as any });
@@ -203,30 +202,20 @@ function CustomersPage() {
     [navigate],
   );
 
-  const printCustomerStatement = useCallback(
+  /**
+   * الانتقال المباشر إلى مستند الكشف النهائي.
+   * استبدل هذا الدالة `printCustomerStatement()` القديمة التي كانت تبني
+   * قالب HTML ثالثًا داخل الصفحة بمجاميع ومنطق مختلف عن باقي الشاشات.
+   */
+  const goStatement = useCallback(
     (c: Customer) => {
-      const rtl = lang === "ar";
-      const esc = (value: string | number | null | undefined) =>
-        String(value ?? "—").replace(
-          /[&<>"']/g,
-          (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]!,
-        );
-      const date = (value: string) => new Date(value).toLocaleDateString(rtl ? "ar-SA" : "en-GB");
-      const activityRows = activity
-        .map(
-          (a) =>
-            `<tr><td>${esc(date(a.date))}</td><td>${esc(a.label)}</td><td class="${a.kind === "sale" ? "balance" : "paid"}">${a.kind === "sale" ? "+" : "−"}${esc(money(a.amount))}</td></tr>`,
-        )
-        .join("");
-      const popup = window.open("", "_blank", "noopener,noreferrer");
-      if (!popup) return;
-      popup.document
-        .write(`<!doctype html><html lang="${rtl ? "ar" : "en"}" dir="${rtl ? "rtl" : "ltr"}"><head><meta charset="utf-8"><title>${rtl ? "كشف حساب" : "Account statement"} — ${esc(c.name)}</title><style>
-      @page { size: A4; margin: 14mm; } * { box-sizing: border-box; } body { font-family: Tahoma, Arial, sans-serif; color:#172033; font-size:12px; } .top { display:flex; justify-content:space-between; gap:24px; border-bottom:3px solid #2563eb; padding-bottom:14px; } h1 { margin:0 0 5px; font-size:24px; } .muted { color:#667085; } .summary { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin:20px 0; } .card { border:1px solid #dbe3ef; border-radius:10px; padding:11px; background:#f8fafc; } .card b { display:block; font-size:17px; margin-top:4px; } table { width:100%; border-collapse:collapse; margin-top:14px; } th { background:#1e293b; color:white; font-weight:600; } th,td { padding:8px; border:1px solid #dbe3ef; text-align:${rtl ? "right" : "left"}; } tr:nth-child(even) { background:#f8fafc; } .balance { color:#b45309; font-weight:700; } .paid { color:#047857; font-weight:700; } .foot { margin-top:24px; padding-top:10px; border-top:1px solid #dbe3ef; color:#667085; font-size:10px; } @media print { .no-print { display:none; } }
-    </style></head><body><div class="top"><div><h1>${rtl ? "كشف حساب عميل" : "Customer account statement"}</h1><div class="muted">${rtl ? "تاريخ الإصدار" : "Issued"}: ${esc(new Date().toLocaleDateString(rtl ? "ar-SA" : "en-GB"))}</div></div><div><b>${esc(c.name)}</b><div class="muted">${esc(c.phone)} ${c.email ? `· ${esc(c.email)}` : ""}</div></div></div><div class="summary"><div class="card"><span class="muted">${rtl ? "الرصيد المستحق" : "Current balance"}</span><b>${esc(money(Number(c.balance)))}</b></div><div class="card"><span class="muted">${rtl ? "حد الائتمان" : "Credit limit"}</span><b>${esc(money(Number(c.credit_limit)))}</b></div></div><table><thead><tr><th>${rtl ? "التاريخ" : "Date"}</th><th>${rtl ? "البيان" : "Description"}</th><th>${rtl ? "المبلغ" : "Amount"}</th></tr></thead><tbody>${activityRows || `<tr><td colspan="3">${rtl ? "لا توجد حركات" : "No activity"}</td></tr>`}</tbody></table><div class="foot">${rtl ? "تم إنشاء هذا التقرير تلقائياً بواسطة نظام فورتيكس ERP." : "Generated automatically by Vortex ERP."}</div><script>window.onload=()=>setTimeout(()=>window.print(),200)</script></body></html>`);
-      popup.document.close();
+      void navigate({
+        to: "/statements/$entityType/$entityId",
+        params: { entityType: "customer", entityId: c.id },
+        search: { template: "customer" } as never,
+      });
     },
-    [lang, activity],
+    [navigate],
   );
 
   // ─── Keyboard shortcuts (customers page only) ───
@@ -341,6 +330,23 @@ function CustomersPage() {
       lastActivity,
     };
   }, [selected, activity]);
+
+  /**
+   * الرصيد المعتمد للعميل المحدد — من الدفتر لا من العمود المخزَّن.
+   * يُستخدم في بطاقة التفاصيل مع شارة تحذير عند وجود فرق.
+   */
+  const selectedLedgerRow = selected ? ledgerIndex.get(selected.id) : undefined;
+  const selectedBalance = selectedLedgerRow
+    ? selectedLedgerRow.ledgerBalance
+    : Number(selected?.balance ?? 0);
+  const selectedIntegrity = selectedLedgerRow
+    ? {
+        ledgerBalance: selectedLedgerRow.ledgerBalance,
+        cachedBalance: selectedLedgerRow.cachedBalance,
+        difference: selectedLedgerRow.difference,
+        hasGap: selectedLedgerRow.hasGap,
+      }
+    : null;
 
   return (
     <>
@@ -761,7 +767,7 @@ function CustomersPage() {
             <div className="mb-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
               <MiniStat
                 label={lang === "ar" ? "الرصيد المستحق" : "Balance"}
-                value={money(Number(selected.balance))}
+                value={money(selectedBalance)}
                 color="text-primary"
               />
               <MiniStat
@@ -778,6 +784,14 @@ function CustomersPage() {
                 color="text-emerald-500"
               />
             </div>
+
+            {selectedIntegrity?.hasGap && (
+              <StatementIntegrityBadge
+                integrity={selectedIntegrity}
+                variant="panel"
+                className="mb-4"
+              />
+            )}
 
             {/* Quick action buttons */}
             <div className="mb-4 flex flex-wrap gap-2">
@@ -806,7 +820,7 @@ function CustomersPage() {
               <DetailActionBtn
                 icon={<Printer className="h-3.5 w-3.5" />}
                 label={lang === "ar" ? "طباعة كشف" : "Print"}
-                onClick={() => printCustomerStatement(selected)}
+                onClick={() => goStatement(selected)}
               />
             </div>
 
