@@ -12,8 +12,14 @@ import {
   Search,
   ShieldCheck,
   Warehouse,
+  Boxes,
+  Scale,
+  TrendingUp,
+  TrendingDown,
+  RefreshCw,
+  FileCheck,
 } from "lucide-react";
-import { toast } from "sonner";
+import { type PageGuideConfig } from "@/components/page-guide";
 
 export const Route = createFileRoute("/_app/settlements")({
   head: () => ({ meta: [{ title: "التسويات — فورتيكس ERP" }] }),
@@ -35,6 +41,145 @@ type SettlementRow = {
   products: { id: string; name: string; name_ar: string | null; sku: string | null } | null;
   warehouses: { id: string; name: string; name_ar: string | null; code: string | null } | null;
   profiles: { full_name: string | null } | null;
+};
+
+const settlementGuideConfig: PageGuideConfig = {
+  title: "دليل التسويات والمطابقة المخزنية",
+  subtitle:
+    "شرح شامل لكيفية معالجة الفروقات الجردية وتأثير كل حركة على الأرصدة والقيود المحاسبية وسجل التدقيق الداخلي.",
+  badge: "إدارة المخزون والرقابة",
+  icon: <Scale className="h-5 w-5 text-sky-500" />,
+  summaryText:
+    "شاشة التسويات هي صمام الأمان للرقابة المخزنية؛ تسجل بدقة وبصمة رقمية غير قابلة للتلاعب كل حركة تؤثر على رصيد المستودعات، سواء كانت تسوية يدوية لمعالجة عجز/فائض جردي، أو حركات آلية ناتجة عن فواتير بيع وشراء وترجيع.",
+  overviewCards: [
+    {
+      title: "التسوية الجردية (Stock Adjustment)",
+      description:
+        "إدخال مباشر لتعديل رصيد صنف في مستودع محدد لمطابقة الجرد الفعلي على الرفوف مع الرصيد الدفتري للنظام.",
+      icon: <Boxes className="h-4 w-4" />,
+    },
+    {
+      title: "التتبع المالي والمحاسبي",
+      description:
+        "الفروقات الموجبة تُعامل كإيرادات فروق جرد، بينما العجز يسجل في حساب خسائر العجز أو التلف المحاسبي.",
+      icon: <TrendingUp className="h-4 w-4" />,
+    },
+    {
+      title: "سجل تدقيق كامل (Audit Trail)",
+      description:
+        "كل حركة تسجل اسم المستخدم الذي نفذها، التكلفة التاريخية، التاريخ والوقت بدقة، وسبب التسوية.",
+      icon: <FileCheck className="h-4 w-4" />,
+    },
+    {
+      title: "الربط مع الفواتير والتحويلات",
+      description:
+        "تعرض الشاشة بجانب التسويات كافة حركات الإدخال والإخراج الناتجة عن نقاط البيع، المشتريات، والتحويل بين الفروع.",
+      icon: <RefreshCw className="h-4 w-4" />,
+    },
+  ],
+  matrixTitle: "مصفوفة تأثير العمليات على المخزون والحسابات العامة",
+  matrixDescription:
+    "جدول تحليلي يوضح الأثر الفوري لكل نوع حركة على قاعدة البيانات، القيود اليومية، وأرصدة التكلفة:",
+  impactMatrix: {
+    columns: [
+      { key: "type", label: "نوع الحركة", className: "w-[18%]" },
+      { key: "stockImpact", label: "التأثير على رصيد المستودع", className: "w-[24%]" },
+      { key: "financialImpact", label: "الأثر المالي والقيد المحاسبي", className: "w-[30%]" },
+      { key: "triggerCondition", label: "سبب الحدوث ومصدر البيانات", className: "w-[28%]" },
+    ],
+    rows: [
+      {
+        badge: { label: "تسوية فائض (+)", variant: "emerald" },
+        fields: {
+          type: "تسوية بالزيادة (Adjustment In)",
+          stockImpact: "زيادة الرصيد المتاح للصنف في المستودع المحدد فوراً بالقيمة المدخلة.",
+          financialImpact: "من حـ/ المخزون (مدين) إلى حـ/ أرباح وفروقات جردية (دائن) بسعر التكلفة.",
+          triggerCondition: "اكتشاف بضاعة فعلية زائدة أثناء عمليات الجرد الدوري أو السنوي.",
+        },
+      },
+      {
+        badge: { label: "تسوية عجز (-)", variant: "rose" },
+        fields: {
+          type: "تسوية بالنقص (Adjustment Out)",
+          stockImpact: "تخفيض الرصيد المتاح للصنف لمنع البيع السالب أو الوهمي.",
+          financialImpact: "من حـ/ عجز وفاقد مخزني (مدين) إلى حـ/ المخزون (دائن) بقيمة التكلفة.",
+          triggerCondition: "تلف بضاعة، انتهاء صلاحية، أو نقص مثبت بمحضر جرد رسمي.",
+        },
+      },
+      {
+        badge: { label: "شراء (+)", variant: "blue" },
+        fields: {
+          type: "فاتورة مشتريات (Purchase)",
+          stockImpact: "زيادة كميات المخزون وتحديث متوسط التكلفة المرجح (WAC).",
+          financialImpact: "من حـ/ المخزون إلى حـ/ المورد أو الصندوق/البنك بحسب طريقة الدفع.",
+          triggerCondition: "اعتماد فاتورة مشتريات أو إدخال عبر نقطة المشتريات (POP).",
+        },
+      },
+      {
+        badge: { label: "بيع (-)", variant: "purple" },
+        fields: {
+          type: "فاتورة مبيعات (Sale)",
+          stockImpact: "خصم الكميات المباعة فوراً من مستودع نقطة البيع أو المستودع الرئيسي.",
+          financialImpact: "إثبات الإيراد + قيد تكلفة البضاعة المباعة (COGS) من حـ/ التكلفة إلى حـ/ المخزون.",
+          triggerCondition: "إتمام عملية بيع في الكاشير (POS) أو فاتورة مبيعات معتمدة.",
+        },
+      },
+      {
+        badge: { label: "تحويل (⇄)", variant: "amber" },
+        fields: {
+          type: "تحويل بين مستودعين (Transfer)",
+          stockImpact: "خصم من المستودع المصدر وإضافة إلى المستودع الهدف دون تغيير الإجمالي العام.",
+          financialImpact: "قيد مناقلة بين مراكز التكلفة وحسابات الفروع المعنية دون أثر على الأرباح.",
+          triggerCondition: "مناقلة مخزنية بين المعارض والمستودعات المركزية.",
+        },
+      },
+    ],
+  },
+  stepsTitle: "الخطوات القياسية لتنفيذ تسوية مخزنية صحيحة",
+  steps: [
+    {
+      number: "1",
+      title: "إجراء الجرد الفعلي ومطابقة الباركود",
+      description: "قم بعد الكميات الموجودة فعلياً في المستودع ومقارنتها بالرقم الظاهر في شاشة المخزون.",
+    },
+    {
+      number: "2",
+      title: "تحديد الصنف والمستودع بدقة",
+      description: "تأكد من اختيار المستودع الصحيح لتفادي ترحيل كميات لمستودع فرع آخر بالخطأ.",
+    },
+    {
+      number: "3",
+      title: "تسجيل السبب والمبرر الإداري",
+      description: "كتابة سبب التسوية (مثل: تلف ناتج عن سوء تخزين، عجز جرد شهر مارس) لسلامة التدقيق المالي.",
+    },
+    {
+      number: "4",
+      title: "مراجعة السجل بعد الحفظ",
+      description: "تظهر الحركة فوراً في هذا الجدول مع إبراز المستخدم والوقت والتكلفة لضمان الشفافية.",
+    },
+  ],
+  rulesTitle: "الضوابط والتحذيرات الرقابية",
+  rules: [
+    {
+      type: "danger",
+      title: "منع التعديل بأثر رجعي أو الحذف المباشر",
+      description:
+        "حركات المخزون تُسجل كحركات غير قابلة للحذف (Append-Only)؛ في حال وجود خطأ في تسوية سابقة، يجب تصحيحها بتسوية عكسية جديدة موثقة.",
+    },
+    {
+      type: "warning",
+      title: "صلاحيات الوصول والرقابة الثنائية",
+      description:
+        "صفحة التسويات تقتصر على أصحاب الصلاحيات المخولة (المالك، المدير، المحاسب، أمين المستودع) لمنع أي تلاعب غير مصرح به.",
+    },
+    {
+      type: "info",
+      title: "حماية بيانات الشركة وقاعدة البيانات الحية",
+      description:
+        "جميع الاستعلامات مفهرسة ومهيأة للعمل السريع دون استهلاك موارد الخادم أو التأثير على حركة البيع المستمرة.",
+    },
+  ],
+  footerTip: "فورتيكس ERP — التدقيق الرقمي الموحد والمطابقة المحاسبية اللحظية",
 };
 
 function SettlementsPage() {
@@ -104,6 +249,7 @@ function SettlementsPage() {
             ? "سجل واضح لكل حركة مخزون وتعديل مع مطابقة المستخدم والتاريخ والسبب"
             : "Clear audit trail for stock changes and review steps"
         }
+        guide={settlementGuideConfig}
       />
       <div className="panel-elevated overflow-hidden rounded-3xl border border-border/80 bg-surface/90 shadow-sm">
         <div className="flex flex-wrap items-center gap-2 border-b border-border/70 p-3.5">
