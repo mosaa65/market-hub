@@ -939,7 +939,7 @@ function PurchasePOSPage() {
         </div>
 
         {/* Right Column: Purchase Cart & Invoicing */}
-        <div className="w-full lg:w-[420px] xl:w-[460px] shrink-0 flex flex-col bg-surface/70 backdrop-blur-md overflow-hidden">
+        <div className="w-full lg:w-[420px] xl:w-[460px] shrink-0 flex flex-col bg-surface/70 backdrop-blur-md overflow-y-auto custom-scrollbar">
           {/* Cart Header */}
           <div className="shrink-0 p-3 border-b border-border/70 flex items-center justify-between bg-surface/90">
             <div className="flex items-center gap-2">

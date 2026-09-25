@@ -1520,8 +1520,8 @@ function POSPage() {
           </div>
         </div>
 
-        {/* Cart Panel - Elegant, Fixed Viewport Height, Dedicated Internal Scroll */}
-        <div className="order-1 flex flex-col rounded-3xl border border-border/80 bg-surface/95 shadow-xl p-4 lg:order-2 lg:sticky lg:top-4 h-[650px] lg:h-[calc(100vh-120px)] lg:max-h-[calc(100vh-120px)] overflow-hidden backdrop-blur-md">
+        {/* Cart Panel - Responsive, natural height with internal & page scroll protection */}
+        <div className="order-1 flex flex-col rounded-3xl border border-border/80 bg-surface/95 shadow-xl p-4 lg:order-2 lg:sticky lg:top-4 min-h-[520px] lg:max-h-[calc(100vh-5rem)] overflow-y-auto custom-scrollbar backdrop-blur-md">
           {/* Cart Header */}
           <div className="shrink-0 mb-3 flex items-center justify-between rounded-2xl border border-border/70 bg-gradient-to-l from-primary/10 via-surface-2/40 to-transparent px-3.5 py-2.5 shadow-2xs">
             <div className="flex items-center gap-2">
@@ -1972,6 +1972,7 @@ function POSPage() {
             </div>
 
             {/* Checkout Button */}
+            <div className="shrink-0 mt-2">
             {isOverpaid ? (
               <button
                 type="button"
@@ -2008,6 +2009,7 @@ function POSPage() {
                 </div>
               </button>
             )}
+            </div>
           </div>
         </div>
       </div>

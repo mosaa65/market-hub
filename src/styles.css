@@ -202,22 +202,25 @@
     background: oklch(0.62 0.21 260 / 0.35);
   }
 
-  /* Scrollbar */
+  /* Minimalist overlay scrollbar - track container completely hidden */
   ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
-  }
-  ::-webkit-scrollbar-track {
+    width: 6px;
+    height: 6px;
     background: transparent;
   }
+  ::-webkit-scrollbar-track {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
   ::-webkit-scrollbar-thumb {
-    background: oklch(1 0 0 / 0.06);
-    border-radius: 8px;
-    border: 2px solid transparent;
+    background: oklch(1 0 0 / 0.12);
+    border-radius: 9999px;
+    border: 1px solid transparent;
     background-clip: padding-box;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: oklch(1 0 0 / 0.12);
+    background: oklch(1 0 0 / 0.25);
     background-clip: padding-box;
   }
 }
@@ -319,25 +322,30 @@
 }
 
 
-/* Phase 2: Single unified smooth scrollbar & stable layout */
+/* Sleek minimalist scrollbar: track completely transparent, only thumb visible */
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: hsl(var(--muted-foreground) / 0.25) transparent;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.22) transparent;
   overscroll-behavior: contain;
 }
 
 .custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
+  width: 5px;
+  height: 5px;
   background: transparent;
 }
 
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: hsl(var(--muted-foreground) / 0.25);
+  background-color: hsl(var(--muted-foreground) / 0.22);
   border-radius: 9999px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
@@ -345,5 +353,5 @@
 }
 
 .stable-scrollbar {
-  scrollbar-gutter: stable;
+  /* Gutter disabled to prevent visible container track */
 }

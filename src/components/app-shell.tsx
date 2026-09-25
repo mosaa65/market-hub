@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   LayoutDashboard,
   ScanBarcode,
+  ShoppingBag,
   Package,
   Warehouse,
   Receipt,
@@ -197,6 +198,15 @@ const sections: Section[] = [
         allowedRoles: ["owner", "manager", "accountant", "warehouse"],
         color: "text-blue-400",
         bg: "bg-blue-500/15",
+      },
+      {
+        to: "/purchase-pos",
+        icon: ShoppingBag,
+        key: "nav.purchase_pos",
+        moduleId: "purchases",
+        allowedRoles: ["owner", "manager", "accountant", "warehouse"],
+        color: "text-indigo-400",
+        bg: "bg-indigo-500/15",
       },
       {
         to: "/purchase-returns",
@@ -520,7 +530,7 @@ function SidebarContents({
       {/* Navigation Links */}
       <nav
         className={cn(
-          "flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-gutter:stable] custom-scrollbar",
+          "flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain custom-scrollbar",
           collapsed
             ? "px-2 py-3 space-y-2"
             : "px-3 py-3.5 space-y-4",
@@ -976,14 +986,12 @@ export function AppShell({
 
         <main
           className={cn(
-            "flex-1 min-h-0",
-            isPosRoute
-              ? "overflow-hidden flex flex-col"
-              : "overflow-y-auto custom-scrollbar stable-scrollbar"
+            "flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar",
+            isPosRoute ? "flex flex-col" : ""
           )}
         >
           {isPosRoute ? (
-            <div className="flex-1 min-h-0 flex flex-col">{children}</div>
+            <div className="flex-1 min-h-0 flex flex-col p-3 sm:p-5 pb-16">{children}</div>
           ) : (
             <>
               <div className="mx-auto w-full max-w-[1400px] p-4 sm:p-6">
