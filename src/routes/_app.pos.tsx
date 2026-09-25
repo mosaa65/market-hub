@@ -32,6 +32,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { money } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
+import { type PageGuideConfig } from "@/components/page-guide";
+import { ShoppingCart, Zap, CreditCard, ShieldCheck, Barcode, Scale, ArrowRightLeft, DollarSign } from "lucide-react";
 import { toast } from "sonner";
 import { BarcodeScanner } from "@/components/barcode-scanner";
 import { useKeyboardWedge } from "@/hooks/use-keyboard-wedge";
@@ -102,6 +104,99 @@ interface Compatibility {
   product_id: string;
   vehicle_model_id: string;
 }
+
+
+const posGuideConfig: PageGuideConfig = {
+  title: "دليل نقطة البيع والكاشير المتقدم (POS)",
+  subtitle: "شرح شامل لدورة البيع السريع، الأثر المخزني والمالي، معالجة الدفع، واختصارات لوحة المفاتيح.",
+  badge: "كاشير ونقاط البيع السريعة",
+  icon: <ShoppingCart className="h-5 w-5 text-sky-500" />,
+  summaryText: "صُممت نقطة البيع لتقديم تجربة كاشير فائقة السرعة مع تحديث فوري للمخزون والحسابات المالية لحظة بلحظة وبدون الحاجة لإعادة تحميل الصفحة.",
+  overviewCards: [
+    {
+      title: "مسح باركود فوري وبحث مرن",
+      description: "دعم كامل لقوارئ الباركود السلكية واللاسلكية وكاميرا الجوال مع البحث الذكي بالاسم أو الكود (اختصار F2).",
+      icon: <Barcode className="h-4 w-4" />
+    },
+    {
+      title: "تعدد وتنوع طرق السداد",
+      description: "سداد نقدي، عبر نقاط البيع (شبكة/مدى/فيزا)، تحويلات بنكية، أو مبيعات آجلة مع التحقق من سقف العميل.",
+      icon: <CreditCard className="h-4 w-4" />
+    },
+    {
+      title: "الخصم الفوري والتحكم المالي",
+      description: "خصم تلقائي لكميات المنتجات من مستودع نقطة البيع المختار فور تأكيد العملية لمنع العجز والبيع الزائد.",
+      icon: <Scale className="h-4 w-4" />
+    },
+    {
+      title: "طباعة وحفظ فوري",
+      description: "إتمام الفاتورة وطباعة الإيصال الحراري بضغطة زر واحدة أو باختصار لوحة المفاتيح (F4).",
+      icon: <Zap className="h-4 w-4" />
+    }
+  ],
+  matrixTitle: "مصفوفة الأثر المالي والمخزني لعمليات الكاشير",
+  matrixDescription: "جدول تفصيلي يوضح كيفية تأثير كل طريقة دفع وحركة في نقطة البيع على القيود المحاسبية ورصيد المخزون:",
+  impactMatrix: {
+    columns: [
+      { key: "paymentType", label: "طريقة العملية", className: "w-[20%]" },
+      { key: "inventoryImpact", label: "التأثير المخزني", className: "w-[25%]" },
+      { key: "accountingImpact", label: "القيد المحاسبي والأثر المالي", className: "w-[30%]" },
+      { key: "controls", label: "شروط وضوابط العملية", className: "w-[25%]" }
+    ],
+    rows: [
+      {
+        badge: { label: "سداد نقدي (Cash)", variant: "emerald" },
+        fields: {
+          paymentType: "فاتورة كاش فورية",
+          inventoryImpact: "خصم الكميات من مستودع الفرع فوراً وتحديث الرصيد الفعلي.",
+          accountingImpact: "من حـ/ الصندوق (مدين) إلى حـ/ المبيعات (دائن) + إثبات تكلفة البضاعة المباعة.",
+          controls: "تسجيل المبلغ المستلم وحساب الفكة/المتبقي للعميل آلياً."
+        }
+      },
+      {
+        badge: { label: "دفع إلكتروني (Card/Network)", variant: "blue" },
+        fields: {
+          paymentType: "شبكة / مدى / بطاقة",
+          inventoryImpact: "خصم الكميات فوراً من مستودع الفرع.",
+          accountingImpact: "من حـ/ البنك أو وسيط الدفع (مدين) إلى حـ/ المبيعات (دائن).",
+          controls: "مطابقة إشعار جهاز الدفع الإلكتروني قبل اعتماد الفاتورة."
+        }
+      },
+      {
+        badge: { label: "مبيعات آجلة (Credit)", variant: "purple" },
+        fields: {
+          paymentType: "على الحساب (ذمم عملاء)",
+          inventoryImpact: "خصم الكميات فوراً من مستودع الفرع.",
+          accountingImpact: "من حـ/ العميل (مدين) إلى حـ/ المبيعات (دائن) بزيادة رصيد مديونية العميل.",
+          controls: "اشتراط اختيار عميل حقيقي غير نقدي والتحقق من عدم تجاوز الحد الائتماني."
+        }
+      },
+      {
+        badge: { label: "تحويل بنكي (Transfer)", variant: "amber" },
+        fields: {
+          paymentType: "حوالة / إيداع بنكي",
+          inventoryImpact: "خصم الكميات فوراً من المستودع.",
+          accountingImpact: "من حـ/ الحساب الجاري بالبنك (مدين) إلى حـ/ المبيعات (دائن).",
+          controls: "إدخال رقم الحوالة أو المرجع في حقل الملاحظات لسهولة المطابقة البنكية."
+        }
+      }
+    ]
+  },
+  stepsTitle: "خطوات إتمام عملية بيع نموذجية في الكاشير",
+  steps: [
+    { number: "1", title: "تجهيز السلة والأصناف", description: "امسح الباركود بالقارئ السريع أو ابحث بالاسم بالضغط على (F2) وانقر لإضافة المنتج للسلة." },
+    { number: "2", title: "تعديل الكميات والخصومات", description: "عدل كمية كل صنف، وطبق الخصم الإجمالي إن وجد وفق الصلاحيات المخولة لك." },
+    { number: "3", title: "تحديد العميل وطريقة الدفع", description: "اترك العميل الافتراضي للمبيعات النقدية، أو اختر العميل المسجل للمبيعات الآجلة، وحدد طريقة السداد." },
+    { number: "4", title: "الحفظ والطباعة (F4)", description: "اضغط زر حفظ الفاتورة أو F4 لإصدار الفاتورة فوراً وطباعة إيصال الكاشير الحراري." }
+  ],
+  rulesTitle: "إرشادات السلامة والرقابة التشغيلية",
+  rules: [
+    { type: "danger", title: "التحقق من الرصيد لمنع المخزون السالب", description: "النظام يمنع استكمال البيع إذا كانت الكمية المطلوبة غير متوفرة في المستودع المختار إلا إذا كان البيع على المكشوف مصرحاً به." },
+    { type: "warning", title: "تدقيق أسعار البيع والخصم", description: "لا يُسمح بتعديل سعر البيع إلى أقل من سعر التكلفة إلا بموافقة إدارية لحماية هوامش الربحية." },
+    { type: "info", title: "حفظ فوري دون فقدان الجلسة", description: "جميع بنود السلة محمية محلياً في الذاكرة السريعة لمنع ضياع الفاتورة في حال انقطاع الاتصال المؤقت." }
+  ],
+  footerTip: "فورتيكس ERP — نظام الكاشير ونقاط البيع السريعة المعتمد"
+};
 
 function POSPage() {
   const { isModuleEnabled } = useModules();
@@ -991,7 +1086,7 @@ function POSPage() {
 
   return (
     <>
-      <PageHeader title={t("pos.title")} subtitle={t("pos.subtitle")} />
+      <PageHeader title={t("pos.title")} subtitle={t("pos.subtitle")} guide={posGuideConfig} />
 
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_440px]">
         {/* Products Panel */}

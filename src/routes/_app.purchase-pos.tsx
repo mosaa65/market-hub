@@ -34,6 +34,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { money } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
+import { PageGuideButton, type PageGuideConfig } from "@/components/page-guide";
+import { ShoppingBag, DollarSign, Archive } from "lucide-react";
 import { toast } from "sonner";
 import { BarcodeScanner } from "@/components/barcode-scanner";
 import { useKeyboardWedge } from "@/hooks/use-keyboard-wedge";
@@ -104,6 +106,99 @@ interface Compatibility {
   product_id: string;
   vehicle_model_id: string;
 }
+
+
+const purchasePosGuideConfig: PageGuideConfig = {
+  title: "دليل نقطة المشتريات السريعة والتوريد (POP)",
+  subtitle: "شرح لدورة إدخال البضاعة اللحظية، تحديث أسعار التكلفة والمخزون، ومعالجة الموردين النقديين والآجلين.",
+  badge: "توريد ومشتريات سريعة",
+  icon: <ShoppingBag className="h-5 w-5 text-sky-500" />,
+  summaryText: "تم تصميم واجهة نقطة المشتريات (Point of Purchase) لتمنح مسؤولي المشتريات وأمناء المخازن نفس سلاسة وسرعة الكاشير، لتوثيق استلام البضائع وزيادة الأرصدة وتعديل أسعار الشراء لحظة بلحظة.",
+  overviewCards: [
+    {
+      title: "دعم كامل للمورد النقدي (Cash Vendor)",
+      description: "إمكانية الشراء السريع والنثري دون الحاجة لفتح حساب مالي مستقل لكل بائع عابر في السوق.",
+      icon: <DollarSign className="h-4 w-4" />
+    },
+    {
+      title: "تعديل فوري لسعر التكلفة لكل صنف",
+      description: "إمكانية مراجعة وتحديث سعر الشراء مباشرة في السلة لكل بند ليتناسب مع فاتورة المورد الفعلية.",
+      icon: <Truck className="h-4 w-4" />
+    },
+    {
+      title: "إضافة فورية للرصيد بالمستودع",
+      description: "زيادة كميات المخزون وتحديث متوسط التكلفة في المستودع المختار فور الضغط على زر الحفظ.",
+      icon: <Archive className="h-4 w-4" />
+    },
+    {
+      title: "حفظ سريع باختصار لوحة المفاتيح",
+      description: "البحث السريع بـ (F2) وحفظ وتأكيد فاتورة الشراء بالكامل بضغطة زر أو اختصار (F4).",
+      icon: <Zap className="h-4 w-4" />
+    }
+  ],
+  matrixTitle: "مصفوفة الأثر المالي والمخزني لفواتير المشتريات السريعة",
+  matrixDescription: "جدول تحليلي يوضح قيود اليومية وتأثير حركة الشراء على الذمم وأرصدة المستودعات:",
+  impactMatrix: {
+    columns: [
+      { key: "purchaseType", label: "نوع العملية وطريقة السداد", className: "w-[22%]" },
+      { key: "inventoryImpact", label: "التأثير المخزني", className: "w-[24%]" },
+      { key: "financialImpact", label: "الأثر المالي والقيد المحاسبي", className: "w-[30%]" },
+      { key: "auditControls", label: "الضوابط والتدقيق", className: "w-[24%]" }
+    ],
+    rows: [
+      {
+        badge: { label: "شراء نقدي كاش", variant: "emerald" },
+        fields: {
+          purchaseType: "فاتورة مشتريات نقدية كاملة",
+          inventoryImpact: "زيادة رصيد المستودع المختار فوراً بالكميات المستلمة.",
+          accountingImpact: "من حـ/ المخزون (مدين) إلى حـ/ الصندوق أو العهدة النقدية (دائن).",
+          auditControls: "تسوية فورية دون تسجيل أي ذمة أو مديونية على المنشأة."
+        }
+      },
+      {
+        badge: { label: "شراء آجل (ذمم موردين)", variant: "purple" },
+        fields: {
+          purchaseType: "فاتورة مشتريات على الحساب",
+          inventoryImpact: "زيادة رصيد المستودع بالكميات المستلمة.",
+          accountingImpact: "من حـ/ المخزون (مدين) إلى حـ/ المورد المختار (دائن) كالتزام مالي.",
+          auditControls: "اشتراط اختيار مورد معتمد ومطابقة كشف حساب المورد لاحقاً."
+        }
+      },
+      {
+        badge: { label: "سداد بنكي / شبكة", variant: "blue" },
+        fields: {
+          purchaseType: "دفع بالتحويل أو البطاقة",
+          inventoryImpact: "زيادة كميات المخزون وتحديث التكلفة.",
+          accountingImpact: "من حـ/ المخزون (مدين) إلى حـ/ البنك أو الحساب الجاري (دائن).",
+          auditControls: "توثيق رقم المرجع البنكي في حقل الملاحظات."
+        }
+      },
+      {
+        badge: { label: "سداد جزئي", variant: "amber" },
+        fields: {
+          purchaseType: "دفع دفعة مقدمة والباقي آجل",
+          inventoryImpact: "زيادة كامل كميات البضاعة في المستودع.",
+          accountingImpact: "قيد مركب: إلى حـ/ الصندوق (بالمبلغ المدفوع) وحـ/ المورد (بالمتبقي).",
+          auditControls: "تحديث رصيد المورد التراكمي بالمبلغ المتبقي غير المسدد فقط."
+        }
+      }
+    ]
+  },
+  stepsTitle: "الخطوات القياسية لتسجيل مشتريات سريعة",
+  steps: [
+    { number: "1", title: "اختيار المستودع والمورد", description: "حدد المستودع الذي ستدخل إليه البضاعة، واختر المورد (أو اترك المورد النقدي الافتراضي للمشتريات العاجلة)." },
+    { number: "2", title: "مسح أو اختيار المنتجات", description: "ابحث بالاسم أو امسح الباركود لإضافة الأصناف المطلوبة إلى سلة الشراء." },
+    { number: "3", title: "مراجعة سعر الشراء والكمية", description: "تأكد من مطابقة سعر التكلفة للوحدة مع فاتورة المورد الورقية وعدل الكميات بدقة." },
+    { number: "4", title: "تحديد الدفع والحفظ (F4)", description: "اختر طريقة السداد (نقدي/آجل/بنكي) واضغط زر الحفظ (F4) لترحيل الفاتورة فوراً." }
+  ],
+  rulesTitle: "ضوابط الرقابة وسلامة التكلفة",
+  rules: [
+    { type: "danger", title: "دقة تكلفة الشراء", description: "سعر الشراء المدخل هو الأساس لحساب متوسط تكلفة الصنف وأرباح المبيعات لاحقاً، احرص على مطابقته التامة مع الفاتورة الضريبية." },
+    { type: "warning", title: "تحديد المستودع بعناية", description: "لا يمكن تعديل المستودع بعد حفظ الفاتورة؛ تأكد من المستودع الفعلي الذي تم تفريغ البضاعة فيه لتجنب فروقات الجرد." },
+    { type: "info", title: "تحديث المخزون التلقائي", description: "يقوم النظام بتحديث رصيد الصنف محلياً وعبر السيرفر فوراً دون الحاجة لتحديث الصفحة." }
+  ],
+  footerTip: "فورتيكس ERP — وحدة التوريد ونقاط المشتريات السريعة"
+};
 
 function PurchasePOSPage() {
   const { isModuleEnabled } = useModules();
@@ -602,6 +697,9 @@ function PurchasePOSPage() {
               className="bg-transparent text-xs text-foreground outline-none cursor-pointer font-mono"
             />
           </div>
+
+          {/* Page Guide Button */}
+          <PageGuideButton config={purchasePosGuideConfig} className="!h-8 !w-8" />
 
           {/* Barcode Camera Modal Trigger */}
           <button
