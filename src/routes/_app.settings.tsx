@@ -1,5 +1,4 @@
 import { SubscriptionSettingsCard } from "@/components/subscription-settings-card";
-import { StatementSettingsCard } from "@/components/statements/statement-settings-card";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/page-header";
@@ -152,8 +151,6 @@ function SettingsPage() {
       />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <SubscriptionSettingsCard />
-        {/* Statement Customization — Phase 9 of the statements plan */}
-        <StatementSettingsCard canEdit={canEdit} />
         {/* Industry & Catalog Modules Card */}
         <Card className="lg:col-span-2 border-primary/30 bg-gradient-to-r from-primary/5 via-surface to-surface">
           <CardHeader>

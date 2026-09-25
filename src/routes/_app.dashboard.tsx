@@ -48,9 +48,37 @@ const CHART_COLORS = [
   "oklch(0.75 0.15 140)",
 ];
 
+// Theme-aware tooltip styling shared by every chart on this page. Recharts paints each
+// payload item with the series colour, so itemStyle is explicit to keep tooltip text readable.
+const TOOLTIP_STYLE = {
+  background: "var(--popover)",
+  color: "var(--popover-foreground)",
+  border: "1px solid var(--border)",
+  borderRadius: 12,
+  fontSize: 12,
+  boxShadow: "var(--shadow-elegant)",
+} as const;
+const TOOLTIP_ITEM_STYLE = { color: "var(--popover-foreground)" } as const;
+const TOOLTIP_LABEL_STYLE = { color: "var(--muted-foreground)", marginBottom: 4 } as const;
+const CHART_GRID_STROKE = "var(--border)";
+
+// Reuses the app-wide pos.pm.* strings; raw payment_method enum values are never shown.
+function paymentMethodLabel(method: string | null | undefined, isAr: boolean): string {
+  const map: Record<string, string> = {
+    cash: isAr ? "نقدًا" : "Cash",
+    card: isAr ? "بطاقة" : "Card",
+    bank_transfer: isAr ? "تحويل بنكي" : "Bank transfer",
+    bank: isAr ? "تحويل بنكي" : "Bank",
+    credit: isAr ? "آجل" : "Credit",
+  };
+  if (!method) return isAr ? "غير محدد" : "Unspecified";
+  return map[method] ?? method;
+}
+
 function DashboardPage() {
   const { isModuleEnabled } = useModules();
   const { t, lang } = useI18n();
+  const isAr = lang === "ar";
 
   const { data } = useQuery({
     queryKey: ["dashboard-v2"],
@@ -121,10 +149,12 @@ function DashboardPage() {
         .sort((a, b) => b.total - a.total)
         .slice(0, 5);
 
-      // Payment mix
+      // Payment mix — resolved through the pos.pm.* strings so raw enum values
+      // (cash / card / bank_transfer / credit) never reach the user.
       const paySplit: Record<string, number> = {};
       salesRows.forEach((r: any) => {
-        paySplit[r.payment_method] = (paySplit[r.payment_method] ?? 0) + Number(r.paid);
+        const label = paymentMethodLabel(r.payment_method, lang === "ar");
+        paySplit[label] = (paySplit[label] ?? 0) + Number(r.paid);
       });
 
       const totalRev = salesRows.reduce((a, r: any) => a + Number(r.total), 0);
@@ -268,17 +298,10 @@ function DashboardPage() {
                     </linearGradient>
                   </defs>
                   <Tooltip
-                    contentStyle={{
-                      background: "rgba(20, 20, 25, 0.95)",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      borderRadius: 10,
-                      fontSize: 11,
-                      color: "#fff",
-                    }}
-                    formatter={(val: any) => [
-                      money(Number(val)),
-                      lang === "ar" ? "الإيراد" : "Revenue",
-                    ]}
+                    contentStyle={TOOLTIP_STYLE}
+                    itemStyle={TOOLTIP_ITEM_STYLE}
+                    labelStyle={TOOLTIP_LABEL_STYLE}
+                    formatter={(val: any) => [money(Number(val)), isAr ? "الإيراد" : "Revenue"]}
                   />
                   <Area
                     type="monotone"
@@ -343,10 +366,9 @@ function DashboardPage() {
               <p className="text-xs text-muted-foreground">{t("dash.last_14_days")}</p>
             </div>
             <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-              <span className="h-2 w-2 rounded-full bg-primary" />{" "}
-              {lang === "ar" ? "الإيراد" : "Revenue"}
+              <span className="h-2 w-2 rounded-full bg-primary" /> {isAr ? "الإيراد" : "Revenue"}
               <span className="ms-2 h-2 w-2 rounded-full bg-chart-2" />{" "}
-              {lang === "ar" ? "الطلبات" : "Orders"}
+              {isAr ? "الطلبات" : "Orders"}
             </div>
           </div>
           <div className="h-64">
@@ -362,11 +384,7 @@ function DashboardPage() {
                     <stop offset="100%" stopColor="#06b6d4" stopOpacity={0.0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid
-                  stroke="rgba(255,255,255,0.06)"
-                  strokeDasharray="3 3"
-                  vertical={false}
-                />
+                <CartesianGrid stroke={CHART_GRID_STROKE} strokeDasharray="3 3" vertical={false} />{" "}
                 <XAxis
                   dataKey="day"
                   stroke="currentColor"
@@ -395,22 +413,18 @@ function DashboardPage() {
                   allowDecimals={false}
                 />
                 <Tooltip
-                  contentStyle={{
-                    background: "rgba(20, 20, 25, 0.95)",
-                    border: "1px solid rgba(255,255,255,0.12)",
-                    borderRadius: 12,
-                    fontSize: 12,
-                    color: "#fff",
-                  }}
+                  contentStyle={TOOLTIP_STYLE}
+                  itemStyle={TOOLTIP_ITEM_STYLE}
+                  labelStyle={TOOLTIP_LABEL_STYLE}
                   formatter={(val: any, name: any) => [
                     name === "revenue"
                       ? money(Number(val))
-                      : `${num(Number(val))} ${lang === "ar" ? "طلب" : "orders"}`,
+                      : `${num(Number(val))} ${isAr ? "طلب" : "orders"}`,
                     name === "revenue"
-                      ? lang === "ar"
+                      ? isAr
                         ? "الإيراد"
                         : "Revenue"
-                      : lang === "ar"
+                      : isAr
                         ? "عدد الفواتير"
                         : "Orders",
                   ]}
@@ -464,12 +478,10 @@ function DashboardPage() {
                     ))}
                   </Pie>
                   <Tooltip
-                    contentStyle={{
-                      background: "oklch(0.18 0.007 270)",
-                      border: "1px solid oklch(1 0 0 / 0.08)",
-                      borderRadius: 12,
-                      fontSize: 12,
-                    }}
+                    contentStyle={TOOLTIP_STYLE}
+                    itemStyle={TOOLTIP_ITEM_STYLE}
+                    labelStyle={TOOLTIP_LABEL_STYLE}
+                    formatter={(val: any, name: any) => [money(Number(val)), name]}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -478,7 +490,7 @@ function DashboardPage() {
           <div className="mt-2 space-y-1.5">
             {paymentPie.map((p, i) => (
               <div key={p.name} className="flex items-center justify-between text-xs">
-                <span className="flex items-center gap-2 capitalize text-muted-foreground">
+                <span className="flex items-center gap-2 text-muted-foreground">
                   <span
                     className="h-2 w-2 rounded-full"
                     style={{ background: CHART_COLORS[i % CHART_COLORS.length] }}

@@ -224,11 +224,11 @@ export const SYSTEM_PLANS: PlatformPlan[] = [
       ar: "للأنشطة الصغيرة: مبيعات ومخزون مبسط ومستودع واحد",
       en: "Essential single-location sales, products and inventory",
     },
-    modules: ["core"],
+    modules: ["core", "pos"],
     maxUsers: 1,
     maxWarehouses: 1,
     maxProducts: 500,
-    priceMonthly: 0,
+    priceMonthly: 15,
   },
   {
     id: "professional",

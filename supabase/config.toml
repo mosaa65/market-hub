@@ -3,3 +3,18 @@ project_id = "slmnyjontxydoyuvqitm"
 [db.seed]
 enabled = true
 sql_paths = ["./seeds/seed.sql"]
+
+# ---------------------------------------------------------------------------
+# Edge Functions
+# ---------------------------------------------------------------------------
+# admin-create-user provisions store staff accounts (Auth user + profile +
+# store role) through the Supabase Admin API. That API requires a secret key
+# which must never reach the browser, so this function is the only place the
+# key is used.
+#
+# verify_jwt = true -> calls without a bearer token are rejected by the
+# platform before the function body runs. The function additionally re-derives
+# the caller's permissions from the database, so a valid token alone is never
+# sufficient to create a user.
+[functions.admin-create-user]
+verify_jwt = true
