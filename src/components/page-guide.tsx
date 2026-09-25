@@ -84,6 +84,7 @@ export function PageGuideButton({
 }) {
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "matrix" | "steps" | "security">("overview");
+  const impactMatrix = config.impactMatrix;
 
   return (
     <>
@@ -240,7 +241,7 @@ export function PageGuideButton({
             )}
 
             {/* TAB 2: SUPABASE-STYLE IMPACT MATRIX */}
-            {activeTab === "matrix" && config.impactMatrix && (
+            {activeTab === "matrix" && impactMatrix && (
               <div className="space-y-4">
                 {(config.matrixTitle || config.matrixDescription) && (
                   <div>
@@ -262,7 +263,7 @@ export function PageGuideButton({
                     <table className="w-full text-start text-xs">
                       <thead>
                         <tr className="border-b border-border/80 bg-muted/40 font-mono text-[11px] text-muted-foreground">
-                          {config.impactMatrix.columns.map((col) => (
+                          {impactMatrix.columns.map((col) => (
                             <th
                               key={col.key}
                               className={cn("px-4 py-3 font-semibold", col.className)}
@@ -273,12 +274,12 @@ export function PageGuideButton({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border/60">
-                        {config.impactMatrix.rows.map((row, rIdx) => (
+                        {impactMatrix.rows.map((row, rIdx) => (
                           <tr
                             key={rIdx}
                             className="transition-colors hover:bg-accent/40"
                           >
-                            {config.impactMatrix.columns.map((col, cIdx) => (
+                            {impactMatrix.columns.map((col, cIdx) => (
                               <td
                                 key={col.key}
                                 className={cn(

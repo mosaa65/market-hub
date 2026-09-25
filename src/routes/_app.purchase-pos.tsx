@@ -445,8 +445,10 @@ function PurchasePOSPage() {
     scanHandlerRef.current = handleBarcode;
   });
 
-  useKeyboardWedge((scanned) => {
-    scanHandlerRef.current(scanned);
+  useKeyboardWedge({
+    onScan: (scanned) => {
+      scanHandlerRef.current(scanned);
+    },
   });
 
   // Hotkeys: F2 search, F4 submit, Esc clear
@@ -1305,6 +1307,7 @@ function PurchasePOSPage() {
       {/* Barcode Camera Scanner */}
       {scannerOpen && (
         <BarcodeScanner
+          open={scannerOpen}
           onDetected={(code) => {
             setScannerOpen(false);
             handleBarcode(code);

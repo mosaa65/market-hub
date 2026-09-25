@@ -192,16 +192,38 @@ function SettlementsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["settlements"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: movements, error } = await supabase
         .from("stock_movements")
         .select(
-          "id, movement_type, quantity, note, created_at, product_id, warehouse_id, created_by, unit_cost, reference, reference_type, products(id,name,name_ar,sku), warehouses(id,name,name_ar,code), profiles(full_name)",
+          "id, movement_type, quantity, note, created_at, product_id, warehouse_id, created_by, unit_cost, reference, reference_type, products(id,name,name_ar,sku), warehouses(id,name,name_ar,code)",
         )
-        .in("movement_type", ["adjustment", "purchase", "sale", "transfer", "return"])
+        .in("movement_type", [
+          "adjustment",
+          "purchase",
+          "sale",
+          "transfer_in",
+          "transfer_out",
+          "return_in",
+          "return_out",
+          "purchase_return",
+          "sale_return",
+        ])
         .order("created_at", { ascending: false })
         .limit(200);
       if (error) throw error;
-      return (data ?? []) as SettlementRow[];
+
+      const userIds = [
+        ...new Set((movements ?? []).flatMap((row) => (row.created_by ? [row.created_by] : []))),
+      ];
+      const { data: profiles } = userIds.length
+        ? await supabase.from("profiles").select("id, full_name").in("id", userIds)
+        : { data: [] };
+      const profileById = new Map((profiles ?? []).map((profile) => [profile.id, profile]));
+
+      return (movements ?? []).map((movement) => ({
+        ...movement,
+        profiles: movement.created_by ? profileById.get(movement.created_by) ?? null : null,
+      })) as SettlementRow[];
     },
     enabled: canManageSettlement,
   });
