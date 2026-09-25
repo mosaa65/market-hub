@@ -179,6 +179,7 @@ export function DataTable<T>({
   stickyTop,
 }: DataTableProps<T>) {
   const scrollRef = React.useRef<HTMLDivElement>(null);
+  const headerScrollRef = React.useRef<HTMLDivElement>(null);
   const sentinelRef = React.useRef<HTMLDivElement>(null);
   const toolbarRef = React.useRef<HTMLDivElement>(null);
   const [page, setPage] = React.useState(1);
@@ -280,20 +281,6 @@ export function DataTable<T>({
     return () => observer.disconnect();
   }, [infinite, hasMore, onLoadMore, loadingMore]);
 
-  /* ---- sort toggle (3-state: asc → desc → none) ---- */
-  const handleSortToggle = (col: DataTableColumn<T>) => {
-    if (!col.sortable || !onSortChange) return;
-    if (sort?.key !== col.key) {
-      onSortChange({ key: col.key, direction: "asc" });
-      return;
-    }
-    if (sort.direction === "asc") {
-      onSortChange({ key: col.key, direction: "desc" });
-      return;
-    }
-    onSortChange(null);
-  };
-
   /* ---- error ---- */
   if (error) {
     return (
@@ -316,6 +303,19 @@ export function DataTable<T>({
    * with the other hooks at the top of the component.
    */
   const stickyOffset = stickyTop ?? "0px";
+  const tableClassName = cn(
+    "w-full border-collapse text-sm",
+    minWidth || horizontalScroll ? "table-auto" : "table-fixed",
+  );
+  const tableStyle = minWidth ? { minWidth } : undefined;
+  const detachedHeader = horizontalScroll && stickyHeader;
+
+  const syncHorizontalScroll = (source: "header" | "body") => (event: React.UIEvent<HTMLDivElement>) => {
+    const target = source === "header" ? scrollRef.current : headerScrollRef.current;
+    if (target && target.scrollLeft !== event.currentTarget.scrollLeft) {
+      target.scrollLeft = event.currentTarget.scrollLeft;
+    }
+  };
 
   return (
     <div
@@ -342,25 +342,39 @@ export function DataTable<T>({
           action={empty?.action}
         />
       ) : (
-        <div
+        <>
+          {/* A horizontally scrollable element cannot also anchor a sticky table
+           * header to the page. Keep an identical, scroll-synchronised header
+           * outside the panning body: labels stay visible while the page scrolls
+           * and the body retains natural two-axis touch gestures. */}
+          {detachedHeader ? (
+            <div
+              className="sticky z-20 border-b border-border bg-surface-2/85 shadow-[0_5px_14px_oklch(0_0_0/0.06)] backdrop-blur-xl"
+              style={{ top: "calc(var(--ds-sticky-top,0px) + var(--ds-toolbar-h,0px))" }}
+            >
+              <div
+                ref={headerScrollRef}
+                onScroll={syncHorizontalScroll("header")}
+                className="w-full overflow-x-auto overscroll-x-contain custom-scrollbar"
+              >
+                <table className={tableClassName} style={tableStyle}>
+                  <TableHead
+                    columns={visibleColumns}
+                    sort={sort}
+                    onSortChange={onSortChange}
+                    pinFirst={pinFirst}
+                  />
+                </table>
+              </div>
+            </div>
+          ) : null}
+          <div
           ref={scrollRef}
+          onScroll={detachedHeader ? syncHorizontalScroll("body") : undefined}
           className={cn(
-            /* No `overflow` here. Both `overflow-x: auto` and `overflow-y: clip`
-             * were measured and both break the sticky table header:
-             *
-             *  - `overflow-x: auto` computes `overflow-y` to `auto`, making this
-             *    div a scroll container — so it becomes the containing block for
-             *    the sticky `<thead>` and the header scrolls away with the page
-             *    (measured: `theadTop: -617` after scrolling 900px).
-             *  - `overflow-y: clip` does not create a scroll container, but it
-             *    *clips* the pinned header, which is worse: the header is still
-             *    positioned but invisible, and the wrapper would not actually
-             *    scroll horizontally either (`scrollLeft` stayed at 0).
-             *
-             * Leaving overflow visible lets the sticky header resolve against
-             * `<main>` (the real scroll container) and pin correctly. The wide
-             * -table problem this creates on phones is handled by the responsive
-             * column strategy in `_app.products.tsx`, not by this wrapper. */
+            /* The detached header above is synchronised with this body scroller,
+             * so horizontal panning remains direct and its labels stay pinned to
+             * the app's real vertical scrolling surface. */
             horizontalScroll
               ? "w-full overflow-x-auto overscroll-x-contain custom-scrollbar"
               : "w-full overscroll-x-contain",
@@ -379,83 +393,17 @@ export function DataTable<T>({
              * instead of expanding the table. It is applied from `sm` up only
              * when a `minWidth` is requested (wide accounting tables that are
              * *meant* to scroll); otherwise it applies at every width. */
-            className={cn(
-              "w-full border-collapse text-sm",
-              minWidth || horizontalScroll ? "table-auto" : "table-fixed",
-            )}
-            style={minWidth ? { minWidth } : undefined}
+            className={tableClassName}
+            style={tableStyle}
           >
-            <thead
-              className={cn(
-                stickyHeader &&
-                  "sticky z-20 bg-surface-2/70 backdrop-blur-md [top:calc(var(--ds-sticky-top,0px)+var(--ds-toolbar-h,0px))]",
-                !stickyHeader && "bg-surface-2/50",
-              )}
-            >
-              <tr className="border-b border-border">
-                {visibleColumns.map((col) => {
-                  const active = sort?.key === col.key;
-                  const stickyCol = col.sticky ?? (pinFirst && col === visibleColumns[0]);
-                  return (
-                    <th
-                      key={col.key}
-                      scope="col"
-                      aria-sort={
-                        active
-                          ? sort?.direction === "asc"
-                            ? "ascending"
-                            : "descending"
-                          : col.sortable
-                            ? "none"
-                            : undefined
-                      }
-                      className={cn(
-                        "h-10 px-3 align-middle text-[11px] font-semibold uppercase tracking-wider text-muted-foreground first:rounded-s-xl first:ps-4 last:rounded-e-xl last:pe-4",
-                        "whitespace-normal sm:whitespace-nowrap",
-                        col.align === "end"
-                          ? "text-end"
-                          : col.align === "center"
-                            ? "text-center"
-                            : "text-start",
-                        col.width,
-                        col.className,
-                        col.hideBelow && HIDE_BELOW[col.hideBelow],
-                        stickyCol && "sticky start-0 z-30 bg-surface-2",
-                      )}
-                    >
-                      {col.sortable && onSortChange ? (
-                        <button
-                          type="button"
-                          onClick={() => handleSortToggle(col)}
-                          aria-label={
-                            typeof col.header === "string" ? `Sort by ${col.header}` : "Sort"
-                          }
-                          className={cn(
-                            "inline-flex items-center gap-1 rounded-sm transition-colors hover:text-foreground",
-                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-                            col.align === "end" && "flex-row-reverse",
-                            active && "text-primary",
-                          )}
-                        >
-                          <span>{col.header}</span>
-                          {active ? (
-                            sort?.direction === "asc" ? (
-                              <ArrowUp className="size-3" aria-hidden />
-                            ) : (
-                              <ArrowDown className="size-3" aria-hidden />
-                            )
-                          ) : (
-                            <ChevronsUpDown className="size-3 opacity-40" aria-hidden />
-                          )}
-                        </button>
-                      ) : (
-                        col.header
-                      )}
-                    </th>
-                  );
-                })}
-              </tr>
-            </thead>
+            <TableHead
+              columns={visibleColumns}
+              sort={sort}
+              onSortChange={onSortChange}
+              pinFirst={pinFirst}
+              sticky={stickyHeader && !detachedHeader}
+              visuallyHidden={detachedHeader}
+            />
 
             <tbody>
               {displayRows.map((row, index) => (
@@ -531,7 +479,8 @@ export function DataTable<T>({
               </button>
             </div>
           ) : null}
-        </div>
+          </div>
+        </>
       )}
 
       {/* ---------- Caption ---------- */}
@@ -550,6 +499,102 @@ export function DataTable<T>({
 /* ------------------------------------------------------------------ */
 /*  Skeleton                                                          */
 /* ------------------------------------------------------------------ */
+
+function TableHead<T>({
+  columns,
+  sort,
+  onSortChange,
+  pinFirst,
+  sticky = false,
+  visuallyHidden = false,
+}: {
+  columns: DataTableColumn<T>[];
+  sort: DataTableSort | null;
+  onSortChange?: (sort: DataTableSort | null) => void;
+  pinFirst: boolean;
+  sticky?: boolean;
+  visuallyHidden?: boolean;
+}) {
+  const toggleSort = (column: DataTableColumn<T>) => {
+    if (!column.sortable || !onSortChange) return;
+    if (sort?.key !== column.key) return onSortChange({ key: column.key, direction: "asc" });
+    if (sort.direction === "asc") return onSortChange({ key: column.key, direction: "desc" });
+    onSortChange(null);
+  };
+
+  return (
+    <thead
+      className={cn(
+        visuallyHidden && "sr-only",
+        sticky &&
+          "sticky z-20 bg-surface-2/70 backdrop-blur-md [top:calc(var(--ds-sticky-top,0px)+var(--ds-toolbar-h,0px))]",
+        !sticky && !visuallyHidden && "bg-surface-2/50",
+      )}
+    >
+      <tr className="border-b border-border">
+        {columns.map((column, index) => {
+          const active = sort?.key === column.key;
+          const stickyColumn = column.sticky ?? (pinFirst && index === 0);
+          return (
+            <th
+              key={column.key}
+              scope="col"
+              aria-sort={
+                active
+                  ? sort?.direction === "asc"
+                    ? "ascending"
+                    : "descending"
+                  : column.sortable
+                    ? "none"
+                    : undefined
+              }
+              className={cn(
+                "h-10 px-3 align-middle text-[11px] font-semibold uppercase tracking-wider text-muted-foreground first:rounded-s-xl first:ps-4 last:rounded-e-xl last:pe-4",
+                "whitespace-normal sm:whitespace-nowrap",
+                column.align === "end"
+                  ? "text-end"
+                  : column.align === "center"
+                    ? "text-center"
+                    : "text-start",
+                column.width,
+                column.className,
+                column.hideBelow && HIDE_BELOW[column.hideBelow],
+                stickyColumn && "sticky start-0 z-30 bg-surface-2",
+              )}
+            >
+              {column.sortable && onSortChange ? (
+                <button
+                  type="button"
+                  onClick={() => toggleSort(column)}
+                  aria-label={typeof column.header === "string" ? `Sort by ${column.header}` : "Sort"}
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-sm transition-colors hover:text-foreground",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                    column.align === "end" && "flex-row-reverse",
+                    active && "text-primary",
+                  )}
+                >
+                  <span>{column.header}</span>
+                  {active ? (
+                    sort?.direction === "asc" ? (
+                      <ArrowUp className="size-3" aria-hidden />
+                    ) : (
+                      <ArrowDown className="size-3" aria-hidden />
+                    )
+                  ) : (
+                    <ChevronsUpDown className="size-3 opacity-40" aria-hidden />
+                  )}
+                </button>
+              ) : (
+                column.header
+              )}
+            </th>
+          );
+        })}
+      </tr>
+    </thead>
+  );
+}
 
 function TableSkeleton({ columns }: { columns: number }) {
   return (

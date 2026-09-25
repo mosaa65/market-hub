@@ -1,5 +1,15 @@
 import * as React from "react";
-import { ArrowDownUp, Check, Filter as FilterIcon, X } from "lucide-react";
+import {
+  ArrowDownUp,
+  CalendarDays,
+  Check,
+  ChevronDown,
+  Filter as FilterIcon,
+  ListFilter,
+  Search,
+  ToggleLeft,
+  X,
+} from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -191,7 +201,7 @@ export function TableToolbar({
 }
 
 /* ------------------------------------------------------------------ */
-/*  Toolbar action button — icon-only on mobile, labelled from `sm`     */
+/*  Toolbar action button — circular, icon-led control at every width. */
 /* ------------------------------------------------------------------ */
 
 interface ToolbarActionProps {
@@ -201,11 +211,7 @@ interface ToolbarActionProps {
   badge?: number;
   active?: boolean;
   controls?: string;
-  /**
-   * `ghost` (default) is the neutral glass pill used by Filter/Sort.
-   * `primary` tints it with the brand colour — used by the Add action so it is
-   * visually identical in shape and weight but reads as the main action.
-   */
+  /** `primary` receives a brighter translucent treatment for the main action. */
   tone?: "ghost" | "primary";
 }
 
@@ -228,19 +234,18 @@ export function ToolbarAction({
       aria-haspopup={tone === "ghost" ? "dialog" : undefined}
       aria-expanded={tone === "ghost" ? active : undefined}
       className={cn(
-        "relative inline-flex h-9 w-9 shrink-0 items-center justify-center gap-1.5 rounded-[10px] border text-sm font-medium shadow-[var(--shadow-control)] transition-[background-color,border-color,color,box-shadow] duration-200 sm:h-10 sm:w-auto sm:px-3.5",
+        "relative inline-flex size-10 shrink-0 items-center justify-center rounded-full border text-sm font-medium shadow-[var(--shadow-control)] backdrop-blur-xl transition-[background-color,border-color,color,box-shadow,transform] duration-200 sm:size-11",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 active:scale-95",
         tone === "primary"
-          ? "border-primary bg-primary text-primary-foreground shadow-primary/20 hover:bg-primary/90"
+          ? "border-primary/45 bg-primary/18 text-primary shadow-primary/15 hover:border-primary/60 hover:bg-primary/26"
           : active
             ? "border-primary/45 bg-primary/12 text-primary"
-            : "border-border/70 bg-surface text-muted-foreground hover:border-border hover:bg-accent hover:text-foreground",
+            : "border-border/70 bg-surface/55 text-muted-foreground hover:border-primary/30 hover:bg-surface/85 hover:text-foreground",
       )}
     >
       <span className="[&_svg]:size-4">{icon}</span>
-      <span className="hidden sm:inline">{label}</span>
       {badge > 0 ? (
-        <span className="absolute -end-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground ring-2 ring-surface sm:static sm:ring-0">
+        <span className="absolute -end-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground ring-2 ring-surface">
           {badge}
         </span>
       ) : null}
@@ -337,6 +342,8 @@ function FilterPanel({ open, onClose, definitions, values, onSubmit }: FilterPan
       }
       size="sm"
       desktop="popover-start"
+      sheetUntil="lg"
+      eyebrow="تصفية ذكية"
       footer={
         <div className="flex w-full items-center gap-2">
           <Button
@@ -398,6 +405,8 @@ function SortPanel({ open, onClose, options, value, onSubmit }: SortPanelProps) 
       description="اختر الحقل الذي تريد الترتيب حسبه"
       size="sm"
       desktop="popover-start"
+      sheetUntil="lg"
+      eyebrow="خيارات العرض"
     >
       <div className="flex flex-col gap-1" role="listbox" aria-label="خيارات الترتيب">
         {options.map((o) => {
@@ -410,14 +419,19 @@ function SortPanel({ open, onClose, options, value, onSubmit }: SortPanelProps) 
               aria-selected={selected}
               onClick={() => onSubmit(o.value)}
               className={cn(
-                "flex items-center justify-between gap-3 rounded-[10px] px-3 py-2.5 text-start text-sm transition-colors",
+                "flex items-center justify-between gap-3 rounded-full border border-transparent px-3.5 py-2.5 text-start text-sm transition-colors",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
                 selected
-                  ? "bg-primary/12 font-medium text-primary"
-                  : "text-foreground hover:bg-accent",
+                  ? "border-primary/25 bg-primary/12 font-medium text-primary"
+                  : "text-foreground hover:border-border/70 hover:bg-surface-2/70",
               )}
             >
-              <span className="truncate">{o.label}</span>
+              <span className="flex min-w-0 items-center gap-2.5 truncate">
+                <span className="grid size-7 shrink-0 place-items-center rounded-full bg-surface-2 text-muted-foreground [&_svg]:size-3.5">
+                  <ArrowDownUp />
+                </span>
+                <span className="truncate">{o.label}</span>
+              </span>
               {selected ? <Check className="size-4 shrink-0" aria-hidden /> : null}
             </button>
           );
@@ -438,28 +452,38 @@ interface FilterControlProps {
 }
 
 const controlClass =
-  "h-9 w-full rounded-[10px] border-border/70 bg-surface/60 px-3.5 text-sm text-foreground transition-colors placeholder:text-muted-foreground/70 focus:border-primary/70 focus:outline-none focus:ring-2 focus:ring-primary/20";
+  "h-11 w-full rounded-full border border-border/70 bg-surface/55 px-4 text-sm text-foreground shadow-[inset_0_1px_0_0_oklch(1_0_0/0.06)] backdrop-blur-xl transition-[border-color,box-shadow,background-color] duration-200 placeholder:text-muted-foreground/70 hover:border-primary/30 hover:bg-surface/75 focus:border-primary/60 focus:bg-surface/85 focus:outline-none focus:ring-4 focus:ring-primary/12";
+
+function filterIcon(type: FilterDefinition["type"]) {
+  const Icon =
+    type === "date-range" ? CalendarDays : type === "text" ? Search : type === "boolean" ? ToggleLeft : ListFilter;
+  return <Icon className="size-3.5" aria-hidden />;
+}
 
 function FilterControl({ def, value, onChange }: FilterControlProps) {
   if (def.type === "select") {
     return (
       <div className="flex flex-col gap-1.5">
-        <label htmlFor={`filter-${def.key}`} className="text-label text-muted-foreground">
+        <label htmlFor={`filter-${def.key}`} className="flex items-center gap-1.5 text-label text-muted-foreground">
+          <span className="grid size-5 place-items-center rounded-full bg-primary/10 text-primary">{filterIcon(def.type)}</span>
           {def.label}
         </label>
-        <select
-          id={`filter-${def.key}`}
-          value={typeof value === "string" ? value : ""}
-          onChange={(e) => onChange(e.target.value || undefined)}
-          className={controlClass}
-        >
-          <option value="">الكل</option>
-          {def.options?.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+        <div className="relative">
+          <select
+            id={`filter-${def.key}`}
+            value={typeof value === "string" ? value : ""}
+            onChange={(e) => onChange(e.target.value || undefined)}
+            className={`${controlClass} appearance-none pe-10`}
+          >
+            <option value="">الكل</option>
+            {def.options?.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute inset-y-0 end-4 my-auto size-4 text-muted-foreground" aria-hidden />
+        </div>
       </div>
     );
   }
@@ -468,7 +492,10 @@ function FilterControl({ def, value, onChange }: FilterControlProps) {
     const current = typeof value === "string" ? value : "";
     return (
       <div className="flex flex-col gap-1.5">
-        <span className="text-label text-muted-foreground">{def.label}</span>
+        <span className="flex items-center gap-1.5 text-label text-muted-foreground">
+          <span className="grid size-5 place-items-center rounded-full bg-primary/10 text-primary">{filterIcon(def.type)}</span>
+          {def.label}
+        </span>
         <div className="flex gap-1.5" role="radiogroup" aria-label={def.label}>
           {[
             { v: "", l: "الكل" },
@@ -484,7 +511,7 @@ function FilterControl({ def, value, onChange }: FilterControlProps) {
                 aria-checked={selected}
                 onClick={() => onChange(opt.v || undefined)}
                 className={cn(
-                  "h-9 flex-1 rounded-full border text-xs font-medium transition-colors",
+                  "h-10 flex-1 rounded-full border text-xs font-medium transition-colors",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
                   selected
                     ? "border-primary/45 bg-primary/12 text-primary"
@@ -504,7 +531,10 @@ function FilterControl({ def, value, onChange }: FilterControlProps) {
     const range = typeof value === "object" && value != null ? value : {};
     return (
       <div className="flex flex-col gap-1.5">
-        <span className="text-label text-muted-foreground">{def.label}</span>
+        <span className="flex items-center gap-1.5 text-label text-muted-foreground">
+          <span className="grid size-5 place-items-center rounded-full bg-primary/10 text-primary">{filterIcon(def.type)}</span>
+          {def.label}
+        </span>
         <div className="grid grid-cols-2 gap-2">
           <input
             type="date"
@@ -527,7 +557,8 @@ function FilterControl({ def, value, onChange }: FilterControlProps) {
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={`filter-${def.key}`} className="text-label text-muted-foreground">
+      <label htmlFor={`filter-${def.key}`} className="flex items-center gap-1.5 text-label text-muted-foreground">
+        <span className="grid size-5 place-items-center rounded-full bg-primary/10 text-primary">{filterIcon(def.type)}</span>
         {def.label}
       </label>
       <input

@@ -50,7 +50,7 @@ import {
   type SortOption,
 } from "@/components/ui/table-toolbar";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { useBreakpoint, useIsCompact } from "@/design/breakpoints";
+import { useBreakpoint } from "@/design/breakpoints";
 import { useRealtimeTable } from "@/lib/realtime";
 import { QUERY_KEYS } from "@/lib/query-keys";
 
@@ -125,7 +125,6 @@ function ProductsPage() {
   const qc = useQueryClient();
   const searchParams = Route.useSearch();
   const breakpoint = useBreakpoint();
-  const compact = useIsCompact();
   const tableUsesHorizontalScroll = breakpoint === "xs" || breakpoint === "sm" || breakpoint === "md";
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState<FilterValues>({});
@@ -190,6 +189,22 @@ function ProductsPage() {
       return { rows, hasMore: rows.length === PRODUCTS_PAGE_SIZE };
     },
     getNextPageParam: (lastPage, pages) => (lastPage.hasMore ? pages.length : undefined),
+  });
+
+  // The stream intentionally receives fifty rows at a time. The total must come
+  // from the database separately so the number beside search never pretends that
+  // the first page is the whole catalogue.
+  const { data: productCount } = useQuery({
+    queryKey: ["products", "count"],
+    queryFn: async () => {
+      const { count, error: countError } = await (supabase.from("products") as any).select("id", {
+        count: "exact",
+        head: true,
+      });
+      if (countError) throw countError;
+      return count ?? 0;
+    },
+    staleTime: 30_000,
   });
 
   const products = useMemo(
@@ -525,7 +540,7 @@ function ProductsPage() {
   }, [config, canViewCost, lang, t, meta?.models, meta?.makes]);
 
   const openNew = () => {
-    const qCheck = checkQuota("products", products.length);
+    const qCheck = checkQuota("products", productCount ?? products.length);
     if (!qCheck.allowed) {
       toast.error(lang === "ar" ? qCheck.message?.ar : qCheck.message?.en);
       return;
@@ -559,9 +574,10 @@ function ProductsPage() {
           }}
           loadingMore={isFetchingNextPage}
           pageSize={PRODUCTS_PAGE_SIZE}
+          totalCount={productCount}
           minWidth={canViewCost ? 900 : 780}
           horizontalScroll={tableUsesHorizontalScroll}
-          stickyHeader={!tableUsesHorizontalScroll}
+          stickyHeader
           onRowClick={(product) => {
             setEditing(product);
             setPrefillBarcode(undefined);
@@ -583,7 +599,7 @@ function ProductsPage() {
                 value: query,
                 onValueChange: setQuery,
                 placeholder: t("products.search"),
-                resultCount: filtered.length,
+                resultCount: productCount ?? filtered.length,
               }}
               filters={{
                 definitions: productFilterDefinitions,
@@ -637,6 +653,7 @@ function ProductsPage() {
             // Realtime applies the row-level event immediately, and navigation
             // performs the eventual background refresh.
             qc.invalidateQueries({ queryKey: QUERY_KEYS.products, refetchType: "none" });
+            qc.invalidateQueries({ queryKey: ["products", "count"] });
             qc.invalidateQueries({ queryKey: ["products-meta"] });
           }}
         />
@@ -801,7 +818,7 @@ function ProductDialog({
     cost_price: initial?.cost_price?.toString() ?? "0",
     sale_price: initial?.sale_price?.toString() ?? "0",
     tax_rate: initial?.tax_rate?.toString() ?? "0",
-    min_stock: initial?.min_stock?.toString() ?? "0",
+    min_stock: initial?.min_stock?.toString() ?? "1",
     shelf_location: initial?.shelf_location ?? "",
     origin_id: initial?.origin_id ?? "",
     quality_grade_id: initial?.quality_grade_id ?? "",
@@ -842,7 +859,7 @@ function ProductDialog({
       cost_price: Number(form.cost_price) || 0,
       sale_price: Number(form.sale_price) || 0,
       tax_rate: Number(form.tax_rate) || 0,
-      min_stock: Number(form.min_stock) || 0,
+      min_stock: Number(form.min_stock) || 1,
       shelf_location: form.shelf_location.trim() || null,
       origin_id: config.enableOrigins ? form.origin_id || null : null,
       quality_grade_id: config.enableQualityGrades ? form.quality_grade_id || null : null,
@@ -1164,7 +1181,7 @@ function ProductDialog({
                   onValueChange={(v) =>
                     setForm({ ...form, cost_price: v == null ? "" : String(v) })
                   }
-                  min={0}
+                  min={1}
                   suffix="﷼"
                 />
               </FormField>

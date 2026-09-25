@@ -45,12 +45,12 @@ export const fieldSizeClass: Record<FieldSize, string> = {
 
 /** Shared visual recipe for every boxed control (input, select trigger, textarea). */
 export const fieldSurfaceClass = cn(
-  "w-full min-w-0 rounded-[12px] border-input bg-surface/70 backdrop-blur-sm text-foreground",
-  "shadow-[inset_0_1px_0_0_oklch(1_0_0/0.04)]",
+  "w-full min-w-0 rounded-full border-input/80 bg-surface/52 backdrop-blur-xl text-foreground",
+  "shadow-[inset_0_1px_0_0_oklch(1_0_0/0.08),0_1px_2px_0_oklch(0_0_0/0.08)]",
   "transition-[border-color,box-shadow,background-color] duration-200 ease-[cubic-bezier(0.32,0.72,0,1)]",
   "placeholder:text-muted-foreground",
-  "hover:border-primary/25 hover:bg-surface",
-  "focus:outline-none focus:border-primary/60 focus:bg-surface focus:ring-4 focus:ring-primary/10",
+  "hover:border-primary/30 hover:bg-surface/72",
+  "focus:outline-none focus:border-primary/60 focus:bg-surface/82 focus:ring-4 focus:ring-primary/12",
   "aria-[invalid=true]:border-destructive/70 aria-[invalid=true]:ring-4 aria-[invalid=true]:ring-destructive/10",
   "disabled:cursor-not-allowed disabled:opacity-50",
   "read-only:border-transparent read-only:bg-surface-2/50 read-only:text-muted-foreground",

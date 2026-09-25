@@ -34,8 +34,7 @@ const searchSize: Record<FieldSize, string> = {
  * SearchInput — the single search field for the whole system.
  *
  * Visual design (per requirements):
- *  - control-radius surface that aligns with the table toolbar rather than
- *    looking like an unrelated floating pill
+ *  - translucent pill surface that aligns with the toolbar controls
  *  - quiet translucent surface with a crisp input layer on top
  *  - the clear button is **tinted** (primary) rather than plain grey, so it is
  *    obviously interactive
@@ -126,7 +125,7 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
         <span
           aria-hidden
           className={cn(
-            "pointer-events-none absolute inset-0 -z-10 rounded-[10px] border transition-all duration-200 ease-[cubic-bezier(0.32,0.72,0,1)]",
+            "pointer-events-none absolute inset-0 -z-10 rounded-full border transition-all duration-200 ease-[cubic-bezier(0.32,0.72,0,1)]",
             "shadow-[inset_0_1px_0_0_oklch(1_0_0/0.07)] backdrop-blur-xl backdrop-saturate-150",
             focused
               ? "border-primary/45 bg-surface/90 shadow-[inset_0_1px_0_0_oklch(1_0_0/0.09),0_0_0_3px_oklch(0.62_0.21_260/0.14)]"
@@ -174,7 +173,7 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
           placeholder={placeholder}
           className={cn(
             searchSize[size],
-            "rounded-[10px] border-0 bg-transparent text-foreground shadow-none",
+            "rounded-full border-0 bg-transparent text-foreground shadow-none",
             // The input sits on a translucent glass layer, so a 70%-opacity token
             // made the placeholder practically invisible. Full muted-foreground
             // keeps it readable in both themes.

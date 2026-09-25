@@ -46,7 +46,6 @@ import {
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { useModules } from "@/lib/modules";
-import { supabase } from "@/integrations/supabase/client";
 import { CommandPalette } from "@/components/command-palette";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { ConnectionBanner } from "@/components/ui/connection";
@@ -444,23 +443,9 @@ function SidebarContents({
     select: (s) => s.location.pathname,
   });
 
-  const [logoUrl, setLogoUrl] = useState<string>(
-    "/inama-soft-logo.ico",
-  );
-
-  useEffect(() => {
-    supabase
-      .from("company_settings")
-      .select("logo_url")
-      .order("id")
-      .limit(1)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data?.logo_url) {
-          setLogoUrl(data.logo_url);
-        }
-      });
-  }, []);
+  // Navigation belongs to the application itself, not to an individual tenant.
+  // The company logo remains available in invoices and printable documents.
+  const logoUrl = "/vortex-erp-mark.png";
 
   const filteredSections = useMemo(() => {
     return sections
@@ -503,7 +488,9 @@ function SidebarContents({
             src={logoUrl}
             alt={t("app.name")}
             className="h-9 w-9 shrink-0 rounded-xl object-contain bg-surface-2/90 p-1 border border-border/60 shadow-md ring-1 ring-white/10"
-            onError={() => setLogoUrl("/inama-soft-logo.ico")}
+            onError={(event) => {
+              event.currentTarget.style.visibility = "hidden";
+            }}
           />
 
           {!collapsed && (
@@ -521,7 +508,7 @@ function SidebarContents({
               </div>
 
               <span className="text-[11px] text-muted-foreground font-medium">
-                ERP · Inama Soft
+                VORTEX ERP
               </span>
             </div>
           )}

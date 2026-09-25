@@ -4,7 +4,7 @@ import { X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { useIsCompact } from "@/design/breakpoints";
+import { useBreakpoint, useIsCompact } from "@/design/breakpoints";
 
 export type ModalSize = "sm" | "md" | "lg" | "xl" | "full";
 
@@ -34,6 +34,11 @@ export interface ModalProps {
    *    space and should not cover the list they act on.
    */
   desktop?: "auto" | "popover-start" | "popover-end";
+  /**
+   * Width below which an auto sheet is preferred. Use `lg` for compact utility
+   * panels: a filter should be a bottom sheet on both phones and tablets.
+   */
+  sheetUntil?: "md" | "lg";
   /** Prevents closing on overlay click (destructive confirmations, unsaved data). */
   dismissible?: boolean;
   /** Hides the header close button (rarely needed). */
@@ -81,6 +86,7 @@ export function Modal({
   size = "md",
   mobile = "auto",
   desktop = "auto",
+  sheetUntil = "md",
   dismissible = true,
   hideClose = false,
   className,
@@ -88,7 +94,9 @@ export function Modal({
   children,
   describedBy,
 }: ModalProps) {
-  const compact = useIsCompact();
+  const compactAtMd = useIsCompact();
+  const breakpoint = useBreakpoint();
+  const compact = sheetUntil === "lg" ? breakpoint !== "lg" && breakpoint !== "xl" && breakpoint !== "2xl" : compactAtMd;
   const [mounted, setMounted] = React.useState(false);
   const panelRef = React.useRef<HTMLDivElement>(null);
   const previouslyFocused = React.useRef<HTMLElement | null>(null);
@@ -105,10 +113,9 @@ export function Modal({
 
   const asSheet = compact && presentation === "sheet";
   const asFullscreen = compact && presentation === "fullscreen";
-  const asCentered = !compact || presentation === "center";
-
   // Desktop popover-style panel (filters, sort): compact, edge-anchored.
   const asPopover = !compact && (desktop === "popover-start" || desktop === "popover-end");
+  const asCentered = (!compact && !asPopover) || presentation === "center";
 
   /* ---- scroll lock (no layout shift) ---- */
   React.useEffect(() => {
@@ -199,8 +206,8 @@ export function Modal({
         "fixed inset-0 z-[60] flex",
         asPopover
           ? desktop === "popover-start"
-            ? "items-center justify-start ps-4 sm:ps-6"
-            : "items-center justify-end pe-4 sm:pe-6"
+            ? "items-start justify-start pt-20"
+            : "items-start justify-end pt-20"
           : "justify-center",
       )}
       role="presentation"
@@ -225,7 +232,9 @@ export function Modal({
           asCentered &&
             cn("panel-enter m-auto max-h-[calc(100dvh-2rem)] rounded-[16px]", sizeClass[size]),
           asPopover &&
-            cn("panel-enter my-auto max-h-[calc(100dvh-3rem)] rounded-[16px]", sizeClass[size]),
+            cn("panel-enter max-h-[calc(100dvh-6rem)] rounded-[20px]", sizeClass[size]),
+          asPopover && desktop === "popover-start" && "absolute left-4 sm:left-6",
+          asPopover && desktop === "popover-end" && "absolute right-4 sm:right-6",
           className,
         )}
       >
