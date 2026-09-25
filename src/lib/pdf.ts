@@ -128,13 +128,13 @@ export function generateInvoicePDF(doc: InvoiceDoc) {
   printInvoice(doc, "standard", labels, true);
 }
 
-export function generateInvoicePdfBlob(doc: InvoiceDoc) {
+export async function generateInvoicePdfBlob(doc: InvoiceDoc) {
   const pdf = await generateInvoicePdfDoc(doc);
   return pdf.output("blob");
 }
 
-export function shareInvoicePDF(doc: InvoiceDoc) {
-  const blob = generateInvoicePdfBlob(doc);
+export async function shareInvoicePDF(doc: InvoiceDoc) {
+  const blob = await generateInvoicePdfBlob(doc);
   const file = new File([blob], `${doc.number}.pdf`, { type: "application/pdf" });
 
   if (navigator.share && typeof navigator.share === "function") {
