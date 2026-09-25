@@ -75,6 +75,34 @@ export function updateQueryListCache<T extends { id: string | number }>(
       }
     }
 
+    // Support TanStack `useInfiniteQuery` data without refetching every page.
+    // A realtime product event only changes the row that arrived from Postgres;
+    // joined display fields already cached for that row remain intact.
+    if (oldData && Array.isArray(oldData.pages)) {
+      const newItem = payload.new as T;
+      const oldItem = payload.old as Partial<T>;
+      const applyToRows = (rows: T[], pageIndex: number): T[] => {
+        switch (payload.eventType) {
+          case "INSERT":
+            if (pageIndex !== 0 || rows.some((item) => item.id === newItem.id)) return rows;
+            return [newItem, ...rows];
+          case "UPDATE":
+            return rows.map((item) => (item.id === newItem.id ? { ...item, ...newItem } : item));
+          case "DELETE":
+            return rows.filter((item) => item.id !== oldItem.id);
+          default:
+            return rows;
+        }
+      };
+
+      return {
+        ...oldData,
+        pages: oldData.pages.map((page: any, pageIndex: number) =>
+          Array.isArray(page?.rows) ? { ...page, rows: applyToRows(page.rows, pageIndex) } : page,
+        ),
+      };
+    }
+
     return oldData;
   });
 }
