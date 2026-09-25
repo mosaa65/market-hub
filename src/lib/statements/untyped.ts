@@ -42,6 +42,46 @@ interface UntypedQuery<T> {
 }
 
 /**
+ * نداء REST خام عبر الوسيط `raw-rest`.
+ * الأعمدة في `columns` تُمرَّر كما هي (بلا ترميز) لأن PostgREST يرفض `%2C`.
+ *
+ * السبب في وجود هذا الوسيط: بعض بيئات المتصفح تُعدّل معاملات الاستعلام النصية
+ * (`eq.`) فتُفشل طلبات PostgREST بـ 400 — الوسيط يبني الـ URL خارج المتصفح.
+ */
+export async function rawRest<T>(
+  table: string,
+  options: { columns?: string; query?: string } = {},
+): Promise<T[]> {
+  const params = new URLSearchParams();
+  params.set("path", table);
+  if (options.columns) params.set("columns", options.columns);
+  if (options.query) params.set("query", options.query);
+
+  let token = "";
+  try {
+    const { data } = await supabase.auth.getSession();
+    token = data.session?.access_token ?? "";
+  } catch {
+    token = "";
+  }
+
+  const { data: res, error } = await supabase.functions.invoke<unknown>(
+    `raw-rest?${params.toString()}`,
+    {
+      method: "GET",
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    },
+  );
+
+  if (error) throw error;
+  if (Array.isArray(res)) return res as T[];
+  if (res && typeof res === "object" && "message" in (res as Record<string, unknown>)) {
+    throw new Error(String((res as Record<string, unknown>).message));
+  }
+  return [];
+}
+
+/**
  * واجهة قراءة غير مُقيَّدة بالأنواع لجداول موجودة فعلًا في قاعدة البيانات.
  * النوع العام T يُمرَّر صريحًا عند الاستخدام لإبقاء بقية الكود مُقيَّدًا.
  */

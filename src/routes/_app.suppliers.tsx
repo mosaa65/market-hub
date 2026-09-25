@@ -32,6 +32,7 @@ function SuppliersPage() {
   const { t, lang } = useI18n();
   const [rows, setRows] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [edit, setEdit] = useState<Partial<Supplier> | null>(null);
   const [saving, setSaving] = useState(false);
@@ -39,8 +40,14 @@ function SuppliersPage() {
 
   async function load() {
     setLoading(true);
-    const { data } = await supabase.from("suppliers").select("*").order("name");
-    setRows((data ?? []) as Supplier[]);
+    setLoadError(null);
+    const { data, error } = await supabase.from("suppliers").select("*").order("name");
+    if (error) {
+      setRows([]);
+      setLoadError(error.message);
+    } else {
+      setRows((data ?? []) as Supplier[]);
+    }
     setLoading(false);
   }
   useEffect(() => {
@@ -50,7 +57,7 @@ function SuppliersPage() {
   const filtered = rows.filter(
     (r) =>
       !search ||
-      r.name.toLowerCase().includes(search.toLowerCase()) ||
+      (r.name ?? "").toLowerCase().includes(search.toLowerCase()) ||
       (r.phone ?? "").includes(search) ||
       (r.email ?? "").toLowerCase().includes(search.toLowerCase()),
   );
@@ -124,6 +131,16 @@ function SuppliersPage() {
                     {t("common.loading")}
                   </td>
                 </tr>
+              ) : loadError ? (
+                <tr>
+                  <td colSpan={6} className="py-10 text-center text-sm text-destructive">
+                    <p>{lang === "ar" ? "تعذر تحميل الموردين" : "Could not load suppliers"}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{loadError}</p>
+                    <button type="button" onClick={() => void load()} className="mt-3 rounded-md border-border px-3 py-1.5 text-xs hover:bg-surface-2">
+                      {lang === "ar" ? "إعادة المحاولة" : "Retry"}
+                    </button>
+                  </td>
+                </tr>
               ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-12 text-center text-muted-foreground">
@@ -134,7 +151,7 @@ function SuppliersPage() {
               ) : (
                 filtered.map((r) => (
                   <tr key={r.id} className="border-b border-border/50 hover:bg-surface-2/50">
-                    <td className="px-3 py-2.5 font-medium">{r.name}</td>
+                    <td className="px-3 py-2.5 font-medium">{r.name || "—"}</td>
                     <td className="px-3 py-2.5 text-muted-foreground">{r.phone ?? "—"}</td>
                     <td className="px-3 py-2.5 text-muted-foreground">{r.email ?? "—"}</td>
                     <td className="px-3 py-2.5 text-end font-mono">{money(Number(r.balance))}</td>

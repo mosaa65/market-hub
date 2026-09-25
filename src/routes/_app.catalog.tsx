@@ -42,15 +42,18 @@ function CatalogPage() {
   const { isTabEnabled, config } = useCatalogModules();
   const [modulesDialogOpen, setModulesDialogOpen] = useState(false);
 
-  const allTabs: { key: Tab; label: string }[] = [
-    { key: "categories", label: t("catalog.categories") },
-    { key: "brands", label: t("catalog.brands") },
-    { key: "units", label: t("catalog.units") },
-    { key: "origins", label: lang === "ar" ? "بلدان المنشأ" : "Origins" },
-    { key: "qualities", label: lang === "ar" ? "درجات الجودة" : "Quality Grades" },
-    { key: "makes", label: lang === "ar" ? "ماركات المركبات" : "Vehicle Makes" },
-    { key: "models", label: lang === "ar" ? "موديلات المركبات" : "Vehicle Models" },
-  ];
+  const allTabs = useMemo<{ key: Tab; label: string }[]>(
+    () => [
+      { key: "categories", label: t("catalog.categories") },
+      { key: "brands", label: t("catalog.brands") },
+      { key: "units", label: t("catalog.units") },
+      { key: "origins", label: lang === "ar" ? "بلدان المنشأ" : "Origins" },
+      { key: "qualities", label: lang === "ar" ? "درجات الجودة" : "Quality Grades" },
+      { key: "makes", label: lang === "ar" ? "ماركات المركبات" : "Vehicle Makes" },
+      { key: "models", label: lang === "ar" ? "موديلات المركبات" : "Vehicle Models" },
+    ],
+    [lang, t],
+  );
 
   // Only show tabs that are enabled by the current business profile
   const availableTabs = useMemo(() => {

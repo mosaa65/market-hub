@@ -44,6 +44,7 @@ function IncomeStatementPage() {
 
   useEffect(() => {
     void loadIncomeStatement();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadIncomeStatement يقرأ range.from و range.to فقط في الاعتماديات
   }, [range.from, range.to]);
 
   async function loadIncomeStatement() {

@@ -9,7 +9,7 @@
  */
 
 import { AlertTriangle, CheckCircle2, Info } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { fmtAmount } from "@/lib/statements/format";
 import type { StatementIntegrity } from "@/lib/statements/types";
 import { useI18n } from "@/lib/i18n";
@@ -65,22 +65,24 @@ export function StatementIntegrityBadge({
 
   if (variant === "inline") {
     return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span
-            className={cn(
-              "inline-flex cursor-help items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-600",
-              className,
-            )}
-          >
-            <AlertTriangle className="h-3 w-3 shrink-0" />
-            {ar ? `فرق ${absDiff}` : `Gap ${absDiff}`}
-          </span>
-        </TooltipTrigger>
-        <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed">
-          {tooltipText}
-        </TooltipContent>
-      </Tooltip>
+      <TooltipProvider delayDuration={150}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span
+              className={cn(
+                "inline-flex cursor-help items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-600",
+                className,
+              )}
+            >
+              <AlertTriangle className="h-3 w-3 shrink-0" />
+              {ar ? `فرق ${absDiff}` : `Gap ${absDiff}`}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed">
+            {tooltipText}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     );
   }
 
@@ -130,24 +132,26 @@ export function DerivedDataBadge({ className }: { className?: string }) {
   const { lang } = useI18n();
   const ar = lang === "ar";
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span
-          className={cn(
-            "inline-flex cursor-help items-center gap-1 rounded-full border border-sky-500/35 bg-sky-500/10 px-2 py-0.5 text-[10px] font-medium text-sky-600",
-            className,
-          )}
-        >
-          <Info className="h-3 w-3 shrink-0" />
-          {ar ? "بيانات مُشتقّة" : "Derived data"}
-        </span>
-      </TooltipTrigger>
-      <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed">
-        {ar
-          ? "لا يوجد دفتر موردين في النظام، لذلك تُشتقّ الحركات من فواتير التوريد ومرتجعات المشتريات. حركات السداد مُعلَّمة بـ «سداد مرافق للفاتورة» لأن قيمة السداد مخزَّنة داخل الفاتورة بلا تاريخ سداد مستقل."
-          : "No supplier ledger exists; entries are derived from purchase invoices and returns. Payments are tagged as bundled with the invoice."}
-      </TooltipContent>
-    </Tooltip>
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span
+            className={cn(
+              "inline-flex cursor-help items-center gap-1 rounded-full border border-sky-500/35 bg-sky-500/10 px-2 py-0.5 text-[10px] font-medium text-sky-600",
+              className,
+            )}
+          >
+            <Info className="h-3 w-3 shrink-0" />
+            {ar ? "بيانات مُشتقّة" : "Derived data"}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed">
+          {ar
+            ? "لا يوجد دفتر موردين في النظام، لذلك تُشتقّ الحركات من فواتير التوريد ومرتجعات المشتريات. حركات السداد مُعلَّمة بـ «سداد مرافق للفاتورة» لأن قيمة السداد مخزَّنة داخل الفاتورة بلا تاريخ سداد مستقل."
+            : "No supplier ledger exists; entries are derived from purchase invoices and returns. Payments are tagged as bundled with the invoice."}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 

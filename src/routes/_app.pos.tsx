@@ -657,6 +657,7 @@ function POSPage() {
         }
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- مقصود: يستجيب فقط لتغيّر total حتى لا يعاد ضبط وسيلة الدفع التي يختارها المستخدم
   }, [total]);
 
   // Global Keyboard Shortcuts
@@ -677,6 +678,7 @@ function POSPage() {
     };
     window.addEventListener("keydown", handleGlobalShortcuts);
     return () => window.removeEventListener("keydown", handleGlobalShortcuts);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- checkout تعاد إنشاؤها كل render؛ الاعتماديات أعلاه تغطي كل مدخلاتها
   }, [
     cart,
     loading,

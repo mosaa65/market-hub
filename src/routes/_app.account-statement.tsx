@@ -15,23 +15,11 @@ import { ModuleGuard } from "@/lib/modules";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
-import {
-  Calendar,
-  ChevronDown,
-  FileSpreadsheet,
-  Filter,
-  Loader2,
-  Printer,
-  RotateCcw,
-  UserCheck,
-  Building2,
-  Wallet,
-} from "lucide-react";
+import { FileSpreadsheet, Loader2, Printer, UserCheck, Building2, Wallet, ClipboardList } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { useI18n } from "@/lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -39,7 +27,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
   TableBody,
@@ -50,7 +37,6 @@ import {
 } from "@/components/ui/table";
 import { useStatement } from "@/hooks/use-statement";
 import { useStatementSettings } from "@/lib/statements/settings";
-import { TEMPLATE_ORDER, templateLabel } from "@/lib/statements/templates";
 import { printStatementDocument } from "@/lib/statements/print";
 import { exportStatementToCsv, statementFilename } from "@/lib/statements/export";
 import { fmtAmount, fmtOrDash } from "@/lib/statements/format";
@@ -66,10 +52,36 @@ import {
   SourceBadge,
 } from "@/components/statements/statement-integrity-badge";
 import { CASH_ENTITY_ID } from "@/lib/statements/adapters/cash";
-import type { StatementEntityType, StatementTemplateId } from "@/lib/statements/types";
+import type {
+  StatementEntityType,
+  StatementFieldKey,
+  StatementTransaction,
+} from "@/lib/statements/types";
+import {
+  ReportFilterMenu,
+  type ReportFilterPreset,
+  type ReportFilterValues,
+} from "@/components/statements/report-filter-menu";
+import { ColumnVisibilityMenu } from "@/components/statements/column-visibility-menu";
+import { StatementEntryDetails } from "@/components/statements/entry-details";
 import { money } from "@/lib/format";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { ReportPickerDialog } from "@/components/statements/report-picker-dialog";
+import { PurchasesReport } from "@/components/statements/purchases-report";
+import { OperationalReports } from "@/components/statements/operational-reports";
+import { DebtsReport } from "@/components/statements/debts-report";
+import { ProfitSalesReport } from "@/components/statements/profit-sales-report";
+import {
+  DEFAULT_REPORT_PREFERENCES,
+  getReportPreferences,
+  saveReportPreferences,
+} from "@/lib/statements/local-storage";
+import {
+  reportDefinition,
+  reportTypeForEntity,
+  type ReportType,
+} from "@/lib/statements/report-registry";
 
 const accountStatementSearchSchema = z.object({
   customerId: z.string().optional(),
@@ -119,22 +131,57 @@ function AccountStatementPage() {
   const ar = lang === "ar";
   const searchParams = Route.useSearch();
   const { settings } = useStatementSettings();
+  const savedPreferences = useMemo(() => getReportPreferences(), []);
 
-  // ── نوع الحساب والجهة ──
-  const [partyType, setPartyType] = useState<StatementEntityType>(
-    (searchParams.entityType as StatementEntityType) || "customer",
+  // ── نوع الكشف والحساب والجهة ──
+  const [reportType, setReportType] = useState<ReportType>(
+    savedPreferences.reportType ?? DEFAULT_REPORT_PREFERENCES.reportType,
   );
-  const [partyId, setPartyId] = useState<string>("");
+  const [reportPickerOpen, setReportPickerOpen] = useState(false);
+  const [partyType, setPartyType] = useState<StatementEntityType>(
+    (searchParams.entityType as StatementEntityType) || savedPreferences.entityType || "customer",
+  );
+  const [partyId, setPartyId] = useState<string>(
+    searchParams.entityId ?? searchParams.customerId ?? savedPreferences.entityId ?? "",
+  );
   const [partyList, setPartyList] = useState<PartyOption[]>([]);
   const [loadingParties, setLoadingParties] = useState(false);
+  /** الحركة المفتوحة في لوحة «تفاصيل القيد» */
+  const [detailEntry, setDetailEntry] = useState<StatementTransaction | null>(null);
 
   // ── الخيارات (مضغوطة داخل نفس الشاشة) ──
-  const [optionsOpen, setOptionsOpen] = useState(true);
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
-  const [activePreset, setActivePreset] = useState("all");
-  const [includeZero, setIncludeZero] = useState(settings.includeZeroRowsDefault);
-  const [templateId, setTemplateId] = useState<StatementTemplateId>(settings.defaultTemplate);
+  const [from, setFrom] = useState(savedPreferences.from);
+  const [to, setTo] = useState(savedPreferences.to);
+  const [activePreset, setActivePreset] = useState(savedPreferences.preset);
+  const [includeZero, setIncludeZero] = useState(
+    savedPreferences.includeZeroRows || settings.includeZeroRowsDefault,
+  );
+  const [visibleColumns, setVisibleColumns] = useState<Record<StatementFieldKey, boolean>>({
+    index: true,
+    date: true,
+    reference: true,
+    kind: true,
+    description: true,
+    debit: true,
+    credit: true,
+    balance: true,
+    paymentMethod: true,
+    ...savedPreferences.visibleColumns,
+  });
+
+  // حفظ الاختيارات محليًا: هذه تفضيلات واجهة فقط، وليست مصدرًا للبيانات المالية.
+  useEffect(() => {
+    saveReportPreferences({
+      reportType,
+      entityType: partyType,
+      entityId: partyId,
+      from,
+      to,
+      preset: activePreset,
+      includeZeroRows: includeZero,
+      visibleColumns,
+    });
+  }, [reportType, partyType, partyId, from, to, activePreset, includeZero, visibleColumns]);
 
   // ── جلب الجهات حسب النوع ──
   useEffect(() => {
@@ -149,6 +196,7 @@ function AccountStatementPage() {
 
       setLoadingParties(true);
       setPartyId("");
+      setDetailEntry(null);
       const table = partyType === "customer" ? "customers" : "suppliers";
       const { data } = await supabase
         .from(table)
@@ -183,7 +231,6 @@ function AccountStatementPage() {
     from: from || null,
     to: to || null,
     includeZeroRows: includeZero,
-    templateId,
     enabled: Boolean(partyId),
   });
 
@@ -196,20 +243,31 @@ function AccountStatementPage() {
     [settings.currencySymbolOverride, company?.currencySymbol],
   );
 
-  const selectedParty = partyList.find((p) => p.id === partyId) ?? null;
-
   // مجاميع العرض — من النتيجة، لا حساب هنا
   const totalDebit = result?.totalDebit ?? 0;
   const totalCredit = result?.totalCredit ?? 0;
   const closingBalance = result?.closingBalance ?? 0;
   const statementRows = result?.transactions ?? [];
 
-  function applyPreset(key: string) {
-    setActivePreset(key);
-    const preset = periodPresets().find((p) => p.key === key);
-    if (!preset) return;
-    setFrom(preset.from);
-    setTo(preset.to);
+  const filterPresets: ReportFilterPreset[] = periodPresets().map((preset) => ({
+    key: preset.key,
+    label: ar ? preset.ar : preset.en,
+    from: preset.from,
+    to: preset.to,
+  }));
+
+  const filterValues: ReportFilterValues = {
+    from,
+    to,
+    preset: activePreset,
+    includeZeroRows: includeZero,
+  };
+
+  function updateFilterValues(next: ReportFilterValues) {
+    setActivePreset(next.preset);
+    setFrom(next.from);
+    setTo(next.to);
+    setIncludeZero(next.includeZeroRows);
   }
 
   function resetOptions() {
@@ -217,13 +275,7 @@ function AccountStatementPage() {
     setFrom("");
     setTo("");
     setIncludeZero(settings.includeZeroRowsDefault);
-    setTemplateId(settings.defaultTemplate);
   }
-
-  const optionsDirty =
-    activePreset !== "all" ||
-    includeZero !== settings.includeZeroRowsDefault ||
-    templateId !== settings.defaultTemplate;
 
   function handlePrintPDF() {
     if (!result || !layout || !company) return;
@@ -249,6 +301,24 @@ function AccountStatementPage() {
     toast.success(ar ? "تم تصدير الملف" : "File exported");
   }
 
+  function handleReportSelect(nextType: ReportType) {
+    const definition = reportDefinition(nextType);
+    if (!definition.implemented || !definition.entityType) {
+      setReportType(nextType);
+      saveReportPreferences({ reportType: nextType });
+      toast.info(
+        ar
+          ? "تم حفظ اختيار الكشف، وسيتم تنفيذ مصدر بياناته في المرحلة التالية."
+          : "The report choice was saved and its data source will be implemented in the next phase.",
+      );
+      return;
+    }
+    setReportType(nextType);
+    setPartyType(definition.entityType);
+    setDetailEntry(null);
+    saveReportPreferences({ reportType: nextType, entityType: definition.entityType });
+  }
+
   const partyTabs: { type: StatementEntityType; label: string; icon: typeof UserCheck }[] = [
     { type: "customer", label: ar ? "حسابات العملاء" : "Customers", icon: UserCheck },
     { type: "supplier", label: ar ? "حسابات الموردين" : "Suppliers", icon: Building2 },
@@ -258,19 +328,32 @@ function AccountStatementPage() {
   const alignClass = (align: "start" | "center" | "end") =>
     align === "end" ? "text-end" : align === "center" ? "text-center" : "text-start";
 
-  const columns = layout?.columns ?? [];
+  const columns = (layout?.columns ?? []).filter((column) => visibleColumns[column.key]);
+  const columnOptions = (layout?.columns ?? []).map((column) => ({
+    key: column.key,
+    label: column.label,
+  }));
 
   return (
     <>
       <PageHeader
-        title={ar ? "كشف حساب تفصيلي (عميل / مورد)" : "Account Statement"}
+        title={ar ? "مركز الكشوفات" : "Reports center"}
         subtitle={
           ar
-            ? "تتبع وحساب الأرصدة التراكمية والفواتير والتحصيلات خطوة بخطوة"
-            : "Live customer & supplier account statement with running balance"
+            ? "تاختر نوع الكشف واعرض بياناته من الجداول التشغيلية المناسبة"
+            : "Choose a report and view data from its operational source"
         }
         actions={
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setReportPickerOpen(true)}
+              className="gap-1.5"
+            >
+              <ClipboardList className="h-4 w-4" />
+              {ar ? "فتح كشف آخر" : "Open another report"}
+            </Button>
             <Button
               onClick={handleExportExcel}
               variant="outline"
@@ -288,6 +371,52 @@ function AccountStatementPage() {
         }
       />
 
+      <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
+        <span className="rounded-full border-primary/20 bg-primary/5 px-2.5 py-1 text-primary">
+          {ar ? reportDefinition(reportType).title.ar : reportDefinition(reportType).title.en}
+        </span>
+        {!reportDefinition(reportType).implemented && (
+          <span>{ar ? "مصدر البيانات قيد التنفيذ" : "Data source is planned"}</span>
+        )}
+      </div>
+
+      {reportType === "purchases" ? (
+        <PurchasesReport
+          from={from}
+          to={to}
+          ar={ar}
+          onBack={() => handleReportSelect("customer-account")}
+          filterValues={filterValues}
+          filterPresets={filterPresets}
+          onFilterChange={updateFilterValues}
+          onFilterReset={resetOptions}
+        />
+      ) : reportType === "debts" ? (
+        <DebtsReport ar={ar} onBack={() => handleReportSelect("customer-account")} />
+      ) : reportType === "profit-sales" ? (
+        <ProfitSalesReport
+          from={from}
+          to={to}
+          ar={ar}
+          onBack={() => handleReportSelect("customer-account")}
+          filterValues={filterValues}
+          filterPresets={filterPresets}
+          onFilterChange={updateFilterValues}
+          onFilterReset={resetOptions}
+        />
+      ) : ["sales-invoices", "returns", "expenses", "inventory-movements", "product"].includes(reportType) ? (
+        <OperationalReports
+          type={reportType as "sales-invoices" | "returns" | "expenses" | "inventory-movements" | "product"}
+          from={from}
+          to={to}
+          ar={ar}
+          onBack={() => handleReportSelect("customer-account")}
+          filterValues={filterValues}
+          filterPresets={filterPresets}
+          onFilterChange={updateFilterValues}
+          onFilterReset={resetOptions}
+        />
+      ) : (
       <div className="space-y-4">
         {/* ═══ شريط الاختيار (كما كان) ═══ */}
         <div className="panel-elevated p-4 flex flex-wrap items-center justify-between gap-4">
@@ -300,7 +429,10 @@ function AccountStatementPage() {
                     key={tab.type}
                     variant={partyType === tab.type ? "default" : "ghost"}
                     size="sm"
-                    onClick={() => setPartyType(tab.type)}
+                    onClick={() => {
+                      setPartyType(tab.type);
+                      setReportType(reportTypeForEntity(tab.type));
+                    }}
                     className="gap-2 text-xs"
                   >
                     <Icon className="h-4 w-4" />
@@ -365,137 +497,34 @@ function AccountStatementPage() {
           )}
         </div>
 
-        {/* ═══ شريط الخيارات المضغوط (جديد — داخل نفس الشاشة) ═══ */}
-        <div className="panel-elevated">
-          <button
-            type="button"
-            onClick={() => setOptionsOpen((v) => !v)}
-            className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-start"
-          >
-            <span className="flex items-center gap-2 text-xs font-semibold">
-              <Filter className="h-3.5 w-3.5 text-primary" />
-              {ar ? "خيارات الكشف" : "Statement options"}
-              {result && (
-                <span className="font-normal text-muted-foreground">· {result.period.label}</span>
-              )}
-              {optionsDirty && (
-                <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
-                  {ar ? "مُعدَّلة" : "modified"}
-                </span>
-              )}
-            </span>
-            <ChevronDown
-              className={cn(
-                "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-                optionsOpen && "rotate-180",
-              )}
-            />
-          </button>
-
-          {optionsOpen && (
-            <div className="flex flex-wrap items-end gap-3 border-t border-border/60 px-4 py-3">
-              {/* نطاقات جاهزة */}
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                  {ar ? "الفترة" : "Period"}
-                </span>
-                <div className="flex flex-wrap gap-1">
-                  {periodPresets().map((p) => (
-                    <button
-                      key={p.key}
-                      type="button"
-                      onClick={() => applyPreset(p.key)}
-                      className={cn(
-                        "rounded-full border px-2.5 py-1 text-[11px] font-medium transition",
-                        activePreset === p.key
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border/80 text-muted-foreground hover:bg-surface-2 hover:text-foreground",
-                      )}
-                    >
-                      {ar ? p.ar : p.en}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* من / إلى */}
-              <div className="flex flex-col gap-1">
-                <span className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                  <Calendar className="h-3 w-3" />
-                  {ar ? "من" : "From"}
-                </span>
-                <Input
-                  type="date"
-                  value={from}
-                  onChange={(e) => {
-                    setFrom(e.target.value);
-                    setActivePreset("custom");
-                  }}
-                  className="h-8 w-[140px] text-xs"
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                  {ar ? "إلى" : "To"}
-                </span>
-                <Input
-                  type="date"
-                  value={to}
-                  onChange={(e) => {
-                    setTo(e.target.value);
-                    setActivePreset("custom");
-                  }}
-                  className="h-8 w-[140px] text-xs"
-                />
-              </div>
-
-              {/* القالب */}
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                  {ar ? "القالب" : "Template"}
-                </span>
-                <Select
-                  value={templateId}
-                  onValueChange={(v) => setTemplateId(v as StatementTemplateId)}
-                >
-                  <SelectTrigger className="h-8 w-[150px] text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TEMPLATE_ORDER.map((id) => (
-                      <SelectItem key={id} value={id}>
-                        {templateLabel(id, lang)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* إظهار المسددة */}
-              <label className="flex h-8 cursor-pointer items-center gap-2 rounded-lg border border-border/80 bg-surface/60 px-3">
-                <Checkbox
-                  checked={includeZero}
-                  onCheckedChange={(v) => setIncludeZero(Boolean(v))}
-                  className="h-3.5 w-3.5"
-                />
-                <span className="text-[11px]">
-                  {ar ? "إظهار الفواتير المسددة" : "Include settled"}
-                </span>
-              </label>
-
-              {/* إعادة الضبط */}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={resetOptions}
-                disabled={!optionsDirty}
-                className="h-8 gap-1.5 text-[11px] text-muted-foreground"
-              >
-                <RotateCcw className="h-3 w-3" />
-                {ar ? "إعادة الضبط" : "Reset"}
-              </Button>
-            </div>
-          )}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <ReportFilterMenu
+            values={filterValues}
+            presets={filterPresets}
+            onChange={updateFilterValues}
+            onReset={resetOptions}
+            labels={{
+              trigger: ar ? "تصفية الكشف" : "Filter statement",
+              title: ar ? "تصفية الكشف" : "Statement filters",
+              date: ar ? "التاريخ والفترة" : "Date and period",
+              period: ar ? "الفترة" : "Period",
+              options: ar ? "خيارات إضافية" : "More options",
+              includeZeroRows: ar ? "إظهار الفواتير المسددة" : "Include settled",
+              reset: ar ? "إعادة ضبط الفلاتر" : "Reset filters",
+              back: ar ? "رجوع" : "Back",
+              from: ar ? "من" : "From",
+              to: ar ? "إلى" : "To",
+            }}
+          />
+          <ColumnVisibilityMenu
+            columns={columnOptions}
+            visible={visibleColumns}
+            onChange={(key, value) =>
+              setVisibleColumns((current) => ({ ...current, [key]: value }))
+            }
+            label={ar ? "الأعمدة" : "Columns"}
+            title={ar ? "إظهار أعمدة الكشف" : "Visible columns"}
+          />
         </div>
 
         {/* ═══ تنبيهات ═══ */}
@@ -526,6 +555,9 @@ function AccountStatementPage() {
             </span>
           </div>
 
+          <div className="mb-2 text-[11px] text-muted-foreground">
+            {result ? `${ar ? "الفترة" : "Period"}: ${result.period.label}` : ""}
+          </div>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -625,7 +657,12 @@ function AccountStatementPage() {
                     )}
 
                     {statementRows.map((row) => (
-                      <TableRow key={row.id} className="hover:bg-surface-2/60">
+                      <TableRow
+                        key={row.id}
+                        className="cursor-pointer hover:bg-surface-2/60"
+                        onClick={() => setDetailEntry(row)}
+                        title={ar ? "عرض تفاصيل القيد" : "View entry details"}
+                      >
                         {columns.map((col) => {
                           let content: React.ReactNode = "—";
                           switch (col.key) {
@@ -757,6 +794,21 @@ function AccountStatementPage() {
           )}
         </div>
       </div>
+      )}
+
+      {/* تفاصيل القيد — تُفتح بالنقر على أي حركة */}
+      <StatementEntryDetails
+        entry={detailEntry}
+        entityType={partyType}
+        onClose={() => setDetailEntry(null)}
+      />
+      <ReportPickerDialog
+        open={reportPickerOpen}
+        selected={reportType}
+        onOpenChange={setReportPickerOpen}
+        onSelect={handleReportSelect}
+        ar={ar}
+      />
     </>
   );
 }
