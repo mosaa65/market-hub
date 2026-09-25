@@ -1,5 +1,5 @@
 import { ModuleGuard, useModules } from "@/lib/modules";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { ShoppingCart, Plus, Search, Eye, X, Loader2, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -149,12 +149,20 @@ function PurchasesPage() {
         title={t("purchases.title")}
         subtitle={t("purchases.subtitle")}
         actions={
-          <button
-            onClick={() => setCreating(true)}
-            className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90"
-          >
-            <Plus className="h-4 w-4" /> {t("purchases.new")}
-          </button>
+          <div className="flex items-center gap-2">
+            <Link
+              to="/purchase-pos"
+              className="flex h-9 items-center gap-1.5 rounded-md border border-primary/40 bg-primary/10 px-3 text-sm font-medium text-primary hover:bg-primary/20 transition"
+            >
+              <ShoppingCart className="h-4 w-4" /> {lang === "ar" ? "نقطة المشتريات السريعة (POP)" : "Fast Purchase POS"}
+            </Link>
+            <button
+              onClick={() => setCreating(true)}
+              className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90"
+            >
+              <Plus className="h-4 w-4" /> {t("purchases.new")}
+            </button>
+          </div>
         }
       />
       <div className="panel-elevated p-4">

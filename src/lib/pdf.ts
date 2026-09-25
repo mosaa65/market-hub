@@ -9,8 +9,14 @@
  *
  * This module provides the unified PDF generation with Arabic font embedding.
  */
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+// Phase 5 Optimization: Dynamic lazy-loading of heavy PDF libraries
+async function getPdfLibraries() {
+  const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+    import("jspdf"),
+    import("jspdf-autotable"),
+  ]);
+  return { jsPDF, autoTable };
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -122,13 +128,13 @@ export function generateInvoicePDF(doc: InvoiceDoc) {
   printInvoice(doc, "standard", labels, true);
 }
 
-export function generateInvoicePdfBlob(doc: InvoiceDoc) {
-  const pdf = generateInvoicePdfDoc(doc);
+export async function generateInvoicePdfBlob(doc: InvoiceDoc) {
+  const pdf = await generateInvoicePdfDoc(doc);
   return pdf.output("blob");
 }
 
-export function shareInvoicePDF(doc: InvoiceDoc) {
-  const blob = generateInvoicePdfBlob(doc);
+export async function shareInvoicePDF(doc: InvoiceDoc) {
+  const blob = await generateInvoicePdfBlob(doc);
   const file = new File([blob], `${doc.number}.pdf`, { type: "application/pdf" });
 
   if (navigator.share && typeof navigator.share === "function") {
@@ -144,7 +150,8 @@ export function shareInvoicePDF(doc: InvoiceDoc) {
   return Promise.resolve();
 }
 
-function generateInvoicePdfDoc(doc: InvoiceDoc) {
+async function generateInvoicePdfDoc(doc: InvoiceDoc) {
+  const { jsPDF, autoTable } = await getPdfLibraries();
   const pdf = new jsPDF({ unit: "mm", format: "a4" });
   const w = pdf.internal.pageSize.getWidth();
   const cur = doc.currency ?? "";

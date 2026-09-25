@@ -32,6 +32,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { money } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
+import { type PageGuideConfig } from "@/components/page-guide";
+import { ShoppingCart, Zap, ShieldCheck, Barcode, Scale, ArrowRightLeft, DollarSign } from "lucide-react";
 import { toast } from "sonner";
 import { BarcodeScanner } from "@/components/barcode-scanner";
 import { useKeyboardWedge } from "@/hooks/use-keyboard-wedge";
@@ -102,6 +104,99 @@ interface Compatibility {
   product_id: string;
   vehicle_model_id: string;
 }
+
+
+const posGuideConfig: PageGuideConfig = {
+  title: "دليل نقطة البيع والكاشير المتقدم (POS)",
+  subtitle: "شرح شامل لدورة البيع السريع، الأثر المخزني والمالي، معالجة الدفع، واختصارات لوحة المفاتيح.",
+  badge: "كاشير ونقاط البيع السريعة",
+  icon: <ShoppingCart className="h-5 w-5 text-sky-500" />,
+  summaryText: "صُممت نقطة البيع لتقديم تجربة كاشير فائقة السرعة مع تحديث فوري للمخزون والحسابات المالية لحظة بلحظة وبدون الحاجة لإعادة تحميل الصفحة.",
+  overviewCards: [
+    {
+      title: "مسح باركود فوري وبحث مرن",
+      description: "دعم كامل لقوارئ الباركود السلكية واللاسلكية وكاميرا الجوال مع البحث الذكي بالاسم أو الكود (اختصار F2).",
+      icon: <Barcode className="h-4 w-4" />
+    },
+    {
+      title: "تعدد وتنوع طرق السداد",
+      description: "سداد نقدي، عبر نقاط البيع (شبكة/مدى/فيزا)، تحويلات بنكية، أو مبيعات آجلة مع التحقق من سقف العميل.",
+      icon: <CreditCard className="h-4 w-4" />
+    },
+    {
+      title: "الخصم الفوري والتحكم المالي",
+      description: "خصم تلقائي لكميات المنتجات من مستودع نقطة البيع المختار فور تأكيد العملية لمنع العجز والبيع الزائد.",
+      icon: <Scale className="h-4 w-4" />
+    },
+    {
+      title: "طباعة وحفظ فوري",
+      description: "إتمام الفاتورة وطباعة الإيصال الحراري بضغطة زر واحدة أو باختصار لوحة المفاتيح (F4).",
+      icon: <Zap className="h-4 w-4" />
+    }
+  ],
+  matrixTitle: "مصفوفة الأثر المالي والمخزني لعمليات الكاشير",
+  matrixDescription: "جدول تفصيلي يوضح كيفية تأثير كل طريقة دفع وحركة في نقطة البيع على القيود المحاسبية ورصيد المخزون:",
+  impactMatrix: {
+    columns: [
+      { key: "paymentType", label: "طريقة العملية", className: "w-[20%]" },
+      { key: "inventoryImpact", label: "التأثير المخزني", className: "w-[25%]" },
+      { key: "accountingImpact", label: "القيد المحاسبي والأثر المالي", className: "w-[30%]" },
+      { key: "controls", label: "شروط وضوابط العملية", className: "w-[25%]" }
+    ],
+    rows: [
+      {
+        badge: { label: "سداد نقدي (Cash)", variant: "emerald" },
+        fields: {
+          paymentType: "فاتورة كاش فورية",
+          inventoryImpact: "خصم الكميات من مستودع الفرع فوراً وتحديث الرصيد الفعلي.",
+          accountingImpact: "من حـ/ الصندوق (مدين) إلى حـ/ المبيعات (دائن) + إثبات تكلفة البضاعة المباعة.",
+          controls: "تسجيل المبلغ المستلم وحساب الفكة/المتبقي للعميل آلياً."
+        }
+      },
+      {
+        badge: { label: "دفع إلكتروني (Card/Network)", variant: "blue" },
+        fields: {
+          paymentType: "شبكة / مدى / بطاقة",
+          inventoryImpact: "خصم الكميات فوراً من مستودع الفرع.",
+          accountingImpact: "من حـ/ البنك أو وسيط الدفع (مدين) إلى حـ/ المبيعات (دائن).",
+          controls: "مطابقة إشعار جهاز الدفع الإلكتروني قبل اعتماد الفاتورة."
+        }
+      },
+      {
+        badge: { label: "مبيعات آجلة (Credit)", variant: "purple" },
+        fields: {
+          paymentType: "على الحساب (ذمم عملاء)",
+          inventoryImpact: "خصم الكميات فوراً من مستودع الفرع.",
+          accountingImpact: "من حـ/ العميل (مدين) إلى حـ/ المبيعات (دائن) بزيادة رصيد مديونية العميل.",
+          controls: "اشتراط اختيار عميل حقيقي غير نقدي والتحقق من عدم تجاوز الحد الائتماني."
+        }
+      },
+      {
+        badge: { label: "تحويل بنكي (Transfer)", variant: "amber" },
+        fields: {
+          paymentType: "حوالة / إيداع بنكي",
+          inventoryImpact: "خصم الكميات فوراً من المستودع.",
+          accountingImpact: "من حـ/ الحساب الجاري بالبنك (مدين) إلى حـ/ المبيعات (دائن).",
+          controls: "إدخال رقم الحوالة أو المرجع في حقل الملاحظات لسهولة المطابقة البنكية."
+        }
+      }
+    ]
+  },
+  stepsTitle: "خطوات إتمام عملية بيع نموذجية في الكاشير",
+  steps: [
+    { number: "1", title: "تجهيز السلة والأصناف", description: "امسح الباركود بالقارئ السريع أو ابحث بالاسم بالضغط على (F2) وانقر لإضافة المنتج للسلة." },
+    { number: "2", title: "تعديل الكميات والخصومات", description: "عدل كمية كل صنف، وطبق الخصم الإجمالي إن وجد وفق الصلاحيات المخولة لك." },
+    { number: "3", title: "تحديد العميل وطريقة الدفع", description: "اترك العميل الافتراضي للمبيعات النقدية، أو اختر العميل المسجل للمبيعات الآجلة، وحدد طريقة السداد." },
+    { number: "4", title: "الحفظ والطباعة (F4)", description: "اضغط زر حفظ الفاتورة أو F4 لإصدار الفاتورة فوراً وطباعة إيصال الكاشير الحراري." }
+  ],
+  rulesTitle: "إرشادات السلامة والرقابة التشغيلية",
+  rules: [
+    { type: "danger", title: "التحقق من الرصيد لمنع المخزون السالب", description: "النظام يمنع استكمال البيع إذا كانت الكمية المطلوبة غير متوفرة في المستودع المختار إلا إذا كان البيع على المكشوف مصرحاً به." },
+    { type: "warning", title: "تدقيق أسعار البيع والخصم", description: "لا يُسمح بتعديل سعر البيع إلى أقل من سعر التكلفة إلا بموافقة إدارية لحماية هوامش الربحية." },
+    { type: "info", title: "حفظ فوري دون فقدان الجلسة", description: "جميع بنود السلة محمية محلياً في الذاكرة السريعة لمنع ضياع الفاتورة في حال انقطاع الاتصال المؤقت." }
+  ],
+  footerTip: "فورتيكس ERP — نظام الكاشير ونقاط البيع السريعة المعتمد"
+};
 
 function POSPage() {
   const { isModuleEnabled } = useModules();
@@ -237,33 +332,84 @@ function POSPage() {
     if (warehouseId) void loadStock(warehouseId);
   }, [warehouseId]);
 
+  // Granular Realtime sync: updates specific state without triggering full-page reload or re-fetching 11 tables
   useEffect(() => {
-    const channel = supabase.channel("pos-live-meta");
-    const tables = [
-      "categories",
-      "brands",
-      "units",
-      "products",
-      "warehouses",
-      "customers",
-      "countries_of_origin",
-      "quality_grades",
-      "vehicle_makes",
-      "vehicle_models",
-      "product_compatibilities",
-    ] as const;
+    const channel = supabase.channel("pos-live-meta-optimized");
 
-    tables.forEach((table) => {
-      channel.on("postgres_changes", { event: "*", schema: "public", table }, () => {
-        void loadAll();
-      });
-    });
+    // Granular updates for products without re-running loadAll
+    channel.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "products" },
+      (payload) => {
+        if (payload.eventType === "UPDATE") {
+          const updated = payload.new as any;
+          setProducts((prev) =>
+            prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p))
+          );
+        } else if (payload.eventType === "INSERT") {
+          const inserted = payload.new as any;
+          setProducts((prev) => [inserted, ...prev]);
+        } else if (payload.eventType === "DELETE") {
+          const deleted = payload.old as any;
+          setProducts((prev) => prev.filter((p) => p.id !== deleted.id));
+        }
+      }
+    );
+
+    // Granular updates for customers
+    channel.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "customers" },
+      (payload) => {
+        if (payload.eventType === "UPDATE") {
+          const updated = payload.new as any;
+          setCustomers((prev) =>
+            prev.map((c) => (c.id === updated.id ? { ...c, ...updated } : c))
+          );
+        } else if (payload.eventType === "INSERT") {
+          setCustomers((prev) => [payload.new as any, ...prev]);
+        } else if (payload.eventType === "DELETE") {
+          setCustomers((prev) => prev.filter((c) => c.id !== (payload.old as any).id));
+        }
+      }
+    );
+
+    // Granular updates for warehouses
+    channel.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "warehouses" },
+      (payload) => {
+        if (payload.eventType === "UPDATE") {
+          const updated = payload.new as any;
+          setWarehouses((prev) =>
+            prev.map((w) => (w.id === updated.id ? { ...w, ...updated } : w))
+          );
+        } else if (payload.eventType === "INSERT") {
+          setWarehouses((prev) => [...prev, payload.new as any]);
+        }
+      }
+    );
+
+    // Granular updates for stock levels (inventory)
+    channel.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "inventory_balances" },
+      (payload) => {
+        const row = (payload.new || payload.old) as any;
+        if (row && row.product_id && (!warehouseId || row.warehouse_id === warehouseId)) {
+          setStockMap((prev) => ({
+            ...prev,
+            [row.product_id]: Number(row.balance ?? row.available_quantity ?? 0),
+          }));
+        }
+      }
+    );
 
     channel.subscribe();
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, []);
+  }, [warehouseId]);
 
   async function loadAll() {
     try {
@@ -940,7 +1086,7 @@ function POSPage() {
 
   return (
     <>
-      <PageHeader title={t("pos.title")} subtitle={t("pos.subtitle")} />
+      <PageHeader title={t("pos.title")} subtitle={t("pos.subtitle")} guide={posGuideConfig} />
 
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_440px]">
         {/* Products Panel */}
@@ -1374,8 +1520,8 @@ function POSPage() {
           </div>
         </div>
 
-        {/* Cart Panel - Elegant, Fixed Viewport Height, Dedicated Internal Scroll */}
-        <div className="order-1 flex flex-col rounded-3xl border border-border/80 bg-surface/95 shadow-xl p-4 lg:order-2 lg:sticky lg:top-4 h-[650px] lg:h-[calc(100vh-120px)] lg:max-h-[calc(100vh-120px)] overflow-hidden backdrop-blur-md">
+        {/* Cart Panel - Responsive, natural height with internal & page scroll protection */}
+        <div className="order-1 flex flex-col rounded-3xl border border-border/80 bg-surface/95 shadow-xl p-4 lg:order-2 lg:sticky lg:top-4 min-h-[520px] lg:max-h-[calc(100vh-5rem)] overflow-y-auto custom-scrollbar backdrop-blur-md">
           {/* Cart Header */}
           <div className="shrink-0 mb-3 flex items-center justify-between rounded-2xl border border-border/70 bg-gradient-to-l from-primary/10 via-surface-2/40 to-transparent px-3.5 py-2.5 shadow-2xs">
             <div className="flex items-center gap-2">
@@ -1826,6 +1972,7 @@ function POSPage() {
             </div>
 
             {/* Checkout Button */}
+            <div className="shrink-0 mt-2">
             {isOverpaid ? (
               <button
                 type="button"
@@ -1862,6 +2009,7 @@ function POSPage() {
                 </div>
               </button>
             )}
+            </div>
           </div>
         </div>
       </div>

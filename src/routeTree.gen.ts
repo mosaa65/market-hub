@@ -27,6 +27,7 @@ import { Route as AppPurchasesRouteImport } from './routes/_app.purchases'
 import { Route as AppPurchaseReturnsRouteImport } from './routes/_app.purchase-returns'
 import { Route as AppProductsRouteImport } from './routes/_app.products'
 import { Route as AppPosRouteImport } from './routes/_app.pos'
+import { Route as AppPurchasePosRouteImport } from './routes/_app.purchase-pos'
 import { Route as AppPlatformAdminRouteImport } from './routes/_app.platform-admin'
 import { Route as AppPlansRouteImport } from './routes/_app.plans'
 import { Route as AppPaymentsRouteImport } from './routes/_app.payments'
@@ -129,6 +130,11 @@ const AppPurchaseReturnsRoute = AppPurchaseReturnsRouteImport.update({
 const AppProductsRoute = AppProductsRouteImport.update({
   id: '/products',
   path: '/products',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPurchasePosRoute = AppPurchasePosRouteImport.update({
+  id: '/purchase-pos',
+  path: '/purchase-pos',
   getParentRoute: () => AppRoute,
 } as any)
 const AppPosRoute = AppPosRouteImport.update({
@@ -255,6 +261,7 @@ export interface FileRoutesByFullPath {
   '/plans': typeof AppPlansRoute
   '/platform-admin': typeof AppPlatformAdminRoute
   '/pos': typeof AppPosRoute
+  '/purchase-pos': typeof AppPurchasePosRoute
   '/products': typeof AppProductsRoute
   '/purchase-returns': typeof AppPurchaseReturnsRoute
   '/purchases': typeof AppPurchasesRoute
@@ -293,6 +300,7 @@ export interface FileRoutesByTo {
   '/plans': typeof AppPlansRoute
   '/platform-admin': typeof AppPlatformAdminRoute
   '/pos': typeof AppPosRoute
+  '/purchase-pos': typeof AppPurchasePosRoute
   '/products': typeof AppProductsRoute
   '/purchase-returns': typeof AppPurchaseReturnsRoute
   '/purchases': typeof AppPurchasesRoute
@@ -333,6 +341,7 @@ export interface FileRoutesById {
   '/_app/plans': typeof AppPlansRoute
   '/_app/platform-admin': typeof AppPlatformAdminRoute
   '/_app/pos': typeof AppPosRoute
+  '/_app/purchase-pos': typeof AppPurchasePosRoute
   '/_app/products': typeof AppProductsRoute
   '/_app/purchase-returns': typeof AppPurchaseReturnsRoute
   '/_app/purchases': typeof AppPurchasesRoute
@@ -373,6 +382,7 @@ export interface FileRouteTypes {
     | '/plans'
     | '/platform-admin'
     | '/pos'
+    | '/purchase-pos'
     | '/products'
     | '/purchase-returns'
     | '/purchases'
@@ -411,6 +421,7 @@ export interface FileRouteTypes {
     | '/plans'
     | '/platform-admin'
     | '/pos'
+    | '/purchase-pos'
     | '/products'
     | '/purchase-returns'
     | '/purchases'
@@ -450,6 +461,7 @@ export interface FileRouteTypes {
     | '/_app/plans'
     | '/_app/platform-admin'
     | '/_app/pos'
+    | '/_app/purchase-pos'
     | '/_app/products'
     | '/_app/purchase-returns'
     | '/_app/purchases'
@@ -591,6 +603,13 @@ declare module '@tanstack/react-router' {
       path: '/products'
       fullPath: '/products'
       preLoaderRoute: typeof AppProductsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/purchase-pos': {
+      id: '/_app/purchase-pos'
+      path: '/purchase-pos'
+      fullPath: '/purchase-pos'
+      preLoaderRoute: typeof AppPurchasePosRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/pos': {
@@ -757,6 +776,7 @@ interface AppRouteChildren {
   AppPlansRoute: typeof AppPlansRoute
   AppPlatformAdminRoute: typeof AppPlatformAdminRoute
   AppPosRoute: typeof AppPosRoute
+  AppPurchasePosRoute: typeof AppPurchasePosRoute
   AppProductsRoute: typeof AppProductsRoute
   AppPurchaseReturnsRoute: typeof AppPurchaseReturnsRoute
   AppPurchasesRoute: typeof AppPurchasesRoute
@@ -794,6 +814,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppPlansRoute: AppPlansRoute,
   AppPlatformAdminRoute: AppPlatformAdminRoute,
   AppPosRoute: AppPosRoute,
+  AppPurchasePosRoute: AppPurchasePosRoute,
   AppProductsRoute: AppProductsRoute,
   AppPurchaseReturnsRoute: AppPurchaseReturnsRoute,
   AppPurchasesRoute: AppPurchasesRoute,
