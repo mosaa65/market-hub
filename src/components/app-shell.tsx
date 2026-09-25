@@ -445,8 +445,7 @@ function SidebarContents({
 
   // Navigation belongs to the application itself, not to an individual tenant.
   // The company logo remains available in invoices and printable documents.
-  const logoUrl = "/vortex-erp-wordmark.png";
-  const compactLogoUrl = "/vortex-erp-mark.png";
+  const logoUrl = "/vortex-erp-mark.png";
 
   const filteredSections = useMemo(() => {
     return sections
@@ -481,20 +480,22 @@ function SidebarContents({
           "flex h-16 items-center border-b border-sidebar-border/60 transition-all duration-300",
           collapsed
             ? "justify-center px-2"
-            : "justify-center px-4",
+            : "justify-start gap-2.5 px-4",
         )}
       >
         <img
-          src={collapsed ? compactLogoUrl : logoUrl}
+          src={logoUrl}
           alt={t("app.name")}
           className={cn(
-            "object-contain",
-            collapsed ? "size-9" : "h-11 w-[150px] max-w-full",
+            "size-9 shrink-0 rounded-xl border border-border/60 bg-surface-2/90 p-1 object-contain shadow-md ring-1 ring-white/10",
           )}
           onError={(event) => {
             event.currentTarget.style.visibility = "hidden";
           }}
         />
+        {!collapsed ? (
+          <span className="text-base font-extrabold tracking-tight text-foreground">فورتكس</span>
+        ) : null}
       </div>
 
       {/* Navigation Links */}

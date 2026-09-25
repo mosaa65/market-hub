@@ -182,6 +182,13 @@ export function DataTable<T>({
   const headerScrollRef = React.useRef<HTMLDivElement>(null);
   const sentinelRef = React.useRef<HTMLDivElement>(null);
   const toolbarRef = React.useRef<HTMLDivElement>(null);
+  const panRef = React.useRef<{
+    pointerId: number | null;
+    startX: number;
+    startY: number;
+    startScrollLeft: number;
+    panned: boolean;
+  }>({ pointerId: null, startX: 0, startY: 0, startScrollLeft: 0, panned: false });
   const [page, setPage] = React.useState(1);
 
   /*
@@ -317,6 +324,44 @@ export function DataTable<T>({
     }
   };
 
+  // Native horizontal scrolling can be handed to the page's vertical scroller
+  // on mobile browsers. Own only the horizontal gesture while `touch-pan-y`
+  // preserves normal up/down scrolling outside and inside the table.
+  const beginHorizontalPan = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!horizontalScroll) return;
+    panRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startScrollLeft: event.currentTarget.scrollLeft,
+      panned: false,
+    };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  };
+
+  const moveHorizontalPan = (event: React.PointerEvent<HTMLDivElement>) => {
+    const pan = panRef.current;
+    if (!horizontalScroll || pan.pointerId !== event.pointerId) return;
+    const dx = event.clientX - pan.startX;
+    const dy = event.clientY - pan.startY;
+    if (Math.abs(dx) <= Math.abs(dy)) return;
+
+    pan.panned = true;
+    const rtl = getComputedStyle(event.currentTarget).direction === "rtl";
+    event.currentTarget.scrollLeft = pan.startScrollLeft + (rtl ? dx : -dx);
+  };
+
+  const endHorizontalPan = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (panRef.current.pointerId === event.pointerId) panRef.current.pointerId = null;
+  };
+
+  const suppressPanClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!panRef.current.panned) return;
+    event.preventDefault();
+    event.stopPropagation();
+    panRef.current.panned = false;
+  };
+
   return (
     <div
       className={cn("flex min-w-0 flex-col", className)}
@@ -349,13 +394,18 @@ export function DataTable<T>({
            * and the body retains natural two-axis touch gestures. */}
           {detachedHeader ? (
             <div
-              className="sticky z-20 overflow-hidden rounded-[18px] border border-border bg-surface-2/85 shadow-[0_5px_14px_oklch(0_0_0/0.06)] backdrop-blur-xl"
+              className="sticky z-20 overflow-hidden rounded-[var(--radius-panel)] border border-border bg-surface-2/85 shadow-[0_5px_14px_oklch(0_0_0/0.06)] backdrop-blur-xl"
               style={{ top: "calc(var(--ds-sticky-top,0px) + var(--ds-toolbar-h,0px))" }}
             >
               <div
                 ref={headerScrollRef}
                 onScroll={syncHorizontalScroll("header")}
-                className="w-full overflow-x-auto touch-manipulation [-webkit-overflow-scrolling:touch] custom-scrollbar"
+                onPointerDown={beginHorizontalPan}
+                onPointerMove={moveHorizontalPan}
+                onPointerUp={endHorizontalPan}
+                onPointerCancel={endHorizontalPan}
+                onClickCapture={suppressPanClick}
+                className="w-full overflow-x-auto touch-pan-y [-webkit-overflow-scrolling:touch] custom-scrollbar"
               >
                 <table className={tableClassName} style={tableStyle}>
                   <TableHead
@@ -371,12 +421,17 @@ export function DataTable<T>({
           <div
             ref={scrollRef}
             onScroll={detachedHeader ? syncHorizontalScroll("body") : undefined}
+            onPointerDown={beginHorizontalPan}
+            onPointerMove={moveHorizontalPan}
+            onPointerUp={endHorizontalPan}
+            onPointerCancel={endHorizontalPan}
+            onClickCapture={suppressPanClick}
             className={cn(
             /* The detached header above is synchronised with this body scroller,
              * so horizontal panning remains direct and its labels stay pinned to
              * the app's real vertical scrolling surface. */
             horizontalScroll
-              ? "w-full overflow-x-auto touch-manipulation [-webkit-overflow-scrolling:touch] custom-scrollbar"
+              ? "w-full overflow-x-auto touch-pan-y [-webkit-overflow-scrolling:touch] custom-scrollbar"
               : "w-full overscroll-x-contain",
             refreshing && "opacity-70 transition-opacity",
             scrollClassName,
