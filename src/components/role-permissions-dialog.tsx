@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- يصدّر بيانات الأدوار (ROLE_DEFINITIONS و CAPABILITY_MATRIX) مع المكوّن عمداً */
 import { useState } from "react";
 import {
   Dialog,

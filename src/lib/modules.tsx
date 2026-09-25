@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- يصدّر ModuleGuard مع منظومة الوحدات والثوابت عمداً */
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";

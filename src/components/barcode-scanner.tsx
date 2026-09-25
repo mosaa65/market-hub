@@ -140,7 +140,7 @@ export function BarcodeScanner({ open, onClose, onDetected, continuous = false }
       cancelled = true;
       void stopScanner(scanner);
     };
-  }, [cameraId, close, lang, onDetected, open, stopScanner]);
+  }, [cameraId, close, continuous, lang, onDetected, open, stopScanner]);
 
   if (!open) return null;
 
