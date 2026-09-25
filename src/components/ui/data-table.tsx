@@ -192,6 +192,65 @@ export function DataTable<T>({
   const [page, setPage] = React.useState(1);
 
   /*
+   * عجلة الفأرة فوق جدول قابل للتمرير الأفقي: المتصفح يستخدمها للتمرير الأفقي
+   * فيتوقف التمرير الرأسي فوق السجلات. نُعيد توجيه التمرير الرأسي إلى أقرب سلف
+   * قابل للتمرير عموديًا. الربط يحدث عبر callback ref — وليس useEffect عند
+   * التحميل — لأن حاوية الجدول لا تُرسم أثناء حالة الهيكل (Skeleton) فيكون
+   * الـ ref فارغًا وقت تشغيل أي تأثير مُهيّأ مرة واحدة.
+   */
+  const bodyWheelCleanupRef = React.useRef<(() => void) | null>(null);
+  const headerWheelCleanupRef = React.useRef<(() => void) | null>(null);
+
+  const wheelRedirectCleanup = (el: HTMLDivElement | null): (() => void) | null => {
+    if (!el) return null;
+    const onWheel = (event: WheelEvent) => {
+      if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+      event.preventDefault();
+      // deltaMode 1 = خطوط، 2 = صفحات — نحوّلها إلى بكسل.
+      const dy =
+        event.deltaMode === 1
+          ? event.deltaY * 16
+          : event.deltaMode === 2
+            ? event.deltaY * el.clientHeight
+            : event.deltaY;
+      let node: HTMLElement | null = el.parentElement;
+      while (node) {
+        if (node.scrollHeight > node.clientHeight + 1) {
+          node.scrollTop += dy;
+          // إذا بلغ هذا الحاويّ نهايته نُكمِل إلى سلفه (سلوك متسلسل طبيعي).
+          if (
+            (dy > 0 && node.scrollTop < node.scrollHeight - node.clientHeight - 1) ||
+            (dy < 0 && node.scrollTop > 1)
+          ) {
+            return;
+          }
+        }
+        node = node.parentElement;
+      }
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  };
+
+  const setBodyScrollerRef = (el: HTMLDivElement | null) => {
+    scrollRef.current = el;
+    if (bodyWheelCleanupRef.current) {
+      bodyWheelCleanupRef.current();
+      bodyWheelCleanupRef.current = null;
+    }
+    bodyWheelCleanupRef.current = wheelRedirectCleanup(el);
+  };
+
+  const setHeaderScrollerRef = (el: HTMLDivElement | null) => {
+    headerScrollRef.current = el;
+    if (headerWheelCleanupRef.current) {
+      headerWheelCleanupRef.current();
+      headerWheelCleanupRef.current = null;
+    }
+    headerWheelCleanupRef.current = wheelRedirectCleanup(el);
+  };
+
+  /*
    * Sticky geometry: the toolbar height has to be known so the table header can
    * pin directly beneath it.
    *
@@ -317,6 +376,29 @@ export function DataTable<T>({
   const tableStyle = minWidth ? { minWidth } : undefined;
   const detachedHeader = Boolean(horizontalScroll || minWidth) && stickyHeader;
 
+  /*
+   * توزيع الأعمدة متطابق بين جدول الرأس المفصول وجدول البيانات: نُصدر
+   * <colgroup> واحدًا بنفس كلاسات العرض لكلا الجدولين. بدونه، يُحسب تخطيط
+   * الجدول التلقائي (table-auto) من محتوى كل جدول على حدة — فتتباين أعمدة
+   * الرأس عن أعمدة البيانات.
+   */
+  const colGroup = visibleColumns.length ? (
+    <colgroup>
+      {visibleColumns.map((c) => (
+        <col key={c.key} className={c.width} />
+      ))}
+    </colgroup>
+  ) : null;
+
+  /* مع min-width يبقى التخطيط تلقائيًا ليتسع المحتوى؛ مع ثبات الأعمدة
+   * (كل الأعمدة عرضها محدد ببكسل) نستخدم table-fixed ليكون الجدولان متطابقين
+   * تمامًا وعمودًا بعمود. */
+  const allColsWidths =
+    visibleColumns.length > 0 &&
+    visibleColumns.every((c) => /w-\[[\d.]+px\]/.test(c.width ?? ""));
+  const alignedTableClassName =
+    minWidth && allColsWidths ? cn(tableClassName, "table-fixed") : tableClassName;
+
   const syncHorizontalScroll = (source: "header" | "body") => (event: React.UIEvent<HTMLDivElement>) => {
     const target = source === "header" ? scrollRef.current : headerScrollRef.current;
     if (target && target.scrollLeft !== event.currentTarget.scrollLeft) {
@@ -365,39 +447,6 @@ export function DataTable<T>({
     panRef.current.panned = false;
   };
 
-  /*
-   * عجلة الفأرة فوق جدول قابل للتمرير الأفقي: المتصفح يحاول تمرير العنصر أفقيًا
-   * بدل تمرير الصفحة عموديًا، فيتوقف التمرير الرأسي فوق السجلات. نُعيد توجيه
-   * التمرير الرأسي إلى أقرب سلف قابل للتمرير عموديًا (عنصر <main> في الهيكل)،
- * ونترك التمرير الأفقي يعمل طبيعيًا. مستمع أصلي غير سلبي لأن React يجعل
-   * مستمعي wheel سلبيين فيمنع preventDefault.
-   */
-  React.useEffect(() => {
-    const redirectVerticalWheel = (el: HTMLElement | null) => {
-      if (!el) return () => {};
-      const onWheel = (event: WheelEvent) => {
-        if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
-        event.preventDefault();
-        let node: HTMLElement | null = el.parentElement;
-        while (node) {
-          if (node.scrollHeight > node.clientHeight + 1) {
-            node.scrollTop += event.deltaY;
-            return;
-          }
-          node = node.parentElement;
-        }
-      };
-      el.addEventListener("wheel", onWheel, { passive: false });
-      return () => el.removeEventListener("wheel", onWheel);
-    };
-    const cleanupBody = redirectVerticalWheel(scrollRef.current);
-    const cleanupHeader = redirectVerticalWheel(headerScrollRef.current);
-    return () => {
-      cleanupBody();
-      cleanupHeader();
-    };
-  }, []);
-
   return (
     <div
       className={cn("flex min-w-0 flex-col", className)}
@@ -434,16 +483,17 @@ export function DataTable<T>({
               style={{ top: "calc(var(--ds-sticky-top,0px) + var(--ds-toolbar-h,0px))" }}
             >
               <div
-                ref={headerScrollRef}
+                ref={setHeaderScrollerRef}
                 onScroll={syncHorizontalScroll("header")}
                 onPointerDown={beginHorizontalPan}
                 onPointerMove={moveHorizontalPan}
                 onPointerUp={endHorizontalPan}
                 onPointerCancel={endHorizontalPan}
                 onClickCapture={suppressPanClick}
-                className="w-full overflow-x-auto touch-pan-y [-webkit-overflow-scrolling:touch] scrollbar-x-none custom-scrollbar"
+                className="w-full overflow-x-auto overscroll-y-auto touch-pan-y [-webkit-overflow-scrolling:touch] scrollbar-x-none custom-scrollbar"
               >
-                <table className={tableClassName} style={tableStyle}>
+                <table className={alignedTableClassName} style={tableStyle}>
+                  {colGroup}
                   <TableHead
                     columns={visibleColumns}
                     sort={sort}
@@ -455,7 +505,7 @@ export function DataTable<T>({
             </div>
           ) : null}
           <div
-            ref={scrollRef}
+            ref={setBodyScrollerRef}
             onScroll={detachedHeader ? syncHorizontalScroll("body") : undefined}
             onPointerDown={beginHorizontalPan}
             onPointerMove={moveHorizontalPan}
@@ -467,7 +517,7 @@ export function DataTable<T>({
              * so horizontal panning remains direct and its labels stay pinned to
              * the app's real vertical scrolling surface. */
             horizontalScroll || minWidth
-              ? "w-full overflow-x-auto touch-pan-y [-webkit-overflow-scrolling:touch] scrollbar-x-none custom-scrollbar"
+              ? "w-full overflow-x-auto overscroll-y-auto touch-pan-y [-webkit-overflow-scrolling:touch] scrollbar-x-none custom-scrollbar"
               : "w-full overscroll-x-contain",
             refreshing && "opacity-70 transition-opacity",
             scrollClassName,
@@ -484,9 +534,10 @@ export function DataTable<T>({
              * instead of expanding the table. It is applied from `sm` up only
              * when a `minWidth` is requested (wide accounting tables that are
              * *meant* to scroll); otherwise it applies at every width. */
-            className={tableClassName}
+            className={alignedTableClassName}
             style={tableStyle}
           >
+            {colGroup}
             <TableHead
               columns={visibleColumns}
               sort={sort}

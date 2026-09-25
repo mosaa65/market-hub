@@ -187,14 +187,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return (data ?? []).map((r: { role: Role }) => r.role);
   }
 
+  /*
+   * بعض قواعد البيانات المستضافة لم تُطبّق ترحيل profiles.is_active بعد
+   * (خطأ 42703). نحاول مرة واحدة فقط، وإذا كان العمود غائبًا نُعطّل الاستعلام
+   * لجلسة الصفحة كاملة بدل تكرار طلبات 400 في الكونسول مع كل تحديث حالة.
+   */
+  let profilesIsActiveColumnMissing = false;
   async function fetchIsActive(userId: string): Promise<boolean> {
+    if (profilesIsActiveColumnMissing) return true;
     try {
       const { data, error } = await supabase
         .from("profiles")
         .select("is_active")
         .eq("id", userId)
         .maybeSingle();
-      if (error || !data) return true;
+      if (error) {
+        if ((error as { code?: string }).code === "42703") {
+          profilesIsActiveColumnMissing = true;
+          console.warn(
+            "profiles.is_active column is missing — run migration 20260918000100_add_profiles_is_active.sql",
+          );
+          return true;
+        }
+        return true;
+      }
+      if (!data) return true;
       return (data as { is_active?: boolean }).is_active !== false;
     } catch {
       return true;
