@@ -214,6 +214,7 @@ function NewSalesReturn({
       setProducts(p.data ?? []);
       if (!warehouseId && w.data?.[0]) setWarehouseId(w.data[0].id);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- مقصود: تحديد المستودع الافتراضي مرة واحدة عند الفتح
   }, [open]);
 
   useEffect(() => {

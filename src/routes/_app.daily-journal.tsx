@@ -47,6 +47,7 @@ function DailyJournalPage() {
 
   useEffect(() => {
     void loadJournal(selectedDate);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadJournal يعتمد فقط على selectedDate و lang المستقر
   }, [selectedDate]);
 
   async function loadJournal(dateStr: string) {
