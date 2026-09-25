@@ -349,13 +349,13 @@ export function DataTable<T>({
            * and the body retains natural two-axis touch gestures. */}
           {detachedHeader ? (
             <div
-              className="sticky z-20 border-b border-border bg-surface-2/85 shadow-[0_5px_14px_oklch(0_0_0/0.06)] backdrop-blur-xl"
+              className="sticky z-20 overflow-hidden rounded-[18px] border border-border bg-surface-2/85 shadow-[0_5px_14px_oklch(0_0_0/0.06)] backdrop-blur-xl"
               style={{ top: "calc(var(--ds-sticky-top,0px) + var(--ds-toolbar-h,0px))" }}
             >
               <div
                 ref={headerScrollRef}
                 onScroll={syncHorizontalScroll("header")}
-                className="w-full overflow-x-auto overscroll-x-contain custom-scrollbar"
+                className="w-full overflow-x-auto touch-manipulation [-webkit-overflow-scrolling:touch] custom-scrollbar"
               >
                 <table className={tableClassName} style={tableStyle}>
                   <TableHead
@@ -369,19 +369,19 @@ export function DataTable<T>({
             </div>
           ) : null}
           <div
-          ref={scrollRef}
-          onScroll={detachedHeader ? syncHorizontalScroll("body") : undefined}
-          className={cn(
+            ref={scrollRef}
+            onScroll={detachedHeader ? syncHorizontalScroll("body") : undefined}
+            className={cn(
             /* The detached header above is synchronised with this body scroller,
              * so horizontal panning remains direct and its labels stay pinned to
              * the app's real vertical scrolling surface. */
             horizontalScroll
-              ? "w-full overflow-x-auto overscroll-x-contain custom-scrollbar"
+              ? "w-full overflow-x-auto touch-manipulation [-webkit-overflow-scrolling:touch] custom-scrollbar"
               : "w-full overscroll-x-contain",
             refreshing && "opacity-70 transition-opacity",
             scrollClassName,
           )}
-        >
+          >
           <table
             /* `table-layout: auto` with `w-full` lets the browser grow the table
              * past its container when a cell's content needs more room — on a

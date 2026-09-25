@@ -201,7 +201,7 @@ export function TableToolbar({
 }
 
 /* ------------------------------------------------------------------ */
-/*  Toolbar action button — circular, icon-led control at every width. */
+/*  Toolbar action button — icons on phones, labelled circular controls from `sm`. */
 /* ------------------------------------------------------------------ */
 
 interface ToolbarActionProps {
@@ -234,7 +234,7 @@ export function ToolbarAction({
       aria-haspopup={tone === "ghost" ? "dialog" : undefined}
       aria-expanded={tone === "ghost" ? active : undefined}
       className={cn(
-        "relative inline-flex size-10 shrink-0 items-center justify-center rounded-full border text-sm font-medium shadow-[var(--shadow-control)] backdrop-blur-xl transition-[background-color,border-color,color,box-shadow,transform] duration-200 sm:size-11",
+        "relative inline-flex size-10 shrink-0 items-center justify-center gap-1.5 rounded-full border text-sm font-medium shadow-[var(--shadow-control)] backdrop-blur-xl transition-[background-color,border-color,color,box-shadow,transform] duration-200 sm:h-11 sm:w-auto sm:px-4",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 active:scale-95",
         tone === "primary"
           ? "border-primary/45 bg-primary/18 text-primary shadow-primary/15 hover:border-primary/60 hover:bg-primary/26"
@@ -242,10 +242,11 @@ export function ToolbarAction({
             ? "border-primary/45 bg-primary/12 text-primary"
             : "border-border/70 bg-surface/55 text-muted-foreground hover:border-primary/30 hover:bg-surface/85 hover:text-foreground",
       )}
-    >
+      >
       <span className="[&_svg]:size-4">{icon}</span>
+      <span className="hidden sm:inline">{label}</span>
       {badge > 0 ? (
-        <span className="absolute -end-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground ring-2 ring-surface">
+        <span className="absolute -end-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground ring-2 ring-surface sm:static sm:ring-0">
           {badge}
         </span>
       ) : null}

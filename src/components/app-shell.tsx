@@ -431,7 +431,7 @@ function SidebarContents({
   const isSuperOrOwner =
     isPlatformAdmin || isPlatformSuperadmin || hasRole("owner");
 
-  const { isModuleEnabled, currentPlan } = useModules();
+  const { isModuleEnabled } = useModules();
 
   const navigate = useNavigate();
 
@@ -445,7 +445,8 @@ function SidebarContents({
 
   // Navigation belongs to the application itself, not to an individual tenant.
   // The company logo remains available in invoices and printable documents.
-  const logoUrl = "/vortex-erp-mark.png";
+  const logoUrl = "/vortex-erp-wordmark.png";
+  const compactLogoUrl = "/vortex-erp-mark.png";
 
   const filteredSections = useMemo(() => {
     return sections
@@ -480,39 +481,20 @@ function SidebarContents({
           "flex h-16 items-center border-b border-sidebar-border/60 transition-all duration-300",
           collapsed
             ? "justify-center px-2"
-            : "gap-2.5 px-4 justify-between",
+            : "justify-center px-4",
         )}
       >
-        <div className="flex items-center gap-2.5 min-w-0">
-          <img
-            src={logoUrl}
-            alt={t("app.name")}
-            className="h-9 w-9 shrink-0 rounded-xl object-contain bg-surface-2/90 p-1 border border-border/60 shadow-md ring-1 ring-white/10"
-            onError={(event) => {
-              event.currentTarget.style.visibility = "hidden";
-            }}
-          />
-
-          {!collapsed && (
-            <div className="flex flex-col leading-tight min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm font-bold tracking-tight text-foreground truncate">
-                  {t("app.name")}
-                </span>
-
-                <span className="inline-flex items-center rounded-full bg-primary/10 border border-primary/25 px-1.5 py-0.2 text-[9px] font-medium text-primary shrink-0">
-                  {lang === "ar"
-                    ? (currentPlan?.name?.ar ?? "—")
-                    : (currentPlan?.name?.en ?? "—")}
-                </span>
-              </div>
-
-              <span className="text-[11px] text-muted-foreground font-medium">
-                VORTEX ERP
-              </span>
-            </div>
+        <img
+          src={collapsed ? compactLogoUrl : logoUrl}
+          alt={t("app.name")}
+          className={cn(
+            "object-contain",
+            collapsed ? "size-9" : "h-11 w-[150px] max-w-full",
           )}
-        </div>
+          onError={(event) => {
+            event.currentTarget.style.visibility = "hidden";
+          }}
+        />
       </div>
 
       {/* Navigation Links */}
