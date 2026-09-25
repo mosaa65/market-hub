@@ -49,6 +49,7 @@ import { useModules } from "@/lib/modules";
 import { supabase } from "@/integrations/supabase/client";
 import { CommandPalette } from "@/components/command-palette";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { ConnectionBanner } from "@/components/ui/connection";
 import { cn } from "@/lib/utils";
 import { InamaSoftFooter } from "@/components/inama-soft-footer";
 
@@ -896,6 +897,9 @@ export function AppShell({
 
       {/* Main column */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        {/* Offline notice — sits above everything in the content column */}
+        <ConnectionBanner />
+
         {/* Top bar */}
         <header className="sticky top-0 z-30 flex h-16 items-center gap-2.5 border-b border-border/60 bg-background/70 px-4 backdrop-blur-xl sm:px-6">
           <button
@@ -994,7 +998,7 @@ export function AppShell({
             <div className="flex-1 min-h-0 flex flex-col p-3 sm:p-5 pb-16">{children}</div>
           ) : (
             <>
-              <div className="mx-auto w-full max-w-[1400px] p-4 sm:p-6">
+              <div className="mx-auto w-full max-w-[1400px] px-3 py-4 sm:px-4 sm:py-5 lg:px-6 lg:py-6">
                 {children}
               </div>
               <InamaSoftFooter />

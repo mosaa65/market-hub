@@ -16,6 +16,44 @@
   --radius-xl: 12px;
   --radius-2xl: 16px;
 
+  /* Control role radii — the single place to retune shape across the app. */
+  --radius-control: 10px;
+  --radius-control-lg: 14px;
+  --radius-panel: 16px;
+  --radius-chip: 999px;
+  --radius-sheet: 24px;
+
+  /* Elevation scale — replaces raw shadow-sm/xs/2xl scatter. */
+  --shadow-control: 0 1px 2px 0 oklch(0 0 0 / 0.24);
+  --shadow-raised: 0 1px 3px 0 oklch(0 0 0 / 0.28), 0 1px 2px -1px oklch(0 0 0 / 0.24);
+  --shadow-panel: 0 1px 2px 0 oklch(0 0 0 / 0.22), 0 12px 32px -20px oklch(0 0 0 / 0.45);
+  --shadow-popover: 0 4px 12px -2px oklch(0 0 0 / 0.32), 0 16px 40px -16px oklch(0 0 0 / 0.5);
+  --shadow-overlay: 0 24px 64px -24px oklch(0 0 0 / 0.6);
+  --shadow-focus: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
+
+  /* Control size scale — one height per size, everywhere. */
+  --control-h-xs: 28px;
+  --control-h-sm: 32px;
+  --control-h-md: 36px;
+  --control-h-lg: 44px;
+  --control-h-xl: 48px;
+  --control-px: 12px;
+  --control-px-lg: 16px;
+
+  /* Motion scale. */
+  --duration-fast: 120ms;
+  --duration-normal: 200ms;
+  --duration-slow: 320ms;
+  --ease-standard: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  /* Table metrics. */
+  --table-cell-x: 12px;
+  --table-cell-y: 10px;
+  --table-header-h: 40px;
+  --table-row-h: 44px;
+
   --font-sans: "Inter", "SF Pro Display", "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: "Inter", "Geist", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "Geist Mono", ui-monospace, monospace;
@@ -53,6 +91,31 @@
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
 
+  /* Secondary surfaces referenced by overlay/panel components. */
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+
+  /* Semantic status tones — replaces the emerald/sky/violet/amber/rose literals
+     currently hard-coded across list pages. */
+  --color-tone-neutral: var(--tone-neutral);
+  --color-tone-neutral-fg: var(--tone-neutral-fg);
+  --color-tone-info: var(--tone-info);
+  --color-tone-info-fg: var(--tone-info-fg);
+  --color-tone-success: var(--tone-success);
+  --color-tone-success-fg: var(--tone-success-fg);
+  --color-tone-warning: var(--tone-warning);
+  --color-tone-warning-fg: var(--tone-warning-fg);
+  --color-tone-danger: var(--tone-danger);
+  --color-tone-danger-fg: var(--tone-danger-fg);
+  --color-tone-primary: var(--tone-primary);
+  --color-tone-primary-fg: var(--tone-primary-fg);
+
+  /* Foreground-only status colors for inline messages/icons. */
+  --color-success-fg: var(--tone-success-fg);
+  --color-warning-fg: var(--tone-warning-fg);
+  --color-danger-fg: var(--tone-danger-fg);
+  --color-info-fg: var(--tone-info-fg);
+
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -64,6 +127,19 @@
 
   --shadow-elegant: 0 1px 0 0 oklch(1 0 0 / 0.04) inset, 0 1px 2px 0 oklch(0 0 0 / 0.4);
   --shadow-glow: 0 0 0 1px oklch(0.6 0.2 260 / 0.3), 0 8px 32px -8px oklch(0.6 0.2 260 / 0.4);
+
+  --z-header: 30;
+  --z-dropdown: 40;
+  --z-overlay: 50;
+  --z-modal: 60;
+  --z-toast: 70;
+
+  --breakpoint-xs: 380px;
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
 }
 
 /* Default = dark (Linear style). Light variant available via .light on html */
@@ -73,6 +149,8 @@
   --foreground: oklch(0.96 0.005 270); /* near white */
   --surface: oklch(0.16 0.006 270); /* #131316 */
   --surface-elevated: oklch(0.185 0.007 270); /* #18181C */
+  --surface-2: oklch(0.205 0.008 270);
+  --surface-3: oklch(0.24 0.009 270);
 
   --card: oklch(0.16 0.006 270);
   --card-foreground: oklch(0.96 0.005 270);
@@ -116,6 +194,20 @@
   --sidebar-accent-foreground: oklch(0.96 0.005 270);
   --sidebar-border: oklch(1 0 0 / 0.06);
   --sidebar-ring: oklch(0.62 0.21 260 / 0.5);
+
+  /* Status tones (dark) */
+  --tone-neutral: oklch(0.28 0.008 270);
+  --tone-neutral-fg: oklch(0.72 0.01 270);
+  --tone-info: oklch(0.62 0.16 250 / 0.16);
+  --tone-info-fg: oklch(0.78 0.12 250);
+  --tone-success: oklch(0.66 0.17 155 / 0.16);
+  --tone-success-fg: oklch(0.8 0.14 158);
+  --tone-warning: oklch(0.78 0.15 80 / 0.16);
+  --tone-warning-fg: oklch(0.85 0.12 82);
+  --tone-danger: oklch(0.62 0.22 25 / 0.16);
+  --tone-danger-fg: oklch(0.78 0.15 25);
+  --tone-primary: oklch(0.62 0.21 260 / 0.16);
+  --tone-primary-fg: oklch(0.78 0.13 260);
 }
 
 .light {
@@ -149,6 +241,23 @@
   --sidebar-accent: oklch(0.95 0.005 270);
   --sidebar-accent-foreground: oklch(0.2 0.005 270);
   --sidebar-border: oklch(0.1 0 0 / 0.08);
+
+  --surface-2: oklch(0.965 0.003 270);
+  --surface-3: oklch(0.93 0.004 270);
+
+  /* Status tones (light) */
+  --tone-neutral: oklch(0.94 0.004 270);
+  --tone-neutral-fg: oklch(0.44 0.012 270);
+  --tone-info: oklch(0.55 0.22 260 / 0.12);
+  --tone-info-fg: oklch(0.45 0.19 260);
+  --tone-success: oklch(0.55 0.17 155 / 0.12);
+  --tone-success-fg: oklch(0.42 0.14 155);
+  --tone-warning: oklch(0.7 0.16 80 / 0.16);
+  --tone-warning-fg: oklch(0.45 0.12 70);
+  --tone-danger: oklch(0.58 0.23 25 / 0.1);
+  --tone-danger-fg: oklch(0.48 0.2 25);
+  --tone-primary: oklch(0.55 0.22 260 / 0.1);
+  --tone-primary-fg: oklch(0.45 0.19 260);
 }
 
 @layer base {
@@ -202,7 +311,26 @@
     background: oklch(0.62 0.21 260 / 0.35);
   }
 
-  /* Minimalist overlay scrollbar - track container completely hidden */
+  /*
+   * Placeholder colour.
+   *
+   * Tailwind's `placeholder:` variant was losing to the element's own colour in
+   * this build, leaving placeholders at full foreground opacity (they looked like
+   * real values). Declaring the pseudo-element here is reliable and applies to
+   * every input in the app from one place.
+   */
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--muted-foreground);
+    opacity: 1;
+  }
+
+  input:disabled::placeholder,
+  textarea:disabled::placeholder {
+    color: color-mix(in oklab, var(--muted-foreground) 60%, transparent);
+  }
+
+  /* Minimalist overlay scrollbar — the track remains invisible. */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -235,13 +363,13 @@
   .panel {
     background: var(--surface);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-panel);
   }
   .panel-elevated {
     background: var(--surface-elevated);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-elegant);
+    border-radius: var(--radius-panel);
+    box-shadow: var(--shadow-panel);
   }
   .text-gradient {
     background: linear-gradient(135deg, oklch(0.96 0.005 270), oklch(0.7 0.05 270));
@@ -255,44 +383,127 @@
       0 0 0 2px var(--color-background),
       0 0 0 4px var(--color-ring);
   }
-}
 
-/* Preserve readable record columns on phones; the surrounding containers already scroll horizontally. */
-@media (max-width: 640px) {
-  .overflow-x-auto {
-    -webkit-overflow-scrolling: touch;
+  /* ---- Motion utilities (single transition language) ---- */
+  .motion-fast {
+    transition-duration: var(--duration-fast);
+    transition-timing-function: var(--ease-standard);
+  }
+  .motion-normal {
+    transition-duration: var(--duration-normal);
+    transition-timing-function: var(--ease-standard);
+  }
+  .motion-slow {
+    transition-duration: var(--duration-slow);
+    transition-timing-function: var(--ease-emphasized);
   }
 
-  .overflow-x-auto > table {
-    min-width: 680px;
+  /* ---- Typography helpers (bilingual-safe line heights) ---- */
+  .text-title {
+    font-size: 1.375rem;
+    line-height: 1.85rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .text-section {
+    font-size: 1rem;
+    line-height: 1.5rem;
+    font-weight: 600;
+  }
+  .text-label {
+    font-size: 0.75rem;
+    line-height: 1.125rem;
+    font-weight: 600;
+  }
+  .text-caption {
+    font-size: 0.6875rem;
+    line-height: 1rem;
+  }
+  .text-cell-num {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  /* ---- Safe-area aware padding for mobile sheets/action bars ---- */
+  .pb-safe {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+  .mb-safe {
+    margin-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* ---- Overlay entry/exit (shared by Modal, Drawer, Popover, Toast) ---- */
+  .overlay-enter {
+    animation: overlay-in var(--duration-normal) var(--ease-standard);
+  }
+  .overlay-exit {
+    animation: overlay-out var(--duration-fast) var(--ease-exit);
+  }
+  .panel-enter {
+    animation: panel-in var(--duration-normal) var(--ease-emphasized);
+  }
+  .sheet-enter {
+    animation: sheet-in var(--duration-slow) var(--ease-emphasized);
   }
 }
 
-/* ============================================================
- * Barcode label preview (screen only)
- * Keeps the printable label sheet inside its viewport container
- * without affecting the standalone print window (which rebuilds
- * its own markup from the DOM via outerHTML).
- * The printed sheet geometry (A4 / label sizes / inline styles)
- * is intentionally left untouched.
- * ========================================================== */
-.barcode-preview-scroll {
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes overlay-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+@keyframes sheet-in {
+  from {
+    transform: translate3d(0, 100%, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* Respect the user's motion preference globally (was previously ignored). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Barcode labels are intentionally constrained on-screen only; printing keeps
+   its own physical sheet dimensions and is unaffected. */
+.barcode-preview-scroll,
+.barcode-preview-scroll .sheet {
   width: 100%;
   min-width: 0;
   max-width: 100%;
 }
 
 @media screen {
-  .barcode-preview-scroll .sheet {
-    width: 100%;
-    min-width: 0;
-    max-width: 100%;
-  }
-
-  /* `minmax(0, 1fr)` stops the fixed-width JsBarcode SVG from
-   * forcing each label column (and the whole page) wider than
-   * the viewport. Print output keeps the original `1fr` inline
-   * grid definition, so label geometry is unchanged. */
   .barcode-preview-sheet {
     grid-template-columns: repeat(var(--barcode-cols, 4), minmax(0, 1fr)) !important;
   }
@@ -307,25 +518,11 @@
   }
 }
 
-@keyframes shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
-}
-.shimmer {
-  background: linear-gradient(90deg, transparent, oklch(1 0 0 / 0.05), transparent);
-  background-size: 200% 100%;
-  animation: shimmer 1.6s linear infinite;
-}
-
-
-/* Sleek minimalist scrollbar: track completely transparent, only thumb visible */
+/* A thin thumb provides an affordance for the deliberate horizontal product
+   * scroll without adding a heavy track around the table. */
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: hsl(var(--muted-foreground) / 0.22) transparent;
+  scrollbar-color: color-mix(in oklab, var(--muted-foreground) 32%, transparent) transparent;
   overscroll-behavior: contain;
 }
 
@@ -342,16 +539,26 @@
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: hsl(var(--muted-foreground) / 0.22);
+  background-color: color-mix(in oklab, var(--muted-foreground) 32%, transparent);
   border-radius: 9999px;
   border: 1px solid transparent;
   background-clip: padding-box;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: hsl(var(--muted-foreground) / 0.45);
+  background-color: color-mix(in oklab, var(--muted-foreground) 55%, transparent);
 }
 
-.stable-scrollbar {
-  /* Gutter disabled to prevent visible container track */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+.shimmer {
+  background: linear-gradient(90deg, transparent, oklch(1 0 0 / 0.05), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
 }

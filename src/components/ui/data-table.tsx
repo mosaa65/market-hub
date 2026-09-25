@@ -1,0 +1,574 @@
+import * as React from "react";
+import { ArrowDown, ArrowUp, ChevronDown, ChevronsUpDown, Inbox, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { EmptyState, Spinner } from "@/components/ui/feedback";
+import { QueryErrorState, InlineRefreshing } from "@/components/ui/connection";
+
+/* ------------------------------------------------------------------ */
+/*  Types                                                             */
+/* ------------------------------------------------------------------ */
+
+export interface DataTableColumn<T> {
+  /** Stable identifier; also used as the default sort accessor key. */
+  key: string;
+  /** Localized header label. */
+  header: React.ReactNode;
+  /** Cell renderer. */
+  cell: (row: T, index: number) => React.ReactNode;
+  align?: "start" | "end" | "center";
+  /** Extra class applied to both header and body cells. */
+  className?: string;
+  /** Enables click-to-sort for this column. */
+  sortable?: boolean;
+  /** Value used for client-side sorting. Defaults to the raw field. */
+  sortValue?: (row: T) => string | number | null | undefined;
+  /** Hide the column entirely (e.g. permission-gated cost). */
+  hidden?: boolean;
+  /**
+   * Hide this column below a viewport width, so a wide table fits a phone
+   * without horizontal scrolling. CSS-only (a Tailwind responsive class), so it
+   * costs no measurement and does not affect sticky positioning.
+   *
+   * - `sm`  → hidden under 640px
+   * - `md`  → hidden under 768px
+   * - `lg`  → hidden under 1024px
+   */
+  hideBelow?: "sm" | "md" | "lg";
+  /** Tailwind width class, e.g. `w-32`. */
+  width?: string;
+  /** Allow wrapping (default: columns stay on one line). */
+  wrap?: boolean;
+  /** Pin this column while the table scrolls horizontally. */
+  sticky?: boolean;
+}
+
+export interface DataTableSort {
+  key: string;
+  direction: "asc" | "desc";
+}
+
+export interface DataTableProps<T> {
+  columns: DataTableColumn<T>[];
+  rows: T[];
+  rowKey: (row: T) => string;
+
+  loading?: boolean;
+  /** True only for the very first load (renders skeletons). */
+  initialLoading?: boolean;
+  error?: Error | null;
+  onRetry?: () => void;
+  /** Background refetch: dims the body but keeps rows visible. */
+  refreshing?: boolean;
+
+  /** Controlled sort. */
+  sort?: DataTableSort | null;
+  onSortChange?: (sort: DataTableSort | null) => void;
+
+  /** Rendered above the table (toolbar). */
+  toolbar?: React.ReactNode;
+
+  onRowClick?: (row: T) => void;
+
+  empty?: {
+    title: string;
+    description?: string;
+    icon?: React.ReactNode;
+    action?: React.ReactNode;
+  };
+
+  /* ---- Infinite scroll ---- */
+  /** Enables "load more as you scroll" behaviour. */
+  infinite?: boolean;
+  /** Whether more rows exist on the server. */
+  hasMore?: boolean;
+  /** Fired when the sentinel scrolls into view. */
+  onLoadMore?: () => void;
+  /** True while the next page is being fetched. */
+  loadingMore?: boolean;
+  /** Rows per page, used for the caption. 0 hides the caption. */
+  pageSize?: number;
+  /** Total row count when known (server-side count). */
+  totalCount?: number;
+
+  /* ---- Legacy client-side paging (accounting tables) ---- */
+  paginate?: boolean;
+  initialPageSize?: number;
+
+  className?: string;
+  scrollClassName?: string;
+  stickyHeader?: boolean;
+  /** Minimum table width before horizontal scrolling kicks in. */
+  minWidth?: number;
+  /**
+   * Deliberate side-to-side scrolling for dense operational tables.  This is
+   * opt-in: a scroll container and a vertically sticky table header cannot
+   * share the same wrapper reliably, so callers should disable `stickyHeader`
+   * for the compact layout when enabling it.
+   */
+  horizontalScroll?: boolean;
+  /** Pin the first column while scrolling horizontally. */
+  stickyFirstColumn?: boolean;
+
+  /**
+   * Offset from the top of the scrolling container at which the sticky toolbar
+   * pins. Defaults to `0px`.
+   *
+   * This is deliberately **not** the app-header height: the app shell renders
+   * the header as a flex sibling *above* `<main>`, and `<main>` is the element
+   * that actually scrolls. A sticky element measures `top` from its nearest
+   * scrolling ancestor, so `0` places the toolbar directly beneath the header.
+   * Only override this for an embedded table with its own scroll parent.
+   */
+  stickyTop?: string;
+}
+
+const DEFAULT_PAGE_SIZE = 50;
+
+/** Tailwind classes that hide a column below the given breakpoint. */
+const HIDE_BELOW: Record<"sm" | "md" | "lg", string> = {
+  sm: "hidden sm:table-cell",
+  md: "hidden md:table-cell",
+  lg: "hidden lg:table-cell",
+};
+
+/* ------------------------------------------------------------------ */
+/*  Component                                                         */
+/* ------------------------------------------------------------------ */
+
+/**
+ * DataTable — the single table implementation for Market Hub.
+ *
+ * Key decisions (per requirements):
+ *  - **Always a real table, including on phones.** Records scroll horizontally
+ *    rather than becoming stacked cards, so a dense ERP list stays scannable and
+ *    column-aligned. `minWidth` keeps the numeric columns readable.
+ *  - **Infinite scroll, no pagination arrows.** Rows arrive 50 at a time as the
+ *    user reaches the bottom, with a subtle loading indicator. When everything is
+ *    loaded the list simply ends.
+ *  - **Full bleed.** No horizontal padding around the table, so rows fill the
+ *    panel edge to edge.
+ */
+export function DataTable<T>({
+  columns,
+  rows,
+  rowKey,
+  loading = false,
+  initialLoading,
+  error = null,
+  onRetry,
+  refreshing = false,
+  sort = null,
+  onSortChange,
+  toolbar,
+  onRowClick,
+  empty,
+  infinite = false,
+  hasMore = false,
+  onLoadMore,
+  loadingMore = false,
+  pageSize = DEFAULT_PAGE_SIZE,
+  totalCount,
+  paginate = false,
+  initialPageSize = 25,
+  className,
+  scrollClassName,
+  stickyHeader = true,
+  minWidth,
+  horizontalScroll = false,
+  stickyFirstColumn = false,
+  stickyTop,
+}: DataTableProps<T>) {
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+  const sentinelRef = React.useRef<HTMLDivElement>(null);
+  const toolbarRef = React.useRef<HTMLDivElement>(null);
+  const [page, setPage] = React.useState(1);
+
+  /*
+   * Sticky geometry: the toolbar height has to be known so the table header can
+   * pin directly beneath it.
+   *
+   * The height is not constant — the filter-chips row appears and disappears, and
+   * the toolbar wraps on narrow viewports — so it is written to the
+   * `--ds-toolbar-h` custom property by a ResizeObserver rather than guessed. The
+   * property is set directly on the DOM node (no React state), so the write can
+   * never cause a render loop or lag a paint.
+   *
+   * This hook is declared here, with the other hooks, because it must run on
+   * every render — the error branch below returns early.
+   */
+  const hasToolbar = Boolean(toolbar);
+  React.useEffect(() => {
+    const el = toolbarRef.current;
+    if (!el) return;
+    const host = el.parentElement;
+    if (!host) return;
+
+    const sync = () => host.style.setProperty("--ds-toolbar-h", `${el.offsetHeight}px`);
+    sync();
+    const ro = new ResizeObserver(sync);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [hasToolbar]);
+
+  // Mobile shows the same table as desktop — every column, plain horizontal
+  // scrolling, no pinned column and no hidden-column expander. Dense ERP lists
+  // stay column-aligned and readable; panning is expected on a phone.
+  const visibleColumns = React.useMemo(() => columns.filter((c) => !c.hidden), [columns]);
+
+  const pinFirst = stickyFirstColumn;
+
+  /* ---- sorting ---- */
+  const sortedRows = React.useMemo(() => {
+    if (!sort) return rows;
+    const col = visibleColumns.find((c) => c.key === sort.key);
+    if (!col) return rows;
+
+    const valueOf = (row: T): string | number | null | undefined => {
+      if (col.sortValue) return col.sortValue(row);
+      const raw = (row as Record<string, unknown>)[col.key];
+      if (raw == null) return null;
+      if (typeof raw === "number" || typeof raw === "string") return raw;
+      return String(raw);
+    };
+
+    const factor = sort.direction === "asc" ? 1 : -1;
+    return [...rows].sort((a, b) => {
+      const av = valueOf(a);
+      const bv = valueOf(b);
+      // Nulls always sort last, whichever direction is active.
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      if (typeof av === "number" && typeof bv === "number") return (av - bv) * factor;
+      return (
+        String(av).localeCompare(String(bv), undefined, { numeric: true, sensitivity: "base" }) *
+        factor
+      );
+    });
+  }, [rows, sort, visibleColumns]);
+
+  /* ---- legacy client-side paging (accounting tables only) ---- */
+  const legacyPageRows = React.useMemo(() => {
+    if (!paginate) return sortedRows;
+    return sortedRows.slice(0, page * initialPageSize);
+  }, [sortedRows, paginate, page, initialPageSize]);
+
+  const displayRows = paginate ? legacyPageRows : sortedRows;
+
+  const showSkeleton = initialLoading ?? loading;
+  const showEmpty = !showSkeleton && displayRows.length === 0;
+
+  /* ---- infinite scroll sentinel ---- */
+  React.useEffect(() => {
+    if (!infinite || !hasMore || !onLoadMore) return;
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const root = scrollRef.current;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && !loadingMore) onLoadMore();
+      },
+      // Begin loading slightly before the user actually reaches the bottom.
+      {
+        root: root && root.scrollHeight > root.clientHeight ? root : null,
+        rootMargin: "480px 0px",
+      },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [infinite, hasMore, onLoadMore, loadingMore]);
+
+  /* ---- sort toggle (3-state: asc → desc → none) ---- */
+  const handleSortToggle = (col: DataTableColumn<T>) => {
+    if (!col.sortable || !onSortChange) return;
+    if (sort?.key !== col.key) {
+      onSortChange({ key: col.key, direction: "asc" });
+      return;
+    }
+    if (sort.direction === "asc") {
+      onSortChange({ key: col.key, direction: "desc" });
+      return;
+    }
+    onSortChange(null);
+  };
+
+  /* ---- error ---- */
+  if (error) {
+    return (
+      <div className={cn("flex min-w-0 flex-col", className)}>
+        {toolbar ? <div className="border-b border-border/60 px-3 py-2.5">{toolbar}</div> : null}
+        <QueryErrorState error={error} onRetry={onRetry} />
+      </div>
+    );
+  }
+
+  const loadedCount = displayRows.length;
+
+  /*
+   * Sticky geometry.
+   *
+   * The toolbar and the table header both pin while the list scrolls. Their
+   * containing block is `<main>` in the app shell, so `stickyTop` defaults to
+   * `0px` — *not* the app-header height (the header is a flex sibling above
+   * `<main>`, not the scroll container). The toolbar height measurement lives
+   * with the other hooks at the top of the component.
+   */
+  const stickyOffset = stickyTop ?? "0px";
+
+  return (
+    <div
+      className={cn("flex min-w-0 flex-col", className)}
+      style={{ "--ds-sticky-top": stickyOffset } as React.CSSProperties}
+    >
+      {toolbar ? (
+        <div
+          ref={toolbarRef}
+          className="sticky z-30 border-b border-border/60 bg-surface/90 backdrop-blur-xl"
+          style={{ top: stickyOffset }}
+        >
+          <div className="px-3 py-2.5 sm:px-3.5">{toolbar}</div>
+        </div>
+      ) : null}
+
+      {showSkeleton ? (
+        <TableSkeleton columns={Math.min(visibleColumns.length, 7)} />
+      ) : showEmpty ? (
+        <EmptyState
+          icon={empty?.icon ?? <Inbox />}
+          title={empty?.title ?? "No records"}
+          description={empty?.description}
+          action={empty?.action}
+        />
+      ) : (
+        <div
+          ref={scrollRef}
+          className={cn(
+            /* No `overflow` here. Both `overflow-x: auto` and `overflow-y: clip`
+             * were measured and both break the sticky table header:
+             *
+             *  - `overflow-x: auto` computes `overflow-y` to `auto`, making this
+             *    div a scroll container — so it becomes the containing block for
+             *    the sticky `<thead>` and the header scrolls away with the page
+             *    (measured: `theadTop: -617` after scrolling 900px).
+             *  - `overflow-y: clip` does not create a scroll container, but it
+             *    *clips* the pinned header, which is worse: the header is still
+             *    positioned but invisible, and the wrapper would not actually
+             *    scroll horizontally either (`scrollLeft` stayed at 0).
+             *
+             * Leaving overflow visible lets the sticky header resolve against
+             * `<main>` (the real scroll container) and pin correctly. The wide
+             * -table problem this creates on phones is handled by the responsive
+             * column strategy in `_app.products.tsx`, not by this wrapper. */
+            horizontalScroll
+              ? "w-full overflow-x-auto overscroll-x-contain custom-scrollbar"
+              : "w-full overscroll-x-contain",
+            refreshing && "opacity-70 transition-opacity",
+            scrollClassName,
+          )}
+        >
+          <table
+            /* `table-layout: auto` with `w-full` lets the browser grow the table
+             * past its container when a cell's content needs more room — on a
+             * 390px phone the four remaining columns summed to 384px inside a
+             * 344px container, pushing the table 17px off-screen and clipping
+             * the row-action buttons (measured: `childWiderThanParent: true`).
+             *
+             * `table-fixed` makes the declared width authoritative so cells wrap
+             * instead of expanding the table. It is applied from `sm` up only
+             * when a `minWidth` is requested (wide accounting tables that are
+             * *meant* to scroll); otherwise it applies at every width. */
+            className={cn(
+              "w-full border-collapse text-sm",
+              minWidth || horizontalScroll ? "table-auto" : "table-fixed",
+            )}
+            style={minWidth ? { minWidth } : undefined}
+          >
+            <thead
+              className={cn(
+                stickyHeader &&
+                  "sticky z-20 bg-surface-2/70 backdrop-blur-md [top:calc(var(--ds-sticky-top,0px)+var(--ds-toolbar-h,0px))]",
+                !stickyHeader && "bg-surface-2/50",
+              )}
+            >
+              <tr className="border-b border-border">
+                {visibleColumns.map((col) => {
+                  const active = sort?.key === col.key;
+                  const stickyCol = col.sticky ?? (pinFirst && col === visibleColumns[0]);
+                  return (
+                    <th
+                      key={col.key}
+                      scope="col"
+                      aria-sort={
+                        active
+                          ? sort?.direction === "asc"
+                            ? "ascending"
+                            : "descending"
+                          : col.sortable
+                            ? "none"
+                            : undefined
+                      }
+                      className={cn(
+                        "h-10 px-3 align-middle text-[11px] font-semibold uppercase tracking-wider text-muted-foreground first:rounded-s-xl first:ps-4 last:rounded-e-xl last:pe-4",
+                        "whitespace-normal sm:whitespace-nowrap",
+                        col.align === "end"
+                          ? "text-end"
+                          : col.align === "center"
+                            ? "text-center"
+                            : "text-start",
+                        col.width,
+                        col.className,
+                        col.hideBelow && HIDE_BELOW[col.hideBelow],
+                        stickyCol && "sticky start-0 z-30 bg-surface-2",
+                      )}
+                    >
+                      {col.sortable && onSortChange ? (
+                        <button
+                          type="button"
+                          onClick={() => handleSortToggle(col)}
+                          aria-label={
+                            typeof col.header === "string" ? `Sort by ${col.header}` : "Sort"
+                          }
+                          className={cn(
+                            "inline-flex items-center gap-1 rounded-sm transition-colors hover:text-foreground",
+                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                            col.align === "end" && "flex-row-reverse",
+                            active && "text-primary",
+                          )}
+                        >
+                          <span>{col.header}</span>
+                          {active ? (
+                            sort?.direction === "asc" ? (
+                              <ArrowUp className="size-3" aria-hidden />
+                            ) : (
+                              <ArrowDown className="size-3" aria-hidden />
+                            )
+                          ) : (
+                            <ChevronsUpDown className="size-3 opacity-40" aria-hidden />
+                          )}
+                        </button>
+                      ) : (
+                        col.header
+                      )}
+                    </th>
+                  );
+                })}
+              </tr>
+            </thead>
+
+            <tbody>
+              {displayRows.map((row, index) => (
+                <tr
+                  key={rowKey(row)}
+                  className={cn(
+                    "border-b border-border/60 transition-colors duration-150 hover:bg-accent/40",
+                    onRowClick && "cursor-pointer",
+                  )}
+                  onClick={onRowClick ? () => onRowClick(row) : undefined}
+                >
+                  {visibleColumns.map((col) => {
+                    const stickyCol = col.sticky ?? (pinFirst && col === visibleColumns[0]);
+                    return (
+                      <td
+                        key={col.key}
+                        className={cn(
+                          "px-3 py-2.5 align-middle first:ps-4 last:pe-4",
+                          /* On a phone, forced single-line cells are what push a
+                           * wide table past the viewport. Let text wrap under
+                           * `sm` and keep the single-line ERP look from `sm`
+                           * up, where there is room for it. */
+                          !col.wrap && "whitespace-normal sm:whitespace-nowrap",
+                          col.align === "end"
+                            ? "text-end"
+                            : col.align === "center"
+                              ? "text-center"
+                              : "text-start",
+                          col.className,
+                          col.hideBelow && HIDE_BELOW[col.hideBelow],
+                          stickyCol && "sticky start-0 z-10 bg-surface",
+                        )}
+                      >
+                        {col.cell(row, index)}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* ---------- Infinite-scroll footer ---------- */}
+          {infinite ? (
+            <div ref={sentinelRef} className="flex items-center justify-center gap-2 py-4">
+              {loadingMore ? (
+                <>
+                  <Loader2 className="size-4 animate-spin text-muted-foreground" aria-hidden />
+                  <span className="text-[11px] text-muted-foreground">جارٍ تحميل المزيد…</span>
+                </>
+              ) : hasMore ? (
+                <ChevronDown
+                  className="size-4 animate-bounce text-muted-foreground/50"
+                  aria-hidden
+                />
+              ) : loadedCount > 0 ? (
+                <span className="text-[11px] text-muted-foreground/70">
+                  تم عرض جميع السجلات ({loadedCount})
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+
+          {/* ---------- "Load more" for legacy paged tables ---------- */}
+          {paginate && legacyPageRows.length < sortedRows.length ? (
+            <div className="flex justify-center py-3">
+              <button
+                type="button"
+                onClick={() => setPage((p) => p + 1)}
+                className="rounded-full border border-border bg-surface px-4 py-1.5 text-xs font-medium transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+              >
+                تحميل المزيد
+              </button>
+            </div>
+          ) : null}
+        </div>
+      )}
+
+      {/* ---------- Caption ---------- */}
+      {!showSkeleton && !showEmpty && (pageSize > 0 || totalCount != null) ? (
+        <div className="flex items-center justify-between gap-3 border-t border-border/60 px-4 py-1.5">
+          <p className="text-[11px] tabular-nums text-muted-foreground">
+            {totalCount != null ? `عرض ${loadedCount} من ${totalCount}` : `عرض ${loadedCount} سجل`}
+          </p>
+          {refreshing ? <InlineRefreshing /> : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Skeleton                                                          */
+/* ------------------------------------------------------------------ */
+
+function TableSkeleton({ columns }: { columns: number }) {
+  return (
+    <div role="status" aria-live="polite" className="flex flex-col">
+      <div className="flex items-center gap-4 border-b border-border px-3 py-2.5">
+        {Array.from({ length: columns }).map((_, i) => (
+          <div key={i} className="shimmer h-3 flex-1 rounded" />
+        ))}
+      </div>
+      {Array.from({ length: 8 }).map((_, r) => (
+        <div key={r} className="flex items-center gap-4 border-b border-border/60 px-3 py-3">
+          {Array.from({ length: columns }).map((_, c) => (
+            <div key={c} className="shimmer h-4 flex-1 rounded" />
+          ))}
+        </div>
+      ))}
+      <span className="sr-only">
+        <Spinner /> Loading
+      </span>
+    </div>
+  );
+}
