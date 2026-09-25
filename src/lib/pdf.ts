@@ -92,9 +92,6 @@ function esc(s: unknown) {
     .replace(/'/g, "&#039;");
 }
 
-/** اسم قديم للتوافق مع الشاشات السابقة — يستخدم القالب الموحد نفسه. */
-export const printReport = printUnifiedReport;
-
 // ---------------------------------------------------------------------------
 // Generate Invoice PDF & Print
 // ---------------------------------------------------------------------------
@@ -271,11 +268,7 @@ async function generateInvoicePdfDoc(doc: InvoiceDoc) {
 // Print Report via HTML Window (Arabic-first, RTL, Google Fonts)
 // ---------------------------------------------------------------------------
 
-/**
- * قالب الطباعة الموحد لكل الكشوف.
- * يستقبل أعمدة وصفوف أي كشف، لذلك لا يعتمد على نوع تقرير محدد.
- */
-export function printUnifiedReport(data: ReportPrintData): void {
+export function printReport(data: ReportPrintData) {
   const rtl = data.rtl ?? true;
   const cur = data.currency ?? "﷼";
 
