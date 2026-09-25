@@ -33,7 +33,7 @@ import { useI18n } from "@/lib/i18n";
 import { money } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
 import { type PageGuideConfig } from "@/components/page-guide";
-import { ShoppingCart, Zap, CreditCard, ShieldCheck, Barcode, Scale, ArrowRightLeft, DollarSign } from "lucide-react";
+import { ShoppingCart, Zap, ShieldCheck, Barcode, Scale, ArrowRightLeft, DollarSign } from "lucide-react";
 import { toast } from "sonner";
 import { BarcodeScanner } from "@/components/barcode-scanner";
 import { useKeyboardWedge } from "@/hooks/use-keyboard-wedge";

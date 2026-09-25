@@ -35,7 +35,7 @@ import { useI18n } from "@/lib/i18n";
 import { money } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
 import { PageGuideButton, type PageGuideConfig } from "@/components/page-guide";
-import { ShoppingBag, DollarSign, Archive } from "lucide-react";
+import { DollarSign, Archive, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { BarcodeScanner } from "@/components/barcode-scanner";
 import { useKeyboardWedge } from "@/hooks/use-keyboard-wedge";
