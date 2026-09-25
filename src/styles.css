@@ -549,6 +549,16 @@
   background-color: color-mix(in oklab, var(--muted-foreground) 55%, transparent);
 }
 
+/* يخفف شريط التمرير الأفقي بصريًا مع بقاء التمرير بالسحب/اللمس/العجلة الأفقية يعمل. */
+.scrollbar-x-none {
+  scrollbar-width: none;
+}
+
+.scrollbar-x-none::-webkit-scrollbar {
+  display: none;
+  height: 0;
+}
+
 @keyframes shimmer {
   0% {
     background-position: -200% 0;

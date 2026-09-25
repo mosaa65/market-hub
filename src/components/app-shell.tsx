@@ -483,19 +483,31 @@ function SidebarContents({
             : "justify-start gap-2.5 px-4",
         )}
       >
-        <img
-          src={logoUrl}
-          alt={t("app.name")}
-          className={cn(
-            "size-9 shrink-0 rounded-xl border border-border/60 bg-surface-2/90 p-1 object-contain shadow-md ring-1 ring-white/10",
-          )}
-          onError={(event) => {
-            event.currentTarget.style.visibility = "hidden";
-          }}
-        />
-        {!collapsed ? (
-          <span className="text-base font-extrabold tracking-tight text-foreground">فورتكس</span>
-        ) : null}
+        {collapsed ? (
+          <img
+            src={logoUrl}
+            alt={t("app.name")}
+            className={cn(
+              "size-9 shrink-0 rounded-xl border border-border/60 bg-surface-2/90 p-1 object-contain shadow-md ring-1 ring-white/10",
+            )}
+            onError={(event) => {
+              event.currentTarget.style.visibility = "hidden";
+            }}
+          />
+        ) : (
+          <>
+            {/* شعار مركّب (رمز + كلمة) بجانب النص */}
+            <img
+              src="/vortex-erp-wordmark.png"
+              alt={t("app.name")}
+              className="h-9 w-auto shrink-0 object-contain"
+              onError={(event) => {
+                event.currentTarget.style.visibility = "hidden";
+              }}
+            />
+            <span className="text-base font-extrabold tracking-tight text-foreground">فورتكس</span>
+          </>
+        )}
       </div>
 
       {/* Navigation Links */}
@@ -968,7 +980,7 @@ export function AppShell({
             <div className="flex-1 min-h-0 flex flex-col p-3 sm:p-5 pb-16">{children}</div>
           ) : (
             <>
-              <div className="mx-auto w-full max-w-[1400px] px-3 py-4 sm:px-4 sm:py-5 lg:px-6 lg:py-6">
+              <div className="mx-auto w-full max-w-[1400px] px-2 py-3 sm:px-1 sm:py-4 lg:px-1 lg:py-6">
                 {children}
               </div>
               <InamaSoftFooter />
