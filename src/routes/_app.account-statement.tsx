@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/page-header";
 import { useI18n } from "@/lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
 import { money } from "@/lib/format";
-import { printReport } from "@/lib/pdf";
+import { printUnifiedReport } from "@/lib/pdf";
 import { exportToCSV } from "@/lib/excel-export";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -201,7 +201,7 @@ function AccountStatementPage() {
   const netBalance = totalDebit - totalCredit;
 
   function handlePrintPDF() {
-    printReport({
+    printUnifiedReport({
       title:
         lang === "ar"
           ? `كشف حساب تفصيلي — ${selectedParty?.name || ""}`
