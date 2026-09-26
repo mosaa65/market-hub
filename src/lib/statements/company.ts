@@ -14,18 +14,18 @@ import { supabase } from "@/integrations/supabase/client";
 
 /** هوية صانع النظام — مصدرها inama-soft-footer.tsx */
 export const INAMA_SOFT_BRAND = {
-  name: "انما سوفت للبرمجيات",
+  name: "انماء سوفت",
   owner: "",
   tagline: "",
   phone: "+967 772 217 218",
   website: "inma-soft.vercel.app",
   logoUrl: "/inama-soft-logo.ico",
-  softwareName: "انما سوفت للبرمجيات",
+  softwareName: "انماء سوفت",
 } as const;
 
 /** القيم الافتراضية للطباعة قبل وصول بيانات قاعدة البيانات */
 export const DEFAULT_COMPANY_INFO = {
-  name: "انما سوفت للبرمجيات",
+  name: "انماء سوفت",
   currency: "YER",
   currencySymbol: "﷼",
 };
