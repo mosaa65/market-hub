@@ -3,6 +3,7 @@ import { ArrowDown, ArrowUp, ChevronDown, ChevronsUpDown, Inbox, Loader2 } from 
 import { cn } from "@/lib/utils";
 import { EmptyState, Spinner } from "@/components/ui/feedback";
 import { QueryErrorState, InlineRefreshing } from "@/components/ui/connection";
+import { useBreakpoint } from "@/design/breakpoints";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                             */
@@ -182,75 +183,10 @@ export function DataTable<T>({
   const headerScrollRef = React.useRef<HTMLDivElement>(null);
   const sentinelRef = React.useRef<HTMLDivElement>(null);
   const toolbarRef = React.useRef<HTMLDivElement>(null);
-  const panRef = React.useRef<{
-    pointerId: number | null;
-    startX: number;
-    startY: number;
-    startScrollLeft: number;
-    panned: boolean;
-  }>({ pointerId: null, startX: 0, startY: 0, startScrollLeft: 0, panned: false });
+  const activeScrollerRef = React.useRef<"header" | "body" | null>(null);
+  const scrollTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const [page, setPage] = React.useState(1);
-
-  /*
-   * عجلة الفأرة فوق جدول قابل للتمرير الأفقي: المتصفح يستخدمها للتمرير الأفقي
-   * فيتوقف التمرير الرأسي فوق السجلات. نُعيد توجيه التمرير الرأسي إلى أقرب سلف
-   * قابل للتمرير عموديًا. الربط يحدث عبر callback ref — وليس useEffect عند
-   * التحميل — لأن حاوية الجدول لا تُرسم أثناء حالة الهيكل (Skeleton) فيكون
-   * الـ ref فارغًا وقت تشغيل أي تأثير مُهيّأ مرة واحدة.
-   */
-  const bodyWheelCleanupRef = React.useRef<(() => void) | null>(null);
-  const headerWheelCleanupRef = React.useRef<(() => void) | null>(null);
-
-  const wheelRedirectCleanup = (el: HTMLDivElement | null): (() => void) | null => {
-    if (!el) return null;
-    const onWheel = (event: WheelEvent) => {
-      // لا تعترض إيماءات التكبير والتصغير (Ctrl + العجلة أو pinch-to-zoom في لوحة اللمس)
-      if (event.ctrlKey || event.metaKey) return;
-      if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
-      event.preventDefault();
-      // deltaMode 1 = خطوط، 2 = صفحات — نحوّلها إلى بكسل.
-      const dy =
-        event.deltaMode === 1
-          ? event.deltaY * 16
-          : event.deltaMode === 2
-            ? event.deltaY * el.clientHeight
-            : event.deltaY;
-      let node: HTMLElement | null = el.parentElement;
-      while (node) {
-        if (node.scrollHeight > node.clientHeight + 1) {
-          node.scrollTop += dy;
-          // إذا بلغ هذا الحاويّ نهايته نُكمِل إلى سلفه (سلوك متسلسل طبيعي).
-          if (
-            (dy > 0 && node.scrollTop < node.scrollHeight - node.clientHeight - 1) ||
-            (dy < 0 && node.scrollTop > 1)
-          ) {
-            return;
-          }
-        }
-        node = node.parentElement;
-      }
-    };
-    el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
-  };
-
-  const setBodyScrollerRef = (el: HTMLDivElement | null) => {
-    scrollRef.current = el;
-    if (bodyWheelCleanupRef.current) {
-      bodyWheelCleanupRef.current();
-      bodyWheelCleanupRef.current = null;
-    }
-    bodyWheelCleanupRef.current = wheelRedirectCleanup(el);
-  };
-
-  const setHeaderScrollerRef = (el: HTMLDivElement | null) => {
-    headerScrollRef.current = el;
-    if (headerWheelCleanupRef.current) {
-      headerWheelCleanupRef.current();
-      headerWheelCleanupRef.current = null;
-    }
-    headerWheelCleanupRef.current = wheelRedirectCleanup(el);
-  };
+  const breakpoint = useBreakpoint();
 
   /*
    * Sticky geometry: the toolbar height has to be known so the table header can
@@ -279,10 +215,25 @@ export function DataTable<T>({
     return () => ro.disconnect();
   }, [hasToolbar]);
 
-  // Mobile shows the same table as desktop — every column, plain horizontal
-  // scrolling, no pinned column and no hidden-column expander. Dense ERP lists
-  // stay column-aligned and readable; panning is expected on a phone.
-  const visibleColumns = React.useMemo(() => columns.filter((c) => !c.hidden), [columns]);
+  // فلترة الأعمدة الحية حسب نقطة التوقف (Breakpoint):
+  // منع إضافة مساحات وهمية (ghost space) في colgroup أو الجدول، بحيث ينتهي الجدول
+  // عند آخر عمود فعلي تماماً ويعود بمطاطية متناسقة في اليمين واليسار (RTL/LTR).
+  const isColumnVisible = React.useCallback(
+    (col: DataTableColumn<T>) => {
+      if (col.hidden) return false;
+      if (!col.hideBelow) return true;
+      const order = ["xs", "sm", "md", "lg", "xl"];
+      const currentIdx = order.indexOf(breakpoint);
+      const hideIdx = order.indexOf(col.hideBelow);
+      return currentIdx >= hideIdx;
+    },
+    [breakpoint],
+  );
+
+  const visibleColumns = React.useMemo(
+    () => columns.filter(isColumnVisible),
+    [columns, isColumnVisible],
+  );
 
   const pinFirst = stickyFirstColumn;
 
@@ -387,76 +338,34 @@ export function DataTable<T>({
   const colGroup = visibleColumns.length ? (
     <colgroup>
       {visibleColumns.map((c) => (
-        <col
-          key={c.key}
-          className={cn(
-            c.width,
-            c.hideBelow === "sm" && "hidden sm:table-column",
-            c.hideBelow === "md" && "hidden md:table-column",
-            c.hideBelow === "lg" && "hidden lg:table-column",
-          )}
-        />
+        <col key={c.key} className={c.width} />
       ))}
     </colgroup>
   ) : null;
 
   /* مع min-width يبقى التخطيط تلقائيًا ليتسع المحتوى؛ مع ثبات الأعمدة
-   * (كل الأعمدة عرضها محدد ببكسل) نستخدم table-fixed ليكون الجدولان متطابقين
-   * تمامًا وعمودًا بعمود. */
+   * نستخدم table-fixed ليكون الجدولان متطابقين تمامًا وعمودًا بعمود. */
   const allColsWidths =
     visibleColumns.length > 0 &&
     visibleColumns.every((c) => /w-\[[\d.]+px\]/.test(c.width ?? ""));
   const alignedTableClassName =
     minWidth && allColsWidths ? cn(tableClassName, "table-fixed") : tableClassName;
 
+  // مزامنة أفقية موحدة وفورية تمنع حلقة الصدى (echo loop) والتقطع،
+  // وتسمح للمتصفح بالاحتفاظ بعزم الحركة الطبيعي (120Hz momentum) والمطاطية (rubber-band)
   const syncHorizontalScroll = (source: "header" | "body") => (event: React.UIEvent<HTMLDivElement>) => {
+    if (activeScrollerRef.current && activeScrollerRef.current !== source) return;
+
+    activeScrollerRef.current = source;
+    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+    scrollTimeoutRef.current = setTimeout(() => {
+      activeScrollerRef.current = null;
+    }, 100);
+
     const target = source === "header" ? scrollRef.current : headerScrollRef.current;
     if (target && target.scrollLeft !== event.currentTarget.scrollLeft) {
       target.scrollLeft = event.currentTarget.scrollLeft;
     }
-  };
-
-  // Native horizontal scrolling can be handed to the page's vertical scroller
-  // on mobile browsers. Own only the horizontal gesture while `touch-pan-y`
-  // preserves normal up/down scrolling outside and inside the table.
-  const beginHorizontalPan = (event: React.PointerEvent<HTMLDivElement>) => {
-    // اللمس على الجوال يدار أصلياً عبر المتصفح (native touch scroll & pinch zoom) دون اعتراض
-    if (event.pointerType === "touch") return;
-    if (!horizontalScroll) return;
-    panRef.current = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      startScrollLeft: event.currentTarget.scrollLeft,
-      panned: false,
-    };
-    /* لا نلتقط المؤشر هنا: الالتقاط المبكر يمنع تمرير الصفحة العمودي الطبيعي
-     * داخل الجدول. يُلتقط فقط عند ظهور نية أفقية واضحة في moveHorizontalPan. */
-  };
-
-  const moveHorizontalPan = (event: React.PointerEvent<HTMLDivElement>) => {
-    const pan = panRef.current;
-    if (!horizontalScroll || pan.pointerId !== event.pointerId) return;
-    const dx = event.clientX - pan.startX;
-    const dy = event.clientY - pan.startY;
-    if (Math.abs(dx) <= Math.abs(dy)) return;
-
-    // التقط المؤشر فقط عند تأكد النية الأفقية، حتى يبقى التمرير العمودي حُرًّا.
-    if (!pan.panned) event.currentTarget.setPointerCapture?.(event.pointerId);
-    pan.panned = true;
-    // تحريك المحتوى مع حركة المؤشر بالسحب (سحب لليمين يكشف المحتوى لليسار)
-    event.currentTarget.scrollLeft = pan.startScrollLeft - dx;
-  };
-
-  const endHorizontalPan = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (panRef.current.pointerId === event.pointerId) panRef.current.pointerId = null;
-  };
-
-  const suppressPanClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (!panRef.current.panned) return;
-    event.preventDefault();
-    event.stopPropagation();
-    panRef.current.panned = false;
   };
 
   return (
@@ -495,14 +404,9 @@ export function DataTable<T>({
               style={{ top: "calc(var(--ds-sticky-top,0px) + var(--ds-toolbar-h,0px))" }}
             >
               <div
-                ref={setHeaderScrollerRef}
+                ref={headerScrollRef}
                 onScroll={syncHorizontalScroll("header")}
-                onPointerDown={beginHorizontalPan}
-                onPointerMove={moveHorizontalPan}
-                onPointerUp={endHorizontalPan}
-                onPointerCancel={endHorizontalPan}
-                onClickCapture={suppressPanClick}
-                className="w-full overflow-x-auto overscroll-y-auto touch-manipulation [-webkit-overflow-scrolling:touch] scrollbar-x-none custom-scrollbar"
+                className="w-full overflow-x-auto touch-pan-y [-webkit-overflow-scrolling:touch] scrollbar-x-none"
               >
                 <table className={alignedTableClassName} style={tableStyle}>
                   {colGroup}
@@ -517,20 +421,13 @@ export function DataTable<T>({
             </div>
           ) : null}
           <div
-            ref={setBodyScrollerRef}
+            ref={scrollRef}
             onScroll={detachedHeader ? syncHorizontalScroll("body") : undefined}
-            onPointerDown={beginHorizontalPan}
-            onPointerMove={moveHorizontalPan}
-            onPointerUp={endHorizontalPan}
-            onPointerCancel={endHorizontalPan}
-            onClickCapture={suppressPanClick}
             className={cn(
-            /* The detached header above is synchronised with this body scroller,
-             * so horizontal panning remains direct and its labels stay pinned to
-             * the app's real vertical scrolling surface. */
+            /* الحاوية متزامنة بسلاسة ومطاطية طبيعية مع الرأس */
             horizontalScroll || minWidth
-              ? "w-full overflow-x-auto overscroll-y-auto touch-manipulation [-webkit-overflow-scrolling:touch] scrollbar-x-none custom-scrollbar"
-              : "w-full overscroll-x-contain",
+              ? "w-full overflow-x-auto touch-pan-y [-webkit-overflow-scrolling:touch] scrollbar-x-none"
+              : "w-full overscroll-x-auto",
             refreshing && "opacity-70 transition-opacity",
             scrollClassName,
           )}
