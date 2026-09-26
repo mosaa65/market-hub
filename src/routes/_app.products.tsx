@@ -401,24 +401,21 @@ function ProductsPage() {
         key: "name",
         header: t("products.product"),
         sortable: true,
-        width: "w-[240px]",
+        width: "min-w-[180px] max-w-[280px]",
         sortValue: (p) => (lang === "ar" ? p.name_ar || p.name : p.name || p.name_ar) ?? "",
         cell: (p) => {
           const primary = lang === "ar" ? p.name_ar || p.name : p.name || p.name_ar || "—";
           const other = lang === "ar" ? p.name : p.name_ar;
           const secondary = other && other.trim() && other.trim() !== primary.trim() ? other : null;
           return (
-            <div className="min-w-[190px]">
-              <div className="font-semibold text-foreground" dir={lang === "ar" ? "rtl" : "ltr"}>
+            <div className="flex flex-col py-0.5">
+              <span className="font-semibold text-foreground text-sm leading-snug line-clamp-1" dir={lang === "ar" ? "rtl" : "ltr"}>
                 {primary}
-              </div>
+              </span>
               {secondary ? (
-                <div
-                  className="text-[11px] text-muted-foreground"
-                  dir={lang === "ar" ? "ltr" : "rtl"}
-                >
+                <span className="text-[11px] text-muted-foreground line-clamp-1" dir={lang === "ar" ? "ltr" : "rtl"}>
                   {secondary}
-                </div>
+                </span>
               ) : null}
             </div>
           );
@@ -428,10 +425,11 @@ function ProductsPage() {
         key: "category",
         header: t("products.category"),
         sortable: true,
-        width: "w-[140px]",
+        hideBelow: "sm",
+        width: "w-[120px]",
         sortValue: (p) => label(p.category?.name, p.category?.name_ar),
         cell: (p) => (
-          <span className="text-muted-foreground">
+          <span className="text-xs text-muted-foreground truncate block max-w-[110px]">
             {label(p.category?.name, p.category?.name_ar)}
           </span>
         ),
@@ -440,8 +438,9 @@ function ProductsPage() {
 
     cols.push({
       key: "shelf_location",
-      header: lang === "ar" ? "موقع الرف" : "Shelf",
-      width: "w-[120px]",
+      header: lang === "ar" ? "الرف" : "Shelf",
+      hideBelow: "lg",
+      width: "w-[85px]",
       cell: (p) => (
         <span className="font-mono text-xs text-muted-foreground">{p.shelf_location ?? "—"}</span>
       ),
@@ -453,10 +452,11 @@ function ProductsPage() {
         header: t("common.cost"),
         align: "end",
         sortable: true,
-        width: "w-[124px]",
+        hideBelow: "md",
+        width: "w-[105px]",
         sortValue: (p) => Number(p.cost_price),
         cell: (p) => (
-          <span className="font-mono text-[13px] tabular-nums">{moneyCell(p.cost_price)}</span>
+          <span className="font-mono text-xs tabular-nums text-muted-foreground">{moneyCell(p.cost_price)}</span>
         ),
       });
     }
@@ -467,10 +467,10 @@ function ProductsPage() {
         header: t("common.price"),
         align: "end",
         sortable: true,
-        width: "w-[124px]",
+        width: "w-[110px]",
         sortValue: (p) => Number(p.sale_price),
         cell: (p) => (
-          <span className="font-mono text-[13px] font-semibold tabular-nums text-foreground">
+          <span className="font-mono text-xs font-bold tabular-nums text-foreground">
             {moneyCell(p.sale_price)}
           </span>
         ),
@@ -480,10 +480,11 @@ function ProductsPage() {
         header: t("products.min"),
         align: "end",
         sortable: true,
-        width: "w-[96px]",
+        hideBelow: "sm",
+        width: "w-[75px]",
         sortValue: (p) => Number(p.min_stock),
         cell: (p) => (
-          <span className="font-mono text-[13px] tabular-nums text-muted-foreground">
+          <span className="font-mono text-xs tabular-nums text-muted-foreground">
             {qtyCell(p.min_stock)}
           </span>
         ),
@@ -491,7 +492,7 @@ function ProductsPage() {
       {
         key: "is_active",
         header: t("common.status"),
-        width: "w-[106px]",
+        width: "w-[90px]",
         cell: (p) => (
           <StatusBadge tone={p.is_active ? "success" : "neutral"} dot>
             {p.is_active ? t("common.active") : t("common.inactive")}
@@ -555,7 +556,7 @@ function ProductsPage() {
     <>
       <PageHeader title={t("products.title")} subtitle={t("products.subtitle")} />
 
-      <div className="panel-elevated -mx-1 sm:mx-0">
+      <div className="panel-elevated w-full overflow-hidden">
         <DataTable
           className="px-0"
           columns={columns}
@@ -940,21 +941,24 @@ function ProductDialog({
       title={initial ? t("products.edit_product") : t("products.new_product")}
       description={initial ? (lang === "ar" ? "تعديل تفاصيل المنتج والأسعار والمخزون" : "Edit product details, pricing, and stock") : (lang === "ar" ? "إضافة منتج جديد وتحديد الأسعار والمخزون" : "Create a new product with pricing and stock")}
       footer={
-        <FormActions
-          sticky={false}
-          fullWidth
-          className="border-t-0 pt-0"
-          cancel={
-            <Button type="button" variant="outline" onClick={onClose}>
-              {t("common.cancel")}
-            </Button>
-          }
-          submit={
-            <Button type="submit" form="product-form" loading={saving}>
-              {t("common.save")}
-            </Button>
-          }
-        />
+        <div className="flex w-full items-center justify-end gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            className="flex-1 sm:flex-initial min-w-[110px] rounded-xl font-medium"
+          >
+            {t("common.cancel")}
+          </Button>
+          <Button
+            type="submit"
+            form="product-form"
+            loading={saving}
+            className="flex-1 sm:flex-initial min-w-[140px] rounded-xl bg-primary font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
+          >
+            {t("common.save")}
+          </Button>
+        </div>
       }
     >
       <form id="product-form" onSubmit={submit} className="flex flex-col gap-6">
