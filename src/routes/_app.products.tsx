@@ -1,3 +1,4 @@
+import { VortexDrawerDialog, VortexTextInput, VortexCurrencyInput, VortexNumberInput } from "@/components/vortex-ui";
 ﻿import { useModules } from "@/lib/modules";
 import { createFileRoute } from "@tanstack/react-router";
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -407,17 +408,14 @@ function ProductsPage() {
           const other = lang === "ar" ? p.name : p.name_ar;
           const secondary = other && other.trim() && other.trim() !== primary.trim() ? other : null;
           return (
-            <div className="min-w-[190px]">
-              <div className="font-semibold text-foreground" dir={lang === "ar" ? "rtl" : "ltr"}>
+            <div className="flex flex-col py-0.5">
+              <span className="font-semibold text-foreground text-sm leading-snug truncate" dir={lang === "ar" ? "rtl" : "ltr"}>
                 {primary}
-              </div>
+              </span>
               {secondary ? (
-                <div
-                  className="text-[11px] text-muted-foreground"
-                  dir={lang === "ar" ? "ltr" : "rtl"}
-                >
+                <span className="text-[11px] text-muted-foreground truncate" dir={lang === "ar" ? "ltr" : "rtl"}>
                   {secondary}
-                </div>
+                </span>
               ) : null}
             </div>
           );
@@ -430,7 +428,7 @@ function ProductsPage() {
         width: "w-[140px]",
         sortValue: (p) => label(p.category?.name, p.category?.name_ar),
         cell: (p) => (
-          <span className="text-muted-foreground">
+          <span className="text-xs text-muted-foreground truncate block">
             {label(p.category?.name, p.category?.name_ar)}
           </span>
         ),
@@ -439,8 +437,8 @@ function ProductsPage() {
 
     cols.push({
       key: "shelf_location",
-      header: lang === "ar" ? "موقع الرف" : "Shelf",
-      width: "w-[120px]",
+      header: lang === "ar" ? "الرف" : "Shelf",
+      width: "w-[110px]",
       cell: (p) => (
         <span className="font-mono text-xs text-muted-foreground">{p.shelf_location ?? "—"}</span>
       ),
@@ -455,7 +453,7 @@ function ProductsPage() {
         width: "w-[124px]",
         sortValue: (p) => Number(p.cost_price),
         cell: (p) => (
-          <span className="font-mono text-[13px] tabular-nums">{moneyCell(p.cost_price)}</span>
+          <span className="font-mono text-xs tabular-nums text-muted-foreground">{moneyCell(p.cost_price)}</span>
         ),
       });
     }
@@ -469,7 +467,7 @@ function ProductsPage() {
         width: "w-[124px]",
         sortValue: (p) => Number(p.sale_price),
         cell: (p) => (
-          <span className="font-mono text-[13px] font-semibold tabular-nums text-foreground">
+          <span className="font-mono text-xs font-bold tabular-nums text-foreground">
             {moneyCell(p.sale_price)}
           </span>
         ),
@@ -482,7 +480,7 @@ function ProductsPage() {
         width: "w-[96px]",
         sortValue: (p) => Number(p.min_stock),
         cell: (p) => (
-          <span className="font-mono text-[13px] tabular-nums text-muted-foreground">
+          <span className="font-mono text-xs tabular-nums text-muted-foreground">
             {qtyCell(p.min_stock)}
           </span>
         ),
@@ -501,9 +499,9 @@ function ProductsPage() {
         key: "actions",
         header: t("common.actions"),
         align: "end",
-        width: "w-[78px]",
+        width: "w-[110px]",
         cell: (p) => (
-          <div className="inline-flex items-center gap-0.5">
+          <div className="inline-flex items-center gap-1.5 pe-2">
             <IconButton
               size="sm"
               variant="outline"
@@ -575,7 +573,7 @@ function ProductsPage() {
           loadingMore={isFetchingNextPage}
           pageSize={PRODUCTS_PAGE_SIZE}
           totalCount={productCount}
-          minWidth={canViewCost ? 900 : 780}
+          minWidth={canViewCost ? 1050 : 930}
           horizontalScroll={tableUsesHorizontalScroll}
           stickyHeader
           onRowClick={(product) => {
@@ -932,28 +930,31 @@ function ProductDialog({
   const labelOf = (en: string, ar: string | null) => (lang === "ar" ? ar || en : en || ar || "");
 
   return (
-    <Modal
-      open
-      onClose={onClose}
+    <VortexDrawerDialog
+      open={true}
+      onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}
       size="lg"
       title={initial ? t("products.edit_product") : t("products.new_product")}
-      eyebrow={initial ? t("common.edit") : t("common.new")}
+      description={initial ? (lang === "ar" ? "تعديل تفاصيل المنتج والأسعار والمخزون" : "Edit product details, pricing, and stock") : (lang === "ar" ? "إضافة منتج جديد وتحديد الأسعار والمخزون" : "Create a new product with pricing and stock")}
       footer={
-        <FormActions
-          sticky={false}
-          fullWidth
-          className="border-t-0 pt-0"
-          cancel={
-            <Button type="button" variant="outline" onClick={onClose}>
-              {t("common.cancel")}
-            </Button>
-          }
-          submit={
-            <Button type="submit" form="product-form" loading={saving}>
-              {t("common.save")}
-            </Button>
-          }
-        />
+        <div className="flex w-full items-center justify-end gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            className="flex-1 sm:flex-initial min-w-[110px] rounded-xl font-medium"
+          >
+            {t("common.cancel")}
+          </Button>
+          <Button
+            type="submit"
+            form="product-form"
+            loading={saving}
+            className="flex-1 sm:flex-initial min-w-[140px] rounded-xl bg-primary font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
+          >
+            {t("common.save")}
+          </Button>
+        </div>
       }
     >
       <form id="product-form" onSubmit={submit} className="flex flex-col gap-6">
@@ -961,22 +962,28 @@ function ProductDialog({
           <FormGrid cols={3}>
             <FormField label={t("products.name_ar")} required>
               {(p) => (
-                <FieldInput
-                  {...p}
+                <VortexTextInput
+                  id={p.id}
+                  aria-describedby={p["aria-describedby"]}
                   dir="rtl"
+                  clearable
                   value={form.name_ar}
-                  onValueChange={(v) => setForm({ ...form, name_ar: v })}
+                  onChange={(e) => setForm({ ...form, name_ar: e.target.value })}
+                  placeholder={lang === "ar" ? "أدخل اسم المنتج بالعربية..." : "Product name in Arabic..."}
                 />
               )}
             </FormField>
 
             <FormField label={t("products.name_en")}>
               {(p) => (
-                <FieldInput
-                  {...p}
+                <VortexTextInput
+                  id={p.id}
+                  aria-describedby={p["aria-describedby"]}
                   dir="ltr"
+                  clearable
                   value={form.name}
-                  onValueChange={(v) => setForm({ ...form, name: v })}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder={lang === "ar" ? "Product name in English..." : "Product name..."}
                 />
               )}
             </FormField>
@@ -1005,10 +1012,13 @@ function ProductDialog({
               hint={lang === "ar" ? "معرّف داخلي فريد" : "Unique internal identifier"}
             >
               {(p) => (
-                <FieldInput
-                  {...p}
+                <VortexTextInput
+                  id={p.id}
+                  aria-describedby={p["aria-describedby"]}
+                  clearable
                   value={form.sku}
-                  onValueChange={(v) => setForm({ ...form, sku: v })}
+                  onChange={(e) => setForm({ ...form, sku: e.target.value })}
+                  placeholder={lang === "ar" ? "مثال: PRD-001" : "e.g. PRD-001"}
                 />
               )}
             </FormField>
@@ -1017,12 +1027,15 @@ function ProductDialog({
               <FormField label={t("products.barcode")}>
                 {(p) => (
                   <div className="flex items-center gap-2">
-                    <FieldInput
-                      {...p}
+                    <VortexTextInput
+                      id={p.id}
+                      aria-describedby={p["aria-describedby"]}
                       dir="ltr"
+                      clearable
                       value={form.barcode}
-                      onValueChange={(v) => setForm({ ...form, barcode: v })}
-                      containerClassName="min-w-0 flex-1"
+                      onChange={(e) => setForm({ ...form, barcode: e.target.value })}
+                      placeholder="628100..."
+                      className="min-w-0 flex-1"
                     />
                     <IconButton
                       type="button"
@@ -1039,10 +1052,12 @@ function ProductDialog({
 
             <FormField label={lang === "ar" ? "موقع الرف / المستودع" : "Shelf location"}>
               {(p) => (
-                <FieldInput
-                  {...p}
+                <VortexTextInput
+                  id={p.id}
+                  aria-describedby={p["aria-describedby"]}
+                  clearable
                   value={form.shelf_location}
-                  onValueChange={(v) => setForm({ ...form, shelf_location: v })}
+                  onChange={(e) => setForm({ ...form, shelf_location: e.target.value })}
                   placeholder={lang === "ar" ? "مثال: رف A - 03" : "e.g. Shelf A - 03"}
                 />
               )}
@@ -1176,27 +1191,30 @@ function ProductDialog({
                 label={t("common.cost")}
                 hint={lang === "ar" ? "سعر الشراء" : "Purchase price"}
               >
-                <NumberInput
-                  value={form.cost_price === "" ? null : Number(form.cost_price)}
-                  onValueChange={(v) =>
-                    setForm({ ...form, cost_price: v == null ? "" : String(v) })
+                <VortexCurrencyInput
+                  value={form.cost_price === "" ? 0 : Number(form.cost_price)}
+                  onValueChange={(num) =>
+                    setForm({ ...form, cost_price: String(num) })
                   }
-                  min={1}
-                  suffix="﷼"
+                  min={0}
+                  currency="﷼"
+                  placeholder="0.00"
                 />
               </FormField>
             )}
 
             <FormField label={t("common.price")} required>
               {(p) => (
-                <NumberInput
-                  {...p}
-                  value={form.sale_price === "" ? null : Number(form.sale_price)}
-                  onValueChange={(v) =>
-                    setForm({ ...form, sale_price: v == null ? "" : String(v) })
+                <VortexCurrencyInput
+                  id={p.id}
+                  aria-describedby={p["aria-describedby"]}
+                  value={form.sale_price === "" ? 0 : Number(form.sale_price)}
+                  onValueChange={(num) =>
+                    setForm({ ...form, sale_price: String(num) })
                   }
                   min={0}
-                  suffix="﷼"
+                  currency="﷼"
+                  placeholder="0.00"
                 />
               )}
             </FormField>
@@ -1266,7 +1284,7 @@ function ProductDialog({
         onClose={() => setScannerOpen(false)}
         onDetected={(barcode) => setForm((current) => ({ ...current, barcode }))}
       />
-    </Modal>
+    </VortexDrawerDialog>
   );
 }
 
