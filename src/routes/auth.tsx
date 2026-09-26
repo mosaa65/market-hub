@@ -44,20 +44,9 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [logoUrl, setLogoUrl] = useState<string>("/inama-soft-logo.ico");
+  const logoMarkUrl = "/vortex-erp-mark.png";
+  const logoWordmarkUrl = "/vortex-erp-wordmark.png";
   const isRtl = dir === "rtl";
-
-  useEffect(() => {
-    supabase
-      .from("company_settings")
-      .select("logo_url")
-      .order("id")
-      .limit(1)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data?.logo_url) setLogoUrl(data.logo_url);
-      });
-  }, []);
 
   useEffect(() => {
     if (session) navigate({ to: "/dashboard", replace: true });
@@ -155,12 +144,19 @@ function AuthPage() {
               <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.25),_transparent_40%)]" />
 
               <div className="relative z-10">
+                <img
+                  src={logoWordmarkUrl}
+                  alt="Vortex ERP"
+                  className="mb-5 h-12 w-auto max-w-full object-contain object-start mix-blend-screen sm:h-14"
+                />
                 <div className="inline-flex items-center gap-2.5 rounded-full border border-white/25 bg-white/15 px-3.5 py-1.5 text-xs font-semibold backdrop-blur-md shadow-sm">
                   <img
-                    src={logoUrl}
+                    src={logoMarkUrl}
                     alt={t("app.name")}
                     className="h-4.5 w-4.5 rounded-md object-contain bg-white/90 p-0.5"
-                    onError={() => setLogoUrl("/inama-soft-logo.ico")}
+                    onError={(event) => {
+                      event.currentTarget.style.visibility = "hidden";
+                    }}
                   />
                   <span>{t("app.name")} ERP</span>
                 </div>
@@ -238,10 +234,12 @@ function AuthPage() {
                 {/* Brand Header */}
                 <div className="flex items-center gap-3 pb-5 border-b border-border/60">
                   <img
-                    src={logoUrl}
+                    src={logoMarkUrl}
                     alt={t("app.name")}
                     className="h-9 w-9 shrink-0 rounded-xl object-contain bg-surface-2 p-1 border border-border/70 shadow-sm"
-                    onError={() => setLogoUrl("/inama-soft-logo.ico")}
+                    onError={(event) => {
+                      event.currentTarget.style.visibility = "hidden";
+                    }}
                   />
                   <div>
                     <h2 className="text-base font-bold text-foreground">{t("app.name")}</h2>

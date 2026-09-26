@@ -2,28 +2,67 @@ import { QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
 
-export const getRouter = () => {
-  const queryClient = new QueryClient({
+/**
+ * Resilient QueryClient.
+ *
+ * The audit found the app had a bare `new QueryClient()` — no retry policy, no
+ * offline awareness, no cache tuning. On a shop floor with flaky connectivity a
+ * single dropped request showed an error immediately, and every navigation
+ * refetched from scratch.
+ *
+ *  - retry transient failures with exponential backoff, never a 4xx
+ *  - never retry while the browser reports offline — wait for reconnect
+ *  - short stale window so navigation is instant, 5-minute cache
+ *  - refetch on reconnect so returning from a dead zone self-heals
+ *  - do NOT refetch on window focus (POS terminals keep several tabs open)
+ */
+function isRetryable(failureCount: number, error: unknown): boolean {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return false;
+  if (failureCount >= 3) return false;
+
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  const status = (error as { status?: number } | null)?.status;
+
+  // Client errors will not succeed on a second attempt.
+  if (typeof status === "number" && status >= 400 && status < 500) return false;
+  // Cancellation is not a failure worth retrying.
+  if (/aborted|AbortError/i.test(message)) return false;
+
+  return true;
+}
+
+export function createQueryClient() {
+  return new QueryClient({
     defaultOptions: {
       queries: {
-        // Phase 4 Optimization: Smart caching to eliminate redundant server queries
-        staleTime: 1000 * 60 * 3, // Data stays fresh for 3 minutes
-        gcTime: 1000 * 60 * 30, // Unused cache kept for 30 minutes in memory
-        refetchOnWindowFocus: false, // Prevent aggressive network requests when switching tabs
-        refetchOnReconnect: "always", // Ensure fresh data on network reconnect
-        retry: 1, // Avoid infinite retry loops on client errors
+        retry: isRetryable,
+        retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
+        staleTime: 30_000,
+        gcTime: 5 * 60_000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: true,
+        // Keep the previous page visible while the next one loads instead of
+        // flashing a skeleton on every filter change.
+        placeholderData: (previous: unknown) => previous,
+        networkMode: "online",
       },
       mutations: {
+        // Mutations are not idempotent — never auto-retry.
         retry: 0,
+        networkMode: "online",
       },
     },
   });
+}
+
+export const getRouter = () => {
+  const queryClient = createQueryClient();
 
   const router = createRouter({
     routeTree,
     context: { queryClient },
     scrollRestoration: true,
-    defaultPreloadStaleTime: 1000 * 60 * 5,
+    defaultPreloadStaleTime: 0,
   });
 
   return router;

@@ -1,6 +1,6 @@
-import { useModules } from "@/lib/modules";
+﻿import { useModules } from "@/lib/modules";
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,16 +17,42 @@ import {
   Trash2,
   X,
   SlidersHorizontal,
-  Loader2,
-  Car,
-  Globe,
-  Award,
   ExternalLink,
+  Power,
   Camera,
   ScanBarcode,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
+import {
+  deleteProductSafely,
+  setProductActive,
+  describeReferences,
+  isHistoryOnly,
+  type DeleteOutcome,
+  type ReferenceCounts,
+} from "@/lib/safety";
+import { fuzzySearch, buildSearchIndex } from "@/design/fuzzy";
+import { moneyCell, qtyCell } from "@/lib/format";
+import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
+import { FieldInput, NumberInput, fieldSurfaceClass } from "@/components/ui/input";
+import { FormField } from "@/components/ui/form-field";
+import { FormActions, FormGrid, FormSection } from "@/components/ui/form-layout";
+import { Modal, ConfirmDialog } from "@/components/ui/modal";
+import { DataTable, type DataTableColumn, type DataTableSort } from "@/components/ui/data-table";
+import {
+  TableToolbar,
+  ToolbarAction,
+  applyFilters,
+  type FilterDefinition,
+  type FilterValues,
+  type SortOption,
+} from "@/components/ui/table-toolbar";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { useBreakpoint } from "@/design/breakpoints";
+import { useRealtimeTable } from "@/lib/realtime";
+import { QUERY_KEYS } from "@/lib/query-keys";
 
 export const Route = createFileRoute("/_app/products")({
   head: () => ({ meta: [{ title: "المنتجات — فورتيكس ERP" }] }),
@@ -35,6 +61,8 @@ export const Route = createFileRoute("/_app/products")({
   }),
   component: ProductsPage,
 });
+
+const PRODUCTS_PAGE_SIZE = 50;
 
 type ProductRow = {
   id: string;
@@ -67,6 +95,21 @@ type ProductRow = {
   compatibilities?: { vehicle_model_id: string }[];
 };
 
+/** Neutral reference counts — used before the guard has answered. */
+const EMPTY_COUNTS: ReferenceCounts = {
+  salesItems: 0,
+  purchaseItems: 0,
+  salesReturns: 0,
+  purchaseReturns: 0,
+  transfers: 0,
+  stockMovements: 0,
+  inventoryRows: 0,
+  compatibilities: 0,
+  blockingTotal: 0,
+  canDelete: false,
+  hasHistory: false,
+};
+
 function ProductsPage() {
   const { checkQuota } = useModules();
   const { t, lang } = useI18n();
@@ -81,42 +124,106 @@ function ProductsPage() {
     hasRole("accountant");
   const qc = useQueryClient();
   const searchParams = Route.useSearch();
+  const breakpoint = useBreakpoint();
+  const tableUsesHorizontalScroll = breakpoint === "xs" || breakpoint === "sm" || breakpoint === "md";
   const [query, setQuery] = useState("");
+  const [filters, setFilters] = useState<FilterValues>({});
+  const [sort, setSort] = useState<DataTableSort | null>(null);
   const [editing, setEditing] = useState<ProductRow | null>(null);
   const [open, setOpen] = useState(false);
   const [prefillBarcode, setPrefillBarcode] = useState<string | undefined>(undefined);
-  const [modulesDialogOpen, setModulesDialogOpen] = useState(false);
 
-  const { data: products, isLoading } = useQuery({
-    queryKey: ["products"],
-    queryFn: async () => {
-      const [pRes, compRes] = await Promise.all([
-        supabase
-          .from("products")
-          .select(
-            "id, name, name_ar, sku, barcode, sale_price, cost_price, tax_rate, min_stock, shelf_location, origin_id, quality_grade_id, is_active, category_id, brand_id, unit_id, category:categories(name, name_ar), brand:brands(name, name_ar), unit:units(short_name, name_ar), origin:countries_of_origin(id, name, name_ar, code), quality:quality_grades(id, name, name_ar, code, sort_order)",
-          )
-          .order("created_at", { ascending: false })
-          .limit(500),
-        (supabase as any).from("product_compatibilities").select("product_id, vehicle_model_id"),
-      ]);
+  const [confirmDelete, setConfirmDelete] = useState<ProductRow | null>(null);
+  /** Set when a delete was refused because the product has history. */
+  const [blockedDelete, setBlockedDelete] = useState<{
+    product: ProductRow | null;
+    counts: ReferenceCounts;
+  } | null>(null);
 
-      if (pRes.error) throw pRes.error;
+  const {
+    data: productPages,
+    isLoading,
+    error,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetching,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: QUERY_KEYS.products,
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }) => {
+      const from = pageParam * PRODUCTS_PAGE_SIZE;
+      const to = from + PRODUCTS_PAGE_SIZE - 1;
+      const { data: page, error: productError } = await (supabase.from("products") as any)
+        .select(
+          "id, name, name_ar, sku, barcode, sale_price, cost_price, tax_rate, min_stock, shelf_location, origin_id, quality_grade_id, is_active, category_id, brand_id, unit_id, category:categories(name, name_ar), brand:brands(name, name_ar), unit:units(short_name, name_ar), origin:countries_of_origin(id, name, name_ar, code), quality:quality_grades(id, name, name_ar, code, sort_order)",
+        )
+        .order("created_at", { ascending: false })
+        .range(from, to);
 
-      const compMap: Record<string, string[]> = {};
-      for (const row of compRes.data ?? []) {
-        if (!compMap[row.product_id]) compMap[row.product_id] = [];
-        compMap[row.product_id].push(row.vehicle_model_id);
+      if (productError) throw productError;
+
+      const productIds = ((page as ProductRow[] | null) ?? []).map((product) => product.id);
+      const { data: compatibilityRows, error: compatibilityError } = productIds.length
+        ? await (supabase as any)
+            .from("product_compatibilities")
+            .select("product_id, vehicle_model_id")
+            .in("product_id", productIds)
+        : { data: [], error: null };
+
+      if (compatibilityError) throw compatibilityError;
+
+      const compatibilityByProduct: Record<string, { vehicle_model_id: string }[]> = {};
+      for (const compatibility of compatibilityRows ?? []) {
+        (compatibilityByProduct[compatibility.product_id] ??= []).push({
+          vehicle_model_id: compatibility.vehicle_model_id,
+        });
       }
 
-      const rows = (pRes.data ?? []).map((p: any) => ({
-        ...p,
-        compatibilities: (compMap[p.id] ?? []).map((mid) => ({ vehicle_model_id: mid })),
-      }));
+      const rows = (page ?? []).map((product: any) => ({
+        ...product,
+        compatibilities: compatibilityByProduct[product.id] ?? [],
+      })) as ProductRow[];
 
-      return rows as ProductRow[];
+      return { rows, hasMore: rows.length === PRODUCTS_PAGE_SIZE };
     },
+    getNextPageParam: (lastPage, pages) => (lastPage.hasMore ? pages.length : undefined),
   });
+
+  // The stream intentionally receives fifty rows at a time. The total must come
+  // from the database separately so the number beside search never pretends that
+  // the first page is the whole catalogue.
+  const { data: productCount } = useQuery({
+    queryKey: ["products", "count"],
+    queryFn: async () => {
+      const { count, error: countError } = await (supabase.from("products") as any).select("id", {
+        count: "exact",
+        head: true,
+      });
+      if (countError) throw countError;
+      return count ?? 0;
+    },
+    staleTime: 30_000,
+  });
+
+  const products = useMemo(
+    () => productPages?.pages.flatMap((page) => page.rows) ?? [],
+    [productPages],
+  );
+
+  useRealtimeTable<ProductRow>({
+    table: "products",
+    queryKey: QUERY_KEYS.products,
+    debounceMs: 100,
+  }, qc);
+
+  useEffect(() => {
+    if (!searchParams.barcode) return;
+    setEditing(null);
+    setPrefillBarcode(searchParams.barcode);
+    setOpen(true);
+  }, [searchParams.barcode]);
 
   const { data: meta } = useQuery({
     queryKey: ["products-meta"],
@@ -148,348 +255,375 @@ function ProductsPage() {
     },
   });
 
-  const filtered = useMemo(() => {
+  // Typo-tolerant, Arabic-normalised search index (see `src/design/fuzzy.ts`).
+  const searchIndex = useMemo(
+    () => buildSearchIndex(products ?? [], (p) => [p.name, p.name_ar, p.sku, p.barcode]),
+    [products],
+  );
+
+  const searched = useMemo(() => {
     if (!products) return [];
-    const q = query.trim().toLowerCase();
+    const q = query.trim();
     if (!q) return products;
-    return products.filter((p) =>
-      [p.name, p.name_ar, p.sku, p.barcode].some((x) => (x ?? "").toLowerCase().includes(q)),
-    );
-  }, [products, query]);
+    return fuzzySearch(searchIndex, q, { threshold: 0.55, requireAll: true }).map((m) => m.item);
+  }, [products, query, searchIndex]);
 
-  // Open the create-product dialog pre-filled with a scanned barcode
-  // (e.g. from the POS "create product with this barcode" action).
-  // No product record is created here — the user still reviews and saves.
-  useEffect(() => {
-    if (searchParams.barcode) {
-      setEditing(null);
-      setPrefillBarcode(searchParams.barcode);
-      setOpen(true);
+  // Structured filters, applied client-side over the rows already fetched.
+  const filtered = useMemo(
+    () =>
+      applyFilters(searched, filters, {
+        category: (p) => p.category_id ?? "",
+        brand: (p) => p.brand_id ?? "",
+        unit: (p) => p.unit_id ?? "",
+        origin: (p) => p.origin_id ?? "",
+        status: (p) => (p.is_active ? "active" : "inactive"),
+      }),
+    [searched, filters],
+  );
+
+  /* ---------------- filter + sort definitions (localized) ---------------- */
+  const productFilterDefinitions = useMemo<FilterDefinition[]>(() => {
+    const defs: FilterDefinition[] = [
+      {
+        key: "status",
+        label: lang === "ar" ? "الحالة" : "Status",
+        type: "select",
+        options: [
+          { value: "active", label: t("common.active") },
+          { value: "inactive", label: t("common.inactive") },
+        ],
+      },
+    ];
+
+    if (meta?.categories?.length) {
+      defs.push({
+        key: "category",
+        label: t("products.category"),
+        type: "select",
+        options: meta.categories.map((c) => ({
+          value: c.id,
+          label: (lang === "ar" ? c.name_ar || c.name : c.name || c.name_ar) ?? c.name,
+        })),
+      });
     }
-  }, [searchParams.barcode]);
+    if (config.enableBrands && meta?.brands?.length) {
+      defs.push({
+        key: "brand",
+        label: t("products.brand"),
+        type: "select",
+        options: meta.brands.map((b) => ({
+          value: b.id,
+          label: (lang === "ar" ? b.name_ar || b.name : b.name || b.name_ar) ?? b.name,
+        })),
+      });
+    }
+    if (config.enableUnits && meta?.units?.length) {
+      defs.push({
+        key: "unit",
+        label: t("products.unit"),
+        type: "select",
+        options: meta.units.map((u) => ({
+          value: u.id,
+          label: (lang === "ar" ? u.name_ar || u.name : u.name || u.name_ar) ?? u.name,
+        })),
+      });
+    }
+    if (config.enableOrigins && meta?.origins?.length) {
+      defs.push({
+        key: "origin",
+        label: lang === "ar" ? "بلد المنشأ" : "Origin",
+        type: "select",
+        options: meta.origins.map(
+          (o: { id: string; name: string; name_ar: string | null; code: string }) => ({
+            value: o.id,
+            label: `${o.name_ar || o.name} (${o.code})`,
+          }),
+        ),
+      });
+    }
 
+    return defs;
+  }, [meta, config, lang, t]);
+
+  const productSortOptions = useMemo<SortOption[]>(
+    () => [
+      { value: "", label: lang === "ar" ? "الافتراضي (الأحدث)" : "Default (newest)" },
+      { value: "name", label: lang === "ar" ? "الاسم" : "Name" },
+      { value: "sku", label: t("products.sku") },
+      { value: "sale_price", label: t("common.price") },
+      ...(canViewCost ? [{ value: "cost_price", label: t("common.cost") }] : []),
+      { value: "min_stock", label: t("products.min") },
+    ],
+    [lang, t, canViewCost],
+  );
+
+  /**
+   * Guarded delete.
+   *
+   * A product referenced by an invoice, return, transfer or stock movement is
+   * NEVER deleted — the schema cascades to `inventory`/`stock_movements`, so a
+   * naive delete would silently destroy that history. Instead the UI offers to
+   * deactivate (which only flips `is_active` on that one row).
+   */
   const remove = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("products").delete().eq("id", id);
-      if (error) throw error;
+      const outcome = await deleteProductSafely(id);
+      if (outcome.status === "deleted") return outcome;
+      // Signal the UI without throwing a raw Postgres error at the user.
+      throw Object.assign(new Error("delete-blocked"), { outcome });
     },
     onSuccess: () => {
       toast.success(lang === "ar" ? "تم حذف المنتج بنجاح" : t("products.deleted"));
       qc.invalidateQueries({ queryKey: ["products"] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error & { outcome?: DeleteOutcome }) => {
+      const outcome = e.outcome;
+      if (outcome?.status === "blocked") {
+        setBlockedDelete({ product: null, counts: outcome.counts });
+        return;
+      }
+      if (outcome?.status === "forbidden") {
+        toast.error(lang === "ar" ? "ليس لديك صلاحية حذف المنتجات" : "You cannot delete products");
+        return;
+      }
+      toast.error(e.message);
+    },
   });
 
-  const profileLabel =
-    config.profile === "spare_parts"
-      ? lang === "ar"
-        ? "قطع غيار ومركبات"
-        : "Spare Parts"
-      : config.profile === "grocery"
-        ? lang === "ar"
-          ? "مواد غذائية وبقالة"
-          : "Grocery"
-        : config.profile === "retail"
-          ? lang === "ar"
-            ? "تجارة عامة"
-            : "General Retail"
-          : lang === "ar"
-            ? "تخصيص مخصص"
-            : "Custom";
+  const label = (en?: string | null, ar?: string | null) =>
+    (lang === "ar" ? ar || en : en || ar) ?? "—";
 
-  const modelsMap = useMemo(
-    () => new Map<string, any>((meta?.models ?? []).map((m: any) => [m.id, m])),
-    [meta?.models],
-  );
-  const makesMap = useMemo(
-    () => new Map<string, any>((meta?.makes ?? []).map((mk: any) => [mk.id, mk])),
-    [meta?.makes],
-  );
+  /* ---------------- columns ---------------- */
+  const columns = useMemo<DataTableColumn<ProductRow>[]>(() => {
+    const cols: DataTableColumn<ProductRow>[] = [
+      {
+        key: "name",
+        header: t("products.product"),
+        sortable: true,
+        width: "w-[240px]",
+        sortValue: (p) => (lang === "ar" ? p.name_ar || p.name : p.name || p.name_ar) ?? "",
+        cell: (p) => {
+          const primary = lang === "ar" ? p.name_ar || p.name : p.name || p.name_ar || "—";
+          const other = lang === "ar" ? p.name : p.name_ar;
+          const secondary = other && other.trim() && other.trim() !== primary.trim() ? other : null;
+          return (
+            <div className="min-w-[190px]">
+              <div className="font-semibold text-foreground" dir={lang === "ar" ? "rtl" : "ltr"}>
+                {primary}
+              </div>
+              {secondary ? (
+                <div
+                  className="text-[11px] text-muted-foreground"
+                  dir={lang === "ar" ? "ltr" : "rtl"}
+                >
+                  {secondary}
+                </div>
+              ) : null}
+            </div>
+          );
+        },
+      },
+      {
+        key: "category",
+        header: t("products.category"),
+        sortable: true,
+        width: "w-[140px]",
+        sortValue: (p) => label(p.category?.name, p.category?.name_ar),
+        cell: (p) => (
+          <span className="text-muted-foreground">
+            {label(p.category?.name, p.category?.name_ar)}
+          </span>
+        ),
+      },
+    ];
 
-  const getProductCompats = (compats?: { vehicle_model_id: string }[]) => {
-    if (!compats || compats.length === 0) return [];
-    return compats
-      .map((c) => {
-        const m = modelsMap.get(c.vehicle_model_id);
-        const mk = m ? makesMap.get(m.make_id) : null;
-        const makeName =
-          lang === "ar" ? mk?.name_ar || mk?.name || "" : mk?.name || mk?.name_ar || "";
-        const modelName = lang === "ar" ? m?.name_ar || m?.name || "" : m?.name || m?.name_ar || "";
-        return { makeName, modelName };
-      })
-      .filter((x) => x.makeName || x.modelName);
+    cols.push({
+      key: "shelf_location",
+      header: lang === "ar" ? "موقع الرف" : "Shelf",
+      width: "w-[120px]",
+      cell: (p) => (
+        <span className="font-mono text-xs text-muted-foreground">{p.shelf_location ?? "—"}</span>
+      ),
+    });
+
+    if (canViewCost) {
+      cols.push({
+        key: "cost_price",
+        header: t("common.cost"),
+        align: "end",
+        sortable: true,
+        width: "w-[124px]",
+        sortValue: (p) => Number(p.cost_price),
+        cell: (p) => (
+          <span className="font-mono text-[13px] tabular-nums">{moneyCell(p.cost_price)}</span>
+        ),
+      });
+    }
+
+    cols.push(
+      {
+        key: "sale_price",
+        header: t("common.price"),
+        align: "end",
+        sortable: true,
+        width: "w-[124px]",
+        sortValue: (p) => Number(p.sale_price),
+        cell: (p) => (
+          <span className="font-mono text-[13px] font-semibold tabular-nums text-foreground">
+            {moneyCell(p.sale_price)}
+          </span>
+        ),
+      },
+      {
+        key: "min_stock",
+        header: t("products.min"),
+        align: "end",
+        sortable: true,
+        width: "w-[96px]",
+        sortValue: (p) => Number(p.min_stock),
+        cell: (p) => (
+          <span className="font-mono text-[13px] tabular-nums text-muted-foreground">
+            {qtyCell(p.min_stock)}
+          </span>
+        ),
+      },
+      {
+        key: "is_active",
+        header: t("common.status"),
+        width: "w-[106px]",
+        cell: (p) => (
+          <StatusBadge tone={p.is_active ? "success" : "neutral"} dot>
+            {p.is_active ? t("common.active") : t("common.inactive")}
+          </StatusBadge>
+        ),
+      },
+      {
+        key: "actions",
+        header: t("common.actions"),
+        align: "end",
+        width: "w-[78px]",
+        cell: (p) => (
+          <div className="inline-flex items-center gap-0.5">
+            <IconButton
+              size="sm"
+              variant="outline"
+              tooltip
+              ariaLabel={t("common.edit")}
+              icon={<Pencil />}
+              round
+              onClick={(event) => {
+                event.stopPropagation();
+                setEditing(p);
+                setPrefillBarcode(undefined);
+                setOpen(true);
+              }}
+            />
+            <IconButton
+              size="sm"
+              variant="danger"
+              tooltip
+              ariaLabel={t("common.delete")}
+              icon={<Trash2 />}
+              round
+              onClick={(event) => {
+                event.stopPropagation();
+                setConfirmDelete(p);
+              }}
+            />
+          </div>
+        ),
+      },
+    );
+
+    return cols;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config, canViewCost, lang, t, meta?.models, meta?.makes]);
+
+  const openNew = () => {
+    const qCheck = checkQuota("products", productCount ?? products.length);
+    if (!qCheck.allowed) {
+      toast.error(lang === "ar" ? qCheck.message?.ar : qCheck.message?.en);
+      return;
+    }
+    setEditing(null);
+    setPrefillBarcode(undefined);
+    setOpen(true);
   };
 
   return (
     <>
-      <PageHeader
-        title={t("products.title")}
-        subtitle={t("products.subtitle")}
-        actions={
-          <button
-            type="button"
-            onClick={() => setModulesDialogOpen(true)}
-            className="flex h-10 items-center gap-2 rounded-full border border-border/80 bg-surface px-4 text-xs font-semibold text-muted-foreground shadow-xs transition hover:border-primary/40 hover:text-foreground active:scale-95"
-          >
-            <SlidersHorizontal className="h-3.5 w-3.5 text-primary" />
-            <span>{lang === "ar" ? "تخصيص نمط النشاط" : "Industry Profile"}</span>
-            <span className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-bold">
-              {profileLabel}
-            </span>
-          </button>
-        }
-      />
+      <PageHeader title={t("products.title")} subtitle={t("products.subtitle")} />
 
-      <div className="panel-elevated overflow-hidden rounded-3xl border border-border/80 bg-surface/90 shadow-sm">
-        <div className="flex flex-wrap items-center gap-2 border-b border-border/70 p-3.5">
-          <div className="flex h-10 flex-1 items-center gap-2 rounded-full border border-border bg-surface px-4 text-sm shadow-2xs">
-            <Search className="h-4 w-4 text-muted-foreground" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground text-sm"
-              placeholder={t("products.search")}
-            />
-            <span className="hidden sm:inline text-[11px] text-muted-foreground tabular-nums">
-              {filtered.length}
-            </span>
-          </div>
-
-          <button
-            onClick={() => {
-              const qCheck = checkQuota("products", (products ?? []).length);
-              if (!qCheck.allowed) {
-                toast.error(lang === "ar" ? qCheck.message?.ar : qCheck.message?.en);
-                return;
+      <div className="panel-elevated -mx-1 sm:mx-0">
+        <DataTable
+          className="px-0"
+          columns={columns}
+          rows={filtered}
+          rowKey={(p) => p.id}
+          loading={isLoading}
+          initialLoading={isLoading}
+          refreshing={isFetching && !isLoading && !isFetchingNextPage}
+          error={(error as Error) ?? null}
+          onRetry={() => refetch()}
+          sort={sort}
+          onSortChange={setSort}
+          infinite
+          hasMore={Boolean(hasNextPage)}
+          onLoadMore={() => {
+            if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
+          }}
+          loadingMore={isFetchingNextPage}
+          pageSize={PRODUCTS_PAGE_SIZE}
+          totalCount={productCount}
+          minWidth={canViewCost ? 900 : 780}
+          horizontalScroll={tableUsesHorizontalScroll}
+          stickyHeader
+          onRowClick={(product) => {
+            setEditing(product);
+            setPrefillBarcode(undefined);
+            setOpen(true);
+          }}
+          empty={{
+            icon: <Package />,
+            title: t("products.no_products"),
+            description: t("products.empty_hint"),
+            action: (
+              <Button size="sm" icon={<Plus />} onClick={openNew}>
+                {t("common.new")}
+              </Button>
+            ),
+          }}
+          toolbar={
+            <TableToolbar
+              search={{
+                value: query,
+                onValueChange: setQuery,
+                placeholder: t("products.search"),
+                resultCount: productCount ?? filtered.length,
+              }}
+              filters={{
+                definitions: productFilterDefinitions,
+                values: filters,
+                onValueChange: setFilters,
+              }}
+              sort={{
+                options: productSortOptions,
+                value: sort?.key ?? "",
+                onValueChange: (v) =>
+                  setSort(v ? { key: v, direction: sort?.direction ?? "asc" } : null),
+                label: lang === "ar" ? "ترتيب" : "Sort",
+              }}
+              action={
+                <ToolbarAction
+                  label={t("common.new")}
+                  icon={<Plus />}
+                  tone="primary"
+                  onClick={openNew}
+                />
               }
-              setEditing(null);
-              setPrefillBarcode(undefined);
-              setOpen(true);
-            }}
-            className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm shadow-primary/20 hover:opacity-90 transition active:scale-95"
-          >
-            <Plus className="h-3.5 w-3.5" />{" "}
-            <span className="hidden sm:inline">{t("common.new")}</span>
-          </button>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[850px] text-sm">
-            <thead>
-              <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-                <th className="px-4 py-2.5 text-start font-medium">{t("products.product")}</th>
-                <th className="px-4 py-2.5 text-start font-medium">{t("products.sku")}</th>
-                <th className="px-4 py-2.5 text-start font-medium">{t("products.category")}</th>
-                {config.enableBrands && (
-                  <th className="px-4 py-2.5 text-start font-medium">{t("products.brand")}</th>
-                )}
-                <th className="px-4 py-2.5 text-start font-medium">
-                  {lang === "ar" ? "موقع الرف" : "Shelf"}
-                </th>
-                {canViewCost && (
-                  <th className="px-4 py-2.5 text-end font-medium">{t("common.cost")}</th>
-                )}
-                <th className="px-4 py-2.5 text-end font-medium">{t("common.price")}</th>
-                <th className="px-4 py-2.5 text-end font-medium">{t("products.min")}</th>
-                <th className="px-4 py-2.5 text-end font-medium">{t("common.status")}</th>
-                <th className="px-4 py-2.5 text-end font-medium">{t("common.actions")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading &&
-                Array.from({ length: 6 }).map((_, i) => (
-                  <tr key={i} className="border-b border-border/60">
-                    <td
-                      colSpan={(config.enableBrands ? 10 : 9) - (canViewCost ? 0 : 1)}
-                      className="px-4 py-3"
-                    >
-                      <div className="h-4 w-full rounded shimmer" />
-                    </td>
-                  </tr>
-                ))}
-              {!isLoading && filtered.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={(config.enableBrands ? 10 : 9) - (canViewCost ? 0 : 1)}
-                    className="px-4 py-16 text-center"
-                  >
-                    <div className="mx-auto grid h-10 w-10 place-items-center rounded-2xl bg-surface border border-border">
-                      <Package className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                    <p className="mt-3 text-sm text-foreground">{t("products.no_products")}</p>
-                    <p className="text-xs text-muted-foreground">{t("products.empty_hint")}</p>
-                  </td>
-                </tr>
-              )}
-              {filtered.map((p) => {
-                const primary = lang === "ar" ? p.name_ar || p.name : p.name || p.name_ar || "—";
-                const secondary = lang === "ar" ? p.name : p.name_ar;
-                const catLabel =
-                  lang === "ar"
-                    ? p.category?.name_ar || p.category?.name
-                    : p.category?.name || p.category?.name_ar;
-                const brandLabel =
-                  lang === "ar"
-                    ? p.brand?.name_ar || p.brand?.name
-                    : p.brand?.name || p.brand?.name_ar;
-                const compats = getProductCompats(p.compatibilities);
-                const uniqueMakes = Array.from(
-                  new Set(compats.map((c) => c.makeName).filter(Boolean)),
-                );
-
-                return (
-                  <tr
-                    key={p.id}
-                    className="border-b border-border/60 hover:bg-accent/40 transition-colors"
-                  >
-                    <td className="px-4 py-2.5">
-                      {/* Catalog Index Micro-badges Above Product Name */}
-                      <div className="mb-1 flex flex-wrap items-center gap-1 text-[10px] leading-none">
-                        {config.enableQualityGrades && p.quality && (
-                          <span
-                            className={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 font-bold border ${
-                              p.quality.code?.toLowerCase() === "genuine" ||
-                              p.quality.sort_order === 1
-                                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25"
-                                : p.quality.code?.toLowerCase() === "premium" ||
-                                    p.quality.sort_order === 2
-                                  ? "bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/25"
-                                  : "bg-surface-2 text-foreground/80 border-border/70"
-                            }`}
-                          >
-                            <Award className="h-2.5 w-2.5" />
-                            <span>
-                              {lang === "ar"
-                                ? p.quality.name_ar || p.quality.name
-                                : p.quality.name || p.quality.name_ar}
-                            </span>
-                          </span>
-                        )}
-
-                        {config.enableOrigins && p.origin && (
-                          <span className="inline-flex items-center gap-0.5 rounded border border-border/70 bg-surface px-1.5 py-0.5 text-muted-foreground font-medium">
-                            <Globe className="h-2.5 w-2.5 opacity-70" />
-                            <span>
-                              {lang === "ar"
-                                ? p.origin.name_ar || p.origin.name
-                                : p.origin.name || p.origin.name_ar}
-                            </span>
-                            {p.origin.code && (
-                              <span className="font-mono text-[9px] opacity-75">
-                                ({p.origin.code})
-                              </span>
-                            )}
-                          </span>
-                        )}
-
-                        {config.enableUnits && p.unit && (
-                          <span className="inline-flex items-center rounded border border-border/60 bg-surface-2 px-1.5 py-0.5 text-muted-foreground font-mono">
-                            {lang === "ar"
-                              ? p.unit.name_ar || p.unit.short_name
-                              : p.unit.short_name || p.unit.name_ar}
-                          </span>
-                        )}
-
-                        {config.enableMakesAndModels && compats.length > 0 && (
-                          <span
-                            className="inline-flex items-center gap-1 rounded border border-sky-500/25 bg-sky-500/10 px-1.5 py-0.5 font-medium text-sky-700 dark:text-sky-300 cursor-help"
-                            title={compats.map((c) => `${c.makeName} - ${c.modelName}`).join(" | ")}
-                          >
-                            <Car className="h-2.5 w-2.5" />
-                            <span>
-                              {uniqueMakes.length > 0 ? uniqueMakes.slice(0, 2).join("، ") : ""}
-                              {uniqueMakes.length > 2 ? ` (+${uniqueMakes.length - 2})` : ""}
-                              <span className="font-mono opacity-80"> ({compats.length})</span>
-                            </span>
-                          </span>
-                        )}
-                      </div>
-
-                      <div
-                        className="font-medium text-foreground"
-                        dir={lang === "ar" ? "rtl" : "ltr"}
-                      >
-                        {primary}
-                      </div>
-                      {secondary && (
-                        <div
-                          className="text-[11px] text-muted-foreground"
-                          dir={lang === "ar" ? "ltr" : "rtl"}
-                        >
-                          {secondary}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
-                      {p.sku ?? "—"}
-                    </td>
-                    <td className="px-4 py-2.5 text-muted-foreground">{catLabel ?? "—"}</td>
-                    {config.enableBrands && (
-                      <td className="px-4 py-2.5 text-muted-foreground">{brandLabel ?? "—"}</td>
-                    )}
-                    <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
-                      {p.shelf_location ?? "—"}
-                    </td>
-                    {canViewCost && (
-                      <td className="px-4 py-2.5 text-end font-mono">
-                        {Number(p.cost_price).toFixed(2)}
-                      </td>
-                    )}
-                    <td className="px-4 py-2.5 text-end font-mono text-foreground font-semibold">
-                      {Number(p.sale_price).toFixed(2)}
-                    </td>
-                    <td className="px-4 py-2.5 text-end font-mono text-muted-foreground">
-                      {Number(p.min_stock)}
-                    </td>
-                    <td className="px-4 py-2.5 text-end">
-                      <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                          p.is_active
-                            ? "bg-success/10 text-success"
-                            : "bg-muted text-muted-foreground"
-                        }`}
-                      >
-                        {p.is_active ? t("common.active") : t("common.inactive")}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-end whitespace-nowrap">
-                      <div className="inline-flex items-center gap-1.5 shrink-0">
-                        <button
-                          onClick={() => {
-                            setEditing(p);
-                            setPrefillBarcode(undefined);
-                            setOpen(true);
-                          }}
-                          className="grid h-8 w-8 place-items-center rounded-full border border-border bg-surface text-muted-foreground hover:bg-surface-2 hover:text-foreground transition active:scale-95"
-                          title={t("common.edit")}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (
-                              confirm(
-                                lang === "ar"
-                                  ? `هل أنت متأكد من حذف "${primary}"؟`
-                                  : `${t("common.delete")} "${primary}"?`,
-                              )
-                            ) {
-                              remove.mutate(p.id);
-                            }
-                          }}
-                          className="grid h-8 w-8 place-items-center rounded-full border border-destructive/30 bg-destructive/5 text-destructive hover:bg-destructive/10 transition active:scale-95"
-                          title={t("common.delete")}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+            />
+          }
+        />
       </div>
 
       {open && (
@@ -515,14 +649,133 @@ function ProductsPage() {
           onSaved={() => {
             setOpen(false);
             setPrefillBarcode(undefined);
-            qc.invalidateQueries({ queryKey: ["products"] });
+            // Mark cached pages stale without tearing down the visible list.
+            // Realtime applies the row-level event immediately, and navigation
+            // performs the eventual background refresh.
+            qc.invalidateQueries({ queryKey: QUERY_KEYS.products, refetchType: "none" });
+            qc.invalidateQueries({ queryKey: ["products", "count"] });
             qc.invalidateQueries({ queryKey: ["products-meta"] });
           }}
         />
       )}
 
+      <ConfirmDialog
+        open={confirmDelete != null}
+        onClose={() => setConfirmDelete(null)}
+        tone="danger"
+        title={lang === "ar" ? "تأكيد الحذف" : t("common.delete")}
+        description={
+          confirmDelete ? (
+            <>
+              {lang === "ar"
+                ? `هل أنت متأكد من حذف "${confirmDelete.name_ar || confirmDelete.name}"؟`
+                : `Delete "${confirmDelete.name || confirmDelete.name_ar}"?`}
+              <br />
+              <span className="text-caption">
+                {lang === "ar"
+                  ? "لا يمكن التراجع عن هذا الإجراء."
+                  : "This action cannot be undone."}
+              </span>
+            </>
+          ) : null
+        }
+        confirmLabel={t("common.delete")}
+        cancelLabel={t("common.cancel")}
+        onConfirm={() => {
+          if (confirmDelete) {
+            setBlockedDelete({ product: confirmDelete, counts: EMPTY_COUNTS });
+            remove.mutate(confirmDelete.id);
+          }
+          setConfirmDelete(null);
+        }}
+      />
+
+      {/*
+        Delete was refused: the product is referenced by documents and/or stock
+        history. Explain exactly what references it and offer the safe action
+        (deactivate) instead of destroying the audit trail.
+      */}
+      <Modal
+        open={blockedDelete != null && blockedDelete.counts.blockingTotal > 0}
+        onClose={() => setBlockedDelete(null)}
+        size="md"
+        mobile="sheet"
+        title={lang === "ar" ? "لا يمكن حذف هذا المنتج" : "This product cannot be deleted"}
+        eyebrow={lang === "ar" ? "محظور" : "Blocked"}
+        footer={
+          <div className="flex flex-col gap-2">
+            <Button
+              type="button"
+              variant="primary"
+              block
+              icon={<Power />}
+              onClick={async () => {
+                const product = blockedDelete?.product;
+                if (!product) return;
+                const res = await setProductActive(product.id, !product.is_active);
+                if (res.ok) {
+                  toast.success(
+                    product.is_active
+                      ? lang === "ar"
+                        ? "تم إيقاف تنشيط المنتج"
+                        : "Product deactivated"
+                      : lang === "ar"
+                        ? "تم تنشيط المنتج"
+                        : "Product activated",
+                  );
+                  qc.invalidateQueries({ queryKey: ["products"] });
+                  setBlockedDelete(null);
+                } else {
+                  toast.error(res.message ?? "error");
+                }
+              }}
+            >
+              {blockedDelete?.product?.is_active
+                ? lang === "ar"
+                  ? "إيقاف التنشيط بدلًا من الحذف"
+                  : "Deactivate instead"
+                : lang === "ar"
+                  ? "إعادة التنشيط"
+                  : "Reactivate"}
+            </Button>
+            <Button type="button" variant="outline" block onClick={() => setBlockedDelete(null)}>
+              {lang === "ar" ? "إغلاق" : "Close"}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm leading-6 text-muted-foreground">
+            {lang === "ar"
+              ? "هذا المنتج مرتبط بسجلات قائمة، ولذلك لا يمكن حذفه. يمكنك إيقاف تنشيطه لإخفانه من القوائم وعمليات البيع الجديدة، دون فقدان أي سجل تاريخي."
+              : "This product is referenced by existing records, so it cannot be deleted. You can deactivate it to hide it from lists and new sales, without losing any historical record."}
+          </p>
+
+          <div className="rounded-[12px] border-border/60 bg-surface-2/50 p-3">
+            <p className="mb-2 text-label text-muted-foreground">
+              {lang === "ar" ? "مرتبط بـ" : "Referenced by"}
+            </p>
+            <ul className="space-y-1.5">
+              {describeReferences(blockedDelete?.counts ?? EMPTY_COUNTS, lang).map((line) => (
+                <li key={line} className="flex items-center gap-2 text-[13px]">
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-tone-warning-fg/70" />
+                  <span dir="auto">{line}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {blockedDelete && isHistoryOnly(blockedDelete.counts) ? (
+            <p className="text-caption text-muted-foreground">
+              {lang === "ar"
+                ? "المرتبط هنا هو سجل مخزون فقط، وليس فواتير. حذفه سيمسح تاريخ المخزون، لذلك ننصح بإيقاف التنشيط."
+                : "Only stock history references this product (no invoices). Deleting would erase that history, so deactivation is recommended."}
+            </p>
+          ) : null}
+        </div>
+      </Modal>
+
       {/* Catalog Modules Customization Dialog */}
-      <CatalogModulesDialog open={modulesDialogOpen} onClose={() => setModulesDialogOpen(false)} />
     </>
   );
 }
@@ -565,37 +818,27 @@ function ProductDialog({
     cost_price: initial?.cost_price?.toString() ?? "0",
     sale_price: initial?.sale_price?.toString() ?? "0",
     tax_rate: initial?.tax_rate?.toString() ?? "0",
-    min_stock: initial?.min_stock?.toString() ?? "0",
+    min_stock: initial?.min_stock?.toString() ?? "1",
     shelf_location: initial?.shelf_location ?? "",
     origin_id: initial?.origin_id ?? "",
     quality_grade_id: initial?.quality_grade_id ?? "",
     is_active: initial?.is_active ?? true,
   });
   const [saving, setSaving] = useState(false);
-  const [compatibleModels, setCompatibleModels] = useState<string[]>([]);
+  // The row already carries its compatibility ids. Reusing them avoids a second
+  // asynchronous request that could finish late and accidentally clear links on
+  // save — especially important for the shared production database.
+  const [compatibleModels, setCompatibleModels] = useState<string[]>(
+    () => initial?.compatibilities?.map((compatibility) => compatibility.vehicle_model_id) ?? [],
+  );
 
-  // USB/Bluetooth keyboard-wedge support: a scanner can fill the barcode field
-  // without the user focusing it first. Routed into the same form state used by
-  // manual entry and the camera, and disabled while the camera dialog is open.
   useKeyboardWedge({
-    onScan: (code) => {
-      setForm((f) => ({ ...f, barcode: code }));
-      toast.success(lang === "ar" ? "تم استقبال الباركود" : "Barcode received", { duration: 1500 });
+    onScan: (barcode) => {
+      setForm((current) => ({ ...current, barcode }));
+      toast.success(lang === "ar" ? "تمت قراءة الباركود" : "Barcode received", { duration: 1500 });
     },
     disabled: !isModuleEnabled("barcode") || scannerOpen,
   });
-
-  useEffect(() => {
-    if (initial?.id && config.enableMakesAndModels) {
-      (supabase as any)
-        .from("product_compatibilities")
-        .select("vehicle_model_id")
-        .eq("product_id", initial.id)
-        .then(({ data }: any) =>
-          setCompatibleModels((data ?? []).map((r: any) => r.vehicle_model_id)),
-        );
-    }
-  }, [initial?.id, config.enableMakesAndModels]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -616,7 +859,7 @@ function ProductDialog({
       cost_price: Number(form.cost_price) || 0,
       sale_price: Number(form.sale_price) || 0,
       tax_rate: Number(form.tax_rate) || 0,
-      min_stock: Number(form.min_stock) || 0,
+      min_stock: Number(form.min_stock) || 1,
       shelf_location: form.shelf_location.trim() || null,
       origin_id: config.enableOrigins ? form.origin_id || null : null,
       quality_grade_id: config.enableQualityGrades ? form.quality_grade_id || null : null,
@@ -630,37 +873,48 @@ function ProductDialog({
           .single()
       : (supabase.from("products") as any).insert(payload).select("id").single();
     const { data, error } = await request;
-    if (!error) {
-      if (config.enableMakesAndModels) {
-        await (supabase as any).from("product_compatibilities").delete().eq("product_id", data.id);
-        if (compatibleModels.length) {
-          await (supabase as any).from("product_compatibilities").insert(
-            compatibleModels.map((vehicle_model_id) => ({
-              product_id: data.id,
-              vehicle_model_id,
-            })),
-          );
-        }
+    let writeError = error;
+    if (!writeError && config.enableMakesAndModels) {
+      const savedProductId = data.id;
+      const previouslySelected = new Set(
+        initial?.compatibilities?.map((compatibility) => compatibility.vehicle_model_id) ?? [],
+      );
+      const nextSelected = new Set(compatibleModels);
+      const toAdd = [...nextSelected].filter((id) => !previouslySelected.has(id));
+      const toRemove = [...previouslySelected].filter((id) => !nextSelected.has(id));
+
+      // Insert before removing. A failed request can therefore leave an extra
+      // compatibility at worst, never erase an existing production record.
+      if (toAdd.length) {
+        const { error: insertError } = await (supabase as any)
+          .from("product_compatibilities")
+          .insert(toAdd.map((vehicle_model_id) => ({ product_id: savedProductId, vehicle_model_id })));
+        writeError = insertError;
+      }
+      if (!writeError && toRemove.length) {
+        const { error: deleteError } = await (supabase as any)
+          .from("product_compatibilities")
+          .delete()
+          .eq("product_id", savedProductId)
+          .in("vehicle_model_id", toRemove);
+        writeError = deleteError;
       }
     }
     setSaving(false);
-    if (error) {
-      // products.barcode is UNIQUE in the database. Surface a clear, friendly
-      // message for a duplicate barcode instead of the raw PostgreSQL text.
-      const err = error as { code?: string; message?: string; details?: string };
-      const isDuplicate =
-        err.code === "23505" ||
-        /duplicate key/i.test(err.message ?? "") ||
-        /products_barcode_key/i.test(err.message ?? "");
-      if (isDuplicate) {
+    if (writeError) {
+      const databaseError = writeError as { code?: string; message?: string };
+      if (
+        databaseError.code === "23505" ||
+        /duplicate key|products_barcode_key/i.test(databaseError.message ?? "")
+      ) {
         toast.error(
           lang === "ar"
-            ? "هذا الباركود مستخدم بالفعل لمنتج آخر."
+            ? "هذا الباركود مستخدم لمنتج آخر بالفعل."
             : "This barcode is already used by another product.",
         );
         return;
       }
-      toast.error(error.message);
+      toast.error(databaseError.message ?? "Unable to save the product.");
       return;
     }
     toast.success(
@@ -678,298 +932,341 @@ function ProductDialog({
   const labelOf = (en: string, ar: string | null) => (lang === "ar" ? ar || en : en || ar || "");
 
   return (
-    <div
-      className="fixed inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur-sm p-4 animate-in fade-in duration-150"
-      onClick={onClose}
+    <Modal
+      open
+      onClose={onClose}
+      size="lg"
+      title={initial ? t("products.edit_product") : t("products.new_product")}
+      eyebrow={initial ? t("common.edit") : t("common.new")}
+      footer={
+        <FormActions
+          sticky={false}
+          fullWidth
+          className="border-t-0 pt-0"
+          cancel={
+            <Button type="button" variant="outline" onClick={onClose}>
+              {t("common.cancel")}
+            </Button>
+          }
+          submit={
+            <Button type="submit" form="product-form" loading={saving}>
+              {t("common.save")}
+            </Button>
+          }
+        />
+      }
     >
-      <form
-        onSubmit={submit}
-        onClick={(e) => e.stopPropagation()}
-        className="panel-elevated w-full max-w-3xl rounded-3xl overflow-hidden border border-border/80 shadow-2xl"
-      >
-        <div className="flex items-center justify-between border-b border-border/70 px-6 py-3.5">
-          <h2 className="text-sm font-bold text-foreground">
-            {initial ? t("products.edit_product") : t("products.new_product")}
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="grid h-7 w-7 place-items-center rounded-full text-muted-foreground hover:bg-surface-2 hover:text-foreground transition"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 gap-3.5 p-6 sm:grid-cols-2 lg:grid-cols-3 max-h-[70vh] overflow-y-auto custom-scrollbar">
-          <Field label={`${t("products.name_ar")} *`}>
-            <input
-              value={form.name_ar}
-              onChange={(e) => setForm({ ...form, name_ar: e.target.value })}
-              className={inputCls}
-              dir="rtl"
-              required
-            />
-          </Field>
-          <Field label={t("products.name_en")}>
-            <input
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className={inputCls}
-            />
-          </Field>
-          <Field label={t("products.category")}>
-            <select
-              value={form.category_id}
-              onChange={(e) => setForm({ ...form, category_id: e.target.value })}
-              className={inputCls}
-            >
-              <option value="">—</option>
-              {meta.categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {labelOf(c.name, c.name_ar)}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label={t("products.sku")}>
-            <input
-              value={form.sku}
-              onChange={(e) => setForm({ ...form, sku: e.target.value })}
-              className={inputCls}
-            />
-          </Field>
-          {isModuleEnabled("barcode") && (
-            <Field label={t("products.barcode")}>
-              <div className="flex items-center gap-2">
-                <input
-                  value={form.barcode}
-                  onChange={(e) => setForm({ ...form, barcode: e.target.value })}
-                  className={inputCls}
-                  dir="ltr"
-                  inputMode="numeric"
-                  autoComplete="off"
+      <form id="product-form" onSubmit={submit} className="flex flex-col gap-6">
+        <FormSection title={lang === "ar" ? "بيانات المنتج" : "Product details"}>
+          <FormGrid cols={3}>
+            <FormField label={t("products.name_ar")} required>
+              {(p) => (
+                <FieldInput
+                  {...p}
+                  dir="rtl"
+                  value={form.name_ar}
+                  onValueChange={(v) => setForm({ ...form, name_ar: v })}
                 />
-                <button
-                  type="button"
-                  onClick={() => setScannerOpen(true)}
-                  title={lang === "ar" ? "تصوير/مسح الباركود بالكاميرا" : "Scan barcode with camera"}
-                  aria-label={lang === "ar" ? "تصوير/مسح الباركود بالكاميرا" : "Scan barcode with camera"}
-                  className="grid h-10 w-11 shrink-0 place-items-center rounded-2xl border-primary/30 bg-primary/10 text-primary transition hover:bg-primary/20 active:scale-95"
+              )}
+            </FormField>
+
+            <FormField label={t("products.name_en")}>
+              {(p) => (
+                <FieldInput
+                  {...p}
+                  dir="ltr"
+                  value={form.name}
+                  onValueChange={(v) => setForm({ ...form, name: v })}
+                />
+              )}
+            </FormField>
+
+            <FormField label={t("products.category")}>
+              {(p) => (
+                <select
+                  id={p.id}
+                  aria-describedby={p["aria-describedby"]}
+                  value={form.category_id}
+                  onChange={(e) => setForm({ ...form, category_id: e.target.value })}
+                  className={fieldSurfaceClass}
                 >
-                  <Camera className="h-4 w-4" />
-                </button>
-              </div>
-              {/* Honest scan hint: never claims a scanner is connected. */}
-              <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                <ScanBarcode className="h-3 w-3 text-primary" />
-                <span className="hidden md:inline">{t("scan.ready")}</span>
-                <span className="md:hidden">{t("scan.use_device_camera")}</span>
-              </div>
-            </Field>
-          )}
-          <Field label={lang === "ar" ? "موقع الرف / المستودع" : "Shelf location"}>
-            <input
-              value={form.shelf_location}
-              onChange={(e) => setForm({ ...form, shelf_location: e.target.value })}
-              placeholder={lang === "ar" ? "مثال: رف A - 03" : "e.g. Shelf A - 03"}
-              className={inputCls}
-            />
-          </Field>
+                  <option value="">—</option>
+                  {meta.categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {labelOf(c.name, c.name_ar)}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </FormField>
 
-          {/* Conditional Brand Field */}
-          {config.enableBrands && (
-            <Field label={t("products.brand")}>
-              <select
-                value={form.brand_id}
-                onChange={(e) => setForm({ ...form, brand_id: e.target.value })}
-                className={inputCls}
-              >
-                <option value="">—</option>
-                {meta.brands.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {labelOf(b.name, b.name_ar)}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          )}
-
-          {/* Conditional Origin Field */}
-          {config.enableOrigins && (
-            <Field label={lang === "ar" ? "بلد المنشأ" : "Country of origin"}>
-              <select
-                value={form.origin_id}
-                onChange={(e) => setForm({ ...form, origin_id: e.target.value })}
-                className={inputCls}
-              >
-                <option value="">—</option>
-                {meta.origins.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {lang === "ar" ? o.name_ar : o.name} ({o.code})
-                  </option>
-                ))}
-              </select>
-            </Field>
-          )}
-
-          {/* Conditional Quality Grade Field */}
-          {config.enableQualityGrades && (
-            <Field label={lang === "ar" ? "درجة الجودة" : "Quality grade"}>
-              <select
-                value={form.quality_grade_id}
-                onChange={(e) => setForm({ ...form, quality_grade_id: e.target.value })}
-                className={inputCls}
-              >
-                <option value="">—</option>
-                {meta.qualities.map((q) => (
-                  <option key={q.id} value={q.id}>
-                    {lang === "ar" ? q.name_ar : q.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          )}
-
-          {/* Conditional Vehicle Fitment / Models from Database Index */}
-          {config.enableMakesAndModels && (
-            <Field
-              label={
-                lang === "ar"
-                  ? "توافق المركبات والدراجات (من جدول الفهرس)"
-                  : "Vehicle compatibility (from catalog)"
-              }
-              className="sm:col-span-2 lg:col-span-3"
+            <FormField
+              label={t("products.sku")}
+              hint={lang === "ar" ? "معرّف داخلي فريد" : "Unique internal identifier"}
             >
-              <VehicleCompatibilityPicker
-                makes={meta.makes}
-                models={meta.models}
-                selectedModelIds={compatibleModels}
-                onChange={setCompatibleModels}
-                lang={lang}
-              />
-            </Field>
-          )}
+              {(p) => (
+                <FieldInput
+                  {...p}
+                  value={form.sku}
+                  onValueChange={(v) => setForm({ ...form, sku: v })}
+                />
+              )}
+            </FormField>
 
-          {/* Conditional Unit Field */}
-          {config.enableUnits && (
-            <Field label={t("products.unit")}>
-              <select
-                value={form.unit_id}
-                onChange={(e) => setForm({ ...form, unit_id: e.target.value })}
-                className={inputCls}
+            {isModuleEnabled("barcode") && (
+              <FormField label={t("products.barcode")}>
+                {(p) => (
+                  <div className="flex items-center gap-2">
+                    <FieldInput
+                      {...p}
+                      dir="ltr"
+                      value={form.barcode}
+                      onValueChange={(v) => setForm({ ...form, barcode: v })}
+                      containerClassName="min-w-0 flex-1"
+                    />
+                    <IconButton
+                      type="button"
+                      size="md"
+                      variant="outline"
+                      ariaLabel={lang === "ar" ? "مسح الباركود بالكاميرا" : "Scan barcode with camera"}
+                      icon={<Camera />}
+                      onClick={() => setScannerOpen(true)}
+                    />
+                  </div>
+                )}
+              </FormField>
+            )}
+
+            <FormField label={lang === "ar" ? "موقع الرف / المستودع" : "Shelf location"}>
+              {(p) => (
+                <FieldInput
+                  {...p}
+                  value={form.shelf_location}
+                  onValueChange={(v) => setForm({ ...form, shelf_location: v })}
+                  placeholder={lang === "ar" ? "مثال: رف A - 03" : "e.g. Shelf A - 03"}
+                />
+              )}
+            </FormField>
+          </FormGrid>
+        </FormSection>
+        {/* Catalog attributes */}
+        {(config.enableBrands ||
+          config.enableOrigins ||
+          config.enableQualityGrades ||
+          config.enableUnits ||
+          config.enableMakesAndModels) && (
+          <FormSection title={lang === "ar" ? "خصائص الفهرس" : "Catalog attributes"}>
+            <FormGrid cols={3}>
+              {config.enableBrands && (
+                <FormField label={t("products.brand")}>
+                  {(p) => (
+                    <select
+                      id={p.id}
+                      aria-describedby={p["aria-describedby"]}
+                      value={form.brand_id}
+                      onChange={(e) => setForm({ ...form, brand_id: e.target.value })}
+                      className={fieldSurfaceClass}
+                    >
+                      <option value="">—</option>
+                      {meta.brands.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {labelOf(b.name, b.name_ar)}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </FormField>
+              )}
+
+              {config.enableOrigins && (
+                <FormField label={lang === "ar" ? "بلد المنشأ" : "Country of origin"}>
+                  {(p) => (
+                    <select
+                      id={p.id}
+                      aria-describedby={p["aria-describedby"]}
+                      value={form.origin_id}
+                      onChange={(e) => setForm({ ...form, origin_id: e.target.value })}
+                      className={fieldSurfaceClass}
+                    >
+                      <option value="">—</option>
+                      {meta.origins.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {lang === "ar" ? o.name_ar : o.name} ({o.code})
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </FormField>
+              )}
+
+              {config.enableQualityGrades && (
+                <FormField label={lang === "ar" ? "درجة الجودة" : "Quality grade"}>
+                  {(p) => (
+                    <select
+                      id={p.id}
+                      aria-describedby={p["aria-describedby"]}
+                      value={form.quality_grade_id}
+                      onChange={(e) => setForm({ ...form, quality_grade_id: e.target.value })}
+                      className={fieldSurfaceClass}
+                    >
+                      <option value="">—</option>
+                      {meta.qualities.map((q) => (
+                        <option key={q.id} value={q.id}>
+                          {lang === "ar" ? q.name_ar : q.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </FormField>
+              )}
+
+              {config.enableUnits && (
+                <FormField label={t("products.unit")}>
+                  {(p) => (
+                    <select
+                      id={p.id}
+                      aria-describedby={p["aria-describedby"]}
+                      value={form.unit_id}
+                      onChange={(e) => setForm({ ...form, unit_id: e.target.value })}
+                      className={fieldSurfaceClass}
+                    >
+                      <option value="">—</option>
+                      {meta.units.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {labelOf(u.name, u.name_ar)} ({u.short_name})
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </FormField>
+              )}
+
+              {config.enableMakesAndModels && (
+                <FormField
+                  span="full"
+                  label={
+                    lang === "ar"
+                      ? "توافق المركبات والدراجات (من جدول الفهرس)"
+                      : "Vehicle compatibility (from catalog)"
+                  }
+                  hint={
+                    lang === "ar"
+                      ? "اختر الطرازات المتوافقة مع هذا المنتج"
+                      : "Select the vehicle models this product fits"
+                  }
+                >
+                  <VehicleCompatibilityPicker
+                    makes={meta.makes}
+                    models={meta.models}
+                    selectedModelIds={compatibleModels}
+                    onChange={setCompatibleModels}
+                    lang={lang}
+                  />
+                </FormField>
+              )}
+            </FormGrid>
+          </FormSection>
+        )}
+
+        {/* Pricing & stock */}
+        <FormSection title={lang === "ar" ? "التسعير والمخزون" : "Pricing & stock"}>
+          <FormGrid cols={3}>
+            {canViewCost && (
+              <FormField
+                label={t("common.cost")}
+                hint={lang === "ar" ? "سعر الشراء" : "Purchase price"}
               >
-                <option value="">—</option>
-                {meta.units.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {labelOf(u.name, u.name_ar)} ({u.short_name})
-                  </option>
-                ))}
-              </select>
-            </Field>
-          )}
+                <NumberInput
+                  value={form.cost_price === "" ? null : Number(form.cost_price)}
+                  onValueChange={(v) =>
+                    setForm({ ...form, cost_price: v == null ? "" : String(v) })
+                  }
+                  min={1}
+                  suffix="﷼"
+                />
+              </FormField>
+            )}
 
-          {canViewCost && (
-            <Field label={t("common.cost")}>
-              <input
-                type="number"
-                step="0.01"
-                value={form.cost_price}
-                onChange={(e) => setForm({ ...form, cost_price: e.target.value })}
-                className={inputCls}
-              />
-            </Field>
-          )}
-          <Field label={t("common.price")}>
-            <input
-              type="number"
-              step="0.01"
-              value={form.sale_price}
-              onChange={(e) => setForm({ ...form, sale_price: e.target.value })}
-              className={inputCls}
-            />
-          </Field>
-          <Field label={t("products.tax_rate")}>
-            <input
-              type="number"
-              step="0.01"
-              value={form.tax_rate}
-              onChange={(e) => setForm({ ...form, tax_rate: e.target.value })}
-              className={inputCls}
-            />
-          </Field>
-          <Field label={t("products.min")}>
-            <input
-              type="number"
-              step="0.01"
-              value={form.min_stock}
-              onChange={(e) => setForm({ ...form, min_stock: e.target.value })}
-              className={inputCls}
-            />
-          </Field>
-          <Field label={t("common.status")}>
-            <label className="flex h-10 items-center gap-2 rounded-2xl border border-border bg-surface px-3.5 text-sm cursor-pointer">
-              <input
-                type="checkbox"
-                checked={form.is_active}
-                onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
-                className="rounded border-border"
-              />
-              <span className="text-muted-foreground text-xs font-medium">
-                {t("common.active")}
-              </span>
-            </label>
-          </Field>
-        </div>
+            <FormField label={t("common.price")} required>
+              {(p) => (
+                <NumberInput
+                  {...p}
+                  value={form.sale_price === "" ? null : Number(form.sale_price)}
+                  onValueChange={(v) =>
+                    setForm({ ...form, sale_price: v == null ? "" : String(v) })
+                  }
+                  min={0}
+                  suffix="﷼"
+                />
+              )}
+            </FormField>
 
-        <div className="flex items-center justify-end gap-2 border-t border-border/70 bg-surface/40 px-6 py-3.5">
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-9 items-center rounded-full border border-border bg-surface px-4 text-xs font-medium text-muted-foreground hover:text-foreground transition"
-          >
-            {t("common.cancel")}
-          </button>
-          <button
-            type="submit"
-            disabled={saving}
-            className="flex h-9 items-center justify-center gap-1.5 rounded-full bg-primary px-5 text-xs font-semibold text-primary-foreground hover:opacity-90 transition disabled:opacity-50 disabled:pointer-events-none active:scale-95"
-          >
-            {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            <span>{saving ? t("common.saving") : initial ? t("common.save") : t("products.new_product")}</span>
-          </button>
-        </div>
+            <FormField label={t("products.tax_rate")}>
+              {(p) => (
+                <NumberInput
+                  {...p}
+                  value={form.tax_rate === "" ? null : Number(form.tax_rate)}
+                  onValueChange={(v) => setForm({ ...form, tax_rate: v == null ? "" : String(v) })}
+                  min={0}
+                  max={100}
+                  suffix="%"
+                />
+              )}
+            </FormField>
+
+            <FormField
+              label={t("products.min")}
+              hint={lang === "ar" ? "حد التنبيه للمخزون" : "Low-stock alert level"}
+            >
+              {(p) => (
+                <NumberInput
+                  {...p}
+                  value={form.min_stock === "" ? null : Number(form.min_stock)}
+                  onValueChange={(v) => setForm({ ...form, min_stock: v == null ? "" : String(v) })}
+                  min={0}
+                  decimal={false}
+                />
+              )}
+            </FormField>
+
+            <FormField label={t("common.status")}>
+              {(p) => (
+                <label
+                  htmlFor={p.id}
+                  className="flex h-9 cursor-pointer items-center gap-2 rounded-[10px] border-input bg-surface px-3 text-sm"
+                >
+                  <input
+                    id={p.id}
+                    type="checkbox"
+                    checked={form.is_active}
+                    onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
+                    className="size-4 rounded border-border accent-[var(--primary)]"
+                  />
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {t("common.active")}
+                  </span>
+                </label>
+              )}
+            </FormField>
+          </FormGrid>
+        </FormSection>
       </form>
 
-      {/* Camera barcode scanner — fills the barcode field with the raw value.
-          Works for any barcode; the product does not need to exist yet. */}
+      <div className="flex items-center gap-1.5 text-caption text-muted-foreground" aria-live="polite">
+        <ScanBarcode className="size-3.5 text-primary" aria-hidden />
+        <span>
+          {lang === "ar"
+            ? "يمكنك إدخال الباركود أو مسحه بالكاميرا أو قارئ USB."
+            : "Enter, scan with the camera, or use a USB barcode reader."}
+        </span>
+      </div>
+
       <BarcodeScanner
         open={scannerOpen}
         onClose={() => setScannerOpen(false)}
-        onDetected={(code) => setForm((f) => ({ ...f, barcode: code }))}
+        onDetected={(barcode) => setForm((current) => ({ ...current, barcode }))}
       />
-    </div>
-  );
-}
-
-const inputCls =
-  "h-10 w-full rounded-2xl border border-border bg-surface px-3.5 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition";
-
-function Field({
-  label,
-  children,
-  className = "",
-}: {
-  label: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <label className={`flex flex-col gap-1.5 ${className}`}>
-      <span className="text-[11px] font-semibold tracking-wider text-muted-foreground">
-        {label}
-      </span>
-      {children}
-    </label>
+    </Modal>
   );
 }
 

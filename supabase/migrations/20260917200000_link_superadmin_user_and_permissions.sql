@@ -119,9 +119,11 @@ CREATE POLICY tenant_subscriptions_update ON public.tenant_subscriptions
   WITH CHECK (public.is_platform_admin(auth.uid()));
 
 DROP POLICY IF EXISTS tenant_subscriptions_insert ON public.tenant_subscriptions;
+-- NOTE: an INSERT policy accepts only WITH CHECK; `USING` is invalid for INSERT in
+-- PostgreSQL (SQLSTATE 42601), which previously aborted this migration. The
+-- original intent — "only platform admins may insert" — is fully preserved.
 CREATE POLICY tenant_subscriptions_insert ON public.tenant_subscriptions
   FOR INSERT TO authenticated
-  USING (public.is_platform_admin(auth.uid()))
   WITH CHECK (public.is_platform_admin(auth.uid()));
 
 -- 6. Grants

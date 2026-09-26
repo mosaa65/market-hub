@@ -46,9 +46,9 @@ import {
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { useModules } from "@/lib/modules";
-import { supabase } from "@/integrations/supabase/client";
 import { CommandPalette } from "@/components/command-palette";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { ConnectionBanner } from "@/components/ui/connection";
 import { cn } from "@/lib/utils";
 import { InamaSoftFooter } from "@/components/inama-soft-footer";
 
@@ -431,7 +431,7 @@ function SidebarContents({
   const isSuperOrOwner =
     isPlatformAdmin || isPlatformSuperadmin || hasRole("owner");
 
-  const { isModuleEnabled, currentPlan } = useModules();
+  const { isModuleEnabled } = useModules();
 
   const navigate = useNavigate();
 
@@ -443,23 +443,9 @@ function SidebarContents({
     select: (s) => s.location.pathname,
   });
 
-  const [logoUrl, setLogoUrl] = useState<string>(
-    "/inama-soft-logo.ico",
-  );
-
-  useEffect(() => {
-    supabase
-      .from("company_settings")
-      .select("logo_url")
-      .order("id")
-      .limit(1)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data?.logo_url) {
-          setLogoUrl(data.logo_url);
-        }
-      });
-  }, []);
+  // Navigation belongs to the application itself, not to an individual tenant.
+  // The company logo remains available in invoices and printable documents.
+  const logoUrl = "/vortex-erp-mark.png";
 
   const filteredSections = useMemo(() => {
     return sections
@@ -494,37 +480,34 @@ function SidebarContents({
           "flex h-16 items-center border-b border-sidebar-border/60 transition-all duration-300",
           collapsed
             ? "justify-center px-2"
-            : "gap-2.5 px-4 justify-between",
+            : "justify-start gap-2.5 px-4",
         )}
       >
-        <div className="flex items-center gap-2.5 min-w-0">
+        {collapsed ? (
           <img
             src={logoUrl}
             alt={t("app.name")}
-            className="h-9 w-9 shrink-0 rounded-xl object-contain bg-surface-2/90 p-1 border border-border/60 shadow-md ring-1 ring-white/10"
-            onError={() => setLogoUrl("/inama-soft-logo.ico")}
+            className={cn(
+              "size-9 shrink-0 rounded-xl border border-border/60 bg-surface-2/90 p-1 object-contain shadow-md ring-1 ring-white/10",
+            )}
+            onError={(event) => {
+              event.currentTarget.style.visibility = "hidden";
+            }}
           />
-
-          {!collapsed && (
-            <div className="flex flex-col leading-tight min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm font-bold tracking-tight text-foreground truncate">
-                  {t("app.name")}
-                </span>
-
-                <span className="inline-flex items-center rounded-full bg-primary/10 border border-primary/25 px-1.5 py-0.2 text-[9px] font-medium text-primary shrink-0">
-                  {lang === "ar"
-                    ? (currentPlan?.name?.ar ?? "—")
-                    : (currentPlan?.name?.en ?? "—")}
-                </span>
-              </div>
-
-              <span className="text-[11px] text-muted-foreground font-medium">
-                ERP · Inama Soft
-              </span>
-            </div>
-          )}
-        </div>
+        ) : (
+          <>
+            {/* شعار مركّب (رمز + كلمة) بجانب النص */}
+            <img
+              src="/vortex-erp-wordmark.png"
+              alt={t("app.name")}
+              className="h-9 w-auto shrink-0 object-contain"
+              onError={(event) => {
+                event.currentTarget.style.visibility = "hidden";
+              }}
+            />
+            <span className="text-base font-extrabold tracking-tight text-foreground">فورتكس</span>
+          </>
+        )}
       </div>
 
       {/* Navigation Links */}
@@ -896,6 +879,9 @@ export function AppShell({
 
       {/* Main column */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        {/* Offline notice — sits above everything in the content column */}
+        <ConnectionBanner />
+
         {/* Top bar */}
         <header className="sticky top-0 z-30 flex h-16 items-center gap-2.5 border-b border-border/60 bg-background/70 px-4 backdrop-blur-xl sm:px-6">
           <button
@@ -994,7 +980,7 @@ export function AppShell({
             <div className="flex-1 min-h-0 flex flex-col p-3 sm:p-5 pb-16">{children}</div>
           ) : (
             <>
-              <div className="mx-auto w-full max-w-[1400px] p-4 sm:p-6">
+              <div className="mx-auto w-full max-w-[1400px] px-2 py-3 sm:px-1 sm:py-4 lg:px-1 lg:py-6">
                 {children}
               </div>
               <InamaSoftFooter />
