@@ -113,7 +113,7 @@ export const DEFAULT_STATEMENT_SETTINGS: StatementSettings = {
     showGeneratedStamp: true,
     showBrandFooter: true,
     notesText: "",
-    footerNote: "هذا الكشف مُنشأ من النظام ويمكن حفظه كملف PDF من نافذة الطباعة.",
+    footerNote: "",
   },
   currencySymbolOverride: "",
   includeZeroRowsDefault: false,

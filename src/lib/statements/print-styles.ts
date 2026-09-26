@@ -9,7 +9,7 @@ export function statementPrintStyles(lang: "ar" | "en"): string {
   const start = lang === "ar" ? "right" : "left";
 
   return `
-@page { size: A4; margin: 11mm 11mm 15mm 11mm; }
+@page { size: A4; margin: 0; }
 * { box-sizing: border-box; }
 :root {
   --ink: #0a1128; --gold: #b8935a; --line: #e2dfd6; --muted: #6b6860;
@@ -160,8 +160,8 @@ td.empty { text-align:center; padding:22px; color:var(--muted); font-size:12px; 
   .page { background:#fff; box-shadow:0 12px 46px rgba(0,0,0,.16); border-radius:6px; }
 }
 @media print {
-  body { background:#fff; }
-  .page { box-shadow:none; padding:0; max-width:none; }
+  body { background:#fff; margin:0; }
+  .page { box-shadow:none; padding:10mm 12mm 12mm 12mm; max-width:none; width:100%; }
 }
 `;
 }
