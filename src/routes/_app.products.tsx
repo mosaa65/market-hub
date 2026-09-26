@@ -401,7 +401,7 @@ function ProductsPage() {
         key: "name",
         header: t("products.product"),
         sortable: true,
-        width: "min-w-[180px] max-w-[280px]",
+        width: "w-[240px]",
         sortValue: (p) => (lang === "ar" ? p.name_ar || p.name : p.name || p.name_ar) ?? "",
         cell: (p) => {
           const primary = lang === "ar" ? p.name_ar || p.name : p.name || p.name_ar || "—";
@@ -409,11 +409,11 @@ function ProductsPage() {
           const secondary = other && other.trim() && other.trim() !== primary.trim() ? other : null;
           return (
             <div className="flex flex-col py-0.5">
-              <span className="font-semibold text-foreground text-sm leading-snug line-clamp-1" dir={lang === "ar" ? "rtl" : "ltr"}>
+              <span className="font-semibold text-foreground text-sm leading-snug truncate" dir={lang === "ar" ? "rtl" : "ltr"}>
                 {primary}
               </span>
               {secondary ? (
-                <span className="text-[11px] text-muted-foreground line-clamp-1" dir={lang === "ar" ? "ltr" : "rtl"}>
+                <span className="text-[11px] text-muted-foreground truncate" dir={lang === "ar" ? "ltr" : "rtl"}>
                   {secondary}
                 </span>
               ) : null}
@@ -425,11 +425,10 @@ function ProductsPage() {
         key: "category",
         header: t("products.category"),
         sortable: true,
-        hideBelow: "sm",
-        width: "w-[120px]",
+        width: "w-[140px]",
         sortValue: (p) => label(p.category?.name, p.category?.name_ar),
         cell: (p) => (
-          <span className="text-xs text-muted-foreground truncate block max-w-[110px]">
+          <span className="text-xs text-muted-foreground truncate block">
             {label(p.category?.name, p.category?.name_ar)}
           </span>
         ),
@@ -439,8 +438,7 @@ function ProductsPage() {
     cols.push({
       key: "shelf_location",
       header: lang === "ar" ? "الرف" : "Shelf",
-      hideBelow: "lg",
-      width: "w-[85px]",
+      width: "w-[110px]",
       cell: (p) => (
         <span className="font-mono text-xs text-muted-foreground">{p.shelf_location ?? "—"}</span>
       ),
@@ -452,8 +450,7 @@ function ProductsPage() {
         header: t("common.cost"),
         align: "end",
         sortable: true,
-        hideBelow: "md",
-        width: "w-[105px]",
+        width: "w-[124px]",
         sortValue: (p) => Number(p.cost_price),
         cell: (p) => (
           <span className="font-mono text-xs tabular-nums text-muted-foreground">{moneyCell(p.cost_price)}</span>
@@ -467,7 +464,7 @@ function ProductsPage() {
         header: t("common.price"),
         align: "end",
         sortable: true,
-        width: "w-[110px]",
+        width: "w-[124px]",
         sortValue: (p) => Number(p.sale_price),
         cell: (p) => (
           <span className="font-mono text-xs font-bold tabular-nums text-foreground">
@@ -480,8 +477,7 @@ function ProductsPage() {
         header: t("products.min"),
         align: "end",
         sortable: true,
-        hideBelow: "sm",
-        width: "w-[75px]",
+        width: "w-[96px]",
         sortValue: (p) => Number(p.min_stock),
         cell: (p) => (
           <span className="font-mono text-xs tabular-nums text-muted-foreground">
@@ -492,7 +488,7 @@ function ProductsPage() {
       {
         key: "is_active",
         header: t("common.status"),
-        width: "w-[90px]",
+        width: "w-[106px]",
         cell: (p) => (
           <StatusBadge tone={p.is_active ? "success" : "neutral"} dot>
             {p.is_active ? t("common.active") : t("common.inactive")}
@@ -503,9 +499,9 @@ function ProductsPage() {
         key: "actions",
         header: t("common.actions"),
         align: "end",
-        width: "w-[78px]",
+        width: "w-[110px]",
         cell: (p) => (
-          <div className="inline-flex items-center gap-0.5">
+          <div className="inline-flex items-center gap-1.5 pe-2">
             <IconButton
               size="sm"
               variant="outline"
@@ -577,15 +573,7 @@ function ProductsPage() {
           loadingMore={isFetchingNextPage}
           pageSize={PRODUCTS_PAGE_SIZE}
           totalCount={productCount}
-          minWidth={
-            breakpoint === "xs"
-              ? 440
-              : breakpoint === "sm"
-                ? 560
-                : breakpoint === "md"
-                  ? (canViewCost ? 740 : 660)
-                  : (canViewCost ? 900 : 780)
-          }
+          minWidth={canViewCost ? 1050 : 930}
           horizontalScroll={tableUsesHorizontalScroll}
           stickyHeader
           onRowClick={(product) => {

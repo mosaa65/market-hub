@@ -222,9 +222,10 @@ export function DataTable<T>({
     (col: DataTableColumn<T>) => {
       if (col.hidden) return false;
       if (!col.hideBelow) return true;
-      const order = ["xs", "sm", "md", "lg", "xl"];
+      const order = ["xs", "sm", "md", "lg", "xl", "2xl"];
       const currentIdx = order.indexOf(breakpoint);
       const hideIdx = order.indexOf(col.hideBelow);
+      if (currentIdx === -1) return true;
       return currentIdx >= hideIdx;
     },
     [breakpoint],
@@ -406,7 +407,7 @@ export function DataTable<T>({
               <div
                 ref={headerScrollRef}
                 onScroll={syncHorizontalScroll("header")}
-                className="w-full overflow-x-auto touch-pan-y [-webkit-overflow-scrolling:touch] scrollbar-x-none"
+                className="w-full overflow-x-auto touch-auto [-webkit-overflow-scrolling:touch] overscroll-x-contain scrollbar-x-none"
               >
                 <table className={alignedTableClassName} style={tableStyle}>
                   {colGroup}
@@ -426,7 +427,7 @@ export function DataTable<T>({
             className={cn(
             /* الحاوية متزامنة بسلاسة ومطاطية طبيعية مع الرأس */
             horizontalScroll || minWidth
-              ? "w-full overflow-x-auto touch-pan-y [-webkit-overflow-scrolling:touch] scrollbar-x-none"
+              ? "w-full overflow-x-auto touch-auto [-webkit-overflow-scrolling:touch] overscroll-x-contain scrollbar-x-none"
               : "w-full overscroll-x-auto",
             refreshing && "opacity-70 transition-opacity",
             scrollClassName,
@@ -472,7 +473,7 @@ export function DataTable<T>({
                       <td
                         key={col.key}
                         className={cn(
-                          "px-3 py-2.5 align-middle first:ps-4 last:pe-4",
+                          "px-3 py-2.5 align-middle first:ps-4 last:pe-5",
                           /* On a phone, forced single-line cells are what push a
                            * wide table past the viewport. Let text wrap under
                            * `sm` and keep the single-line ERP look from `sm`
@@ -600,7 +601,7 @@ function TableHead<T>({
                     : undefined
               }
               className={cn(
-                "h-10 px-3 align-middle text-[11px] font-semibold uppercase tracking-wider text-muted-foreground first:rounded-s-xl first:ps-4 last:rounded-e-xl last:pe-4",
+                "h-10 px-3 align-middle text-[11px] font-semibold uppercase tracking-wider text-muted-foreground first:rounded-s-xl first:ps-4 last:rounded-e-xl last:pe-5",
                 "whitespace-normal sm:whitespace-nowrap",
                 column.align === "end"
                   ? "text-end"
