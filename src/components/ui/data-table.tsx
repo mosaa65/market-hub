@@ -204,6 +204,8 @@ export function DataTable<T>({
   const wheelRedirectCleanup = (el: HTMLDivElement | null): (() => void) | null => {
     if (!el) return null;
     const onWheel = (event: WheelEvent) => {
+      // لا تعترض إيماءات التكبير والتصغير (Ctrl + العجلة أو pinch-to-zoom في لوحة اللمس)
+      if (event.ctrlKey || event.metaKey) return;
       if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
       event.preventDefault();
       // deltaMode 1 = خطوط، 2 = صفحات — نحوّلها إلى بكسل.
@@ -410,6 +412,8 @@ export function DataTable<T>({
   // on mobile browsers. Own only the horizontal gesture while `touch-pan-y`
   // preserves normal up/down scrolling outside and inside the table.
   const beginHorizontalPan = (event: React.PointerEvent<HTMLDivElement>) => {
+    // اللمس على الجوال يدار أصلياً عبر المتصفح (native touch scroll & pinch zoom) دون اعتراض
+    if (event.pointerType === "touch") return;
     if (!horizontalScroll) return;
     panRef.current = {
       pointerId: event.pointerId,
@@ -432,8 +436,8 @@ export function DataTable<T>({
     // التقط المؤشر فقط عند تأكد النية الأفقية، حتى يبقى التمرير العمودي حُرًّا.
     if (!pan.panned) event.currentTarget.setPointerCapture?.(event.pointerId);
     pan.panned = true;
-    const rtl = getComputedStyle(event.currentTarget).direction === "rtl";
-    event.currentTarget.scrollLeft = pan.startScrollLeft + (rtl ? dx : -dx);
+    // تحريك المحتوى مع حركة المؤشر بالسحب (سحب لليمين يكشف المحتوى لليسار)
+    event.currentTarget.scrollLeft = pan.startScrollLeft - dx;
   };
 
   const endHorizontalPan = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -490,7 +494,7 @@ export function DataTable<T>({
                 onPointerUp={endHorizontalPan}
                 onPointerCancel={endHorizontalPan}
                 onClickCapture={suppressPanClick}
-                className="w-full overflow-x-auto overscroll-y-auto touch-pan-y [-webkit-overflow-scrolling:touch] scrollbar-x-none custom-scrollbar"
+                className="w-full overflow-x-auto overscroll-y-auto touch-manipulation [-webkit-overflow-scrolling:touch] scrollbar-x-none custom-scrollbar"
               >
                 <table className={alignedTableClassName} style={tableStyle}>
                   {colGroup}
@@ -517,7 +521,7 @@ export function DataTable<T>({
              * so horizontal panning remains direct and its labels stay pinned to
              * the app's real vertical scrolling surface. */
             horizontalScroll || minWidth
-              ? "w-full overflow-x-auto overscroll-y-auto touch-pan-y [-webkit-overflow-scrolling:touch] scrollbar-x-none custom-scrollbar"
+              ? "w-full overflow-x-auto overscroll-y-auto touch-manipulation [-webkit-overflow-scrolling:touch] scrollbar-x-none custom-scrollbar"
               : "w-full overscroll-x-contain",
             refreshing && "opacity-70 transition-opacity",
             scrollClassName,

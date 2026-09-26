@@ -556,7 +556,7 @@ function ProductsPage() {
     <>
       <PageHeader title={t("products.title")} subtitle={t("products.subtitle")} />
 
-      <div className="panel-elevated w-full overflow-hidden">
+      <div className="panel-elevated -mx-1 sm:mx-0">
         <DataTable
           className="px-0"
           columns={columns}
