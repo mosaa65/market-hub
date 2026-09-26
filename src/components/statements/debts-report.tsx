@@ -4,6 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { StatementEntityType, StatementFieldKey } from "@/lib/statements/types";
 import { ColumnVisibilityMenu } from "@/components/statements/column-visibility-menu";
+import {
+  ReportOutputButtons,
+  exportReportToExcel,
+  printLuxuryReport,
+} from "@/components/statements/report-tools";
 import { loadDebtsOverview, type DebtRow } from "@/lib/statements/debts";
 import { money } from "@/lib/format";
 
@@ -132,6 +137,131 @@ export function DebtsReport({ ar, onBack }: DebtsReportProps) {
             onChange={(key, value) => setVisible((current) => ({ ...current, [key]: value }))}
             label={ar ? "الأعمدة" : "Columns"}
             title={ar ? "إظهار أعمدة الكشف" : "Visible columns"}
+          />
+          <ReportOutputButtons
+            ar={ar}
+            disabled={loading || filtered.length === 0}
+            onExport={() => {
+              const activeColumns = reportColumns.filter((c) => visible[c.key]);
+              const headers = activeColumns.map((c) => (ar ? c.ar : c.en));
+              const outputRows = filtered.map((row) =>
+                activeColumns.map((col) => {
+                  if (col.key === "description") return row.name;
+                  if (col.key === "debit") return money(row.ledgerBalance);
+                  if (col.key === "credit") return row.creditLimit ? money(row.creditLimit) : "—";
+                  if (col.key === "balance")
+                    return row.oldestDebtDays !== null && row.oldestDebtDays !== undefined
+                      ? `${row.oldestDebtDays} ${ar ? "يوم" : "days"}`
+                      : "—";
+                  if (col.key === "date")
+                    return row.lastMovementAt
+                      ? new Date(row.lastMovementAt).toLocaleDateString(ar ? "ar-YE" : "en-GB")
+                      : "—";
+                  if (col.key === "reference")
+                    return row.hasGap
+                      ? ar
+                        ? "دفتر مع فرق"
+                        : "Ledger with gap"
+                      : ar
+                        ? entityType === "supplier"
+                          ? "فواتير ومرتجعات المورد"
+                          : "دفتر العميل"
+                        : entityType === "supplier"
+                          ? "Supplier documents"
+                          : "Customer ledger";
+                  return "—";
+                }),
+              );
+              exportReportToExcel(
+                entityType === "supplier"
+                  ? ar
+                    ? "مستحقات_الموردين"
+                    : "supplier-payables"
+                  : ar
+                    ? "ديون_العملاء"
+                    : "customer-debts",
+                headers,
+                outputRows,
+                ar,
+              );
+            }}
+            onPrint={() => {
+              const activeColumns = reportColumns.filter((c) => visible[c.key]);
+              const headers = activeColumns.map((c) => ({
+                label: ar ? c.ar : c.en,
+                align: (c.key === "debit" || c.key === "credit"
+                  ? "end"
+                  : c.key === "balance" || c.key === "date"
+                    ? "center"
+                    : "start") as "start" | "center" | "end",
+              }));
+              const outputRows = filtered.map((row) =>
+                activeColumns.map((col) => {
+                  if (col.key === "description") return row.name;
+                  if (col.key === "debit") return money(row.ledgerBalance);
+                  if (col.key === "credit") return row.creditLimit ? money(row.creditLimit) : "—";
+                  if (col.key === "balance")
+                    return row.oldestDebtDays !== null && row.oldestDebtDays !== undefined
+                      ? `${row.oldestDebtDays} ${ar ? "يوم" : "days"}`
+                      : "—";
+                  if (col.key === "date")
+                    return row.lastMovementAt
+                      ? new Date(row.lastMovementAt).toLocaleDateString(ar ? "ar-YE" : "en-GB")
+                      : "—";
+                  if (col.key === "reference")
+                    return row.hasGap
+                      ? ar
+                        ? "دفتر مع فرق"
+                        : "Ledger with gap"
+                      : ar
+                        ? entityType === "supplier"
+                          ? "فواتير ومرتجعات المورد"
+                          : "دفتر العميل"
+                        : entityType === "supplier"
+                          ? "Supplier documents"
+                          : "Customer ledger";
+                  return "—";
+                }),
+              );
+              const totalDebt = filtered.reduce((sum, r) => sum + (r.ledgerBalance || 0), 0);
+              const debitIdx = activeColumns.findIndex((c) => c.key === "debit");
+              const totalsMap: Record<number, string> = {};
+              if (debitIdx >= 0) totalsMap[debitIdx] = money(totalDebt);
+
+              void printLuxuryReport({
+                title:
+                  entityType === "supplier"
+                    ? ar
+                      ? "كشف مستحقات الموردين"
+                      : "Supplier Payables"
+                    : ar
+                      ? "كشف ديون العملاء"
+                      : "Customer Debts",
+                subtitle: ar ? "تقرير أرصدة الحسابات ومتابعة الديون" : "Accounts balances and debt aging report",
+                periodLabel: ar ? "حتى تاريخه" : "Up to date",
+                headers,
+                rows: outputRows,
+                totalsRow: {
+                  label: ar ? "الإجمالي النهائي" : "Grand Total",
+                  values: totalsMap,
+                },
+                summaryCards: [
+                  { label: ar ? "عدد الحسابات" : "Accounts", value: String(filtered.length) },
+                  {
+                    label:
+                      entityType === "supplier"
+                        ? ar
+                          ? "إجمالي المستحق"
+                          : "Total Payable"
+                        : ar
+                          ? "إجمالي المديونية"
+                          : "Total Debt",
+                    value: money(totalDebt),
+                  },
+                ],
+                ar,
+              });
+            }}
           />
           <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
             <RefreshCw className={loading ? "animate-spin" : ""} />

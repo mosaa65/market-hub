@@ -11,7 +11,12 @@ import {
 } from "@/components/statements/report-filter-menu";
 import type { StatementFieldKey } from "@/lib/statements/types";
 import { money } from "@/lib/format";
-import { ReportOutputButtons, ReportRowDetails, exportReportRows, printReportRows } from "@/components/statements/report-tools";
+import {
+  ReportOutputButtons,
+  ReportRowDetails,
+  exportReportToExcel,
+  printLuxuryReport,
+} from "@/components/statements/report-tools";
 
 type PurchaseRow = {
   id: string;
@@ -162,8 +167,59 @@ export function PurchasesReport({
           />
           <ReportOutputButtons
             ar={ar}
-            onExport={() => exportReportRows("market-hub-purchases", outputHeaders, outputRows)}
-            onPrint={() => printReportRows(ar ? "كشف المشتريات" : "Purchases report", outputHeaders, outputRows, ar)}
+            disabled={loading || filteredRows.length === 0}
+            onExport={() =>
+              exportReportToExcel(
+                ar ? "كشف_المشتريات" : "purchases-report",
+                outputHeaders,
+                outputRows,
+                ar,
+              )
+            }
+            onPrint={() => {
+              const activeCols = columns.filter((column) => visibleColumns[column.key]);
+              const debitIdx = activeCols.findIndex((c) => c.key === "debit");
+              const creditIdx = activeCols.findIndex((c) => c.key === "credit");
+              const balanceIdx = activeCols.findIndex((c) => c.key === "balance");
+              const totalsMap: Record<number, string> = {};
+              if (debitIdx >= 0) totalsMap[debitIdx] = money(total);
+              if (creditIdx >= 0) totalsMap[creditIdx] = money(paid);
+              if (balanceIdx >= 0) totalsMap[balanceIdx] = money(total - paid);
+
+              void printLuxuryReport({
+                title: ar ? "كشف المشتريات" : "Purchases Report",
+                subtitle: ar ? "فواتير المشتريات وحركة الموردين" : "Purchase invoices & supplier transactions",
+                periodLabel:
+                  from && to
+                    ? ar
+                      ? `الفترة من ${from} إلى ${to}`
+                      : `Period ${from} to ${to}`
+                    : ar
+                      ? "كل الفترات"
+                      : "All periods",
+                headers: activeCols.map((c) => ({
+                  label: c.label,
+                  align:
+                    c.key === "debit" || c.key === "credit" || c.key === "balance"
+                      ? "end"
+                      : c.key === "date" || c.key === "reference" || c.key === "kind"
+                        ? "center"
+                        : "start",
+                })),
+                rows: outputRows,
+                totalsRow: {
+                  label: ar ? "الإجمالي النهائي" : "Grand Total",
+                  values: totalsMap,
+                },
+                summaryCards: [
+                  { label: ar ? "عدد الفواتير" : "Invoices", value: String(filteredRows.length) },
+                  { label: ar ? "إجمالي المشتريات" : "Total Purchases", value: money(total) },
+                  { label: ar ? "المدفوع" : "Paid", value: money(paid) },
+                  { label: ar ? "المتبقي" : "Remaining", value: money(total - paid) },
+                ],
+                ar,
+              });
+            }}
           />
           <ColumnVisibilityMenu
             columns={columns}

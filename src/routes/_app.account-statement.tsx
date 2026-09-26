@@ -340,7 +340,7 @@ function AccountStatementPage() {
         title={ar ? "مركز الكشوفات" : "Reports center"}
         subtitle={
           ar
-            ? "تاختر نوع الكشف واعرض بياناته من الجداول التشغيلية المناسبة"
+            ? "اختر نوع الكشف واعرض بياناته من الجداول التشغيلية المناسبة"
             : "Choose a report and view data from its operational source"
         }
         actions={
@@ -354,19 +354,23 @@ function AccountStatementPage() {
               <ClipboardList className="h-4 w-4" />
               {ar ? "فتح كشف آخر" : "Open another report"}
             </Button>
-            <Button
-              onClick={handleExportExcel}
-              variant="outline"
-              disabled={!result}
-              className="gap-2 text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10"
-            >
-              <FileSpreadsheet className="h-4 w-4" />
-              {ar ? "تصدير Excel" : "Export Excel"}
-            </Button>
-            <Button onClick={handlePrintPDF} disabled={!result} className="gap-2 bg-primary">
-              <Printer className="h-4 w-4" />
-              {ar ? "طباعة PDF فاخر" : "Print PDF"}
-            </Button>
+            {["customer-account", "supplier-account", "cash-account"].includes(reportType) && (
+              <>
+                <Button
+                  onClick={handleExportExcel}
+                  variant="outline"
+                  disabled={!result}
+                  className="gap-2 text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10"
+                >
+                  <FileSpreadsheet className="h-4 w-4" />
+                  {ar ? "تصدير Excel" : "Export Excel"}
+                </Button>
+                <Button onClick={handlePrintPDF} disabled={!result} className="gap-2 bg-primary">
+                  <Printer className="h-4 w-4" />
+                  {ar ? "طباعة PDF فاخر" : "Print PDF"}
+                </Button>
+              </>
+            )}
           </div>
         }
       />

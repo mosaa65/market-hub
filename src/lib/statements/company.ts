@@ -14,18 +14,18 @@ import { supabase } from "@/integrations/supabase/client";
 
 /** هوية صانع النظام — مصدرها inama-soft-footer.tsx */
 export const INAMA_SOFT_BRAND = {
-  name: "Inama Soft",
-  owner: "Mousa Gamil Al-Awadhi",
-  tagline: "Ibb, Yemen",
+  name: "انما سوفت للبرمجيات",
+  owner: "",
+  tagline: "",
   phone: "+967 772 217 218",
   website: "inma-soft.vercel.app",
   logoUrl: "/inama-soft-logo.ico",
-  softwareName: "Market Hub",
+  softwareName: "انما سوفت للبرمجيات",
 } as const;
 
 /** القيم الافتراضية للطباعة قبل وصول بيانات قاعدة البيانات */
 export const DEFAULT_COMPANY_INFO = {
-  name: "Market Hub",
+  name: "انما سوفت للبرمجيات",
   currency: "YER",
   currencySymbol: "﷼",
 };

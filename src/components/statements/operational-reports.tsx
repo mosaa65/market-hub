@@ -1,16 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ColumnVisibilityMenu } from "@/components/statements/column-visibility-menu";
+import { ReportShell, ReportSummary, ReportSummaryItem } from "@/components/statements/report-shell";
 import {
   ReportFilterMenu,
   type ReportFilterPreset,
   type ReportFilterValues,
 } from "@/components/statements/report-filter-menu";
 import { money } from "@/lib/format";
-import { ReportOutputButtons, ReportRowDetails, exportReportRows, printReportRows } from "@/components/statements/report-tools";
+import {
+  ReportOutputButtons,
+  ReportRowDetails,
+  exportReportToExcel,
+  printLuxuryReport,
+} from "@/components/statements/report-tools";
 import type { ReportType } from "@/lib/statements/report-registry";
 import type { StatementFieldKey } from "@/lib/statements/types";
 
@@ -104,16 +109,23 @@ export function OperationalReports({
         if (to) request = request.lte("created_at", `${to}T23:59:59`);
         result = await request;
       } else {
-        const [sales, purchases] = await Promise.all([
-          supabase
-            .from("sales_returns")
-            .select("*, customers(name), warehouses(name,name_ar)")
-            .order("created_at", { ascending: false }),
-          supabase
-            .from("purchase_returns")
-            .select("*, suppliers(name), warehouses(name,name_ar)")
-            .order("created_at", { ascending: false }),
-        ]);
+        let salesRequest = supabase
+          .from("sales_returns")
+          .select("*, customers(name), warehouses(name,name_ar)")
+          .order("created_at", { ascending: false });
+        let purchasesRequest = supabase
+          .from("purchase_returns")
+          .select("*, suppliers(name), warehouses(name,name_ar)")
+          .order("created_at", { ascending: false });
+        if (from) {
+          salesRequest = salesRequest.gte("created_at", `${from}T00:00:00`);
+          purchasesRequest = purchasesRequest.gte("created_at", `${from}T00:00:00`);
+        }
+        if (to) {
+          salesRequest = salesRequest.lte("created_at", `${to}T23:59:59`);
+          purchasesRequest = purchasesRequest.lte("created_at", `${to}T23:59:59`);
+        }
+        const [sales, purchases] = await Promise.all([salesRequest, purchasesRequest]);
         const salesRows: AnyRow[] = ((sales.data ?? []) as AnyRow[]).map((row) => ({
           ...row,
           return_kind: "sales",
@@ -141,16 +153,19 @@ export function OperationalReports({
     void load();
   }, [load]);
 
+  const searchableRows = useMemo(
+    () => rows.map((row) => ({ row, searchText: JSON.stringify(row).toLowerCase() })),
+    [rows],
+  );
   const filtered = useMemo(() => {
     const value = query.trim().toLowerCase();
-    if (!value) return rows;
-    return rows.filter((row) => {
-      const matchesQuery = !value || JSON.stringify(row).toLowerCase().includes(value);
+    return searchableRows.filter(({ row, searchText }) => {
+      const matchesQuery = !value || searchText.includes(value);
       const matchesStatus = statusFilter === "all" || String(row.status ?? "") === statusFilter || String(row.return_kind ?? "") === statusFilter;
       const matchesMethod = methodFilter === "all" || String(row.payment_method ?? "") === methodFilter;
       return matchesQuery && matchesStatus && matchesMethod;
-    });
-  }, [methodFilter, query, rows, statusFilter]);
+    }).map(({ row }) => row);
+  }, [methodFilter, query, searchableRows, statusFilter]);
 
   const title =
     type === "sales-invoices"
@@ -183,15 +198,11 @@ export function OperationalReports({
   const outputTitle = title;
 
   return (
-    <div className="panel-elevated overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4">
-        <div>
-          <h2 className="text-sm font-semibold">{title}</h2>
-          <p className="mt-1 text-[11px] text-muted-foreground">
-            {ar ? "بيانات مباشرة من الجداول التشغيلية" : "Live data from operational tables"}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
+    <ReportShell
+      title={title}
+      subtitle={ar ? "بيانات مباشرة من الجداول التشغيلية" : "Live data from operational tables"}
+      actions={
+        <>
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -218,54 +229,83 @@ export function OperationalReports({
             onChange={onFilterChange}
             onReset={onFilterReset}
             labels={{
-              trigger: ar ? "تصفية الكشف" : "Filter report",
-              title: ar ? "تصفية الكشف" : "Report filters",
-              date: ar ? "التاريخ والفترة" : "Date and period",
-              period: ar ? "الفترة" : "Period",
-              options: ar ? "خيارات إضافية" : "More options",
-              includeZeroRows: ar ? "إظهار الحركات المسددة" : "Include settled",
-              reset: ar ? "إعادة ضبط الفلاتر" : "Reset filters",
-              back: ar ? "رجوع" : "Back",
-              from: ar ? "من" : "From",
-              to: ar ? "إلى" : "To",
+              trigger: ar ? "تصفية الكشف" : "Filter report", title: ar ? "تصفية الكشف" : "Report filters", date: ar ? "التاريخ والفترة" : "Date and period", period: ar ? "الفترة" : "Period", options: ar ? "خيارات إضافية" : "More options", includeZeroRows: ar ? "إظهار الحركات المسددة" : "Include settled", reset: ar ? "إعادة ضبط الفلاتر" : "Reset filters", back: ar ? "رجوع" : "Back", from: ar ? "من" : "From", to: ar ? "إلى" : "To",
             }}
           />
-          <ColumnVisibilityMenu
-            columns={columnDefinitions}
-            visible={visibleColumns as Record<StatementFieldKey, boolean>}
-            onChange={(key, value) =>
-              setVisibleColumns((current) => ({ ...current, [key]: value }))
-            }
-            label={ar ? "الأعمدة" : "Columns"}
-            title={ar ? "إظهار أعمدة الكشف" : "Visible columns"}
-          />
+          <ColumnVisibilityMenu columns={columnDefinitions} visible={visibleColumns as Record<StatementFieldKey, boolean>} onChange={(key, value) => setVisibleColumns((current) => ({ ...current, [key]: value }))} label={ar ? "الأعمدة" : "Columns"} title={ar ? "إظهار أعمدة الكشف" : "Visible columns"} />
           <ReportOutputButtons
             ar={ar}
-            onExport={() => exportReportRows(`market-hub-${type}`, outputHeaders, outputRows)}
-            onPrint={() => printReportRows(outputTitle, outputHeaders, outputRows, ar)}
+            disabled={loading || filtered.length === 0}
+            onExport={() =>
+              exportReportToExcel(
+                outputTitle.replace(/\s+/g, "_"),
+                outputHeaders,
+                outputRows,
+                ar,
+              )
+            }
+            onPrint={() => {
+              const activeDefs = columnDefinitions.filter((c) => visibleColumns[c.key]);
+              const amountColIdx = activeDefs.findIndex(
+                (c) => c.key === "debit" || c.key === "balance" || c.key === "credit",
+              );
+              const totalsMap: Record<number, string> = {};
+              if (amountColIdx >= 0 && amount > 0) {
+                totalsMap[amountColIdx] = money(amount);
+              }
+
+              void printLuxuryReport({
+                title: outputTitle,
+                subtitle: ar
+                  ? "بيانات تفصيلية من السجلات التشغيلية"
+                  : "Detailed operational records",
+                periodLabel:
+                  from && to
+                    ? ar
+                      ? `الفترة من ${from} إلى ${to}`
+                      : `Period ${from} to ${to}`
+                    : ar
+                      ? "كل الفترات"
+                      : "All periods",
+                headers: activeDefs.map((c) => ({
+                  label: c.label,
+                  align:
+                    c.key === "debit" || c.key === "credit" || c.key === "balance"
+                      ? "end"
+                      : c.key === "date" || c.key === "reference" || c.key === "kind"
+                        ? "center"
+                        : "start",
+                })),
+                rows: outputRows,
+                totalsRow:
+                  amount > 0
+                    ? {
+                        label: ar ? "الإجمالي النهائي" : "Grand Total",
+                        values: totalsMap,
+                      }
+                    : undefined,
+                summaryCards: [
+                  { label: ar ? "عدد السجلات" : "Records", value: String(filtered.length) },
+                  { label: ar ? "إجمالي القيمة" : "Total Amount", value: money(amount) },
+                ],
+                ar,
+              });
+            }}
           />
-          <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
-            <RefreshCw className={loading ? "animate-spin" : ""} />
-            {ar ? "تحديث" : "Refresh"}
-          </Button>
-          <Button variant="ghost" size="sm" onClick={onBack}>
-            {ar ? "العودة" : "Back"}
-          </Button>
-        </div>
-      </div>
-      {error && (
-        <div className="border-b border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
-          {error}
-        </div>
-      )}
-      <div className="grid grid-cols-2 gap-3 border-b border-border p-4 sm:grid-cols-3">
-        <Summary label={ar ? "عدد السجلات" : "Records"} value={String(filtered.length)} />
-        <Summary label={ar ? "القيمة" : "Amount"} value={money(amount)} />
-        <Summary
-          label={ar ? "الفترة" : "Period"}
-          value={from || to ? `${from || "…"} — ${to || "…"}` : ar ? "كل الفترات" : "All periods"}
-        />
-      </div>
+        </>
+      }
+      error={error}
+      loading={loading}
+      onRefresh={() => void load()}
+      onBack={onBack}
+      refreshLabel={ar ? "تحديث" : "Refresh"}
+      backLabel={ar ? "العودة" : "Back"}
+    >
+      <ReportSummary>
+        <ReportSummaryItem label={ar ? "عدد السجلات" : "Records"} value={String(filtered.length)} />
+        <ReportSummaryItem label={ar ? "القيمة" : "Amount"} value={money(amount)} />
+        <ReportSummaryItem label={ar ? "الفترة" : "Period"} value={from || to ? `${from || "…"} — ${to || "…"}` : ar ? "كل الفترات" : "All periods"} />
+      </ReportSummary>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="bg-surface-2 text-muted-foreground">
@@ -314,7 +354,7 @@ export function OperationalReports({
         title={title}
         values={selectedRow ? detailValues(selectedRow, type, ar) : []}
       />
-    </div>
+    </ReportShell>
   );
 }
 
@@ -456,14 +496,6 @@ function Cell({
 }) {
   return (
     <td className={`px-3 py-2 ${end ? "text-end" : ""} ${mono ? "font-mono" : ""}`}>{children}</td>
-  );
-}
-function Summary({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg border-border/70 bg-surface/50 p-3">
-      <div className="text-[10px] text-muted-foreground">{label}</div>
-      <div className="mt-1 truncate font-mono text-sm font-semibold">{value}</div>
-    </div>
   );
 }
 function formatDate(value: unknown, ar: boolean) {

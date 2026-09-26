@@ -21,7 +21,7 @@
 |------|------|-------------|
 | `id` | `uuid` | Primary |
 | `user_id` | `uuid` |  |
-| `role` | `app_role` |  |
+| `role` | `app_role` |  
 | `created_at` | `timestamptz` |  |
 
 ## Table `company_settings`

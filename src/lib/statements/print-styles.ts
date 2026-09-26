@@ -69,6 +69,22 @@ html, body { margin:0; padding:0; background:var(--bg); color:var(--ink);
 .legacy-statement-table tr.grand-total td { background:#a9a9a9; color:#fff; font-weight:700; border-top:2px solid #222; }
 .legacy-currency { margin-top:4px; font-size:9px; color:#666; text-align:left; }
 
+.luxury-report-table { width:100%; border-collapse:collapse; margin-top:8px; border:1px solid #777; font-size:10px; }
+.luxury-report-table th, .luxury-report-table td { border:1px solid #aaa; padding:5px 6px; }
+.luxury-report-table th { background:#f2f2f2; color:#111; font-size:10px; font-weight:700; }
+.luxury-report-table td { color:#333; font-family:'Tahoma','Segoe UI',sans-serif; }
+.luxury-report-table td.num { font-family:'IBM Plex Mono',monospace; }
+.luxury-report-table td.debit { color:#233b76; font-weight:600; }
+.luxury-report-table td.credit { color:#5c2130; font-weight:600; }
+.luxury-report-table tr:nth-child(even) td { background:rgba(248,246,240,.4); }
+.luxury-report-table tr.subtotal td { background:#e8f5e9; color:#1b5e20; font-weight:700; border-top:1.5px solid #2e7d32; }
+.luxury-report-table tr.grand-total td { background:#a9a9a9; color:#fff; font-weight:700; border-top:2px solid #222; }
+.luxury-report-table tr.grand-total td.debit, .luxury-report-table tr.grand-total td.credit { color:#fff; }
+.luxury-cards { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 8px; }
+.luxury-card { flex:1; min-width:100px; background:#fff; border:1px solid var(--line); border-radius:6px; padding:6px 10px; }
+.luxury-card .lc-label { font-size:9.5px; color:var(--muted); }
+.luxury-card .lc-val { font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:700; color:var(--ink); margin-top:2px; }
+
 /* ── Entity + Summary ── */
 .meta-grid { display:grid; grid-template-columns:1.05fr 1.35fr; gap:12px; margin:12px 0 10px; }
 .box { border:1px solid var(--line); border-radius:8px; overflow:hidden; background:#fff; }
