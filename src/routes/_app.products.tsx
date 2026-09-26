@@ -1,3 +1,4 @@
+import { VortexDrawerDialog, VortexTextInput, VortexCurrencyInput, VortexNumberInput } from "@/components/vortex-ui";
 ﻿import { useModules } from "@/lib/modules";
 import { createFileRoute } from "@tanstack/react-router";
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -932,12 +933,12 @@ function ProductDialog({
   const labelOf = (en: string, ar: string | null) => (lang === "ar" ? ar || en : en || ar || "");
 
   return (
-    <Modal
-      open
-      onClose={onClose}
+    <VortexDrawerDialog
+      open={true}
+      onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}
       size="lg"
       title={initial ? t("products.edit_product") : t("products.new_product")}
-      eyebrow={initial ? t("common.edit") : t("common.new")}
+      description={initial ? (lang === "ar" ? "تعديل تفاصيل المنتج والأسعار والمخزون" : "Edit product details, pricing, and stock") : (lang === "ar" ? "إضافة منتج جديد وتحديد الأسعار والمخزون" : "Create a new product with pricing and stock")}
       footer={
         <FormActions
           sticky={false}
@@ -961,22 +962,28 @@ function ProductDialog({
           <FormGrid cols={3}>
             <FormField label={t("products.name_ar")} required>
               {(p) => (
-                <FieldInput
-                  {...p}
+                <VortexTextInput
+                  id={p.id}
+                  aria-describedby={p["aria-describedby"]}
                   dir="rtl"
+                  clearable
                   value={form.name_ar}
-                  onValueChange={(v) => setForm({ ...form, name_ar: v })}
+                  onChange={(e) => setForm({ ...form, name_ar: e.target.value })}
+                  placeholder={lang === "ar" ? "أدخل اسم المنتج بالعربية..." : "Product name in Arabic..."}
                 />
               )}
             </FormField>
 
             <FormField label={t("products.name_en")}>
               {(p) => (
-                <FieldInput
-                  {...p}
+                <VortexTextInput
+                  id={p.id}
+                  aria-describedby={p["aria-describedby"]}
                   dir="ltr"
+                  clearable
                   value={form.name}
-                  onValueChange={(v) => setForm({ ...form, name: v })}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder={lang === "ar" ? "Product name in English..." : "Product name..."}
                 />
               )}
             </FormField>
@@ -1005,10 +1012,13 @@ function ProductDialog({
               hint={lang === "ar" ? "معرّف داخلي فريد" : "Unique internal identifier"}
             >
               {(p) => (
-                <FieldInput
-                  {...p}
+                <VortexTextInput
+                  id={p.id}
+                  aria-describedby={p["aria-describedby"]}
+                  clearable
                   value={form.sku}
-                  onValueChange={(v) => setForm({ ...form, sku: v })}
+                  onChange={(e) => setForm({ ...form, sku: e.target.value })}
+                  placeholder={lang === "ar" ? "مثال: PRD-001" : "e.g. PRD-001"}
                 />
               )}
             </FormField>
@@ -1017,12 +1027,15 @@ function ProductDialog({
               <FormField label={t("products.barcode")}>
                 {(p) => (
                   <div className="flex items-center gap-2">
-                    <FieldInput
-                      {...p}
+                    <VortexTextInput
+                      id={p.id}
+                      aria-describedby={p["aria-describedby"]}
                       dir="ltr"
+                      clearable
                       value={form.barcode}
-                      onValueChange={(v) => setForm({ ...form, barcode: v })}
-                      containerClassName="min-w-0 flex-1"
+                      onChange={(e) => setForm({ ...form, barcode: e.target.value })}
+                      placeholder="628100..."
+                      className="min-w-0 flex-1"
                     />
                     <IconButton
                       type="button"
@@ -1039,10 +1052,12 @@ function ProductDialog({
 
             <FormField label={lang === "ar" ? "موقع الرف / المستودع" : "Shelf location"}>
               {(p) => (
-                <FieldInput
-                  {...p}
+                <VortexTextInput
+                  id={p.id}
+                  aria-describedby={p["aria-describedby"]}
+                  clearable
                   value={form.shelf_location}
-                  onValueChange={(v) => setForm({ ...form, shelf_location: v })}
+                  onChange={(e) => setForm({ ...form, shelf_location: e.target.value })}
                   placeholder={lang === "ar" ? "مثال: رف A - 03" : "e.g. Shelf A - 03"}
                 />
               )}
@@ -1176,27 +1191,30 @@ function ProductDialog({
                 label={t("common.cost")}
                 hint={lang === "ar" ? "سعر الشراء" : "Purchase price"}
               >
-                <NumberInput
-                  value={form.cost_price === "" ? null : Number(form.cost_price)}
-                  onValueChange={(v) =>
-                    setForm({ ...form, cost_price: v == null ? "" : String(v) })
+                <VortexCurrencyInput
+                  value={form.cost_price === "" ? 0 : Number(form.cost_price)}
+                  onValueChange={(num) =>
+                    setForm({ ...form, cost_price: String(num) })
                   }
-                  min={1}
-                  suffix="﷼"
+                  min={0}
+                  currency="﷼"
+                  placeholder="0.00"
                 />
               </FormField>
             )}
 
             <FormField label={t("common.price")} required>
               {(p) => (
-                <NumberInput
-                  {...p}
-                  value={form.sale_price === "" ? null : Number(form.sale_price)}
-                  onValueChange={(v) =>
-                    setForm({ ...form, sale_price: v == null ? "" : String(v) })
+                <VortexCurrencyInput
+                  id={p.id}
+                  aria-describedby={p["aria-describedby"]}
+                  value={form.sale_price === "" ? 0 : Number(form.sale_price)}
+                  onValueChange={(num) =>
+                    setForm({ ...form, sale_price: String(num) })
                   }
                   min={0}
-                  suffix="﷼"
+                  currency="﷼"
+                  placeholder="0.00"
                 />
               )}
             </FormField>
@@ -1266,7 +1284,7 @@ function ProductDialog({
         onClose={() => setScannerOpen(false)}
         onDetected={(barcode) => setForm((current) => ({ ...current, barcode }))}
       />
-    </Modal>
+    </VortexDrawerDialog>
   );
 }
 
