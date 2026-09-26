@@ -387,7 +387,15 @@ export function DataTable<T>({
   const colGroup = visibleColumns.length ? (
     <colgroup>
       {visibleColumns.map((c) => (
-        <col key={c.key} className={c.width} />
+        <col
+          key={c.key}
+          className={cn(
+            c.width,
+            c.hideBelow === "sm" && "hidden sm:table-column",
+            c.hideBelow === "md" && "hidden md:table-column",
+            c.hideBelow === "lg" && "hidden lg:table-column",
+          )}
+        />
       ))}
     </colgroup>
   ) : null;

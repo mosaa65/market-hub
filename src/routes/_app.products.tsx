@@ -577,7 +577,15 @@ function ProductsPage() {
           loadingMore={isFetchingNextPage}
           pageSize={PRODUCTS_PAGE_SIZE}
           totalCount={productCount}
-          minWidth={canViewCost ? 900 : 780}
+          minWidth={
+            breakpoint === "xs"
+              ? 440
+              : breakpoint === "sm"
+                ? 560
+                : breakpoint === "md"
+                  ? (canViewCost ? 740 : 660)
+                  : (canViewCost ? 900 : 780)
+          }
           horizontalScroll={tableUsesHorizontalScroll}
           stickyHeader
           onRowClick={(product) => {
