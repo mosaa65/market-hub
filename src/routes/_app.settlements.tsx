@@ -191,8 +191,8 @@ function SettlementsPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["settlements"],
-    queryFn: async () => {
-      const { data: movements, error } = await supabase
+    queryFn: async (): Promise<SettlementRow[]> => {
+      const { data, error } = await supabase
         .from("stock_movements")
         .select(
           "id, movement_type, quantity, note, created_at, product_id, warehouse_id, created_by, unit_cost, reference, reference_type, products(id,name,name_ar,sku), warehouses(id,name,name_ar,code)",
@@ -205,6 +205,7 @@ function SettlementsPage() {
           "transfer_out",
           "return_in",
           "return_out",
+          "opening",
           "purchase_return",
           "sale_return",
         ])
@@ -212,22 +213,33 @@ function SettlementsPage() {
         .limit(200);
       if (error) throw error;
 
-      const userIds = [
-        ...new Set((movements ?? []).flatMap((row) => (row.created_by ? [row.created_by] : []))),
-      ];
-      const { data: profiles } = userIds.length
-        ? await supabase.from("profiles").select("id, full_name").in("id", userIds)
-        : { data: [] };
-      const profileById = new Map((profiles ?? []).map((profile) => [profile.id, profile]));
+      const rows = data ?? [];
 
-      return (movements ?? []).map((movement) => ({
-        ...movement,
-        profiles: movement.created_by ? profileById.get(movement.created_by) ?? null : null,
-      })) as SettlementRow[];
+      // لا توجد علاقة مباشرة بين stock_movements و profiles،
+      // لذا نجلب أسماء المستخدمين بطلب منفصل ونطابقها عبر created_by.
+      const creatorIds = Array.from(
+        new Set(rows.map((row) => row.created_by).filter((id): id is string => Boolean(id))),
+      );
+      let profilesByUser: Record<string, { full_name: string | null }> = {};
+      if (creatorIds.length > 0) {
+        const { data: profiles, error: profilesError } = await supabase
+          .from("profiles")
+          .select("id, full_name")
+          .in("id", creatorIds);
+        if (!profilesError && profiles) {
+          profilesByUser = Object.fromEntries(
+            profiles.map((profile) => [profile.id, { full_name: profile.full_name }]),
+          );
+        }
+      }
+
+      return rows.map((row) => ({
+        ...row,
+        profiles: row.created_by ? (profilesByUser[row.created_by] ?? null) : null,
+      }));
     },
     enabled: canManageSettlement,
   });
-
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return data ?? [];
