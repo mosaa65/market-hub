@@ -1469,10 +1469,26 @@ function ProductDialog({
   const { config } = useCatalogModules();
   const { isModuleEnabled } = useModules();
   const [scannerOpen, setScannerOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [policy, setPolicy] = useState<UserItemPolicyPreferences>(() =>
+  /** Saved policy for this user (localStorage) — the baseline the form starts from. */
+  const [baseline, setBaseline] = useState<UserItemPolicyPreferences>(() =>
     userId ? readUserItemPolicyPreferences(userId) : DEFAULT_USER_ITEM_POLICY_PREFERENCES,
   );
+  /**
+   * Policy settings are edited inline in this same form, behind the switch at the
+   * top. Creating a product starts with them ON, so the product is created
+   * instantly with the user's saved policy; turning the switch off restores the
+   * saved baseline and leaves the product on the catalog defaults.
+   */
+  const [applyDefaults, setApplyDefaults] = useState(true);
+  /** Draft policy: edited by the user, only persisted when they press Save. */
+  const [policy, setPolicy] = useState<UserItemPolicyPreferences>(baseline);
+  /** What the product will actually be created with (defaults vs. the draft). */
+  const effectivePolicy: UserItemPolicyPreferences = applyDefaults ? policy : baseline;
+  /**
+   * The settings switch is an edit-time decision only. When changing an existing
+   * product we show its stored policy as a read-only summary instead.
+   */
+  const settingsEditable = initial == null;
   const [form, setForm] = useState({
     name: initial?.name ?? "",
     name_ar: initial?.name_ar ?? "",
@@ -1494,7 +1510,10 @@ function ProductDialog({
 
   useEffect(() => {
     if (!initial && userId) {
-      setPolicy(readUserItemPolicyPreferences(userId));
+      const stored = readUserItemPolicyPreferences(userId);
+      setBaseline(stored);
+      setPolicy(stored);
+      setApplyDefaults(true);
     }
   }, [initial, userId]);
 
@@ -1513,13 +1532,13 @@ function ProductDialog({
       toast.error(lang === "ar" ? "اسم المنتج مطلوب" : t("products.name_required"));
       return;
     }
-    if (!policy.is_sellable && !policy.is_purchasable) {
+    if (!effectivePolicy.is_sellable && !effectivePolicy.is_purchasable) {
       toast.error(
         lang === "ar"
           ? "يجب أن يكون المنتج متاحًا للبيع أو الشراء على الأقل."
           : "The product must be available for sales or purchases.",
       );
-      setSettingsOpen(true);
+      setApplyDefaults(true);
       return;
     }
     setSaving(true);
@@ -1565,15 +1584,23 @@ function ProductDialog({
       toast.error(databaseError.message ?? "Unable to save the product.");
       return;
     }
-    if (userId) saveUserItemPolicyPreferences(userId, policy);
+    // Persist the policy for *this and future products* on an explicit save.
+    if (!initial && userId) {
+      saveUserItemPolicyPreferences(userId, policy);
+      setBaseline(policy);
+    }
     toast.success(
       lang === "ar"
         ? initial
-          ? "تم تحديث المنتج وحفظ إعداداتك لهذا المستخدم"
-          : "تم إنشاء المنتج وحفظ إعداداتك لهذا المستخدم"
+          ? "تم تحديث المنتج"
+          : applyDefaults
+            ? "تم إنشاء المنتج وتطبيق الإعدادات المحفوظة"
+            : "تم إنشاء المنتج بسياسات الفهرس الافتراضية"
         : initial
-          ? "Product updated; your settings were saved for this user"
-          : "Product created; your settings were saved for this user",
+          ? "Product updated"
+          : applyDefaults
+            ? "Product created with your saved settings"
+            : "Product created with the catalog default policy",
     );
     onSaved();
   }
@@ -1619,23 +1646,22 @@ function ProductDialog({
       }
     >
       <form id="product-form" onSubmit={submit} className="flex flex-col gap-6">
-        <FormSection
-          title={lang === "ar" ? "بيانات المنتج" : "Product details"}
-          actions={
-            <IconButton
-              type="button"
-              size="md"
-              variant="outline"
-              tooltip
-              ariaLabel={lang === "ar" ? "إعدادات المنتج" : "Product settings"}
-              icon={<Settings className="size-4" />}
-              onPointerDown={() => {
-                (document.activeElement as HTMLElement | null)?.blur?.();
-              }}
-              onClick={() => setSettingsOpen(true)}
-            />
-          }
-        >
+        <ProductSettingsSection
+          editable={settingsEditable}
+          enabled={applyDefaults}
+          onEnabledChange={(next) => {
+            setApplyDefaults(next);
+            // Turning the switch back off restores the saved policy untouched.
+            if (!next) setPolicy(baseline);
+          }}
+          policy={effectivePolicy}
+          onPolicyChange={(next) => {
+            setPolicy(next);
+            setApplyDefaults(true);
+          }}
+        />
+
+        <FormSection title={lang === "ar" ? "بيانات المنتج" : "Product details"}>
           <FormGrid cols={3}>
             <FormField label={t("products.name_ar")} required>
               {(p) => (
@@ -1835,7 +1861,6 @@ function ProductDialog({
                   )}
                 </FormField>
               )}
-
             </FormGrid>
           </FormSection>
         )}
@@ -1923,122 +1948,6 @@ function ProductDialog({
         </FormSection>
       </form>
 
-      <Modal
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        size="md"
-        mobile="sheet"
-        title={lang === "ar" ? "إعدادات المنتج" : "Product settings"}
-        eyebrow={lang === "ar" ? "تخصيص" : "Customize"}
-        description={
-          lang === "ar"
-            ? "حدد طبيعة المنتج وسياسة المخزون وطريقة استخدامه."
-            : "Define the product nature, inventory policy, and how it is used."
-        }
-        footer={
-          <Button type="button" onClick={() => setSettingsOpen(false)} block>
-            {lang === "ar" ? "تم" : "Done"}
-          </Button>
-        }
-      >
-        <div className="space-y-5">
-          <SettingsChoice
-            label={lang === "ar" ? "طبيعة المنتج" : "Product nature"}
-            value={policy.item_nature}
-            options={[
-              { value: "GOOD", label: ITEM_NATURE_LABELS.GOOD[lang === "ar" ? "ar" : "en"] },
-              { value: "SERVICE", label: ITEM_NATURE_LABELS.SERVICE[lang === "ar" ? "ar" : "en"] },
-            ]}
-            onChange={(value) =>
-              setPolicy((current) => ({
-                ...current,
-                item_nature: value as ItemNature,
-                inventory_policy: value === "SERVICE" ? "UNTRACKED" : current.inventory_policy,
-                tracking: value === "SERVICE" ? "NONE" : current.tracking,
-                costing_method: value === "SERVICE" ? "NONE" : current.costing_method,
-              }))
-            }
-          />
-          {policy.item_nature === "GOOD" && (
-            <SettingsChoice
-              label={lang === "ar" ? "سياسة المخزون" : "Inventory policy"}
-              value={policy.inventory_policy}
-              options={(["TRACKED", "UNTRACKED", "CUSTOMER_OWNED"] as InventoryPolicy[]).map(
-                (value) => ({
-                  value,
-                  label: INVENTORY_POLICY_LABELS[value][lang === "ar" ? "ar" : "en"],
-                }),
-              )}
-              onChange={(value) =>
-                setPolicy((current) => ({
-                  ...current,
-                  inventory_policy: value as InventoryPolicy,
-                  tracking: value === "TRACKED" ? current.tracking : "NONE",
-                  costing_method: value === "TRACKED" ? current.costing_method : "NONE",
-                }))
-              }
-            />
-          )}
-          {policy.item_nature === "GOOD" && policy.inventory_policy === "TRACKED" && (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <SettingsChoice
-                label={lang === "ar" ? "التتبع الدقيق" : "Detailed tracking"}
-                value={policy.tracking}
-                options={(["NONE", "BATCH", "SERIAL"] as ItemTracking[]).map((value) => ({
-                  value,
-                  label: TRACKING_LABELS[value][lang === "ar" ? "ar" : "en"],
-                }))}
-                onChange={(value) =>
-                  setPolicy((current) => ({ ...current, tracking: value as ItemTracking }))
-                }
-              />
-              <SettingsChoice
-                label={lang === "ar" ? "طريقة التكلفة" : "Costing method"}
-                value={policy.costing_method}
-                options={(["MOVING_AVERAGE", "FIFO", "STANDARD"] as CostingMethod[]).map(
-                  (value) => ({
-                    value,
-                    label: COSTING_METHOD_LABELS[value][lang === "ar" ? "ar" : "en"],
-                  }),
-                )}
-                onChange={(value) =>
-                  setPolicy((current) => ({ ...current, costing_method: value as CostingMethod }))
-                }
-              />
-            </div>
-          )}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <SettingsToggle
-              label={lang === "ar" ? "يظهر في المبيعات" : "Available for sales"}
-              checked={policy.is_sellable}
-              onChange={(checked) => setPolicy((current) => ({ ...current, is_sellable: checked }))}
-            />
-            <SettingsToggle
-              label={lang === "ar" ? "يظهر في المشتريات" : "Available for purchases"}
-              checked={policy.is_purchasable}
-              onChange={(checked) => setPolicy((current) => ({ ...current, is_purchasable: checked }))}
-            />
-          </div>
-          <p className="rounded-xl border-primary/20 bg-primary/5 p-3 text-xs leading-6 text-muted-foreground">
-            {policy.item_nature === "SERVICE"
-              ? lang === "ar"
-                ? "الخدمة تظهر كسطر خدمة ولا تنشئ حركة مخزون."
-                : "A service appears as a service line and never creates stock movements."
-              : policy.inventory_policy === "TRACKED"
-                ? lang === "ar"
-                  ? "السلعة المتتبعة تُخصم عند البيع وتزداد عند الشراء."
-                  : "A tracked good is issued on sale and received on purchase."
-                : policy.inventory_policy === "CUSTOMER_OWNED"
-                  ? lang === "ar"
-                    ? "مادة مملوكة للعميل: تحفظ في موقعك ولا تدخل قيمة مخزون الشركة."
-                    : "Customer-owned material is held at your site but excluded from company stock valuation."
-                  : lang === "ar"
-                    ? "السلعة غير المتتبعة تظهر في الفواتير بلا رصيد مخزني."
-                    : "An untracked good appears on invoices without a managed stock balance."}
-          </p>
-        </div>
-      </Modal>
-
       <div
         className="flex items-center gap-1.5 text-caption text-muted-foreground"
         aria-live="polite"
@@ -2060,19 +1969,222 @@ function ProductDialog({
   );
 }
 
+interface ProductSettingsSectionProps {
+  /** Only a new product can change the policy; an existing one shows its own. */
+  editable: boolean;
+  enabled: boolean;
+  onEnabledChange: (enabled: boolean) => void;
+  policy: UserItemPolicyPreferences;
+  onPolicyChange: (next: UserItemPolicyPreferences) => void;
+}
+
+/**
+ * Product settings — product nature, inventory policy, counting, costing and usage.
+ *
+ * Inline in the product form instead of a second overlay: the policy is part of
+ * the product being saved, so it must be visible and saved by the same button.
+ * The switch turns the saved policy on for this product and every product added
+ * afterwards; turning it off leaves the product on the catalog default policy.
+ */
+function ProductSettingsSection({
+  editable,
+  enabled,
+  onEnabledChange,
+  policy,
+  onPolicyChange,
+}: ProductSettingsSectionProps) {
+  const { lang } = useI18n();
+  const ar = lang === "ar";
+
+  return (
+    <section className="rounded-2xl border border-border/70 bg-surface/60">
+      <div className="flex items-start justify-between gap-3 p-3.5">
+        <div className="flex min-w-0 items-start gap-2.5">
+          <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg border-primary/20 bg-primary/10 text-primary">
+            <Settings className="size-4" />
+          </span>
+          <div className="space-y-0.5">
+            <p className="text-sm font-semibold text-foreground">
+              {ar ? "إعدادات المنتج" : "Product settings"}
+            </p>
+            <p className="text-caption leading-5 text-muted-foreground">
+              {editable
+                ? ar
+                  ? "عند التفعيل يجب تطبيق هذه الإعدادات على هذا المنتج وعلى كل منتج يُضاف بعد الحفظ."
+                  : "When enabled, these settings apply to this product and to every product added after saving."
+                : ar
+                  ? "الإعدادات المطبقة على هذا المنتج."
+                  : "The settings applied to this product."}
+            </p>
+          </div>
+        </div>
+
+        {editable ? (
+          <label className="flex shrink-0 cursor-pointer items-center gap-2 pt-1">
+            <span className="text-xs font-medium text-muted-foreground">
+              {enabled ? (ar ? "مفعّل" : "Enabled") : ar ? "غير مفعّل" : "Disabled"}
+            </span>
+            <span className="relative inline-flex">
+              <input
+                type="checkbox"
+                role="switch"
+                checked={enabled}
+                onChange={(event) => onEnabledChange(event.target.checked)}
+                aria-label={ar ? "تفعيل إعدادات المنتج" : "Enable product settings"}
+                className="peer size-5 cursor-pointer appearance-none rounded-md border border-input bg-surface transition checked:border-primary checked:bg-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+              />
+              <CheckCircle2
+                aria-hidden
+                className="pointer-events-none absolute inset-0 m-auto size-3.5 text-primary-foreground opacity-0 peer-checked:opacity-100"
+              />
+            </span>
+          </label>
+        ) : (
+          <span className="shrink-0 rounded-full border-border/60 bg-surface-2 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+            {ar ? "مطبقة" : "Applied"}
+          </span>
+        )}
+      </div>
+
+      {editable && !enabled ? (
+        <p className="mx-3.5 mb-3.5 rounded-xl border-border/60 bg-surface-2/60 p-3 text-xs leading-6 text-muted-foreground">
+          {ar
+            ? "تم إرجاع الإعدادات والسياسات إلى افتراضيات الفهرس. لن يتأثر أي منتج آخر."
+            : "Settings and policies were reset to the catalog defaults. No other product is affected."}
+        </p>
+      ) : (
+        <div className="space-y-5 border-t border-border/60 p-3.5">
+          {!editable ? (
+            <p className="rounded-xl border-border/60 bg-surface-2/60 p-3 text-xs leading-6 text-muted-foreground">
+              {ar
+                ? "تغيير سياسة منتج قائم يتم من شاشة سياسات الأصناف بعد اعتمادها، حتى لا تتغير حركات مخزون سابقة."
+                : "Changing the policy of an existing product is done from the item policies screen once approved, so previous stock movements stay intact."}
+            </p>
+          ) : null}
+
+          <SettingsChoice
+            label={ar ? "طبيعة المنتج" : "Product nature"}
+            value={policy.item_nature}
+            disabled={!editable}
+            options={[
+              { value: "GOOD", label: ITEM_NATURE_LABELS.GOOD[ar ? "ar" : "en"] },
+              { value: "SERVICE", label: ITEM_NATURE_LABELS.SERVICE[ar ? "ar" : "en"] },
+            ]}
+            onChange={(value) =>
+              onPolicyChange({
+                ...policy,
+                item_nature: value as ItemNature,
+                inventory_policy: value === "SERVICE" ? "UNTRACKED" : policy.inventory_policy,
+                tracking: value === "SERVICE" ? "NONE" : policy.tracking,
+                costing_method: value === "SERVICE" ? "NONE" : policy.costing_method,
+              })
+            }
+          />
+
+          {policy.item_nature === "GOOD" && (
+            <SettingsChoice
+              label={ar ? "سياسة المخزون" : "Inventory policy"}
+              value={policy.inventory_policy}
+              disabled={!editable}
+              options={(["TRACKED", "UNTRACKED", "CUSTOMER_OWNED"] as InventoryPolicy[]).map(
+                (value) => ({
+                  value,
+                  label: INVENTORY_POLICY_LABELS[value][ar ? "ar" : "en"],
+                }),
+              )}
+              onChange={(value) =>
+                onPolicyChange({
+                  ...policy,
+                  inventory_policy: value as InventoryPolicy,
+                  tracking: value === "TRACKED" ? policy.tracking : "NONE",
+                  costing_method: value === "TRACKED" ? policy.costing_method : "NONE",
+                })
+              }
+            />
+          )}
+
+          {policy.item_nature === "GOOD" && policy.inventory_policy === "TRACKED" && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <SettingsChoice
+                label={ar ? "التتبع الدقيق" : "Detailed tracking"}
+                value={policy.tracking}
+                disabled={!editable}
+                options={(["NONE", "BATCH", "SERIAL"] as ItemTracking[]).map((value) => ({
+                  value,
+                  label: TRACKING_LABELS[value][ar ? "ar" : "en"],
+                }))}
+                onChange={(value) => onPolicyChange({ ...policy, tracking: value as ItemTracking })}
+              />
+              <SettingsChoice
+                label={ar ? "طريقة التكلفة" : "Costing method"}
+                value={policy.costing_method}
+                disabled={!editable}
+                options={(["MOVING_AVERAGE", "FIFO", "STANDARD"] as CostingMethod[]).map(
+                  (value) => ({
+                    value,
+                    label: COSTING_METHOD_LABELS[value][ar ? "ar" : "en"],
+                  }),
+                )}
+                onChange={(value) =>
+                  onPolicyChange({ ...policy, costing_method: value as CostingMethod })
+                }
+              />
+            </div>
+          )}
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <SettingsToggle
+              label={ar ? "يظهر في المبيعات" : "Available for sales"}
+              checked={policy.is_sellable}
+              disabled={!editable}
+              onChange={(checked) => onPolicyChange({ ...policy, is_sellable: checked })}
+            />
+            <SettingsToggle
+              label={ar ? "يظهر في المشتريات" : "Available for purchases"}
+              checked={policy.is_purchasable}
+              disabled={!editable}
+              onChange={(checked) => onPolicyChange({ ...policy, is_purchasable: checked })}
+            />
+          </div>
+
+          <p className="rounded-xl border-primary/20 bg-primary/5 p-3 text-xs leading-6 text-muted-foreground">
+            {policy.item_nature === "SERVICE"
+              ? ar
+                ? "الخدمة تظهر كسطر خدمة ولا تنشئ حركة مخزون."
+                : "A service appears as a service line and never creates stock movements."
+              : policy.inventory_policy === "TRACKED"
+                ? ar
+                  ? "السلعة المتتبعة تُخصم عند البيع وتزداد عند الشراء."
+                  : "A tracked good is issued on sale and received on purchase."
+                : policy.inventory_policy === "CUSTOMER_OWNED"
+                  ? ar
+                    ? "مادة مملوكة للعميل: تحفظ في موقعك ولا تدخل قيمة مخزون الشركة."
+                    : "Customer-owned material is held at your site but excluded from company stock valuation."
+                  : ar
+                    ? "السلعة غير المتتبعة تظهر في الفواتير بلا رصيد مخزني."
+                    : "An untracked good appears on invoices without a managed stock balance."}
+          </p>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function SettingsChoice({
   label,
   value,
   options,
+  disabled = false,
   onChange,
 }: {
   label: string;
   value: string;
   options: { value: string; label: string }[];
+  disabled?: boolean;
   onChange: (value: string) => void;
 }) {
   return (
-    <fieldset className="flex flex-col gap-2">
+    <fieldset className="flex flex-col gap-2" disabled={disabled}>
       <legend className="text-xs font-semibold text-foreground">{label}</legend>
       <div className="grid gap-2 sm:grid-cols-2">
         {options.map((option) => {
@@ -2082,12 +2194,19 @@ function SettingsChoice({
               key={option.value}
               type="button"
               aria-pressed={selected}
-              onClick={() => onChange(option.value)}
-              className={`min-h-10 rounded-xl border px-3 py-2 text-start text-xs font-medium transition ${
+              disabled={disabled}
+              onPointerDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (disabled) return;
+                onChange(option.value);
+              }}
+              onClick={(event) => event.stopPropagation()}
+              className={`pointer-events-auto min-h-10 rounded-xl border px-3 py-2 text-start text-xs font-medium transition ${
                 selected
                   ? "border-primary bg-primary/15 text-primary shadow-sm"
                   : "border-border bg-surface text-muted-foreground hover:border-primary/40 hover:text-foreground"
-              }`}
+              } ${disabled ? "cursor-default opacity-70" : ""}`}
             >
               {option.label}
             </button>
@@ -2101,18 +2220,26 @@ function SettingsChoice({
 function SettingsToggle({
   label,
   checked,
+  disabled = false,
   onChange,
 }: {
   label: string;
   checked: boolean;
+  disabled?: boolean;
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="flex cursor-pointer items-center gap-3 rounded-xl border-border bg-surface p-3 text-sm">
+    <label
+      className={`flex items-center gap-3 rounded-xl border-border bg-surface p-3 text-sm ${
+        disabled ? "cursor-default opacity-70" : "cursor-pointer"
+      }`}
+    >
       <input
         type="checkbox"
         checked={checked}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.checked)}
+        onClick={(event) => event.stopPropagation()}
         className="size-4 accent-[var(--primary)]"
       />
       <span>{label}</span>
