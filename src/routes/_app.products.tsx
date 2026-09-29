@@ -38,6 +38,7 @@ import {
   MapPin,
   Sparkles,
   Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
@@ -199,9 +200,12 @@ function ProductsPage() {
     queryFn: async ({ pageParam }) => {
       const from = pageParam * PRODUCTS_PAGE_SIZE;
       const to = from + PRODUCTS_PAGE_SIZE - 1;
+      // Keep the primary product query independent from optional catalog
+      // relationships. A missing/incorrect foreign-key relationship must not
+      // hide otherwise valid product rows from the catalogue.
       const { data: page, error: productError } = await (supabase.from("products") as any)
         .select(
-          "id, name, name_ar, sku, barcode, sale_price, cost_price, tax_rate, min_stock, shelf_location, origin_id, quality_grade_id, is_active, category_id, brand_id, unit_id, category:categories(name, name_ar), brand:brands(name, name_ar), unit:units(short_name, name_ar), origin:countries_of_origin(id, name, name_ar, code), quality:quality_grades(id, name, name_ar, code, sort_order)",
+          "id, name, name_ar, sku, barcode, sale_price, cost_price, tax_rate, min_stock, shelf_location, origin_id, quality_grade_id, is_active, category_id, brand_id, unit_id, created_at",
         )
         .order("created_at", { ascending: false })
         .range(from, to);
@@ -212,6 +216,10 @@ function ProductsPage() {
       return { rows, hasMore: rows.length === PRODUCTS_PAGE_SIZE };
     },
     getNextPageParam: (lastPage, pages) => (lastPage.hasMore ? pages.length : undefined),
+    // Data inserted from the CLI or another session must be fetched when the
+    // products route becomes visible again, not only when realtime is enabled.
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
 
   // The stream intentionally receives fifty rows at a time. The total must come
@@ -763,6 +771,19 @@ function ProductsPage() {
           {/* Luxury Quick Filter Pills (visible only when view is Grid) */}
           {viewMode === "grid" && (
             <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-x-none">
+              <button
+                type="button"
+                onClick={() => {
+                  void refetch();
+                  void qc.refetchQueries({ queryKey: ["products", "count"], type: "active" });
+                }}
+                disabled={isFetching}
+                className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border-border/70 bg-surface/70 text-muted-foreground transition hover:bg-surface-2 hover:text-foreground disabled:opacity-50"
+                aria-label={lang === "ar" ? "تحديث المنتجات" : "Refresh products"}
+                title={lang === "ar" ? "تحديث المنتجات" : "Refresh products"}
+              >
+                <RefreshCw className={`size-3.5 ${isFetching ? "animate-spin" : ""}`} />
+              </button>
               {[
                 {
                   id: "all",
@@ -813,7 +834,19 @@ function ProductsPage() {
       {/* ─── Main Records View: Grid vs List (Mullak style) vs Classic Table ─── */}
       {viewMode === "grid" ? (
         <div className="space-y-4">
-          {isLoading ? (
+          {error ? (
+            <div className="card-mullak p-8 text-center">
+              <p className="text-sm font-semibold text-destructive">
+                {lang === "ar" ? "تعذر تحميل المنتجات" : "Unable to load products"}
+              </p>
+              <p className="mt-2 text-xs text-muted-foreground" dir="ltr">
+                {error instanceof Error ? error.message : String(error)}
+              </p>
+              <Button size="sm" variant="outline" className="mt-4" onClick={() => void refetch()}>
+                {lang === "ar" ? "إعادة المحاولة" : "Retry"}
+              </Button>
+            </div>
+          ) : isLoading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {Array.from({ length: 8 }).map((_, i) => (
                 <div
@@ -1278,9 +1311,12 @@ function ProductsPage() {
           onSaved={() => {
             setOpen(false);
             setPrefillBarcode(undefined);
-            qc.invalidateQueries({ queryKey: QUERY_KEYS.products, refetchType: "none" });
-            qc.invalidateQueries({ queryKey: ["products", "count"] });
-            qc.invalidateQueries({ queryKey: ["products-meta"] });
+            // Refetch the first page so newly inserted rows are visible immediately.
+            // `refetchType: "none"` only marked the cache stale and left the current
+            // list unchanged when realtime was unavailable or not enabled.
+            void qc.refetchQueries({ queryKey: QUERY_KEYS.products, type: "active" });
+            void qc.refetchQueries({ queryKey: ["products", "count"], type: "active" });
+            void qc.invalidateQueries({ queryKey: ["products-meta"] });
           }}
         />
       )}
@@ -1593,6 +1629,9 @@ function ProductDialog({
               tooltip
               ariaLabel={lang === "ar" ? "إعدادات المنتج" : "Product settings"}
               icon={<Settings className="size-4" />}
+              onPointerDown={() => {
+                (document.activeElement as HTMLElement | null)?.blur?.();
+              }}
               onClick={() => setSettingsOpen(true)}
             />
           }
@@ -2033,20 +2072,29 @@ function SettingsChoice({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="flex flex-col gap-2">
-      <span className="text-xs font-semibold text-foreground">{label}</span>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className={fieldSurfaceClass}
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
+    <fieldset className="flex flex-col gap-2">
+      <legend className="text-xs font-semibold text-foreground">{label}</legend>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {options.map((option) => {
+          const selected = option.value === value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              aria-pressed={selected}
+              onClick={() => onChange(option.value)}
+              className={`min-h-10 rounded-xl border px-3 py-2 text-start text-xs font-medium transition ${
+                selected
+                  ? "border-primary bg-primary/15 text-primary shadow-sm"
+                  : "border-border bg-surface text-muted-foreground hover:border-primary/40 hover:text-foreground"
+              }`}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+    </fieldset>
   );
 }
 
