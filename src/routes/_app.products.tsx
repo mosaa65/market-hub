@@ -2420,7 +2420,7 @@ function SettingsToggle({
         })}
       </div>
 
-      { / * Models Grid * /}
+      { Models Grid }
       <div className="grid max-h-44 grid-cols-2 gap-1.5 overflow-y-auto rounded-xl border border-border/70 bg-background/50 p-2 sm:grid-cols-3 custom-scrollbar">
         {filteredModels.length === 0 ? (
           <div className="col-span-full py-6 text-center text-xs text-muted-foreground">
@@ -2479,7 +2479,7 @@ function SettingsToggle({
         )}
       </div>
 
-      { / * Selected Items Summary Tags (if any) * /}
+      { Selected Items Summary Tags (if any) }
       {selectedModelIds.length > 0 && (
         <div className="mt-2.5 flex flex-wrap items-center gap-1 border-t border-border/60 pt-2 text-[10px]">
           <span className="text-muted-foreground font-medium me-1">

@@ -82,4 +82,3 @@ export function saveUserItemPolicyPreferences(
     // Preferences are best-effort if browser storage is unavailable.
   }
 }
-

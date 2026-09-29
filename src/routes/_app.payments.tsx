@@ -11,6 +11,13 @@ import { toast } from "sonner";
 import { WhatsAppButton } from "@/components/whatsapp-button";
 import { paymentReceiptMessage, debtReminderMessage } from "@/lib/whatsapp-templates";
 import { openWhatsApp } from "@/lib/whatsapp";
+import {
+  VortexDateBadge,
+  VortexTransactionDetailSheet,
+  VortexMetricCard,
+  VortexSearchInput,
+} from "@/components/vortex-ui";
+import { ArrowUpRight, CheckCircle2, AlertTriangle, Sparkles } from "lucide-react";
 
 const paymentsSearchSchema = z.object({
   customerId: z.string().optional(),
@@ -66,6 +73,7 @@ function PaymentsPage() {
   const [note, setNote] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [saving, setSaving] = useState(false);
+  const [selectedTx, setSelectedTx] = useState<any>(null);
 
   useEffect(() => {
     (async () => {
@@ -250,13 +258,12 @@ function PaymentsPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_1fr]">
         {/* Customer list */}
         <div className="panel-elevated p-3">
-          <div className="mb-3 flex h-10 items-center gap-2 rounded-full border border-input bg-surface px-4 text-sm">
-            <Search className="h-4 w-4 text-muted-foreground" />
-            <input
+          <div className="mb-3">
+            <VortexSearchInput
               value={customerSearch}
               onChange={(e) => setCustomerSearch(e.target.value)}
-              placeholder={lang === "ar" ? "ابحث عن عميل..." : "Search customer…"}
-              className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
+              placeholder={lang === "ar" ? "ابحث بالاسم أو رقم الهاتف..." : "Search customer or phone..."}
+              className="w-full"
             />
           </div>
           <div className="max-h-[70vh] space-y-1 overflow-y-auto pr-1">
@@ -532,20 +539,44 @@ function PaymentsPage() {
                     </thead>
                     <tbody>
                       {payments.map((p) => (
-                        <tr key={p.id} className="border-b border-border/50">
-                          <td className="px-3 py-2 text-muted-foreground">{p.payment_date}</td>
-                          <td className="px-3 py-2 font-mono text-xs">
-                            {p.sales_invoices?.invoice_number ??
-                              (lang === "ar" ? "على الحساب" : "On account")}
+                        <tr
+                          key={p.id}
+                          onClick={() => {
+                            setSelectedTx({
+                              id: p.id,
+                              type: "payment",
+                              title: `سند تحصيل #${p.id.slice(-6)}`,
+                              amount: Number(p.amount),
+                              date: p.payment_date,
+                              customerName: selected.name,
+                              customerPhone: selected.phone,
+                              referenceNumber: p.id.slice(-6),
+                              method: pmLabel(p.payment_method),
+                              notes: p.note || undefined,
+                              remainingBalance: Number(selected.balance),
+                            });
+                          }}
+                          className="border-b border-border/50 hover:bg-surface-2/60 cursor-pointer transition-colors"
+                        >
+                          <td className="px-3 py-2">
+                            <VortexDateBadge date={p.payment_date} size="sm" />
                           </td>
-                          <td className="px-3 py-2 text-muted-foreground">
+                          <td className="px-3 py-2 font-mono text-xs">
+                            <span className="rounded-full bg-muted/70 px-2 py-0.5">
+                              {p.sales_invoices?.invoice_number ?? (lang === "ar" ? "على الحساب" : "On account")}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-muted-foreground font-medium text-xs">
                             {pmLabel(p.payment_method)}
                           </td>
-                          <td className="px-3 py-2 max-w-[220px] truncate text-muted-foreground">
+                          <td className="px-3 py-2 max-w-[220px] truncate text-muted-foreground text-xs">
                             {p.note ?? "—"}
                           </td>
-                          <td className="px-3 py-2 text-end font-mono font-semibold text-emerald-500">
-                            {money(Number(p.amount))}
+                          <td className="px-3 py-2 text-end font-mono font-bold text-emerald-500">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <span>{money(Number(p.amount))}</span>
+                              <ArrowUpRight className="size-3.5 opacity-60" />
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -557,6 +588,12 @@ function PaymentsPage() {
           </div>
         )}
       </div>
+
+      <VortexTransactionDetailSheet
+        open={!!selectedTx}
+        onOpenChange={(op) => !op && setSelectedTx(null)}
+        transaction={selectedTx}
+      />
     </>
   );
 }

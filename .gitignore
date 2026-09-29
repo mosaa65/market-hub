@@ -39,3 +39,12 @@ dist-ssr
 .env.local
 .env.*
 .codebuddy
+
+# Supabase CLI local state (machine-specific, never commit)
+supabase/.temp/
+supabase/.branches/
+supabase/.linter/
+
+# Local QA / dev scratch files
+qa-login*.mjs
+dev-server.log

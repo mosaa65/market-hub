@@ -415,6 +415,14 @@ const sections: Section[] = [
         bg: "bg-slate-500/15",
       },
       {
+        to: "/vortex-ui",
+        icon: Sparkles,
+        key: "nav.vortex_ui",
+        moduleId: "core",
+        color: "text-primary",
+        bg: "bg-primary/15",
+      },
+      {
         to: "/plans",
         icon: Crown,
         key: "nav.plans",

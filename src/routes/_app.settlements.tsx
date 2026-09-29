@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
+import { StockAdjustmentDialog } from "@/components/stock/stock-adjustment-dialog";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -18,6 +19,7 @@ import {
   TrendingDown,
   RefreshCw,
   FileCheck,
+  Plus,
 } from "lucide-react";
 import { type PageGuideConfig } from "@/components/page-guide";
 
@@ -190,9 +192,11 @@ const settlementGuideConfig: PageGuideConfig = {
 function SettlementsPage() {
   const { t, lang } = useI18n();
   const { hasRole, user } = useAuth();
+  const queryClient = useQueryClient();
   const canManageSettlement =
     hasRole("owner") || hasRole("manager") || hasRole("warehouse") || hasRole("accountant");
   const [query, setQuery] = useState("");
+  const [isAdjustmentOpen, setIsAdjustmentOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["settlements"],
@@ -291,8 +295,8 @@ function SettlementsPage() {
         guide={settlementGuideConfig}
       />
       <div className="panel-elevated overflow-hidden rounded-3xl border border-border/80 bg-surface/90 shadow-sm">
-        <div className="flex flex-wrap items-center gap-2 border-b border-border/70 p-3.5">
-          <div className="flex h-10 flex-1 items-center gap-2 rounded-full border border-border bg-surface px-4 text-sm shadow-2xs">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 p-3.5">
+          <div className="flex flex-1 min-w-[260px] items-center gap-2 rounded-full border border-border bg-surface px-4 h-10 text-sm shadow-2xs">
             <Search className="h-4 w-4 text-muted-foreground" />
             <input
               value={query}
@@ -305,8 +309,20 @@ function SettlementsPage() {
               className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground text-sm"
             />
           </div>
-          <div className="rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[11px] font-semibold text-amber-600 dark:text-amber-300">
-            {filtered.length} {lang === "ar" ? "حركة" : "records"}
+          <div className="flex items-center gap-2">
+            <div className="rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[11px] font-semibold text-amber-600 dark:text-amber-300">
+              {filtered.length} {lang === "ar" ? "حركة" : "records"}
+            </div>
+            {canManageSettlement && (
+              <button
+                type="button"
+                onClick={() => setIsAdjustmentOpen(true)}
+                className="flex h-10 items-center gap-2 rounded-full bg-primary px-4 text-xs font-bold text-primary-foreground shadow-sm hover:opacity-90 transition"
+              >
+                <Plus className="h-4 w-4" />
+                <span>{lang === "ar" ? "إجراء تسوية جردية جديدة" : "New Stock Adjustment"}</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -450,6 +466,17 @@ function SettlementsPage() {
           </table>
         </div>
       </div>
+
+      {isAdjustmentOpen && (
+        <StockAdjustmentDialog
+          onClose={() => setIsAdjustmentOpen(false)}
+          onSaved={() => {
+            setIsAdjustmentOpen(false);
+            queryClient.invalidateQueries({ queryKey: ["settlements"] });
+            queryClient.invalidateQueries({ queryKey: ["inventory"] });
+          }}
+        />
+      )}
     </>
   );
 }

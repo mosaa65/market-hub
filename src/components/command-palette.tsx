@@ -43,6 +43,7 @@ import {
   LineChart,
   Crown,
   ClipboardList,
+  Sparkles,
 } from "lucide-react";
 
 export function CommandPalette({
@@ -219,6 +220,9 @@ export function CommandPalette({
           </CommandItem>
           <CommandItem onSelect={() => go("/settings")}>
             <Settings /> {t("nav.settings")}
+          </CommandItem>
+          <CommandItem onSelect={() => go("/vortex-ui")}>
+            <Sparkles className="text-primary" /> {t("nav.vortex_ui")}
           </CommandItem>
           {isPlatformAdmin && (
             <CommandItem onSelect={() => go("/platform-admin")}>

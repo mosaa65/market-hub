@@ -1,3 +1,11 @@
+import {
+  VortexMetricCard,
+  VortexCollectionSheet,
+  VortexFilterSheet,
+  VortexFilterSection,
+  type PaymentMethod,
+} from "@/components/vortex-ui";
+import { SlidersHorizontal, HandCoins, AlertTriangle, UserCheck } from "lucide-react";
 /**
  * شاشة الديون — تعرض الأرصدة **من الدفتر** لا من العمود المخزَّن.
  *
@@ -70,9 +78,56 @@ function DebtsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "debt" | "over_limit">("debt");
+  const [advancedFilterOpen, setAdvancedFilterOpen] = useState(false);
+  const [hasPhoneOnly, setHasPhoneOnly] = useState(false);
+  const [collectionCustomer, setCollectionCustomer] = useState<{
+    id: string;
+    name: string;
+    phone: string | null;
+    balance: number;
+  } | null>(null);
+  const [collectionOpen, setCollectionOpen] = useState(false);
   const [selected, setSelected] = useState<Customer | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+
+  const handleSaveCollection = async (data: {
+    customerId: string;
+    amount: number;
+    method: PaymentMethod;
+    notes?: string;
+  }) => {
+    const dbMethodMap: Record<PaymentMethod, "cash" | "card" | "bank_transfer"> = {
+      cash: "cash",
+      card: "card",
+      transfer: "bank_transfer",
+      cheque: "bank_transfer",
+    };
+    const dbMethod = dbMethodMap[data.method] || "cash";
+    const receiptNumber = String(Date.now()).slice(-6);
+
+    const { error: pError } = await (supabase as any).from("customer_payments").insert({
+      customer_id: data.customerId,
+      amount: data.amount,
+      payment_method: dbMethod,
+      note: data.notes || null,
+      payment_date: new Date().toISOString(),
+    });
+    if (pError) throw pError;
+
+    const currentCust = rows.find((r) => r.id === data.customerId) || collectionCustomer;
+    if (currentCust) {
+      const newBal = (Number(currentCust.balance) || 0) - data.amount;
+      await (supabase as any)
+        .from("customers")
+        .update({ balance: newBal })
+        .eq("id", data.customerId);
+    }
+
+    toast.success(lang === "ar" ? "تم تسجيل التحصيل بنجاح" : "Payment recorded successfully");
+    await load();
+    return { receiptNumber };
+  };
 
   // أرصدة مؤكَّدة من الدفتر — مصدر واحد لكل الشاشات
   const { index: ledgerIndex } = useDebtIndex("customer");
@@ -211,10 +266,33 @@ function DebtsPage() {
         }
       />
 
-      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <SumCard label={t("debts.total_debt")} value={money(totals.totalDebt)} tone="warn" />
-        <SumCard label={t("debts.debtors")} value={String(totals.debtors)} tone="info" />
-        <SumCard label={t("debts.over_limit")} value={String(totals.overLimit)} tone="neg" />
+      {/* ─── Luxury Vortex Metric Cards ─── */}
+      <div className="mb-5 grid grid-cols-1 gap-3.5 sm:grid-cols-3">
+        <VortexMetricCard
+          title={t("debts.total_debt")}
+          value={totals.totalDebt}
+          currency="ر.س"
+          highlight
+          icon={<HandCoins className="size-5 text-amber-600 dark:text-amber-400" />}
+          iconClassName="bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+          subtitle="إجمالي المبالغ المستحقة طرف العملاء"
+        />
+        <VortexMetricCard
+          title={t("debts.debtors")}
+          value={totals.debtors}
+          currency="عميل"
+          icon={<UserCheck className="size-5 text-sky-600 dark:text-sky-400" />}
+          iconClassName="bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20"
+          subtitle="عملاء عليهم أرصدة مدينة قائمة"
+        />
+        <VortexMetricCard
+          title={t("debts.over_limit")}
+          value={totals.overLimit}
+          currency="حساب"
+          icon={<AlertTriangle className="size-5 text-rose-600 dark:text-rose-400" />}
+          iconClassName="bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
+          subtitle="حسابات تجاوزت الحد الائتماني المسموح"
+        />
       </div>
 
       <div className="panel-elevated p-4">
@@ -228,6 +306,17 @@ function DebtsPage() {
               className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
             />
           </div>
+          {/* Advanced Filter Button */}
+          <button
+            type="button"
+            onClick={() => setAdvancedFilterOpen(true)}
+            className="flex items-center gap-1.5 rounded-full border border-input bg-surface px-3 py-1.5 text-xs font-medium hover:bg-surface-elevated transition-colors text-foreground"
+          >
+            <SlidersHorizontal className="size-3.5 text-primary" />
+            <span>فلترة متقدمة</span>
+            {hasPhoneOnly && <span className="size-1.5 rounded-full bg-primary" />}
+          </button>
+
           <div className="flex rounded-full border border-input bg-surface p-1 text-xs">
             {(["debt", "over_limit", "all"] as const).map((f) => (
               <button
@@ -325,16 +414,38 @@ function DebtsPage() {
                       <td className="px-3 py-2.5 text-end">
                         <div className="flex items-center justify-end gap-1.5">
                           {bal > 0 && (
-                            <WhatsAppButton
-                              phone={r.phone}
-                              message={debtReminderMessage({
-                                name: r.name,
-                                balance: money(bal),
-                                lang,
-                              })}
-                            />
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setCollectionCustomer({
+                                    id: r.id,
+                                    name: r.name,
+                                    phone: r.phone,
+                                    balance: bal,
+                                  });
+                                  setCollectionOpen(true);
+                                }}
+                                title={lang === "ar" ? "تحصيل فوري" : "Quick Collect"}
+                                className="flex h-7 items-center gap-1 rounded-full bg-primary/10 hover:bg-primary hover:text-primary-foreground border border-primary/20 px-2.5 text-[11px] font-bold text-primary transition active:scale-95"
+                              >
+                                <HandCoins className="size-3" />
+                                <span>{lang === "ar" ? "تحصيل" : "Collect"}</span>
+                              </button>
+                              <WhatsAppButton
+                                phone={r.phone}
+                                message={debtReminderMessage({
+                                  name: r.name,
+                                  balance: money(bal),
+                                  lang,
+                                })}
+                              />
+                            </>
                           )}
-                          <button className="rounded-full border border-border bg-surface px-3 py-1 text-xs text-muted-foreground hover:bg-surface-2">
+                          <button
+                            onClick={() => openDetail(r)}
+                            className="rounded-full border border-border bg-surface px-3 py-1 text-xs text-muted-foreground hover:bg-surface-2"
+                          >
                             {t("debts.view")}
                           </button>
                         </div>
@@ -347,6 +458,16 @@ function DebtsPage() {
           </table>
         </div>
       </div>
+
+      <VortexCollectionSheet
+        open={collectionOpen}
+        onOpenChange={setCollectionOpen}
+        customer={collectionCustomer}
+        onSavePayment={handleSaveCollection}
+        onSuccess={() => {
+          load();
+        }}
+      />
 
       {selected && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur-sm p-4">
@@ -493,12 +614,21 @@ function DebtsPage() {
                 <FileText className="h-4 w-4" />
                 {lang === "ar" ? "كشف حساب / PDF" : "Statement / PDF"}
               </button>
-              <Link
-                to="/payments"
-                className="flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90"
+              <button
+                type="button"
+                onClick={() => {
+                  setCollectionCustomer({
+                    id: selected.id,
+                    name: selected.name,
+                    phone: selected.phone,
+                    balance: selectedLedgerBalance,
+                  });
+                  setCollectionOpen(true);
+                }}
+                className="flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90 active:scale-95 transition"
               >
-                {lang === "ar" ? "تحصيل دفعة" : "Record payment"}
-              </Link>
+                {lang === "ar" ? "تحصيل دفعة فوري" : "Record payment"}
+              </button>
             </div>
           </div>
         </div>

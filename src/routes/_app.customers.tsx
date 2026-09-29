@@ -41,6 +41,7 @@ import { openWhatsApp } from "@/lib/whatsapp";
 import { debtReminderMessage } from "@/lib/whatsapp-templates";
 import { useDebtIndex } from "@/hooks/use-debts-overview";
 import { StatementIntegrityBadge } from "@/components/statements/statement-integrity-badge";
+import { VortexCollectionSheet, type PaymentMethod } from "@/components/vortex-ui";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/customers")({
@@ -91,6 +92,8 @@ function CustomersPage() {
   const [viewMode, setViewMode] = useState<ViewMode>("cards");
   const [edit, setEdit] = useState<Partial<Customer> | null>(null);
   const [selected, setSelected] = useState<Customer | null>(null);
+  const [collectionCustomer, setCollectionCustomer] = useState<Customer | null>(null);
+  const [collectionOpen, setCollectionOpen] = useState(false);
   const [activity, setActivity] = useState<
     { label: string; date: string; amount: number; kind: "sale" | "payment" }[]
   >([]);
@@ -239,12 +242,49 @@ function CustomersPage() {
   }
 
   // ─── Quick actions navigation ───
-  const goPayment = useCallback(
-    (c: Customer) => {
-      navigate({ to: "/payments", search: { customerId: c.id } as any });
-    },
-    [navigate],
-  );
+  const goPayment = useCallback((c: Customer) => {
+    setCollectionCustomer(c);
+    setCollectionOpen(true);
+  }, []);
+
+  const handleSaveCollection = async (data: {
+    customerId: string;
+    amount: number;
+    method: PaymentMethod;
+    notes?: string;
+  }) => {
+    const dbMethodMap: Record<PaymentMethod, "cash" | "card" | "bank_transfer"> = {
+      cash: "cash",
+      card: "card",
+      transfer: "bank_transfer",
+      cheque: "bank_transfer",
+    };
+    const dbMethod = dbMethodMap[data.method] || "cash";
+    const receiptNumber = String(Date.now()).slice(-6);
+
+    const { error: pError } = await (supabase as any).from("customer_payments").insert({
+      customer_id: data.customerId,
+      amount: data.amount,
+      payment_method: dbMethod,
+      note: data.notes || null,
+      payment_date: new Date().toISOString(),
+    });
+    if (pError) throw pError;
+
+    // Update customer balance directly
+    const currentCust = rows.find((r) => r.id === data.customerId) || collectionCustomer;
+    if (currentCust) {
+      const newBal = (Number(currentCust.balance) || 0) - data.amount;
+      await (supabase as any)
+        .from("customers")
+        .update({ balance: newBal })
+        .eq("id", data.customerId);
+    }
+
+    toast.success(lang === "ar" ? "تم تسجيل سند التحصيل بنجاح" : "Payment recorded successfully");
+    await load();
+    return { receiptNumber };
+  };
   const goDebts = useCallback(
     (c: Customer) => {
       navigate({ to: "/debts", search: { customerId: c.id } as any });

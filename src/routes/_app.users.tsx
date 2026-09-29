@@ -1,19 +1,11 @@
 import { useModules } from "@/lib/modules";
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +24,13 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { toast } from "sonner";
 import {
   ShieldCheck,
@@ -47,26 +46,88 @@ import {
   Check,
   KeyRound,
   Loader2,
+  Search,
+  Phone,
+  Mail,
+  Calendar,
+  Eye,
+  Send,
+  MessageCircle,
+  Briefcase,
+  Shield,
+  Filter,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 import { RolePermissionsDialog } from "@/components/role-permissions-dialog";
+import { VortexMetricCard, VortexSearchInput, VortexDateBadge } from "@/components/vortex-ui";
+import { toSystemDigits, formatLuxuryDate } from "@/lib/format-preferences";
 import { cn } from "@/lib/utils";
 
 const STORE_ROLES = ["owner", "manager", "accountant", "cashier", "warehouse"] as const;
 type StoreRole = (typeof STORE_ROLES)[number];
 
-/** Default role offered for a brand-new staff account. */
 const DEFAULT_NEW_ROLE: StoreRole = "cashier";
 
-/** Credentials shown exactly once after a successful provisioning. */
 type IssuedCredentials = {
   email: string;
   password: string;
   full_name: string;
   role: string;
+  phone?: string;
 };
 
+// Role styling & icons helper
+function getRoleMeta(role: string) {
+  switch (role) {
+    case "owner":
+      return {
+        labelAr: "المالك",
+        icon: Crown,
+        badgeClass: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30",
+        colorClass: "text-amber-500",
+      };
+    case "manager":
+      return {
+        labelAr: "المدير",
+        icon: ShieldCheck,
+        badgeClass: "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30",
+        colorClass: "text-blue-500",
+      };
+    case "accountant":
+      return {
+        labelAr: "المحاسب",
+        icon: Briefcase,
+        badgeClass:
+          "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
+        colorClass: "text-emerald-500",
+      };
+    case "cashier":
+      return {
+        labelAr: "الكاشير",
+        icon: Sparkles,
+        badgeClass: "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30",
+        colorClass: "text-purple-500",
+      };
+    case "warehouse":
+      return {
+        labelAr: "أمين المستودع",
+        icon: Shield,
+        badgeClass: "bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/30",
+        colorClass: "text-orange-500",
+      };
+    default:
+      return {
+        labelAr: role,
+        icon: Shield,
+        badgeClass: "bg-muted text-muted-foreground border-border",
+        colorClass: "text-muted-foreground",
+      };
+  }
+}
+
 export const Route = createFileRoute("/_app/users")({
-  head: () => ({ meta: [{ title: "المستخدمين وإدارة الصلاحيات — Vortex ERP" }] }),
+  head: () => ({ meta: [{ title: "إدارة المستخدمين والصلاحيات — Vortex ERP" }] }),
   component: UsersPage,
 });
 
@@ -84,6 +145,14 @@ function UsersPage() {
   const [platformAdminRows, setPlatformAdminRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Search & Filter state
+  const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  // User detail sheet state
+  const [selectedUser, setSelectedUser] = useState<any | null>(null);
+
   // Create-user dialog state
   const [addOpen, setAddOpen] = useState(false);
   const [addName, setAddName] = useState("");
@@ -91,18 +160,14 @@ function UsersPage() {
   const [addPhone, setAddPhone] = useState("");
   const [addRole, setAddRole] = useState<StoreRole>(DEFAULT_NEW_ROLE);
   const [addSaving, setAddSaving] = useState(false);
-  // Populated only on success; holds the one-time credentials for hand-off.
   const [issued, setIssued] = useState<IssuedCredentials | null>(null);
   const [copiedField, setCopiedField] = useState<"password" | "all" | null>(null);
 
   async function load() {
     setLoading(true);
     try {
-      // The platform_admins table is admin-only at the RLS layer now. Non-admins
-      // must not even attempt the query (it would return zero rows) and must not
-      // receive any Super Admin data in the client payload.
       const [profilesRes, rolesRes, platformRes] = await Promise.all([
-        supabase.from("profiles").select("id, full_name, avatar_url, created_at, is_active"),
+        supabase.from("profiles").select("id, full_name, avatar_url, phone, created_at, is_active"),
         supabase.from("user_roles").select("id, user_id, role"),
         isSuper
           ? (supabase as any)
@@ -125,21 +190,13 @@ function UsersPage() {
       const profileMap = new Map<string, any>();
       (profiles ?? []).forEach((p) => profileMap.set(p.id, p));
 
-      // 1. Store Staff: tenant users who hold at least one store role.
-      //    Platform superadmins are never listed here, so the Super Admin
-      //    identity is never exposed to unauthorised viewers.
       const storeUsers: any[] = [];
       (profiles ?? []).forEach((p) => {
         const uRoles = byUser.get(p.id) ?? [];
-        // Accounts with no store role yet are deliberately not listed here:
-        // store staff are created from this page, which provisions the role
-        // atomically. A profile left without a role is a failed provisioning
-        // attempt and must not be presented as a team member.
         if (uRoles.length === 0) return;
         storeUsers.push({ ...p, roles: uRoles });
       });
 
-      // 2. Platform Admins: strictly from platform_admins table (admins only).
       const platformUsers: any[] = (platformAdmins ?? []).map((pa: any) => {
         const prof = profileMap.get(pa.user_id);
         return {
@@ -156,6 +213,7 @@ function UsersPage() {
       setPlatformAdminRows(platformUsers);
     } catch (err) {
       console.error("Error loading users:", err);
+      toast.error(isAr ? "تعذر تحميل قائمة المستخدمين" : "Failed to load users");
     } finally {
       setLoading(false);
     }
@@ -163,8 +221,58 @@ function UsersPage() {
 
   useEffect(() => {
     void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSuper]);
+
+  // Statistics calculation
+  const stats = useMemo(() => {
+    const total = storeRows.length;
+    const active = storeRows.filter((r) => r.is_active !== false).length;
+    const disabled = storeRows.filter((r) => r.is_active === false).length;
+    const managers = storeRows.filter((r) =>
+      r.roles.some((ro: any) => ro.role === "owner" || ro.role === "manager"),
+    ).length;
+
+    return { total, active, disabled, managers };
+  }, [storeRows]);
+
+  // Filtered staff rows
+  const filteredStoreRows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return storeRows.filter((r) => {
+      // Text search
+      if (q) {
+        const name = (r.full_name || "").toLowerCase();
+        const phone = (r.phone || "").toLowerCase();
+        const rolesStr = (r.roles || [])
+          .map((ro: any) => ro.role)
+          .join(" ")
+          .toLowerCase();
+        const rolesArStr = (r.roles || []).map((ro: any) => getRoleMeta(ro.role).labelAr).join(" ");
+        if (
+          !name.includes(q) &&
+          !phone.includes(q) &&
+          !rolesStr.includes(q) &&
+          !rolesArStr.includes(q)
+        ) {
+          return false;
+        }
+      }
+
+      // Role filter
+      if (roleFilter !== "all") {
+        const has = r.roles.some((ro: any) => ro.role === roleFilter);
+        if (!has) return false;
+      }
+
+      // Status filter
+      if (statusFilter !== "all") {
+        if (statusFilter === "active" && r.is_active === false) return false;
+        if (statusFilter === "disabled" && r.is_active !== false) return false;
+      }
+
+      return true;
+    });
+  }, [storeRows, search, roleFilter, statusFilter]);
 
   async function assignStoreRole(userId: string, role: string) {
     const qCheck = checkQuota("users", storeRows.length);
@@ -187,9 +295,6 @@ function UsersPage() {
     void load();
   }
 
-  // Account-level deactivation. The auth user, profile, roles and every
-  // historical record are preserved untouched — only profiles.is_active flips.
-  // Access is actually revoked by RLS (migration 20260918000200).
   async function setUserActive(userId: string, active: boolean) {
     if (userId === user?.id && !active) {
       return toast.error(
@@ -218,7 +323,7 @@ function UsersPage() {
     toast.success(
       active
         ? isAr
-          ? "تمت إعادة تفعيل المستخدم"
+          ? "تمت إعادة تفعيل المستخدم بنجاح"
           : "User reactivated"
         : isAr
           ? "تم تعطيل المستخدم مع الاحتفاظ ببياناته"
@@ -227,14 +332,6 @@ function UsersPage() {
     void load();
   }
 
-  // Creates a BRAND-NEW staff account via the `admin-create-user` Edge
-  // Function: Auth user + profile + store role are provisioned server-side.
-  //
-  // SECURITY: the browser never sees a service/secret key. The function
-  // re-derives the caller's permissions from the database, validates the role
-  // against a hard allow-list, and refuses platform/super admin tiers. The
-  // quota check is repeated there too, so it cannot be bypassed by calling the
-  // function directly (bypassing this dialog).
   async function createStoreUser() {
     const name = addName.trim();
     const email = addEmail.trim().toLowerCase();
@@ -254,8 +351,6 @@ function UsersPage() {
 
     setAddSaving(true);
     try {
-      // The bearer token must be attached explicitly: without it the function
-      // cannot tell who is calling and every request would be rejected.
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData.session?.access_token;
       if (!accessToken) {
@@ -269,8 +364,6 @@ function UsersPage() {
       });
 
       if (error) {
-        // Supabase attaches the raw response body to `context` for non-2xx
-        // replies; prefer the server's Arabic message over the generic one.
         let payload: any = data;
         const ctx = (error as any).context;
         if (!payload && ctx && typeof ctx.json === "function") {
@@ -289,13 +382,12 @@ function UsersPage() {
         );
       }
 
-      // The password exists only in this response. It is never persisted, so
-      // it is handed to the admin once and never fetched again.
       setIssued({
         email: data.email,
         password: data.password,
         full_name: data.full_name,
         role: data.role,
+        phone,
       });
       setCopiedField(null);
       toast.success(isAr ? "تم إنشاء حساب المستخدم بنجاح" : "User account created successfully");
@@ -307,7 +399,6 @@ function UsersPage() {
     }
   }
 
-  /** Clears the one-time credentials and closes the create dialog. */
   function resetCreateDialog() {
     setIssued(null);
     setCopiedField(null);
@@ -321,10 +412,10 @@ function UsersPage() {
     try {
       await navigator.clipboard.writeText(text);
       setCopiedField(field);
-      toast.success(isAr ? "تم النسخ" : "Copied");
+      toast.success(isAr ? "تم النسخ بنجاح" : "Copied");
       setTimeout(() => setCopiedField(null), 2000);
     } catch {
-      toast.error(isAr ? "تعذر النسخ تلقائيًا. انسخ البيانات يدويًا." : "Copy failed.");
+      toast.error(isAr ? "تعذر النسخ تلقائيًا" : "Copy failed.");
     }
   }
 
@@ -347,295 +438,419 @@ function UsersPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={isAr ? "إدارة المستخدمين والصلاحيات" : "Users & Access Control"}
-        subtitle={
-          isAr
-            ? "تنظيم طاقم موظفي المتجر وتعيين المسؤوليات وفق مصفوفة الصلاحيات المعتمدة."
-            : "Manage store personnel and assign operational role boundaries."
-        }
-        actions={
-          <div className="flex items-center gap-2.5">
-            <RolePermissionsDialog />
-          </div>
-        }
-      />
+    <div className="space-y-6 pb-12">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
+            {isAr ? "إدارة المستخدمين وطاقم العمل" : "Staff & Access Control"}
+          </h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+            {isAr
+              ? "إدارة حسابات الموظفين وتعيين الأدوار التشغيلية والصلاحيات المعتمدة للمتجر"
+              : "Manage staff accounts, assign operational roles, and enforce security policies"}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <RolePermissionsDialog
+            trigger={
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-2xl gap-2 h-10 px-3.5 border-border/80 hover:bg-muted text-xs font-semibold"
+              >
+                <Sparkles className="size-4 text-primary" />
+                <span>{isAr ? "مصفوفة الصلاحيات" : "Permissions Matrix"}</span>
+              </Button>
+            }
+          />
+
+          {canManageStore && (
+            <Button
+              size="sm"
+              onClick={() => setAddOpen(true)}
+              className="rounded-2xl gap-2 h-10 px-4 text-xs font-bold shadow-md shadow-primary/20"
+            >
+              <UserPlus className="size-4" />
+              <span>{isAr ? "إضافة موظف جديد" : "Add Staff"}</span>
+            </Button>
+          )}
+        </div>
+      </div>
 
       {/* Warning banner for non-owners */}
       {!canManageStore && (
-        <div className="p-3.5 rounded-2xl border border-amber-500/30 bg-amber-500/5 text-xs text-amber-600 dark:text-amber-400 flex items-center gap-2">
-          <Lock className="h-4 w-4 shrink-0" />
+        <div className="p-4 rounded-3xl border border-amber-500/30 bg-amber-500/5 text-xs text-amber-700 dark:text-amber-400 flex items-center gap-2.5">
+          <Lock className="size-4 shrink-0 text-amber-500" />
           <span>
             {isAr
-              ? "صلاحية المالك فقط هي المخولة بتعيين أو تعديل أدوار الموظفين."
-              : "Only the Owner has privilege to assign or modify roles."}
+              ? "ملاحظة: صلاحية المالك والمدير المخول فقط هي التي تملك حق تعيين أو تعديل أدوار الموظفين."
+              : "Notice: Only Owner and authorized Managers can modify staff role assignments."}
           </span>
         </div>
       )}
 
-      {/* Tabs (Shown if user is Platform Superadmin) */}
+      {/* Top Metric Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <VortexMetricCard
+          title={isAr ? "إجمالي طاقم العمل" : "Total Staff"}
+          value={toSystemDigits(stats.total)}
+          currency=""
+          subtitle={isAr ? "موظف مسجل بالمنشأة" : "Registered store staff"}
+          icon={<Users className="size-5" />}
+          iconClassName="bg-primary/10 text-primary"
+        />
+        <VortexMetricCard
+          title={isAr ? "الحسابات النشطة" : "Active Staff"}
+          value={toSystemDigits(stats.active)}
+          currency=""
+          subtitle={isAr ? "جاهزون للعمل والدخول" : "Ready for operations"}
+          icon={<UserCheck className="size-5" />}
+          iconClassName="bg-emerald-500/10 text-emerald-600"
+          highlight={stats.active > 0}
+        />
+        <VortexMetricCard
+          title={isAr ? "الحسابات المعطلة" : "Disabled Staff"}
+          value={toSystemDigits(stats.disabled)}
+          currency=""
+          subtitle={isAr ? "تم إيقاف وصولهم مؤقتاً" : "Access currently revoked"}
+          icon={<UserX className="size-5" />}
+          iconClassName={
+            stats.disabled > 0 ? "bg-rose-500/10 text-rose-600" : "bg-muted text-muted-foreground"
+          }
+        />
+        <VortexMetricCard
+          title={isAr ? "القيادة والإدارة" : "Managers & Owners"}
+          value={toSystemDigits(stats.managers)}
+          currency=""
+          subtitle={isAr ? "صلاحيات إدارية متقدمة" : "Elevated privileges"}
+          icon={<Crown className="size-5" />}
+          iconClassName="bg-amber-500/10 text-amber-600"
+        />
+      </div>
+
+      {/* Superadmin Tab Navigation */}
       {isSuper && (
         <div className="flex items-center gap-2 border-b border-border/70 pb-3">
           <button
             onClick={() => setActiveTab("store")}
             className={cn(
-              "flex items-center gap-2 rounded-full px-4 py-2 text-xs font-bold transition-all",
+              "flex items-center gap-2 rounded-2xl px-4 py-2 text-xs font-bold transition-all",
               activeTab === "store"
-                ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
-                : "bg-surface hover:bg-surface-2 text-muted-foreground hover:text-foreground border border-border",
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "bg-card hover:bg-muted text-muted-foreground hover:text-foreground border border-border/70",
             )}
           >
-            <Users className="h-4 w-4" />
-            <span>{isAr ? "طاقم موظفي المنشأة / المتجر" : "Store Staff Team"}</span>
-            <span className="rounded-full bg-primary-foreground/20 px-2 py-0.5 text-[10px] tabular-nums">
-              {storeRows.length}
+            <Users className="size-4" />
+            <span>{isAr ? "طاقم موظفي المنشأة" : "Store Staff Team"}</span>
+            <span className="rounded-full bg-primary-foreground/20 px-2 py-0.5 text-[10px] font-mono">
+              {toSystemDigits(storeRows.length)}
             </span>
           </button>
 
           <button
             onClick={() => setActiveTab("platform")}
             className={cn(
-              "flex items-center gap-2 rounded-full px-4 py-2 text-xs font-bold transition-all",
+              "flex items-center gap-2 rounded-2xl px-4 py-2 text-xs font-bold transition-all",
               activeTab === "platform"
-                ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md shadow-amber-500/20"
-                : "bg-surface hover:bg-surface-2 text-muted-foreground hover:text-foreground border border-border",
+                ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm"
+                : "bg-card hover:bg-muted text-muted-foreground hover:text-foreground border border-border/70",
             )}
           >
-            <Crown className="h-4 w-4 text-amber-400" />
-            <span>{isAr ? "مدراء المنصة السحابية (جدول مستقل)" : "Platform Superadmins"}</span>
-            <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] tabular-nums">
-              {platformAdminRows.length}
+            <Crown className="size-4 text-amber-200" />
+            <span>{isAr ? "مدراء المنصة السحابية" : "Platform Superadmins"}</span>
+            <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-mono">
+              {toSystemDigits(platformAdminRows.length)}
             </span>
           </button>
         </div>
       )}
 
-      {/* Tab 1: Store Staff Table */}
+      {/* Store Staff Tab View */}
       {activeTab === "store" && (
-        <Card className="border-border/80 shadow-sm overflow-hidden rounded-3xl">
-          <CardHeader className="p-5 border-b border-border/70 bg-surface/50">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
-                  <Users className="h-4 w-4 text-primary" />
-                  <span>
-                    {isAr
-                      ? "كشف موظفي المتجر والأدوار التشغيلية"
-                      : "Store Personnel & Role Allocations"}
-                  </span>
-                </CardTitle>
-                <CardDescription className="text-xs text-muted-foreground mt-0.5">
-                  {isAr
-                    ? "الأدوار المحلية المعتمدة: المالك، المدير، المحاسب، الكاشير، أمين المستودع."
-                    : "Standard operational roles: Owner, Manager, Accountant, Cashier, Warehouse."}
-                </CardDescription>
-              </div>
-              <div className="flex items-center gap-2">
-                {canManageStore && (
-                  <Button
-                    size="sm"
-                    onClick={() => setAddOpen(true)}
-                    className="rounded-full text-xs gap-1.5"
-                  >
-                    <UserPlus className="h-3.5 w-3.5" />
-                    <span>{isAr ? "إضافة مستخدم" : "Add User"}</span>
-                  </Button>
-                )}
-                <Badge variant="outline" className="text-xs font-mono">
-                  {isAr ? `${storeRows.length} موظف` : `${storeRows.length} Staff`}
-                </Badge>
-              </div>
+        <div className="space-y-4">
+          {/* Search & Quick Filter Toolbar */}
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            <div className="w-full sm:flex-1">
+              <VortexSearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder={
+                  isAr
+                    ? "ابحث بالاسم، الدور، أو رقم الهاتف..."
+                    : "Search staff by name, role, or phone..."
+                }
+                className="w-full"
+              />
             </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-                    <TableHead className="px-4 py-3">{isAr ? "الموظف" : "Employee"}</TableHead>
-                    <TableHead className="px-4 py-3">
-                      {isAr ? "الأدوار والصلاحيات بالمتجر" : "Store Roles"}
-                    </TableHead>
-                    <TableHead className="px-4 py-3">{isAr ? "الحالة" : "Status"}</TableHead>
-                    <TableHead className="px-4 py-3">
-                      {isAr ? "تاريخ التسجيل" : "Joined Date"}
-                    </TableHead>
-                    {canManageStore && (
-                      <TableHead className="px-4 py-3 text-end">
-                        {isAr ? "الإجراءات وتعيين الأدوار" : "Actions"}
-                      </TableHead>
-                    )}
-                  </tr>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    Array.from({ length: 3 }).map((_, i) => (
-                      <TableRow key={i} className="border-b border-border/60">
-                        <TableCell colSpan={5} className="px-4 py-4">
-                          <div className="h-5 w-full rounded shimmer" />
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : storeRows.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground py-12">
-                        {isAr ? "لا يوجد موظفون مسجلون حالياً" : "No store employees found"}
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    storeRows.map((r) => {
-                      const isCurrentUser = r.id === user?.id;
-                      const hasOwner = r.roles.some((ro: any) => ro.role === "owner");
 
-                      return (
-                        <TableRow
-                          key={r.id}
-                          className="border-b border-border/60 hover:bg-accent/25 transition-colors"
-                        >
-                          <TableCell className="px-4 py-3">
-                            <div className="flex items-center gap-3">
-                              <div className="h-9 w-9 rounded-2xl bg-primary/10 text-primary grid place-items-center text-xs font-bold border border-primary/20 shadow-2xs">
-                                {(r.full_name ?? "?").slice(0, 2).toUpperCase()}
-                              </div>
-                              <div>
-                                <div className="font-semibold text-sm text-foreground flex items-center gap-1.5">
-                                  <span>{r.full_name ?? "—"}</span>
-                                  {isCurrentUser && (
-                                    <span className="text-[11px] font-normal text-primary">
-                                      ({isAr ? "أنت" : "You"})
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </TableCell>
+            {/* Quick role filter pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0 scrollbar-none">
+              <Button
+                size="sm"
+                variant={roleFilter === "all" ? "default" : "outline"}
+                onClick={() => setRoleFilter("all")}
+                className="rounded-full text-xs h-9 px-3 shrink-0"
+              >
+                {isAr ? "جميع الأدوار" : "All"}
+              </Button>
+              {STORE_ROLES.map((r) => {
+                const meta = getRoleMeta(r);
+                const Icon = meta.icon;
+                return (
+                  <Button
+                    key={r}
+                    size="sm"
+                    variant={roleFilter === r ? "default" : "outline"}
+                    onClick={() => setRoleFilter(r)}
+                    className="rounded-full text-xs h-9 px-3 shrink-0 gap-1.5"
+                  >
+                    <Icon
+                      className={cn(
+                        "size-3.5",
+                        roleFilter === r ? "text-primary-foreground" : meta.colorClass,
+                      )}
+                    />
+                    <span>{meta.labelAr}</span>
+                  </Button>
+                );
+              })}
 
-                          <TableCell className="px-4 py-3">
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              {r.roles.length === 0 ? (
-                                <span className="text-xs text-muted-foreground italic">
-                                  {isAr ? "بلا دور مسند" : "No role assigned"}
-                                </span>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-32 h-9 text-xs rounded-full border-border/80">
+                  <SelectValue placeholder={isAr ? "الحالة" : "Status"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-xs">
+                    {isAr ? "كل الحالات" : "All Status"}
+                  </SelectItem>
+                  <SelectItem value="active" className="text-xs">
+                    {isAr ? "نشط فقط" : "Active only"}
+                  </SelectItem>
+                  <SelectItem value="disabled" className="text-xs">
+                    {isAr ? "معطّل فقط" : "Disabled only"}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Staff Cards & Table List */}
+          <Card className="rounded-3xl border border-border/70 shadow-sm overflow-hidden bg-card">
+            <CardContent className="p-0">
+              {loading ? (
+                <div className="p-12 text-center space-y-3">
+                  <Loader2 className="size-8 animate-spin mx-auto text-primary" />
+                  <p className="text-xs text-muted-foreground">
+                    {isAr ? "جارٍ تحميل طاقم العمل..." : "Loading staff..."}
+                  </p>
+                </div>
+              ) : filteredStoreRows.length === 0 ? (
+                <div className="p-16 text-center">
+                  <div className="mx-auto mb-4 grid size-16 place-items-center rounded-3xl bg-muted/60 text-muted-foreground">
+                    <Users className="size-8 opacity-60" />
+                  </div>
+                  <h3 className="text-base font-bold text-foreground mb-1">
+                    {isAr ? "لا يوجد موظفون مطابقون" : "No matching staff"}
+                  </h3>
+                  <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                    {isAr
+                      ? "لم نجد أي موظف يطابق معايير البحث والفلترة المحددة حالياً."
+                      : "No staff member matched your current search filters."}
+                  </p>
+                  {(search || roleFilter !== "all" || statusFilter !== "all") && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSearch("");
+                        setRoleFilter("all");
+                        setStatusFilter("all");
+                      }}
+                      className="mt-4 rounded-2xl text-xs"
+                    >
+                      {isAr ? "إعادة ضبط البحث" : "Reset Filters"}
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div className="divide-y divide-border/50">
+                  {filteredStoreRows.map((r) => {
+                    const isCurrentUser = r.id === user?.id;
+                    const hasOwner = r.roles.some((ro: any) => ro.role === "owner");
+                    const initials = (r.full_name ?? "?").slice(0, 2).toUpperCase();
+
+                    return (
+                      <div
+                        key={r.id}
+                        className="group flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5 hover:bg-muted/30 transition-colors"
+                      >
+                        {/* Left Info Column */}
+                        <div className="flex items-start sm:items-center gap-3.5">
+                          {/* Avatar */}
+                          <div className="size-11 rounded-2xl bg-primary/10 text-primary grid place-items-center text-sm font-black border border-primary/20 shrink-0 shadow-2xs">
+                            {initials}
+                          </div>
+
+                          {/* Details */}
+                          <div className="space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-sm font-black text-foreground">
+                                {r.full_name ?? "—"}
+                              </span>
+                              {isCurrentUser && (
+                                <Badge
+                                  variant="secondary"
+                                  className="text-[10px] font-bold rounded-lg px-2 py-0.5 bg-primary/15 text-primary border-primary/20"
+                                >
+                                  {isAr ? "أنت (حسابك)" : "You"}
+                                </Badge>
+                              )}
+                              {r.is_active === false ? (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] font-bold rounded-lg px-2 py-0.5 border-rose-500/40 text-rose-600 bg-rose-500/10"
+                                >
+                                  <XCircle className="size-3 me-1 inline" />
+                                  {isAr ? "معطّل" : "Disabled"}
+                                </Badge>
                               ) : (
-                                r.roles.map((ro: any) => (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] font-bold rounded-lg px-2 py-0.5 border-emerald-500/40 text-emerald-600 bg-emerald-500/10"
+                                >
+                                  <CheckCircle2 className="size-3 me-1 inline" />
+                                  {isAr ? "نشط" : "Active"}
+                                </Badge>
+                              )}
+                            </div>
+
+                            {/* Phone & Date */}
+                            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                              {r.phone && (
+                                <span className="flex items-center gap-1 font-mono text-[11px] dir-ltr text-foreground/80">
+                                  <Phone className="size-3 text-muted-foreground" />
+                                  {toSystemDigits(r.phone)}
+                                </span>
+                              )}
+                              <span className="flex items-center gap-1 text-[11px]">
+                                <Calendar className="size-3 text-muted-foreground" />
+                                <span>{isAr ? "انضم:" : "Joined:"}</span>
+                                <span>{formatLuxuryDate(r.created_at).full}</span>
+                              </span>
+                            </div>
+
+                            {/* Roles badges list */}
+                            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                              {r.roles.map((ro: any) => {
+                                const meta = getRoleMeta(ro.role);
+                                const Icon = meta.icon;
+                                return (
                                   <Badge
                                     key={ro.id}
-                                    variant={ro.role === "owner" ? "default" : "secondary"}
-                                    className="gap-1.5 py-1 px-2.5 text-xs font-semibold"
+                                    variant="outline"
+                                    className={cn(
+                                      "gap-1.5 py-1 px-2.5 text-xs font-bold rounded-xl border",
+                                      meta.badgeClass,
+                                    )}
                                   >
-                                    <ShieldCheck className="h-3.5 w-3.5" />
-                                    <span>{t(`role.${ro.role}`)}</span>
+                                    <Icon className="size-3.5" />
+                                    <span>{meta.labelAr}</span>
                                     {canManageStore && !isCurrentUser && !hasOwner && (
                                       <button
                                         type="button"
-                                        onClick={() => removeStoreRole(ro.id)}
-                                        className="ms-1 opacity-60 hover:opacity-100 hover:text-destructive transition"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          removeStoreRole(ro.id);
+                                        }}
+                                        className="ms-1 opacity-60 hover:opacity-100 hover:text-rose-600 transition"
                                         title={isAr ? "حذف هذا الدور" : "Remove role"}
                                       >
-                                        <Trash2 className="h-3 w-3" />
+                                        <Trash2 className="size-3" />
                                       </button>
                                     )}
                                   </Badge>
-                                ))
-                              )}
+                                );
+                              })}
                             </div>
-                          </TableCell>
+                          </div>
+                        </div>
 
-                          <TableCell className="px-4 py-3">
-                            {r.is_active === false ? (
-                              <Badge
-                                variant="outline"
-                                className="gap-1.5 py-1 px-2.5 text-xs font-semibold border-rose-500/40 text-rose-600 dark:text-rose-400"
-                              >
-                                <UserX className="h-3.5 w-3.5" />
-                                <span>{isAr ? "معطّل" : "Disabled"}</span>
-                              </Badge>
-                            ) : (
-                              <Badge
-                                variant="outline"
-                                className="gap-1.5 py-1 px-2.5 text-xs font-semibold border-emerald-500/40 text-emerald-600 dark:text-emerald-400"
-                              >
-                                <UserCheck className="h-3.5 w-3.5" />
-                                <span>{isAr ? "نشط" : "Active"}</span>
-                              </Badge>
-                            )}
-                          </TableCell>
-
-                          <TableCell className="px-4 py-3 text-xs text-muted-foreground font-mono">
-                            {new Date(r.created_at).toLocaleDateString()}
-                          </TableCell>
-
-                          {canManageStore && (
-                            <TableCell className="px-4 py-3 text-end">
-                              <div className="inline-flex items-center gap-2 justify-end">
-                                {/* Owner rows are protected: no role removal and no
-                                    disable, mirroring the existing ownership rule. */}
-                                {!hasOwner &&
-                                  !isCurrentUser &&
-                                  (r.is_active === false ? (
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => setUserActive(r.id, true)}
-                                      className="h-8 text-xs gap-1.5 rounded-xl border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
-                                    >
-                                      <UserCheck className="h-3.5 w-3.5" />
-                                      <span>{isAr ? "إعادة التفعيل" : "Reactivate"}</span>
-                                    </Button>
-                                  ) : (
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={() => setUserActive(r.id, false)}
-                                      className="h-8 text-xs gap-1.5 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                                    >
-                                      <UserX className="h-3.5 w-3.5" />
-                                      <span>{isAr ? "تعطيل المستخدم" : "Disable"}</span>
-                                    </Button>
-                                  ))}
-                                {!hasOwner && (
-                                  <Select onValueChange={(v) => assignStoreRole(r.id, v)}>
-                                    <SelectTrigger className="w-36 h-8 text-xs rounded-xl">
-                                      <SelectValue
-                                        placeholder={isAr ? "إسناد دور جديد..." : "Add role..."}
-                                      />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {STORE_ROLES.filter(
-                                        (ro) => !r.roles.find((x: any) => x.role === ro),
-                                      ).map((ro) => (
-                                        <SelectItem key={ro} value={ro} className="text-xs">
-                                          {t(`role.${ro}`)}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                )}
-                              </div>
-                            </TableCell>
+                        {/* Right Actions Column */}
+                        <div className="flex items-center justify-between sm:justify-end gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/40">
+                          {canManageStore && !hasOwner && (
+                            <Select onValueChange={(v) => assignStoreRole(r.id, v)}>
+                              <SelectTrigger className="w-32 h-8 text-xs rounded-xl border-border/70">
+                                <SelectValue placeholder={isAr ? "+ إضافة دور" : "+ Add role"} />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {STORE_ROLES.filter(
+                                  (ro) => !r.roles.find((x: any) => x.role === ro),
+                                ).map((ro) => (
+                                  <SelectItem key={ro} value={ro} className="text-xs">
+                                    {getRoleMeta(ro).labelAr}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           )}
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+
+                          {canManageStore &&
+                            !hasOwner &&
+                            !isCurrentUser &&
+                            (r.is_active === false ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setUserActive(r.id, true)}
+                                className="h-8 text-xs gap-1.5 rounded-xl border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10"
+                              >
+                                <UserCheck className="size-3.5" />
+                                <span>{isAr ? "تفعيل" : "Enable"}</span>
+                              </Button>
+                            ) : (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setUserActive(r.id, false)}
+                                className="h-8 text-xs gap-1.5 rounded-xl text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10"
+                              >
+                                <UserX className="size-3.5" />
+                                <span>{isAr ? "تعطيل" : "Disable"}</span>
+                              </Button>
+                            ))}
+
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setSelectedUser(r)}
+                            className="size-8 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted"
+                            title={isAr ? "عرض بطاقة الموظف" : "View Card"}
+                          >
+                            <Eye className="size-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       )}
 
-      {/* Tab 2: Platform Admins Table (Superadmins Only) */}
+      {/* Platform Admins View (Superadmins Only) */}
       {isSuper && activeTab === "platform" && (
-        <Card className="border-amber-500/40 shadow-sm overflow-hidden rounded-3xl bg-surface/90">
-          <CardHeader className="p-5 border-b border-border/70 bg-gradient-to-r from-amber-500/10 via-transparent to-transparent">
+        <Card className="border-amber-500/40 shadow-sm overflow-hidden rounded-3xl bg-card">
+          <CardHeader className="p-5 border-b border-border/70 bg-amber-500/5">
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
-                  <Crown className="h-4.5 w-4.5 text-amber-500" />
+                  <Crown className="size-4.5 text-amber-500" />
                   <span>
                     {isAr
                       ? "مدراء المنصة السحابية (جدول platform_admins)"
@@ -644,8 +859,8 @@ function UsersPage() {
                 </CardTitle>
                 <CardDescription className="text-xs text-muted-foreground mt-0.5">
                   {isAr
-                    ? "هذا السجل منفصل تماماً عن موظفي المتاجر؛ يختص بالتحكم في الباقات وموديلات المنصة وتراخيص النظام."
-                    : "Strictly isolated from store staff; manages SaaS subscription tiers and global platform capabilities."}
+                    ? "سجل مستقل تماماً يختص بالتحكم في الباقات والموديلات السحابية والتراخيص العامة."
+                    : "Strictly isolated infrastructure ledger for platform governance."}
                 </CardDescription>
               </div>
               <Badge className="bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/40 text-xs font-semibold">
@@ -654,127 +869,164 @@ function UsersPage() {
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-                    <TableHead className="px-4 py-3">
-                      {isAr ? "مدير المنصة" : "Platform Admin"}
-                    </TableHead>
-                    <TableHead className="px-4 py-3">
-                      {isAr ? "مستوى الصلاحية" : "Privilege Tier"}
-                    </TableHead>
-                    <TableHead className="px-4 py-3">
-                      {isAr ? "تاريخ التعيين" : "Appointed"}
-                    </TableHead>
-                    <TableHead className="px-4 py-3 text-end">
-                      {isAr ? "إجراءات" : "Actions"}
-                    </TableHead>
-                  </tr>
-                </TableHeader>
-                <TableBody>
-                  {platformAdminRows.map((pa) => (
-                    <TableRow
-                      key={pa.id}
-                      className="border-b border-border/60 hover:bg-accent/25 transition-colors"
-                    >
-                      <TableCell className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="h-9 w-9 rounded-2xl bg-amber-500/15 text-amber-600 dark:text-amber-400 grid place-items-center text-xs font-bold border border-amber-500/30">
-                            <Crown className="h-4 w-4" />
-                          </div>
-                          <div>
-                            <div className="font-semibold text-sm text-foreground flex items-center gap-1.5">
-                              <span>{pa.full_name}</span>
-                              {pa.user_id === user?.id && (
-                                <span className="text-[11px] font-normal text-amber-500">
-                                  ({isAr ? "أنت" : "You"})
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-[11px] text-muted-foreground font-mono">
-                              User ID: {pa.user_id.slice(0, 8)}...
-                            </div>
-                          </div>
-                        </div>
-                      </TableCell>
-
-                      <TableCell className="px-4 py-3">
-                        <Badge className="bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/40 gap-1.5 font-bold py-1">
-                          <Crown className="h-3.5 w-3.5 text-amber-500" />
-                          <span>{isAr ? "سوبر أدمن المنصة" : "Platform Superadmin"}</span>
-                        </Badge>
-                      </TableCell>
-
-                      <TableCell className="px-4 py-3 text-xs text-muted-foreground font-mono">
-                        {new Date(pa.created_at).toLocaleDateString()}
-                      </TableCell>
-
-                      <TableCell className="px-4 py-3 text-end">
-                        {pa.user_id !== user?.id && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => revokePlatformAdmin(pa.id)}
-                            className="h-8 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                          >
-                            <span>{isAr ? "إلغاء الصلاحية" : "Revoke"}</span>
-                          </Button>
+            <div className="divide-y divide-border/60">
+              {platformAdminRows.map((pa) => (
+                <div
+                  key={pa.id}
+                  className="flex items-center justify-between p-4 sm:p-5 hover:bg-muted/30 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="size-10 rounded-2xl bg-amber-500/15 text-amber-600 dark:text-amber-400 grid place-items-center text-xs font-bold border border-amber-500/30">
+                      <Crown className="size-5" />
+                    </div>
+                    <div>
+                      <div className="font-bold text-sm text-foreground flex items-center gap-2">
+                        <span>{pa.full_name}</span>
+                        {pa.user_id === user?.id && (
+                          <span className="text-[11px] font-normal text-amber-500">
+                            ({isAr ? "أنت" : "You"})
+                          </span>
                         )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                      </div>
+                      <div className="text-[11px] text-muted-foreground font-mono">
+                        User ID: {pa.user_id.slice(0, 8)}...
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <VortexDateBadge date={pa.created_at} size="sm" variant="subtle" />
+                    {pa.user_id !== user?.id && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => revokePlatformAdmin(pa.id)}
+                        className="h-8 text-xs text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10 rounded-xl"
+                      >
+                        {isAr ? "إلغاء الصلاحية" : "Revoke"}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Footer Instructions */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-4 rounded-2xl border border-border/70 bg-surface/60 text-xs text-muted-foreground">
-        <div>
-          <p className="font-semibold text-foreground">
-            {isAr ? "ملاحظة حول إضافة الموظفين:" : "Staff Onboarding Notice:"}
-          </p>
-          <p className="mt-0.5">
-            {isAr
-              ? "تُنشأ حسابات الموظفين من هنا مباشرة دون حاجة الموظف للتسجيل مسبقًا: أدخل اسمه وبريده ودوره، وسيُولَّد له حساب جاهز ومُفعّل مع كلمة مرور تُعرض لك مرة واحدة لتسليمها له. التعطيل يوقف وصول المستخدم فورًا مع الاحتفاظ بكل بياناته وسجلاته، ويمكن إعادة تفعيله في أي وقت."
-              : "Staff accounts are created directly from here with no prior sign-up: enter a name, email and role, and an active account is provisioned with a password shown to you once for hand-off. Disabling revokes access immediately while keeping all data and history, and can be reversed anytime."}
-          </p>
-        </div>
-        <RolePermissionsDialog
-          trigger={
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-full text-xs gap-1.5 border-primary/30 shrink-0"
-            >
-              <Sparkles className="h-3.5 w-3.5 text-primary" />
-              <span>{isAr ? "استعراض مصفوفة الصلاحيات" : "View Matrix"}</span>
-            </Button>
-          }
-        />
-      </div>
+      {/* User Detail Sheet */}
+      <Sheet open={Boolean(selectedUser)} onOpenChange={(open) => !open && setSelectedUser(null)}>
+        <SheetContent side="left" className="sm:max-w-md w-full p-0 flex flex-col">
+          {selectedUser && (
+            <>
+              <div className="p-6 border-b border-border/60 bg-muted/20">
+                <div className="flex items-center gap-3">
+                  <div className="size-12 rounded-2xl bg-primary/10 text-primary grid place-items-center text-base font-black border border-primary/20">
+                    {(selectedUser.full_name ?? "?").slice(0, 2).toUpperCase()}
+                  </div>
+                  <div>
+                    <SheetTitle className="text-lg font-black text-foreground">
+                      {selectedUser.full_name ?? "—"}
+                    </SheetTitle>
+                    <SheetDescription className="text-xs text-muted-foreground">
+                      معرف الموظف: {selectedUser.id}
+                    </SheetDescription>
+                  </div>
+                </div>
+              </div>
 
-      {/* Create-user dialog: provisions a new account server-side.
-          It deliberately offers only store roles — no Platform/Super Admin. */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-5">
+                {/* Details list */}
+                <div className="space-y-3 p-4 rounded-3xl bg-card border border-border/70">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-muted-foreground">حالة الحساب</span>
+                    {selectedUser.is_active === false ? (
+                      <Badge
+                        variant="outline"
+                        className="border-rose-500/40 text-rose-600 bg-rose-500/10 font-bold"
+                      >
+                        معطّل
+                      </Badge>
+                    ) : (
+                      <Badge
+                        variant="outline"
+                        className="border-emerald-500/40 text-emerald-600 bg-emerald-500/10 font-bold"
+                      >
+                        نشط
+                      </Badge>
+                    )}
+                  </div>
+
+                  {selectedUser.phone && (
+                    <div className="flex items-center justify-between text-xs pt-2 border-t border-border/40">
+                      <span className="font-bold text-muted-foreground">رقم الهاتف</span>
+                      <span className="font-mono font-bold text-foreground dir-ltr">
+                        {toSystemDigits(selectedUser.phone)}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between text-xs pt-2 border-t border-border/40">
+                    <span className="font-bold text-muted-foreground">تاريخ التسجيل</span>
+                    <span className="font-bold text-foreground">
+                      {formatLuxuryDate(selectedUser.created_at, { showDayName: true }).full}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Roles & Permissions Card */}
+                <div className="space-y-2.5">
+                  <span className="text-xs font-black text-foreground block">
+                    الأدوار والصلاحيات المسندة
+                  </span>
+                  <div className="space-y-2">
+                    {selectedUser.roles.map((ro: any) => {
+                      const meta = getRoleMeta(ro.role);
+                      const Icon = meta.icon;
+                      return (
+                        <div
+                          key={ro.id}
+                          className="flex items-center justify-between p-3 rounded-2xl border border-border/70 bg-card"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <div
+                              className={cn(
+                                "size-8 rounded-xl grid place-items-center border",
+                                meta.badgeClass,
+                              )}
+                            >
+                              <Icon className="size-4" />
+                            </div>
+                            <span className="text-xs font-bold text-foreground">
+                              {meta.labelAr}
+                            </span>
+                          </div>
+                          <Badge variant="secondary" className="text-[10px] font-bold">
+                            صلاحية متجر
+                          </Badge>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {/* Create-User Dialog */}
       <Dialog
         open={addOpen}
         onOpenChange={(open) => {
-          // Once the account exists, the one-time password lives only in this
-          // dialog's state. Escape / outside-click / the X button must NOT be
-          // able to discard it: they would leave a real account behind whose
-          // password nobody knows. Closing is therefore allowed only through
-          // the explicit "Done" button below while `issued` is set.
           if (!open && issued) return;
           setAddOpen(open);
           if (!open) resetCreateDialog();
         }}
       >
         <DialogContent
-          className="max-w-md"
+          className="max-w-md rounded-3xl"
           onEscapeKeyDown={(e) => {
             if (issued) e.preventDefault();
           }}
@@ -786,203 +1038,206 @@ function UsersPage() {
           }}
         >
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base">
-              <UserPlus className="h-4 w-4 text-primary" />
+            <DialogTitle className="flex items-center gap-2 text-base font-black">
+              <UserPlus className="size-5 text-primary" />
               <span>
                 {issued
                   ? isAr
-                    ? "بيانات دخول المستخدم"
-                    : "User Sign-in Credentials"
+                    ? "بيانات دخول الموظف الجديد"
+                    : "Staff Sign-in Credentials"
                   : isAr
-                    ? "إضافة مستخدم جديد"
-                    : "Add New User"}
+                    ? "إضافة موظف جديد للمتجر"
+                    : "Add Store Staff Member"}
               </span>
             </DialogTitle>
-            <DialogDescription className="text-xs">
+            <DialogDescription className="text-xs text-muted-foreground">
               {issued
                 ? isAr
-                  ? "انسخ بيانات الدخول وسلّمها للمستخدم. لن تُعرض كلمة المرور مرة أخرى."
+                  ? "انسخ بيانات الدخول وسلّمها للموظف. لن يتم عرض كلمة المرور مرة أخرى لدواعي الأمان."
                   : "Copy these credentials and hand them to the user. The password is not shown again."
                 : isAr
-                  ? "سيتم إنشاء الحساب ودوره في المتجر فورًا، ويستطيع المستخدم تسجيل الدخول بحسابه متى شاء."
-                  : "The account and its store role are created immediately. The user can sign in whenever they are ready."}
+                  ? "سيتم إنشاء الحساب وتعيين الدور التشغيلي فوراً دون الحاجة لتسجيل مسبق."
+                  : "The account and its store role are provisioned immediately."}
             </DialogDescription>
           </DialogHeader>
 
           {issued ? (
-            /* ---------- Success: one-time credentials ---------- */
-            <div className="space-y-4 py-1">
-              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs text-emerald-700 dark:text-emerald-400 flex items-start gap-2">
-                <Check className="h-4 w-4 shrink-0 mt-0.5" />
-                <span>
+            /* Success View */
+            <div className="space-y-4 py-2">
+              <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs text-emerald-700 dark:text-emerald-400 flex items-start gap-2.5">
+                <Check className="size-4 shrink-0 mt-0.5 text-emerald-600" />
+                <span className="font-semibold">
                   {isAr
-                    ? "تم إنشاء الحساب بنجاح وإسناد الدور. سلّم البيانات التالية للمستخدم الآن."
-                    : "Account created and role assigned. Hand the credentials below to the user now."}
+                    ? "تم إنشاء الحساب بنجاح وتعيين الصلاحيات! سلّم البيانات التالية للموظف الآن."
+                    : "Account created and role assigned successfully."}
                 </span>
               </div>
 
-              <div className="space-y-2.5 rounded-xl border border-border/70 bg-surface/60 p-3">
+              <div className="space-y-3 rounded-2xl border border-border/70 bg-muted/30 p-4">
                 <CredentialRow label={isAr ? "الاسم" : "Name"} value={issued.full_name} />
                 <CredentialRow label={isAr ? "البريد الإلكتروني" : "Email"} value={issued.email} />
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-[11px] font-semibold text-muted-foreground">
+                <div className="flex items-center justify-between gap-3 pt-1 border-t border-border/40">
+                  <span className="text-[11px] font-bold text-muted-foreground">
                     {isAr ? "كلمة المرور" : "Password"}
                   </span>
                   <div className="flex items-center gap-2">
-                    <code className="rounded-lg bg-background px-2 py-1 font-mono text-xs text-foreground border border-border/70">
+                    <code className="rounded-xl bg-background px-2.5 py-1 font-mono text-xs text-foreground font-black border border-border/70">
                       {issued.password}
                     </code>
                     <Button
                       type="button"
                       size="sm"
                       variant="outline"
-                      className="h-7 gap-1.5 rounded-lg px-2 text-[11px]"
+                      className="h-7 gap-1 rounded-xl px-2 text-[11px]"
                       onClick={() => void copyToClipboard(issued.password, "password")}
                     >
                       {copiedField === "password" ? (
-                        <Check className="h-3 w-3" />
+                        <Check className="size-3 text-emerald-500" />
                       ) : (
-                        <Copy className="h-3 w-3" />
+                        <Copy className="size-3" />
                       )}
-                      <span>{isAr ? "نسخ كلمة المرور" : "Copy password"}</span>
+                      <span>{isAr ? "نسخ" : "Copy"}</span>
                     </Button>
                   </div>
                 </div>
-                <CredentialRow label={isAr ? "الدور" : "Role"} value={t(`role.${issued.role}`)} />
+                <CredentialRow
+                  label={isAr ? "الدور" : "Role"}
+                  value={getRoleMeta(issued.role).labelAr}
+                />
               </div>
 
               <Button
                 type="button"
                 variant="outline"
-                className="w-full gap-2 rounded-xl text-xs"
+                className="w-full gap-2 rounded-2xl text-xs h-10 font-bold border-primary/30 text-primary hover:bg-primary/10"
                 onClick={() =>
                   void copyToClipboard(
                     isAr
-                      ? `بيانات الدخول إلى ${t("app.name")}:\nالبريد الإلكتروني: ${issued.email}\nكلمة المرور: ${issued.password}\nالرابط: ${window.location.origin}/auth`
-                      : `Your ${t("app.name")} sign-in details:\nEmail: ${issued.email}\nPassword: ${issued.password}\nLink: ${window.location.origin}/auth`,
+                      ? `مرحباً بك في نظام فورتاكس!\nبيانات الدخول لحسابك:\nالبريد: ${issued.email}\nكلمة المرور: ${issued.password}\nرابط الدخول: ${window.location.origin}/auth`
+                      : `Welcome to Vortex ERP!\nYour sign-in credentials:\nEmail: ${issued.email}\nPassword: ${issued.password}\nLink: ${window.location.origin}/auth`,
                     "all",
                   )
                 }
               >
                 {copiedField === "all" ? (
-                  <Check className="h-3.5 w-3.5" />
+                  <Check className="size-4 text-emerald-500" />
                 ) : (
-                  <KeyRound className="h-3.5 w-3.5" />
+                  <MessageCircle className="size-4" />
                 )}
-                <span>{isAr ? "نسخ بيانات الدخول كاملة" : "Copy full sign-in details"}</span>
+                <span>
+                  {isAr ? "نسخ رسالة الترحيب وبيانات الدخول كاملة" : "Copy Full Welcome Message"}
+                </span>
               </Button>
             </div>
           ) : (
-            /* ---------- Form ---------- */
-            <div className="space-y-4 py-1">
+            /* Input Form */
+            <div className="space-y-4 py-2">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground">
-                  {isAr ? "الاسم الكامل" : "Full name"}
+                <label className="text-xs font-bold text-foreground">
+                  {isAr ? "الاسم الكامل للموظف" : "Full Name"}
                 </label>
                 <Input
                   value={addName}
                   onChange={(e) => setAddName(e.target.value)}
-                  placeholder={isAr ? "مثال: أحمد علي" : "e.g. Ahmed Ali"}
-                  className="h-9 text-xs rounded-xl"
+                  placeholder={isAr ? "مثال: عبد الرحمن محمد" : "e.g. Ahmed Ali"}
+                  className="h-10 text-xs rounded-2xl border-border/70"
                   maxLength={120}
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground">
-                  {isAr ? "البريد الإلكتروني" : "Email"}
+                <label className="text-xs font-bold text-foreground">
+                  {isAr ? "البريد الإلكتروني (لتسجيل الدخول)" : "Email"}
                 </label>
                 <Input
                   type="email"
                   value={addEmail}
                   onChange={(e) => setAddEmail(e.target.value)}
-                  placeholder="user@example.com"
-                  className="h-9 text-xs rounded-xl"
+                  placeholder="employee@vortex.app"
+                  className="h-10 text-xs rounded-2xl border-border/70"
                   dir="ltr"
                   maxLength={255}
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground">
+                <label className="text-xs font-bold text-foreground">
                   {isAr ? "رقم الهاتف (اختياري)" : "Phone (optional)"}
                 </label>
                 <Input
                   type="tel"
                   value={addPhone}
                   onChange={(e) => setAddPhone(e.target.value)}
-                  placeholder={isAr ? "7xxxxxxxx" : "7xxxxxxxx"}
-                  className="h-9 text-xs rounded-xl"
+                  placeholder="7xxxxxxxx"
+                  className="h-10 text-xs rounded-2xl border-border/70"
                   dir="ltr"
                   maxLength={40}
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground">
-                  {isAr ? "الدور في المتجر" : "Store Role"}
+                <label className="text-xs font-bold text-foreground">
+                  {isAr ? "الدور التشغيلي الأولي" : "Store Role"}
                 </label>
                 <Select value={addRole} onValueChange={(v) => setAddRole(v as StoreRole)}>
-                  <SelectTrigger className="w-full h-9 text-xs rounded-xl">
+                  <SelectTrigger className="w-full h-10 text-xs rounded-2xl border-border/70">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {STORE_ROLES.map((ro) => (
                       <SelectItem key={ro} value={ro} className="text-xs">
-                        {t(`role.${ro}`)}
+                        {getRoleMeta(ro).labelAr}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
-              <p className="rounded-xl border border-border/70 bg-surface/60 p-3 text-[11px] leading-relaxed text-muted-foreground">
+              <p className="rounded-2xl border border-border/60 bg-muted/20 p-3 text-[11px] leading-relaxed text-muted-foreground">
                 {isAr
-                  ? "يتم توليد كلمة مرور قوية تلقائيًا على السيرفر وتُعرض لك مرة واحدة فقط بعد الإنشاء. يبدأ الحساب نشطًا ويستطيع الدخول مباشرة من شاشة تسجيل الدخول."
-                  : "A strong password is generated server-side and shown to you once after creation. The account starts active and can sign in immediately."}
+                  ? "يتم توليد كلمة مرور معقدة وآمنة تلقائياً في السيرفر وتُسلّم لك مباشرة لتقديمها للموظف، مع تفعيل فوري للحساب دون أي انتظار."
+                  : "A secure password is automatically generated server-side and presented once for hand-off."}
               </p>
             </div>
           )}
 
           <DialogFooter className="gap-2">
             {issued ? (
-              /* The only way out of the issued-credentials view: closes the
-                 dialog and clears the password from memory in one step. */
               <Button
                 size="sm"
-                className="rounded-xl"
+                className="rounded-2xl h-10 px-6 font-bold"
                 onClick={() => {
                   setAddOpen(false);
                   resetCreateDialog();
                 }}
               >
-                {isAr ? "تم، إغلاق" : "Done"}
+                {isAr ? "تم، إنهاء" : "Done"}
               </Button>
             ) : (
               <>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="rounded-xl"
+                  className="rounded-2xl h-10 px-4"
                   onClick={() => setAddOpen(false)}
                 >
                   {isAr ? "إلغاء" : "Cancel"}
                 </Button>
                 <Button
                   size="sm"
-                  className="rounded-xl gap-1.5"
+                  className="rounded-2xl h-10 px-5 gap-1.5 font-bold"
                   disabled={addSaving || !addName.trim() || !addEmail.trim()}
                   onClick={() => void createStoreUser()}
                 >
-                  {addSaving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  {addSaving && <Loader2 className="size-4 animate-spin" />}
                   <span>
                     {addSaving
                       ? isAr
-                        ? "جارٍ الإنشاء..."
+                        ? "جارٍ إنشاء الحساب..."
                         : "Creating..."
                       : isAr
-                        ? "إنشاء الحساب"
-                        : "Create account"}
+                        ? "إنشاء الحساب فوراً"
+                        : "Create Account"}
                   </span>
                 </Button>
               </>
@@ -994,12 +1249,11 @@ function UsersPage() {
   );
 }
 
-/** Read-only label/value pair used in the one-time credentials panel. */
 function CredentialRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className="text-[11px] font-semibold text-muted-foreground">{label}</span>
-      <code className="rounded-lg bg-background px-2 py-1 font-mono text-xs text-foreground border border-border/70 break-all">
+      <span className="text-[11px] font-bold text-muted-foreground">{label}</span>
+      <code className="rounded-xl bg-background px-2.5 py-1 font-mono text-xs text-foreground font-semibold border border-border/70 break-all">
         {value}
       </code>
     </div>

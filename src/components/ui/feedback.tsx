@@ -105,10 +105,10 @@ export interface ErrorStateProps {
 
 /** Error boundary representation with an optional retry action. */
 export function ErrorState({
-  title = "Something went wrong",
+  title = "تعذّر إكمال العملية",
   description,
   onRetry,
-  retryLabel = "Retry",
+  retryLabel = "إعادة المحاولة",
   className,
 }: ErrorStateProps) {
   return (

@@ -13,6 +13,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppWarehousesRouteImport } from './routes/_app.warehouses'
+import { Route as AppVortexUiRouteImport } from './routes/_app.vortex-ui'
 import { Route as AppUsersRouteImport } from './routes/_app.users'
 import { Route as AppTrialBalanceRouteImport } from './routes/_app.trial-balance'
 import { Route as AppTransfersRouteImport } from './routes/_app.transfers'
@@ -65,6 +66,11 @@ const IndexRoute = IndexRouteImport.update({
 const AppWarehousesRoute = AppWarehousesRouteImport.update({
   id: '/warehouses',
   path: '/warehouses',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppVortexUiRoute = AppVortexUiRouteImport.update({
+  id: '/vortex-ui',
+  path: '/vortex-ui',
   getParentRoute: () => AppRoute,
 } as any)
 const AppUsersRoute = AppUsersRouteImport.update({
@@ -275,6 +281,7 @@ export interface FileRoutesByFullPath {
   '/transfers': typeof AppTransfersRoute
   '/trial-balance': typeof AppTrialBalanceRoute
   '/users': typeof AppUsersRoute
+  '/vortex-ui': typeof AppVortexUiRoute
   '/warehouses': typeof AppWarehousesRoute
 }
 export interface FileRoutesByTo {
@@ -314,6 +321,7 @@ export interface FileRoutesByTo {
   '/transfers': typeof AppTransfersRoute
   '/trial-balance': typeof AppTrialBalanceRoute
   '/users': typeof AppUsersRoute
+  '/vortex-ui': typeof AppVortexUiRoute
   '/warehouses': typeof AppWarehousesRoute
 }
 export interface FileRoutesById {
@@ -355,6 +363,7 @@ export interface FileRoutesById {
   '/_app/transfers': typeof AppTransfersRoute
   '/_app/trial-balance': typeof AppTrialBalanceRoute
   '/_app/users': typeof AppUsersRoute
+  '/_app/vortex-ui': typeof AppVortexUiRoute
   '/_app/warehouses': typeof AppWarehousesRoute
 }
 export interface FileRouteTypes {
@@ -396,6 +405,7 @@ export interface FileRouteTypes {
     | '/transfers'
     | '/trial-balance'
     | '/users'
+    | '/vortex-ui'
     | '/warehouses'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -435,6 +445,7 @@ export interface FileRouteTypes {
     | '/transfers'
     | '/trial-balance'
     | '/users'
+    | '/vortex-ui'
     | '/warehouses'
   id:
     | '__root__'
@@ -475,6 +486,7 @@ export interface FileRouteTypes {
     | '/_app/transfers'
     | '/_app/trial-balance'
     | '/_app/users'
+    | '/_app/vortex-ui'
     | '/_app/warehouses'
   fileRoutesById: FileRoutesById
 }
@@ -512,6 +524,13 @@ declare module '@tanstack/react-router' {
       path: '/warehouses'
       fullPath: '/warehouses'
       preLoaderRoute: typeof AppWarehousesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/vortex-ui': {
+      id: '/_app/vortex-ui'
+      path: '/vortex-ui'
+      fullPath: '/vortex-ui'
+      preLoaderRoute: typeof AppVortexUiRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/users': {
@@ -790,6 +809,7 @@ interface AppRouteChildren {
   AppTransfersRoute: typeof AppTransfersRoute
   AppTrialBalanceRoute: typeof AppTrialBalanceRoute
   AppUsersRoute: typeof AppUsersRoute
+  AppVortexUiRoute: typeof AppVortexUiRoute
   AppWarehousesRoute: typeof AppWarehousesRoute
 }
 
@@ -828,6 +848,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppTransfersRoute: AppTransfersRoute,
   AppTrialBalanceRoute: AppTrialBalanceRoute,
   AppUsersRoute: AppUsersRoute,
+  AppVortexUiRoute: AppVortexUiRoute,
   AppWarehousesRoute: AppWarehousesRoute,
 }
 

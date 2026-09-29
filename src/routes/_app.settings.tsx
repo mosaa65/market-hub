@@ -1,4 +1,7 @@
+import { getDigitPreference, setDigitPreference, type DigitStyle } from "@/lib/format-preferences";
+import { Hash } from "lucide-react";
 import { SubscriptionSettingsCard } from "@/components/subscription-settings-card";
+import { BackupSettingsCard } from "@/components/backup-settings-card";
 import { PrintSettingsCard } from "@/components/print-settings-card";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
@@ -44,6 +47,17 @@ function SettingsPage() {
   });
   const [exists, setExists] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [digitStyle, setDigitStyle] = useState<DigitStyle>("latin");
+
+  useEffect(() => {
+    setDigitStyle(getDigitPreference());
+  }, []);
+
+  const handleDigitChange = (style: DigitStyle) => {
+    setDigitStyle(style);
+    setDigitPreference(style);
+    toast.success(lang === "ar" ? "تم حفظ تفضيل نظام الأرقام" : "Number system preference updated");
+  };
 
   const [enablePosServiceFee, setEnablePosServiceFee] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
@@ -133,6 +147,7 @@ function SettingsPage() {
       />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <SubscriptionSettingsCard />
+        <BackupSettingsCard />
         {/* Industry & Catalog Modules Card */}
         <Card className="lg:col-span-2 border-primary/30 bg-gradient-to-r from-primary/5 via-surface to-surface">
           <CardHeader>
@@ -171,6 +186,63 @@ function SettingsPage() {
                 <SlidersHorizontal className="h-3.5 w-3.5 me-1.5" />
                 {lang === "ar" ? "تخصيص الموديولات والنشاط" : "Customize Modules"}
               </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Numbering Format Card - Inspired by Mullak */}
+        <Card className="rounded-3xl border-border/80">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Hash className="h-4 w-4 text-primary" />
+                {lang === "ar" ? "نظام الأرقام والترقيم الموحد" : "Numbering & Digit System"}
+              </span>
+              <span className="rounded-full bg-primary/10 text-primary border border-primary/20 px-2.5 py-0.5 text-xs font-medium">
+                {digitStyle === "arabic" ? "الأرقام العربية (٠-٩)" : "Latin (0-9)"}
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              {lang === "ar"
+                ? "حدد النمط الرقمي المعتمد في كامل النظام (الفواتير، السندات، تقارير الديون، وبطاقات التحصيل)."
+                : "Select the standard digit style used across all system views, invoices, and debt sheets."}
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div
+                onClick={() => handleDigitChange("latin")}
+                className={`cursor-pointer rounded-2xl border p-3.5 transition-all flex flex-col justify-between ${
+                  digitStyle === "latin"
+                    ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+                    : "border-border hover:border-primary/40 bg-surface"
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-semibold">أرقام لاتينية / إنجليزية</span>
+                  <span className="text-xs font-mono px-2 py-0.5 rounded bg-muted">0 - 9</span>
+                </div>
+                <div className="text-xs text-muted-foreground font-mono">
+                  معاينة: 1,250.00 ﷼ • 2026-09-28
+                </div>
+              </div>
+
+              <div
+                onClick={() => handleDigitChange("arabic")}
+                className={`cursor-pointer rounded-2xl border p-3.5 transition-all flex flex-col justify-between ${
+                  digitStyle === "arabic"
+                    ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+                    : "border-border hover:border-primary/40 bg-surface"
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-semibold">أرقام عربية مشرقية</span>
+                  <span className="text-xs font-mono px-2 py-0.5 rounded bg-muted">٠ - ٩</span>
+                </div>
+                <div className="text-xs text-muted-foreground font-mono">
+                  معاينة: ١,٢٥٠.٠٠ ﷼ • ٢٠٢٦-٠٩-٢٨
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>

@@ -1,10 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/page-header";
+import { formatLuxuryDate, toSystemDigits } from "@/lib/format-preferences";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { useModules } from "@/lib/modules";
+import { useAuth } from "@/lib/auth";
 import { money, num } from "@/lib/format";
+import { VortexMetricCard } from "@/components/vortex-ui/finance/vortex-metric-card";
 import {
   ArrowUpRight,
   ArrowDownRight,
@@ -19,6 +22,15 @@ import {
   Sparkles,
   Receipt,
   Boxes,
+  Sun,
+  Moon,
+  Sunrise,
+  Crown,
+  ShieldCheck,
+  Calendar as CalendarIcon,
+  Clock,
+  ArrowLeft,
+  ChevronLeft,
 } from "lucide-react";
 import {
   AreaChart,
@@ -48,13 +60,11 @@ const CHART_COLORS = [
   "oklch(0.75 0.15 140)",
 ];
 
-// Theme-aware tooltip styling shared by every chart on this page. Recharts paints each
-// payload item with the series colour, so itemStyle is explicit to keep tooltip text readable.
 const TOOLTIP_STYLE = {
   background: "var(--popover)",
   color: "var(--popover-foreground)",
   border: "1px solid var(--border)",
-  borderRadius: 12,
+  borderRadius: 14,
   fontSize: 12,
   boxShadow: "var(--shadow-elegant)",
 } as const;
@@ -62,7 +72,6 @@ const TOOLTIP_ITEM_STYLE = { color: "var(--popover-foreground)" } as const;
 const TOOLTIP_LABEL_STYLE = { color: "var(--muted-foreground)", marginBottom: 4 } as const;
 const CHART_GRID_STROKE = "var(--border)";
 
-// Reuses the app-wide pos.pm.* strings; raw payment_method enum values are never shown.
 function paymentMethodLabel(method: string | null | undefined, isAr: boolean): string {
   const map: Record<string, string> = {
     cash: isAr ? "نقدًا" : "Cash",
@@ -75,10 +84,124 @@ function paymentMethodLabel(method: string | null | undefined, isAr: boolean): s
   return map[method] ?? method;
 }
 
+function getGreeting(hour: number, isAr: boolean) {
+  if (hour >= 4 && hour < 12) {
+    return {
+      title: isAr ? "صباح الخير والبركة" : "Good morning",
+      icon: Sunrise,
+      badge: isAr ? "بداية يوم موفقة ☀️" : "Morning focus",
+      color: "text-amber-500",
+    };
+  }
+  if (hour >= 12 && hour < 17) {
+    return {
+      title: isAr ? "طاب يومك بكل خير" : "Good afternoon",
+      icon: Sun,
+      badge: isAr ? "ذروة النشاط 🌤️" : "Peak afternoon",
+      color: "text-amber-400",
+    };
+  }
+  return {
+    title: isAr ? "مساء النور والمسرات" : "Good evening",
+    icon: Moon,
+    badge: isAr ? "أمسية سعيدة 🌙" : "Evening wrap-up",
+    color: "text-indigo-400",
+  };
+}
+
+function getRoleMeta(
+  isPlatformSuperadmin: boolean,
+  isPlatformAdmin: boolean,
+  hasRole: (r: any) => boolean,
+  isAr: boolean,
+) {
+  if (isPlatformSuperadmin) {
+    return {
+      label: isAr ? "السوبر أدمن 👑" : "Superadmin",
+      badgeCls: "border-amber-500/40 bg-amber-500/10 text-amber-500",
+      icon: Crown,
+    };
+  }
+  if (isPlatformAdmin) {
+    return {
+      label: isAr ? "مدير المنصة 🛡️" : "Platform Admin",
+      badgeCls: "border-primary/40 bg-primary/10 text-primary",
+      icon: ShieldCheck,
+    };
+  }
+  if (hasRole("owner")) {
+    return {
+      label: isAr ? "مالك النظام ⚡" : "Business Owner",
+      badgeCls: "border-emerald-500/40 bg-emerald-500/10 text-emerald-500",
+      icon: Crown,
+    };
+  }
+  if (hasRole("admin")) {
+    return {
+      label: isAr ? "مدير النظام 👔" : "Admin",
+      badgeCls: "border-primary/30 bg-primary/10 text-primary",
+      icon: ShieldCheck,
+    };
+  }
+  if (hasRole("accountant")) {
+    return {
+      label: isAr ? "المحاسب المالي 💼" : "Accountant",
+      badgeCls: "border-blue-500/30 bg-blue-500/10 text-blue-500",
+      icon: ShieldCheck,
+    };
+  }
+  if (hasRole("cashier")) {
+    return {
+      label: isAr ? "كاشير 🏷️" : "Cashier",
+      badgeCls: "border-cyan-500/30 bg-cyan-500/10 text-cyan-500",
+      icon: ShieldCheck,
+    };
+  }
+  return {
+    label: isAr ? "عضو فريق" : "Staff Member",
+    badgeCls: "border-border bg-surface-2 text-muted-foreground",
+    icon: ShieldCheck,
+  };
+}
+
 function DashboardPage() {
   const { isModuleEnabled } = useModules();
-  const { t, lang } = useI18n();
+  const { t, lang, dir } = useI18n();
   const isAr = lang === "ar";
+  const { user, isPlatformAdmin, isPlatformSuperadmin, hasRole } = useAuth();
+
+  // User Profile
+  const { data: profile } = useQuery({
+    queryKey: ["current-user-profile", user?.id],
+    enabled: Boolean(user?.id),
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data } = await supabase
+        .from("profiles")
+        .select("full_name, avatar_url")
+        .eq("id", user.id)
+        .maybeSingle();
+      return data;
+    },
+  });
+
+  const userName =
+    profile?.full_name ||
+    user?.user_metadata?.full_name ||
+    (user?.email ? user.email.split("@")[0] : isAr ? "موسى" : "User");
+
+  const now = new Date();
+  const currentHour = now.getHours();
+  const greeting = getGreeting(currentHour, isAr);
+  const roleMeta = getRoleMeta(isPlatformSuperadmin, isPlatformAdmin, hasRole, isAr);
+
+  // Elegant Date formatting
+  const formattedDate = now.toLocaleDateString(isAr ? "ar-SA" : "en-US", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 
   const { data } = useQuery({
     queryKey: ["dashboard-v2"],
@@ -120,7 +243,6 @@ function DashboardPage() {
         (p: any) => (stockMap.get(p.id) ?? 0) <= Number(p.min_stock ?? 0),
       );
 
-      // Daily revenue for last 14 days
       const daily: { day: string; revenue: number; orders: number }[] = [];
       for (let i = 13; i >= 0; i--) {
         const d = new Date(Date.now() - i * 86400_000);
@@ -134,7 +256,6 @@ function DashboardPage() {
         });
       }
 
-      // Top products
       const prodAgg = new Map<string, { qty: number; total: number }>();
       (items.data ?? []).forEach((it: any) => {
         const cur = prodAgg.get(it.product_id) ?? { qty: 0, total: 0 };
@@ -149,8 +270,6 @@ function DashboardPage() {
         .sort((a, b) => b.total - a.total)
         .slice(0, 5);
 
-      // Payment mix — resolved through the pos.pm.* strings so raw enum values
-      // (cash / card / bank_transfer / credit) never reach the user.
       const paySplit: Record<string, number> = {};
       salesRows.forEach((r: any) => {
         const label = paymentMethodLabel(r.payment_method, lang === "ar");
@@ -190,6 +309,8 @@ function DashboardPage() {
 
   const paymentPie = Object.entries(data?.paySplit ?? {}).map(([name, value]) => ({ name, value }));
 
+  const GreetingIcon = greeting.icon;
+
   return (
     <>
       <PageHeader
@@ -199,7 +320,7 @@ function DashboardPage() {
           isModuleEnabled("analytics") ? (
             <Link
               to="/analytics"
-              className="hidden sm:flex h-9 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-4 text-xs font-medium text-primary hover:bg-primary/20 transition"
+              className="hidden sm:flex h-9 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-4 text-xs font-medium text-primary hover:bg-primary/20 transition shadow-sm"
             >
               <Sparkles className="h-3.5 w-3.5" />{" "}
               {lang === "ar" ? "التحليلات المتقدمة" : "Advanced analytics"}
@@ -208,158 +329,225 @@ function DashboardPage() {
         }
       />
 
-      {/* Executive Performance Overview */}
-      <div className="relative mb-6 overflow-hidden rounded-3xl border border-border/80 bg-gradient-to-br from-surface via-surface/90 to-primary/5 p-6 sm:p-7 shadow-sm transition-all">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[11px] font-semibold text-primary">
-                <TrendingUp className="h-3 w-3" />
-                {lang === "ar"
-                  ? "لوحة الأداء المالي والتشغيلي (30 يوم)"
-                  : "Executive Performance (30 Days)"}
-              </span>
-              <span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-[11px] font-mono text-muted-foreground border border-border/60">
-                {lang === "ar"
-                  ? `${num(data?.orders ?? 0)} فاتورة مسجلة`
-                  : `${num(data?.orders ?? 0)} recorded invoices`}
-              </span>
-            </div>
+      {/* Executive Luxury Greeting & Calendar Masterpiece */}
+      <div className="relative mb-6 overflow-hidden rounded-3xl border border-border/80 bg-gradient-to-br from-card/90 via-card to-surface-2/40 p-4 sm:p-6 shadow-sm backdrop-blur-xl">
+        <div className="pointer-events-none absolute -end-16 -top-16 size-60 rounded-full bg-primary/10 blur-3xl opacity-60" />
 
-            <div>
-              <div className="text-xs font-medium text-muted-foreground">
-                {lang === "ar" ? "إجمالي إيراد المبيعات" : "Gross Revenue"}
-              </div>
-              <div className="mt-1 text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground font-mono">
-                {money(data?.revenue ?? 0)}
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 pt-1">
-              <MiniBadge
-                label={lang === "ar" ? "المحصّل نقدًا وبنكًا" : "Collected Cash"}
-                value={money(data?.collected ?? 0)}
-                tone="pos"
-              />
-              <MiniBadge
-                label={lang === "ar" ? "الذمم والديون المتبقية" : "Receivables"}
-                value={money(data?.receivables ?? 0)}
-                tone={data?.receivables && data.receivables > 0 ? "warn" : "pos"}
-              />
-              <MiniBadge
-                label={lang === "ar" ? "متوسط الفاتورة" : "Avg Order"}
-                value={money(data?.orders ? data.revenue / data.orders : 0)}
-                tone="neutral"
-              />
-              <MiniBadge
-                label={lang === "ar" ? "صافي التدفق" : "Net Cash"}
-                value={money(data?.netCash ?? 0)}
-                tone={data?.netCash && data.netCash >= 0 ? "pos" : "neg"}
-              />
-            </div>
-          </div>
-
-          {/* Quick Action Buttons & Sparkline */}
-          <div className="flex flex-col sm:flex-row lg:flex-col items-start lg:items-end justify-between gap-4 border-t lg:border-t-0 lg:border-s border-border/60 pt-4 lg:pt-0 lg:ps-6">
-            <div className="flex flex-wrap items-center gap-2">
-              <Link
-                to="/pos"
-                className="inline-flex h-9 items-center gap-2 rounded-2xl bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm shadow-primary/20 hover:bg-primary/90 transition-all active:scale-95"
-              >
-                <ShoppingCart className="h-3.5 w-3.5" />
-                <span>{lang === "ar" ? "نقطة البيع السريعة" : "Open POS"}</span>
-              </Link>
-              <Link
-                to="/sales"
-                className="inline-flex h-9 items-center gap-1.5 rounded-2xl border border-border/80 bg-surface/80 px-3.5 text-xs font-medium text-foreground hover:bg-surface-2 transition-all active:scale-95"
-              >
-                <Receipt className="h-3.5 w-3.5 text-muted-foreground" />
-                <span>{lang === "ar" ? "فواتير المبيعات" : "Sales Invoices"}</span>
-              </Link>
-              {isModuleEnabled("analytics") && (
-                <Link
-                  to="/analytics"
-                  className="inline-flex h-9 items-center gap-1.5 rounded-2xl border border-primary/30 bg-primary/5 px-3.5 text-xs font-medium text-primary hover:bg-primary/10 transition-all active:scale-95"
-                >
-                  <Sparkles className="h-3.5 w-3.5" />
-                  <span>{lang === "ar" ? "التحليلات" : "Analytics"}</span>
-                </Link>
+        <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          {/* Left / Start: Smart Greeting with Avatar & Role */}
+          <div className="flex items-center gap-3.5">
+            <div className="relative shrink-0">
+              {profile?.avatar_url ? (
+                <img
+                  src={profile.avatar_url}
+                  alt={userName}
+                  className="size-12 sm:size-14 rounded-2xl object-cover border-2 border-primary/20 shadow-md"
+                />
+              ) : (
+                <div className="grid size-12 sm:size-14 place-items-center rounded-2xl bg-gradient-to-tr from-primary to-primary/80 text-primary-foreground font-black text-xl sm:text-2xl shadow-md shadow-primary/20 border border-primary/30">
+                  {userName ? userName.charAt(0).toUpperCase() : "م"}
+                </div>
               )}
+              {/* Online pulse dot */}
+              <span className="absolute -bottom-0.5 -end-0.5 flex size-3.5 items-center justify-center">
+                <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex size-2.5 rounded-full bg-emerald-500 border-2 border-card" />
+              </span>
             </div>
 
-            {/* Sparkline mini-chart */}
-            <div className="w-full sm:w-60 h-20 rounded-2xl bg-surface-2/40 border border-border/40 p-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={data?.daily ?? []}>
-                  <defs>
-                    <linearGradient id="heroG" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="var(--primary, #3b82f6)" stopOpacity={0.4} />
-                      <stop offset="100%" stopColor="var(--primary, #3b82f6)" stopOpacity={0.0} />
-                    </linearGradient>
-                  </defs>
-                  <Tooltip
-                    contentStyle={TOOLTIP_STYLE}
-                    itemStyle={TOOLTIP_ITEM_STYLE}
-                    labelStyle={TOOLTIP_LABEL_STYLE}
-                    formatter={(val: any) => [money(Number(val)), isAr ? "الإيراد" : "Revenue"]}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="revenue"
-                    stroke="var(--primary, #3b82f6)"
-                    strokeWidth={2}
-                    fill="url(#heroG)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 px-2.5 py-0.5 text-xs font-bold text-primary">
+                  <GreetingIcon className={`size-3.5 ${greeting.color}`} />
+                  <span>{greeting.badge}</span>
+                </span>
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-bold shadow-xs ${roleMeta.badgeCls}`}
+                >
+                  <span>{roleMeta.label}</span>
+                </span>
+              </div>
+
+              <h2 className="text-xl sm:text-2xl font-black tracking-tight text-foreground flex items-center gap-1.5">
+                <span>{greeting.title}،</span>
+                <span className="bg-gradient-to-l from-primary via-primary/90 to-foreground bg-clip-text text-transparent">
+                  {userName}
+                </span>
+                <span className="text-lg select-none">✨</span>
+              </h2>
+
+              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <span className="inline-block size-1.5 rounded-full bg-emerald-500" />
+                <span>
+                  {isAr ? "نظام فورتكس يعمل بكفاءة ومباشر" : "Vortex ERP connected & live"}
+                </span>
+              </p>
             </div>
           </div>
+
+          {/* Right / End: The Calendar Masterpiece Card (تحفة تقويمية فاخرة) */}
+          <div className="self-end sm:self-auto shrink-0">
+            {(() => {
+              const luxuryDate = formatLuxuryDate(now, { showDayName: true, showYear: true });
+              return (
+                <div className="group relative overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm transition-all hover:border-primary/40 hover:shadow-md">
+                  {/* Calendar Top Accent Header Bar */}
+                  <div className="flex items-center justify-between gap-3 bg-gradient-to-r from-primary via-primary/95 to-primary/90 px-3.5 py-1 text-primary-foreground">
+                    <span className="text-[11px] font-black tracking-wider uppercase">
+                      {luxuryDate.month}
+                    </span>
+                    <span className="text-[10px] font-bold opacity-90 font-mono">
+                      {luxuryDate.year}
+                    </span>
+                  </div>
+
+                  {/* Calendar Body */}
+                  <div className="flex items-center gap-3 px-3.5 py-2 bg-gradient-to-b from-card via-card to-surface-2/30">
+                    <div className="text-center min-w-[2.2rem]">
+                      <span className="block text-2xl sm:text-3xl font-black text-foreground font-mono leading-none tracking-tight">
+                        {luxuryDate.day}
+                      </span>
+                    </div>
+                    <div className="h-7 w-px bg-border/60" />
+                    <div className="space-y-0.5">
+                      <span className="block text-xs font-bold text-foreground">
+                        {luxuryDate.weekday}
+                      </span>
+                      <span className="block text-[10px] text-muted-foreground">
+                        {isAr ? "اليوم الحالي" : "Today"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+
+        {/* Sleek Quick Action Dock */}
+        <div className="mt-4 flex flex-wrap items-center gap-2 pt-3 border-t border-border/60">
+          <Link
+            to="/pos"
+            className="inline-flex h-8 sm:h-9 items-center gap-1.5 rounded-xl bg-primary px-3 text-xs font-bold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all active:scale-95"
+          >
+            <ShoppingCart className="size-3.5" />
+            <span>{lang === "ar" ? "نقطة البيع (POS)" : "Open POS"}</span>
+          </Link>
+          <Link
+            to="/sales"
+            className="inline-flex h-8 sm:h-9 items-center gap-1.5 rounded-xl border border-border/80 bg-surface/80 px-3 text-xs font-semibold text-foreground hover:bg-surface-2 transition-all active:scale-95"
+          >
+            <Receipt className="size-3.5 text-muted-foreground" />
+            <span>{lang === "ar" ? "فواتير المبيعات" : "Invoices"}</span>
+          </Link>
+          <Link
+            to="/debts"
+            className="inline-flex h-8 sm:h-9 items-center gap-1.5 rounded-xl border border-border/80 bg-surface/80 px-3 text-xs font-semibold text-foreground hover:bg-surface-2 transition-all active:scale-95"
+          >
+            <Wallet className="size-3.5 text-muted-foreground" />
+            <span>{lang === "ar" ? "الديون والتحصيل" : "Debts & Collection"}</span>
+          </Link>
+          {isModuleEnabled("analytics") && (
+            <Link
+              to="/analytics"
+              className="inline-flex h-8 sm:h-9 items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-3 text-xs font-semibold text-primary hover:bg-primary/20 transition-all active:scale-95"
+            >
+              <Sparkles className="size-3.5" />
+              <span>{lang === "ar" ? "التحليلات المتقدمة" : "Analytics"}</span>
+            </Link>
+          )}
         </div>
       </div>
 
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard
-          label={t("dash.sales")}
-          value={num(data?.orders ?? 0)}
-          delta="+4.1%"
-          up
-          icon={ShoppingCart}
-          accent="primary"
-          to="/sales"
-        />
-        <StatCard
-          label={t("dash.customers")}
-          value={num(data?.customers ?? 0)}
-          delta="+2"
-          up
-          icon={Users}
-          accent="chart-2"
-          to="/customers"
-        />
-        <StatCard
-          label={lang === "ar" ? "المصروفات" : "Expenses"}
-          value={money(data?.expenses ?? 0)}
-          delta="-3%"
-          up={false}
-          icon={Wallet}
-          accent="chart-3"
-          to="/finance"
-        />
-        <StatCard
-          label={t("dash.alerts")}
-          value={num(data?.alerts ?? 0)}
-          delta={data?.alerts ? "!" : "0"}
-          up={!data?.alerts}
-          icon={AlertTriangle}
-          accent="warning"
-          to="/inventory"
-        />
+      {/* Modern Vortex Metric Cards Grid - 2 cards per row on mobile */}
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4 mb-6">
+        <Link to="/sales" className="block focus:outline-none">
+          <VortexMetricCard
+            title={t("dash.sales")}
+            value={num(data?.orders ?? 0)}
+            subtitle={lang === "ar" ? "مبيعات آخر 30 يوماً" : "Last 30 days"}
+            badge={lang === "ar" ? "فواتير" : "Orders"}
+            currency=""
+            icon={<ShoppingCart className="size-5" />}
+            iconClassName="bg-primary/10 text-primary"
+            trend={{
+              value: "+4.2%",
+              direction: "up",
+              isPositive: true,
+              label: lang === "ar" ? "نمو" : "growth",
+            }}
+          />
+        </Link>
+
+        <Link to="/customers" className="block focus:outline-none">
+          <VortexMetricCard
+            title={t("dash.customers")}
+            value={num(data?.customers ?? 0)}
+            subtitle={lang === "ar" ? "عملاء نشطون مسجلون" : "Registered customers"}
+            badge={lang === "ar" ? "عميل" : "Clients"}
+            currency=""
+            icon={<Users className="size-5" />}
+            iconClassName="bg-cyan-500/10 text-cyan-600 dark:text-cyan-400"
+            trend={{
+              value: "+2",
+              direction: "up",
+              isPositive: true,
+              label: lang === "ar" ? "جديد" : "new",
+            }}
+          />
+        </Link>
+
+        <Link to="/finance" className="block focus:outline-none">
+          <VortexMetricCard
+            title={lang === "ar" ? "المصروفات التشغيلية" : "Expenses"}
+            value={money(data?.expenses ?? 0)}
+            subtitle={lang === "ar" ? "المصروفات المسجلة" : "Logged expenses"}
+            currency=""
+            icon={<Wallet className="size-5" />}
+            iconClassName="bg-amber-500/10 text-amber-600 dark:text-amber-400"
+            trend={{
+              value: "-3%",
+              direction: "down",
+              isPositive: true,
+              label: lang === "ar" ? "وفورات" : "savings",
+            }}
+          />
+        </Link>
+
+        <Link to="/inventory" className="block focus:outline-none">
+          <VortexMetricCard
+            title={t("dash.alerts")}
+            value={num(data?.alerts ?? 0)}
+            subtitle={
+              (data?.alerts ?? 0) > 0
+                ? lang === "ar"
+                  ? "منتجات تحت حد الطلب"
+                  : "Items below min stock"
+                : lang === "ar"
+                  ? "المخزون بمستوى ممتاز"
+                  : "Stock level healthy"
+            }
+            currency=""
+            badge={(data?.alerts ?? 0) > 0 ? (lang === "ar" ? "تنبيه" : "Alert") : undefined}
+            icon={<AlertTriangle className="size-5" />}
+            iconClassName={
+              (data?.alerts ?? 0) > 0
+                ? "bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+            }
+            trend={{
+              value: (data?.alerts ?? 0) > 0 ? `${data?.alerts} تنبيه` : "سليم ✓",
+              direction: (data?.alerts ?? 0) > 0 ? "down" : "up",
+              isPositive: (data?.alerts ?? 0) === 0,
+            }}
+            highlight={(data?.alerts ?? 0) > 0}
+          />
+        </Link>
       </div>
 
       {/* Charts row */}
       <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-3">
-        <div className="panel-elevated lg:col-span-2 p-5">
+        <div className="panel-elevated lg:col-span-2 p-5 rounded-3xl border border-border/80 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <div>
               <h3 className="text-sm font-semibold">{t("dash.revenue_trend")}</h3>
@@ -384,7 +572,7 @@ function DashboardPage() {
                     <stop offset="100%" stopColor="#06b6d4" stopOpacity={0.0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid stroke={CHART_GRID_STROKE} strokeDasharray="3 3" vertical={false} />{" "}
+                <CartesianGrid stroke={CHART_GRID_STROKE} strokeDasharray="3 3" vertical={false} />
                 <XAxis
                   dataKey="day"
                   stroke="currentColor"
@@ -452,7 +640,7 @@ function DashboardPage() {
           </div>
         </div>
 
-        <div className="panel-elevated p-5">
+        <div className="panel-elevated p-5 rounded-3xl border border-border/80 shadow-sm">
           <h3 className="text-sm font-semibold">
             {lang === "ar" ? "توزيع طرق الدفع" : "Payment mix"}
           </h3>
@@ -481,7 +669,7 @@ function DashboardPage() {
                     contentStyle={TOOLTIP_STYLE}
                     itemStyle={TOOLTIP_ITEM_STYLE}
                     labelStyle={TOOLTIP_LABEL_STYLE}
-                    formatter={(val: any, name: any) => [money(Number(val)), name]}
+                    formatter={(val: any) => [money(Number(val)), name]}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -506,7 +694,7 @@ function DashboardPage() {
 
       {/* Top products & Recent sales */}
       <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <div className="panel-elevated p-5">
+        <div className="panel-elevated p-5 rounded-3xl border border-border/80 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <div>
               <h3 className="text-sm font-semibold flex items-center gap-1.5">
@@ -549,7 +737,7 @@ function DashboardPage() {
           )}
         </div>
 
-        <div className="panel-elevated p-5">
+        <div className="panel-elevated p-5 rounded-3xl border border-border/80 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-sm font-semibold flex items-center gap-1.5">
               <Receipt className="h-4 w-4 text-primary" /> {t("dash.recent_sales")}
@@ -594,7 +782,7 @@ function DashboardPage() {
 
       {/* Low stock & Top debtors */}
       <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <div className="panel-elevated p-5">
+        <div className="panel-elevated p-5 rounded-3xl border border-border/80 shadow-sm">
           <h3 className="text-sm font-semibold flex items-center gap-1.5">
             <Boxes className="h-4 w-4 text-warning" />{" "}
             {lang === "ar" ? "منتجات على وشك النفاد" : "Low stock alerts"}
@@ -626,7 +814,7 @@ function DashboardPage() {
           )}
         </div>
 
-        <div className="panel-elevated p-5">
+        <div className="panel-elevated p-5 rounded-3xl border border-border/80 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-sm font-semibold flex items-center gap-1.5">
               <Users className="h-4 w-4 text-chart-3" />{" "}
@@ -680,58 +868,9 @@ function MiniBadge({
           ? "border-primary/25 bg-primary/5 text-primary"
           : "border-amber-500/30 bg-amber-500/10 text-amber-500";
   return (
-    <div className={`rounded-full border px-3 py-1 text-xs backdrop-blur ${cls}`}>
+    <div className={`rounded-full border px-3 py-1 text-xs backdrop-blur shadow-sm ${cls}`}>
       <span className="opacity-70">{label}:</span>{" "}
-      <span className="font-semibold font-mono">{value}</span>
+      <span className="font-bold font-mono">{value}</span>
     </div>
   );
-}
-
-function StatCard({
-  label,
-  value,
-  delta,
-  up,
-  icon: Icon,
-  accent,
-  to,
-}: {
-  label: string;
-  value: string;
-  delta: string;
-  up: boolean;
-  icon: typeof DollarSign;
-  accent: "primary" | "chart-2" | "chart-3" | "warning";
-  to?: string;
-}) {
-  const colorMap: Record<string, string> = {
-    primary: "text-primary bg-primary/10",
-    "chart-2": "text-chart-2 bg-chart-2/10",
-    "chart-3": "text-chart-3 bg-chart-3/10",
-    warning: "text-warning bg-warning/10",
-  };
-  const Body = (
-    <div className="panel-elevated p-4 relative overflow-hidden group hover:border-ring/40 transition-all">
-      <div className="flex items-start justify-between">
-        <div className="min-w-0">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground truncate">
-            {label}
-          </p>
-          <p className="mt-2 text-2xl font-bold tracking-tight text-foreground truncate">{value}</p>
-        </div>
-        <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${colorMap[accent]}`}>
-          <Icon className="h-4 w-4" />
-        </div>
-      </div>
-      <div className="mt-3 flex items-center gap-1 text-xs">
-        {up ? (
-          <ArrowUpRight className="h-3.5 w-3.5 text-emerald-500" />
-        ) : (
-          <ArrowDownRight className="h-3.5 w-3.5 text-rose-500" />
-        )}
-        <span className={up ? "text-emerald-500" : "text-rose-500"}>{delta}</span>
-      </div>
-    </div>
-  );
-  return to ? <Link to={to}>{Body}</Link> : Body;
 }
