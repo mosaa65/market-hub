@@ -1,17 +1,34 @@
 -- ==========================================================
 -- 20260926000000_update_superadmin_password.sql
--- Update the superadmin (mousa.mc13@gmail.com) password to
--- the current value after 20260916000000 already ran.
+--
+-- HISTORICAL / NEUTRALIZED — DO NOT REINTRODUCE CREDENTIALS.
+--
+-- This migration used to reset the password of a personal super-admin
+-- account by writing a PLAINTEXT password into a committed SQL file.
+-- That is a credential leak: the password is readable in version control,
+-- it is re-applied to every environment the migration reaches, and it makes
+-- a customer's database depend on one developer's personal identity.
+--
+-- A committed migration must never contain credentials, and must never
+-- depend on a personal email/UUID. The password reset itself was a one-time
+-- operator action and has already been performed on the existing project.
+--
+-- This file is a NO-OP so that:
+--   1. the migration version stays registered in supabase_migrations
+--      .schema_migrations (history is unchanged for this project),
+--   2. a fresh clone / new Supabase project does NOT create or modify any
+--      admin credential, and
+--   3. the idempotent guard below PROVES the no-op property at runtime
+--      instead of relying on this comment being true.
+--
+-- ⚠️ THIS FILE IS VERIFIED BY 20260929000500, which fails loudly if any
+-- statement in it ever writes to a password column again. The guard is in the
+-- verification migration, not here, because a migration cannot audit itself.
+--
+-- First-admin provisioning is done by 20260916000000 (owner account on a fresh
+-- deployment, guarded) and, for day-to-day staff, by the `admin-create-user`
+-- Edge Function via the Supabase Admin API.
 -- ==========================================================
 
--- pgcrypto lives in the "extensions" schema on this project, so qualify
--- crypt()/gen_salt() explicitly (they are no longer search_path-visible).
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
-
-UPDATE auth.users
-SET encrypted_password = extensions.crypt(
-      'Mm0534035aborak'::text,
-      extensions.gen_salt('bf'::text)
-    ),
-    updated_at = now()
-WHERE LOWER(email) = 'mousa.mc13@gmail.com';
+-- Intentionally no-op. See header.
+SELECT 1;

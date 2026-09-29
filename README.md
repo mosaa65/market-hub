@@ -411,7 +411,16 @@ The following points describe implemented behavior and its boundaries; the repos
 # SUPABASE_SERVICE_ROLE_KEY=<server-only-key; only when admin client is used>
 ```
 
-4. Apply the SQL migrations in `supabase/migrations/` to the configured Supabase project. The repository also enables the seed definition at `supabase/seeds/seed.sql`; no repository-specific Supabase CLI command is documented.
+4. Apply the SQL migrations in `supabase/migrations/` to the configured Supabase project. The repository also enables a seed definition at `supabase/seeds/reference.sql` (default expense categories and units only — safe to run anywhere).
+
+   The demo dataset is deliberately **not** wired to `config.toml`, because it contains another company's sample invoices and would overwrite `company_settings`. Load it only on a throwaway development database, users file first:
+
+   ```bash
+   psql "$DATABASE_URL" -f supabase/seeds/demo_users.sql
+   psql "$DATABASE_URL" -f supabase/seeds/demo.sql
+   ```
+
+   See `docs/database/migration-safety-notes.md` for the full provisioning contract.
 5. Run the available quality and build scripts.
 
 ```bash

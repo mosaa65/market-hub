@@ -1,6 +1,18 @@
 -- ==========================================================
 -- 20260915030000_superadmin_user_and_strict_subscription_rls.sql
 -- Configure Platform Superadmin & Strict Subscription Security
+--
+-- ⚠️ HISTORICAL — CONTAINS A HARD-CODED PERSONAL ADDRESS.
+--
+-- This file hard-codes one email address as an auto-escalation rule inside
+-- handle_new_user(). It is superseded by 20260929000000, which replaces
+-- handle_new_user() with a body that grants nothing at all — so the rule is
+-- inert on any database where 20260929000000 has run, which is every database
+-- this repository ships.
+--
+-- It is kept, and its address is kept, only so the migration history of the
+-- existing deployment stays byte-identical. It is NOT a pattern to copy: a
+-- migration must never key a privilege on a person's address.
 -- ==========================================================
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
@@ -28,7 +40,11 @@ BEGIN
 
     INSERT INTO public.platform_admins (user_id, role, is_active, mfa_required)
     VALUES (NEW.id, 'superadmin', true, false)
-    ON CONFLICT (user_id) DO UPDATE SET role = 'superadmin', is_active = true;
+    -- DO NOTHING, not DO UPDATE: an operator who deliberately revoked this
+    -- account's platform access (is_active = false) must not have it silently
+    -- reinstated by that account signing in again. The old DO UPDATE made the
+    -- revocation undurable — the next signup undid it.
+    ON CONFLICT (user_id) DO NOTHING;
   END IF;
 
   RETURN NEW;
@@ -58,7 +74,7 @@ BEGIN
 
     INSERT INTO public.platform_admins (user_id, role, is_active, mfa_required)
     VALUES (v_user_id, 'superadmin', true, false)
-    ON CONFLICT (user_id) DO UPDATE SET role = 'superadmin', is_active = true;
+    ON CONFLICT (user_id) DO NOTHING;
   END IF;
 END $$;
 

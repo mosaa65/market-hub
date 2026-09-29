@@ -1,5 +1,6 @@
--- Keep schema/default enum values compatible with the Yemen stationery seed.
--- Operational rows live in supabase/seeds/seed.sql.
+-- Keep schema/default enum values compatible with the Yemen stationery demo seed.
+-- Operational rows live in supabase/seeds/demo.sql (opt-in, never auto-run).
+-- The auto-run seed is supabase/seeds/reference.sql and contains no business rows.
 
 ALTER TYPE public.invoice_status ADD VALUE IF NOT EXISTS 'received';
 ALTER TYPE public.invoice_status ADD VALUE IF NOT EXISTS 'completed';

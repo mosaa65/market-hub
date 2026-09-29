@@ -2,7 +2,25 @@ project_id = "kwzqvgdyadylwnvjghqn"
 
 [db.seed]
 enabled = true
-sql_paths = ["./seeds/seed.sql"]
+# ONLY reference data runs automatically.
+#
+# It used to point at ./seeds/seed.sql, which mixed three lifecycles in one
+# file: reference rows + DEMO BUSINESS DATA (56 products, 20 customers, 10
+# invoices, stock movements, expenses, audit rows) + company identity. Because
+# this file runs automatically on every `supabase db reset`, a customer project
+# would have been seeded with another company's demo invoices and its company
+# name overwritten.
+#
+# Split result:
+#   seeds/reference.sql   default expense categories + units. Auto-run. Safe.
+#   seeds/demo.sql        the demo business data. NEVER auto-run.
+#   seeds/demo_users.sql  demo accounts. NEVER auto-run.
+#
+# To load the demo dataset on a throwaway development database:
+#   psql "$DATABASE_URL" -f supabase/seeds/demo_users.sql   # users first
+#   psql "$DATABASE_URL" -f supabase/seeds/demo.sql
+# (demo_users.sql must run first: the demo invoices reference its user ids.)
+sql_paths = ["./seeds/reference.sql"]
 
 # ---------------------------------------------------------------------------
 # Edge Functions

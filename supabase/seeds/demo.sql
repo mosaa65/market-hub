@@ -1,3 +1,35 @@
+-- ============================================================================
+-- supabase/seeds/demo.sql
+--
+-- ⚠️ DEMO BUSINESS DATA — NOT AUTO-RUN. NEVER EXECUTE ON A CUSTOMER DATABASE.
+--
+-- This file used to be supabase/seeds/seed.sql and was wired into config.toml,
+-- so it ran automatically on every `supabase db reset`. It contains another
+-- company's operational data:
+--
+--     * company_settings          — overwrites the company's name, currency,
+--                                   tax rate, address and invoice prefix
+--     * 56 products, 12 categories, 7 brands, 8 suppliers, 20 customers
+--     * 4 purchase invoices + items, 1 purchase return
+--     * 6 sales invoices + items, 1 sales return
+--     * inventory, product batches, 2 stock transfers, ~50 stock movements
+--     * loyalty transactions, 7 expenses, 4 audit-log rows
+--
+-- On a customer project that is not demo data, it is CORRUPTION: fabricated
+-- invoices in their books and their company identity replaced. It is therefore
+-- no longer referenced by config.toml. See supabase/seeds/reference.sql for the
+-- safe defaults that do run automatically.
+--
+-- HOW TO RUN (local development or a throwaway project ONLY)
+--   psql "$DATABASE_URL" -f supabase/seeds/demo_users.sql   # MUST run first
+--   psql "$DATABASE_URL" -f supabase/seeds/demo.sql
+--
+--   demo_users.sql must run first: these rows carry created_by / actor_id
+--   foreign keys pointing at its user ids.
+--
+-- The whole file is wrapped in BEGIN/COMMIT, so a failure leaves nothing behind.
+-- ============================================================================
+
 -- Seed data for Yemeni stationery / office supplies POS schema
 -- Notes:
 -- 1) sale_price = retail price.
@@ -76,40 +108,27 @@ INSERT INTO expense_categories (id, name, name_ar, created_at) VALUES
   ('04ec8b9a-deb3-5107-9eda-0b428e92267e', 'الصيانة', 'الصيانة', '2026-07-05T09:05:00+00:00'),
   ('bab4a9a4-3fe9-5d07-bc75-ced14df582f3', 'التغليف', 'التغليف', '2026-07-05T09:06:00+00:00'),
   ('6dac640a-7a6e-511a-83f5-6dec2020facf', 'الإنترنت', 'الإنترنت', '2026-07-05T09:07:00+00:00');
-INSERT INTO auth.users (
-  instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
-  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
-) VALUES
-  ('00000000-0000-0000-0000-000000000000', '5da94d74-bd35-5649-afd6-7694627a7d16', 'authenticated', 'authenticated', 'system.admin@nahj-stationery.example', NULL, '2026-07-05T09:01:00+00:00', '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"مدير النظام"}'::jsonb, '2026-07-05T09:01:00+00:00', '2026-07-05T09:01:00+00:00'),
-  ('00000000-0000-0000-0000-000000000000', 'e9bea84a-7055-5574-873c-62869fd3801d', 'authenticated', 'authenticated', 'branch.manager@nahj-stationery.example', NULL, '2026-07-05T09:02:00+00:00', '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"مدير الفرع"}'::jsonb, '2026-07-05T09:02:00+00:00', '2026-07-05T09:02:00+00:00'),
-  ('00000000-0000-0000-0000-000000000000', 'ac5f3bcb-7bed-546b-83d3-01d9752940f8', 'authenticated', 'authenticated', 'cashier@nahj-stationery.example', NULL, '2026-07-05T09:03:00+00:00', '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"أمين الصندوق"}'::jsonb, '2026-07-05T09:03:00+00:00', '2026-07-05T09:03:00+00:00'),
-  ('00000000-0000-0000-0000-000000000000', '52413eea-a2f6-5d5f-96b0-caebc6954b56', 'authenticated', 'authenticated', 'warehouse@nahj-stationery.example', NULL, '2026-07-05T09:04:00+00:00', '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"أمين المستودع"}'::jsonb, '2026-07-05T09:04:00+00:00', '2026-07-05T09:04:00+00:00')
-ON CONFLICT (id) DO UPDATE SET
-  email = EXCLUDED.email,
-  raw_app_meta_data = EXCLUDED.raw_app_meta_data,
-  raw_user_meta_data = EXCLUDED.raw_user_meta_data,
-  updated_at = EXCLUDED.updated_at;
+-- ===========================================================================
+-- DEMO / TEST USERS MOVED OUT OF THE AUTO-RUN SEED
+-- ===========================================================================
+-- This block used to insert rows directly into auth.users, profiles and
+-- user_roles. That is wrong on two counts:
+--
+--   1. auth.users is owned by GoTrue. Rows written directly (without a matching
+--      auth.identities entry) create users that cannot sign in, and it makes
+--      the seed responsible for identity data it cannot keep consistent.
+--   2. config.toml runs this file automatically on `supabase db reset`. A seed
+--      that creates accounts will create them on every developer machine and
+--      would create them in a customer project too.
+--
+-- The block has been moved verbatim to:
+--     supabase/seeds/demo_users.sql      (opt-in, never auto-run)
+--
+-- Real accounts are provisioned through Supabase Auth, not through SQL.
+-- See docs/database/migration-safety-notes.md.
+-- ===========================================================================
 
-INSERT INTO profiles (id, full_name, avatar_url, phone, language, theme, created_at, updated_at) VALUES
-  ('5da94d74-bd35-5649-afd6-7694627a7d16', 'مدير النظام', NULL, '777100001', 'ar', 'dark', '2026-07-05T09:01:00+00:00', '2026-07-05T09:01:00+00:00'),
-  ('e9bea84a-7055-5574-873c-62869fd3801d', 'مدير الفرع', NULL, '777100002', 'ar', 'light', '2026-07-05T09:02:00+00:00', '2026-07-05T09:02:00+00:00'),
-  ('ac5f3bcb-7bed-546b-83d3-01d9752940f8', 'أمين الصندوق', NULL, '777100003', 'ar', 'light', '2026-07-05T09:03:00+00:00', '2026-07-05T09:03:00+00:00'),
-  ('52413eea-a2f6-5d5f-96b0-caebc6954b56', 'أمين المستودع', NULL, '777100004', 'ar', 'dark', '2026-07-05T09:04:00+00:00', '2026-07-05T09:04:00+00:00')
-ON CONFLICT (id) DO UPDATE SET
-  full_name = EXCLUDED.full_name,
-  avatar_url = EXCLUDED.avatar_url,
-  phone = EXCLUDED.phone,
-  language = EXCLUDED.language,
-  theme = EXCLUDED.theme,
-  updated_at = EXCLUDED.updated_at;
-INSERT INTO user_roles (id, user_id, role, created_at) VALUES
-  ('ec1ecb76-bb48-5a76-ad94-54a7329c4248', '5da94d74-bd35-5649-afd6-7694627a7d16', 'owner', '2026-07-05T09:01:00+00:00'),
-  ('2fccc1b8-f897-57c4-a1fe-9a0ec2362c2d', 'e9bea84a-7055-5574-873c-62869fd3801d', 'manager', '2026-07-05T09:02:00+00:00'),
-  ('b2ce91b7-bd84-5ea4-90c1-9fcc1eb63e68', 'ac5f3bcb-7bed-546b-83d3-01d9752940f8', 'cashier', '2026-07-05T09:03:00+00:00'),
-  ('5a85f897-e8d3-5ea7-99a4-cf01cba550c3', '52413eea-a2f6-5d5f-96b0-caebc6954b56', 'warehouse', '2026-07-05T09:04:00+00:00')
-ON CONFLICT (user_id, role) DO UPDATE SET
-  id = EXCLUDED.id,
-  created_at = EXCLUDED.created_at;
+
 INSERT INTO products (id, sku, barcode, name, name_ar, description, image_url, category_id, brand_id, unit_id, cost_price, sale_price, tax_rate, min_stock, track_expiry, is_active, created_at, updated_at) VALUES
   ('001903a3-52ab-51ce-a397-c6e698e69a13', 'STN-001', '6291000000001', 'دفتر سلك A4 100 ورقة', 'دفتر سلك A4 100 ورقة', 'سعر التجزئة 520 ريال يمني | سعر الجملة 442 ريال يمني | سعر الجملة الكبيرة 390 ريال يمني', NULL, '4b867143-fb9c-57d4-b06c-a96f142eb6d2', '56a96271-c262-5a1a-b761-e5d9b99a2e9b', '1ff213a3-4bef-5782-9b3f-0802ee7bd1e9', 390, 520, 15, 40, FALSE, TRUE, '2026-07-05T09:11:00+00:00', '2026-07-05T09:11:00+00:00'),
   ('2d180117-9227-5e31-8c49-4df0e71237bf', 'STN-002', '6291000000002', 'دفتر سلك A5 70 ورقة', 'دفتر سلك A5 70 ورقة', 'سعر التجزئة 350 ريال يمني | سعر الجملة 298 ريال يمني | سعر الجملة الكبيرة 262 ريال يمني', NULL, '4b867143-fb9c-57d4-b06c-a96f142eb6d2', '56a96271-c262-5a1a-b761-e5d9b99a2e9b', '1ff213a3-4bef-5782-9b3f-0802ee7bd1e9', 260, 350, 15, 50, FALSE, TRUE, '2026-07-05T09:12:00+00:00', '2026-07-05T09:12:00+00:00'),

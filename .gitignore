@@ -24,6 +24,23 @@ dist-ssr
 .playwright-mcp/
 .codebuddy/
 
+# Supabase CLI local state (machine-specific: project ref, pooler URL, CLI
+# version pins, generated sync scripts). These are NOT secrets by themselves,
+# but they leak which project a machine is linked to and cause noisy diffs and
+# cross-machine conflicts. Each developer's CLI recreates them automatically.
+supabase/.temp/
+
+# Demo / QA artefacts that must never reach a customer deployment.
+# qa-login.mjs contains a real account password in plain text — it belongs to a
+# throwaway developer flow, not to this repository.
+qa-login.mjs
+
+# The demo seeds are intentionally NOT auto-run (see supabase/config.toml).
+# Keep them in version control for local testing, but be explicit that they must
+# never be pointed at a customer project.
+# supabase/seeds/demo.sql
+# supabase/seeds/demo_users.sql
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -39,3 +56,4 @@ dist-ssr
 .env.local
 .env.*
 .codebuddy
+dev-server.log
