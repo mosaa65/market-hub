@@ -29,11 +29,46 @@ function createSupabaseClient() {
   });
 }
 
+function createOfflineSession() {
+  const user = {
+    id: "offline-user",
+    email: "offline@localhost",
+    app_metadata: {},
+    user_metadata: {},
+    aud: "authenticated",
+  };
+
+  return {
+    access_token: "offline-local-token",
+    refresh_token: "offline-refresh-token",
+    expires_in: 3600,
+    token_type: "bearer",
+    user,
+  };
+}
+
+function createQueryBuilder() {
+  const base = {
+    select: () => base,
+    eq: () => base,
+    order: () => base,
+    limit: () => base,
+    range: () => base,
+    maybeSingle: async () => ({ data: null, error: null }),
+    single: async () => ({ data: null, error: null }),
+    insert: async () => ({ data: null, error: null }),
+    update: async () => ({ data: null, error: null }),
+    upsert: async () => ({ data: null, error: null }),
+    delete: async () => ({ data: null, error: null }),
+  };
+
+  return base;
+}
+
 function createFakeSupabaseClient() {
-  // Minimal fake supabase client to allow the app to boot offline in the browser.
-  // This intentionally implements only the small subset used during startup.
+  const authListeners = new Set<(event: string, session: any) => void>();
+
   const auth = {
-    // Return whatever session the app might have stored locally
     getSession: async () => {
       try {
         const raw = typeof window !== "undefined" ? localStorage.getItem("supabase_session") : null;
@@ -43,61 +78,69 @@ function createFakeSupabaseClient() {
         return { data: { session: null }, error: e as Error };
       }
     },
-    // noop for subscriptions
-    onAuthStateChange: (_: any, __: any) => ({ data: null, unsubscribe: () => {} }),
-    signIn: async () => ({ data: null, error: null }),
-    signOut: async () => ({ data: null, error: null }),
+    onAuthStateChange: (callback: (event: string, session: any) => void) => {
+      authListeners.add(callback);
+      return {
+        data: { subscription: { unsubscribe: () => authListeners.delete(callback) } },
+        error: null,
+      };
+    },
+    signIn: async () => {
+      const session = createOfflineSession();
+      if (typeof window !== "undefined") {
+        localStorage.setItem("supabase_session", JSON.stringify(session));
+      }
+      authListeners.forEach((listener) => listener("SIGNED_IN", session));
+      return { data: { session }, error: null };
+    },
+    signOut: async () => {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("supabase_session");
+      }
+      authListeners.forEach((listener) => listener("SIGNED_OUT", null));
+      return { data: { session: null }, error: null };
+    },
   };
 
-  const baseResponse = { data: null, error: null };
+  const from = (_table: string) => createQueryBuilder();
 
-  function table() {
-    return new Proxy(
-      {},
-      {
-        get() {
-          // return a function that resolves to a neutral response
-          return async (..._args: any[]) => {
-            // select should typically return array
-            return { data: [], error: null };
-          };
-        },
-      }
-    );
-  }
-
-  const fake = {
+  return {
     auth,
-    from: (_: string) => table(),
-    rpc: async (_: string, __?: any) => ({ data: null, error: null }),
-    // minimal realtime placeholder
-    channel: () => ({ on: () => ({ subscribe: async () => ({ data: null, error: null }) }) }),
-    // basic helper to avoid Reflect/get issues
-    get: (k: string) => (fake as any)[k],
+    from,
+    rpc: async () => ({ data: null, error: null }),
+    channel: () => ({
+      on: () => ({ subscribe: async () => ({ data: null, error: null }) }),
+    }),
+    functions: {
+      invoke: async () => ({ data: null, error: null }),
+    },
+    storage: {
+      from: () => ({
+        upload: async () => ({ data: null, error: null }),
+        download: async () => ({ data: null, error: null }),
+        list: async () => ({ data: [], error: null }),
+      }),
+    },
   } as any;
-
-  return fake as ReturnType<typeof createSupabaseClient>;
 }
 
 let _supabase: ReturnType<typeof createSupabaseClient> | undefined;
 
-// Export a proxy that constructs either the real client or the fake offline client when appropriate.
 export const supabase = new Proxy({} as ReturnType<typeof createSupabaseClient>, {
   get(_, prop, receiver) {
-    // If running in a browser and VITE_OFFLINE is set, or navigator reports offline, use fake client
-    const forceOffline = (import.meta.env.VITE_OFFLINE as string) === "true";
     const isBrowser = typeof window !== "undefined";
+    const forceOffline = (import.meta.env.VITE_OFFLINE as string) === "true";
     const offlineDetected = isBrowser && typeof navigator !== "undefined" && !navigator.onLine;
 
     if (!_supabase) {
       if (isBrowser && (forceOffline || offlineDetected)) {
-        console.info("[Supabase] Using fake offline client (VITE_OFFLINE or browser offline detected).");
-        _supabase = createFakeSupabaseClient() as any;
+        console.info("[Supabase] Using offline-safe mock client (browser offline or VITE_OFFLINE=true).");
+        _supabase = createFakeSupabaseClient() as ReturnType<typeof createSupabaseClient>;
       } else {
         _supabase = createSupabaseClient();
       }
     }
-    // Avoid TypeScript/tsc proxy typing issues by using Reflect
+
     return Reflect.get(_supabase as any, prop, receiver);
   },
 });
