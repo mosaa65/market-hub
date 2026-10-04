@@ -5,21 +5,22 @@ import { PageHeader } from "@/components/page-header";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
-import { StockAdjustmentDialog } from "@/components/stock/stock-adjustment-dialog";
+import { SettlementWizardSheet } from "@/components/stock/settlement-wizard-sheet";
+import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { Button } from "@/components/ui/button";
+import { StatusBadge } from "@/components/ui/status-badge";
 import {
-  AlertTriangle,
-  CheckCircle2,
   ClipboardList,
+  Plus,
+  Scale,
   Search,
   ShieldCheck,
-  Warehouse,
+  Warehouse as WarehouseIcon,
   Boxes,
-  Scale,
   TrendingUp,
   TrendingDown,
   RefreshCw,
   FileCheck,
-  Plus,
 } from "lucide-react";
 import { type PageGuideConfig } from "@/components/page-guide";
 
@@ -189,6 +190,26 @@ const settlementGuideConfig: PageGuideConfig = {
   footerTip: "فورتيكس ERP — التدقيق الرقمي الموحد والمطابقة المحاسبية اللحظية",
 };
 
+/** تسميات حركة المخزون — نفس القيم الموجودة مسبقًا، موحّدة في مكان واحد. */
+function movementTypeLabel(type: string, lang: "ar" | "en") {
+  const map: Record<string, { ar: string; en: string }> = {
+    adjustment: { ar: "تسوية", en: "Adjustment" },
+    opening: { ar: "رصيد أول المدة", en: "Opening stock" },
+  };
+  return map[type]?.[lang] ?? type;
+}
+
+function sourceTypeLabel(type: string | null, lang: "ar" | "en") {
+  const map: Record<string, { ar: string; en: string }> = {
+    purchase: { ar: "فاتورة شراء", en: "Purchase invoice" },
+    stock_opening: { ar: "مستند رصيد أول المدة", en: "Opening-stock document" },
+    stock_adjustment: { ar: "مستند تسوية مخزون", en: "Stock-adjustment document" },
+    sales_invoice: { ar: "فاتورة بيع", en: "Sales invoice" },
+    stock_transfer: { ar: "تحويل مخزون", en: "Stock transfer" },
+  };
+  return (type && map[type]?.[lang]) || type || "—";
+}
+
 function SettlementsPage() {
   const { t, lang } = useI18n();
   const { hasRole, user } = useAuth();
@@ -267,6 +288,109 @@ function SettlementsPage() {
     });
   }, [data, query]);
 
+  const productLabel = (row: SettlementRow) =>
+    lang === "ar"
+      ? row.products?.name_ar || row.products?.name || "—"
+      : row.products?.name || row.products?.name_ar || "—";
+  const warehouseLabel = (row: SettlementRow) =>
+    lang === "ar"
+      ? row.warehouses?.name_ar || row.warehouses?.name || "—"
+      : row.warehouses?.name || row.warehouses?.name_ar || "—";
+
+  const columns: DataTableColumn<SettlementRow>[] = useMemo(
+    () => [
+      {
+        key: "product",
+        header: lang === "ar" ? "المنتج" : "Product",
+        cell: (row) => (
+          <div className="min-w-0">
+            <p className="truncate font-medium text-foreground">{productLabel(row)}</p>
+            <p className="text-[11px] text-muted-foreground">{row.products?.sku ?? "—"}</p>
+          </div>
+        ),
+      },
+      {
+        key: "warehouse",
+        header: lang === "ar" ? "المستودع" : "Warehouse",
+        cell: (row) => (
+          <span className="flex items-center gap-2 text-xs text-muted-foreground">
+            <WarehouseIcon className="size-3.5 shrink-0" />
+            {warehouseLabel(row)}
+          </span>
+        ),
+      },
+      {
+        key: "movement_type",
+        header: lang === "ar" ? "النوع" : "Type",
+        cell: (row) => (
+          <StatusBadge tone={Number(row.quantity) >= 0 ? "success" : "danger"}>
+            {movementTypeLabel(row.movement_type, lang)}
+          </StatusBadge>
+        ),
+      },
+      {
+        key: "reference_type",
+        header: lang === "ar" ? "المستند المصدر" : "Source document",
+        cell: (row) => (
+          <span className="text-[11px] text-muted-foreground">
+            {sourceTypeLabel(row.reference_type, lang)}
+          </span>
+        ),
+        hideBelow: "lg",
+      },
+      {
+        key: "quantity",
+        header: lang === "ar" ? "الكمية" : "Qty",
+        align: "end",
+        cell: (row) => (
+          <span
+            className={
+              Number(row.quantity) >= 0
+                ? "font-mono text-foreground"
+                : "font-mono font-semibold text-rose-600 dark:text-rose-400"
+            }
+          >
+            {Number(row.quantity).toFixed(2)}
+          </span>
+        ),
+        sortable: true,
+        sortValue: (row) => Number(row.quantity),
+      },
+      {
+        key: "note",
+        header: lang === "ar" ? "السبب" : "Reason",
+        cell: (row) => (
+          <span className="truncate text-xs text-muted-foreground">
+            {row.note || row.reference || (lang === "ar" ? "بدون سبب" : "No note")}
+          </span>
+        ),
+        hideBelow: "md",
+      },
+      {
+        key: "user",
+        header: lang === "ar" ? "المستخدم" : "User",
+        cell: (row) => (
+          <span className="text-xs text-muted-foreground">
+            {row.profiles?.full_name ?? user?.email ?? (lang === "ar" ? "غير معروف" : "Unknown")}
+          </span>
+        ),
+        hideBelow: "lg",
+      },
+      {
+        key: "created_at",
+        header: lang === "ar" ? "التاريخ/الوقت" : "Date & time",
+        cell: (row) => (
+          <span className="text-xs text-muted-foreground">
+            {new Date(row.created_at).toLocaleString()}
+          </span>
+        ),
+        hideBelow: "sm",
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- label helpers derive from lang
+    [lang, user],
+  );
+
   if (!canManageSettlement) {
     return (
       <div className="panel-elevated rounded-3xl border border-border/80 bg-surface/90 p-8 text-center">
@@ -326,157 +450,48 @@ function SettlementsPage() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1080px] text-sm">
-            <thead>
-              <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-                <th className="px-4 py-2.5 text-start font-medium">
-                  {lang === "ar" ? "المنتج" : "Product"}
-                </th>
-                <th className="px-4 py-2.5 text-start font-medium">
-                  {lang === "ar" ? "المستودع" : "Warehouse"}
-                </th>
-                <th className="px-4 py-2.5 text-start font-medium">
-                  {lang === "ar" ? "النوع" : "Type"}
-                </th>
-                <th className="px-4 py-2.5 text-start font-medium">
-                  {lang === "ar" ? "المستند المصدر" : "Source document"}
-                </th>
-                <th className="px-4 py-2.5 text-end font-medium">
-                  {lang === "ar" ? "الكمية" : "Qty"}
-                </th>
-                <th className="px-4 py-2.5 text-start font-medium">
-                  {lang === "ar" ? "السبب" : "Reason"}
-                </th>
-                <th className="px-4 py-2.5 text-start font-medium">
-                  {lang === "ar" ? "المستخدم" : "User"}
-                </th>
-                <th className="px-4 py-2.5 text-start font-medium">
-                  {lang === "ar" ? "التاريخ/الوقت" : "Date & time"}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading && (
-                <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">
-                    {t("common.loading")}
-                  </td>
-                </tr>
-              )}
-              {!isLoading && filtered.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="px-4 py-16 text-center text-muted-foreground">
-                    <ClipboardList className="mx-auto mb-3 h-8 w-8 opacity-60" />
-                    {lang === "ar" ? "لا توجد حركات تسوية بعد" : "No settlement movements yet"}
-                  </td>
-                </tr>
-              )}
-              {filtered.map((row) => {
-                const productName =
-                  lang === "ar"
-                    ? row.products?.name_ar || row.products?.name || "—"
-                    : row.products?.name || row.products?.name_ar || "—";
-                const warehouseName =
-                  lang === "ar"
-                    ? row.warehouses?.name_ar || row.warehouses?.name || "—"
-                    : row.warehouses?.name || row.warehouses?.name_ar || "—";
-                /*
-                 * Each movement names its own source document. That is what
-                 * makes it possible to see at a glance that an "opening"
-                 * movement came from an opening-stock document and not from a
-                 * purchase invoice — the distinction the design insists on.
-                 */
-                const movementLabel =
-                  row.movement_type === "adjustment"
-                    ? lang === "ar"
-                      ? "تسوية"
-                      : "Adjustment"
-                    : row.movement_type === "opening"
-                      ? lang === "ar"
-                        ? "رصيد أول المدة"
-                        : "Opening stock"
-                      : row.movement_type;
-                const sourceLabel =
-                  row.reference_type === "purchase"
-                    ? lang === "ar"
-                      ? "فاتورة شراء"
-                      : "Purchase invoice"
-                    : row.reference_type === "stock_opening"
-                      ? lang === "ar"
-                        ? "مستند رصيد أول المدة"
-                        : "Opening-stock document"
-                      : row.reference_type === "stock_adjustment"
-                        ? lang === "ar"
-                          ? "مستند تسوية مخزون"
-                          : "Stock-adjustment document"
-                        : row.reference_type === "sales_invoice"
-                          ? lang === "ar"
-                            ? "فاتورة بيع"
-                            : "Sales invoice"
-                          : row.reference_type === "stock_transfer"
-                            ? lang === "ar"
-                              ? "تحويل مخزون"
-                              : "Stock transfer"
-                            : (row.reference_type ?? "—");
-                const isPositive = Number(row.quantity) >= 0;
-                return (
-                  <tr
-                    key={row.id}
-                    className="border-b border-border/60 hover:bg-accent/40 transition-colors"
-                  >
-                    <td className="px-4 py-2.5">
-                      <div className="font-medium text-foreground">{productName}</div>
-                      <div className="text-[11px] text-muted-foreground">
-                        {row.products?.sku ?? "—"}
-                      </div>
-                    </td>
-                    <td className="px-4 py-2.5 text-muted-foreground">
-                      <div className="flex items-center gap-2">
-                        <Warehouse className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span>{warehouseName}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <span
-                        className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] ${isPositive ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300" : "border-rose-500/25 bg-rose-500/10 text-rose-600 dark:text-rose-300"}`}
-                      >
-                        {movementLabel}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-[11px] text-muted-foreground">{sourceLabel}</td>
-                    <td className="px-4 py-2.5 text-end font-mono text-foreground">
-                      {Number(row.quantity).toFixed(2)}
-                    </td>
-                    <td className="px-4 py-2.5 text-muted-foreground">
-                      {row.note || row.reference || (lang === "ar" ? "بدون سبب" : "No note")}
-                    </td>
-                    <td className="px-4 py-2.5 text-muted-foreground">
-                      {row.profiles?.full_name ??
-                        user?.email ??
-                        (lang === "ar" ? "غير معروف" : "Unknown")}
-                    </td>
-                    <td className="px-4 py-2.5 text-muted-foreground">
-                      {new Date(row.created_at).toLocaleString()}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {isAdjustmentOpen && (
-        <StockAdjustmentDialog
-          onClose={() => setIsAdjustmentOpen(false)}
-          onSaved={() => {
-            setIsAdjustmentOpen(false);
-            queryClient.invalidateQueries({ queryKey: ["settlements"] });
-            queryClient.invalidateQueries({ queryKey: ["inventory"] });
+        <DataTable
+          columns={columns}
+          rows={filtered}
+          rowKey={(row) => row.id}
+          loading={isLoading}
+          initialLoading={isLoading}
+          minWidth={1000}
+          empty={{
+            icon: <ClipboardList className="size-5" />,
+            title: query
+              ? lang === "ar"
+                ? "لا توجد نتائج مطابقة"
+                : "No matching records"
+              : lang === "ar"
+                ? "لا توجد حركات تسوية بعد"
+                : "No settlement movements yet",
+            description:
+              lang === "ar"
+                ? "ابدأ تسوية جرقية جديدة عبر المعالج لiveness مطابقة الجرد مع رصيد الدفتر."
+                : "Start a new settlement from the wizard to reconcile the count with the ledger.",
+            action: canManageSettlement ? (
+              <Button
+                type="button"
+                onClick={() => setIsAdjustmentOpen(true)}
+                className="rounded-xl bg-primary font-semibold text-primary-foreground"
+              >
+                <Plus className="size-4" />
+                {lang === "ar" ? "إجراء تسوية جردية جديدة" : "New Stock Adjustment"}
+              </Button>
+            ) : undefined,
           }}
         />
-      )}
+      </div>
+
+      <SettlementWizardSheet
+        open={isAdjustmentOpen}
+        onOpenChange={setIsAdjustmentOpen}
+        onSaved={() => {
+          queryClient.invalidateQueries({ queryKey: ["settlements"] });
+          queryClient.invalidateQueries({ queryKey: ["inventory"] });
+        }}
+      />
     </>
   );
 }

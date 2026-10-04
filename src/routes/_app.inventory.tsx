@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/page-header";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
-import { StockAdjustmentDialog } from "@/components/stock/stock-adjustment-dialog";
+import { SettlementWizardSheet } from "@/components/stock/settlement-wizard-sheet";
 import { DirectStockInDialog } from "@/components/stock/direct-stock-in-dialog";
 import { OpeningStockDialog } from "@/components/stock/opening-stock-dialog";
 import {
@@ -574,7 +574,9 @@ function InventoryPage() {
                     ? "text-emerald-500"
                     : "text-muted-foreground";
           return (
-            <span className={`font-mono text-xs font-bold tabular-nums ${tone} inline-flex items-center gap-1`}>
+            <span
+              className={`font-mono text-xs font-bold tabular-nums ${tone} inline-flex items-center gap-1`}
+            >
               <span>{qtyCell(qtyFor(r))}</span>
               {(r.unit?.name_ar || r.unit?.name || r.unit?.short_name) && (
                 <span className="text-[10px] font-normal text-muted-foreground">
@@ -924,7 +926,6 @@ function InventoryPage() {
                         >
                           {primary}
                         </h4>
-
                       </div>
 
                       <div className="mb-3.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
@@ -1223,10 +1224,13 @@ function InventoryPage() {
       <p className="px-1 text-[11px] text-muted-foreground/70">{t("inventory.scope_hint")}</p>
 
       {adjustTarget && (
-        <StockAdjustmentDialog
+        <SettlementWizardSheet
+          open
+          onOpenChange={(open) => {
+            if (!open) setAdjust(null);
+          }}
           initialProductId={adjustTarget.productId}
           initialWarehouseId={adjustTarget.warehouseId}
-          onClose={() => setAdjust(null)}
           onSaved={() => {
             setAdjust(null);
             qc.invalidateQueries({ queryKey: ["inventory"] });

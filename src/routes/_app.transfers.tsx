@@ -22,6 +22,7 @@ import {
   TableProperties,
   Trash2,
   Warehouse,
+  CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,8 @@ import { FieldInput, NumberInput, fieldSurfaceClass } from "@/components/ui/inpu
 import { FormField } from "@/components/ui/form-field";
 import { FormActions, FormGrid, FormSection } from "@/components/ui/form-layout";
 import { VortexDrawerDialog } from "@/components/vortex-ui";
+import { EmptyState } from "@/components/ui/feedback";
+import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { DataTable, type DataTableColumn, type DataTableSort } from "@/components/ui/data-table";
 import {
@@ -1174,7 +1177,19 @@ function NewTransferDialog({ onClose, onSaved }: { onClose: () => void; onSaved:
             }
             className="flex-1 sm:flex-initial min-w-[140px] rounded-xl bg-primary font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
           >
-            {t("common.save")}
+            {saving ? (
+              <span className="flex items-center gap-2">
+                <Loader2 className="size-4 animate-spin" />
+                {lang === "ar" ? "جارٍ تنفيذ التحويل..." : "Executing transfer…"}
+              </span>
+            ) : stockLoading ? (
+              <span className="flex items-center gap-2">
+                <Loader2 className="size-4 animate-spin" />
+                {lang === "ar" ? "جارٍ التحقق من الأرصدة..." : "Verifying stock…"}
+              </span>
+            ) : (
+              t("common.save")
+            )}
           </Button>
         </div>
       }
@@ -1187,48 +1202,56 @@ function NewTransferDialog({ onClose, onSaved }: { onClose: () => void; onSaved:
         }}
         className="flex flex-col gap-6"
       >
-        <FormSection title={lang === "ar" ? "بيانات التحويل" : "Transfer details"}>
-          <FormGrid cols={2}>
-            <FormField label={t("transfers.from")} required>
-              {(p) => (
-                <select
-                  id={p.id}
-                  aria-describedby={p["aria-describedby"]}
-                  value={from}
-                  onChange={(e) => handleFromChange(e.target.value)}
-                  className={fieldSurfaceClass}
-                >
-                  <option value="">{lang === "ar" ? "اختر..." : "Select..."}</option>
-                  {warehouses.map((w) => (
-                    <option key={w.id} value={w.id}>
-                      {lang === "ar" ? w.name_ar || w.name : w.name || w.name_ar}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </FormField>
+        <FormSection
+          title={lang === "ar" ? "بيانات التحويل" : "Transfer details"}
+          description={
+            lang === "ar"
+              ? "اختر المستودع المصدر ثم الوجهة — يُمنع اختيار المستودع نفسه للطرفين."
+              : "Pick the source then the destination — the same warehouse cannot be both."
+          }
+        >
+          <div className="grid gap-4 md:grid-cols-[1fr_auto_1fr] md:items-stretch">
+            <WarehousePicker
+              label={t("transfers.from")}
+              icon={<Warehouse className="size-4" />}
+              tone="source"
+              warehouses={warehouses}
+              value={from}
+              onChange={handleFromChange}
+              disabledIds={to ? [to] : []}
+              loading={stockLoading}
+              footer={
+                from && !stockLoading ? (
+                  <span className="text-[11px] text-muted-foreground">
+                    {lang === "ar"
+                      ? `${Object.keys(stockByProduct).length} صنف برصيد في هذا المستودع`
+                      : `${Object.keys(stockByProduct).length} items in stock here`}
+                  </span>
+                ) : null
+              }
+              lang={lang}
+            />
 
-            <FormField label={t("transfers.to")} required>
-              {(p) => (
-                <select
-                  id={p.id}
-                  aria-describedby={p["aria-describedby"]}
-                  value={to}
-                  onChange={(e) => setTo(e.target.value)}
-                  className={fieldSurfaceClass}
-                >
-                  <option value="">{lang === "ar" ? "اختر..." : "Select..."}</option>
-                  {warehouses
-                    .filter((w) => w.id !== from)
-                    .map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {lang === "ar" ? w.name_ar || w.name : w.name || w.name_ar}
-                      </option>
-                    ))}
-                </select>
-              )}
-            </FormField>
+            <div className="hidden md:flex md:items-center md:justify-center">
+              <span className="grid size-9 place-items-center rounded-full border border-border/80 bg-muted/60 text-muted-foreground">
+                <ArrowRightLeft className="size-4 rtl:rotate-180" />
+              </span>
+            </div>
 
+            <WarehousePicker
+              label={t("transfers.to")}
+              icon={<Warehouse className="size-4" />}
+              tone="destination"
+              warehouses={warehouses}
+              value={to}
+              onChange={setTo}
+              disabledIds={from ? [from] : []}
+              loading={catalogueLoaded && warehouses.length === 0}
+              lang={lang}
+            />
+          </div>
+
+          <div className="md:hidden">
             <FormField label={t("transfers.note")}>
               {(p) => (
                 <FieldInput
@@ -1240,14 +1263,22 @@ function NewTransferDialog({ onClose, onSaved }: { onClose: () => void; onSaved:
                 />
               )}
             </FormField>
+          </div>
 
-            {!catalogueLoaded && (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Loader2 className="size-3.5 animate-spin" />
-                {lang === "ar" ? "جارٍ تحميل البيانات..." : "Loading data…"}
-              </div>
-            )}
-          </FormGrid>
+          {!hasMultiWarehouse && (
+            <p className="text-[11px] text-muted-foreground">
+              {lang === "ar"
+                ? "تحويل المستودعات يتطلب تفعيل وحدة تعدد المستودعات."
+                : "Warehouse transfers require the multi-warehouse module."}
+            </p>
+          )}
+
+          {!catalogueLoaded && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="size-3.5 animate-spin" />
+              {lang === "ar" ? "جارٍ تحميل البيانات..." : "Loading data…"}
+            </div>
+          )}
         </FormSection>
 
         <FormSection title={lang === "ar" ? "بنود التحويل" : "Transfer items"}>
@@ -1295,8 +1326,16 @@ function NewTransferDialog({ onClose, onSaved }: { onClose: () => void; onSaved:
               <tbody>
                 {lines.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="py-6 text-center text-muted-foreground">
-                      {t("transfers.add_products")}
+                    <td colSpan={4} className="p-0">
+                      <EmptyState
+                        icon={<Package className="size-4" />}
+                        title={t("transfers.add_products")}
+                        description={
+                          lang === "ar"
+                            ? "ابحث عن صنف أعلاه لإضافته — سيظهر رصيده المتاح من المستودع المصدر."
+                            : "Search for an item above — its available source balance will be shown."
+                        }
+                      />
                     </td>
                   </tr>
                 ) : (
@@ -1366,6 +1405,37 @@ function NewTransferDialog({ onClose, onSaved }: { onClose: () => void; onSaved:
             </p>
           )}
 
+          {from && !stockLoading && lines.length === 0 && (
+            <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <Warehouse className="size-3.5 shrink-0" />
+              {lang === "ar"
+                ? `الرصيد المتاح في المستودع المصدر: ${Object.keys(stockByProduct).length} صنف`
+                : `Available at source: ${Object.keys(stockByProduct).length} items`}
+            </p>
+          )}
+
+          {from && to && (
+            <p className="flex flex-wrap items-center gap-1.5 rounded-xl border-border/70 bg-surface-2/40 px-3 py-2 text-[11px] text-muted-foreground">
+              <span className="font-semibold text-foreground">
+                {warehouses.find((w) => w.id === from)
+                  ? lang === "ar"
+                    ? warehouses.find((w) => w.id === from)?.name_ar ||
+                      warehouses.find((w) => w.id === from)?.name
+                    : warehouses.find((w) => w.id === from)?.name
+                  : "—"}
+              </span>
+              <ArrowRightLeft className="size-3.5 shrink-0 rtl:rotate-180" />
+              <span className="font-semibold text-foreground">
+                {warehouses.find((w) => w.id === to)
+                  ? lang === "ar"
+                    ? warehouses.find((w) => w.id === to)?.name_ar ||
+                      warehouses.find((w) => w.id === to)?.name
+                    : warehouses.find((w) => w.id === to)?.name
+                  : "—"}
+              </span>
+            </p>
+          )}
+
           {hasMultiWarehouse && warehouses.length === 0 && catalogueLoaded && (
             <p className="mt-2 text-[11px] text-muted-foreground">
               {lang === "ar" ? "لا توجد مستودعات مفعّلة" : "No active warehouses found"}
@@ -1374,5 +1444,137 @@ function NewTransferDialog({ onClose, onSaved }: { onClose: () => void; onSaved:
         </FormSection>
       </form>
     </VortexDrawerDialog>
+  );
+}
+/* ------------------------------------------------------------------ */
+/*  WarehousePicker — بطاقات مرئية لاختيار مستودع                       */
+/*  تستبدل الـ Select التقليدي، وتمنع اختيار نفس المستودع للطرفين،   */
+/*  وتعرض حالة الرصيد قبل النقل بوضوح.                                 */
+/* ------------------------------------------------------------------ */
+
+type PickerWarehouse = { id: string; name: string; name_ar?: string | null };
+
+function WarehousePicker({
+  label,
+  icon,
+  tone,
+  warehouses,
+  value,
+  onChange,
+  disabledIds,
+  loading,
+  footer,
+  lang,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  tone: "source" | "destination";
+  warehouses: PickerWarehouse[];
+  value: string;
+  onChange: (id: string) => void;
+  /** مستودعات لا يجوز اختيارها (لمنع المصدر = الوجهة). */
+  disabledIds: string[];
+  loading?: boolean;
+  footer?: React.ReactNode;
+  lang: "ar" | "en";
+}) {
+  const isAr = lang === "ar";
+  const name = (w: PickerWarehouse) => (isAr ? w.name_ar || w.name : w.name || w.name_ar || "—");
+
+  return (
+    <div className="space-y-1.5">
+      <p className="flex items-center gap-1.5 text-xs font-semibold text-foreground/90">
+        {icon}
+        {label}
+        <span className="font-bold text-destructive">*</span>
+      </p>
+
+      {loading ? (
+        <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-1">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="h-16 animate-pulse rounded-xl bg-muted/50" />
+          ))}
+        </div>
+      ) : warehouses.length === 0 ? (
+        <EmptyState
+          icon={<Warehouse className="size-4" />}
+          title={isAr ? "لا توجد مستودعات" : "No warehouses"}
+          description={
+            isAr ? "أضف مستودعاً نشطاً للمتابعة." : "Add an active warehouse to continue."
+          }
+        />
+      ) : (
+        <div
+          role="radiogroup"
+          aria-label={label}
+          className={cn(
+            "grid gap-2",
+            tone === "source" ? "sm:grid-cols-2 md:grid-cols-1" : "sm:grid-cols-2 md:grid-cols-1",
+          )}
+        >
+          {warehouses.map((w) => {
+            const active = w.id === value;
+            const blocked = disabledIds.includes(w.id);
+            return (
+              <button
+                key={w.id}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                disabled={blocked}
+                title={
+                  blocked
+                    ? isAr
+                      ? "لا يمكن اختيار نفس المستودع للطرفين"
+                      : "The same warehouse cannot be both sides"
+                    : undefined
+                }
+                onClick={() => !blocked && onChange(w.id)}
+                className={cn(
+                  "flex items-center justify-between gap-2 rounded-xl border p-3 text-start transition",
+                  active
+                    ? tone === "source"
+                      ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                      : "border-emerald-500/60 bg-emerald-500/5 ring-2 ring-emerald-500/20"
+                    : "border-border/80 hover:bg-muted/50",
+                  blocked && "cursor-not-allowed opacity-40 hover:bg-transparent",
+                )}
+              >
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-medium text-foreground">
+                    {name(w)}
+                  </span>
+                  <span className="block text-[11px] text-muted-foreground">
+                    {blocked
+                      ? isAr
+                        ? "غير متاح للاختيار"
+                        : "Not selectable"
+                      : isAr
+                        ? tone === "source"
+                          ? "مستودع المصدر"
+                          : "مستودع الوجهة"
+                        : tone === "source"
+                          ? "Source warehouse"
+                          : "Destination warehouse"}
+                  </span>
+                </span>
+                {active ? (
+                  <CheckCircle2
+                    className={cn(
+                      "size-4 shrink-0",
+                      tone === "source" ? "text-primary" : "text-emerald-500",
+                    )}
+                  />
+                ) : blocked ? (
+                  <AlertTriangle className="size-4 shrink-0 text-muted-foreground" />
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {footer && <div className="pt-0.5">{footer}</div>}
+    </div>
   );
 }
