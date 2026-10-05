@@ -119,7 +119,8 @@ function ReportsPage() {
     // Payment method split
     const methods: Record<string, number> = {};
     (salesRes.data ?? []).forEach((s: any) => {
-      methods[s.payment_method] = (methods[s.payment_method] ?? 0) + Number(s.paid);
+      const pm = s.payment_method || "cash";
+      methods[pm] = (methods[pm] ?? 0) + Number(s.paid || 0);
     });
     setByMethod(methods);
 

@@ -517,11 +517,11 @@ function POSPage() {
       let cats = catsRes.status === "fulfilled" ? catsRes.value.data : null;
       let brs = brsRes.status === "fulfilled" ? brsRes.value.data : null;
       let uns = unsRes.status === "fulfilled" ? unsRes.value.data : null;
-      let origs = origsRes.status === "fulfilled" ? origsRes.value.data : [];
-      let quals = qualsRes.status === "fulfilled" ? qualsRes.value.data : [];
-      let vMakes = vMakesRes.status === "fulfilled" ? vMakesRes.value.data : [];
-      let vModels = vModelsRes.status === "fulfilled" ? vModelsRes.value.data : [];
-      let compats = compatsRes.status === "fulfilled" ? compatsRes.value.data : [];
+      const origs = origsRes.status === "fulfilled" ? origsRes.value.data : [];
+      const quals = qualsRes.status === "fulfilled" ? qualsRes.value.data : [];
+      const vMakes = vMakesRes.status === "fulfilled" ? vMakesRes.value.data : [];
+      const vModels = vModelsRes.status === "fulfilled" ? vModelsRes.value.data : [];
+      const compats = compatsRes.status === "fulfilled" ? compatsRes.value.data : [];
 
       // Offline fallbacks from local repositories
       if (!ws || ws.length === 0) ws = (await warehousesRepo.getAll()) as any;
