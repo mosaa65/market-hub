@@ -509,6 +509,7 @@ export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
                   ["showMovementInfo", "بيانات الحركة والمستودع"],
                   ["showFinancialDetails", "الضريبة والخصم"],
                   ["showPaymentInfo", "طريقة الدفع والمدفوع"],
+                  ["showChange", "إظهار الباقي في الفواتير"],
                   ["showNotes", "الملاحظات والشروط"],
                   ["showSignatures", "خانات التوقيعات"],
                   ["showFooter", "الهامش السفلي Footer"],

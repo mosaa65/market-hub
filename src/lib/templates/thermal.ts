@@ -91,9 +91,23 @@ export function renderThermalTemplate(
   <div class="tot grand"><span>${L.grandTotal}</span><span>${money(doc.total)}</span></div>
   ${
     doc.paid !== undefined
-      ? `
-  <div class="tot"><span>${L.paid}</span><span>${money(doc.paid)}</span></div>
-  <div class="tot"><span>${L.balance}</span><span>${money((doc.total ?? 0) - doc.paid)}</span></div>`
+      ? (() => {
+          const tendered = doc.amountTendered ?? doc.paid;
+          const changeVal = doc.change ?? Math.max(0, tendered - (doc.total ?? 0));
+          const balanceVal = doc.balance ?? Math.max(0, (doc.total ?? 0) - doc.paid);
+          return `
+  <div class="tot"><span>${L.paid}</span><span>${money(tendered)}</span></div>
+  ${
+    opts.showChange !== false && changeVal > 0
+      ? `<div class="tot" style="font-weight: 700;"><span>${rtl ? "الباقي للعميل" : "Change"}</span><span>${money(changeVal)}</span></div>`
+      : ""
+  }
+  ${
+    balanceVal > 0
+      ? `<div class="tot"><span>${L.balance}</span><span>${money(balanceVal)}</span></div>`
+      : ""
+  }`;
+        })()
       : ""
   }
   <div class="hr"></div>

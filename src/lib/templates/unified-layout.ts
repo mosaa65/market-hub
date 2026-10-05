@@ -460,15 +460,34 @@ export function renderUnifiedLayout(
 
         ${
           doc.paid !== undefined
-            ? `
+            ? (() => {
+                const tendered = doc.amountTendered ?? doc.paid;
+                const changeVal = doc.change ?? Math.max(0, tendered - (doc.total ?? 0));
+                const balanceVal = doc.balance ?? Math.max(0, (doc.total ?? 0) - doc.paid);
+                return `
         <div class="totals-row" style="margin-top: 4px;">
           <span>${L.paid}</span>
-          <span style="font-family: system-ui, sans-serif; font-weight: 700;">${money(doc.paid)}</span>
+          <span style="font-family: system-ui, sans-serif; font-weight: 700;">${money(tendered)}</span>
         </div>
+        ${
+          opts.showChange !== false && changeVal > 0
+            ? `
+        <div class="totals-row" style="color: #047857; font-weight: 800;">
+          <span>${rtl ? "الباقي للعميل" : "Change"}</span>
+          <span style="font-family: system-ui, sans-serif; font-weight: 800;">${money(changeVal)}</span>
+        </div>`
+            : ""
+        }
+        ${
+          balanceVal > 0
+            ? `
         <div class="totals-row">
           <span>${L.balance}</span>
-          <span style="font-family: system-ui, sans-serif; font-weight: 700;">${money((doc.total ?? 0) - doc.paid)}</span>
+          <span style="font-family: system-ui, sans-serif; font-weight: 700;">${money(balanceVal)}</span>
         </div>`
+            : ""
+        }`;
+              })()
             : ""
         }
       </div>`

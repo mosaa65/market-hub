@@ -57,6 +57,7 @@ export interface CustomFieldOptions {
   showNotes?: boolean;
   showSignatures?: boolean;
   showFooter?: boolean;
+  showChange?: boolean;
 }
 
 export interface UnifiedDocumentData {
@@ -88,6 +89,8 @@ export interface UnifiedDocumentData {
   discount?: number;
   total?: number;
   paid?: number;
+  amountTendered?: number; // المبلغ المقدم من العميل (e.g. 8000)
+  change?: number; // الباقي للعميل (e.g. 500)
   balance?: number;
   currency?: string;
 

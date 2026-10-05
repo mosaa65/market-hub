@@ -956,7 +956,7 @@ function POSPage() {
       : total
     : Math.max(0, Number(paid));
   const effectivePaid = isSplitPayment ? splitPaidTotal : singlePaidNum;
-  const isOverpaid = isSplitPayment ? splitPaidTotal > total : !isPaidEmpty && Number(paid) > total;
+  const changeToReturn = Math.max(0, Math.round((effectivePaid - total) * 100) / 100);
   const remainingDebt = Math.max(0, Math.round((total - effectivePaid) * 100) / 100);
 
   // وسيلة الدفع يختارها الكاشير وتتبدل ذكياً حسب المبلغ:
@@ -999,7 +999,7 @@ function POSPage() {
         setScannerOpen((v) => !v);
       } else if (e.key === "F9" || (e.ctrlKey && e.key === "Enter")) {
         e.preventDefault();
-        if (cart.length > 0 && !loading && !isOverpaid) {
+        if (cart.length > 0 && !loading) {
           void checkout();
         }
       }
@@ -1015,7 +1015,6 @@ function POSPage() {
     paymentMethod,
     paid,
     discount,
-    isOverpaid,
     total,
     isSplitPayment,
     splitPaidTotal,
@@ -1029,13 +1028,6 @@ function POSPage() {
     if (cart.length === 0) {
       return toast.error(
         lang === "ar" ? "السلة فارغة، يرجى إضافة منتجات أولاً" : t("pos.cart_empty"),
-      );
-    }
-    if (isOverpaid) {
-      return toast.error(
-        lang === "ar"
-          ? "المبلغ المدفوع أكبر من إجمالي الفاتورة المطلوب!"
-          : "Paid amount cannot exceed invoice total!",
       );
     }
     if (effectivePaid < 0) {
@@ -1243,6 +1235,8 @@ function POSPage() {
         discount: discountN,
         total,
         paid: Math.min(Math.max(effectivePaid, 0), total),
+        amountTendered: effectivePaid,
+        change: changeToReturn,
         lines: cart.map((l) => ({
           product: l.name,
           qty: l.quantity,
@@ -2256,13 +2250,16 @@ function POSPage() {
                   </div>
 
                   {/* Status Badges */}
-                  {isOverpaid ? (
-                    <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-xs font-semibold text-destructive flex items-center gap-1.5 animate-in fade-in duration-200">
-                      <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                      <span className="truncate">
-                        {lang === "ar"
-                          ? `المبلغ المدفوع (${money(effectivePaid)}) أكبر من الإجمالي المطلوب (${money(total)})`
-                          : `Paid amount (${money(effectivePaid)}) exceeds total (${money(total)})`}
+                  {changeToReturn > 0 ? (
+                    <div className="flex items-center justify-between rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 animate-in fade-in duration-200">
+                      <span className="flex items-center gap-1.5 font-bold">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        {lang === "ar" ? "الباقي للعميل (المسترجع):" : "Change to Return:"}
+                      </span>
+                      <span className="font-mono font-bold text-sm">
+                        <span dir="ltr" className="[unicode-bidi:isolate]">
+                          {money(changeToReturn)}
+                        </span>
                       </span>
                     </div>
                   ) : paymentMethod === "credit" || remainingDebt > 0 ? (
