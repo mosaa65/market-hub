@@ -361,35 +361,65 @@ export function UnifiedPrintModal({ open, onClose, data }: UnifiedPrintModalProp
   );
 }
 
+import { printDocument, renderDocumentHTML, getPrintSettings, type UnifiedDocumentData } from "@/lib/templates";
+
+export function ticketToUnifiedDoc(d: UnifiedTicketPrintData): UnifiedDocumentData {
+  return {
+    docType: "customer_invoice",
+    title: "فاتورة وإيصال طحن",
+    number: d.ticketNumber,
+    date: new Date(d.createdAt).toLocaleDateString("ar-EG"),
+    partyName: d.customerName,
+    partyPhone: d.customerPhone,
+    subtotal: d.millingFeeTotal + d.packagingTotal,
+    discount: d.discount || 0,
+    total: d.grandTotal,
+    paid: d.paidAmount,
+    amountTendered: d.paidAmount,
+    change: Math.max(0, d.paidAmount - d.grandTotal),
+    balance: d.remainingAmount,
+    payment: d.paymentMethodLabel || "نقداً",
+    notes: `تفاصيل الطحن: ${d.grainType} (${d.millingTypeLabel}) - عدد الأكياس: ${d.bagCount} كيس (${d.bagSizeKg}كجم) - الوزن الصافي: ${d.totalWeightKg}كجم - الأكياس: ${d.bagsSourceLabel}` + (d.notes ? ` — ${d.notes}` : ""),
+    lines: [
+      {
+        product: `أجرة طحن: ${d.grainType} (${d.millingTypeLabel})`,
+        qty: d.totalWeightKg,
+        unit: "كجم",
+        price: d.millingFeeTotal / (d.totalWeightKg || 1),
+        total: d.millingFeeTotal,
+      },
+      ...(d.packagingTotal > 0
+        ? [
+            {
+              product: `مستلزمات تعبئة وأكياس المطحنة (${d.bagsSourceLabel})`,
+              qty: d.bagCount,
+              unit: "كيس",
+              price: d.packagingTotal / (d.bagCount || 1),
+              total: d.packagingTotal,
+            },
+          ]
+        : []),
+    ],
+    company: d.companyName
+      ? {
+          name: d.companyName,
+          address: d.companyAddress,
+          phone: d.companyPhone,
+        }
+      : undefined,
+  };
+}
+
 /**
  * Native, non-blocking hidden iframe printer for the unified milling ticket.
  */
 export function printUnifiedTicket(data: UnifiedTicketPrintData, paper: "thermal" | "a4"): void {
-  const iframe = document.createElement("iframe");
-  iframe.style.position = "fixed";
-  iframe.style.right = "0";
-  iframe.style.bottom = "0";
-  iframe.style.width = "0";
-  iframe.style.height = "0";
-  iframe.style.border = "0";
-  document.body.appendChild(iframe);
+  const settings = getPrintSettings();
+  const templateId = paper === "thermal" ? settings.defaultCustomerTemplate || "thermal" : "standard";
 
-  const doc = iframe.contentWindow?.document;
-  if (!doc) return;
-
-  const html = paper === "thermal" ? renderThermalHtml(data) : renderA4Html(data);
-
-  doc.open();
-  doc.write(html);
-  doc.close();
-
-  iframe.contentWindow?.focus();
-  setTimeout(() => {
-    iframe.contentWindow?.print();
-    setTimeout(() => {
-      document.body.removeChild(iframe);
-    }, 1500);
-  }, 250);
+  // Use central unified printing system for seamless template enforcement
+  const unifiedDoc = ticketToUnifiedDoc(data);
+  printDocument(unifiedDoc, templateId);
 }
 
 function renderThermalHtml(d: UnifiedTicketPrintData): string {
