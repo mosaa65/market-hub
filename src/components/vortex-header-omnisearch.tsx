@@ -11,7 +11,9 @@ import {
   Command as CommandIcon,
   Loader2,
   Building2,
+  ScanBarcode,
 } from "lucide-react";
+import { InvoiceScannerModal } from "@/components/invoice-scanner-modal";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
@@ -82,6 +84,7 @@ export const VortexHeaderOmnisearch = memo(function VortexHeaderOmnisearch({
   const [isLoading, setIsLoading] = useState(false);
   const [dataResults, setDataResults] = useState<SearchResultItem[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [scannerModalOpen, setScannerModalOpen] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -454,7 +457,22 @@ export const VortexHeaderOmnisearch = memo(function VortexHeaderOmnisearch({
             </kbd>
           </div>
         )}
+
+        <button
+          type="button"
+          onClick={() => setScannerModalOpen(true)}
+          title={isAr ? "الاستعلام عن فاتورة بالباركود / QR" : "Scan Invoice QR/Barcode"}
+          className="flex h-7 items-center gap-1 rounded-full bg-primary/10 px-2 text-[11px] font-bold text-primary hover:bg-primary/20 transition-colors shrink-0"
+        >
+          <ScanBarcode className="h-3.5 w-3.5" />
+          <span className="hidden md:inline">{isAr ? "مسح فاتورة" : "Scan Invoice"}</span>
+        </button>
       </div>
+
+      <InvoiceScannerModal
+        open={scannerModalOpen}
+        onClose={() => setScannerModalOpen(false)}
+      />
 
       {/* Floating Expansive Results Dropdown anchored directly below header */}
       {isOpen && (

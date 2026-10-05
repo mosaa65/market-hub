@@ -8,6 +8,8 @@ import { money } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { ScanBarcode } from "lucide-react";
+import { InvoiceScannerModal } from "@/components/invoice-scanner-modal";
 import {
   Table,
   TableBody,
@@ -59,6 +61,9 @@ function SalesReturnsPage() {
   const [salesReturns, setSalesReturns] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [presetInvoice, setPresetInvoice] = useState<any | null>(null);
+  const [newReturnOpen, setNewReturnOpen] = useState(false);
 
   const whName = (w?: { name: string; name_ar?: string | null } | null) =>
     !w ? "—" : lang === "ar" ? w.name_ar || w.name : w.name || w.name_ar || "—";
@@ -92,7 +97,34 @@ function SalesReturnsPage() {
         subtitle={
           lang === "ar" ? "سجل وأداء مرتجعات المبيعات والعملاء" : "Track customer sales returns"
         }
-        actions={<NewSalesReturn onSaved={load} />}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setScannerOpen(true)}
+              className="gap-2 rounded-xl text-xs font-semibold"
+            >
+              <ScanBarcode className="h-4 w-4 text-primary" />
+              {lang === "ar" ? "مسح باركود الفاتورة" : "Scan Invoice Barcode"}
+            </Button>
+            <NewSalesReturn
+              onSaved={load}
+              presetInvoice={presetInvoice}
+              openOverride={newReturnOpen}
+              onOpenChange={setNewReturnOpen}
+            />
+          </div>
+        }
+      />
+
+      <InvoiceScannerModal
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onSelectForReturn={(inv) => {
+          setPresetInvoice(inv);
+          setNewReturnOpen(true);
+        }}
       />
 
       <div className="panel-elevated p-4">
@@ -177,12 +209,21 @@ function SalesReturnsPage() {
 function NewSalesReturn({
   onSaved,
   hasMultiWarehouse,
+  presetInvoice,
+  openOverride,
+  onOpenChange,
 }: {
   onSaved: () => void;
   hasMultiWarehouse?: boolean;
+  presetInvoice?: any;
+  openOverride?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const { t, lang } = useI18n();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = openOverride ?? internalOpen;
+  const setOpen = onOpenChange ?? setInternalOpen;
+
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
@@ -196,6 +237,13 @@ function NewSalesReturn({
   const [invoiceItems, setInvoiceItems] = useState<any[]>([]);
   const [lines, setLines] = useState<Line[]>([]);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (presetInvoice && open) {
+      if (presetInvoice.customer_id) setCustomerId(presetInvoice.customer_id);
+      if (presetInvoice.id) setCustomerInvoiceId(presetInvoice.id);
+    }
+  }, [presetInvoice, open]);
 
   useEffect(() => {
     if (!open) return;
