@@ -21,6 +21,7 @@ import { renderElegantTemplate } from "./elegant";
 import { renderInventoryThermalTemplate, renderInventoryStandardTemplate } from "./inventory";
 import { getPrintSettings } from "./settings-store";
 import { renderFormalTemplate } from "@/lib/printing/formal";
+import { renderMillingMasterTemplate, renderMillingThermalTemplate } from "./milling";
 
 export * from "./types";
 export * from "./settings-store";
@@ -30,6 +31,7 @@ export { renderStandardTemplate } from "./standard";
 export { renderElegantTemplate } from "./elegant";
 export { renderInventoryThermalTemplate, renderInventoryStandardTemplate } from "./inventory";
 export { renderFormalTemplate } from "@/lib/printing/formal";
+export { renderMillingMasterTemplate, renderMillingThermalTemplate } from "./milling";
 export { numberToArabicWords } from "./tafqeet";
 
 interface RegisteredTemplate {
@@ -69,6 +71,10 @@ export function getTemplateRenderer(
 
   // Default customer invoice fallbacks
   switch (id) {
+    case "milling-master":
+      return renderMillingMasterTemplate;
+    case "milling-thermal":
+      return renderMillingThermalTemplate;
     case "thermal":
       return renderThermalTemplate;
     case "elegant":
@@ -245,6 +251,40 @@ registerTemplate(
     ],
   },
   (doc, labels, rtl, options) => renderFormalTemplate(doc, labels, rtl, options),
+);
+
+registerTemplate(
+  {
+    id: "milling-master",
+    nameAr: "قالب المطحنة الفاخر (A4)",
+    nameEn: "Milling Master (A4)",
+    category: "standard",
+    paperSize: "A4",
+    supportedPaperProfiles: ["a4"],
+    supportedDocTypes: [
+      "customer_invoice",
+      "purchase_invoice",
+      "sales_return",
+      "purchase_return",
+      "payment_receipt",
+      "delivery_note",
+      "inventory_document",
+    ],
+  },
+  renderMillingMasterTemplate,
+);
+
+registerTemplate(
+  {
+    id: "milling-thermal",
+    nameAr: "إيصال المطحنة الحراري (80mm)",
+    nameEn: "Milling Thermal (80mm)",
+    category: "thermal",
+    paperSize: "80mm",
+    supportedPaperProfiles: ["thermal-80", "thermal-58"],
+    supportedDocTypes: ["customer_invoice", "inventory_document"],
+  },
+  renderMillingThermalTemplate,
 );
 
 /**

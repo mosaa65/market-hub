@@ -433,10 +433,12 @@ function renderThermalHtml(d: UnifiedTicketPrintData): string {
     body { font-family: system-ui, -apple-system, sans-serif; width: 72mm; margin: 0 auto; padding: 10px 4px; font-size: 12px; color: #000; }
     .center { text-align: center; }
     .bold { font-weight: bold; }
-    .dashed { border-bottom: 1px dashed #444; margin: 8px 0; }
-    .flex { display: flex; justify-content: space-between; margin-bottom: 4px; }
+    .dashed { border-bottom: 1px dashed rgba(0,0,0,0.2); margin: 8px 0; }
+    .hairline-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(0, 0, 0, 0.08); }
+    .hairline-row:last-child { border-bottom: none; }
     .badge { display: inline-block; border: 1px solid #000; padding: 2px 8px; border-radius: 99px; font-weight: bold; font-size: 11px; margin: 4px 0; }
-    .box { background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 8px; padding: 6px; margin: 6px 0; }
+    .box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 8px; margin: 6px 0; }
+    .inama-footer { text-align: center; margin-top: 12px; padding-top: 6px; border-top: 1px solid rgba(0, 0, 0, 0.1); font-size: 10px; font-weight: 700; color: #334155; }
   </style>
 </head>
 <body>
@@ -447,31 +449,34 @@ function renderThermalHtml(d: UnifiedTicketPrintData): string {
     <div class="badge">فاتورة وإيصال طحن فوري</div>
   </div>
   <div class="dashed"></div>
-  <div class="flex"><span>رقم الفاتورة:</span><span class="bold">${d.ticketNumber}</span></div>
-  <div class="flex"><span>التاريخ:</span><span>${new Date(d.createdAt).toLocaleDateString("ar-EG")} ${new Date(d.createdAt).toLocaleTimeString("ar-EG", { hour: '2-digit', minute: '2-digit' })}</span></div>
-  <div class="flex"><span>العميل:</span><span class="bold">${d.customerName}</span></div>
-  ${d.customerPhone ? `<div class="flex"><span>الهاتف:</span><span>${d.customerPhone}</span></div>` : ""}
+  <div class="hairline-row"><span>رقم الفاتورة:</span><span class="bold">${d.ticketNumber}</span></div>
+  <div class="hairline-row"><span>التاريخ:</span><span>${new Date(d.createdAt).toLocaleDateString("ar-EG")} ${new Date(d.createdAt).toLocaleTimeString("ar-EG", { hour: '2-digit', minute: '2-digit' })}</span></div>
+  <div class="hairline-row"><span>العميل:</span><span class="bold">${d.customerName}</span></div>
+  ${d.customerPhone ? `<div class="hairline-row"><span>الهاتف:</span><span>${d.customerPhone}</span></div>` : ""}
   <div class="dashed"></div>
-  <div class="bold">تفاصيل الطحن:</div>
+  <div class="bold" style="margin-bottom: 4px;">تفاصيل الطحن:</div>
   <div class="box">
-    <div class="flex"><span>الحبوب:</span><span class="bold">${d.grainType}</span></div>
-    <div class="flex"><span>درجة الطحن:</span><span class="bold">${d.millingTypeLabel}</span></div>
-    <div class="flex"><span>الأكياس:</span><span class="bold">${d.bagCount} كيس (${d.bagSizeKg} كجم)</span></div>
-    <div class="flex"><span>الوزن الصافي:</span><span class="bold">${d.totalWeightKg} كجم</span></div>
-    <div class="flex"><span>أكياس التعبئة:</span><span>${d.bagsSourceLabel}</span></div>
+    <div class="hairline-row"><span>نوع الحبوب:</span><span class="bold">${d.grainType}</span></div>
+    <div class="hairline-row"><span>درجة الطحن:</span><span class="bold">${d.millingTypeLabel}</span></div>
+    <div class="hairline-row"><span>عدد الأكياس:</span><span class="bold">${d.bagCount} كيس (${d.bagSizeKg} كجم)</span></div>
+    <div class="hairline-row"><span>الوزن الصافي:</span><span class="bold">${d.totalWeightKg} كجم</span></div>
+    <div class="hairline-row"><span>أكياس التعبئة:</span><span>${d.bagsSourceLabel}</span></div>
   </div>
   <div class="dashed"></div>
-  <div class="flex"><span>أجرة الطحن:</span><span class="bold">${d.millingFeeTotal.toLocaleString()} ر.ي</span></div>
-  ${d.packagingTotal > 0 ? `<div class="flex"><span>قيمة الأكياس:</span><span class="bold">${d.packagingTotal.toLocaleString()} ر.ي</span></div>` : ""}
-  ${(d.discount || 0) > 0 ? `<div class="flex"><span>الخصم:</span><span>-${d.discount?.toLocaleString()} ر.ي</span></div>` : ""}
+  <div class="hairline-row"><span>أجرة الطحن:</span><span class="bold">${d.millingFeeTotal.toLocaleString()} ر.ي</span></div>
+  ${d.packagingTotal > 0 ? `<div class="hairline-row"><span>قيمة الأكياس:</span><span class="bold">${d.packagingTotal.toLocaleString()} ر.ي</span></div>` : ""}
+  ${(d.discount || 0) > 0 ? `<div class="hairline-row"><span>الخصم:</span><span>-${d.discount?.toLocaleString()} ر.ي</span></div>` : ""}
   <div class="dashed"></div>
-  <div class="flex" style="font-size: 14px; font-weight: 900;"><span>الإجمالي المطلوب:</span><span>${d.grandTotal.toLocaleString()} ر.ي</span></div>
-  <div class="flex"><span>المدفوع:</span><span class="bold">${d.paidAmount.toLocaleString()} ر.ي</span></div>
-  ${d.remainingAmount > 0 ? `<div class="flex" style="color: red; font-weight: bold;"><span>المتبقي:</span><span>${d.remainingAmount.toLocaleString()} ر.ي</span></div>` : ""}
+  <div class="hairline-row" style="font-size: 14px; font-weight: 900;"><span>الإجمالي المطلوب:</span><span>${d.grandTotal.toLocaleString()} ر.ي</span></div>
+  <div class="hairline-row"><span>المدفوع:</span><span class="bold">${d.paidAmount.toLocaleString()} ر.ي</span></div>
+  ${d.remainingAmount > 0 ? `<div class="hairline-row" style="color: red; font-weight: bold;"><span>المتبقي:</span><span>${d.remainingAmount.toLocaleString()} ر.ي</span></div>` : ""}
   <div class="dashed"></div>
-  <div class="center" style="font-size: 10px; margin-top: 10px;">
+  <div class="center" style="font-size: 10px; margin-top: 8px;">
     <div>تم استلام وطحن وتسليم الحبوب بنجاح.</div>
     <div style="font-weight: bold; margin-top: 4px;">شكرًا لتعاملكم معنا</div>
+  </div>
+  <div class="inama-footer">
+    عمل بواسطة شركة إنما سوفت - 772217218
   </div>
 </body>
 </html>`;
@@ -485,13 +490,23 @@ function renderA4Html(d: UnifiedTicketPrintData): string {
   <title>فاتورة وسند طحن ${d.ticketNumber}</title>
   <style>
     @page { size: A4 portrait; margin: 15mm; }
-    body { font-family: system-ui, -apple-system, sans-serif; font-size: 13px; color: #1e293b; padding: 10px; }
+    body { font-family: system-ui, -apple-system, sans-serif; font-size: 13px; color: #1e293b; padding: 10px; background: #fff; }
     .header { display: flex; justify-content: space-between; border-bottom: 2px solid #0f172a; padding-bottom: 15px; }
     .box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin: 15px 0; }
+    .hairline-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(0, 0, 0, 0.08); }
+    .hairline-row:last-child { border-bottom: none; }
     table { width: 100%; border-collapse: collapse; margin: 15px 0; }
-    th { background: #f1f5f9; text-align: right; padding: 8px; border: 1px solid #cbd5e1; font-weight: bold; }
-    td { padding: 8px; border: 1px solid #cbd5e1; }
-    .flex { display: flex; justify-content: space-between; }
+    th { background: #f1f5f9; text-align: right; padding: 10px 8px; border-bottom: 1px solid #cbd5e1; font-weight: bold; }
+    td { padding: 10px 8px; border-bottom: 1px solid rgba(0, 0, 0, 0.08); }
+    .inama-footer {
+      margin-top: 30px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(0, 0, 0, 0.1);
+      text-align: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: #475569;
+    }
   </style>
 </head>
 <body>
@@ -510,8 +525,8 @@ function renderA4Html(d: UnifiedTicketPrintData): string {
 
   <div class="box">
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-      <div><strong>العميل:</strong> ${d.customerName}</div>
-      <div><strong>الهاتف:</strong> ${d.customerPhone || "—"}</div>
+      <div class="hairline-row"><strong>العميل:</strong> <span>${d.customerName}</span></div>
+      <div class="hairline-row"><strong>الهاتف:</strong> <span>${d.customerPhone || "—"}</span></div>
     </div>
   </div>
 
@@ -544,26 +559,30 @@ function renderA4Html(d: UnifiedTicketPrintData): string {
   </table>
 
   <div style="display: flex; justify-content: flex-end; margin-top: 15px;">
-    <div style="width: 250px;">
-      <div class="flex"><span>المجموع:</span><span>${(d.millingFeeTotal + d.packagingTotal).toLocaleString()} ر.ي</span></div>
-      ${(d.discount || 0) > 0 ? `<div class="flex" style="color: green;"><span>الخصم:</span><span>-${d.discount?.toLocaleString()} ر.ي</span></div>` : ""}
-      <div class="flex" style="font-size: 16px; font-weight: bold; border-top: 1px solid #000; padding-top: 6px; margin-top: 6px;">
+    <div style="width: 260px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px;">
+      <div class="hairline-row"><span>المجموع:</span><span>${(d.millingFeeTotal + d.packagingTotal).toLocaleString()} ر.ي</span></div>
+      ${(d.discount || 0) > 0 ? `<div class="hairline-row" style="color: green;"><span>الخصم:</span><span>-${d.discount?.toLocaleString()} ر.ي</span></div>` : ""}
+      <div class="hairline-row" style="font-size: 15px; font-weight: bold; border-top: 2px solid #0f172a; padding-top: 6px; margin-top: 6px;">
         <span>الصافي:</span><span>${d.grandTotal.toLocaleString()} ر.ي</span>
       </div>
-      <div class="flex" style="color: green;"><span>المدفوع:</span><span>${d.paidAmount.toLocaleString()} ر.ي</span></div>
-      ${d.remainingAmount > 0 ? `<div class="flex" style="color: red; font-weight: bold;"><span>المتبقي:</span><span>${d.remainingAmount.toLocaleString()} ر.ي</span></div>` : ""}
+      <div class="hairline-row" style="color: #0284c7;"><span>المدفوع:</span><span>${d.paidAmount.toLocaleString()} ر.ي</span></div>
+      ${d.remainingAmount > 0 ? `<div class="hairline-row" style="color: red; font-weight: bold;"><span>المتبقي:</span><span>${d.remainingAmount.toLocaleString()} ر.ي</span></div>` : ""}
     </div>
   </div>
 
-  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 60px; text-align: center; color: #64748b;">
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 50px; text-align: center; color: #64748b;">
     <div>
-      <p>توقيع المستلم</p>
-      <div style="border-bottom: 1px dashed #cbd5e1; width: 180px; margin: 30px auto 0;"></div>
+      <p style="margin: 0; font-weight: 600;">توقيع المستلم</p>
+      <div style="border-bottom: 1px dashed #cbd5e1; width: 180px; margin: 28px auto 0;"></div>
     </div>
     <div>
-      <p>مشرف صالة المطحنة</p>
-      <div style="border-bottom: 1px dashed #cbd5e1; width: 180px; margin: 30px auto 0;"></div>
+      <p style="margin: 0; font-weight: 600;">مشرف صالة المطحنة</p>
+      <div style="border-bottom: 1px dashed #cbd5e1; width: 180px; margin: 28px auto 0;"></div>
     </div>
+  </div>
+
+  <div class="inama-footer">
+    عمل بواسطة شركة إنما سوفت - 772217218
   </div>
 </body>
 </html>`;

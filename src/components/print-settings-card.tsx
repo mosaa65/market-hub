@@ -690,7 +690,9 @@ function PrintProfileCard({
   const [paperProfileId, setPaperProfileId] = useState<PaperProfileId>(initialPaperProfileId);
   const templateMeta = getTemplateMeta(templateId);
   const supportedPapers = templateMeta?.supportedPaperProfiles ?? [];
-  const templates = (["thermal", "standard", "elegant"] as InvoiceTemplateId[]).filter((id) => {
+  const templates = (
+    ["thermal", "standard", "elegant", "formal", "milling-master", "milling-thermal"] as InvoiceTemplateId[]
+  ).filter((id) => {
     const meta = getTemplateMeta(id);
     return meta && (!meta.supportedDocTypes || meta.supportedDocTypes.includes(documentType));
   });

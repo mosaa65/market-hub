@@ -16,7 +16,14 @@ export type DocumentType =
 export type PaperSize = "80mm" | "58mm" | "A4" | "A5";
 
 export type InvoiceTemplateId =
-  "thermal" | "standard" | "elegant" | "unified-modern" | "formal" | string;
+  | "thermal"
+  | "standard"
+  | "elegant"
+  | "unified-modern"
+  | "formal"
+  | "milling-master"
+  | "milling-thermal"
+  | string;
 
 export interface DocumentLine {
   product: string;
