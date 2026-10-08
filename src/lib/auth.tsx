@@ -116,15 +116,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userId = nextSession.user.id;
       const cached = readCachedAuth(userId);
 
+      // ضبط الجلسة فوراً لمنع حراس المسارات من طرد المستخدم أثناء جلب الصلاحيات
+      setSession(nextSession);
+
       if (cached) {
-        setSession(nextSession);
         setRoles(cached.roles);
         setIsPlatformAdmin(cached.isAdmin);
         setIsPlatformSuperadmin(cached.isSuperadmin);
         setIsActive(cached.isActive);
         setLoading(false);
         setIsRefreshingPermissions(true);
-      } else if (isInitial) {
+      } else {
+        // إذا لم توجد صلاحيات مخزنة مسبقاً، نبقي التحميل شغالاً حتى تنتهي الاستعلامات
         setLoading(true);
       }
 
