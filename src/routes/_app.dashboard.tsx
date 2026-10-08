@@ -23,6 +23,9 @@ import {
   ArrowRight,
   Sparkles,
   Receipt,
+  Trophy,
+  UserCheck,
+  Award,
   Boxes,
   Sun,
   Moon,
@@ -318,17 +321,7 @@ function DashboardPage() {
       <PageHeader
         title={t("dash.title")}
         subtitle={t("dash.subtitle")}
-        actions={
-          isModuleEnabled("analytics") ? (
-            <Link
-              to="/analytics"
-              className="hidden sm:flex h-9 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-4 text-xs font-medium text-primary hover:bg-primary/20 transition shadow-sm"
-            >
-              <Sparkles className="h-3.5 w-3.5" />{" "}
-              {lang === "ar" ? "التحليلات المتقدمة" : "Advanced analytics"}
-            </Link>
-          ) : undefined
-        }
+        
       />
 
       {/* ═══════════════════════════════════════════════════════════════════════
@@ -339,37 +332,37 @@ function DashboardPage() {
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 items-stretch">
           
           {/* Card 1: Executive Welcome & System Status (7 cols on Desktop) */}
-          <div className="relative overflow-hidden rounded-3xl border border-border/80 bg-gradient-to-br from-card via-card/95 to-surface-2/60 p-5 sm:p-6 lg:col-span-7 shadow-panel backdrop-blur-xl flex flex-col justify-between">
-            {/* Ambient Lighting */}
-            <div className="pointer-events-none absolute -top-24 -start-24 size-72 rounded-full bg-primary/10 blur-3xl opacity-70" />
-            <div className="pointer-events-none absolute -bottom-24 -end-24 size-64 rounded-full bg-emerald-500/10 blur-3xl opacity-50" />
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
+          <div className="relative overflow-hidden rounded-3xl border border-border/80 bg-gradient-to-br from-card via-card/95 to-zinc-900/40 dark:from-zinc-950 dark:via-zinc-900/90 dark:to-zinc-950 p-5 sm:p-6 lg:col-span-7 shadow-panel backdrop-blur-xl flex flex-col justify-between">
+            {/* Ambient Lighting - Warm Champagne & Emerald Luxury Glow (No Blue) */}
+            <div className="pointer-events-none absolute -top-24 -start-24 size-72 rounded-full bg-amber-500/10 blur-3xl opacity-70" />
+            <div className="pointer-events-none absolute -bottom-24 -end-24 size-64 rounded-full bg-emerald-500/10 blur-3xl opacity-60" />
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
 
             {/* Header Content */}
             <div className="relative flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-5">
-              {/* User Avatar with Pulse Radar */}
+              {/* User Avatar: Luxury Circular Translucent Glass Badge with Executive Icon */}
               <div className="relative shrink-0">
                 {profile?.avatar_url ? (
                   <img
                     src={profile.avatar_url}
                     alt={userName}
-                    className="size-16 sm:size-18 rounded-2xl object-cover ring-2 ring-primary/25 shadow-md shadow-primary/15"
+                    className="size-16 sm:size-20 rounded-full object-cover ring-2 ring-amber-500/30 shadow-xl"
                   />
                 ) : (
-                  <div className="grid size-16 sm:size-18 place-items-center rounded-2xl bg-gradient-to-tr from-primary/90 via-primary to-primary/75 text-primary-foreground font-black text-2xl sm:text-3xl shadow-lg shadow-primary/20 ring-1 ring-primary/40">
-                    {userName ? userName.charAt(0).toUpperCase() : "V"}
+                  <div className="relative grid size-16 sm:size-20 place-items-center rounded-full bg-gradient-to-tr from-amber-500/20 via-zinc-800/40 to-emerald-500/20 dark:from-amber-400/15 dark:via-zinc-800/60 dark:to-emerald-400/15 backdrop-blur-xl border border-white/20 dark:border-white/10 shadow-xl ring-1 ring-amber-500/25 group transition-transform duration-300 hover:scale-105">
+                    <roleMeta.icon className="size-8 sm:size-9 text-amber-500 dark:text-amber-400 filter drop-shadow-md" />
                   </div>
                 )}
-                <span className="absolute -bottom-1 -end-1 flex size-4.5 items-center justify-center" title={isAr ? "متصل ومباشر" : "Live"}>
-                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-70" />
-                  <span className="relative inline-flex size-3.5 rounded-full bg-emerald-500 ring-2 ring-card" />
+                <span className="absolute -bottom-0.5 -end-0.5 flex size-5 items-center justify-center" title={isAr ? "جلسة موثقة ومتصلة لحظياً" : "Live Active Session"}>
+                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                  <span className="relative inline-flex size-3.5 rounded-full bg-emerald-500 ring-2 ring-card shadow-sm" />
                 </span>
               </div>
 
               {/* Identity & Badges */}
               <div className="space-y-1.5 min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold text-primary shadow-xs">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-[11px] font-bold text-amber-600 dark:text-amber-400 shadow-xs">
                     <GreetingIcon className={`size-3.5 ${greeting.color}`} />
                     <span>{greeting.badge}</span>
                   </span>
@@ -378,13 +371,13 @@ function DashboardPage() {
                   </span>
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
                     <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>{isAr ? "نظام متزامن لحظياً" : "Realtime Active"}</span>
+                    <span>{isAr ? "مركز القيادة نشط" : "Command Active"}</span>
                   </span>
                 </div>
 
                 <h2 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-foreground flex items-center gap-2 flex-wrap">
                   <span className="text-muted-foreground font-semibold">{greeting.title}،</span>
-                  <span className="text-primary font-black">{userName}</span>
+                  <span className="bg-gradient-to-r from-amber-500 via-emerald-500 to-amber-600 bg-clip-text text-transparent font-black">{userName}</span>
                 </h2>
 
                 <p className="text-xs sm:text-[13px] text-muted-foreground font-medium leading-relaxed">
@@ -403,11 +396,11 @@ function DashboardPage() {
 
               <Link
                 to="/pos"
-                className="inline-flex h-8 sm:h-8.5 items-center gap-2 rounded-xl bg-primary px-3 text-xs font-bold text-primary-foreground shadow-xs hover:bg-primary/90 transition-all active:scale-95"
+                className="inline-flex h-8 sm:h-8.5 items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-3 text-xs font-bold text-white shadow-sm hover:from-amber-600 hover:to-amber-700 transition-all active:scale-95"
               >
                 <Zap className="size-3.5" />
                 <span>{lang === "ar" ? "نقطة البيع (POS)" : "Open POS"}</span>
-                <kbd className="hidden sm:inline-block rounded bg-primary-foreground/20 px-1 py-0.2 text-[9px] font-mono">F2</kbd>
+                <kbd className="hidden sm:inline-block rounded bg-black/20 px-1 py-0.2 text-[9px] font-mono">F2</kbd>
               </Link>
 
               <Link
@@ -434,45 +427,40 @@ function DashboardPage() {
                 <Package className="size-3.5 text-muted-foreground" />
                 <span>{lang === "ar" ? "المنتجات" : "Products"}</span>
               </Link>
-
-              {isModuleEnabled("analytics") && (
-                <Link
-                  to="/analytics"
-                  className="ms-auto inline-flex h-8 sm:h-8.5 items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-3 text-xs font-bold text-primary hover:bg-primary/20 transition-all active:scale-95"
-                >
-                  <Sparkles className="size-3.5" />
-                  <span>{lang === "ar" ? "التحليلات الذكية" : "Analytics"}</span>
-                </Link>
-              )}
             </div>
           </div>
 
           {/* Card 2: Luxury Executive Chronos & Calendar Card (5 cols on Desktop) */}
-          <div className="relative overflow-hidden rounded-3xl border border-border/80 bg-gradient-to-br from-card via-surface/90 to-surface-2/40 p-5 sm:p-6 lg:col-span-5 shadow-panel backdrop-blur-xl flex flex-col justify-between">
-            {/* Ambient Lighting */}
-            <div className="pointer-events-none absolute -top-20 -end-20 size-60 rounded-full bg-chart-4/10 blur-3xl opacity-60" />
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-chart-4/30 to-transparent" />
+          <div className="relative overflow-hidden rounded-3xl border border-border/80 bg-gradient-to-br from-card via-surface/90 to-zinc-900/30 dark:from-zinc-950 dark:via-zinc-900/80 dark:to-zinc-950 p-5 sm:p-6 lg:col-span-5 shadow-panel backdrop-blur-xl flex flex-col justify-between">
+            {/* Ambient Lighting - Warm Amber & Emerald Glow */}
+            <div className="pointer-events-none absolute -top-20 -end-20 size-60 rounded-full bg-amber-500/10 blur-3xl opacity-60" />
+            <div className="pointer-events-none absolute -bottom-20 -start-20 size-56 rounded-full bg-emerald-500/10 blur-3xl opacity-40" />
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
 
             {(() => {
               const luxuryDate = formatLuxuryDate(now, { showDayName: true, showYear: true });
               const currentDayOfWeek = now.getDay(); // 0 is Sunday, 6 is Saturday
-              // Construct a 7-day strip centered or matching Arab week starting Saturday (6, 0, 1, 2, 3, 4, 5)
               const weekDaysAr = ["السبت", "الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة"];
               const weekDaysEn = ["Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri"];
               const dayIndices = [6, 0, 1, 2, 3, 4, 5];
 
               return (
                 <div className="space-y-4">
-                  {/* Top Bar: Date Pillar + Digital Clock */}
+                  {/* Top Bar: Luxury Date Stamp + Digital Clock */}
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <div className="grid place-items-center size-13 sm:size-14 rounded-2xl bg-gradient-to-br from-primary/15 via-primary/10 to-primary/5 border border-primary/20 text-primary font-mono font-black text-2xl sm:text-3xl shadow-inner leading-none">
+                      <div className="grid place-items-center size-14 sm:size-16 rounded-2xl bg-gradient-to-br from-amber-500/20 via-amber-500/10 to-transparent border border-amber-500/30 text-amber-500 dark:text-amber-400 font-mono font-black text-2xl sm:text-3xl shadow-inner leading-none">
                         {luxuryDate.day}
                       </div>
                       <div className="space-y-0.5">
-                        <span className="block text-sm sm:text-base font-black text-foreground">
-                          {luxuryDate.weekday}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="block text-sm sm:text-base font-black text-foreground">
+                            {luxuryDate.weekday}
+                          </span>
+                          <span className="inline-flex items-center rounded-md bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.2 text-[9px] font-bold text-amber-600 dark:text-amber-400">
+                            {isAr ? "سنة مالية" : "Fiscal"}
+                          </span>
+                        </div>
                         <span className="block text-xs font-semibold text-muted-foreground font-mono">
                           {luxuryDate.month} {luxuryDate.year}
                         </span>
@@ -480,16 +468,16 @@ function DashboardPage() {
                     </div>
 
                     {/* Digital Clock Pillar */}
-                    <div className="rounded-2xl border border-border/80 bg-surface-2/50 px-3.5 py-2 text-end shadow-xs backdrop-blur-md">
+                    <div className="rounded-2xl border border-border/80 bg-zinc-900/10 dark:bg-zinc-800/40 px-3.5 py-2 text-end shadow-xs backdrop-blur-md">
                       <div className="flex items-center gap-1.5 text-sm sm:text-base font-black font-mono text-foreground justify-end tracking-wider">
-                        <Clock className="size-3.5 text-primary animate-pulse" />
+                        <Clock className="size-3.5 text-amber-500 animate-pulse" />
                         <span>
                           {now.toLocaleTimeString(isAr ? "ar-YE" : "en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
                         </span>
                       </div>
                       <div className="flex items-center gap-1 text-[10px] text-muted-foreground font-semibold justify-end">
                         <Radio className="size-2.5 text-emerald-500 animate-pulse" />
-                        <span>{isAr ? "توقيت النظام (GMT+3)" : "System Time (GMT+3)"}</span>
+                        <span>{isAr ? "توقيت عدن (GMT+3)" : "Aden Time (GMT+3)"}</span>
                       </div>
                     </div>
                   </div>
@@ -505,14 +493,14 @@ function DashboardPage() {
                             key={dayIdx}
                             className={`flex flex-col items-center justify-center rounded-xl py-1.5 px-0.5 transition-all ${
                               isToday
-                                ? "bg-primary text-primary-foreground font-bold shadow-sm scale-102 ring-2 ring-primary/30"
+                                ? "bg-gradient-to-b from-amber-500 to-amber-600 text-white font-bold shadow-sm scale-102 ring-2 ring-amber-500/40"
                                 : "text-muted-foreground hover:bg-surface-2/60"
                             }`}
                           >
                             <span className="text-[10px] font-medium leading-none mb-1">
                               {label.slice(0, 3)}
                             </span>
-                            <span className={`text-xs font-mono font-bold leading-none ${isToday ? "text-primary-foreground" : "text-foreground"}`}>
+                            <span className={`text-xs font-mono font-bold leading-none ${isToday ? "text-white" : "text-foreground"}`}>
                               {isToday ? luxuryDate.day : "•"}
                             </span>
                           </div>
@@ -524,12 +512,12 @@ function DashboardPage() {
                   {/* Calendar Footer Info */}
                   <div className="flex items-center justify-between text-xs pt-1 text-muted-foreground">
                     <span className="flex items-center gap-1.5 font-medium">
-                      <CalendarDays className="size-3.5 text-primary" />
-                      <span>{isAr ? "سجل النشاط اليومي واليومية" : "Daily Activity Journal"}</span>
+                      <CalendarDays className="size-3.5 text-amber-500" />
+                      <span>{isAr ? "سجل النشاط واليومية العامة" : "Daily Activity Journal"}</span>
                     </span>
                     <Link
                       to="/daily-journal"
-                      className="text-[11px] font-bold text-primary hover:underline flex items-center gap-0.5"
+                      className="text-[11px] font-bold text-amber-500 hover:text-amber-600 dark:hover:text-amber-400 hover:underline flex items-center gap-0.5"
                     >
                       {isAr ? "استعراض اليومية" : "View Journal"}
                       <ChevronLeft className="size-3 rtl:rotate-0 rotate-180" />
@@ -923,40 +911,69 @@ function DashboardPage() {
       </div>
 
       {/* Top products & Recent sales */}
-      <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <div className="panel-elevated p-5 rounded-3xl border border-border/80 shadow-sm">
+      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {/* Card: Top Selling Products */}
+        <div className="relative overflow-hidden rounded-3xl border border-border/80 bg-gradient-to-br from-card via-card/95 to-surface-2/40 p-5 sm:p-6 shadow-sm backdrop-blur-md">
           <div className="mb-4 flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-semibold flex items-center gap-1.5">
-                <Package className="h-4 w-4 text-chart-2" /> {t("dash.top_products")}
-              </h3>
-              <p className="text-xs text-muted-foreground">{t("dash.last_30_days")}</p>
+            <div className="flex items-center gap-2.5">
+              <div className="grid size-9 place-items-center rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                <Trophy className="size-4.5" />
+              </div>
+              <div>
+                <h3 className="text-sm sm:text-base font-bold flex items-center gap-1.5 text-foreground">
+                  {t("dash.top_products")}
+                </h3>
+                <p className="text-[11px] text-muted-foreground font-medium">{t("dash.last_30_days")}</p>
+              </div>
             </div>
+            <span className="rounded-full bg-amber-500/10 px-2.5 py-0.5 text-[11px] font-bold text-amber-600 dark:text-amber-400 border border-amber-500/20">
+              {data?.topProducts?.length ?? 0} {isAr ? "منتجات متصدرة" : "top items"}
+            </span>
           </div>
+
           {(data?.topProducts.length ?? 0) === 0 ? (
-            <div className="grid place-items-center py-10 text-xs text-muted-foreground">
+            <div className="grid place-items-center py-12 text-xs text-muted-foreground">
               {t("common.no_data")}
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-3.5">
               {data!.topProducts.map((tp, i) => {
                 const max = data!.topProducts[0].total || 1;
-                const pct = (tp.total / max) * 100;
+                const pct = Math.min(100, Math.max(5, (tp.total / max) * 100));
                 const name =
                   lang === "ar"
                     ? tp.product?.name_ar || tp.product?.name
                     : tp.product?.name || tp.product?.name_ar;
+
+                const rankBadges = [
+                  "bg-gradient-to-r from-amber-400 to-amber-600 text-white shadow-xs font-black ring-1 ring-amber-400/40",
+                  "bg-gradient-to-r from-slate-300 to-slate-400 text-slate-900 shadow-xs font-black ring-1 ring-slate-300/40",
+                  "bg-gradient-to-r from-amber-700 to-amber-800 text-white shadow-xs font-black ring-1 ring-amber-700/40",
+                ];
+                const badgeClass = i < 3 ? rankBadges[i] : "bg-surface-2 text-muted-foreground font-bold";
+
                 return (
-                  <div key={i}>
-                    <div className="mb-1 flex items-center justify-between text-xs">
-                      <span className="truncate font-medium">{name}</span>
-                      <span className="font-mono text-muted-foreground">
-                        {money(tp.total)} · {tp.qty}
-                      </span>
+                  <div key={i} className="group rounded-2xl border border-border/50 bg-surface/50 p-3 hover:bg-surface-2/60 transition-all">
+                    <div className="mb-2 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className={`grid size-6 place-items-center rounded-lg text-[11px] shrink-0 ${badgeClass}`}>
+                          {i + 1}
+                        </span>
+                        <span className="truncate font-bold text-foreground text-xs sm:text-sm">{name}</span>
+                      </div>
+                      <div className="text-end shrink-0 ms-2">
+                        <span className="font-mono font-black text-foreground text-xs sm:text-sm">
+                          {money(tp.total)}
+                        </span>
+                        <span className="block text-[10px] text-muted-foreground font-semibold">
+                          {num(tp.qty)} {isAr ? "مباع" : "sold"}
+                        </span>
+                      </div>
                     </div>
+                    {/* Modern Multi-tone progress capsule */}
                     <div className="h-1.5 overflow-hidden rounded-full bg-surface-2">
                       <div
-                        className="h-full rounded-full bg-gradient-to-r from-primary to-chart-4"
+                        className="h-full rounded-full bg-gradient-to-r from-amber-500 via-emerald-500 to-teal-400 transition-all duration-500"
                         style={{ width: `${pct}%` }}
                       />
                     </div>
@@ -967,49 +984,86 @@ function DashboardPage() {
           )}
         </div>
 
-        <div className="panel-elevated p-5 rounded-3xl border border-border/80 shadow-sm">
+        {/* Card: Recent Sales Transaction Stream */}
+        <div className="relative overflow-hidden rounded-3xl border border-border/80 bg-gradient-to-br from-card via-card/95 to-surface-2/40 p-5 sm:p-6 shadow-sm backdrop-blur-md">
           <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-sm font-semibold flex items-center gap-1.5">
-              <Receipt className="h-4 w-4 text-primary" /> {t("dash.recent_sales")}
-            </h3>
+            <div className="flex items-center gap-2.5">
+              <div className="grid size-9 place-items-center rounded-xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                <Receipt className="size-4.5" />
+              </div>
+              <div>
+                <h3 className="text-sm sm:text-base font-bold flex items-center gap-1.5 text-foreground">
+                  {t("dash.recent_sales")}
+                </h3>
+                <p className="text-[11px] text-muted-foreground font-medium">{isAr ? "أحدث حركات الفواتير المسجلة" : "Latest invoice activity"}</p>
+              </div>
+            </div>
             <Link
               to="/sales"
-              className="text-[11px] text-primary hover:underline flex items-center gap-0.5"
+              className="text-xs font-bold text-amber-500 hover:text-amber-600 dark:hover:text-amber-400 hover:underline flex items-center gap-0.5"
             >
-              {lang === "ar" ? "الكل" : "All"} <ArrowRight className="h-3 w-3" />
+              {lang === "ar" ? "عرض السجل كامل" : "Full log"} <ChevronLeft className="size-3.5 rtl:rotate-0 rotate-180" />
             </Link>
           </div>
+
           {(data?.recent.length ?? 0) === 0 ? (
-            <div className="grid place-items-center py-10 text-xs text-muted-foreground">
+            <div className="grid place-items-center py-12 text-xs text-muted-foreground">
               {t("dash.no_invoices_hint")}
             </div>
           ) : (
-            <div className="divide-y divide-border/60">
-              {(data?.recent ?? []).map((r: any) => (
-                <div key={r.id} className="flex items-center justify-between py-2.5 text-sm">
-                  <div className="min-w-0">
-                    <div className="truncate font-medium">
-                      {r.customers?.name ?? (lang === "ar" ? "عميل نقدي" : "Walk-in")}
+            <div className="space-y-2.5">
+              {(data?.recent ?? []).map((r: any) => {
+                const isPaid = r.status === "paid";
+                const isPartial = r.status === "partial";
+                const statusCls = isPaid
+                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                  : isPartial
+                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+                  : "bg-surface-2 text-muted-foreground border-border/60";
+
+                const statusLabel = isPaid
+                  ? (isAr ? "مدفوعة" : "Paid")
+                  : isPartial
+                  ? (isAr ? "جزئي" : "Partial")
+                  : (isAr ? "معلقة" : "Pending");
+
+                return (
+                  <div
+                    key={r.id}
+                    className="flex items-center justify-between rounded-2xl border border-border/50 bg-surface/50 p-3 hover:bg-surface-2/60 transition-all text-sm group"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-zinc-800/10 dark:bg-zinc-800/50 border border-border/60 text-muted-foreground group-hover:border-amber-500/30 transition-colors">
+                        <UserCheck className="size-4 text-foreground/70" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="truncate font-bold text-foreground text-xs sm:text-sm">
+                          {r.customers?.name ?? (lang === "ar" ? "عميل نقدي" : "Walk-in")}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground font-mono flex items-center gap-1.5">
+                          <span>{r.invoice_number}</span>
+                          <span>•</span>
+                          <span>{new Date(r.created_at).toLocaleDateString(isAr ? "ar-YE" : "en-US", { month: "short", day: "numeric" })}</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-[11px] text-muted-foreground font-mono">
-                      {r.invoice_number}
+
+                    <div className="text-end shrink-0 ms-2">
+                      <div className="font-black font-mono text-foreground text-xs sm:text-sm">
+                        {money(Number(r.total))}
+                      </div>
+                      <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold ${statusCls}`}>
+                        <span className={`size-1 rounded-full ${isPaid ? "bg-emerald-500" : isPartial ? "bg-amber-500" : "bg-muted-foreground"}`} />
+                        {statusLabel}
+                      </span>
                     </div>
                   </div>
-                  <div className="text-end">
-                    <div className="font-semibold font-mono">{money(Number(r.total))}</div>
-                    <div
-                      className={`text-[10px] ${r.status === "paid" ? "text-emerald-500" : r.status === "partial" ? "text-amber-500" : "text-muted-foreground"}`}
-                    >
-                      {r.status}
-                    </div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
       </div>
-
       {/* Low stock & Top debtors */}
       <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-2">
         <div className="panel-elevated p-5 rounded-3xl border border-border/80 shadow-sm">
