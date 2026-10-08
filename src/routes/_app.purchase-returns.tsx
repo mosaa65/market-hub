@@ -427,7 +427,6 @@ function PurchaseReturnsPage() {
       {/* ─── Standard VORTEX TableToolbar ─── */}
       <TableToolbar
         sticky
-        lang={lang}
         search={{
           value: search,
           onValueChange: setSearch,
@@ -905,11 +904,9 @@ function NewPurchaseReturn({
                 context="purchase_returns"
                 value={refundMethod}
                 onChange={setRefundMethod}
-                variant="select"
                 includeCredit
                 ensureIds={[refundMethod]}
                 ariaLabel={lang === "ar" ? "طريقة الاسترداد" : "Refund method"}
-                lang={lang === "ar" ? "ar" : "en"}
               />
             </div>
           </div>

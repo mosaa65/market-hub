@@ -16,6 +16,7 @@ import {
   TrendingDown,
   Clock,
   CheckCircle2,
+  Printer,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
@@ -37,10 +38,7 @@ import { IconButton } from "@/components/ui/icon-button";
 import { useBreakpoint } from "@/design/breakpoints";
 import { toast } from "sonner";
 import { PaymentMethodPicker } from "@/components/ui/payment-method";
-import {
-  getPaymentMethodDefinition,
-  paymentMethodLabel,
-} from "@/lib/payments/payment-methods";
+import { getPaymentMethodDefinition, paymentMethodLabel } from "@/lib/payments/payment-methods";
 
 export const Route = createFileRoute("/_app/purchases")({
   head: () => ({ meta: [{ title: "Purchases — Vortex ERP" }] }),
@@ -585,7 +583,6 @@ function PurchasesPage() {
       {/* ─── Standard VORTEX TableToolbar: Search + Filters + Sort + View Toggle + Action ─── */}
       <TableToolbar
         sticky
-        lang={isRtl ? "ar" : "en"}
         search={{
           value: search,
           onValueChange: setSearch,
@@ -1461,7 +1458,6 @@ function CreateDialog({
               }}
               ensureIds={[paymentMethod]}
               ariaLabel={t("common.method")}
-              lang={lang === "ar" ? "ar" : "en"}
             />
             {!(getPaymentMethodDefinition(paymentMethod)?.isCreditTerm ?? false) && (
               <input

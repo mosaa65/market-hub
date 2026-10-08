@@ -1167,8 +1167,7 @@ function POSPage() {
       // التحويل يتم عبر الكتالوج: بنك الكريمي وبنك اليمن الدولي يُسجّلان
       // 'bank_transfer'، وجيب/فلوسك/ون كاش تُسجّل 'mobile_money'. أما أسماء
       // المؤسسات فتبقى ظاهرة في القسم والملاحظة، وهذا هو التصميم المقصود.
-      const singleSplitMethod =
-        splitMethodCount === 1 ? (splitCashN > 0 ? "cash" : "card") : null;
+      const singleSplitMethod = splitMethodCount === 1 ? (splitCashN > 0 ? "cash" : "card") : null;
       let finalMethod: string = isSplitPayment
         ? isMultiMethodSplit
           ? "split"
@@ -1199,11 +1198,17 @@ function POSPage() {
       if (isSplitPayment) {
         const parts = [];
         if (splitCashN > 0)
-          parts.push(`${paymentMethodLabel("cash", lang === "ar" ? "ar" : "en")}: ${money(splitCashN)}`);
+          parts.push(
+            `${paymentMethodLabel("cash", lang === "ar" ? "ar" : "en")}: ${money(splitCashN)}`,
+          );
         if (splitCardN > 0)
-          parts.push(`${paymentMethodLabel("card", lang === "ar" ? "ar" : "en")}: ${money(splitCardN)}`);
+          parts.push(
+            `${paymentMethodLabel("card", lang === "ar" ? "ar" : "en")}: ${money(splitCardN)}`,
+          );
         if (remainingDebt > 0)
-          parts.push(`${paymentMethodLabel("credit", lang === "ar" ? "ar" : "en")}: ${money(remainingDebt)}`);
+          parts.push(
+            `${paymentMethodLabel("credit", lang === "ar" ? "ar" : "en")}: ${money(remainingDebt)}`,
+          );
         splitNote = `[${paymentMethodLabel("split", lang === "ar" ? "ar" : "en")}: ${parts.join(" | ")}]`;
       }
 
@@ -2315,7 +2320,6 @@ function POSPage() {
                     }}
                     ensureIds={[paymentMethod]}
                     ariaLabel={lang === "ar" ? "طريقة الدفع" : "Payment method"}
-                    lang={lang === "ar" ? "ar" : "en"}
                     className="min-w-0 flex-1"
                   />
                   <input
@@ -2348,301 +2352,300 @@ function POSPage() {
                 </button>
               </div>
 
-                {/*
+              {/*
                   Transfer reference — shown for ANY method the catalogue marks
                   as needing one, so a bank or wallet added later gets the field
                   without touching this file.
                 */}
-                {!isSplitPayment &&
-                  getPaymentMethodDefinition(paymentMethod)?.requiresReference && (
-                    <input
-                      value={transferRef}
-                      onChange={(e) => setTransferRef(e.target.value)}
-                      placeholder={
-                        getPaymentMethodDefinition(paymentMethod)?.ledgerKind === "WALLET"
-                          ? lang === "ar"
-                            ? "رقم عملية المحفظة / المرجع"
-                            : "Wallet transaction / reference number"
-                          : t("pos.pm.transfer_ref")
-                      }
-                      aria-label={
-                        getPaymentMethodDefinition(paymentMethod)?.ledgerKind === "WALLET"
-                          ? lang === "ar"
-                            ? "مرجع المحفظة"
-                            : "Wallet reference"
-                          : t("pos.pm.transfer_ref")
-                      }
-                      className="h-9 w-full rounded-2xl border border-input/80 bg-surface/90 px-3 text-xs outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                    />
-                  )}
+              {!isSplitPayment && getPaymentMethodDefinition(paymentMethod)?.requiresReference && (
+                <input
+                  value={transferRef}
+                  onChange={(e) => setTransferRef(e.target.value)}
+                  placeholder={
+                    getPaymentMethodDefinition(paymentMethod)?.ledgerKind === "WALLET"
+                      ? lang === "ar"
+                        ? "رقم عملية المحفظة / المرجع"
+                        : "Wallet transaction / reference number"
+                      : t("pos.pm.transfer_ref")
+                  }
+                  aria-label={
+                    getPaymentMethodDefinition(paymentMethod)?.ledgerKind === "WALLET"
+                      ? lang === "ar"
+                        ? "مرجع المحفظة"
+                        : "Wallet reference"
+                      : t("pos.pm.transfer_ref")
+                  }
+                  className="h-9 w-full rounded-2xl border border-input/80 bg-surface/90 px-3 text-xs outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                />
+              )}
 
-                {/* Split Payment inputs if enabled */}
-                {isSplitPayment ? (
-                  <div className="rounded-2xl border border-violet-500/30 bg-violet-500/5 p-2.5 space-y-2 animate-in fade-in duration-200">
-                    <div className="flex items-center justify-between text-xs font-semibold text-violet-700 dark:text-violet-300">
-                      <span>
-                        {lang === "ar"
-                          ? "توزيع الدفعات (نقد / بطاقة أو حوالة / آجل):"
-                          : "Split Allocation:"}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSplitCash(String(total));
-                          setSplitCard("");
-                        }}
-                        className="text-[10px] text-violet-600 underline"
-                      >
-                        {lang === "ar" ? "نقد كامل" : "All Cash"}
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-[10px] text-muted-foreground block mb-0.5">
-                          {lang === "ar" ? "نقدًا:" : "Cash:"}
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          dir="ltr"
-                          value={splitCash}
-                          onChange={(e) => setSplitCash(e.target.value)}
-                          placeholder="0"
-                          className="h-8 w-full rounded-xl border border-border bg-surface px-2 text-xs font-mono outline-none focus:border-violet-500 [unicode-bidi:plaintext]"
-                        />
-                        {splitCash && Number(splitCash) > 0 && (
-                          <span className="text-[9px] text-muted-foreground font-mono block text-end">
-                            <span dir="ltr" className="[unicode-bidi:isolate]">
-                              {formatWithCommas(splitCash)}
-                            </span>
-                          </span>
-                        )}
-                      </div>
-                      <div>
-                        <label className="text-[10px] text-muted-foreground block mb-0.5">
-                          {lang === "ar" ? "بطاقة/حوالة:" : "Card/Transfer:"}
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          dir="ltr"
-                          value={splitCard}
-                          onChange={(e) => setSplitCard(e.target.value)}
-                          placeholder="0"
-                          className="h-8 w-full rounded-xl border border-border bg-surface px-2 text-xs font-mono outline-none focus:border-violet-500 [unicode-bidi:plaintext]"
-                        />
-                        {splitCard && Number(splitCard) > 0 && (
-                          <span className="text-[9px] text-muted-foreground font-mono block text-end">
-                            <span dir="ltr" className="[unicode-bidi:isolate]">
-                              {formatWithCommas(splitCard)}
-                            </span>
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Split Summary Footer */}
-                    <div className="pt-1.5 border-t border-violet-500/20 flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground font-medium">
-                        {lang === "ar" ? "إجمالي المدفوع الآن:" : "Total Paid Now:"}
-                      </span>
-                      <span className="font-mono font-bold text-foreground">
-                        <span dir="ltr" className="[unicode-bidi:isolate]">
-                          {money(splitPaidTotal)}
-                        </span>
-                      </span>
-                    </div>
-
-                    {remainingDebt > 0 && (
-                      <div className="flex items-center justify-between rounded-xl bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 text-xs font-mono text-amber-600 dark:text-amber-300">
-                        <span>
-                          {lang === "ar" ? "المتبقي كدين آجل على العميل:" : "Remaining Debt:"}
-                        </span>
-                        <span className="font-bold">
-                          <span dir="ltr" className="[unicode-bidi:isolate]">
-                            {money(remainingDebt)}
-                          </span>
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                ) : paymentMethod !== "cash" ? (
-                  /* Single Payment Paid Input & Live Comma Preview */
-                  <div className="space-y-1.5">
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between px-1 text-[11px] font-semibold text-muted-foreground">
-                        <span>{lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}</span>
-                        <span className="font-mono text-primary">{money(total)}</span>
-                      </div>
-                      <div className="relative">
-                        <input
-                          type="number"
-                          min="0"
-                          dir="ltr"
-                          value={paid}
-                          onChange={(e) => handlePaidChange(e.target.value)}
-                          placeholder={
-                            isPaidEmpty
-                              ? paymentMethod === "credit"
-                                ? `${lang === "ar" ? "آجل بالكامل" : "Full credit"} (${money(0)})`
-                                : `${lang === "ar" ? "مدفوع بالكامل" : "Full paid"} (${money(total)})`
-                              : `${t("pos.paid")}`
-                          }
-                          className={`h-9 w-full rounded-2xl border px-3 text-xs font-mono outline-none transition ${
-                            isOverpaid
-                              ? "border-destructive bg-destructive/10 text-destructive focus:ring-2 focus:ring-destructive/30"
-                              : "border-input/80 bg-surface/90 text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
-                          } [unicode-bidi:plaintext]`}
-                        />
-                        {paid.trim() !== "" && !isNaN(Number(paid)) && (
-                          <span className="absolute end-3 top-1/2 -translate-y-1/2 text-[11px] font-mono text-muted-foreground pointer-events-none">
-                            <span dir="ltr" className="[unicode-bidi:isolate]">
-                              = {money(Number(paid))}
-                            </span>
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Quick Shortcuts */}
-                    <div className="flex items-center gap-1.5 text-[10px]">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsSplitPayment(false);
-                          setPaymentMethod("cash");
-                          setPaid("");
-                        }}
-                        className="rounded-full bg-surface-2 px-2.5 py-0.5 text-muted-foreground hover:text-foreground hover:bg-surface-3 transition"
-                      >
-                        {lang === "ar" ? "الكامل" : "Full"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsSplitPayment(false);
-                          const half = Math.round((total / 2) * 100) / 100;
-                          setPaid(String(half));
-                          if (half < total) setPaymentMethod("credit");
-                        }}
-                        className="rounded-full bg-surface-2 px-2.5 py-0.5 text-muted-foreground hover:text-foreground hover:bg-surface-3 transition"
-                      >
-                        {lang === "ar" ? "نصف المبلغ" : "Half"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsSplitPayment(false);
-                          setPaymentMethod("credit");
-                          setPaid("0");
-                        }}
-                        className="rounded-full bg-surface-2 px-2.5 py-0.5 text-muted-foreground hover:text-foreground hover:bg-surface-3 transition"
-                      >
-                        {lang === "ar" ? "آجل (0)" : "0 (Debt)"}
-                      </button>
-                    </div>
-
-                    {/* Status Badges */}
-                    {isOverpaid ? (
-                      <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-xs font-semibold text-destructive flex items-center gap-1.5 animate-in fade-in duration-200">
-                        <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                        <span className="truncate">
-                          {lang === "ar"
-                            ? `المبلغ المدفوع (${money(effectivePaid)}) أكبر من الإجمالي المطلوب (${money(total)})`
-                            : `Paid amount (${money(effectivePaid)}) exceeds total (${money(total)})`}
-                        </span>
-                      </div>
-                    ) : paymentMethod === "credit" || remainingDebt > 0 ? (
-                      <div className="flex items-center justify-between rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-mono text-amber-600 dark:text-amber-300">
-                        <span>
-                          {lang === "ar" ? "المتبقي كدين آجل على العميل:" : "Remaining debt:"}
-                        </span>
-                        <span className="font-bold">
-                          <span dir="ltr" className="[unicode-bidi:isolate]">
-                            {money(remainingDebt)}
-                          </span>
-                        </span>
-                      </div>
-                    ) : isPaidEmpty ? (
-                      <div className="flex items-center justify-between text-[11px] text-emerald-600 dark:text-emerald-400 font-medium px-2">
-                        <span className="flex items-center gap-1">
-                          <CheckCircle2 className="h-3 w-3" />
-                          {lang === "ar"
-                            ? "المدفوع تلقائيًا: كامل الإجمالي"
-                            : "Auto paid: Full invoice"}
-                        </span>
-                        <span className="font-mono font-semibold">
-                          <span dir="ltr" className="[unicode-bidi:isolate]">
-                            {money(total)}
-                          </span>
-                        </span>
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
-
-              {/* Notes — kept in the payment area so the operator never hunts for it. */}
-              <input
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder={t("pos.notes_placeholder")}
-                className="h-9 w-full shrink-0 rounded-2xl border border-input/80 bg-surface/90 px-3 text-xs outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-              />
-
-              {/* Action row: primary checkout + secondary quotation. */}
-              <div className="sticky bottom-0 mt-2 shrink-0 bg-surface/95 pb-1 pt-2">
-                {isOverpaid ? (
-                  <button
-                    type="button"
-                    disabled
-                    className="flex h-11 w-full cursor-not-allowed items-center justify-center gap-2 rounded-2xl border border-destructive/60 bg-destructive text-sm font-bold text-destructive-foreground opacity-90 shadow-lg shadow-destructive/20 ring-2 ring-destructive/30"
-                  >
-                    <AlertCircle className="h-4 w-4" />
+              {/* Split Payment inputs if enabled */}
+              {isSplitPayment ? (
+                <div className="rounded-2xl border border-violet-500/30 bg-violet-500/5 p-2.5 space-y-2 animate-in fade-in duration-200">
+                  <div className="flex items-center justify-between text-xs font-semibold text-violet-700 dark:text-violet-300">
                     <span>
                       {lang === "ar"
-                        ? "المبلغ المدفوع أكبر من الإجمالي!"
-                        : "Paid amount exceeds total!"}
+                        ? "توزيع الدفعات (نقد / بطاقة أو حوالة / آجل):"
+                        : "Split Allocation:"}
                     </span>
-                  </button>
-                ) : (
-                  <div className="flex gap-2">
-                    {/* Secondary: quotation preview (never persists). */}
                     <button
                       type="button"
-                      onClick={openQuotation}
-                      disabled={cart.length === 0}
-                      title={t("pos.quote_only_hint")}
-                      className="flex h-11 shrink-0 items-center justify-center gap-2 rounded-2xl border border-transparent bg-foreground px-4 text-sm font-semibold text-background transition hover:opacity-90 active:scale-[0.99] disabled:opacity-50"
+                      onClick={() => {
+                        setSplitCash(String(total));
+                        setSplitCard("");
+                      }}
+                      className="text-[10px] text-violet-600 underline"
                     >
-                      <FileText className="h-4 w-4" />
-                      <span className="hidden sm:inline">{t("pos.quote")}</span>
-                    </button>
-
-                    {/* Primary: issue the invoice. */}
-                    <button
-                      type="button"
-                      onClick={checkout}
-                      disabled={loading || cart.length === 0}
-                      className="flex h-11 flex-1 items-center justify-between rounded-2xl bg-gradient-to-r from-primary to-primary/90 px-4 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition hover:shadow-primary/35 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50"
-                    >
-                      <div className="flex items-center gap-2">
-                        {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-                        <span>{t("pos.checkout")}</span>
-                        <span className="font-mono text-base font-bold">
-                          <span dir="ltr" className="[unicode-bidi:isolate]">
-                            {money(total)}
-                          </span>
-                        </span>
-                      </div>
+                      {lang === "ar" ? "نقد كامل" : "All Cash"}
                     </button>
                   </div>
-                )}
-              </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] text-muted-foreground block mb-0.5">
+                        {lang === "ar" ? "نقدًا:" : "Cash:"}
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        dir="ltr"
+                        value={splitCash}
+                        onChange={(e) => setSplitCash(e.target.value)}
+                        placeholder="0"
+                        className="h-8 w-full rounded-xl border border-border bg-surface px-2 text-xs font-mono outline-none focus:border-violet-500 [unicode-bidi:plaintext]"
+                      />
+                      {splitCash && Number(splitCash) > 0 && (
+                        <span className="text-[9px] text-muted-foreground font-mono block text-end">
+                          <span dir="ltr" className="[unicode-bidi:isolate]">
+                            {formatWithCommas(splitCash)}
+                          </span>
+                        </span>
+                      )}
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-muted-foreground block mb-0.5">
+                        {lang === "ar" ? "بطاقة/حوالة:" : "Card/Transfer:"}
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        dir="ltr"
+                        value={splitCard}
+                        onChange={(e) => setSplitCard(e.target.value)}
+                        placeholder="0"
+                        className="h-8 w-full rounded-xl border border-border bg-surface px-2 text-xs font-mono outline-none focus:border-violet-500 [unicode-bidi:plaintext]"
+                      />
+                      {splitCard && Number(splitCard) > 0 && (
+                        <span className="text-[9px] text-muted-foreground font-mono block text-end">
+                          <span dir="ltr" className="[unicode-bidi:isolate]">
+                            {formatWithCommas(splitCard)}
+                          </span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Split Summary Footer */}
+                  <div className="pt-1.5 border-t border-violet-500/20 flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground font-medium">
+                      {lang === "ar" ? "إجمالي المدفوع الآن:" : "Total Paid Now:"}
+                    </span>
+                    <span className="font-mono font-bold text-foreground">
+                      <span dir="ltr" className="[unicode-bidi:isolate]">
+                        {money(splitPaidTotal)}
+                      </span>
+                    </span>
+                  </div>
+
+                  {remainingDebt > 0 && (
+                    <div className="flex items-center justify-between rounded-xl bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 text-xs font-mono text-amber-600 dark:text-amber-300">
+                      <span>
+                        {lang === "ar" ? "المتبقي كدين آجل على العميل:" : "Remaining Debt:"}
+                      </span>
+                      <span className="font-bold">
+                        <span dir="ltr" className="[unicode-bidi:isolate]">
+                          {money(remainingDebt)}
+                        </span>
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ) : paymentMethod !== "cash" ? (
+                /* Single Payment Paid Input & Live Comma Preview */
+                <div className="space-y-1.5">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between px-1 text-[11px] font-semibold text-muted-foreground">
+                      <span>{lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}</span>
+                      <span className="font-mono text-primary">{money(total)}</span>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        dir="ltr"
+                        value={paid}
+                        onChange={(e) => handlePaidChange(e.target.value)}
+                        placeholder={
+                          isPaidEmpty
+                            ? paymentMethod === "credit"
+                              ? `${lang === "ar" ? "آجل بالكامل" : "Full credit"} (${money(0)})`
+                              : `${lang === "ar" ? "مدفوع بالكامل" : "Full paid"} (${money(total)})`
+                            : `${t("pos.paid")}`
+                        }
+                        className={`h-9 w-full rounded-2xl border px-3 text-xs font-mono outline-none transition ${
+                          isOverpaid
+                            ? "border-destructive bg-destructive/10 text-destructive focus:ring-2 focus:ring-destructive/30"
+                            : "border-input/80 bg-surface/90 text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
+                        } [unicode-bidi:plaintext]`}
+                      />
+                      {paid.trim() !== "" && !isNaN(Number(paid)) && (
+                        <span className="absolute end-3 top-1/2 -translate-y-1/2 text-[11px] font-mono text-muted-foreground pointer-events-none">
+                          <span dir="ltr" className="[unicode-bidi:isolate]">
+                            = {money(Number(paid))}
+                          </span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Quick Shortcuts */}
+                  <div className="flex items-center gap-1.5 text-[10px]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsSplitPayment(false);
+                        setPaymentMethod("cash");
+                        setPaid("");
+                      }}
+                      className="rounded-full bg-surface-2 px-2.5 py-0.5 text-muted-foreground hover:text-foreground hover:bg-surface-3 transition"
+                    >
+                      {lang === "ar" ? "الكامل" : "Full"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsSplitPayment(false);
+                        const half = Math.round((total / 2) * 100) / 100;
+                        setPaid(String(half));
+                        if (half < total) setPaymentMethod("credit");
+                      }}
+                      className="rounded-full bg-surface-2 px-2.5 py-0.5 text-muted-foreground hover:text-foreground hover:bg-surface-3 transition"
+                    >
+                      {lang === "ar" ? "نصف المبلغ" : "Half"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsSplitPayment(false);
+                        setPaymentMethod("credit");
+                        setPaid("0");
+                      }}
+                      className="rounded-full bg-surface-2 px-2.5 py-0.5 text-muted-foreground hover:text-foreground hover:bg-surface-3 transition"
+                    >
+                      {lang === "ar" ? "آجل (0)" : "0 (Debt)"}
+                    </button>
+                  </div>
+
+                  {/* Status Badges */}
+                  {isOverpaid ? (
+                    <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-xs font-semibold text-destructive flex items-center gap-1.5 animate-in fade-in duration-200">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">
+                        {lang === "ar"
+                          ? `المبلغ المدفوع (${money(effectivePaid)}) أكبر من الإجمالي المطلوب (${money(total)})`
+                          : `Paid amount (${money(effectivePaid)}) exceeds total (${money(total)})`}
+                      </span>
+                    </div>
+                  ) : paymentMethod === "credit" || remainingDebt > 0 ? (
+                    <div className="flex items-center justify-between rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-mono text-amber-600 dark:text-amber-300">
+                      <span>
+                        {lang === "ar" ? "المتبقي كدين آجل على العميل:" : "Remaining debt:"}
+                      </span>
+                      <span className="font-bold">
+                        <span dir="ltr" className="[unicode-bidi:isolate]">
+                          {money(remainingDebt)}
+                        </span>
+                      </span>
+                    </div>
+                  ) : isPaidEmpty ? (
+                    <div className="flex items-center justify-between text-[11px] text-emerald-600 dark:text-emerald-400 font-medium px-2">
+                      <span className="flex items-center gap-1">
+                        <CheckCircle2 className="h-3 w-3" />
+                        {lang === "ar"
+                          ? "المدفوع تلقائيًا: كامل الإجمالي"
+                          : "Auto paid: Full invoice"}
+                      </span>
+                      <span className="font-mono font-semibold">
+                        <span dir="ltr" className="[unicode-bidi:isolate]">
+                          {money(total)}
+                        </span>
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+
+            {/* Notes — kept in the payment area so the operator never hunts for it. */}
+            <input
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder={t("pos.notes_placeholder")}
+              className="h-9 w-full shrink-0 rounded-2xl border border-input/80 bg-surface/90 px-3 text-xs outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+            />
+
+            {/* Action row: primary checkout + secondary quotation. */}
+            <div className="sticky bottom-0 mt-2 shrink-0 bg-surface/95 pb-1 pt-2">
+              {isOverpaid ? (
+                <button
+                  type="button"
+                  disabled
+                  className="flex h-11 w-full cursor-not-allowed items-center justify-center gap-2 rounded-2xl border border-destructive/60 bg-destructive text-sm font-bold text-destructive-foreground opacity-90 shadow-lg shadow-destructive/20 ring-2 ring-destructive/30"
+                >
+                  <AlertCircle className="h-4 w-4" />
+                  <span>
+                    {lang === "ar"
+                      ? "المبلغ المدفوع أكبر من الإجمالي!"
+                      : "Paid amount exceeds total!"}
+                  </span>
+                </button>
+              ) : (
+                <div className="flex gap-2">
+                  {/* Secondary: quotation preview (never persists). */}
+                  <button
+                    type="button"
+                    onClick={openQuotation}
+                    disabled={cart.length === 0}
+                    title={t("pos.quote_only_hint")}
+                    className="flex h-11 shrink-0 items-center justify-center gap-2 rounded-2xl border border-transparent bg-foreground px-4 text-sm font-semibold text-background transition hover:opacity-90 active:scale-[0.99] disabled:opacity-50"
+                  >
+                    <FileText className="h-4 w-4" />
+                    <span className="hidden sm:inline">{t("pos.quote")}</span>
+                  </button>
+
+                  {/* Primary: issue the invoice. */}
+                  <button
+                    type="button"
+                    onClick={checkout}
+                    disabled={loading || cart.length === 0}
+                    className="flex h-11 flex-1 items-center justify-between rounded-2xl bg-gradient-to-r from-primary to-primary/90 px-4 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition hover:shadow-primary/35 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50"
+                  >
+                    <div className="flex items-center gap-2">
+                      {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+                      <span>{t("pos.checkout")}</span>
+                      <span className="font-mono text-base font-bold">
+                        <span dir="ltr" className="[unicode-bidi:isolate]">
+                          {money(total)}
+                        </span>
+                      </span>
+                    </div>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
+      </div>
 
       {/* Barcode Scanner Dialog */}
       <BarcodeScanner

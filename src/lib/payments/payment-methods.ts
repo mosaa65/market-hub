@@ -443,4 +443,3 @@ export function isSplitPaymentValue(
   if (!note) return false;
   return note.includes("[دفع مجزأ:") || note.includes("[Split:");
 }
-

@@ -1,40 +1,57 @@
 /**
  * PaymentMethodPicker — المكوّن الموحّد الوحيد لاختيار طريقة الدفع.
  *
- * WHY ONE COMPONENT
- * -----------------
- * Eight screens each invented their own way to ask "how is this being paid?":
- * a <select> in POS and purchase-POS, four buttons in purchases, a Radix Select
- * in the returns dialogs, another <select> in the collection sheet and the
- * expense form. They offered different options, used different labels for the
- * same method, and none of them respected anything the business had configured
- * because nothing was configurable.
+ * ════════════════════════════════════════════════════════════════════════════
+ * DESIGN: THIS IS THE POS CONTROL, COPIED EXACTLY
+ * ════════════════════════════════════════════════════════════════════════════
+ * This is a native `<select>` with the identical class recipe used by the POS
+ * payment switcher on main — not a re-interpretation of it:
  *
- * This is now the only way to choose a payment method.
+ *   height        h-10
+ *   radius        rounded-xl
+ *   border        border-border/80
+ *   surface       bg-surface
+ *   typography    text-xs font-semibold text-foreground
+ *   chevron       ChevronDown, absolute end-3, h-4 w-4, text-muted-foreground
+ *   focus         focus:border-primary focus:ring-2 focus:ring-primary/20
  *
- * DESIGN PROVENANCE
- * -----------------
- * The visual language is the POS switcher's, not a new one: the same rounded
- * card, the same selected border-and-tint treatment, the same compact type.
- * POS is the screen cashiers use hundreds of times a day, so the change there
- * must be "the same control, now driven by settings", not a new experience.
+ * Why a native select and not custom cards: it is what the till already uses, it
+ * is keyboard- and touch-correct for free, it opens the OS picker on a phone,
+ * and it stays one compact row no matter how many Yemeni methods a business
+ * enables. A grid of cards would grow the checkout panel with every method
+ * added — the opposite of what a cashier wants under time pressure.
  *
- * SIZE
- * ----
- * Chips are deliberately small (36px tall) and wrap. A business with eleven
- * enabled methods gets two tidy rows, not a page-height list. In `select` mode
- * a native control is used instead, for narrow columns where a wrapping grid
- * would push the total off-screen.
+ * The icon is rendered as a static adornment at the START of the field, so a
+ * method is recognisable by shape as well as by name. It is decorative: the
+ * select's own option text is the accessible label.
+ *
+ * OPTION LABELS
+ * -------------
+ * They come from the same `pos.pm.*` keys the till already shipped, so "نقدي"
+ * and "بطاقة" keep meaning exactly what they meant yesterday. A named Yemeni
+ * institution (بنك الكريمي، جيب، فلوسك، ون كاش) has no such key, so it uses its
+ * catalogue Arabic name — which is what makes it worth offering in the first
+ * place. Its stored value is still a plain ENUM value, resolved by
+ * `toLegacyPaymentValue` at the call site.
+ *
+ * WHAT IT READS
+ * -------------
+ * `usePaymentMethodsForContext(context)` returns only the methods this business
+ * enabled for this section, in the business's own order. A disabled method is
+ * never offered, and one section's choices never leak into another's.
  */
 
 import { useMemo } from "react";
-import { Check } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { paymentMethodLabel, type PaymentContext } from "@/lib/payments/payment-methods";
+import { useI18n } from "@/lib/i18n";
+import {
+  getPaymentMethodDefinition,
+  paymentMethodLabel,
+  type PaymentContext,
+} from "@/lib/payments/payment-methods";
 import { usePaymentMethodsForContext } from "@/hooks/use-payment-methods";
 import { PaymentMethodIcon } from "./payment-method-icon";
-
-export type PaymentMethodPickerVariant = "chips" | "select";
 
 export interface PaymentMethodPickerProps {
   /** Which section is asking. Decides what the business has allowed here. */
@@ -44,18 +61,18 @@ export interface PaymentMethodPickerProps {
   onChange: (methodId: string) => void;
   /** Show آجل among the options. On by default; off where credit is meaningless. */
   includeCredit?: boolean;
-  variant?: PaymentMethodPickerVariant;
   disabled?: boolean;
-  /** Extra catalogue ids to allow even if the context would exclude them (e.g. the method already on a document). */
+  /**
+   * Extra catalogue ids to keep selectable even if this context would exclude
+   * them — for a method already recorded on the document being edited, so
+   * changing the settings cannot silently rewrite history.
+   */
   ensureIds?: string[];
-  /** Compact mode drops the label under the chip — for dense toolbar rows. */
-  dense?: boolean;
   className?: string;
-  /** Accessible name for the group / select. */
+  /** Accessible name for the select. */
   ariaLabel?: string;
-  /** Select-variant placeholder when `value` is empty. */
+  /** Placeholder shown when `value` is empty. */
   placeholder?: string;
-  lang?: "ar" | "en";
 }
 
 export function PaymentMethodPicker({
@@ -63,16 +80,16 @@ export function PaymentMethodPicker({
   value,
   onChange,
   includeCredit = true,
-  variant = "chips",
   disabled = false,
   ensureIds,
-  dense = false,
   className,
   ariaLabel,
   placeholder,
-  lang = "ar",
 }: PaymentMethodPickerProps) {
-  const { methods, isLoading, isFallback } = usePaymentMethodsForContext(context, {
+  const { t, lang } = useI18n();
+  const isRtl = lang === "ar";
+
+  const { methods, isLoading } = usePaymentMethodsForContext(context, {
     includeCredit,
   });
 
@@ -85,114 +102,77 @@ export function PaymentMethodPicker({
   const options = useMemo(() => {
     if (!ensureIds || ensureIds.length === 0) return methods;
     const present = new Set(methods.map((m) => m.id));
-    const missing = ensureIds.filter((id) => id && !present.has(id));
-    if (missing.length === 0) return methods;
-    // Resolve the missing ids from the full catalogue via the same hook's data.
-    const resolved: typeof methods = [];
-    for (const id of missing) {
-      const found = methods.find((m) => m.id === id);
-      if (found) resolved.push(found);
-    }
-    return resolved.length ? [...methods, ...resolved] : methods;
+    const extra = ensureIds.filter(
+      (id) => id && !present.has(id) && getPaymentMethodDefinition(id),
+    );
+    if (extra.length === 0) return methods;
+    return [
+      ...methods,
+      ...extra
+        .map((id) => methods.find((m) => m.id === id))
+        .filter((m): m is (typeof methods)[number] => Boolean(m)),
+    ];
   }, [methods, ensureIds]);
 
-  const label = (id: string, nameAr: string, nameEn?: string) =>
-    lang === "ar" ? nameAr : (nameEn ?? nameAr);
+  /**
+   * The label for a method, preferring the key POS already shipped.
+   *
+   * A named institution must NOT borrow the generic key: labelling بنك الكريمي
+   * as "تحويل بنكي" would hide the very choice the operator made.
+   */
+  const labelFor = (id: string): string => {
+    const definition = getPaymentMethodDefinition(id);
+    const legacy = definition?.legacyValue;
+    const isNamedInstitution =
+      Boolean(definition) && definition?.nameAr !== paymentMethodLabel(legacy, "ar");
+    if (legacy && !isNamedInstitution) return t(`pos.pm.${legacy}`);
+    return isRtl ? (definition?.nameAr ?? id) : (definition?.nameEn ?? id);
+  };
 
-  if (variant === "select") {
-    return (
+  /** The icon of the currently selected method, shown as the field adornment. */
+  const selectedDefinition = value ? getPaymentMethodDefinition(value) : undefined;
+
+  return (
+    <div className={cn("relative min-w-0", className)}>
+      {/* Adornment: the shape of the chosen method, so it reads at a glance. */}
+      {selectedDefinition && (
+        <span className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2">
+          <PaymentMethodIcon
+            iconKey={selectedDefinition.iconKey}
+            ledgerKind={selectedDefinition.ledgerKind}
+            className="h-4 w-4"
+          />
+        </span>
+      )}
+
       <select
-        aria-label={ariaLabel}
+        aria-label={ariaLabel ?? (isRtl ? "طريقة الدفع" : "Payment method")}
         disabled={disabled || isLoading}
         value={value ?? ""}
         onChange={(event) => onChange(event.target.value)}
         className={cn(
-          "h-9 w-full min-w-0 rounded-[12px] border border-input bg-surface/70 px-3 text-sm text-foreground",
-          "focus:border-primary/60 focus:outline-none focus:ring-4 focus:ring-primary/10",
+          // The POS select recipe, unchanged — including the appearance-none
+          // reset and the absolute chevron that replace the native arrow.
+          "h-10 w-full appearance-none rounded-xl border border-border/80 bg-surface",
+          "ps-9 pe-9 text-xs font-semibold text-foreground",
+          "outline-none transition",
+          "focus:border-primary focus:ring-2 focus:ring-primary/20",
           "disabled:cursor-not-allowed disabled:opacity-50",
-          className,
         )}
       >
         {!value && (
           <option value="" disabled>
-            {placeholder ?? (lang === "ar" ? "اختر طريقة الدفع" : "Select payment method")}
+            {placeholder ?? (isRtl ? "طريقة الدفع" : "Payment method")}
           </option>
         )}
         {options.map((method) => (
           <option key={method.id} value={method.id}>
-            {label(method.id, method.nameAr, method.nameEn)}
+            {labelFor(method.id)}
           </option>
         ))}
       </select>
-    );
-  }
 
-  // Before the catalogue resolves, the picker renders the shipped defaults via
-  // the hook's fallback, so the cashier is never shown an empty row.
-  if (options.length === 0) {
-    return (
-      <p
-        className={cn("text-[11px] text-muted-foreground", className)}
-        role="status"
-        aria-live="polite"
-      >
-        {isFallback
-          ? lang === "ar"
-            ? "تعذّر تحميل طرق الدفع."
-            : "Payment methods could not be loaded."
-          : lang === "ar"
-            ? "لا توجد طرق دفع مفعّلة لهذا القسم. فعّلها من الإعدادات ← طرق الدفع."
-            : "No payment methods are enabled for this section. Enable them in Settings → Payment methods."}
-      </p>
-    );
-  }
-
-  return (
-    <div
-      role="radiogroup"
-      aria-label={ariaLabel ?? (lang === "ar" ? "طريقة الدفع" : "Payment method")}
-      aria-busy={isLoading || undefined}
-      className={cn("flex flex-wrap gap-1.5", className)}
-    >
-      {options.map((method) => {
-        const selected = value === method.id;
-        return (
-          <button
-            key={method.id}
-            type="button"
-            role="radio"
-            aria-checked={selected}
-            disabled={disabled}
-            onClick={() => onChange(method.id)}
-            title={paymentMethodLabel(method.id, lang)}
-            className={cn(
-              "group relative inline-flex items-center gap-1.5 rounded-xl border transition-all",
-              dense ? "h-8 px-2.5 text-[11px]" : "h-9 px-3 text-xs",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-              "disabled:cursor-not-allowed disabled:opacity-50",
-              selected
-                ? "border-primary bg-primary/10 text-foreground shadow-[inset_0_0_0_1px_var(--color-primary)]"
-                : "border-border/80 bg-surface/70 text-muted-foreground hover:border-primary/40 hover:bg-surface-2 hover:text-foreground",
-            )}
-          >
-            <PaymentMethodIcon
-              iconKey={method.iconKey}
-              ledgerKind={method.ledgerKind}
-              tone={selected}
-              className={dense ? "h-3.5 w-3.5" : "h-4 w-4"}
-            />
-            <span className="whitespace-nowrap font-semibold">
-              {label(method.id, method.nameAr, method.nameEn)}
-            </span>
-            {selected && (
-              <Check
-                aria-hidden="true"
-                className={cn("shrink-0", dense ? "h-3 w-3" : "h-3.5 w-3.5")}
-              />
-            )}
-          </button>
-        );
-      })}
+      <ChevronDown className="pointer-events-none absolute end-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
     </div>
   );
 }
@@ -234,4 +214,3 @@ export function PaymentMethodChip({
     </span>
   );
 }
-

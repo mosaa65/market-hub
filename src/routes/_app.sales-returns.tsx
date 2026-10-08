@@ -517,11 +517,9 @@ function NewSalesReturn({
                 context="sales_returns"
                 value={refundMethod}
                 onChange={setRefundMethod}
-                variant="select"
                 includeCredit
                 ensureIds={[refundMethod]}
                 ariaLabel={lang === "ar" ? "طريقة الاسترداد" : "Refund method"}
-                lang={lang === "ar" ? "ar" : "en"}
               />
             </div>
           </div>

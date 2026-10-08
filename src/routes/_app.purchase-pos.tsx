@@ -31,10 +31,7 @@ import {
   Coins,
 } from "lucide-react";
 import { PaymentMethodPicker } from "@/components/ui/payment-method";
-import {
-  getPaymentMethodDefinition,
-  toLegacyPaymentValue,
-} from "@/lib/payments/payment-methods";
+import { getPaymentMethodDefinition, toLegacyPaymentValue } from "@/lib/payments/payment-methods";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
@@ -1225,7 +1222,6 @@ function PurchasePOSPage() {
                 includeCredit
                 ensureIds={[paymentMethod]}
                 ariaLabel={lang === "ar" ? "طريقة الدفع" : "Payment method"}
-                lang={lang === "ar" ? "ar" : "en"}
                 className="min-w-0 flex-1"
               />
               <input

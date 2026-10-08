@@ -90,9 +90,7 @@ export function VortexCollectionSheet({
   const [method, setMethod] = useState<PaymentMethod>("cash");
   const [notes, setNotes] = useState<string>("");
   const [reference, setReference] = useState<string>("");
-  const [paymentDate, setPaymentDate] = useState<string>(
-    new Date().toISOString().slice(0, 10)
-  );
+  const [paymentDate, setPaymentDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>("");
   const [accountId, setAccountId] = useState<string>("main_drawer");
 
@@ -260,15 +258,15 @@ export function VortexCollectionSheet({
         successReceipt
           ? "تم التحصيل بنجاح"
           : partyType === "supplier"
-          ? "سند صرف مورد"
-          : "سند تحصيل عميل"
+            ? "سند صرف مورد"
+            : "سند تحصيل عميل"
       }
       description={
         successReceipt
           ? `رقم السند: ${toSystemDigits(successReceipt.receiptNumber)}`
           : customer
-          ? `الطرف: ${customer.name}`
-          : undefined
+            ? `الطرف: ${customer.name}`
+            : undefined
       }
       className="max-w-lg"
     >
@@ -281,7 +279,9 @@ export function VortexCollectionSheet({
             <div className="text-2xl font-black text-emerald-700 dark:text-emerald-400">
               {toSystemDigits(money(successReceipt.amount))}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">تم توثيق السند وترحيله للدفتر المحاسبي</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              تم توثيق السند وترحيله للدفتر المحاسبي
+            </p>
           </div>
 
           <div className="bg-card border rounded-xl p-4 space-y-2.5 text-sm">
@@ -318,15 +318,29 @@ export function VortexCollectionSheet({
               <div className="flex items-center gap-1 bg-background border rounded-lg p-0.5 text-[11px]">
                 <button
                   type="button"
-                  onClick={() => { setSelectedTemplate("official"); setIsEditingMessage(false); }}
-                  className={cn("px-2 py-0.5 rounded", selectedTemplate === "official" && "bg-primary text-primary-foreground font-medium")}
+                  onClick={() => {
+                    setSelectedTemplate("official");
+                    setIsEditingMessage(false);
+                  }}
+                  className={cn(
+                    "px-2 py-0.5 rounded",
+                    selectedTemplate === "official" &&
+                      "bg-primary text-primary-foreground font-medium",
+                  )}
                 >
                   رسمي
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setSelectedTemplate("reminder"); setIsEditingMessage(false); }}
-                  className={cn("px-2 py-0.5 rounded", selectedTemplate === "reminder" && "bg-primary text-primary-foreground font-medium")}
+                  onClick={() => {
+                    setSelectedTemplate("reminder");
+                    setIsEditingMessage(false);
+                  }}
+                  className={cn(
+                    "px-2 py-0.5 rounded",
+                    selectedTemplate === "reminder" &&
+                      "bg-primary text-primary-foreground font-medium",
+                  )}
                 >
                   موجز
                 </button>
@@ -360,7 +374,11 @@ export function VortexCollectionSheet({
                 onClick={handleCopyMessage}
                 className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg border bg-background hover:bg-muted text-xs font-medium transition-colors"
               >
-                {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                {copied ? (
+                  <Check className="w-4 h-4 text-emerald-500" />
+                ) : (
+                  <Copy className="w-4 h-4" />
+                )}
                 {copied ? "تم النسخ" : "نسخ"}
               </button>
               <button
@@ -452,10 +470,8 @@ export function VortexCollectionSheet({
                 context="customer_collection"
                 value={method}
                 onChange={setMethod}
-                variant="select"
                 ensureIds={[method]}
                 ariaLabel="طريقة الدفع"
-                lang="ar"
               />
             </div>
 

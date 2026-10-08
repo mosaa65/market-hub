@@ -870,11 +870,9 @@ function PaymentModal({
               context="expenses"
               value={method}
               onChange={setMethod}
-              variant="select"
               includeCredit={false}
               ensureIds={[method]}
               ariaLabel={t("common.method")}
-              lang={ar ? "ar" : "en"}
               className="h-9"
             />
           </label>
@@ -907,7 +905,11 @@ function PaymentModal({
               <span className="text-[11px] font-medium text-muted-foreground">
                 {ar ? "المصدر" : "Source"}
               </span>
-              <FieldInput value={label} onValueChange={setLabel} placeholder={t("common.optional")} />
+              <FieldInput
+                value={label}
+                onValueChange={setLabel}
+                placeholder={t("common.optional")}
+              />
             </label>
           )}
         </div>

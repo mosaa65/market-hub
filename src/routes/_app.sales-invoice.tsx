@@ -530,7 +530,8 @@ function SalesInvoicePage() {
             ? warehouse?.name_ar || warehouse?.name
             : warehouse?.name
           : undefined,
-        payment: pmLabel(paymentMethod, isRtl),        status:
+        payment: pmLabel(paymentMethod, isRtl),
+        status:
           remaining > 0
             ? effectivePaid > 0
               ? isRtl
@@ -1253,7 +1254,6 @@ function SalesInvoicePage() {
                   }}
                   ensureIds={[paymentMethod]}
                   ariaLabel={isRtl ? "طريقة السداد" : "Payment method"}
-                  lang={isRtl ? "ar" : "en"}
                 />
               </Field>
 

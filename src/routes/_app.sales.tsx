@@ -72,6 +72,7 @@ import { IconButton } from "@/components/ui/icon-button";
 import { useBreakpoint } from "@/design/breakpoints";
 import { useRealtimeTable } from "@/lib/realtime";
 import { QUERY_KEYS } from "@/lib/query-keys";
+import { isSplitPaymentValue, paymentMethodLabel } from "@/lib/payments/payment-methods";
 
 export const Route = createFileRoute("/_app/sales")({
   head: () => ({ meta: [{ title: "المبيعات والفواتير — فورتيكس ERP" }] }),
@@ -282,7 +283,9 @@ export function SalesPage() {
     try {
       const { data, error } = await supabase
         .from("sales_invoice_items")
-        .select("id,quantity,unit_price,tax,total,line_type,stock_effect,products(name,name_ar,sku)")
+        .select(
+          "id,quantity,unit_price,tax,total,line_type,stock_effect,products(name,name_ar,sku)",
+        )
         .eq("invoice_id", inv.id);
       if (error) throw error;
 
@@ -291,7 +294,9 @@ export function SalesPage() {
       const doc = await buildDoc(inv, invoiceLines);
       if (doc) setPrintDoc(doc);
     } catch {
-      toast.error(isRtl ? "تعذر تحميل بنود الفاتورة للطباعة" : "Could not load invoice items for printing.");
+      toast.error(
+        isRtl ? "تعذر تحميل بنود الفاتورة للطباعة" : "Could not load invoice items for printing.",
+      );
     } finally {
       setLoadingLines(false);
     }
@@ -312,7 +317,6 @@ export function SalesPage() {
     }
     return paymentMethodLabel(m, isRtl ? "ar" : "en");
   };
-
   const pmIcon = (m: string, note?: string | null) => {
     const isSplit = Boolean(note && (note.includes("[دفع مجزأ:") || note.includes("[Split:")));
     if (isSplit || m === "split") return <Coins className="h-3.5 w-3.5 text-amber-500" />;

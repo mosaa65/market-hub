@@ -773,11 +773,9 @@ export function ExpenseFormDialog({
                   context="expenses"
                   value={paymentMethod}
                   onChange={setPaymentMethod}
-                  variant="select"
                   includeCredit={false}
                   ensureIds={[paymentMethod]}
                   ariaLabel={t("common.method")}
-                  lang={ar ? "ar" : "en"}
                 />
               </Field>
 

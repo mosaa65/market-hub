@@ -275,4 +275,3 @@ export function useUpdatePaymentMethodSettings() {
     error: mutation.error as Error | null,
   };
 }
-

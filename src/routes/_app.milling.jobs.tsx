@@ -1314,10 +1314,8 @@ function InvoiceDialog({
               context="sales"
               value={paymentMethod}
               onChange={setPaymentMethod}
-              variant="select"
               ensureIds={[paymentMethod]}
               ariaLabel="طريقة الدفع"
-              lang="ar"
             />
           </MillingField>
 
