@@ -28,6 +28,8 @@ import {
   type PrintingDocumentType,
 } from "@/lib/printing";
 import type { UnifiedDocumentData, InvoiceTemplateId } from "@/lib/templates";
+
+export type LuxuryPaperFormat = PrintPaperId;
 import type { InvoiceDoc } from "@/lib/pdf";
 import { toast } from "sonner";
 

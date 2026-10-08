@@ -11,7 +11,8 @@ export type DocumentType =
   | "stock_issue" // إذن صرف مخزني
   | "payment_receipt" // سند قبض/صرف
   | "quotation" // عرض سعر
-  | "delivery_note"; // إذن تسليم
+  | "delivery_note" // إذن تسليم
+  | string;
 
 export type PaperSize = "80mm" | "58mm" | "A4" | "A5";
 

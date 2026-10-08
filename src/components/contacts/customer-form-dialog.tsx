@@ -95,18 +95,18 @@ export function CustomerFormDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm animate-in fade-in duration-200 sm:items-center sm:p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto"
       onClick={() => !saving && onClose()}
     >
       <div
-        className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-3xl border border-border/80 bg-background/95 p-6 shadow-2xl backdrop-blur-md animate-in slide-in-from-bottom-6 duration-200 sm:rounded-3xl sm:p-7 sm:zoom-in-95"
+        className="flex max-h-[90dvh] w-full max-w-lg flex-col rounded-3xl border border-border/80 bg-background/95 p-5 sm:p-7 shadow-2xl backdrop-blur-md animate-in zoom-in-95 duration-200 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
         dir={isAr ? "rtl" : "ltr"}
       >
-        <div className="flex items-start justify-between border-b border-border/60 pb-5">
+        <div className="flex shrink-0 items-start justify-between border-b border-border/60 pb-4">
           <div className="flex items-center gap-3.5">
-            <div className="grid size-12 place-items-center rounded-2xl border border-primary/20 bg-primary/10 text-primary shadow-sm">
-              <User className="size-6" />
+            <div className="grid size-11 place-items-center rounded-2xl border border-primary/20 bg-primary/10 text-primary shadow-sm">
+              <User className="size-5" />
             </div>
             <div>
               <h3 className="text-lg font-bold tracking-tight text-foreground">
@@ -128,7 +128,7 @@ export function CustomerFormDialog({
           <button
             type="button"
             onClick={onClose}
-            className="grid size-9 place-items-center rounded-full bg-surface-2 text-muted-foreground transition hover:text-foreground"
+            className="grid size-8 place-items-center rounded-full bg-surface-2 text-muted-foreground transition hover:text-foreground"
           >
             <X className="size-4" />
           </button>
@@ -139,143 +139,145 @@ export function CustomerFormDialog({
             e.preventDefault();
             void save();
           }}
-          className="mt-6 space-y-5"
+          className="flex min-h-0 flex-1 flex-col mt-4"
         >
-          {/* Section 1: Identity */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              <Sparkles className="size-3.5 text-primary" />
-              <span>{isAr ? "البيانات الأساسية" : "Primary Information"}</span>
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-foreground">
-                {t("common.name")} <span className="text-rose-500">*</span>
-              </label>
-              <div className="relative">
-                <User className="pointer-events-none absolute right-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  required
-                  autoFocus
-                  value={edit.name ?? ""}
-                  onChange={(e) => setEdit({ ...edit, name: e.target.value })}
-                  placeholder={isAr ? "اسم العميل أو المؤسسة" : "Customer or Company Name"}
-                  className="h-11 w-full rounded-2xl border border-border/80 bg-surface/80 px-4 pr-10 text-sm font-medium transition placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Section 2: Contact */}
-          <div className="space-y-3 pt-2">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              <Phone className="size-3.5 text-primary" />
-              <span>{isAr ? "بيانات الاتصال والتواصل" : "Contact Details"}</span>
-            </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-foreground">
-                  {t("common.phone")}
-                </label>
-                <div className="relative">
-                  <Phone className="pointer-events-none absolute right-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <input
-                    dir="ltr"
-                    value={edit.phone ?? ""}
-                    onChange={(e) => setEdit({ ...edit, phone: e.target.value })}
-                    placeholder="+966 5x xxx xxxx"
-                    className="h-11 w-full rounded-2xl border border-border/80 bg-surface/80 px-4 pr-10 text-right text-sm font-medium transition placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  />
-                </div>
+          <div className="flex-1 overflow-y-auto space-y-4 pe-1 custom-scrollbar">
+            {/* Section 1: Identity */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <Sparkles className="size-3.5 text-primary" />
+                <span>{isAr ? "البيانات الأساسية" : "Primary Information"}</span>
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-foreground">
-                  {t("common.email")}
+                  {t("common.name")} <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
-                  <Mail className="pointer-events-none absolute right-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <User className="pointer-events-none absolute right-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                   <input
-                    type="email"
-                    dir="ltr"
-                    value={edit.email ?? ""}
-                    onChange={(e) => setEdit({ ...edit, email: e.target.value })}
-                    placeholder="customer@domain.com"
-                    className="h-11 w-full rounded-2xl border border-border/80 bg-surface/80 px-4 pr-10 text-right text-sm font-medium transition placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    required
+                    autoFocus
+                    value={edit.name ?? ""}
+                    onChange={(e) => setEdit({ ...edit, name: e.target.value })}
+                    placeholder={isAr ? "اسم العميل أو المؤسسة" : "Customer or Company Name"}
+                    className="h-11 w-full rounded-2xl border border-border/80 bg-surface/80 px-4 pr-10 text-sm font-medium transition placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
                 </div>
               </div>
             </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-foreground">
-                {isAr ? "العنوان أو المدينة" : "Address"}
-              </label>
-              <div className="relative">
-                <MapPin className="pointer-events-none absolute right-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  value={edit.address ?? ""}
-                  onChange={(e) => setEdit({ ...edit, address: e.target.value })}
-                  placeholder={isAr ? "المدينة، الحي، الشارع" : "City, District, Street"}
-                  className="h-11 w-full rounded-2xl border border-border/80 bg-surface/80 px-4 pr-10 text-sm font-medium transition placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                />
+
+            {/* Section 2: Contact */}
+            <div className="space-y-3 pt-1">
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <Phone className="size-3.5 text-primary" />
+                <span>{isAr ? "بيانات الاتصال والتواصل" : "Contact Details"}</span>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-foreground">
+                    {t("common.phone")}
+                  </label>
+                  <div className="relative">
+                    <Phone className="pointer-events-none absolute right-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      dir="ltr"
+                      value={edit.phone ?? ""}
+                      onChange={(e) => setEdit({ ...edit, phone: e.target.value })}
+                      placeholder="+966 5x xxx xxxx"
+                      className="h-11 w-full rounded-2xl border border-border/80 bg-surface/80 px-4 pr-10 text-right text-sm font-medium transition placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-foreground">
+                    {t("common.email")}
+                  </label>
+                  <div className="relative">
+                    <Mail className="pointer-events-none absolute right-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      type="email"
+                      dir="ltr"
+                      value={edit.email ?? ""}
+                      onChange={(e) => setEdit({ ...edit, email: e.target.value })}
+                      placeholder="customer@domain.com"
+                      className="h-11 w-full rounded-2xl border border-border/80 bg-surface/80 px-4 pr-10 text-right text-sm font-medium transition placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-foreground">
+                  {isAr ? "العنوان أو المدينة" : "Address"}
+                </label>
+                <div className="relative">
+                  <MapPin className="pointer-events-none absolute right-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    value={edit.address ?? ""}
+                    onChange={(e) => setEdit({ ...edit, address: e.target.value })}
+                    placeholder={isAr ? "المدينة، الحي، الشارع" : "City, District, Street"}
+                    className="h-11 w-full rounded-2xl border border-border/80 bg-surface/80 px-4 pr-10 text-sm font-medium transition placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Section 3: Credit & status */}
-          <div className="space-y-3 pt-2">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              <Wallet className="size-3.5 text-primary" />
-              <span>{isAr ? "الحد الائتماني والحالة" : "Credit & Status"}</span>
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-foreground">
-                {isAr ? "حد الائتمان المسموح" : "Credit Limit"}
-              </label>
-              <input
-                type="number"
-                dir="ltr"
-                min={0}
-                step="any"
-                value={edit.credit_limit ?? 0}
-                onChange={(e) => setEdit({ ...edit, credit_limit: Number(e.target.value) })}
-                className="h-11 w-full rounded-2xl border border-border/80 bg-surface/80 px-4 text-right font-mono text-sm font-medium transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-              />
-              <p className="mt-1 text-[10px] text-muted-foreground">
-                {isAr
-                  ? "أقصى مبلغ يمكن للعميل شراؤه بالآجل قبل إيقاف الفواتير."
-                  : "Maximum allowable credit before blocking future credit sales."}
-              </p>
-            </div>
-
-            <div className="flex items-center justify-between rounded-2xl border border-border/70 bg-surface/60 p-3.5">
+            {/* Section 3: Credit & status */}
+            <div className="space-y-3 pt-1">
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <Wallet className="size-3.5 text-primary" />
+                <span>{isAr ? "الحد الائتماني والحالة" : "Credit & Status"}</span>
+              </div>
               <div>
-                <p className="text-xs font-bold text-foreground">
-                  {isAr ? "حالة تفعيل العميل" : "Customer Active Status"}
-                </p>
-                <p className="mt-0.5 text-[10px] text-muted-foreground">
+                <label className="mb-1.5 block text-xs font-medium text-foreground">
+                  {isAr ? "حد الائتمان المسموح" : "Credit Limit"}
+                </label>
+                <input
+                  type="number"
+                  dir="ltr"
+                  min={0}
+                  step="any"
+                  value={edit.credit_limit ?? 0}
+                  onChange={(e) => setEdit({ ...edit, credit_limit: Number(e.target.value) })}
+                  className="h-11 w-full rounded-2xl border border-border/80 bg-surface/80 px-4 text-right font-mono text-sm font-medium transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                />
+                <p className="mt-1 text-[10px] text-muted-foreground">
                   {isAr
-                    ? "العميل النشط يظهر تلقائياً في شاشات البيع ونقاط البيع"
-                    : "Active customers appear in POS and sales invoices"}
+                    ? "أقصى مبلغ يمكن للعميل شراؤه بالآجل قبل إيقاف الفواتير."
+                    : "Maximum allowable credit before blocking future credit sales."}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setEdit({ ...edit, is_active: !(edit.is_active ?? true) })}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                  (edit.is_active ?? true) ? "bg-primary" : "bg-muted"
-                }`}
-              >
-                <span
-                  className={`pointer-events-none inline-block size-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                    (edit.is_active ?? true) ? "translate-x-5" : "translate-x-0"
+
+              <div className="flex items-center justify-between rounded-2xl border border-border/70 bg-surface/60 p-3.5">
+                <div>
+                  <p className="text-xs font-bold text-foreground">
+                    {isAr ? "حالة تفعيل العميل" : "Customer Active Status"}
+                  </p>
+                  <p className="mt-0.5 text-[10px] text-muted-foreground">
+                    {isAr
+                      ? "العميل النشط يظهر تلقائياً في شاشات البيع ونقاط البيع"
+                      : "Active customers appear in POS and sales invoices"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEdit({ ...edit, is_active: !(edit.is_active ?? true) })}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    (edit.is_active ?? true) ? "bg-primary" : "bg-muted"
                   }`}
-                />
-              </button>
+                >
+                  <span
+                    className={`pointer-events-none inline-block size-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      (edit.is_active ?? true) ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
+
+            {hint ? <p className="text-[11px] text-muted-foreground">{hint}</p> : null}
           </div>
 
-          {hint ? <p className="text-[11px] text-muted-foreground">{hint}</p> : null}
-
-          <div className="flex items-center justify-end gap-3 border-t border-border/60 pt-4">
+          <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border/60 pt-4 mt-3">
             <button
               type="button"
               disabled={saving}

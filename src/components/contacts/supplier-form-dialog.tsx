@@ -80,22 +80,22 @@ export function SupplierFormDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center bg-background/80 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto"
       onClick={() => !saving && onClose()}
     >
       <div
-        className="w-full max-w-md rounded-2xl border border-border/80 bg-surface p-6 shadow-xl"
+        className="flex max-h-[90dvh] w-full max-w-md flex-col rounded-3xl border border-border/80 bg-surface p-5 sm:p-6 shadow-2xl backdrop-blur-md overflow-hidden"
         onClick={(e) => e.stopPropagation()}
         dir={isAr ? "rtl" : "ltr"}
       >
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex shrink-0 items-center justify-between border-b border-border/50 pb-3">
           <div className="flex items-center gap-2">
             <Building2 className="size-4 text-primary" />
             <h3 className="text-lg font-semibold">
               {edit.id ? t("suppliers.edit") : t("suppliers.new")}
             </h3>
           </div>
-          <button onClick={onClose} className="rounded p-1 hover:bg-surface-2">
+          <button onClick={onClose} className="rounded-full p-1.5 hover:bg-surface-2 text-muted-foreground hover:text-foreground transition">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -105,76 +105,78 @@ export function SupplierFormDialog({
             e.preventDefault();
             void save();
           }}
-          className="space-y-3"
+          className="flex min-h-0 flex-1 flex-col"
         >
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-              {t("common.name")} *
+          <div className="flex-1 overflow-y-auto space-y-3.5 pe-1 custom-scrollbar">
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                {t("common.name")} *
+              </label>
+              <input
+                autoFocus
+                value={edit.name ?? ""}
+                onChange={(e) => setEdit({ ...edit, name: e.target.value })}
+                className="h-10 w-full rounded-xl border border-input bg-surface px-3 text-sm focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                {t("common.phone")}
+              </label>
+              <input
+                value={edit.phone ?? ""}
+                onChange={(e) => setEdit({ ...edit, phone: e.target.value })}
+                className="h-10 w-full rounded-xl border border-input bg-surface px-3 text-sm focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                {t("common.email")}
+              </label>
+              <input
+                type="email"
+                value={edit.email ?? ""}
+                onChange={(e) => setEdit({ ...edit, email: e.target.value })}
+                className="h-10 w-full rounded-xl border border-input bg-surface px-3 text-sm focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                {t("common.address")}
+              </label>
+              <input
+                value={edit.address ?? ""}
+                onChange={(e) => setEdit({ ...edit, address: e.target.value })}
+                className="h-10 w-full rounded-xl border border-input bg-surface px-3 text-sm focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
+              />
+            </div>
+            <label className="flex items-center gap-2 text-sm pt-1 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={edit.is_active ?? true}
+                onChange={(e) => setEdit({ ...edit, is_active: e.target.checked })}
+                className="h-4 w-4 rounded border-border text-primary focus:ring-primary/20"
+              />
+              {t("common.active")}
             </label>
-            <input
-              autoFocus
-              value={edit.name ?? ""}
-              onChange={(e) => setEdit({ ...edit, name: e.target.value })}
-              className="h-9 w-full rounded-md border border-input bg-surface px-3 text-sm focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
-            />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-              {t("common.phone")}
-            </label>
-            <input
-              value={edit.phone ?? ""}
-              onChange={(e) => setEdit({ ...edit, phone: e.target.value })}
-              className="h-9 w-full rounded-md border border-input bg-surface px-3 text-sm focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
-            />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-              {t("common.email")}
-            </label>
-            <input
-              type="email"
-              value={edit.email ?? ""}
-              onChange={(e) => setEdit({ ...edit, email: e.target.value })}
-              className="h-9 w-full rounded-md border border-input bg-surface px-3 text-sm focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
-            />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-              {t("common.address")}
-            </label>
-            <input
-              value={edit.address ?? ""}
-              onChange={(e) => setEdit({ ...edit, address: e.target.value })}
-              className="h-9 w-full rounded-md border border-input bg-surface px-3 text-sm focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
-            />
-          </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={edit.is_active ?? true}
-              onChange={(e) => setEdit({ ...edit, is_active: e.target.checked })}
-              className="h-4 w-4 rounded border-border"
-            />
-            {t("common.active")}
-          </label>
 
-          {hint ? <p className="text-[11px] text-muted-foreground">{hint}</p> : null}
+            {hint ? <p className="text-[11px] text-muted-foreground pt-1">{hint}</p> : null}
+          </div>
 
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="mt-4 flex shrink-0 justify-end gap-2 border-t border-border/50 pt-3">
             <button
               type="button"
               onClick={onClose}
-              className="h-9 rounded-md border border-border px-4 text-sm hover:bg-surface-2"
+              className="h-10 rounded-xl border border-border px-4 text-sm font-medium hover:bg-surface-2"
             >
               {t("common.cancel")}
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="flex h-9 items-center justify-center gap-1.5 rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:pointer-events-none disabled:opacity-50"
+              className="flex h-10 items-center justify-center gap-1.5 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground transition hover:opacity-90 disabled:pointer-events-none disabled:opacity-50 shadow-md shadow-primary/20"
             >
-              {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
               <span>{saving ? (isAr ? "جاري الحفظ..." : "Saving...") : t("common.save")}</span>
             </button>
           </div>

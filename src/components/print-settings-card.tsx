@@ -208,6 +208,17 @@ export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
     );
   }
 
+  function handleDepartmentCopiesChange(docType: PrintingDocumentType, copies: number) {
+    const nextOverrides = {
+      ...unified.overrides,
+      [docType]: {
+        ...unified.overrides[docType],
+        copies,
+      },
+    };
+    updateUnified({ overrides: nextOverrides });
+  }
+
   const sampleDoc = useMemo(() => sampleDocumentFor(previewDocType), [previewDocType]);
 
   const previewRequest = useMemo(() => {
@@ -485,6 +496,38 @@ export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
                               </>
                             )}
                           </select>
+                        </div>
+
+                        {/* Dropdown 3: عدد النسخ التلقائية المخصصة لهذا القسم */}
+                        <div className="space-y-1.5 sm:col-span-2 pt-1">
+                          <label className="text-xs font-semibold text-muted-foreground flex items-center justify-between">
+                            <span>عدد النسخ المطبوعة تلقائياً لهذا القسم</span>
+                            <span className="text-[10px] text-primary font-mono font-bold">
+                              {(override.copies ?? unified.copies)}{" "}
+                              {(override.copies ?? unified.copies) === 1 ? "نسخة واحدة" : (override.copies ?? unified.copies) === 2 ? "نسختين" : "نسخ"}
+                            </span>
+                          </label>
+                          <div className="flex items-center gap-1.5">
+                            {[1, 2, 3, 4].map((cNum) => {
+                              const activeCopies = override.copies ?? unified.copies;
+                              const isSelected = activeCopies === cNum;
+                              return (
+                                <button
+                                  key={cNum}
+                                  type="button"
+                                  disabled={!canEdit}
+                                  onClick={() => handleDepartmentCopiesChange(dept.id, cNum)}
+                                  className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold transition-all border ${
+                                    isSelected
+                                      ? "bg-primary text-primary-foreground border-primary shadow-xs"
+                                      : "bg-background text-muted-foreground border-border/70 hover:text-foreground hover:bg-surface-2"
+                                  }`}
+                                >
+                                  {cNum} {cNum === 1 ? "نسخة" : "نسخ"}
+                                </button>
+                              );
+                            })}
+                          </div>
                         </div>
                       </div>
 
