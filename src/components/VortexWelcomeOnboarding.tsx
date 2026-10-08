@@ -3,6 +3,7 @@ import { Link, useLocation } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
+import { useAuth } from "@/lib/auth";
 import { money, num } from "@/lib/format";
 import {
   Sparkles,
@@ -22,6 +23,7 @@ import {
   ArrowRightLeft,
   ClipboardList,
   Check,
+  LogIn,
   ChevronLeft,
   ChevronRight,
   X,
@@ -37,29 +39,23 @@ export function VortexWelcomeOnboarding() {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
   const location = useLocation();
+  const { session } = useAuth();
   const { dir, lang } = useI18n();
   const isAr = lang === "ar";
 
-  const path = location.pathname.replace(/\/+$/, "") || "/";
-  const isAppRoute =
-    path !== "/" &&
-    !/^\/(login|register|forgot-password|reset-password|verify|auth|404|500)/.test(path);
-
   useEffect(() => {
-    if (!isAppRoute) {
-      setOpen(false);
-      return;
-    }
     let seen = false;
     try {
       seen = localStorage.getItem("vortex_welcome_seen") === "true";
     } catch {
       return;
     }
-    if (seen) return;
-    const timer = setTimeout(() => setOpen(true), 1500);
-    return () => clearTimeout(timer);
-  }, [isAppRoute]);
+    // تظهر الواجهة الترحيبية تلقائياً لأول تشغيل قبل تسجيل الدخول (بعد انتهاء تحميل شاشة البداية)
+    if (!seen && !session) {
+      const timer = setTimeout(() => setOpen(true), 1300);
+      return () => clearTimeout(timer);
+    }
+  }, [session]);
 
   // Support re-opening via custom event anywhere in the app
   useEffect(() => {
@@ -78,12 +74,27 @@ export function VortexWelcomeOnboarding() {
     setOpen(false);
   };
 
-  // Queries for live system overview
+  // Queries for live system overview (فقط في حال وجود جلسة مصادقة لتجنب أخطاء 401 قبل تسجيل الدخول)
   const { data: stats } = useQuery({
-    queryKey: ["vortex-welcome-overview-stats"],
+    queryKey: ["vortex-welcome-overview-stats", Boolean(session)],
     enabled: open,
     staleTime: 60_000,
     queryFn: async () => {
+      if (!session) {
+        return {
+          productsCount: 1420,
+          lowStockCount: 3,
+          warehousesCount: 4,
+          transfersCount: 12,
+          totalSales: 485000,
+          paidSales: 410000,
+          receivables: 75000,
+          customersCount: 260,
+          suppliersCount: 45,
+          purchasesCount: 88,
+          companyName: isAr ? "نظام فورتكس لإدارة الأعمال" : "Vortex Business ERP",
+        };
+      }
       const [
         productsRes,
         inventoryRes,
@@ -154,7 +165,7 @@ export function VortexWelcomeOnboarding() {
     },
   });
 
-  if (!open || !isAppRoute) return null;
+  if (!open) return null;
 
   const totalSteps = 7;
 
@@ -868,8 +879,17 @@ export function VortexWelcomeOnboarding() {
               onClick={handleFinish}
               className="h-11 px-7 rounded-xl bg-primary text-primary-foreground font-extrabold text-sm hover:opacity-95 transition flex items-center gap-2 shadow-lg shadow-primary/25 cursor-pointer mr-auto"
             >
-              <Check className="size-4" />
-              <span>{isAr ? "ابدأ العمل الآن" : "Launch ERP"}</span>
+              {session ? (
+                <>
+                  <Check className="size-4" />
+                  <span>{isAr ? "ابدأ العمل الآن" : "Launch ERP"}</span>
+                </>
+              ) : (
+                <>
+                  <LogIn className="size-4" />
+                  <span>{isAr ? "الانتقال إلى تسجيل الدخول" : "Proceed to Sign In"}</span>
+                </>
+              )}
             </button>
           )}
         </div>

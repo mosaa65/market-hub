@@ -49,12 +49,14 @@ function resolveCandidates(input: string, countryCode: string): string[] {
     return candidates;
   }
 
-  // 1) الرقم كما كُتب، مع إزالة الأصفار البادئة: 0771234567 → 771234567
+  // 1) الصيغة الدولية المعيارية (الأساس المسجل في النظام): +967771234567 → 967771234567
+  // نضعها أولاً لتنجح فوراً بأول محاولة بدلاً من انتظار محاولات تفشل وتسبب بطء تسجيل الدخول
+  const canonical = formatPhoneE164(digits, countryCode).replace(/\D/g, "");
+  push(canonical);
+
+  // 2) الرقم بدون أصفار بادئة كاحتياط في حال سجل بحساب محلي قديم
   const stripped = digits.replace(/^0+/, "");
   push(stripped || digits);
-
-  // 2) الصيغة الدولية الكاملة: +967771234567 → 967771234567
-  push(formatPhoneE164(digits, countryCode).replace(/\D/g, ""));
 
   // 3) الرقم الخام كما أُدخل (احتياط أخير)
   push(digits);
@@ -242,6 +244,16 @@ function AuthPage() {
                 ? "سجّل الدخول لإدارة متجرك، مخزونك ومبيعاتك"
                 : "Sign in to manage your store, inventory, and sales"}
             </p>
+            <div className="mt-3 flex justify-center">
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new CustomEvent("open-vortex-welcome"))}
+                className="inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-3.5 py-1.5 text-xs font-bold text-primary hover:bg-primary/20 transition-colors shadow-sm cursor-pointer"
+              >
+                <Sparkles className="size-3.5" />
+                <span>{isRtl ? "🌟 جولة تعريفية في نظام فورتكس" : "🌟 Explore Vortex ERP Tour"}</span>
+              </button>
+            </div>
           </header>
 
           <div className="grid">
