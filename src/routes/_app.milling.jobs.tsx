@@ -57,6 +57,7 @@ import {
   Cell,
   QueryErrorGuard,
 } from "@/components/milling/milling-ui";
+import { PaymentMethodPicker } from "@/components/ui/payment-method";
 import type { PageGuideConfig } from "@/components/page-guide";
 import { cn } from "@/lib/utils";
 
@@ -1308,11 +1309,16 @@ function InvoiceDialog({
 
         <div className="space-y-3">
           <MillingField label="طريقة الدفع">
-            <MillingSelect value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
-              <option value="cash">نقداً</option>
-              <option value="bank_transfer">تحويل بنكي</option>
-              <option value="credit">آجل (على حساب العميل)</option>
-            </MillingSelect>
+            {/* Same catalogue, sales context — milling invoices are sales. */}
+            <PaymentMethodPicker
+              context="sales"
+              value={paymentMethod}
+              onChange={setPaymentMethod}
+              variant="select"
+              ensureIds={[paymentMethod]}
+              ariaLabel="طريقة الدفع"
+              lang="ar"
+            />
           </MillingField>
 
           <div className="grid grid-cols-2 gap-3">

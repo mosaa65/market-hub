@@ -30,6 +30,11 @@ import {
   PackagePlus,
   Coins,
 } from "lucide-react";
+import { PaymentMethodPicker } from "@/components/ui/payment-method";
+import {
+  getPaymentMethodDefinition,
+  toLegacyPaymentValue,
+} from "@/lib/payments/payment-methods";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
@@ -288,9 +293,7 @@ function PurchasePOSPage() {
   const [cart, setCart] = useState<CartLine[]>([]);
   const [paid, setPaid] = useState<string>("");
   const [discount, setDiscount] = useState<string>("");
-  const [paymentMethod, setPaymentMethod] = useState<
-    "cash" | "mobile_money" | "bank_transfer" | "credit"
-  >("cash");
+  const [paymentMethod, setPaymentMethod] = useState<string>("cash");
   const [note, setNote] = useState("");
   const [purchaseDate, setPurchaseDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [transferRef, setTransferRef] = useState("");
@@ -552,7 +555,9 @@ function PurchasePOSPage() {
   const taxTotal = cart.reduce((s, l) => s + l.unit_cost * l.quantity * (l.tax_rate / 100), 0);
   const discountN = Number(discount || 0);
   const total = Math.max(0, subtotal + taxTotal - discountN);
-  const paidN = paymentMethod === "credit" ? 0 : paid !== "" ? Number(paid) : total;
+  // آجل collects nothing, so the paid amount is a hard zero rather than the total.
+  const isCreditMethod = getPaymentMethodDefinition(paymentMethod)?.isCreditTerm ?? false;
+  const paidN = isCreditMethod ? 0 : paid !== "" ? Number(paid) : total;
   const isOverpaid = Number.isFinite(paidN) && paidN > total;
 
   // Filter products
@@ -637,12 +642,11 @@ function PurchasePOSPage() {
       const composedNote = (() => {
         const parts: string[] = [];
         if (note.trim()) parts.push(note.trim());
-        if (
-          (paymentMethod === "bank_transfer" || paymentMethod === "mobile_money") &&
-          transferRef.trim()
-        ) {
+        // Reference for any method the catalogue flags, not two hard-coded ids.
+        const chosen = getPaymentMethodDefinition(paymentMethod);
+        if (chosen?.requiresReference && transferRef.trim()) {
           parts.push(
-            `${paymentMethod === "mobile_money" ? (lang === "ar" ? "مرجع المحفظة" : "Wallet reference") : lang === "ar" ? "رقم الحوالة" : "Transfer no."}: ${transferRef.trim()}`,
+            `${chosen.ledgerKind === "WALLET" ? (lang === "ar" ? "مرجع المحفظة" : "Wallet reference") : lang === "ar" ? "رقم الحوالة" : "Transfer no."}: ${transferRef.trim()}`,
           );
         }
         return parts.length ? parts.join(" — ") : null;
@@ -651,7 +655,7 @@ function PurchasePOSPage() {
       const { data: invoiceId, error } = await supabase.rpc("create_purchase", {
         _warehouse_id: warehouseId,
         _supplier_id: supplierId,
-        _payment_method: paymentMethod,
+        _payment_method: toLegacyPaymentValue(paymentMethod),
         _paid: paidN,
         _discount: discountN,
         _note: composedNote as any,
@@ -1205,26 +1209,25 @@ function PurchasePOSPage() {
               </div>
             </div>
 
-            {/* Payment Method Selector — 4 clear options incl. wallet & transfer. */}
-            <div className="grid grid-cols-[minmax(0,1fr)_7rem] gap-2">
-              <label className="relative min-w-0">
-                <span className="sr-only">{lang === "ar" ? "طريقة الدفع" : "Payment method"}</span>
-                <select
-                  value={paymentMethod}
-                  onChange={(e) => {
-                    const method = e.target.value as typeof paymentMethod;
-                    setPaymentMethod(method);
-                    setPaid(method === "credit" ? "0" : "");
-                  }}
-                  className="h-10 w-full appearance-none rounded-xl border border-border/80 bg-surface px-3 text-xs font-semibold text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                >
-                  <option value="cash">{lang === "ar" ? "نقدًا" : "Cash"}</option>
-                  <option value="mobile_money">{lang === "ar" ? "محفظة" : "Wallet"}</option>
-                  <option value="bank_transfer">{lang === "ar" ? "حوالة" : "Transfer"}</option>
-                  <option value="credit">{lang === "ar" ? "آجل" : "Credit"}</option>
-                </select>
-                <ChevronDown className="pointer-events-none absolute end-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              </label>
+            {/*
+              طريقة الدفع — المكوّن الموحّد. The four hard-coded options are
+              replaced by whatever the business enabled for purchases.
+            */}
+            <div className="flex items-start gap-2">
+              <PaymentMethodPicker
+                context="purchases"
+                value={paymentMethod}
+                onChange={(method) => {
+                  setPaymentMethod(method);
+                  const definition = getPaymentMethodDefinition(method);
+                  if (definition?.isCreditTerm) setPaid("0");
+                }}
+                includeCredit
+                ensureIds={[paymentMethod]}
+                ariaLabel={lang === "ar" ? "طريقة الدفع" : "Payment method"}
+                lang={lang === "ar" ? "ar" : "en"}
+                className="min-w-0 flex-1"
+              />
               <input
                 type="number"
                 min="0"
@@ -1232,12 +1235,12 @@ function PurchasePOSPage() {
                 onChange={(e) => setDiscount(e.target.value)}
                 placeholder={lang === "ar" ? "الخصم" : "Discount"}
                 aria-label={lang === "ar" ? "الخصم" : "Discount"}
-                className="h-10 w-full rounded-xl border border-border/80 bg-surface px-2 text-end font-mono text-xs outline-none focus:border-primary"
+                className="h-9 w-[7rem] shrink-0 rounded-xl border border-border/80 bg-surface px-2 text-end font-mono text-xs outline-none focus:border-primary"
               />
             </div>
 
-            {/* Transfer reference — shown only for bank transfers. */}
-            {(paymentMethod === "bank_transfer" || paymentMethod === "mobile_money") && (
+            {/* Transfer reference — for any method the catalogue flags. */}
+            {getPaymentMethodDefinition(paymentMethod)?.requiresReference && (
               <input
                 type="text"
                 value={transferRef}

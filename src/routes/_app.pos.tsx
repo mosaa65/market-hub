@@ -47,9 +47,16 @@ import {
   Scale,
   ArrowRightLeft,
   DollarSign,
+  Coins,
 } from "lucide-react";
 import { toast } from "sonner";
 import { BarcodeScanner } from "@/components/barcode-scanner";
+import { PaymentMethodPicker } from "@/components/ui/payment-method";
+import {
+  getPaymentMethodDefinition,
+  paymentMethodLabel,
+  toLegacyPaymentValue,
+} from "@/lib/payments/payment-methods";
 import { useKeyboardWedge } from "@/hooks/use-keyboard-wedge";
 import { useCatalogModules } from "@/lib/catalog-modules";
 import { useIsDesktop } from "@/hooks/use-media-query";
@@ -312,9 +319,15 @@ function POSPage() {
   const [cart, setCart] = useState<CartLine[]>([]);
   const [paid, setPaid] = useState<string>("");
   const [discount, setDiscount] = useState<string>("");
-  const [paymentMethod, setPaymentMethod] = useState<
-    "cash" | "card" | "mobile_money" | "bank_transfer" | "credit"
-  >("cash");
+  /**
+   * A catalogue id, not a closed union.
+   *
+   * It used to be `"cash" | "card" | "mobile_money" | "bank_transfer" | "credit"`,
+   * which is why بنك الكريمي or جيب could not be added to the till without
+   * editing this file. The picker now decides what is offerable; the cashier's
+   * choice is whatever catalogue id that produced.
+   */
+  const [paymentMethod, setPaymentMethod] = useState<string>("cash");
   const [note, setNote] = useState("");
   /** Transfer reference — appended to the note on submit; no DB column needed. */
   const [transferRef, setTransferRef] = useState("");
@@ -1134,14 +1147,19 @@ function POSPage() {
     setLoading(true);
     try {
       // وسيلة الدفع المحفوظة على الفاتورة:
-      //  * وسيلة واحدة -> تُسجل باسمها الحقيقي (نقد/بطاقة/بنك/آجل)
+      //  * وسيلة واحدة -> تُسجل بقيمتها المخزّنة (نقد/بطاقة/بنك/آجل)
       //  * أكثر من وسيلة -> 'split' كي تبقى قابلة للفلترة والتقارير
-      const singleSplitMethod = splitMethodCount === 1 ? (splitCashN > 0 ? "cash" : "card") : null;
+      //
+      // التحويل يتم عبر الكتالوج: بنك الكريمي وبنك اليمن الدولي يُسجّلان
+      // 'bank_transfer'، وجيب/فلوسك/ون كاش تُسجّل 'mobile_money'. أما أسماء
+      // المؤسسات فتبقى ظاهرة في القسم والملاحظة، وهذا هو التصميم المقصود.
+      const singleSplitMethod =
+        splitMethodCount === 1 ? (splitCashN > 0 ? "cash" : "card") : null;
       let finalMethod: string = isSplitPayment
         ? isMultiMethodSplit
           ? "split"
           : (singleSplitMethod ?? "cash")
-        : paymentMethod;
+        : toLegacyPaymentValue(paymentMethod);
 
       // تصحيح منطقي نهائي للوسيلة قبل الإرسال لمنع التناقض:
       if (!isSplitPayment) {
@@ -1166,28 +1184,27 @@ function POSPage() {
       let splitNote = "";
       if (isSplitPayment) {
         const parts = [];
-        if (splitCashN > 0) parts.push(`${lang === "ar" ? "نقد" : "Cash"}: ${money(splitCashN)}`);
+        if (splitCashN > 0)
+          parts.push(`${paymentMethodLabel("cash", lang === "ar" ? "ar" : "en")}: ${money(splitCashN)}`);
         if (splitCardN > 0)
-          parts.push(`${lang === "ar" ? "شبكة/بطاقة" : "Card"}: ${money(splitCardN)}`);
+          parts.push(`${paymentMethodLabel("card", lang === "ar" ? "ar" : "en")}: ${money(splitCardN)}`);
         if (remainingDebt > 0)
-          parts.push(`${lang === "ar" ? "آجل" : "Debt"}: ${money(remainingDebt)}`);
-        splitNote = `[${lang === "ar" ? "الدفع بأكثر من طريقة" : "Split"}: ${parts.join(" | ")}]`;
+          parts.push(`${paymentMethodLabel("credit", lang === "ar" ? "ar" : "en")}: ${money(remainingDebt)}`);
+        splitNote = `[${paymentMethodLabel("split", lang === "ar" ? "ar" : "en")}: ${parts.join(" | ")}]`;
       }
 
       const finalNote = (() => {
         const parts: string[] = [];
         if (note.trim()) parts.push(note.trim());
-        // Electronic references are carried in the existing note field; this
-        // preserves the RPC/offline contract while keeping the cashier context.
-        if (
-          (finalMethod === "bank_transfer" ||
-            finalMethod === "mobile_money" ||
-            paymentMethod === "bank_transfer" ||
-            paymentMethod === "mobile_money") &&
-          transferRef.trim()
-        ) {
+        // A reference is meaningful for any method the catalogue marks as
+        // requiring one — a bank, a wallet, a cheque — rather than for two
+        // hard-coded ids. Without this, بنك الكريمي would silently drop the
+        // transfer number the cashier typed.
+        const chosen = getPaymentMethodDefinition(paymentMethod);
+        const chosenNeedsRef = Boolean(chosen?.requiresReference);
+        if (chosenNeedsRef && transferRef.trim()) {
           const electronicLabel =
-            finalMethod === "mobile_money" || paymentMethod === "mobile_money"
+            chosen?.ledgerKind === "WALLET"
               ? lang === "ar"
                 ? "مرجع المحفظة"
                 : "Wallet reference"
@@ -2253,35 +2270,35 @@ function POSPage() {
                 </div>
               </div>
 
-              {/* Payment Method Switcher: Cash | Card | Bank | Credit | Split */}
+              {/*
+                طريقة الدفع — المكوّن الموحّد.
+
+                The five hard-coded <option>s that used to live here are gone.
+                The picker reads the business's own configuration, so it offers
+                exactly the methods enabled for POS, in the operator's order.
+                "دفع بأكثر من طريقة" stays with the discount field below,
+                because it is a mode of the cart, not a tender.
+              */}
               <div className="space-y-1.5">
-                <div className="grid grid-cols-[minmax(0,1fr)_7rem] gap-2">
-                  <label className="relative min-w-0">
-                    <span className="sr-only">
-                      {lang === "ar" ? "طريقة الدفع" : "Payment method"}
-                    </span>
-                    <select
-                      value={isSplitPayment ? "split" : paymentMethod}
-                      onChange={(e) => {
-                        if (e.target.value === "split") {
-                          setIsSplitPayment(true);
-                        } else {
-                          const method = e.target.value as typeof paymentMethod;
-                          setIsSplitPayment(false);
-                          setPaymentMethod(method);
-                          setPaid(method === "credit" ? "0" : "");
-                        }
-                      }}
-                      className="h-10 w-full appearance-none rounded-xl border border-border/80 bg-surface px-3 text-xs font-semibold text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                    >
-                      <option value="cash">{t("pos.pm.cash")}</option>
-                      <option value="mobile_money">{t("pos.pm.mobile_money")}</option>
-                      <option value="bank_transfer">{t("pos.pm.bank_transfer")}</option>
-                      <option value="credit">{t("pos.pm.credit")}</option>
-                      <option value="split">{t("pos.pm.split")}</option>
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute end-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  </label>
+                <div className="flex items-start gap-2">
+                  <PaymentMethodPicker
+                    context="pos"
+                    value={isSplitPayment ? "" : paymentMethod}
+                    onChange={(method) => {
+                      const definition = getPaymentMethodDefinition(method);
+                      // A new tender cancels the split: leaving both active
+                      // would send a breakdown the cashier did not intend.
+                      setIsSplitPayment(false);
+                      setPaymentMethod(method);
+                      // Âجل means nothing is collected, so the paid amount must
+                      // go back to an explicit zero rather than stay blank.
+                      setPaid(definition?.isCreditTerm ? "0" : "");
+                    }}
+                    ensureIds={[paymentMethod]}
+                    ariaLabel={lang === "ar" ? "طريقة الدفع" : "Payment method"}
+                    lang={lang === "ar" ? "ar" : "en"}
+                    className="min-w-0 flex-1"
+                  />
                   <input
                     type="number"
                     min="0"
@@ -2289,25 +2306,48 @@ function POSPage() {
                     onChange={(e) => setDiscount(e.target.value)}
                     placeholder={t("pos.discount")}
                     aria-label={t("pos.discount")}
-                    className="h-10 w-full rounded-xl border border-border/80 bg-surface px-2 text-end font-mono text-xs outline-none focus:border-primary"
+                    className="h-9 w-[7rem] shrink-0 rounded-xl border border-border/80 bg-surface px-2 text-end font-mono text-xs outline-none focus:border-primary"
                   />
                 </div>
 
-                {/* Transfer reference — only meaningful for bank transfers. */}
+                {/* Split mode is a cart operation, so it is a sibling of the picker. */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSplitPayment((prev) => !prev);
+                    setPaid("");
+                  }}
+                  aria-pressed={isSplitPayment}
+                  className={
+                    isSplitPayment
+                      ? "inline-flex h-8 items-center gap-1.5 rounded-xl border border-violet-500/50 bg-violet-500/10 px-2.5 text-[11px] font-semibold text-violet-700 transition dark:text-violet-300"
+                      : "inline-flex h-8 items-center gap-1.5 rounded-xl border border-border/70 bg-surface/70 px-2.5 text-[11px] font-medium text-muted-foreground transition hover:border-violet-500/40 hover:text-foreground"
+                  }
+                >
+                  <Coins className="h-3.5 w-3.5" />
+                  {lang === "ar" ? "دفع بأكثر من طريقة" : "Split payment"}
+                </button>
+              </div>
+
+                {/*
+                  Transfer reference — shown for ANY method the catalogue marks
+                  as needing one, so a bank or wallet added later gets the field
+                  without touching this file.
+                */}
                 {!isSplitPayment &&
-                  (paymentMethod === "bank_transfer" || paymentMethod === "mobile_money") && (
+                  getPaymentMethodDefinition(paymentMethod)?.requiresReference && (
                     <input
                       value={transferRef}
                       onChange={(e) => setTransferRef(e.target.value)}
                       placeholder={
-                        paymentMethod === "mobile_money"
+                        getPaymentMethodDefinition(paymentMethod)?.ledgerKind === "WALLET"
                           ? lang === "ar"
                             ? "رقم عملية المحفظة / المرجع"
                             : "Wallet transaction / reference number"
                           : t("pos.pm.transfer_ref")
                       }
                       aria-label={
-                        paymentMethod === "mobile_money"
+                        getPaymentMethodDefinition(paymentMethod)?.ledgerKind === "WALLET"
                           ? lang === "ar"
                             ? "مرجع المحفظة"
                             : "Wallet reference"
@@ -2584,7 +2624,6 @@ function POSPage() {
             </div>
           </div>
         </div>
-      </div>
 
       {/* Barcode Scanner Dialog */}
       <BarcodeScanner

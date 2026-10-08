@@ -29,8 +29,10 @@ import {
   isValidWhatsAppPhone,
 } from "@/lib/communication";
 import { useFinancialPosting, type PaymentMethodType } from "@/hooks/use-financial-posting";
+import { PaymentMethodPicker } from "@/components/ui/payment-method";
+import { paymentMethodLabel } from "@/lib/payments/payment-methods";
 
-export type PaymentMethod = "cash" | "transfer" | "card" | "mobile_money";
+export type PaymentMethod = string;
 
 export interface CollectionCustomer {
   id: string;
@@ -290,11 +292,7 @@ export function VortexCollectionSheet({
             <div className="flex justify-between items-center text-muted-foreground text-xs">
               <span>طريقة الدفع</span>
               <span className="font-medium text-foreground">
-                {successReceipt.method === "cash"
-                  ? "نقداً (الصندوق)"
-                  : successReceipt.method === "transfer"
-                  ? "تحويل بنكي"
-                  : "دفع إلكتروني"}
+                {paymentMethodLabel(successReceipt.method, "ar")}
               </span>
             </div>
             {successReceipt.reference && (
@@ -445,16 +443,20 @@ export function VortexCollectionSheet({
                 <CreditCard className="w-3.5 h-3.5 text-primary" />
                 طريقة الدفع
               </label>
-              <select
+              {/*
+                One picker instead of a four-option <select>. The collection
+                context is its own scope, so a business that takes only cash
+                and بنك الكريمي from customers sees exactly those two here.
+              */}
+              <PaymentMethodPicker
+                context="customer_collection"
                 value={method}
-                onChange={(e) => setMethod(e.target.value as PaymentMethod)}
-                className="w-full text-xs p-2.5 rounded-xl border bg-background focus:outline-none focus:ring-1 focus:ring-primary"
-              >
-                <option value="cash">نقداً (كاش)</option>
-                <option value="transfer">تحويل بنكي</option>
-                <option value="card">بطاقة / شبكة</option>
-                <option value="mobile_money">محفظة إلكترونية</option>
-              </select>
+                onChange={setMethod}
+                variant="select"
+                ensureIds={[method]}
+                ariaLabel="طريقة الدفع"
+                lang="ar"
+              />
             </div>
 
             <div className="space-y-1.5">

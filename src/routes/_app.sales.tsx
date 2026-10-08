@@ -284,20 +284,12 @@ export function SalesPage() {
   };
 
   const pmLabel = (m: string, note?: string | null) => {
-    const isSplit = Boolean(note && (note.includes("[دفع مجزأ:") || note.includes("[Split:")));
-    if (isSplit || m === "split") {
-      return isRtl ? "دفع مجزأ" : "Split";
+    // Split detection and naming both come from the catalogue module, so this
+    // screen no longer keeps its own copy of either.
+    if (isSplitPaymentValue(m, note)) {
+      return paymentMethodLabel("split", isRtl ? "ar" : "en");
     }
-    const map: Record<string, string> = {
-      cash: t("pos.pm.cash") || (isRtl ? "نقداً" : "Cash"),
-      card: t("pos.pm.card") || (isRtl ? "شبكة/بطاقة" : "Card"),
-      bank_transfer: t("pos.pm.bank") || (isRtl ? "تحويل بنكي" : "Bank Transfer"),
-      bank: t("pos.pm.bank") || (isRtl ? "تحويل بنكي" : "Bank"),
-      credit: t("pos.pm.credit") || (isRtl ? "آجل" : "Credit"),
-      cheque: isRtl ? "شيك" : "Cheque",
-      mobile_money: isRtl ? "محفظة إلكترونية" : "Mobile Money",
-    };
-    return map[m] ?? m;
+    return paymentMethodLabel(m, isRtl ? "ar" : "en");
   };
 
   const pmIcon = (m: string, note?: string | null) => {

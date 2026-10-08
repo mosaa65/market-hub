@@ -33,6 +33,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { PaymentMethodPicker } from "@/components/ui/payment-method";
 import { Plus, Trash2, RotateCcw, Search, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/_app/sales-returns")({
@@ -438,19 +439,24 @@ function NewSalesReturn({
             </div>
             <div className="grid gap-1.5">
               <Label>{lang === "ar" ? "طريقة الاسترداد" : "Refund method"}</Label>
-              <Select value={refundMethod} onValueChange={setRefundMethod}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cash">{lang === "ar" ? "نقدًا" : "Cash"}</SelectItem>
-                  <SelectItem value="card">{lang === "ar" ? "بطاقة" : "Card"}</SelectItem>
-                  <SelectItem value="bank">{lang === "ar" ? "تحويل بنكي" : "Bank"}</SelectItem>
-                  <SelectItem value="credit">
-                    {lang === "ar" ? "خصم من الدين" : "Credit Balance"}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+              {/*
+                Same catalogue, different context: the returns section has its
+                own scoping, so a business can refund in cash while it never
+                takes cash at the till.
+
+                Replaces a Select whose "bank" option could not be cast to the
+                payment_method ENUM.
+              */}
+              <PaymentMethodPicker
+                context="sales_returns"
+                value={refundMethod}
+                onChange={setRefundMethod}
+                variant="select"
+                includeCredit
+                ensureIds={[refundMethod]}
+                ariaLabel={lang === "ar" ? "طريقة الاسترداد" : "Refund method"}
+                lang={lang === "ar" ? "ar" : "en"}
+              />
             </div>
           </div>
 

@@ -31,6 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { PaymentMethodPicker } from "@/components/ui/payment-method";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Plus, Trash2, RotateCcw, Search } from "lucide-react";
@@ -436,19 +437,24 @@ function NewPurchaseReturn({
             </div>
             <div className="grid gap-1.5">
               <Label>{lang === "ar" ? "طريقة الاسترداد" : "Refund method"}</Label>
-              <Select value={refundMethod} onValueChange={setRefundMethod}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cash">{lang === "ar" ? "نقدًا" : "Cash"}</SelectItem>
-                  <SelectItem value="card">{lang === "ar" ? "بطاقة" : "Card"}</SelectItem>
-                  <SelectItem value="bank">{lang === "ar" ? "تحويل بنكي" : "Bank"}</SelectItem>
-                  <SelectItem value="credit">
-                    {lang === "ar" ? "خصم من رصيد المورد" : "Deduct Balance"}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+              {/*
+                الاسترداد ليس طريقة دفع، لكنه يستخدم نفس الكتالوج بنفس السياق
+                المستقل، فالطرق المتاحة هنا هي ما فعّله العميل لقسم المرتجعات.
+
+                This replaced a Radix Select whose "badge" option used value
+                "bank" — a value the payment_method ENUM does not contain, so
+                the return failed with a cast error.
+              */}
+              <PaymentMethodPicker
+                context="purchase_returns"
+                value={refundMethod}
+                onChange={setRefundMethod}
+                variant="select"
+                includeCredit
+                ensureIds={[refundMethod]}
+                ariaLabel={lang === "ar" ? "طريقة الاسترداد" : "Refund method"}
+                lang={lang === "ar" ? "ar" : "en"}
+              />
             </div>
           </div>
 

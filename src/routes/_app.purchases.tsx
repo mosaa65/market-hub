@@ -36,6 +36,11 @@ import { DataTable, type DataTableColumn, type DataTableSort } from "@/component
 import { IconButton } from "@/components/ui/icon-button";
 import { useBreakpoint } from "@/design/breakpoints";
 import { toast } from "sonner";
+import { PaymentMethodPicker } from "@/components/ui/payment-method";
+import {
+  getPaymentMethodDefinition,
+  paymentMethodLabel,
+} from "@/lib/payments/payment-methods";
 
 export const Route = createFileRoute("/_app/purchases")({
   head: () => ({ meta: [{ title: "Purchases — Vortex ERP" }] }),
@@ -163,17 +168,8 @@ function PurchasesPage() {
    * does not invalidate the filter memo on every render.
    */
   const pmLabel = useCallback(
-    (m: string) => {
-      const map: Record<string, string> = {
-        cash: t("pos.pm.cash"),
-        card: t("pos.pm.card"),
-        bank_transfer: t("pos.pm.bank"),
-        bank: t("pos.pm.bank"),
-        credit: t("pos.pm.credit"),
-      };
-      return map[m] ?? m;
-    },
-    [t],
+    (m: string) => paymentMethodLabel(m, lang === "ar" ? "ar" : "en"),
+    [lang],
   );
   const statusLabel = useCallback(
     (s: string) => {
@@ -1110,9 +1106,7 @@ function CreateDialog({
   const [cart, setCart] = useState<CartLine[]>([]);
   const [paid, setPaid] = useState("");
   const [discount, setDiscount] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "bank_transfer" | "credit">(
-    "bank_transfer",
-  );
+  const [paymentMethod, setPaymentMethod] = useState<string>("bank_transfer");
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
   const productLabel = (p?: Pick<Product, "name" | "name_ar"> | null) =>
@@ -1270,7 +1264,7 @@ function CreateDialog({
     }
   }
 
-  const pmKey = (m: string) => (m === "bank_transfer" ? t("pos.pm.bank") : t(`pos.pm.${m}`));
+  const pmKey = (m: string) => paymentMethodLabel(m, lang === "ar" ? "ar" : "en");
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur-sm p-4">
@@ -1438,18 +1432,27 @@ function CreateDialog({
 
         <div className="mt-4 grid grid-cols-2 gap-3 border-t border-border pt-3 text-sm">
           <div className="space-y-2">
-            <div className="grid grid-cols-4 gap-1">
-              {(["cash", "card", "bank_transfer", "credit"] as const).map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setPaymentMethod(m)}
-                  className={`h-8 rounded-md border text-xs transition ${paymentMethod === m ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-surface-2"}`}
-                >
-                  {pmKey(m)}
-                </button>
-              ))}
-            </div>
-            {paymentMethod !== "credit" && (
+            {/*
+              طريقة دفع المشتريات — المكوّن الموحّد.
+
+              These four hard-coded buttons were a fourth, independent copy of
+              the payment-method list. The picker now offers whatever the
+              business enabled for purchases, and آجل appears only because the
+              catalogue allows it here.
+            */}
+            <PaymentMethodPicker
+              context="purchases"
+              value={paymentMethod}
+              onChange={(method) => {
+                setPaymentMethod(method);
+                const definition = getPaymentMethodDefinition(method);
+                if (definition?.isCreditTerm) setPaid("0");
+              }}
+              ensureIds={[paymentMethod]}
+              ariaLabel={t("common.method")}
+              lang={lang === "ar" ? "ar" : "en"}
+            />
+            {!(getPaymentMethodDefinition(paymentMethod)?.isCreditTerm ?? false) && (
               <input
                 type="number"
                 value={paid}
