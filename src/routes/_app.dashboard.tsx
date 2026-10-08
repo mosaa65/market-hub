@@ -29,7 +29,7 @@ import {
   Sunrise,
   Crown,
   ShieldCheck,
-  Calendar as CalendarIcon,
+  Calendar as CalendarIcon, CalendarDays,
   Clock,
   ArrowLeft,
   ChevronLeft,
@@ -331,100 +331,209 @@ function DashboardPage() {
         }
       />
 
-      {/* Executive Command Center / Hero Card — Reimagined as an Integrated Business Command Deck */}
-      <div className="relative mb-6 overflow-hidden rounded-3xl border border-border/80 bg-gradient-to-b from-card via-card/95 to-surface-2/40 shadow-panel backdrop-blur-xl">
-        {/* Subtle Architectural Ambient Accents */}
-        <div className="pointer-events-none absolute -top-32 -end-24 size-96 rounded-full bg-primary/10 blur-3xl opacity-60" />
-        <div className="pointer-events-none absolute -bottom-32 -start-24 size-80 rounded-full bg-emerald-500/10 blur-3xl opacity-40" />
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
+      {/* ═══════════════════════════════════════════════════════════════════════
+          EXECUTIVE COMMAND DECK — MODULAR ARCHITECTURE (HERO + CALENDAR + VITALS)
+          ═══════════════════════════════════════════════════════════════════════ */}
+      <div className="mb-6 space-y-4">
+        {/* Top Deck: Executive Identity + Luxury Chronos Calendar */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 items-stretch">
+          
+          {/* Card 1: Executive Welcome & System Status (7 cols on Desktop) */}
+          <div className="relative overflow-hidden rounded-3xl border border-border/80 bg-gradient-to-br from-card via-card/95 to-surface-2/60 p-5 sm:p-6 lg:col-span-7 shadow-panel backdrop-blur-xl flex flex-col justify-between">
+            {/* Ambient Lighting */}
+            <div className="pointer-events-none absolute -top-24 -start-24 size-72 rounded-full bg-primary/10 blur-3xl opacity-70" />
+            <div className="pointer-events-none absolute -bottom-24 -end-24 size-64 rounded-full bg-emerald-500/10 blur-3xl opacity-50" />
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
 
-        {/* ─── Layer 1: Identity Horizon & Chronos Capsule ─── */}
-        <div className="relative flex flex-col gap-4 p-3.5 sm:p-6 lg:flex-row lg:items-center lg:justify-between border-b border-border/50 overflow-hidden w-full">
-          {/* Executive Identity & Status */}
-          <div className="flex items-center gap-4">
-            <div className="relative shrink-0">
-              {profile?.avatar_url ? (
-                <img
-                  src={profile.avatar_url}
-                  alt={userName}
-                  className="size-14 sm:size-16 rounded-2xl object-cover ring-2 ring-primary/20 shadow-md shadow-primary/10"
-                />
-              ) : (
-                <div className="grid size-14 sm:size-16 place-items-center rounded-2xl bg-gradient-to-tr from-primary/90 via-primary to-primary/75 text-primary-foreground font-black text-xl sm:text-2xl shadow-md shadow-primary/20 ring-1 ring-primary/40">
-                  {userName ? userName.charAt(0).toUpperCase() : "V"}
-                </div>
-              )}
-              {/* Telemetry Radar Ping */}
-              <span className="absolute -bottom-1 -end-1 flex size-4 items-center justify-center" title={isAr ? "متصل ومباشر" : "Live"}>
-                <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-70" />
-                <span className="relative inline-flex size-3 rounded-full bg-emerald-500 ring-2 ring-card" />
-              </span>
-            </div>
-
-            <div className="space-y-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold text-primary">
-                  <GreetingIcon className={`size-3.5 ${greeting.color}`} />
-                  <span>{greeting.badge}</span>
-                </span>
-                <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${roleMeta.badgeCls}`}>
-                  <span>{roleMeta.label}</span>
-                </span>
-                <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-                  <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>{isAr ? "نظام فورتكس مباشر ومتزامن" : "Vortex Live & Synced"}</span>
+            {/* Header Content */}
+            <div className="relative flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-5">
+              {/* User Avatar with Pulse Radar */}
+              <div className="relative shrink-0">
+                {profile?.avatar_url ? (
+                  <img
+                    src={profile.avatar_url}
+                    alt={userName}
+                    className="size-16 sm:size-18 rounded-2xl object-cover ring-2 ring-primary/25 shadow-md shadow-primary/15"
+                  />
+                ) : (
+                  <div className="grid size-16 sm:size-18 place-items-center rounded-2xl bg-gradient-to-tr from-primary/90 via-primary to-primary/75 text-primary-foreground font-black text-2xl sm:text-3xl shadow-lg shadow-primary/20 ring-1 ring-primary/40">
+                    {userName ? userName.charAt(0).toUpperCase() : "V"}
+                  </div>
+                )}
+                <span className="absolute -bottom-1 -end-1 flex size-4.5 items-center justify-center" title={isAr ? "متصل ومباشر" : "Live"}>
+                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-70" />
+                  <span className="relative inline-flex size-3.5 rounded-full bg-emerald-500 ring-2 ring-card" />
                 </span>
               </div>
 
-              <h2 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-foreground flex items-center gap-2">
-                <span>{greeting.title}،</span>
-                <span className="text-primary">
-                  {userName}
-                </span>
-              </h2>
+              {/* Identity & Badges */}
+              <div className="space-y-1.5 min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold text-primary shadow-xs">
+                    <GreetingIcon className={`size-3.5 ${greeting.color}`} />
+                    <span>{greeting.badge}</span>
+                  </span>
+                  <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-bold shadow-xs ${roleMeta.badgeCls}`}>
+                    <span>{roleMeta.label}</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                    <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>{isAr ? "نظام متزامن لحظياً" : "Realtime Active"}</span>
+                  </span>
+                </div>
 
-              <p className="text-xs text-muted-foreground font-medium">
-                {isAr
-                  ? "مركز القيادة المباشر • ملخص الإيرادات والسيولة وتنبيهات المنشأة"
-                  : "Command Center • Real-time revenue, liquidity & operational alerts"}
-              </p>
+                <h2 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-foreground flex items-center gap-2 flex-wrap">
+                  <span className="text-muted-foreground font-semibold">{greeting.title}،</span>
+                  <span className="text-primary font-black">{userName}</span>
+                </h2>
+
+                <p className="text-xs sm:text-[13px] text-muted-foreground font-medium leading-relaxed">
+                  {isAr
+                    ? "مركز العمليات المتكامل • متابعة لحظية لحركة المبيعات، المخزون، والسيولة النقدية"
+                    : "Integrated Operations Deck • Live tracking of sales, inventory & market liquidity"}
+                </p>
+              </div>
+            </div>
+
+            {/* Fast Launchers Dock */}
+            <div className="relative mt-5 pt-4 border-t border-border/50 flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-semibold text-muted-foreground/80 me-1">
+                {isAr ? "إطلاق سريع:" : "Fast Actions:"}
+              </span>
+
+              <Link
+                to="/pos"
+                className="inline-flex h-8 sm:h-8.5 items-center gap-2 rounded-xl bg-primary px-3 text-xs font-bold text-primary-foreground shadow-xs hover:bg-primary/90 transition-all active:scale-95"
+              >
+                <Zap className="size-3.5" />
+                <span>{lang === "ar" ? "نقطة البيع (POS)" : "Open POS"}</span>
+                <kbd className="hidden sm:inline-block rounded bg-primary-foreground/20 px-1 py-0.2 text-[9px] font-mono">F2</kbd>
+              </Link>
+
+              <Link
+                to="/sales"
+                className="inline-flex h-8 sm:h-8.5 items-center gap-1.5 rounded-xl border border-border/80 bg-surface/80 px-2.5 text-xs font-semibold text-foreground hover:bg-surface-2 transition-all active:scale-95"
+              >
+                <Receipt className="size-3.5 text-muted-foreground" />
+                <span>{lang === "ar" ? "الفواتير" : "Invoices"}</span>
+              </Link>
+
+              <Link
+                to="/debts"
+                className="inline-flex h-8 sm:h-8.5 items-center gap-1.5 rounded-xl border border-border/80 bg-surface/80 px-2.5 text-xs font-semibold text-foreground hover:bg-surface-2 transition-all active:scale-95"
+              >
+                <Wallet className="size-3.5 text-amber-500" />
+                <span>{lang === "ar" ? "التحصيل والديون" : "Debts"}</span>
+              </Link>
+
+              <Link
+                to={"/products" as any}
+                search={({ barcode: undefined } as any)}
+                className="inline-flex h-8 sm:h-8.5 items-center gap-1.5 rounded-xl border border-border/80 bg-surface/80 px-2.5 text-xs font-semibold text-foreground hover:bg-surface-2 transition-all active:scale-95"
+              >
+                <Package className="size-3.5 text-muted-foreground" />
+                <span>{lang === "ar" ? "المنتجات" : "Products"}</span>
+              </Link>
+
+              {isModuleEnabled("analytics") && (
+                <Link
+                  to="/analytics"
+                  className="ms-auto inline-flex h-8 sm:h-8.5 items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-3 text-xs font-bold text-primary hover:bg-primary/20 transition-all active:scale-95"
+                >
+                  <Sparkles className="size-3.5" />
+                  <span>{lang === "ar" ? "التحليلات الذكية" : "Analytics"}</span>
+                </Link>
+              )}
             </div>
           </div>
 
-          {/* Architectural Chronos Horizon Widget */}
-          <div className="flex items-center self-stretch sm:self-auto justify-between sm:justify-end">
+          {/* Card 2: Luxury Executive Chronos & Calendar Card (5 cols on Desktop) */}
+          <div className="relative overflow-hidden rounded-3xl border border-border/80 bg-gradient-to-br from-card via-surface/90 to-surface-2/40 p-5 sm:p-6 lg:col-span-5 shadow-panel backdrop-blur-xl flex flex-col justify-between">
+            {/* Ambient Lighting */}
+            <div className="pointer-events-none absolute -top-20 -end-20 size-60 rounded-full bg-chart-4/10 blur-3xl opacity-60" />
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-chart-4/30 to-transparent" />
+
             {(() => {
               const luxuryDate = formatLuxuryDate(now, { showDayName: true, showYear: true });
+              const currentDayOfWeek = now.getDay(); // 0 is Sunday, 6 is Saturday
+              // Construct a 7-day strip centered or matching Arab week starting Saturday (6, 0, 1, 2, 3, 4, 5)
+              const weekDaysAr = ["السبت", "الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة"];
+              const weekDaysEn = ["Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri"];
+              const dayIndices = [6, 0, 1, 2, 3, 4, 5];
+
               return (
-                <div className="flex flex-wrap sm:flex-nowrap w-full sm:w-auto items-stretch rounded-2xl border border-border/80 bg-surface/70 shadow-xs backdrop-blur-md overflow-hidden">
-                  {/* Date Pillar */}
-                  <div className="flex items-center gap-3 px-3.5 py-2.5">
-                    <div className="grid place-items-center min-w-[2.4rem] h-10 rounded-xl bg-primary/10 text-primary font-mono font-black text-xl leading-none">
-                      {luxuryDate.day}
+                <div className="space-y-4">
+                  {/* Top Bar: Date Pillar + Digital Clock */}
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="grid place-items-center size-13 sm:size-14 rounded-2xl bg-gradient-to-br from-primary/15 via-primary/10 to-primary/5 border border-primary/20 text-primary font-mono font-black text-2xl sm:text-3xl shadow-inner leading-none">
+                        {luxuryDate.day}
+                      </div>
+                      <div className="space-y-0.5">
+                        <span className="block text-sm sm:text-base font-black text-foreground">
+                          {luxuryDate.weekday}
+                        </span>
+                        <span className="block text-xs font-semibold text-muted-foreground font-mono">
+                          {luxuryDate.month} {luxuryDate.year}
+                        </span>
+                      </div>
                     </div>
-                    <div className="space-y-0.5">
-                      <span className="block text-xs font-bold text-foreground">
-                        {luxuryDate.weekday}
-                      </span>
-                      <span className="block text-[11px] text-muted-foreground font-medium font-mono">
-                        {luxuryDate.month} {luxuryDate.year}
-                      </span>
+
+                    {/* Digital Clock Pillar */}
+                    <div className="rounded-2xl border border-border/80 bg-surface-2/50 px-3.5 py-2 text-end shadow-xs backdrop-blur-md">
+                      <div className="flex items-center gap-1.5 text-sm sm:text-base font-black font-mono text-foreground justify-end tracking-wider">
+                        <Clock className="size-3.5 text-primary animate-pulse" />
+                        <span>
+                          {now.toLocaleTimeString(isAr ? "ar-YE" : "en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 text-[10px] text-muted-foreground font-semibold justify-end">
+                        <Radio className="size-2.5 text-emerald-500 animate-pulse" />
+                        <span>{isAr ? "توقيت النظام (GMT+3)" : "System Time (GMT+3)"}</span>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Vertical Hairline Divider */}
-                  <div className="w-px bg-border/60 self-center h-8" />
+                  {/* Elegant Weekday Agenda Strip */}
+                  <div className="rounded-2xl border border-border/60 bg-surface/50 p-2 backdrop-blur-xs">
+                    <div className="grid grid-cols-7 gap-1 text-center">
+                      {dayIndices.map((dayIdx, i) => {
+                        const isToday = dayIdx === currentDayOfWeek;
+                        const label = isAr ? weekDaysAr[i] : weekDaysEn[i];
+                        return (
+                          <div
+                            key={dayIdx}
+                            className={`flex flex-col items-center justify-center rounded-xl py-1.5 px-0.5 transition-all ${
+                              isToday
+                                ? "bg-primary text-primary-foreground font-bold shadow-sm scale-102 ring-2 ring-primary/30"
+                                : "text-muted-foreground hover:bg-surface-2/60"
+                            }`}
+                          >
+                            <span className="text-[10px] font-medium leading-none mb-1">
+                              {label.slice(0, 3)}
+                            </span>
+                            <span className={`text-xs font-mono font-bold leading-none ${isToday ? "text-primary-foreground" : "text-foreground"}`}>
+                              {isToday ? luxuryDate.day : "•"}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
 
-                  {/* Time & Telemetry Pillar */}
-                  <div className="flex flex-col justify-center px-3.5 py-2.5 space-y-0.5 text-end">
-                    <div className="flex items-center gap-1.5 text-xs font-bold font-mono text-foreground justify-end">
-                      <Clock className="size-3 text-primary" />
-                      <span>{now.toLocaleTimeString(isAr ? "ar-YE" : "en-US", { hour: "2-digit", minute: "2-digit" })}</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground font-medium justify-end">
-                      <Radio className="size-2.5 text-emerald-500 animate-pulse" />
-                      <span>{isAr ? "مزامنة لحظية" : "Realtime"}</span>
-                    </div>
+                  {/* Calendar Footer Info */}
+                  <div className="flex items-center justify-between text-xs pt-1 text-muted-foreground">
+                    <span className="flex items-center gap-1.5 font-medium">
+                      <CalendarDays className="size-3.5 text-primary" />
+                      <span>{isAr ? "سجل النشاط اليومي واليومية" : "Daily Activity Journal"}</span>
+                    </span>
+                    <Link
+                      to="/daily-journal"
+                      className="text-[11px] font-bold text-primary hover:underline flex items-center gap-0.5"
+                    >
+                      {isAr ? "استعراض اليومية" : "View Journal"}
+                      <ChevronLeft className="size-3 rtl:rotate-0 rotate-180" />
+                    </Link>
                   </div>
                 </div>
               );
@@ -432,9 +541,9 @@ function DashboardPage() {
           </div>
         </div>
 
-        {/* ─── Layer 2: Integrated Business Vitals Deck (Single-Surface, No Box Clutter) ─── */}
+        {/* Bottom Deck: Executive Business Vitals & Real-Time Pulse (3 Independent Visual Cards) */}
         {data && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x sm:divide-x-reverse divide-border/50 bg-surface/30">
+          <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-3">
             {(() => {
               const todayDaily = data.daily ? data.daily[data.daily.length - 1] : null;
               const todayRev = todayDaily?.revenue ?? 0;
@@ -444,55 +553,72 @@ function DashboardPage() {
 
               return (
                 <>
-                  {/* Vital 1: Sales Velocity */}
-                  <div className="p-4 sm:p-5 flex flex-col justify-between transition-colors hover:bg-surface/50">
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span className="font-semibold text-foreground flex items-center gap-1.5">
-                        <TrendingUp className="size-3.5 text-primary" />
-                        {isAr ? "مبيعات اليوم المسجلة" : "Today Recorded Sales"}
-                      </span>
-                      <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-                        {isAr ? "تدفق حي" : "Live stream"}
+                  {/* Vital Card 1: Today Recorded Sales Velocity */}
+                  <div className="relative overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-br from-card via-card/95 to-surface-2/40 p-4.5 shadow-sm transition-all hover:shadow-md hover:border-primary/40 group">
+                    <div className="pointer-events-none absolute top-0 end-0 size-24 bg-primary/10 rounded-full blur-xl group-hover:bg-primary/15 transition-all" />
+                    <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="grid size-8 place-items-center rounded-xl bg-primary/10 text-primary border border-primary/20">
+                          <TrendingUp className="size-4" />
+                        </div>
+                        <span className="font-bold text-foreground text-xs sm:text-sm">
+                          {isAr ? "تدفق مبيعات اليوم" : "Today Inflow"}
+                        </span>
+                      </div>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                        <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span>{isAr ? "مباشر" : "Live"}</span>
                       </span>
                     </div>
-                    <div className="mt-2 flex items-baseline justify-between gap-2">
+
+                    <div className="mt-2.5 flex items-baseline justify-between gap-2">
                       <span className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-foreground">
                         {money(todayRev)}
                       </span>
                     </div>
-                    <div className="mt-1.5 flex items-center justify-between text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
+
+                    <div className="mt-2 pt-2 border-t border-border/50 flex items-center justify-between text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1 text-[11px] font-medium">
                         <ShoppingCart className="size-3 text-muted-foreground/70" />
-                        <span>{num(todayOrd)} {isAr ? "فواتير اليوم" : "orders today"}</span>
+                        <span>{num(todayOrd)} {isAr ? "فواتير مسجلة اليوم" : "orders recorded"}</span>
                       </span>
                       <Link
                         to="/sales"
                         className="text-[11px] font-bold text-primary hover:underline flex items-center gap-0.5"
                       >
-                        {isAr ? "عرض السجل" : "View log"}
+                        {isAr ? "سجل المبيعات" : "Sales log"}
                         <ChevronLeft className="size-3 rtl:rotate-0 rotate-180" />
                       </Link>
                     </div>
                   </div>
 
-                  {/* Vital 2: Liquidity & Receivables */}
-                  <div className="p-4 sm:p-5 flex flex-col justify-between transition-colors hover:bg-surface/50">
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span className="font-semibold text-foreground flex items-center gap-1.5">
-                        <Wallet className="size-3.5 text-amber-500" />
-                        {isAr ? "المستحقات المفتوحة بالسوق" : "Market Receivables"}
-                      </span>
-                      <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400">
-                        {isAr ? "تحصيل" : "To collect"}
+                  {/* Vital Card 2: Market Liquidity & Receivables Exposure */}
+                  <div className="relative overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-br from-card via-card/95 to-surface-2/40 p-4.5 shadow-sm transition-all hover:shadow-md hover:border-amber-500/40 group">
+                    <div className="pointer-events-none absolute top-0 end-0 size-24 bg-amber-500/10 rounded-full blur-xl group-hover:bg-amber-500/15 transition-all" />
+                    <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="grid size-8 place-items-center rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                          <Wallet className="size-4" />
+                        </div>
+                        <span className="font-bold text-foreground text-xs sm:text-sm">
+                          {isAr ? "مستحقات السوق والذمم" : "Receivables & Market"}
+                        </span>
+                      </div>
+                      <span className="rounded-full bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                        {isAr ? "واجب التحصيل" : "To Collect"}
                       </span>
                     </div>
-                    <div className="mt-2 flex items-baseline justify-between gap-2">
+
+                    <div className="mt-2.5 flex items-baseline justify-between gap-2">
                       <span className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-foreground">
                         {money(rec)}
                       </span>
                     </div>
-                    <div className="mt-1.5 flex items-center justify-between text-xs text-muted-foreground">
-                      <span>{isAr ? "ديون مستحقة على العملاء" : "Outstanding customer balances"}</span>
+
+                    <div className="mt-2 pt-2 border-t border-border/50 flex items-center justify-between text-xs text-muted-foreground">
+                      <span className="text-[11px] font-medium">
+                        {isAr ? "أرصدة عملاء قائمة بالسوق" : "Outstanding customer balances"}
+                      </span>
                       <Link
                         to="/debts"
                         className="text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-0.5"
@@ -503,45 +629,52 @@ function DashboardPage() {
                     </div>
                   </div>
 
-                  {/* Vital 3: Operational Attention Radar (What Needs Attention Now) */}
-                  <div className="p-4 sm:p-5 flex flex-col justify-between transition-colors hover:bg-surface/50 sm:col-span-2 lg:col-span-1">
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span className="font-semibold text-foreground flex items-center gap-1.5">
-                        <Activity className="size-3.5 text-primary" />
-                        {isAr ? "رادار الانتباه الفوري" : "Attention Radar"}
-                      </span>
-                      <span className="text-[10px] font-mono text-muted-foreground font-semibold">
-                        {isAr ? "المخزون والتشغيل" : "Inventory & Ops"}
+                  {/* Vital Card 3: Supply Chain Readiness & Critical Stock */}
+                  <div className="relative overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-br from-card via-card/95 to-surface-2/40 p-4.5 shadow-sm transition-all hover:shadow-md hover:border-chart-4/40 group sm:col-span-2 lg:col-span-1">
+                    <div className="pointer-events-none absolute top-0 end-0 size-24 bg-chart-4/10 rounded-full blur-xl group-hover:bg-chart-4/15 transition-all" />
+                    <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="grid size-8 place-items-center rounded-xl bg-primary/10 text-primary border border-primary/20">
+                          <Activity className="size-4" />
+                        </div>
+                        <span className="font-bold text-foreground text-xs sm:text-sm">
+                          {isAr ? "جاهزية المخزون وسلاسل الإمداد" : "Stock Readiness & Ops"}
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-mono font-semibold text-muted-foreground">
+                        {isAr ? "فحص آلي" : "Auto Check"}
                       </span>
                     </div>
-                    <div className="mt-2 flex items-center gap-2.5">
+
+                    <div className="mt-2.5 flex items-center gap-2">
                       {alerts > 0 ? (
-                        <div className="flex items-center gap-2 rounded-xl bg-rose-500/10 border border-rose-500/20 px-3 py-1.5 text-rose-600 dark:text-rose-400">
+                        <div className="flex items-center gap-2 rounded-xl bg-rose-500/10 border border-rose-500/20 px-3 py-1.5 text-rose-600 dark:text-rose-400 w-full">
                           <AlertTriangle className="size-4 shrink-0 animate-bounce" />
-                          <span className="text-xs sm:text-sm font-bold">
-                            {alerts} {isAr ? "أصناف أوشكت على النفاد" : "items below safety stock"}
+                          <span className="text-xs sm:text-sm font-bold truncate">
+                            {alerts} {isAr ? "أصناف دون حد الأمان" : "items below reorder point"}
                           </span>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 text-emerald-600 dark:text-emerald-400">
+                        <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 text-emerald-600 dark:text-emerald-400 w-full">
                           <CheckCircle2 className="size-4 shrink-0" />
-                          <span className="text-xs sm:text-sm font-bold">
-                            {isAr ? "المستودعات متزنة ومستقرة تماماً" : "All warehouses at optimal level"}
+                          <span className="text-xs sm:text-sm font-bold truncate">
+                            {isAr ? "المستودعات متزنة وفي النطاق الآمن" : "Warehouses optimal"}
                           </span>
                         </div>
                       )}
                     </div>
-                    <div className="mt-1.5 flex items-center justify-between text-xs text-muted-foreground">
-                      <span>
+
+                    <div className="mt-2 pt-2 border-t border-border/50 flex items-center justify-between text-xs text-muted-foreground">
+                      <span className="text-[11px] font-medium truncate">
                         {alerts > 0
-                          ? (isAr ? "تحتاج لإصدار أمر شراء سريع" : "Purchase order recommended")
-                          : (isAr ? "لا توجد نواقص حرجة تتطلب تدخلاً" : "No critical stock deficits")}
+                          ? (isAr ? "تتطلب إصدار أمر شراء أو تحويل" : "Reorder or transfer needed")
+                          : (isAr ? "لا توجد نواقص حرجة تتطلب تدخلاً" : "All safety limits honored")}
                       </span>
                       <Link
                         to="/inventory"
-                        className="text-[11px] font-bold text-primary hover:underline flex items-center gap-0.5"
+                        className="text-[11px] font-bold text-primary hover:underline flex items-center gap-0.5 shrink-0"
                       >
-                        {isAr ? "فحص المستودع" : "Inspect"}
+                        {isAr ? "فحص المستودعات" : "Inspect"}
                         <ChevronLeft className="size-3 rtl:rotate-0 rotate-180" />
                       </Link>
                     </div>
@@ -551,58 +684,6 @@ function DashboardPage() {
             })()}
           </div>
         )}
-
-        {/* ─── Layer 3: Command Flight Deck & Deep Analytics Gateway ─── */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3.5 sm:p-4.5 bg-card/80 border-t border-border/60">
-          {/* Fast Operational Launchers */}
-          <div className="flex flex-wrap items-center gap-2">
-            <Link
-              to="/pos"
-              className="inline-flex h-9 items-center gap-2 rounded-xl bg-primary px-3.5 text-xs font-bold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all active:scale-95"
-            >
-              <Zap className="size-3.5" />
-              <span>{lang === "ar" ? "نقطة البيع (POS)" : "Open POS"}</span>
-              <kbd className="hidden md:inline-block rounded bg-primary-foreground/20 px-1 py-0.2 text-[9px] font-mono">F2</kbd>
-            </Link>
-
-            <Link
-              to="/sales"
-              className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-border/80 bg-surface/70 px-3 text-xs font-semibold text-foreground hover:bg-surface-2 transition-all active:scale-95"
-            >
-              <Receipt className="size-3.5 text-muted-foreground" />
-              <span>{lang === "ar" ? "فواتير المبيعات" : "Invoices"}</span>
-            </Link>
-
-            <Link
-              to="/debts"
-              className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-border/80 bg-surface/70 px-3 text-xs font-semibold text-foreground hover:bg-surface-2 transition-all active:scale-95"
-            >
-              <Wallet className="size-3.5 text-muted-foreground" />
-              <span>{lang === "ar" ? "الديون والتحصيل" : "Debts"}</span>
-            </Link>
-
-            <Link
-              to="/products"
-              search={{ barcode: undefined }}
-              className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-border/80 bg-surface/70 px-3 text-xs font-semibold text-foreground hover:bg-surface-2 transition-all active:scale-95"
-            >
-              <Package className="size-3.5 text-muted-foreground" />
-              <span>{lang === "ar" ? "كتالوج المنتجات" : "Products"}</span>
-            </Link>
-          </div>
-
-          {/* Deep Intelligence & Advanced Analytics Portal */}
-          {isModuleEnabled("analytics") && (
-            <Link
-              to="/analytics"
-              className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-4 text-xs font-bold text-primary hover:bg-primary/20 hover:border-primary/50 transition-all active:scale-95 shadow-xs"
-            >
-              <Sparkles className="size-3.5 text-primary" />
-              <span>{lang === "ar" ? "التحليلات والتوقعات المتقدمة" : "Advanced Analytics & Forecasts"}</span>
-              <ArrowLeft className="size-3.5 rtl:rotate-0 rotate-180" />
-            </Link>
-          )}
-        </div>
       </div>
 
       {/* Modern Vortex Metric Cards Grid - 2 cards per row on mobile */}
