@@ -1,5 +1,4 @@
 import { InvoiceTemplateId, PrintSettings } from "./types";
-import { supabase } from "@/integrations/supabase/client";
 
 export const DEFAULT_PRINT_SETTINGS: PrintSettings = {
   defaultCustomerTemplate: "thermal",
@@ -128,27 +127,6 @@ export function savePrintSettings(settings: Partial<PrintSettings>): PrintSettin
       // Sync legacy keys so older screens (settings page, POS) stay consistent
       localStorage.setItem(LEGACY_TEMPLATE_KEY, updated.defaultCustomerTemplate);
       localStorage.setItem(LEGACY_MODE_KEY, updated.printMode);
-
-      // Sync to Supabase company_settings for server-wide persistence
-      (supabase as any)
-        .from("company_settings")
-        .select("catalog_modules")
-        .eq("id", 1)
-        .maybeSingle()
-        .then(({ data }: any) => {
-          if (data) {
-            const currentCatalog = (data.catalog_modules as Record<string, any>) || {};
-            const updatedCatalog = { ...currentCatalog, printSettings: updated };
-            return (supabase as any)
-              .from("company_settings")
-              .update({ catalog_modules: updatedCatalog })
-              .eq("id", 1);
-          }
-        })
-        .then(
-          () => {},
-          (err: any) => console.warn("[print-settings] Cloud sync warning:", err),
-        );
     } catch (err) {
       console.error("Failed to save print settings:", err);
     }

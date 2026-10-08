@@ -108,7 +108,7 @@ export async function fetchSellableProducts(warehouseId?: string) {
 
   // Stock on hand, when a warehouse is known, so the operator sees what can
   // actually leave today rather than discovering it at posting time.
-  let onHand: Record<string, number> = {};
+  const onHand: Record<string, number> = {};
   if (warehouseId) {
     const { data: inv } = await db
       .from("stock_positions")
@@ -187,21 +187,21 @@ export async function createSalesInvoice(
     const items = input.lines.map((l) =>
       l.kind === "service"
         ? {
-          product_id: null,
-          quantity: Number(l.quantity),
-          unit_price: Number(l.unit_price),
-          tax_rate: Number(l.tax_rate ?? 0),
-          is_service: true,
-          name: l.name,
-        }
+            product_id: null,
+            quantity: Number(l.quantity),
+            unit_price: Number(l.unit_price),
+            tax_rate: Number(l.tax_rate ?? 0),
+            is_service: true,
+            name: l.name,
+          }
         : {
-          product_id: l.product_id,
-          quantity: Number(l.quantity),
-          unit_price: Number(l.unit_price),
-          tax_rate: Number(l.tax_rate),
-          is_service: false,
-          name: l.name,
-        },
+            product_id: l.product_id,
+            quantity: Number(l.quantity),
+            unit_price: Number(l.unit_price),
+            tax_rate: Number(l.tax_rate),
+            is_service: false,
+            name: l.name,
+          },
     );
 
     // A credit sale collects nothing; every other method records what was

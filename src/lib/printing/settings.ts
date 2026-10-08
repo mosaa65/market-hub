@@ -89,3 +89,17 @@ export function saveUnifiedPrintSettings(
   if (typeof window !== "undefined") localStorage.setItem(PRINT_SETTINGS_KEY, JSON.stringify(next));
   return next;
 }
+
+/**
+ * Persist the current user's device-level printing preference only after an
+ * explicit save action. The settings store is intentionally local: printing
+ * behavior belongs to the signed-in operator/device, not the whole company.
+ */
+export function commitPrintSettings(settings: UnifiedPrintSettings): UnifiedPrintSettings {
+  const next = normalizePrintSettings(settings);
+  if (typeof window !== "undefined") {
+    localStorage.setItem(PRINT_SETTINGS_KEY, JSON.stringify(next));
+    localStorage.setItem("vortex_print_settings", JSON.stringify(next));
+  }
+  return next;
+}

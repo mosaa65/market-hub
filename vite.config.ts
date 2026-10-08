@@ -2,6 +2,10 @@ import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
+  server: {
+    host: "0.0.0.0",
+    port: 3000,
+  },
   plugins: [
     VitePWA({
       registerType: "autoUpdate",

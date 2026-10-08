@@ -41,7 +41,7 @@ import { useModules } from "@/lib/modules";
 import { money } from "@/lib/format";
 import { toSystemDigits } from "@/lib/format-preferences";
 import { generateInvoicePDF, type InvoiceDoc } from "@/lib/pdf";
-import { printInvoice, type InvoiceTemplate } from "@/lib/invoice-print";
+import { LuxuryPrintPreviewModal } from "@/components/luxury-print-preview-modal";
 import {
   VortexMetricCard,
   VortexSearchInput,
@@ -156,7 +156,7 @@ export function SalesPage() {
   const [selected, setSelected] = useState<Invoice | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
   const [loadingLines, setLoadingLines] = useState(false);
-  const [printOpen, setPrintOpen] = useState(false);
+  const [printDoc, setPrintDoc] = useState<InvoiceDoc | null>(null);
   const [copiedInvoiceId, setCopiedInvoiceId] = useState<string | null>(null);
 
   // Quick Collection Sheet State
@@ -271,6 +271,27 @@ export function SalesPage() {
       if (!error) {
         setLines((data ?? []) as any);
       }
+    } finally {
+      setLoadingLines(false);
+    }
+  }
+
+  async function openPrintPreview(inv: Invoice) {
+    setSelected(inv);
+    setLoadingLines(true);
+    try {
+      const { data, error } = await supabase
+        .from("sales_invoice_items")
+        .select("id,quantity,unit_price,tax,total,line_type,stock_effect,products(name,name_ar,sku)")
+        .eq("invoice_id", inv.id);
+      if (error) throw error;
+
+      const invoiceLines = (data ?? []) as any as Line[];
+      setLines(invoiceLines);
+      const doc = await buildDoc(inv, invoiceLines);
+      if (doc) setPrintDoc(doc);
+    } catch {
+      toast.error(isRtl ? "تعذر تحميل بنود الفاتورة للطباعة" : "Could not load invoice items for printing.");
     } finally {
       setLoadingLines(false);
     }
@@ -501,29 +522,32 @@ export function SalesPage() {
   };
 
   // Build Invoice Document for Print & PDF
-  async function buildDoc(): Promise<InvoiceDoc | null> {
-    if (!selected) return null;
+  async function buildDoc(
+    invoice: Invoice | null = selected,
+    invoiceLines: Line[] = lines,
+  ): Promise<InvoiceDoc | null> {
+    if (!invoice) return null;
     const { data: cs } = await supabase.from("company_settings").select("*").limit(1).maybeSingle();
     return {
       title: isRtl ? "فاتورة مبيعات ضريبية" : "Tax Sales Invoice",
-      number: selected.invoice_number,
-      date: new Date(selected.created_at).toLocaleString(isRtl ? "ar-EG" : "en-US"),
+      number: invoice.invoice_number,
+      date: new Date(invoice.created_at).toLocaleString(isRtl ? "ar-EG" : "en-US"),
       partyLabel: isRtl ? "العميل / المشترى:" : "Bill To:",
-      partyName: selected.customers?.name ?? (isRtl ? "عميل نقدي" : "Walk-in"),
-      warehouse: hasMultiWarehouse ? (whName(selected.warehouses) ?? undefined) : undefined,
-      payment: pmLabel(selected.payment_method, selected.note),
-      status: statusLabel(selected.status),
-      lines: lines.map((l) => ({
+      partyName: invoice.customers?.name ?? (isRtl ? "عميل نقدي" : "Walk-in"),
+      warehouse: hasMultiWarehouse ? (whName(invoice.warehouses) ?? undefined) : undefined,
+      payment: pmLabel(invoice.payment_method, invoice.note),
+      status: statusLabel(invoice.status),
+      lines: invoiceLines.map((l) => ({
         product: l.products?.name_ar || l.products?.name || "—",
         qty: Number(l.quantity),
         price: Number(l.unit_price),
         total: Number(l.total),
       })),
-      subtotal: Number(selected.subtotal),
-      tax: Number(selected.tax),
-      discount: Number(selected.discount),
-      total: Number(selected.total),
-      paid: Number(selected.paid),
+      subtotal: Number(invoice.subtotal),
+      tax: Number(invoice.tax),
+      discount: Number(invoice.discount),
+      total: Number(invoice.total),
+      paid: Number(invoice.paid),
       company: cs
         ? {
             // Company Profile only — never invent a company name or phone.
@@ -539,37 +563,6 @@ export function SalesPage() {
       currency:
         (cs as any)?.currency_symbol?.trim() || (cs as any)?.currency || (isRtl ? "ريال" : ""),
     };
-  }
-
-  async function doPrint(template: InvoiceTemplate) {
-    const doc = await buildDoc();
-    if (!doc) return;
-    printInvoice(
-      doc,
-      template,
-      {
-        invoice: isRtl ? "فاتورة مبيعات" : "Sales Invoice",
-        date: t("common.date"),
-        billTo: isRtl ? "العميل" : "Bill To",
-        warehouse: t("common.warehouse"),
-        payment: isRtl ? "طريقة السداد" : "Payment",
-        status: t("common.status"),
-        product: isRtl ? "الصنف / المنتج" : "Item",
-        qty: t("common.qty"),
-        price: t("common.price"),
-        total: t("common.total"),
-        subtotal: t("common.subtotal"),
-        tax: t("common.tax"),
-        discount: t("common.discount"),
-        grandTotal: isRtl ? "الإجمالي الكلي" : "Grand Total",
-        paid: isRtl ? "المسدد" : "Paid",
-        balance: isRtl ? "المتبقي" : "Balance",
-        thanks: isRtl ? "شكراً لزيارتكم ونتمنى لكم يوماً سعيداً" : "Thank you for your visit!",
-        poweredBy: "Vortex ERP",
-      },
-      isRtl,
-    );
-    setPrintOpen(false);
   }
 
   async function doPDF() {
@@ -1461,10 +1454,7 @@ export function SalesPage() {
                       ) : (
                         <button
                           type="button"
-                          onClick={() => {
-                            setSelected(inv);
-                            setPrintOpen(true);
-                          }}
+                          onClick={() => void openPrintPreview(inv)}
                           className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-xs font-medium text-foreground transition hover:bg-surface-2"
                         >
                           <Printer className="h-3.5 w-3.5" />
@@ -1573,10 +1563,7 @@ export function SalesPage() {
                         ) : (
                           <button
                             type="button"
-                            onClick={() => {
-                              setSelected(inv);
-                              setPrintOpen(true);
-                            }}
+                            onClick={() => void openPrintPreview(inv)}
                             className="inline-flex h-8 items-center gap-1 rounded-lg border border-border bg-surface px-2.5 text-xs font-medium text-foreground hover:bg-surface-2 transition"
                             title={isRtl ? "طباعة" : "Print"}
                           >
@@ -2105,7 +2092,10 @@ export function SalesPage() {
 
                 <button
                   type="button"
-                  onClick={() => setPrintOpen(true)}
+                  onClick={async () => {
+                    const doc = await buildDoc();
+                    if (doc) setPrintDoc(doc);
+                  }}
                   className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm hover:opacity-95 transition"
                 >
                   <Printer className="h-4 w-4" />
@@ -2125,79 +2115,17 @@ export function SalesPage() {
         </div>
       )}
 
-      {/* Print Selection Dialog */}
-      {printOpen && selected && (
-        <div
-          className="fixed inset-0 z-[60] grid place-items-center bg-background/80 backdrop-blur-sm p-4"
-          onClick={() => setPrintOpen(false)}
-        >
-          <div
-            className="panel-elevated w-full max-w-xl p-6 shadow-2xl border border-border/80"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-5 flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-bold text-foreground">
-                  {isRtl ? "خيارات ونماذج الطباعة الفاخرة" : "Invoice Print Templates"}
-                </h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {isRtl
-                    ? "اختر القالب الأنسب لطابعتك ونوع الورق"
-                    : "Select the best template for your printer"}
-                </p>
-              </div>
-              <button
-                onClick={() => setPrintOpen(false)}
-                className="rounded-lg p-1.5 text-muted-foreground hover:bg-surface-2 hover:text-foreground"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-3">
-              <TemplateCard
-                icon={<ScrollText className="h-6 w-6 text-amber-500" />}
-                title={isRtl ? "فاتورة حرارية" : "Thermal Receipt"}
-                desc={isRtl ? "طابعات الكاشير 80mm و 58mm" : "Cashier POS rolls (80mm/58mm)"}
-                accent="from-amber-500/20 to-orange-500/10 border-amber-500/30"
-                onClick={() => doPrint("thermal")}
-              />
-              <TemplateCard
-                icon={<Printer className="h-6 w-6 text-blue-500" />}
-                title={isRtl ? "قياسي A4" : "Standard A4"}
-                desc={isRtl ? "نموذج رسمي كلاسيكي متكامل" : "Classic official corporate layout"}
-                accent="from-blue-500/20 to-indigo-500/10 border-blue-500/30"
-                onClick={() => doPrint("standard")}
-              />
-              <TemplateCard
-                icon={<Sparkles className="h-6 w-6 text-yellow-500" />}
-                title={isRtl ? "تصميم فاخر" : "Luxury Elegant"}
-                desc={isRtl ? "تنسيق تنفيذي أنيق لكبار العملاء" : "VIP executive styled format"}
-                accent="from-yellow-500/20 via-amber-500/10 to-rose-500/10 border-yellow-500/40"
-                onClick={() => doPrint("elegant")}
-              />
-            </div>
-
-            <div className="mt-6 flex items-center justify-between border-t border-border/80 pt-4">
-              <button
-                type="button"
-                onClick={doPDF}
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-surface px-4 text-xs font-medium text-foreground hover:bg-surface-2 transition"
-              >
-                <FileDown className="h-4 w-4" />
-                <span>{isRtl ? "تنزيل نسخة PDF" : "Download PDF"}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setPrintOpen(false)}
-                className="h-9 rounded-lg border border-border bg-surface px-4 text-xs font-medium text-foreground hover:bg-surface-2"
-              >
-                {isRtl ? "إلغاء" : "Cancel"}
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Luxury Print Preview Modal */}
+      {printDoc && (
+        <LuxuryPrintPreviewModal
+          open={Boolean(printDoc)}
+          onClose={() => setPrintDoc(null)}
+          doc={printDoc}
+          documentType="customer_invoice"
+          title={isRtl ? "معاينة وطباعة فاتورة المبيعات" : "Sales Invoice Print Preview"}
+          customerPhone={selected?.customers?.phone || undefined}
+          customerName={selected?.customers?.name || undefined}
+        />
       )}
 
       {/* Vortex Collection Sheet for Quick Collection */}

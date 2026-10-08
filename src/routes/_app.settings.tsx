@@ -8,7 +8,6 @@ import { SettingsLayout } from "@/components/settings/settings-layout";
 import { supabase } from "@/integrations/supabase/client";
 import { setCompanySettingsCache } from "@/lib/format";
 import { cacheCompanyProfile } from "@/lib/printing";
-import { getPrintSettings, savePrintSettings } from "@/lib/templates";
 
 export const Route = createFileRoute("/_app/settings")({
   head: () => ({ meta: [{ title: "الإعدادات — فورتيكس ERP" }] }),
@@ -63,9 +62,6 @@ function SettingsPage() {
           } else if ((data as any).enable_pos_service_fee !== undefined) {
             setEnablePosServiceFee(Boolean((data as any).enable_pos_service_fee));
           }
-          if (catalog.printSettings) {
-            savePrintSettings(catalog.printSettings);
-          }
           setCompanySettingsCache({
             currency: data.currency,
           });
@@ -83,7 +79,6 @@ function SettingsPage() {
       const updatedCatalog = {
         ...currentCatalog,
         enablePosServiceFee,
-        printSettings: getPrintSettings(),
       };
       const payload = {
         ...form,

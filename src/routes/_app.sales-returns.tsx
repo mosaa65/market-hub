@@ -33,8 +33,11 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+// Payment-method picker (this branch) alongside the unified print preview (main).
 import { PaymentMethodPicker } from "@/components/ui/payment-method";
-import { Plus, Trash2, RotateCcw, Search, Loader2 } from "lucide-react";
+import { Plus, Trash2, RotateCcw, Search, Loader2, Printer } from "lucide-react";
+import { LuxuryPrintPreviewModal } from "@/components/luxury-print-preview-modal";
+import type { UnifiedDocumentData } from "@/lib/templates";
 
 export const Route = createFileRoute("/_app/sales-returns")({
   head: () => ({ meta: [{ title: "مرتجعات المبيعات — Vortex ERP" }] }),
@@ -78,6 +81,43 @@ function SalesReturnsPage() {
   useEffect(() => {
     void load();
   }, []);
+
+  const [previewDoc, setPreviewDoc] = useState<UnifiedDocumentData | null>(null);
+
+  async function openReturnPrint(r: any) {
+    const { data: items } = await supabase
+      .from("sales_return_items")
+      .select("quantity, unit_price, tax_rate, products(name, name_ar, sku)")
+      .eq("return_id", r.id);
+
+    setPreviewDoc({
+      docType: "sales_return",
+      title: lang === "ar" ? "إشعار دائن — مرتجع مبيعات" : "Sales Return Credit Note",
+      number: r.return_number,
+      date: new Date(r.created_at).toLocaleString(lang === "ar" ? "ar-EG" : "en-US"),
+      partyLabel: lang === "ar" ? "العميل" : "Customer",
+      partyName: r.customers?.name ?? (lang === "ar" ? "عميل نقدي" : "Walk-in"),
+      warehouse: hasMultiWarehouse ? whName(r.warehouses) : undefined,
+      payment: r.refund_method ? `استرداد (${r.refund_method})` : "نقداً",
+      status: "معتمد ومسترد",
+      lines: (items || []).map((it: any) => ({
+        product:
+          (lang === "ar" ? it.products?.name_ar : it.products?.name) || it.products?.name || "صنف",
+        qty: Number(it.quantity || 1),
+        price: Number(it.unit_price || 0),
+        total: Number(it.quantity || 1) * Number(it.unit_price || 0),
+        code: it.products?.sku || undefined,
+      })),
+      subtotal: Number(r.subtotal || r.total || 0),
+      tax: Number(r.tax || 0),
+      discount: 0,
+      total: Number(r.total || 0),
+      paid: Number(r.total || 0),
+      balance: 0,
+      currency: "ر.ي",
+      notes: r.note || undefined,
+    });
+  }
 
   const filtered = salesReturns.filter(
     (r) =>
@@ -124,13 +164,16 @@ function SalesReturnsPage() {
                   )}
                   <TableHead>{lang === "ar" ? "طريقة الاسترداد" : "Refund Method"}</TableHead>
                   <TableHead className="text-end">{lang === "ar" ? "الإجمالي" : "Total"}</TableHead>
+                  <TableHead className="text-center w-16">
+                    {lang === "ar" ? "طباعة" : "Print"}
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
                     <TableCell
-                      colSpan={hasMultiWarehouse ? 6 : 5}
+                      colSpan={hasMultiWarehouse ? 7 : 6}
                       className="text-center text-muted-foreground py-8"
                     >
                       {t("common.loading")}
@@ -139,7 +182,7 @@ function SalesReturnsPage() {
                 ) : filtered.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={hasMultiWarehouse ? 6 : 5}
+                      colSpan={hasMultiWarehouse ? 7 : 6}
                       className="text-center text-muted-foreground py-12"
                     >
                       <RotateCcw className="mx-auto mb-2 h-8 w-8 opacity-40" />
@@ -163,6 +206,16 @@ function SalesReturnsPage() {
                       <TableCell className="text-end font-mono font-semibold">
                         {money(Number(r.total))}
                       </TableCell>
+                      <TableCell className="text-center">
+                        <button
+                          type="button"
+                          onClick={() => openReturnPrint(r)}
+                          className="p-1.5 rounded-lg border border-border/80 text-muted-foreground hover:text-foreground hover:bg-surface-2 transition"
+                          title={lang === "ar" ? "معاينة وطباعة الإشعار" : "Print return note"}
+                        >
+                          <Printer className="h-3.5 w-3.5" />
+                        </button>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -171,6 +224,16 @@ function SalesReturnsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {previewDoc && (
+        <LuxuryPrintPreviewModal
+          open={Boolean(previewDoc)}
+          onClose={() => setPreviewDoc(null)}
+          doc={previewDoc}
+          documentType="sales_return"
+          title={lang === "ar" ? "معاينة إشعار مرتجع المبيعات" : "Sales Return Print Preview"}
+        />
+      )}
     </>
   );
 }
@@ -336,7 +399,10 @@ function NewSalesReturn({
     );
   }
 
-  const total = Math.round(lines.reduce((a, l) => a + l.quantity * l.unit_price * (1 + l.tax_rate / 100), 0) * 100) / 100;
+  const total =
+    Math.round(
+      lines.reduce((a, l) => a + l.quantity * l.unit_price * (1 + l.tax_rate / 100), 0) * 100,
+    ) / 100;
 
   async function save() {
     if (saving) return;

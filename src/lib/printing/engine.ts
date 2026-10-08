@@ -75,8 +75,13 @@ export function renderUnifiedDocument(request: PrintRequest): string {
   const theme = normalizeTheme(request.theme ?? override?.theme ?? settings.theme);
   const profile = PRINT_PAPERS[paperId];
   const labels = labelsFor(rtl, request.labels);
+  const effectiveTemplateId =
+    request.templateId ??
+    override?.templateId ??
+    (theme === "formal" ? "formal" : theme === "luxury" ? "elegant" : "standard");
+
   const html =
-    theme === "formal"
+    effectiveTemplateId === "formal"
       ? renderFormalTemplate(
           request.doc,
           labels,
@@ -86,13 +91,11 @@ export function renderUnifiedDocument(request: PrintRequest): string {
         )
       : renderDocumentHTML(
           request.doc,
-          request.templateId ??
-            override?.templateId ??
-            (theme === "luxury" ? "elegant" : "standard"),
+          effectiveTemplateId,
           labels,
           rtl,
           { showFooter: settings.footerEnabled },
-          paperId === "a4" || paperId === "a5" ? "a4" : paperId,
+          paperId,
         );
   return html
     .replace(

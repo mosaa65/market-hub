@@ -1,5 +1,12 @@
-import React, { useState, useRef, useMemo, useEffect, type Dispatch, type SetStateAction } from "react";
-import { Hash, CalendarDays, ChevronDown, Check } from "lucide-react";
+import React, {
+  useState,
+  useRef,
+  useMemo,
+  useEffect,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
+import { ChevronDown, Check } from "lucide-react";
 import {
   Command,
   CommandInput,
@@ -21,6 +28,7 @@ import { FlagIcon, currencyToCountryCode } from "@/components/ui/flag-icon";
 import { toast } from "sonner";
 import type { InvoiceTemplate } from "@/lib/invoice-print";
 import { getPrintSettings, savePrintSettings } from "@/lib/templates";
+import { DocumentNumberingCard } from "./document-numbering-card";
 
 interface InvoicingSectionProps {
   form: any;
@@ -46,30 +54,6 @@ export function InvoicingSection({
   const [logoUploading, setLogoUploading] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const currencyOptions = useMemo(() => getCurrencyOptions(lang), [lang]);
-  const invoiceNumberPreview = useMemo(() => {
-    const cleanPrefix = (value: string) => value.trim().replace(/^-+|-+$/g, "");
-    const digits = Math.max(1, Math.min(8, Number(form.invoice_number_digits) || 4));
-    const sequence = "1".padStart(digits, "0");
-    const now = new Date();
-    const period =
-      form.invoice_number_period === "year_month"
-        ? `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}`
-        : form.invoice_number_period === "year"
-          ? String(now.getFullYear())
-          : "";
-    const format = (prefix: string) =>
-      [cleanPrefix(prefix), period, sequence].filter(Boolean).join("-");
-
-    return {
-      sales: format(form.invoice_prefix ?? "INV-"),
-      purchase: format(form.purchase_invoice_prefix ?? "PO-"),
-    };
-  }, [
-    form.invoice_number_digits,
-    form.invoice_number_period,
-    form.invoice_prefix,
-    form.purchase_invoice_prefix,
-  ]);
   const currencyPreviewSymbol =
     form.currency_symbol?.trim() ||
     getCurrencySymbol(form.currency || "YER", isAr ? "ar-YE" : "en");
@@ -82,21 +66,17 @@ export function InvoicingSection({
 
   const setPrintMode = (v: "auto" | "ask" | "off") => {
     setPrintModeState(v);
-    savePrintSettings({ printMode: v });
   };
 
   const setDefaultPrintTemplate = (v: InvoiceTemplate) => {
     setDefaultPrintTemplateState(v);
-    savePrintSettings({ defaultCustomerTemplate: v });
   };
 
   async function uploadCompanyLogo(file: File) {
     const allowedTypes = ["image/png", "image/jpeg", "image/webp"];
     if (!allowedTypes.includes(file.type)) {
       toast.error(
-        isAr
-          ? "اختر صورة بصيغة PNG أو JPG أو WebP."
-          : "Choose a PNG, JPG, or WebP image.",
+        isAr ? "اختر صورة بصيغة PNG أو JPG أو WebP." : "Choose a PNG, JPG, or WebP image.",
       );
       return;
     }
@@ -113,13 +93,11 @@ export function InvoicingSection({
     const path = `company/logo-${Date.now()}.${extension}`;
 
     try {
-      const { error } = await supabase.storage
-        .from("company-logos")
-        .upload(path, file, {
-          contentType: file.type,
-          cacheControl: "31536000",
-          upsert: false,
-        });
+      const { error } = await supabase.storage.from("company-logos").upload(path, file, {
+        contentType: file.type,
+        cacheControl: "31536000",
+        upsert: false,
+      });
       if (error) throw error;
 
       const { data } = supabase.storage.from("company-logos").getPublicUrl(path);
@@ -220,108 +198,13 @@ export function InvoicingSection({
           </p>
         </div>
 
+        {/* Central Document Numbering Engine — every document type, not just invoices */}
         <div className="space-y-3 rounded-2xl border border-border/80 bg-surface/50 p-4">
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            <Hash className="h-4 w-4 text-primary" />
-            {isAr ? "ترقيم الفواتير" : "Invoice numbering"}
-          </div>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <div className="grid gap-1.5">
-              <Label htmlFor="sales-invoice-prefix" className="text-xs">
-                {isAr ? "بادئة فاتورة المبيعات" : "Sales invoice prefix"}
-              </Label>
-              <Input
-                id="sales-invoice-prefix"
-                value={form.invoice_prefix ?? "INV-"}
-                onChange={(event) =>
-                  setForm((current: any) => ({ ...current, invoice_prefix: event.target.value }))
-                }
-                disabled={!canEdit}
-                placeholder="INV-"
-                className="rounded-2xl font-mono"
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="purchase-invoice-prefix" className="text-xs">
-                {isAr ? "بادئة فاتورة المشتريات" : "Purchase invoice prefix"}
-              </Label>
-              <Input
-                id="purchase-invoice-prefix"
-                value={form.purchase_invoice_prefix ?? "PO-"}
-                onChange={(event) =>
-                  setForm((current: any) => ({
-                    ...current,
-                    purchase_invoice_prefix: event.target.value,
-                  }))
-                }
-                disabled={!canEdit}
-                placeholder="PO-"
-                className="rounded-2xl font-mono"
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="invoice-number-period" className="text-xs">
-                {isAr ? "إضافة التاريخ إلى الرقم" : "Date in invoice number"}
-              </Label>
-              <select
-                id="invoice-number-period"
-                value={form.invoice_number_period ?? "year_month"}
-                onChange={(event) =>
-                  setForm((current: any) => ({
-                    ...current,
-                    invoice_number_period: event.target.value,
-                  }))
-                }
-                disabled={!canEdit}
-                className="h-10 w-full rounded-2xl border border-input bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <option value="none">{isAr ? "بدون تاريخ" : "No date"}</option>
-                <option value="year">{isAr ? "السنة" : "Year"}</option>
-                <option value="year_month">{isAr ? "السنة والشهر" : "Year and month"}</option>
-              </select>
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="invoice-number-digits" className="text-xs">
-                {isAr ? "خانات التسلسل (حد أدنى)" : "Minimum sequence digits"}
-              </Label>
-              <select
-                id="invoice-number-digits"
-                value={String(form.invoice_number_digits ?? 4)}
-                onChange={(event) =>
-                  setForm((current: any) => ({
-                    ...current,
-                    invoice_number_digits: Number(event.target.value),
-                  }))
-                }
-                disabled={!canEdit}
-                className="h-10 w-full rounded-2xl border border-input bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <option value="1">{isAr ? "1 — مثال: 1" : "1 — e.g. 1"}</option>
-                <option value="4">{isAr ? "4 — مثال: 0001" : "4 — e.g. 0001"}</option>
-                <option value="6">{isAr ? "6 — مثال: 000001" : "6 — e.g. 000001"}</option>
-              </select>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-background px-3.5 py-3">
-            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-              <CalendarDays className="h-4 w-4 text-primary" />
-              {isAr ? "مثال على شكل الرقم" : "Invoice number format example"}
-            </div>
-            <div className="flex flex-wrap gap-x-5 gap-y-1 font-mono text-xs" dir="ltr">
-              <span>
-                <span className="text-muted-foreground">{isAr ? "مبيعات: " : "Sales: "}</span>
-                <strong>{invoiceNumberPreview.sales}</strong>
-              </span>
-              <span>
-                <span className="text-muted-foreground">{isAr ? "مشتريات: " : "Purchase: "}</span>
-                <strong>{invoiceNumberPreview.purchase}</strong>
-              </span>
-            </div>
-          </div>
+          <DocumentNumberingCard isAr={isAr} canEdit={canEdit} />
           <p className="text-xs text-muted-foreground">
             {isAr
-              ? "تتبع الأرقام تسلسلاً متواصلاً ولا تعود إلى 0001 عند بداية شهر جديد."
-              : "Numbers remain sequential and do not reset to 0001 when a new month starts."}
+              ? "التسلسل الرقمي منفصل تماماً عن شكل الرقم المعروض: لكل نوع مستند تسلسل مستقل يُخصَّص داخل قاعدة البيانات (ذرّياً) لمنع تكرار الأرقام، ولا يُعاد ترقيم المستندات القديمة عند تغيير التنسيق."
+              : "The numeric sequence is fully separate from the displayed format: each document type has its own sequence allocated atomically inside the database to prevent duplicates, and changing the format never renumbers existing documents."}
           </p>
         </div>
 
@@ -367,7 +250,6 @@ export function InvoicingSection({
             />
           </div>
         </div>
-
       </CardContent>
     </Card>
   );
@@ -405,7 +287,15 @@ function CurrencyPicker({
           >
             <span className="flex min-w-0 items-center gap-2">
               <span aria-hidden="true" className="text-lg leading-none">
-                {selected ? <FlagIcon code={currencyToCountryCode(selected.code) || ""} emoji={selected.flag} size="size-5" /> : "🌐"}
+                {selected ? (
+                  <FlagIcon
+                    code={currencyToCountryCode(selected.code) || ""}
+                    emoji={selected.flag}
+                    size="size-5"
+                  />
+                ) : (
+                  "🌐"
+                )}
               </span>
               <span className="truncate text-start">
                 <span className="font-mono font-semibold">{selectedCode}</span>
@@ -420,9 +310,7 @@ function CurrencyPicker({
         <PopoverContent align="start" className="w-[min(360px,calc(100vw-2rem))] p-0">
           <Command dir={isAr ? "rtl" : "ltr"}>
             <CommandInput
-              placeholder={
-                isAr ? "ابحث باسم العملة أو رمزها..." : "Search by currency or code..."
-              }
+              placeholder={isAr ? "ابحث باسم العملة أو رمزها..." : "Search by currency or code..."}
             />
             <CommandList>
               <CommandEmpty>{isAr ? "لم يتم العثور على عملة." : "No currency found."}</CommandEmpty>
@@ -438,7 +326,11 @@ function CurrencyPicker({
                     className="gap-2"
                   >
                     <span aria-hidden="true" className="text-lg leading-none">
-                      <FlagIcon code={currencyToCountryCode(currency.code) || ""} emoji={currency.flag} size="size-5" />
+                      <FlagIcon
+                        code={currencyToCountryCode(currency.code) || ""}
+                        emoji={currency.flag}
+                        size="size-5"
+                      />
                     </span>
                     <span className="min-w-0 flex-1 truncate">{currency.name}</span>
                     <span className="font-mono text-xs text-muted-foreground">

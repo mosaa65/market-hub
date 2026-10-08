@@ -64,14 +64,12 @@ import { CartLine as CartLineRow } from "@/components/commerce/cart-line";
 import { MobileProductPicker } from "@/components/commerce/mobile-product-picker";
 import { CustomerFormDialog } from "@/components/contacts/customer-form-dialog";
 import { UniversalPrintPreview } from "@/components/universal-print-preview";
+import { LuxuryPrintPreviewModal } from "@/components/luxury-print-preview-modal";
 import { printUnifiedDocument, type PrintRequest } from "@/lib/printing";
 import { printInvoice, type InvoiceTemplate } from "@/lib/invoice-print";
 import type { InvoiceDoc } from "@/lib/pdf";
 import { OperationSuccessModal } from "@/components/communication";
-import type {
-  CustomerContext,
-  InvoiceContext,
-} from "@/lib/communication";
+import type { CustomerContext, InvoiceContext } from "@/lib/communication";
 
 export const Route = createFileRoute("/_app/pos")({
   head: () => ({ meta: [{ title: "نقطة البيع — فورتيكس ERP" }] }),
@@ -578,23 +576,39 @@ function POSPage() {
       // بيانات المستودعات/العملاء مرجعية كذلك: تخزين محلي دون outbox
       // (نفس سبب 409 المذكور أدناه).
       if (ws && ws.length > 0)
-        await Promise.all(ws.map((w) => (warehousesRepo as any).adapter.setItem('warehouses', w.id, w).catch(() => {})));
+        await Promise.all(
+          ws.map((w) =>
+            (warehousesRepo as any).adapter.setItem("warehouses", w.id, w).catch(() => {}),
+          ),
+        );
       if (cs && cs.length > 0) cs.forEach((c) => customersRepo.create(c as any).catch(() => {}));
       // المنتجات/التصنيفات/العلامات/الوحدات بيانات مرجعية للعمل دون اتصال:
       // تُخزَّن محليًا فقط. كتابتها في outbox المزامنة كانت ترفع 409
       // (تعارض) على كل تحميل لأنها موجودة أصلًا في السحابة — والسحابة مصدر
       // الحقيقة لهذه الجداول كلها.
       if (ps && ps.length > 0)
-        await Promise.all(ps.map((p: any) => (productsRepo as any).adapter.setItem('products', p.id, p).catch(() => {})));
+        await Promise.all(
+          ps.map((p: any) =>
+            (productsRepo as any).adapter.setItem("products", p.id, p).catch(() => {}),
+          ),
+        );
       if (cats && cats.length > 0)
-        await Promise.all(cats.map((c) => (categoriesRepo as any).adapter.setItem('categories', c.id, c).catch(() => {})));
+        await Promise.all(
+          cats.map((c) =>
+            (categoriesRepo as any).adapter.setItem("categories", c.id, c).catch(() => {}),
+          ),
+        );
       // بيانات العلامات والوحدات مرجعية للعمل دون اتصال: تُخزَّن محليًا فقط.
       // كتابتها في outbox المزامنة كانت ترفع 409 (تعارض) على كل تحميل لأنها
       // موجودة أصلاً في السحابة — والسحابة مصدر الحقيقة لهما.
       if (brs && brs.length > 0)
-        await Promise.all(brs.map((b) => (brandsRepo as any).adapter.setItem('brands', b.id, b).catch(() => {})));
+        await Promise.all(
+          brs.map((b) => (brandsRepo as any).adapter.setItem("brands", b.id, b).catch(() => {})),
+        );
       if (uns && uns.length > 0)
-        await Promise.all(uns.map((u) => (unitsRepo as any).adapter.setItem('units', u.id, u).catch(() => {})));
+        await Promise.all(
+          uns.map((u) => (unitsRepo as any).adapter.setItem("units", u.id, u).catch(() => {})),
+        );
 
       const loadedWarehouses = ws ?? [];
       setWarehouses(loadedWarehouses);
@@ -1388,7 +1402,12 @@ function POSPage() {
                 creditLimit: saleCustomer.credit_limit ?? undefined,
                 hasLedgerActivity: true,
               }
-            : { id: customerId, name: lang === "ar" ? "عميل" : "Customer", phone: null, balance: remainingDebt },
+            : {
+                id: customerId,
+                name: lang === "ar" ? "عميل" : "Customer",
+                phone: null,
+                balance: remainingDebt,
+              },
           invoice: {
             id: invoiceId,
             invoiceNumber,
@@ -2654,155 +2673,17 @@ function POSPage() {
         eventType="invoice_created"
       />
 
-      {/* Post-Sale Print Dialog */}
+      {/* Post-Sale Luxury Print Preview Modal */}
       {postSaleDoc && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="panel-elevated w-full max-w-md rounded-3xl p-6 shadow-2xl border border-border/80">
-            {/* Header */}
-            <div className="mb-5 flex items-center justify-between border-b border-border/60 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="grid h-10 w-10 place-items-center rounded-2xl bg-primary/10 text-primary">
-                  <Printer className="h-5 w-5" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-foreground">
-                    {lang === "ar" ? "طباعة الفاتورة" : "Print Invoice"}
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    {lang === "ar"
-                      ? `فاتورة #${postSaleDoc.number}`
-                      : `Invoice #${postSaleDoc.number}`}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setPostSaleDoc(null)}
-                className="rounded-full p-1.5 text-muted-foreground hover:bg-surface-2 hover:text-foreground transition"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            {/* Template Selector */}
-            <div className="mb-5">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                {lang === "ar" ? "اختر قالب الطباعة" : "Choose print template"}
-              </p>
-              <div className="grid grid-cols-3 gap-2">
-                {(
-                  [
-                    {
-                      id: "thermal",
-                      icon: Receipt,
-                      ar: "فاتورة حرارية",
-                      en: "Thermal 80mm",
-                      sub_ar: "طابعة مدمجة",
-                      sub_en: "Compact printer",
-                    },
-                    {
-                      id: "standard",
-                      icon: FileText,
-                      ar: "A4 عادي",
-                      en: "Standard A4",
-                      sub_ar: "تصميم أعمال",
-                      sub_en: "Business format",
-                    },
-                    {
-                      id: "elegant",
-                      icon: Sparkles,
-                      ar: "A4 فاخر",
-                      en: "Elegant A4",
-                      sub_ar: "لمسات ذهبية",
-                      sub_en: "Gold accents",
-                    },
-                  ] as const
-                ).map((tmpl) => (
-                  <button
-                    key={tmpl.id}
-                    type="button"
-                    onClick={() => setSelectedTemplate(tmpl.id as InvoiceTemplate)}
-                    className={`flex flex-col items-center gap-1.5 rounded-2xl border p-3 text-center transition-all duration-150 ${
-                      selectedTemplate === tmpl.id
-                        ? "border-primary bg-primary/10 text-primary shadow-sm ring-1 ring-primary/30"
-                        : "border-border/80 hover:border-primary/40 hover:bg-surface-2 text-muted-foreground"
-                    }`}
-                  >
-                    <tmpl.icon className="h-5 w-5" />
-                    <span className="text-xs font-semibold leading-tight">
-                      {lang === "ar" ? tmpl.ar : tmpl.en}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground leading-tight">
-                      {lang === "ar" ? tmpl.sub_ar : tmpl.sub_en}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Save as default */}
-            <label className="flex items-center gap-2 mb-5 cursor-pointer group">
-              <input
-                type="checkbox"
-                className="rounded border-border accent-primary"
-                checked={defaultTemplate === selectedTemplate}
-                onChange={(e) => {
-                  if (e.target.checked) {
-                    setDefaultTemplate(selectedTemplate);
-                    localStorage.setItem("pos_default_template", selectedTemplate);
-                  }
-                }}
-              />
-              <span className="text-xs text-muted-foreground group-hover:text-foreground transition">
-                {lang === "ar" ? "حفظ كقالب افتراضي" : "Save as default template"}
-              </span>
-            </label>
-
-            {/* Action Buttons */}
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setPostSaleDoc(null)}
-                className="flex-1 flex items-center justify-center gap-2 h-10 rounded-2xl border border-border/80 text-sm text-muted-foreground hover:bg-surface-2 hover:text-foreground transition"
-              >
-                <SkipForward className="h-4 w-4" />
-                <span>{lang === "ar" ? "تخطي — بدون طباعة" : "Skip — no print"}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const rtl = lang === "ar";
-                  const labels = {
-                    invoice: rtl ? "فاتورة" : "Invoice",
-                    date: rtl ? "التاريخ" : "Date",
-                    billTo: rtl ? "العميل" : "Bill To",
-                    warehouse: rtl ? "المستودع" : "Warehouse",
-                    payment: rtl ? "الدفع" : "Payment",
-                    status: rtl ? "الحالة" : "Status",
-                    product: rtl ? "المنتج" : "Product",
-                    qty: rtl ? "الكمية" : "Qty",
-                    price: rtl ? "السعر" : "Price",
-                    total: rtl ? "الإجمالي" : "Total",
-                    subtotal: rtl ? "المجموع" : "Subtotal",
-                    tax: rtl ? "الضريبة" : "Tax",
-                    discount: rtl ? "الخصم" : "Discount",
-                    grandTotal: rtl ? "الإجمالي الكلي" : "Grand Total",
-                    paid: rtl ? "المدفوع" : "Paid",
-                    balance: rtl ? "المتبقي" : "Balance",
-                    thanks: rtl ? "شكراً لتعاملكم معنا" : "Thank you for your business",
-                    poweredBy: "Vortex ERP",
-                  };
-                  printInvoice(postSaleDoc!, selectedTemplate, labels, rtl);
-                  setPostSaleDoc(null);
-                }}
-                className="flex-1 flex items-center justify-center gap-2 h-10 rounded-2xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 active:scale-95 transition shadow-md shadow-primary/25"
-              >
-                <Printer className="h-4 w-4" />
-                <span>{lang === "ar" ? "طباعة الآن" : "Print now"}</span>
-              </button>
-            </div>
-          </div>
-        </div>
+        <LuxuryPrintPreviewModal
+          open={Boolean(postSaleDoc)}
+          onClose={() => setPostSaleDoc(null)}
+          doc={postSaleDoc}
+          documentType="customer_invoice"
+          title={lang === "ar" ? "فاتورة مبيعات الكاشير" : "Cashier Sales Invoice"}
+          customerPhone={customers.find((c) => c.id === customerId)?.phone || undefined}
+          customerName={customers.find((c) => c.id === customerId)?.name || undefined}
+        />
       )}
 
       {/* New Customer — the SAME form used by the Customers page. On save the
