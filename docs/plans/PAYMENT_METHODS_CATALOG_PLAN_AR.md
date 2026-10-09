@@ -364,7 +364,7 @@ payment_method_settings              ← إعداد العميل لكل طريق
 ### جديد
 | الملف | الغرض |
 | :-- | :-- |
-| `supabase/migrations/20261009000000_payment_methods_tenant_authoring.sql` | الأعمدة + الحمايات + 3 RPCs + تحديث `payment_method_legacy_id` و`catalog_view` |
+| `supabase/migrations/20261208000001_payment_methods_tenant_authoring.sql` | الأعمدة + الحمايات + 3 RPCs + تحديث `payment_method_legacy_id` و`catalog_view` |
 | `src/components/ui/payment-method/payment-method-identity-editor.tsx` | تعديل الاسم والأيقونة + استعادة الاسم الأصلي |
 | `src/components/ui/payment-method/add-payment-method-dialog.tsx` | إضافة طريقة: الاسم + الأيقونة + «كيف تُحصَّل؟» + الأقسام |
 

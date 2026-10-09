@@ -20,7 +20,7 @@
 5. ابدأ بقراءة `AGENTS.md` وتعليمات المشروع وملفات الخطة ذات الصلة، وبالأخص:
    - `docs/plans/PAYMENT_METHODS_CATALOG_PLAN_AR.md`
    - `supabase/migrations/20261208000000_payment_methods_catalog_unified.sql`
-   - `supabase/migrations/20261009000000_payment_methods_tenant_authoring.sql`
+   - `supabase/migrations/20261208000001_payment_methods_tenant_authoring.sql`
    - `src/lib/payments/payment-methods.ts`
    - `src/hooks/use-payment-methods.ts`
    - `src/components/settings/sections/payment-methods-section.tsx`

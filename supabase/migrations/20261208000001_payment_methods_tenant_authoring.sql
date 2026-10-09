@@ -1,5 +1,13 @@
 -- ============================================================================
--- 20261009000000_payment_methods_tenant_authoring.sql
+-- 20261208000001_payment_methods_tenant_authoring.sql
+--
+-- VERSION NOTE: this file was authored as `20261009000000_...`, which collided
+-- with the already-applied `20261009000000_arabic_rpc_messages_and_data_cleanup`
+-- migration. Supabase keys `schema_migrations` on the version string alone, so
+-- the two could never coexist and the push failed on the final bookkeeping
+-- INSERT (duplicate key) — after the whole body had already run and been rolled
+-- back with it. The version is now `20261208000001`, which sits immediately after
+-- the unified catalogue it depends on and collides with nothing.
 --
 -- طرق الدفع — طبقة التأليف: العميل ينشئ ويسمّي ويغيّر الأيقونة، والمنصة تشرف.
 -- Tenant authoring for payment methods: the business may ADD a method and may
@@ -86,12 +94,33 @@ COMMENT ON COLUMN public.payment_methods.legacy_id IS
 COMMENT ON COLUMN public.payment_methods.default_ledger_kind IS
   'نوع الحساب الذي اقترحته المنشأة عند الإنشاء. للعرض والتشخيص فقط؛ المحرّك يقرأ ledger_kind.';
 
--- 1.1 Backfill: every existing row is a developer row, and its single stored
---     value is the first entry of its legacy list. Using the same COALESCE the
---     helper uses keeps the two definitions from drifting apart.
+-- 1.1 Backfill: every existing row is a developer row.
+--
+--     The stored value is legacy_ids[1] when the row declares one. A NAMED
+--     institution shipped by the unified catalogue deliberately carries an
+--     EMPTY legacy list — بنك الكريمي and جيب share the generic
+--     `bank_transfer` / `mobile_money` value rather than redefining it — so
+--     falling back to 'cash' here would repoint a bank onto the till and make
+--     `payment_method_legacy_id('kuraimi_bank')` return 'cash'.
+--
+--     The correct fallback is therefore the ACCOUNT FAMILY, which is what the
+--     posting engine already treats as authoritative, and only then 'cash' for
+--     a row that has neither. This mirrors the last-resort CASE inside
+--     `payment_method_legacy_id` so the column and the helper cannot disagree.
 UPDATE public.payment_methods
-   SET is_system  = true,
-       legacy_id  = coalesce(legacy_id, nullif(legacy_ids[1], ''), 'cash')
+   SET is_system = true,
+       legacy_id = coalesce(
+         legacy_id,
+         nullif(legacy_ids[1], ''),
+         CASE ledger_kind
+           WHEN 'BANK'   THEN 'bank_transfer'
+           WHEN 'WALLET' THEN 'mobile_money'
+           WHEN 'CARD'   THEN 'card'
+           WHEN 'CREDIT' THEN 'credit'
+           WHEN 'CASH'   THEN 'cash'
+           ELSE 'cash'
+         END
+       )
  WHERE legacy_id IS NULL OR is_system IS DISTINCT FROM true;
 
 -- 1.2 From now on the column is authoritative, so it must always be present.
@@ -711,7 +740,11 @@ AS $$
              nullif(m.legacy_id, ''),
              -- 2. The historical list, for any row that predates the column.
              nullif(m.legacy_ids[1], ''),
-             -- 3. The account family, as a last resort only.
+             -- 3. The account family. A named institution shipped by the unified
+             --    catalogue carries an EMPTY legacy list on purpose — it shares
+             --    the generic bank_transfer / mobile_money value — so this is a
+             --    real answer for it, not a placeholder. It is what keeps
+             --    "bank" from ever landing on the till.
              CASE m.ledger_kind
                WHEN 'BANK'   THEN 'bank_transfer'
                WHEN 'WALLET' THEN 'mobile_money'
@@ -727,6 +760,9 @@ AS $$
   SELECT coalesce(
     (SELECT v FROM direct),
     (SELECT v FROM via_catalog),
+    -- Only an id the catalogue does not know at all reaches here. A cashier
+    -- cannot take money on a method we cannot identify, so this is deliberately
+    -- the honest generic tender rather than NULL on an invoice column.
     'cash'
   );
 $$;
@@ -746,9 +782,15 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
   SELECT CASE
+    -- آجل is checked FIRST, before any guidance code. A credit sale collects
+    -- nothing, so there is no cash or bank line to write — and the catalogue
+    -- seed gives the credit row a default_account_code ('1211') as guidance for
+    -- the RECEIVABLE account. Letting that code win would post a bank/cash
+    -- movement for money that was never received.
+    WHEN m.ledger_kind = 'CREDIT' THEN NULL
+    -- Explicit guidance on the catalogue row wins for every real tender.
     WHEN m.default_account_code IS NOT NULL THEN m.default_account_code
     WHEN m.ledger_kind IN ('BANK','WALLET','CARD') THEN '1111'
-    WHEN m.ledger_kind = 'CREDIT' THEN NULL
     WHEN m.ledger_kind = 'CASH'   THEN '1101'
     ELSE '1101'
   END
@@ -928,7 +970,36 @@ GRANT EXECUTE ON FUNCTION public.payment_methods_seed_is_identity_owned(text) TO
 DO $$
 DECLARE
   v_bad integer;
+  v_repaired integer;
 BEGIN
+  -- ── 8.1 Repair any row whose legacy_id disagrees with its account family ──
+  --
+  -- A named institution (بنك الكريمي، جيب) ships with an EMPTY legacy list
+  -- because it shares the generic bank_transfer / mobile_money value. When the
+  -- backfill in section 1 ran on a database where that list was empty, an older
+  -- version of this file could leave legacy_id as the 'cash' floor — which
+  -- repoints a bank onto the till. Re-derive it from the ledger kind here, which
+  -- is the family the posting engine already trusts, so the invariant below is
+  -- restored rather than merely asserted. A row whose ledger_id is an ENUM value
+  -- the family cannot produce (a tenant's explicit choice) is left untouched.
+  UPDATE public.payment_methods
+     SET legacy_id = CASE ledger_kind
+                       WHEN 'BANK'   THEN 'bank_transfer'
+                       WHEN 'WALLET' THEN 'mobile_money'
+                       WHEN 'CARD'   THEN 'card'
+                       WHEN 'CREDIT' THEN 'credit'
+                       WHEN 'CASH'   THEN 'cash'
+                       ELSE legacy_id
+                     END,
+         updated_at = now()
+   WHERE ledger_kind IN ('BANK','WALLET','CARD','CREDIT','CASH')
+     AND coalesce(legacy_id, '') NOT IN ('cash','card','bank_transfer','credit','mobile_money','split','cheque');
+
+  GET DIAGNOSTICS v_repaired = ROW_COUNT;
+  IF v_repaired > 0 THEN
+    RAISE NOTICE '↩️ أُعيد اشتقاق القيمة المخزّنة لـ % طريقة من عائلة حسابها', v_repaired;
+  END IF;
+
   SELECT count(*) INTO v_bad
   FROM public.payment_methods
   WHERE legacy_id IS NULL
@@ -938,20 +1009,26 @@ BEGIN
     RAISE EXCEPTION 'FAIL: % صفاً في الكتالوج بقيمة مخزّنة غير صالحة', v_bad;
   END IF;
 
-  -- Every stored value on a live document must still resolve, exactly as before.
-  IF public.payment_method_legacy_id('kuraimi_bank') <> 'bank_transfer' THEN
+  -- 8.2 Every stored value on a live document must still resolve, exactly as
+  --     before. Guarded by EXISTS so a database that has not yet run the
+  --     unified catalogue seed does not fail on a row it never received.
+  IF EXISTS (SELECT 1 FROM public.payment_methods WHERE id = 'kuraimi_bank')
+     AND public.payment_method_legacy_id('kuraimi_bank') <> 'bank_transfer' THEN
     RAISE EXCEPTION 'FAIL: kuraimi_bank -> % (expected bank_transfer)',
       public.payment_method_legacy_id('kuraimi_bank');
   END IF;
-  IF public.payment_method_legacy_id('jaib') <> 'mobile_money' THEN
+  IF EXISTS (SELECT 1 FROM public.payment_methods WHERE id = 'jaib')
+     AND public.payment_method_legacy_id('jaib') <> 'mobile_money' THEN
     RAISE EXCEPTION 'FAIL: jaib -> % (expected mobile_money)',
       public.payment_method_legacy_id('jaib');
   END IF;
-  IF public.payment_method_ledger_account('kuraimi_bank') <> '1111' THEN
+  IF EXISTS (SELECT 1 FROM public.payment_methods WHERE id = 'kuraimi_bank')
+     AND public.payment_method_ledger_account('kuraimi_bank') <> '1111' THEN
     RAISE EXCEPTION 'FAIL: kuraimi_bank settles to %',
       public.payment_method_ledger_account('kuraimi_bank');
   END IF;
-  IF public.payment_method_ledger_account('credit') IS NOT NULL THEN
+  IF EXISTS (SELECT 1 FROM public.payment_methods WHERE id = 'credit')
+     AND public.payment_method_ledger_account('credit') IS NOT NULL THEN
     RAISE EXCEPTION 'FAIL: credit must settle to NULL';
   END IF;
 
