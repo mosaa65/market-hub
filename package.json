@@ -17,7 +17,8 @@
     "test:unified-printing": "npx tsx src/lib/printing/__tests__/unified-printing.test.ts",
     "test:transports": "npx tsx src/lib/printing/__tests__/transports.test.ts",
     "test:company-profile": "npx tsx src/lib/printing/__tests__/company-profile.test.ts",
-    "test:communication": "npx tsx src/lib/communication/__tests__/communication-engine.test.ts"
+    "test:communication": "npx tsx src/lib/communication/__tests__/communication-engine.test.ts",
+    "test:payment-methods": "npx tsx src/lib/payments/__tests__/payment-methods.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

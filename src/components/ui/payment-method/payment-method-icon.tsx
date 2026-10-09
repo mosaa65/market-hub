@@ -1,20 +1,18 @@
 /**
  * أيقونة طريقة الدفع الموحّدة.
  *
- * The icon is resolved from the developer's catalogue, never from a URL and
- * never from base64 stored on a record. Consequences that matter:
- *
- *   • zero network requests — the component is in the bundle already
- *   • identical light and dark behaviour, because tone comes from design tokens
- *   • it cannot fail to load, so no broken-image placeholder is needed
- *   • updating an icon is a one-line change here, not a data migration
+ * Provider marks use a small, closed local asset registry; other icons are
+ * bundled components. No URL or base64 supplied by a tenant is ever rendered.
+ * A missing local asset falls back to the method's ledger-family icon.
  *
  * The fallback chain (iconKey -> ledger kind -> wallet) means a method added by
  * a future migration still renders sensibly on an older client bundle.
  */
 
+import { useState } from "react";
 import {
   paymentMethodIcon,
+  paymentMethodIconAsset,
   paymentMethodIconTone,
   type LedgerKind,
 } from "@/lib/payments/payment-methods";
@@ -22,6 +20,7 @@ import { cn } from "@/lib/utils";
 
 export interface PaymentMethodIconProps {
   iconKey: string;
+  methodId?: string | null;
   ledgerKind?: LedgerKind;
   className?: string;
   /** Set false to render the glyph in the inherited colour instead of its ledger tone. */
@@ -31,14 +30,25 @@ export interface PaymentMethodIconProps {
 
 export function PaymentMethodIcon({
   iconKey,
+  methodId,
   ledgerKind,
   className,
   tone = true,
   strokeWidth = 2,
 }: PaymentMethodIconProps) {
+  const [failedAsset, setFailedAsset] = useState<string | null>(null);
   const Icon = paymentMethodIcon(iconKey, ledgerKind);
+  const asset = methodId && failedAsset !== methodId ? paymentMethodIconAsset(methodId) : undefined;
 
-  return (
+  return asset ? (
+    <img
+      src={asset.src}
+      alt={asset.alt}
+      loading="lazy"
+      onError={() => setFailedAsset(methodId ?? null)}
+      className={cn("h-4 w-4 shrink-0 rounded-full object-contain", className)}
+    />
+  ) : (
     <Icon
       aria-hidden="true"
       strokeWidth={strokeWidth}

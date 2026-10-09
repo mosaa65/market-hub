@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Receipt,
@@ -9,15 +9,12 @@ import {
   Printer,
   Sparkles,
   ScrollText,
-  CreditCard,
-  Banknote,
-  Landmark,
-  Clock,
   CheckCircle2,
   AlertCircle,
   XCircle,
   Plus,
   RefreshCw,
+  Clock,
   LayoutGrid,
   List,
   TableProperties,
@@ -26,7 +23,6 @@ import {
   Check,
   Phone,
   Building2,
-  Coins,
   ChevronRight,
   TrendingUp,
   SlidersHorizontal,
@@ -72,7 +68,12 @@ import { IconButton } from "@/components/ui/icon-button";
 import { useBreakpoint } from "@/design/breakpoints";
 import { useRealtimeTable } from "@/lib/realtime";
 import { QUERY_KEYS } from "@/lib/query-keys";
-import { isSplitPaymentValue, paymentMethodLabel } from "@/lib/payments/payment-methods";
+import {
+  isSplitPaymentValue,
+  paymentMethodLabel,
+  toLegacyPaymentValue,
+} from "@/lib/payments/payment-methods";
+import { PaymentMethodChip } from "@/components/ui/payment-method";
 
 export const Route = createFileRoute("/_app/sales")({
   head: () => ({ meta: [{ title: "المبيعات والفواتير — فورتيكس ERP" }] }),
@@ -172,8 +173,11 @@ export function SalesPage() {
 
   const isRtl = lang === "ar";
 
-  const whName = (w: { name: string; name_ar: string | null } | null | undefined) =>
-    !w ? undefined : lang === "ar" ? w.name_ar || w.name : w.name || w.name_ar || undefined;
+  const whName = useCallback(
+    (w: { name: string; name_ar: string | null } | null | undefined) =>
+      !w ? undefined : lang === "ar" ? w.name_ar || w.name : w.name || w.name_ar || undefined,
+    [lang],
+  );
 
   // ─── Paginated / Infinite Streamed Data Fetching (Exact pattern from Products) ───
   const {
@@ -309,31 +313,25 @@ export function SalesPage() {
     setTimeout(() => setCopiedInvoiceId(null), 2000);
   };
 
-  const pmLabel = (m: string, note?: string | null) => {
-    // Split detection and naming both come from the catalogue module, so this
-    // screen no longer keeps its own copy of either.
-    if (isSplitPaymentValue(m, note)) {
-      return paymentMethodLabel("split", isRtl ? "ar" : "en");
-    }
-    return paymentMethodLabel(m, isRtl ? "ar" : "en");
-  };
-  const pmIcon = (m: string, note?: string | null) => {
-    const isSplit = Boolean(note && (note.includes("[دفع مجزأ:") || note.includes("[Split:")));
-    if (isSplit || m === "split") return <Coins className="h-3.5 w-3.5 text-amber-500" />;
-    switch (m) {
-      case "cash":
-        return <Banknote className="h-3.5 w-3.5 text-emerald-500" />;
-      case "card":
-        return <CreditCard className="h-3.5 w-3.5 text-blue-500" />;
-      case "bank":
-      case "bank_transfer":
-        return <Landmark className="h-3.5 w-3.5 text-indigo-500" />;
-      case "credit":
-        return <Clock className="h-3.5 w-3.5 text-purple-500" />;
-      default:
-        return <Receipt className="h-3.5 w-3.5 text-muted-foreground" />;
-    }
-  };
+  const pmLabel = useCallback(
+    (m: string, note?: string | null) => {
+      // Split detection and naming both come from the catalogue module, so this
+      // screen no longer keeps its own copy of either.
+      if (isSplitPaymentValue(m, note)) {
+        return paymentMethodLabel("split", isRtl ? "ar" : "en");
+      }
+      return paymentMethodLabel(m, isRtl ? "ar" : "en");
+    },
+    [isRtl],
+  );
+  const pmChip = (m: string, note?: string | null, className?: string) => (
+    <PaymentMethodChip
+      value={isSplitPaymentValue(m, note) ? "split" : m}
+      note={note}
+      lang={isRtl ? "ar" : "en"}
+      className={className}
+    />
+  );
 
   const statusLabel = (s: string) => {
     const map: Record<string, string> = {
@@ -451,13 +449,11 @@ export function SalesPage() {
   }) => {
     if (!collectionTarget) throw new Error("No collection target selected");
 
-    const dbMethodMap: Record<PaymentMethod, "cash" | "bank_transfer"> = {
-      cash: "cash",
-      transfer: "bank_transfer",
-      card: "bank_transfer",
-      mobile_money: "bank_transfer",
-    };
-    const dbMethod = dbMethodMap[payment.method];
+    // This legacy write keeps the selected method's actual enum family instead
+    // of coercing card and wallet payments to bank_transfer. It still cannot
+    // retain provider identity or atomically post the invoice; those limitations
+    // require the additive payment-id/account storage path planned for the DB.
+    const dbMethod = toLegacyPaymentValue(payment.method);
 
     // 1. Record customer payment if customer exists
     if (collectionTarget.customerId) {
@@ -626,7 +622,7 @@ export function SalesPage() {
       }
     });
     return Array.from(map.entries());
-  }, [rows, lang]);
+  }, [rows, whName]);
 
   const salesFilterDefinitions: FilterDefinition[] = useMemo(() => {
     const defs: FilterDefinition[] = [
@@ -762,8 +758,14 @@ export function SalesPage() {
         sortValue: (inv) => pmLabel(inv.payment_method, inv.note),
         cell: (inv) => (
           <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg border border-border/80 bg-surface-2/60 px-2 py-0.5 text-[11px] text-muted-foreground">
-            {pmIcon(inv.payment_method, inv.note)}
-            <span>{pmLabel(inv.payment_method, inv.note)}</span>
+            <PaymentMethodChip
+              value={
+                isSplitPaymentValue(inv.payment_method, inv.note) ? "split" : inv.payment_method
+              }
+              note={inv.note}
+              lang={isRtl ? "ar" : "en"}
+              className="whitespace-nowrap rounded-lg border-border/80 bg-surface-2/60 px-2 py-0.5 text-[11px] text-muted-foreground"
+            />
           </span>
         ),
       },
@@ -1025,6 +1027,7 @@ export function SalesPage() {
     maxAmount,
     filterDatePreset,
     sort,
+    pmLabel,
   ]);
 
   // Count active filters
@@ -1368,8 +1371,11 @@ export function SalesPage() {
                           </div>
                         </div>
                         <div className="inline-flex max-w-[45%] shrink-0 items-center gap-1 truncate rounded-lg border border-border/80 bg-surface-2/60 px-2 py-1 text-[11px] text-muted-foreground">
-                          {pmIcon(inv.payment_method, inv.note)}
-                          <span className="truncate">{pmLabel(inv.payment_method, inv.note)}</span>
+                          {pmChip(
+                            inv.payment_method,
+                            inv.note,
+                            "max-w-[45%] shrink-0 truncate rounded-lg border-border/80 bg-surface-2/60 px-2 py-1 text-[11px] text-muted-foreground",
+                          )}
                         </div>
                       </div>
 
@@ -1509,12 +1515,11 @@ export function SalesPage() {
                             {inv.invoice_number}
                           </span>
                           <div className="shrink-0">{statusBadge(inv.status)}</div>
-                          <div className="inline-flex items-center gap-1 truncate text-[11px] text-muted-foreground">
-                            {pmIcon(inv.payment_method, inv.note)}
-                            <span className="truncate">
-                              {pmLabel(inv.payment_method, inv.note)}
-                            </span>
-                          </div>
+                          {pmChip(
+                            inv.payment_method,
+                            inv.note,
+                            "truncate text-[11px] text-muted-foreground",
+                          )}
                         </div>
                         <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
                           <span className="truncate font-medium text-foreground">
@@ -1878,9 +1883,8 @@ export function SalesPage() {
                   <span className="text-[10px] uppercase font-semibold text-muted-foreground">
                     {isRtl ? "طريقة السداد" : "Payment Method"}
                   </span>
-                  <div className="mt-0.5 flex items-center gap-1.5 text-sm font-medium text-foreground">
-                    {pmIcon(selected.payment_method, selected.note)}
-                    <span>{pmLabel(selected.payment_method, selected.note)}</span>
+                  <div className="mt-0.5 text-sm font-medium text-foreground">
+                    {pmChip(selected.payment_method, selected.note)}
                   </div>
                 </div>
 

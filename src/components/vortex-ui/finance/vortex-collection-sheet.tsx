@@ -32,7 +32,7 @@ import { useFinancialPosting, type PaymentMethodType } from "@/hooks/use-financi
 import { PaymentMethodPicker } from "@/components/ui/payment-method";
 import { paymentMethodLabel } from "@/lib/payments/payment-methods";
 
-export type PaymentMethod = string;
+export type PaymentMethod = PaymentMethodType;
 
 export interface CollectionCustomer {
   id: string;

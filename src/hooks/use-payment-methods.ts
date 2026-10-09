@@ -33,9 +33,12 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   PAYMENT_METHOD_CATALOG,
   PAYMENT_CONTEXTS,
+  hasAuthoredIdentity,
   type LedgerKind,
+  type LegacyPaymentValue,
   type PaymentContext,
   type PaymentMethodDefinition,
+  type PaymentMethodOverrides,
 } from "@/lib/payments/payment-methods";
 
 /** One cache entry for the whole application. Exported so invalidation is by name, not by string literal. */
@@ -51,6 +54,17 @@ export interface ResolvedPaymentMethod extends PaymentMethodDefinition {
   effectiveContexts: readonly PaymentContext[];
   /** Whether the tenant has configured this row (vs. inheriting the catalogue default). */
   isConfigured: boolean;
+  /**
+   * False for a method this business created. The settings screen uses it to
+   * decide between Delete (tenant row) and Disable only (developer row).
+   */
+  isSystem: boolean;
+  /**
+   * True when the name or icon differs from what the developers shipped — either
+   * because the business renamed it, or because it is its own method.
+   * The settings screen shows "معدّلة" and offers a reset for this.
+   */
+  isAuthored: boolean;
 }
 
 interface CatalogRow {
@@ -66,6 +80,8 @@ interface CatalogRow {
   is_credit_term: boolean;
   requires_reference: boolean;
   legacy_values: string[] | null;
+  legacy_id: string | null;
+  is_system: boolean | null;
 }
 
 interface SettingsRow {
@@ -91,6 +107,7 @@ function toContexts(values: string[] | null | undefined): PaymentContext[] {
 
 const db = supabase as unknown as {
   from: (table: string) => any;
+  rpc: (fn: string, args?: Record<string, unknown>) => any;
 };
 
 async function fetchPaymentMethods(): Promise<{
@@ -101,7 +118,7 @@ async function fetchPaymentMethods(): Promise<{
     db
       .from("payment_methods")
       .select(
-        "id,name_ar,name_en,icon_key,is_active,sort_order,allowed_contexts,ledger_kind,default_account_code,is_credit_term,requires_reference,legacy_values",
+        "id,name_ar,name_en,icon_key,is_active,sort_order,allowed_contexts,ledger_kind,default_account_code,is_credit_term,requires_reference,legacy_values,legacy_id,is_system",
       )
       .order("sort_order"),
     db
@@ -113,7 +130,9 @@ async function fetchPaymentMethods(): Promise<{
   // so its failure alone must not blank the catalogue — it only means nobody has
   // configured anything yet.
   const catalogRows: CatalogRow[] = Array.isArray(catalogRes.data) ? catalogRes.data : [];
-  if (catalogRes.error || catalogRows.length === 0) {
+  if (catalogRes.error || settingsRes.error || catalogRows.length === 0) {
+    // Settings are tenant-specific. Treat a failed read as fallback so the UI
+    // warns that enabled contexts/order may not reflect the saved configuration.
     return { methods: fallbackMethods(), isFallback: true };
   }
 
@@ -131,7 +150,7 @@ function resolveRow(row: CatalogRow, settings?: SettingsRow): ResolvedPaymentMet
   const allowedContexts = toContexts(row.allowed_contexts);
   const tenantContexts = toContexts(settings?.enabled_contexts);
 
-  return {
+  const definition: ResolvedPaymentMethod = {
     id: row.id,
     nameAr: row.name_ar,
     nameEn: row.name_en ?? undefined,
@@ -143,7 +162,11 @@ function resolveRow(row: CatalogRow, settings?: SettingsRow): ResolvedPaymentMet
     defaultAccountCode: row.default_account_code ?? undefined,
     isCreditTerm: row.is_credit_term,
     requiresReference: row.requires_reference,
-    legacyValue: (row.legacy_values?.[0] ?? "cash") as PaymentMethodDefinition["legacyValue"],
+    // The explicit column first, then the historical list. The migration
+    // backfilled `legacy_id` from `legacy_ids[1]` for every pre-existing row, so
+    // reading it first is a no-op for the shipped methods and the ONLY correct
+    // answer for one a business created (whose list is empty on purpose).
+    legacyValue: (row.legacy_id ?? row.legacy_values?.[0] ?? "cash") as LegacyPaymentValue,
 
     enabled: settings ? settings.enabled : true,
     effectiveSortOrder: settings ? settings.sort_order : row.sort_order,
@@ -154,7 +177,15 @@ function resolveRow(row: CatalogRow, settings?: SettingsRow): ResolvedPaymentMet
       ? tenantContexts.filter((c) => allowedContexts.includes(c))
       : allowedContexts,
     isConfigured: Boolean(settings),
+    isSystem: row.is_system !== false,
+    isAuthored: false,
   };
+
+  // A tenant row is authored by definition; a developer row only when its label
+  // or icon no longer matches the shipped definition.
+  definition.isAuthored = definition.isSystem ? hasAuthoredIdentity(definition) : true;
+
+  return definition;
 }
 
 function byEffectiveOrder(a: ResolvedPaymentMethod, b: ResolvedPaymentMethod): number {
@@ -173,6 +204,8 @@ function fallbackMethods(): ResolvedPaymentMethod[] {
       effectiveSortOrder: def.sortOrder,
       effectiveContexts: def.allowedContexts,
       isConfigured: false,
+      isSystem: true,
+      isAuthored: false,
     }))
     .sort(byEffectiveOrder);
 }
@@ -236,6 +269,39 @@ export function usePaymentMethodsForContext(
 }
 
 /**
+ * The business's own names and icons, keyed by catalogue id, for screens that
+ * render a STORED value rather than a catalogue row.
+ *
+ * A report or a printed invoice reads `payment_method::text` from a document;
+ * it has no join and may never have loaded the catalogue. This hook lets such a
+ * screen still print the business's own wording — so the same method is not
+ * «حوالات صنعاء» in the till and «تحويل بنكي» on the receipt.
+ *
+ * Exported separately from `usePaymentMethods` on purpose: a table cell needs
+ * nothing but the lookup, and subscribing it to the full resolved list would
+ * re-render every row whenever a sort order changes.
+ */
+export function usePaymentMethodOverrides(): PaymentMethodOverrides {
+  const { methods } = usePaymentMethods();
+
+  return useMemo(() => {
+    const map: PaymentMethodOverrides = {};
+    for (const method of methods) {
+      // Only methods with something to say. A method still carrying the shipped
+      // name is omitted entirely, so `paymentMethodLabel` keeps its own default
+      // path and the map stays small.
+      if (!method.isAuthored) continue;
+      map[method.id] = {
+        nameAr: method.nameAr,
+        nameEn: method.nameEn,
+        iconKey: method.iconKey,
+      };
+    }
+    return map;
+  }, [methods]);
+}
+
+/**
  * Write the tenant configuration. One mutation for both the bulk save the
  * settings screen performs and any future single-method toggle.
  */
@@ -272,6 +338,158 @@ export function useUpdatePaymentMethodSettings() {
   return {
     save,
     isSaving: mutation.isPending,
+    error: mutation.error as Error | null,
+  };
+}
+
+/* ==========================================================================
+   Authoring — a business names its own methods, and may add one
+   ========================================================================== */
+
+/**
+ * The rules this section enforces are ALL enforced a second time in the
+ * database (migration `20261009000000`), and that is intentional:
+ *
+ *   • here — so the operator gets an Arabic message and the Save button can be
+ *     disabled before a round-trip;
+ *   • there — because a rule that only exists in the browser is not a rule.
+ *
+ * The division of labour is the reason the catalogue can safely let a tenant
+ * write at all: `ledger_kind` and the stored value are decided by the database
+ * from the family the tenant picked, never sent by this code.
+ */
+
+/** What the settings screen sends when it renames or re-icons a method. */
+export interface PaymentMethodIdentityInput {
+  id: string;
+  nameAr: string;
+  nameEn?: string | null;
+  iconKey: string;
+}
+
+/** What the settings screen sends when it creates a method of its own. */
+export interface TenantPaymentMethodInput {
+  nameAr: string;
+  nameEn?: string | null;
+  iconKey: string;
+  /** Which existing stored value it settles as. The account family follows. */
+  legacyValue: LegacyPaymentValue;
+  contexts?: PaymentContext[];
+  requiresReference?: boolean;
+}
+
+/**
+ * Rename / re-icon an existing method — a shipped one or one the business made.
+ *
+ * Returns the row as the database wrote it rather than echoing the input, so a
+ * caller cannot report success for a value the trigger trimmed or rejected.
+ */
+export function useUpdatePaymentMethodIdentity() {
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: async (input: PaymentMethodIdentityInput) => {
+      const { data, error } = await db.rpc("update_payment_method_identity", {
+        p_id: input.id,
+        p_name_ar: input.nameAr,
+        p_name_en: input.nameEn ?? null,
+        p_icon_key: input.iconKey,
+      });
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        id: string;
+        name_ar: string;
+        name_en: string | null;
+        icon_key: string;
+        is_system: boolean;
+      }>;
+    },
+    onSuccess: () => {
+      // Every picker, chip and label in the application reads this one key.
+      queryClient.invalidateQueries({ queryKey: PAYMENT_METHODS_QUERY_KEY });
+    },
+  });
+
+  const rename = useCallback(
+    (input: PaymentMethodIdentityInput) => mutation.mutateAsync(input),
+    [mutation],
+  );
+
+  return {
+    rename,
+    isSaving: mutation.isPending,
+    error: mutation.error as Error | null,
+  };
+}
+
+/**
+ * Create a method the developers did not ship.
+ *
+ * The id is generated by the database from the name. It is deliberately NOT
+ * chosen here: an id is a stable key that migrations, reports and audit rows
+ * address forever, so it must not be something a browser can pick or collide
+ * with.
+ */
+export function useCreateTenantPaymentMethod() {
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: async (input: TenantPaymentMethodInput) => {
+      const { data, error } = await db.rpc("create_tenant_payment_method", {
+        p_name_ar: input.nameAr,
+        p_name_en: input.nameEn ?? null,
+        p_icon_key: input.iconKey,
+        p_legacy_id: input.legacyValue,
+        // Sent as NULL when not chosen, so the database's own default applies.
+        p_ledger_kind: null,
+        p_contexts: input.contexts ?? null,
+        p_requires_reference: input.requiresReference ?? true,
+      });
+      if (error) throw error;
+      return data as string;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: PAYMENT_METHODS_QUERY_KEY });
+    },
+  });
+
+  const create = useCallback(
+    (input: TenantPaymentMethodInput) => mutation.mutateAsync(input),
+    [mutation],
+  );
+
+  return {
+    create,
+    isCreating: mutation.isPending,
+    error: mutation.error as Error | null,
+  };
+}
+
+/**
+ * Remove a method the business created.
+ *
+ * The database refuses while a document still references it, and says so in
+ * Arabic — that refusal is the feature. Disabling is what an operator almost
+ * always wants; deleting is for a method typed by mistake a minute ago.
+ */
+export function useRemoveTenantPaymentMethod() {
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await db.rpc("remove_tenant_payment_method", { p_id: id });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: PAYMENT_METHODS_QUERY_KEY });
+    },
+  });
+
+  const remove = useCallback((id: string) => mutation.mutateAsync(id), [mutation]);
+
+  return {
+    remove,
+    isRemoving: mutation.isPending,
     error: mutation.error as Error | null,
   };
 }

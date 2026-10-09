@@ -36,11 +36,21 @@
 
 import {
   Banknote,
+  Bitcoin,
   Building2,
   Coins,
   CreditCard,
+  FileCheck2,
+  Globe,
+  HandCoins,
   Landmark,
+  Layers,
+  PiggyBank,
+  Receipt,
+  Scale,
+  ScrollText,
   Smartphone,
+  Store,
   Wallet,
   type LucideIcon,
 } from "lucide-react";
@@ -100,7 +110,57 @@ export type LedgerKind = "CASH" | "BANK" | "WALLET" | "CARD" | "CREDIT" | "OTHER
 
 /** The `public.payment_method` values a document may store. */
 export type LegacyPaymentValue =
-  "cash" | "card" | "bank_transfer" | "credit" | "mobile_money" | "split";
+  "cash" | "card" | "bank_transfer" | "credit" | "mobile_money" | "split" | "cheque";
+
+/**
+ * A business's own wording and icon for a catalogue method, keyed by catalogue
+ * id.
+ *
+ * Deliberately a plain lookup and not the full resolved row: a screen that only
+ * has a stored ENUM value (a report, a printed invoice) still needs to render
+ * the business's name, and it cannot join a catalogue it never loaded.
+ */
+export interface PaymentMethodOverride {
+  nameAr: string;
+  nameEn?: string;
+  iconKey: string;
+}
+
+export type PaymentMethodOverrides = Record<string, PaymentMethodOverride>;
+
+/**
+ * The values a BUSINESS may bind a method it creates to.
+ *
+ * `split` is excluded on purpose: it means "this invoice was settled by more
+ * than one method" and is written by the split engine, not chosen by an
+ * operator. `credit` is excluded because آجل is the absence of a payment, and a
+ * tenant-created method is a way of collecting one.
+ */
+export const TENANT_SELECTABLE_LEGACY_VALUES: readonly LegacyPaymentValue[] = [
+  "cash",
+  "card",
+  "bank_transfer",
+  "mobile_money",
+  "cheque",
+];
+
+/**
+ * The catalogue row a tenant may edit freely. Mirrors the migration's
+ * `payment_methods.is_system`: a developer row may be renamed and re-iconed,
+ * never re-pointed; a tenant row may be edited and removed.
+ */
+export interface PaymentMethodProvenance {
+  isSystem: boolean;
+  /** A developer row whose label no longer matches the shipped Arabic name. */
+  isRenamed?: boolean;
+}
+
+/**
+ * The catalogue REPLACES its developer definition once the database answers.
+ * Exported so the hook's doc comment can point at a type rather than scrub the
+ * difference in prose.
+ */
+export type PaymentMethodSource = "database" | "fallback";
 
 /* ==========================================================================
    The developer catalogue
@@ -280,6 +340,25 @@ export const PAYMENT_METHOD_CATALOG: readonly PaymentMethodDefinition[] = [
     legacyValue: "mobile_money",
   },
   {
+    // A cheque clears through the bank, so it settles as `bank_transfer` while
+    // keeping its own name and icon. It shipped in the migration seed from the
+    // start (`20261208000000` section 1) — its absence here meant a database
+    // that had the migration applied showed "شيك" with no label and no icon.
+    id: "cheque",
+    nameAr: "شيك",
+    nameEn: "Cheque",
+    // The applied database seed uses `bank-transfer`; keep it aligned until a
+    // forward migration deliberately changes the stored icon key.
+    iconKey: "bank-transfer",
+    isActive: true,
+    sortOrder: 120,
+    allowedContexts: ["pos", "sales", "purchases", "expenses", "customer_collection"],
+    ledgerKind: "BANK",
+    defaultAccountCode: "1111",
+    requiresReference: true,
+    legacyValue: "cheque",
+  },
+  {
     // Not a tender the operator picks — it is what an invoice records when the
     // cashier split the payment across several methods. It lives in the
     // catalogue so historic split invoices get a name and an icon from the same
@@ -319,6 +398,20 @@ export function getPaymentMethodDefinition(id: string): PaymentMethodDefinition 
   return CATALOG_BY_ID.get(id);
 }
 
+/** The developer definition of a method, ignoring any tenant override. */
+export function getShippedPaymentMethod(id: string): PaymentMethodDefinition | undefined {
+  return CATALOG_BY_ID.get(id);
+}
+
+/**
+ * Is this an id the developers shipped, as opposed to one a business created?
+ * The settings screen uses it to decide whether to offer Delete (tenant) or
+ * only Disable (developer).
+ */
+export function isShippedPaymentMethod(id: string): boolean {
+  return CATALOG_BY_ID.has(id);
+}
+
 /**
  * The ENUM value a document must store for a catalogue id. An unknown id falls
  * back to itself, which is what the database already expects for the `split`
@@ -334,14 +427,14 @@ export function toCatalogId(legacy: string | null | undefined): string | undefin
   return CATALOG_BY_LEGACY.get(legacy)?.id;
 }
 
-/* ==========================================================================
+/* ============================================================================
    Icons — one registry, resolved locally, with a fallback chain
-   ========================================================================== */
+   ============================================================================ */
 
 /**
- * iconKey -> component. Every entry is a small lucide icon already in the
- * bundle. There is deliberately no code path that loads an icon from a URL or
- * from storage: the customer never supplies an icon, and an icon can never 404.
+ * iconKey -> bundled component. Tenant-provided URLs and uploads are never
+ * accepted. Locally supplied Yemeni wallet SVGs are selected through the
+ * separate method-id asset registry below, only for positively identified brands.
  */
 const ICON_REGISTRY: Record<string, LucideIcon> = {
   cash: Banknote,
@@ -353,8 +446,60 @@ const ICON_REGISTRY: Record<string, LucideIcon> = {
   card: CreditCard,
   credit: Coins,
   split: Coins,
+  cheque: FileCheck2,
+  exchange: Scale,
+  "exchange-house": Store,
+  "digital-wallet": Bitcoin,
+  savings: PiggyBank,
+  transfer: Globe,
+  share: Layers,
+  contract: ScrollText,
+  invoice: Receipt,
+  agent: HandCoins,
   generic: Wallet,
 };
+
+/** Only confidently identified, checked-in Yemeni wallet assets are registered by stable method id. */
+export const PAYMENT_METHOD_ICON_ASSETS = {
+  floosak: { src: "/yemeni_wallet_icons_svg/floosak.svg", alt: "Floosak" },
+  one_cash: { src: "/yemeni_wallet_icons_svg/one-cash.svg", alt: "One Cash" },
+  jaib: { src: "/yemeni_wallet_icons_svg/jaib.svg", alt: "Jaib" },
+} as const;
+
+export function paymentMethodIconAsset(methodId?: string | null) {
+  return methodId
+    ? PAYMENT_METHOD_ICON_ASSETS[methodId as keyof typeof PAYMENT_METHOD_ICON_ASSETS]
+    : undefined;
+}
+
+/**
+ * The icon keys the settings screen offers when a business creates or re-icons a
+ * method. Every entry is already in the bundle, so this list is a convenience
+ * over `ICON_REGISTRY`, never a second source of truth: a key the database
+ * holds but this build does not know still resolves through the fallback chain
+ * in `paymentMethodIcon`.
+ */
+export const PAYMENT_ICON_CHOICES: readonly { key: string; labelAr: string; labelEn: string }[] = [
+  { key: "cash", labelAr: "نقد", labelEn: "Cash" },
+  { key: "bank", labelAr: "بنك", labelEn: "Bank" },
+  { key: "bank-transfer", labelAr: "حوالة", labelEn: "Transfer" },
+  { key: "kuraimi", labelAr: "مبنى بنكي", labelEn: "Bank building" },
+  { key: "cheque", labelAr: "شيك", labelEn: "Cheque" },
+  { key: "card", labelAr: "بطاقة", labelEn: "Card" },
+  { key: "wallet", labelAr: "محفظة", labelEn: "Wallet" },
+  { key: "mobile-money", labelAr: "هاتف/محفظة", labelEn: "Mobile wallet" },
+  { key: "digital-wallet", labelAr: "محفظة رقمية", labelEn: "Digital wallet" },
+  { key: "savings", labelAr: "توفير", labelEn: "Savings" },
+  { key: "exchange", labelAr: "صرافة", labelEn: "Exchange" },
+  { key: "exchange-house", labelAr: "شركة صرافة", labelEn: "Exchange house" },
+  { key: "transfer", labelAr: "تحويل دولي", labelEn: "International" },
+  { key: "share", labelAr: "تجميع", labelEn: "Aggregate" },
+  { key: "contract", labelAr: "عقد", labelEn: "Contract" },
+  { key: "invoice", labelAr: "فاتورة", labelEn: "Invoice" },
+  { key: "agent", labelAr: "وكيل", labelEn: "Agent" },
+  { key: "credit", labelAr: "آجل", labelEn: "Credit" },
+  { key: "generic", labelAr: "عام", labelEn: "Generic" },
+];
 
 /** Fallback by ledger kind, so a new method with an unknown key still looks right. */
 const LEDGER_KIND_ICON: Record<LedgerKind, LucideIcon> = {
@@ -412,10 +557,23 @@ export function paymentMethodIconTone(ledgerKind: LedgerKind | undefined): strin
  * both: a settings screen has ids, a sales table has whatever the invoice
  * stored. An unrecognised value is returned verbatim rather than replaced with
  * a dash — a payment method we do not know about is information, not an error.
+ *
+ * `overrides` is the tenant's own naming layer. A business that renamed
+ * بنك الكريمي to «حوالات صنعاء» must see its own word in every table, report
+ * and printed document — otherwise the same money would read differently on two
+ * screens. Keyed by catalogue id, so it survives a shared stored value: two
+ * business methods may both resolve to `bank_transfer` while the generic
+ * «تحويل بنكي» keeps its own row untouched.
+ *
+ * Signature note: the extra parameters are tolerated rather than required.
+ * React Query calls a `queryFn` with a context object, and callers in this
+ * project pass label helpers directly into memoized pipelines, so this function
+ * accepts being invoked with arguments it does not want.
  */
 export function paymentMethodLabel(
   value: string | null | undefined,
   lang: "ar" | "en" = "ar",
+  overrides?: PaymentMethodOverrides | null,
 ): string {
   if (!value) return "—";
 
@@ -424,10 +582,60 @@ export function paymentMethodLabel(
     return lang === "ar" ? "دفع بأكثر من طريقة" : "Split payment";
   }
 
-  const def = CATALOG_BY_ID.get(value) ?? CATALOG_BY_LEGACY.get(value);
+  // A catalogue id is checked first: an override is keyed by id, and an id is
+  // also what the settings screen hands in. Falling back to the legacy index
+  // keeps a raw ENUM value from an old document working.
+  const byId = CATALOG_BY_ID.get(value);
+  const override = overrides?.[value] ?? (byId ? overrides?.[byId.id] : undefined);
+  if (override) {
+    return lang === "ar" ? override.nameAr : (override.nameEn ?? override.nameAr);
+  }
+
+  const def = byId ?? CATALOG_BY_LEGACY.get(value);
   if (!def) return value;
 
   return lang === "ar" ? def.nameAr : (def.nameEn ?? def.nameAr);
+}
+
+/**
+ * The name to render for a stored document value, preferring the tenant's own
+ * wording when the method it belongs to has one.
+ *
+ * This is the function a table cell, a report or a print template should call.
+ * It exists because a stored value alone cannot identify which of two methods
+ * sharing it the operator actually used — the caller must pass the catalogue id
+ * when it knows it (a settings row, a picker) and accept the generic name when
+ * it does not (a historic invoice that never recorded the institution).
+ */
+export function paymentMethodDisplayName(
+  value: string | null | undefined,
+  lang: "ar" | "en",
+  overrides?: PaymentMethodOverrides | null,
+): string {
+  return paymentMethodLabel(value, lang, overrides);
+}
+
+/**
+ * Is this method showing a name or an icon the business chose, rather than the
+ * one the developers shipped?
+ *
+ * Used by the settings screen to show "معدّلة" and offer a reset. Compared
+ * against the developer catalogue rather than against a stored copy, so the
+ * comparison stays correct after a migration improves a shipped label.
+ */
+export function hasAuthoredIdentity(method: {
+  id: string;
+  nameAr: string;
+  nameEn?: string;
+  iconKey: string;
+}): boolean {
+  const shipped = CATALOG_BY_ID.get(method.id);
+  if (!shipped) return true; // a tenant-created method is authored by definition
+  return (
+    shipped.nameAr !== method.nameAr ||
+    (shipped.nameEn ?? "") !== (method.nameEn ?? "") ||
+    shipped.iconKey !== method.iconKey
+  );
 }
 
 /**
