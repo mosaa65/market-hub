@@ -188,6 +188,7 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
           placeholder={placeholder}
           className={cn(
             searchSize[size],
+            "w-full min-w-0 truncate placeholder:truncate",
             "rounded-full border-0 bg-transparent text-foreground shadow-none",
             // The input sits on a translucent glass layer, so a 70%-opacity token
             // made the placeholder practically invisible. Full muted-foreground

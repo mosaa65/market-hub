@@ -32,6 +32,7 @@ import type { InvoiceDoc } from "@/lib/pdf";
 import { toast } from "sonner";
 
 export type PrintMethodType = "thermal" | "page";
+export type LuxuryPaperFormat = PrintPaperId;
 
 export interface LuxuryPrintPreviewModalProps {
   open: boolean;
@@ -56,7 +57,7 @@ function toUnifiedData(
 ): UnifiedDocumentData {
   if (!input) {
     return {
-      docType,
+      docType: docType as any,
       title: "مستند",
       number: "—",
       date: new Date().toLocaleDateString("ar-YE"),
@@ -73,7 +74,7 @@ function toUnifiedData(
   }
 
   return {
-    docType,
+    docType: docType as any,
     title: raw.title || "فاتورة مبيعات",
     number: raw.number || "—",
     date: raw.date || new Date().toLocaleDateString("ar-YE"),
