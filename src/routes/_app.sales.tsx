@@ -4,6 +4,7 @@ import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-quer
 import {
   Receipt,
   Eye,
+  MessageSquare,
   X,
   FileDown,
   Printer,
@@ -383,6 +384,27 @@ export function SalesPage() {
   };
 
   // WhatsApp Message Generator via Unified Communication Engine
+
+  const shareInvoiceSms = (inv: Invoice) => {
+    const hasPhone = Boolean(inv.customers?.phone && inv.customers.phone.trim().length > 0);
+    if (!hasPhone) {
+      toast.warning(
+        isRtl
+          ? "هذا العميل لا يوجد لديه رقم هاتف مسجل في النظام"
+          : "This customer has no phone number registered in the system",
+      );
+      return;
+    }
+
+    const remaining = Math.max(0, Number(inv.total) - Number(inv.paid));
+    const text = isRtl
+      ? `فاتورة مبيعات #${inv.invoice_number}\nالعميل: ${inv.customers?.name || "العميل الكريم"}\nالإجمالي: ${money(Number(inv.total))}\nالمدفوع: ${money(Number(inv.paid))}${remaining > 0 ? `\nالمتبقي: ${money(remaining)}` : ""}`
+      : `Sales Invoice #${inv.invoice_number}\nTotal: ${money(Number(inv.total))}\nPaid: ${money(Number(inv.paid))}${remaining > 0 ? `\nDue: ${money(remaining)}` : ""}`;
+
+    const clean = (inv.customers?.phone || "").replace(/[^\d+]/g, "");
+    window.open(`sms:${clean}?body=${encodeURIComponent(text)}`, "_blank");
+  };
+
   const shareInvoiceWhatsApp = (inv: Invoice) => {
     const hasPhone = Boolean(inv.customers?.phone && inv.customers.phone.trim().length > 0);
     if (!hasPhone) {
@@ -1125,8 +1147,8 @@ export function SalesPage() {
           value: search,
           onValueChange: setSearch,
           placeholder: isRtl
-            ? "البحث برقم الفاتورة، اسم العميل، رقم الهاتف أو الملاحظات..."
-            : "Search invoice #, customer name, phone or notes...",
+            ? "ابحث برقم الفاتورة، العميل، الهاتف..."
+            : "Search invoice #, customer, phone...",
           resultCount: totalInvoiceCount ?? filteredRows.length,
         }}
         filters={{
@@ -1308,7 +1330,7 @@ export function SalesPage() {
         <>
           {/* 1. Cards View (Grid Mode) — same 2-column mobile grid as products */}
           {viewMode === "grid" && (
-            <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {filteredRows.map((inv) => {
                 const total = Number(inv.total) || 0;
                 const paid = Number(inv.paid) || 0;
@@ -1441,6 +1463,27 @@ export function SalesPage() {
                           }
                         >
                           <WhatsAppIcon className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!inv.customers?.phone}
+                          onClick={() => shareInvoiceSms(inv)}
+                          className={`grid size-8 place-items-center rounded-lg border transition ${
+                            inv.customers?.phone
+                              ? "border-border/70 text-muted-foreground hover:bg-surface-2 hover:text-blue-500 cursor-pointer"
+                              : "border-border/40 text-muted-foreground/30 cursor-not-allowed opacity-50"
+                          }`}
+                          title={
+                            !inv.customers?.phone
+                              ? isRtl
+                                ? "هذا العميل لا يوجد لديه رقم هاتف مسجل في النظام"
+                                : "This customer has no phone number registered"
+                              : isRtl
+                                ? "مشاركة عبر رسالة نصية SMS"
+                                : "Share via SMS"
+                          }
+                        >
+                          <MessageSquare className="h-4 w-4" />
                         </button>
                         <button
                           type="button"
@@ -1600,6 +1643,27 @@ export function SalesPage() {
                           }
                         >
                           <WhatsAppIcon className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!inv.customers?.phone}
+                          onClick={() => shareInvoiceSms(inv)}
+                          className={`rounded-lg p-1.5 transition ${
+                            inv.customers?.phone
+                              ? "text-muted-foreground hover:bg-surface-2 hover:text-blue-500 cursor-pointer"
+                              : "text-muted-foreground/30 cursor-not-allowed opacity-50"
+                          }`}
+                          title={
+                            !inv.customers?.phone
+                              ? isRtl
+                                ? "لا يوجد رقم هاتف مسجل"
+                                : "No phone registered"
+                              : isRtl
+                                ? "مشاركة عبر رسالة SMS"
+                                : "Share via SMS"
+                          }
+                        >
+                          <MessageSquare className="h-4 w-4" />
                         </button>
                         <button
                           type="button"
@@ -2035,40 +2099,52 @@ export function SalesPage() {
 
             {/* Modal Footer / Actions */}
             <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/80 bg-surface-2/40 px-6 py-4">
-              <div className="flex items-center gap-2">
-                {/* WhatsApp invoice share */}
-                <div className="flex flex-col items-start gap-1">
-                  {!selected.customers?.phone && (
-                    <span className="flex items-center gap-1 text-[11px] text-amber-500 font-semibold">
-                      <AlertCircle className="size-3" />
-                      {isRtl
-                        ? "هذا العميل لا يوجد لديه رقم هاتف مسجل في النظام."
-                        : "This customer has no phone number registered in the system."}
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    disabled={!selected.customers?.phone}
-                    onClick={() => shareInvoiceWhatsApp(selected)}
-                    title={
-                      !selected.customers?.phone
-                        ? isRtl
-                          ? "هذا العميل لا يوجد لديه رقم هاتف مسجل في النظام"
-                          : "This customer has no phone number registered"
-                        : isRtl
-                          ? "مشاركة واتساب"
-                          : "WhatsApp"
-                    }
-                    className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition ${
-                      selected.customers?.phone
-                        ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 cursor-pointer"
-                        : "border border-border/60 bg-muted/40 text-muted-foreground/40 cursor-not-allowed opacity-50"
-                    }`}
-                  >
-                    <WhatsAppIcon className="h-4 w-4" />
-                    <span>{isRtl ? "مشاركة واتساب" : "WhatsApp"}</span>
-                  </button>
-                </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  disabled={!selected.customers?.phone}
+                  onClick={() => shareInvoiceWhatsApp(selected)}
+                  title={
+                    !selected.customers?.phone
+                      ? isRtl
+                        ? "هذا العميل لا يوجد لديه رقم هاتف مسجل في النظام"
+                        : "This customer has no phone number registered"
+                      : isRtl
+                        ? "مشاركة واتساب"
+                        : "WhatsApp"
+                  }
+                  className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition ${
+                    selected.customers?.phone
+                      ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 cursor-pointer"
+                      : "border border-border/60 bg-muted/40 text-muted-foreground/40 cursor-not-allowed opacity-50"
+                  }`}
+                >
+                  <WhatsAppIcon className="h-4 w-4" />
+                  <span>{isRtl ? "واتساب" : "WhatsApp"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={!selected.customers?.phone}
+                  onClick={() => shareInvoiceSms(selected)}
+                  title={
+                    !selected.customers?.phone
+                      ? isRtl
+                        ? "هذا العميل لا يوجد لديه رقم هاتف مسجل في النظام"
+                        : "This customer has no phone number registered"
+                      : isRtl
+                        ? "مشاركة SMS"
+                        : "SMS"
+                  }
+                  className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition ${
+                    selected.customers?.phone
+                      ? "border border-blue-500/30 bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 cursor-pointer"
+                      : "border border-border/60 bg-muted/40 text-muted-foreground/40 cursor-not-allowed opacity-50"
+                  }`}
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  <span>{isRtl ? "رسالة SMS" : "SMS"}</span>
+                </button>
 
                 {/* PDF */}
                 <button

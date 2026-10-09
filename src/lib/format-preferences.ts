@@ -84,3 +84,37 @@ export function formatLuxuryDate(
     full,
   };
 }
+
+
+export function formatFormalDateTime(
+  dateInput: string | Date | null | undefined,
+  options?: { showTime?: boolean; forceStyle?: DigitStyle; isRtl?: boolean },
+): { date: string; time: string; full: string } {
+  if (!dateInput) return { date: "—", time: "—", full: "—" };
+  const d = typeof dateInput === "string" ? new Date(dateInput) : dateInput;
+  if (isNaN(d.getTime())) return { date: "—", time: "—", full: "—" };
+
+  const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+  const yyyy = d.getFullYear();
+  const mm = pad(d.getMonth() + 1);
+  const dd = pad(d.getDate());
+
+  let hours = d.getHours();
+  const minutes = pad(d.getMinutes());
+  const isPm = hours >= 12;
+  const isArabic = options?.isRtl !== false;
+  const period = isArabic ? (isPm ? "م" : "ص") : (isPm ? "PM" : "AM");
+  hours = hours % 12 || 12;
+  const hh = pad(hours);
+
+  const style = options?.forceStyle;
+  const dateStr = `${yyyy}/${mm}/${dd}`;
+  const timeStr = `${hh}:${minutes} ${period}`;
+  const full = options?.showTime !== false ? `${dateStr}  ${timeStr}` : dateStr;
+
+  return {
+    date: toSystemDigits(dateStr, style),
+    time: toSystemDigits(timeStr, style),
+    full: toSystemDigits(full, style),
+  };
+}
