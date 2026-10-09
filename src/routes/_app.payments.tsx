@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { useI18n } from "@/lib/i18n";
 import { money } from "@/lib/format";
+import { paymentMethodLabel } from "@/lib/payments/payment-methods";
 import { toast } from "sonner";
 import { WhatsAppButton } from "@/components/whatsapp-button";
 import { paymentReceiptMessage, debtReminderMessage } from "@/lib/whatsapp-templates";
@@ -218,20 +219,9 @@ function PaymentsPage() {
     });
   }
 
-  const pmLabel = (m: string) =>
-    m === "cash"
-      ? lang === "ar"
-        ? "نقدي"
-        : "Cash"
-      : m === "card"
-        ? lang === "ar"
-          ? "بطاقة"
-          : "Card"
-        : m === "bank_transfer"
-          ? lang === "ar"
-            ? "تحويل بنكي"
-            : "Bank"
-          : m;
+  // The catalogue, not a local map: a map defaulted everything it did not know
+  // to the raw key, and it did not know mobile_money or a tenant-created method.
+  const pmLabel = (m: string) => paymentMethodLabel(m, lang === "ar" ? "ar" : "en");
 
   return (
     <>
@@ -616,7 +606,8 @@ function PaymentsPage() {
                 receiptNumber: successModalData.receiptNumber || "",
                 date: successModalData.date,
                 amount: successModalData.amount,
-                method: method === "cash" ? "نقداً" : method === "bank_transfer" ? "تحويل بنكي" : "بطاقة",
+                method:
+                  method === "cash" ? "نقداً" : method === "bank_transfer" ? "تحويل بنكي" : "بطاقة",
                 remainingBalance: successModalData.remaining,
                 invoiceNumber: successModalData.invoiceNumber,
               }

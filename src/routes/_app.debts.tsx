@@ -5,7 +5,7 @@ import {
   VortexFilterSection,
   type PaymentMethod,
 } from "@/components/vortex-ui";
-import { toLegacyPaymentValue } from "@/lib/payments/payment-methods";
+import { toLegacyPaymentValue, paymentMethodLabel } from "@/lib/payments/payment-methods";
 import { SlidersHorizontal, Wallet, AlertTriangle, UserCheck } from "lucide-react";
 /**
  * شاشة الديون — تعرض الأرصدة **من الدفتر** لا من العمود المخزَّن.
@@ -213,14 +213,8 @@ function DebtsPage() {
     return { totalDebt, debtors, overLimit };
   }, [rows, ledgerIndex]);
 
-  const pmLabel = (m: string) =>
-    m === "cash"
-      ? t("pos.pm.cash")
-      : m === "card"
-        ? t("pos.pm.card")
-        : m === "bank_transfer"
-          ? t("pos.pm.bank")
-          : m;
+  // The catalogue, not a local map — same change as the payments screen.
+  const pmLabel = (m: string) => paymentMethodLabel(m, lang === "ar" ? "ar" : "en");
 
   /** الرصيد المعتمد للعميل المحدد — من الدفتر لا من العمود المخزَّن */
   const selectedLedgerRow = selected ? ledgerIndex.get(selected.id) : undefined;

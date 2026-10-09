@@ -115,6 +115,13 @@ const SESSION_VARIANT_PREFIXES: readonly string[] = [
   "payments",
   "debts",
   "opening",
+  // The payment-method catalogue carries the business's OWN names, icons and
+  // enabled set (`payment_method_settings`). Leaving it cached across an
+  // identity change would show the previous business's method names in the
+  // picker — and its enabled/disabled choices — until the 30-minute staleTime
+  // expired. The developer catalogue is identical for everyone, but the merge
+  // is not, and the key cannot distinguish the two.
+  "payment-methods",
 ];
 
 /**

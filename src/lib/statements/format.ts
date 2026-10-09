@@ -5,6 +5,7 @@
  */
 
 import { money } from "@/lib/format";
+import { paymentMethodLabel as cataloguePaymentMethodLabel } from "@/lib/payments/payment-methods";
 import { kindLabel } from "./engine";
 import type {
   StatementColumn,
@@ -114,22 +115,11 @@ export function cellValue(
 
 /** طريقة الدفع — تُقرأ من meta وهي بيانات موجودة أصلًا */
 export function paymentMethodLabel(method: string | undefined | null, lang: "ar" | "en"): string {
+  // The catalogue, not a fourth copy of the same map. This file is reached by
+  // reports and by the CSV/print exports, which is precisely where a missing
+  // entry used to leak a raw key like `mobile_money` into a customer's document.
   if (!method) return "—";
-  const ar: Record<string, string> = {
-    cash: "نقدي",
-    card: "بطاقة",
-    bank_transfer: "تحويل بنكي",
-    mobile_money: "محفظة إلكترونية",
-    credit: "آجل",
-  };
-  const en: Record<string, string> = {
-    cash: "Cash",
-    card: "Card",
-    bank_transfer: "Bank transfer",
-    mobile_money: "Mobile money",
-    credit: "Credit",
-  };
-  return (lang === "ar" ? ar : en)[method] ?? method;
+  return cataloguePaymentMethodLabel(method, lang);
 }
 
 /**

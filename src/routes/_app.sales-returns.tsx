@@ -34,7 +34,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 // Payment-method picker (this branch) alongside the unified print preview (main).
-import { PaymentMethodPicker } from "@/components/ui/payment-method";
+import { PaymentMethodPicker, PaymentMethodChip } from "@/components/ui/payment-method";
 import { Plus, Trash2, RotateCcw, Search, Loader2, Printer } from "lucide-react";
 import { LuxuryPrintPreviewModal } from "@/components/luxury-print-preview-modal";
 import type { UnifiedDocumentData } from "@/lib/templates";
@@ -202,7 +202,19 @@ function SalesReturnsPage() {
                         {r.customers?.name ?? (lang === "ar" ? "عميل نقدي" : "Walk-in")}
                       </TableCell>
                       {hasMultiWarehouse && <TableCell>{whName(r.warehouses)}</TableCell>}
-                      <TableCell className="text-xs">{r.refund_method ?? "cash"}</TableCell>
+                      <TableCell className="text-xs">
+                        {/*
+                          Was `{r.refund_method ?? "cash"}` — the raw ENUM value.
+                          An operator read "bank_transfer" and "mobile_money" as
+                          English machine words. The chip resolves the stored
+                          value through the catalogue, so it prints the method's
+                          Arabic name and shows its shape.
+                        */}
+                        <PaymentMethodChip
+                          value={r.refund_method}
+                          lang={lang === "ar" ? "ar" : "en"}
+                        />
+                      </TableCell>
                       <TableCell className="text-end font-mono font-semibold">
                         {money(Number(r.total))}
                       </TableCell>

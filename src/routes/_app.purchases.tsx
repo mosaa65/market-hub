@@ -38,7 +38,11 @@ import { IconButton } from "@/components/ui/icon-button";
 import { useBreakpoint } from "@/design/breakpoints";
 import { toast } from "sonner";
 import { PaymentMethodPicker } from "@/components/ui/payment-method";
-import { getPaymentMethodDefinition, paymentMethodLabel } from "@/lib/payments/payment-methods";
+import {
+  getPaymentMethodDefinition,
+  paymentMethodLabel,
+  toLegacyPaymentValue,
+} from "@/lib/payments/payment-methods";
 
 export const Route = createFileRoute("/_app/purchases")({
   head: () => ({ meta: [{ title: "Purchases — Vortex ERP" }] }),
@@ -1251,7 +1255,10 @@ function CreateDialog({
       const { error } = await supabase.rpc("create_purchase", {
         _warehouse_id: warehouseId,
         _supplier_id: supplierId,
-        _payment_method: paymentMethod,
+        // The picker holds a catalogue id. Convert at the boundary, exactly as
+        // the POS screen does, so `create_purchase` receives the stored value it
+        // casts into the ENUM.
+        _payment_method: toLegacyPaymentValue(paymentMethod),
         _paid: paymentMethod === "credit" ? 0 : paidN || total,
         _discount: discountN,
         _note: (note || null) as any,

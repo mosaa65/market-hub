@@ -1,11 +1,23 @@
 import { lazy, useState, useEffect, useMemo } from "react";
-import { Area, AreaChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/page-header";
 import { formatLuxuryDate, toSystemDigits } from "@/lib/format-preferences";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
+import { paymentMethodLabel as paymentMethodLabelFromCatalog } from "@/lib/payments/payment-methods";
 import { useModules } from "@/lib/modules";
 import { useAuth } from "@/lib/auth";
 import { money, num } from "@/lib/format";
@@ -32,10 +44,14 @@ import {
   Sunrise,
   Crown,
   ShieldCheck,
-  Calendar as CalendarIcon, CalendarDays,
+  Calendar as CalendarIcon,
+  CalendarDays,
   Clock,
   ArrowLeft,
-  ChevronLeft, ChevronRight, RotateCcw, CalendarCheck,
+  ChevronLeft,
+  ChevronRight,
+  RotateCcw,
+  CalendarCheck,
   Radio,
   Activity,
   Zap,
@@ -69,15 +85,8 @@ const TOOLTIP_LABEL_STYLE = { color: "var(--muted-foreground)", marginBottom: 4 
 const CHART_GRID_STROKE = "var(--border)";
 
 function paymentMethodLabel(method: string | null | undefined, isAr: boolean): string {
-  const map: Record<string, string> = {
-    cash: isAr ? "نقدًا" : "Cash",
-    card: isAr ? "بطاقة" : "Card",
-    bank_transfer: isAr ? "تحويل بنكي" : "Bank transfer",
-    bank: isAr ? "تحويل بنكي" : "Bank",
-    credit: isAr ? "آجل" : "Credit",
-  };
-  if (!method) return isAr ? "غير محدد" : "Unspecified";
-  return map[method] ?? method;
+  // The catalogue, not a local map — see the same change in _app.analytics.tsx.
+  return paymentMethodLabelFromCatalog(method, isAr ? "ar" : "en");
 }
 
 function getGreeting(hour: number, isAr: boolean) {
@@ -331,11 +340,7 @@ function DashboardPage() {
 
   return (
     <>
-      <PageHeader
-        title={t("dash.title")}
-        subtitle={t("dash.subtitle")}
-        
-      />
+      <PageHeader title={t("dash.title")} subtitle={t("dash.subtitle")} />
 
       {/* ═══════════════════════════════════════════════════════════════════════
           TOP EXECUTIVE BANNER — FULL WIDTH, COMPACT HEIGHT, UNIFIED ELEGANCE
@@ -356,7 +361,10 @@ function DashboardPage() {
                 <roleMeta.icon className="size-5 sm:size-6 text-amber-500 dark:text-amber-400 filter drop-shadow-sm" />
               </div>
             )}
-            <span className="absolute -bottom-0.5 -end-0.5 flex size-4 items-center justify-center" title={isAr ? "جلسة موثقة ومتصلة لحظياً" : "Live Session"}>
+            <span
+              className="absolute -bottom-0.5 -end-0.5 flex size-4 items-center justify-center"
+              title={isAr ? "جلسة موثقة ومتصلة لحظياً" : "Live Session"}
+            >
               <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-60" />
               <span className="relative inline-flex size-2.5 rounded-full bg-emerald-500 ring-2 ring-card shadow-xs" />
             </span>
@@ -372,7 +380,9 @@ function DashboardPage() {
               <span className="text-sm sm:text-base font-black text-foreground tracking-tight">
                 {userName}
               </span>
-              <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.2 text-[10px] font-bold shadow-xs ${roleMeta.badgeCls}`}>
+              <span
+                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.2 text-[10px] font-bold shadow-xs ${roleMeta.badgeCls}`}
+              >
                 <span>{roleMeta.label}</span>
               </span>
             </div>
@@ -440,33 +450,73 @@ function DashboardPage() {
             });
           }
 
-          const monthNamesAr = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
-          const monthNamesEn = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+          const monthNamesAr = [
+            "يناير",
+            "فبراير",
+            "مارس",
+            "أبريل",
+            "مايو",
+            "يونيو",
+            "يوليو",
+            "أغسطس",
+            "سبتمبر",
+            "أكتوبر",
+            "نوفمبر",
+            "ديسمبر",
+          ];
+          const monthNamesEn = [
+            "January",
+            "February",
+            "March",
+            "April",
+            "May",
+            "June",
+            "July",
+            "August",
+            "September",
+            "October",
+            "November",
+            "December",
+          ];
           const currentMonthName = isAr ? monthNamesAr[calMonth] : monthNamesEn[calMonth];
 
-          const weekHeadersAr = ["السبت", "الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة"];
+          const weekHeadersAr = [
+            "السبت",
+            "الأحد",
+            "الاثنين",
+            "الثلاثاء",
+            "الأربعاء",
+            "الخميس",
+            "الجمعة",
+          ];
           const weekHeadersEn = ["Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri"];
           const weekHeaders = isAr ? weekHeadersAr : weekHeadersEn;
 
           // Sales rows calculation for selected date
           const allSales = data?.allSalesRows ?? [];
           const selectedDaySalesRows = allSales.filter(
-            (r: any) => ((r.created_at || "") as string).slice(0, 10) === selectedDateKey
+            (r: any) => ((r.created_at || "") as string).slice(0, 10) === selectedDateKey,
           );
           const selectedDayRevenue = isSelectedToday
-            ? (data?.daily && data.daily.length > 0 ? data.daily[data.daily.length - 1]?.revenue ?? 0 : selectedDaySalesRows.reduce((a: number, r: any) => a + Number(r.total || 0), 0))
+            ? data?.daily && data.daily.length > 0
+              ? (data.daily[data.daily.length - 1]?.revenue ?? 0)
+              : selectedDaySalesRows.reduce((a: number, r: any) => a + Number(r.total || 0), 0)
             : selectedDaySalesRows.reduce((a: number, r: any) => a + Number(r.total || 0), 0);
           const selectedDayOrders = isSelectedToday
-            ? (data?.daily && data.daily.length > 0 ? data.daily[data.daily.length - 1]?.orders ?? 0 : selectedDaySalesRows.length)
+            ? data?.daily && data.daily.length > 0
+              ? (data.daily[data.daily.length - 1]?.orders ?? 0)
+              : selectedDaySalesRows.length
             : selectedDaySalesRows.length;
 
-          const selectedLuxuryDate = formatLuxuryDate(selectedDate, { showDayName: true, showYear: true });
+          const selectedLuxuryDate = formatLuxuryDate(selectedDate, {
+            showDayName: true,
+            showYear: true,
+          });
 
           return (
             <>
               {/* Top Row: Operational Briefing & Launchers + Full Month Luxury Chronos */}
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 items-stretch">
-                
                 {/* Card 1: Operational Briefing & Quick Launchers Dock (6 cols) */}
                 <div className="relative overflow-hidden rounded-3xl border border-border/80 bg-gradient-to-br from-card via-card/95 to-zinc-900/40 dark:from-zinc-950 dark:via-zinc-900/90 dark:to-zinc-950 p-5 sm:p-6 lg:col-span-6 shadow-panel backdrop-blur-xl flex flex-col justify-between">
                   {/* Ambient Lighting */}
@@ -483,10 +533,14 @@ function DashboardPage() {
                         </div>
                         <div>
                           <h3 className="text-base sm:text-lg font-black text-foreground tracking-tight">
-                            {isAr ? "الموجز التنفيذي والجاهزية اليومية" : "Executive Operations Briefing"}
+                            {isAr
+                              ? "الموجز التنفيذي والجاهزية اليومية"
+                              : "Executive Operations Briefing"}
                           </h3>
                           <p className="text-xs text-muted-foreground font-medium">
-                            {isAr ? "كفاءة حركة النقد ومسارات الإنجاز الفوري" : "Cash velocity & rapid execution paths"}
+                            {isAr
+                              ? "كفاءة حركة النقد ومسارات الإنجاز الفوري"
+                              : "Cash velocity & rapid execution paths"}
                           </p>
                         </div>
                       </div>
@@ -516,7 +570,9 @@ function DashboardPage() {
                         </span>
                         <div className="flex items-center gap-1.5 font-mono text-xs sm:text-sm font-black text-foreground">
                           <ShoppingCart className="size-3.5 text-amber-500 shrink-0" />
-                          <span>{num(selectedDayOrders)} {isAr ? "فاتورة" : "orders"}</span>
+                          <span>
+                            {num(selectedDayOrders)} {isAr ? "فاتورة" : "orders"}
+                          </span>
                         </div>
                       </div>
 
@@ -526,7 +582,9 @@ function DashboardPage() {
                         </span>
                         <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-foreground">
                           <Zap className="size-3.5 text-amber-500 shrink-0" />
-                          <span className="text-emerald-600 dark:text-emerald-400 truncate">{isAr ? "محدثة كلياً" : "Live Synced"}</span>
+                          <span className="text-emerald-600 dark:text-emerald-400 truncate">
+                            {isAr ? "محدثة كلياً" : "Live Synced"}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -550,7 +608,9 @@ function DashboardPage() {
                       >
                         <Zap className="size-3.5" />
                         <span>{lang === "ar" ? "نقطة البيع (POS)" : "Open POS"}</span>
-                        <kbd className="hidden sm:inline-block rounded bg-black/20 px-1 py-0.2 text-[9px] font-mono">F2</kbd>
+                        <kbd className="hidden sm:inline-block rounded bg-black/20 px-1 py-0.2 text-[9px] font-mono">
+                          F2
+                        </kbd>
                       </Link>
 
                       <Link
@@ -571,7 +631,7 @@ function DashboardPage() {
 
                       <Link
                         to={"/products" as any}
-                        search={({ barcode: undefined } as any)}
+                        search={{ barcode: undefined } as any}
                         className="inline-flex h-8 sm:h-9 items-center gap-1.5 rounded-xl border border-border/80 bg-surface/80 px-2.5 text-xs font-semibold text-foreground hover:bg-surface-2 transition-all active:scale-95"
                       >
                         <Package className="size-3.5 text-muted-foreground" />
@@ -638,7 +698,11 @@ function DashboardPage() {
                         <div className="flex items-center gap-1.5 text-xs sm:text-sm font-black font-mono text-foreground justify-end tracking-wider">
                           <Clock className="size-3.5 text-amber-500 animate-pulse" />
                           <span>
-                            {now.toLocaleTimeString(isAr ? "ar-YE" : "en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                            {now.toLocaleTimeString(isAr ? "ar-YE" : "en-US", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              second: "2-digit",
+                            })}
                           </span>
                         </div>
                         <div className="flex items-center gap-1 text-[9px] text-muted-foreground font-semibold justify-end">
@@ -653,7 +717,10 @@ function DashboardPage() {
                       {/* Weekday Labels Header */}
                       <div className="grid grid-cols-7 gap-1 text-center mb-1.5">
                         {weekHeaders.map((w, idx) => (
-                          <span key={idx} className="text-[10px] sm:text-[11px] font-bold text-muted-foreground/80 py-0.5">
+                          <span
+                            key={idx}
+                            className="text-[10px] sm:text-[11px] font-bold text-muted-foreground/80 py-0.5"
+                          >
                             {w.slice(0, 3)}
                           </span>
                         ))}
@@ -677,12 +744,15 @@ function DashboardPage() {
                                 isSelected
                                   ? "bg-gradient-to-tr from-amber-500 to-amber-600 text-white font-black shadow-md scale-105 ring-2 ring-amber-500/50"
                                   : isTodayCell
-                                  ? "border border-amber-500/60 bg-amber-500/10 text-amber-500 font-bold hover:bg-amber-500/20"
-                                  : cell.isCurrentMonth
-                                  ? "text-foreground hover:bg-surface-2 hover:scale-105"
-                                  : "text-muted-foreground/35 hover:text-muted-foreground/60 text-[11px]"
+                                    ? "border border-amber-500/60 bg-amber-500/10 text-amber-500 font-bold hover:bg-amber-500/20"
+                                    : cell.isCurrentMonth
+                                      ? "text-foreground hover:bg-surface-2 hover:scale-105"
+                                      : "text-muted-foreground/35 hover:text-muted-foreground/60 text-[11px]"
                               }`}
-                              title={formatLuxuryDate(cell.date, { showDayName: true, showYear: true }).full}
+                              title={
+                                formatLuxuryDate(cell.date, { showDayName: true, showYear: true })
+                                  .full
+                              }
                             >
                               {cell.day}
                             </button>
@@ -696,7 +766,8 @@ function DashboardPage() {
                       <div className="flex items-center gap-1.5 font-medium truncate">
                         <CalendarCheck className="size-3.5 text-amber-500 shrink-0" />
                         <span className="font-bold text-foreground">
-                          {selectedLuxuryDate.weekday}، {selectedLuxuryDate.day} {selectedLuxuryDate.month} {selectedLuxuryDate.year}
+                          {selectedLuxuryDate.weekday}، {selectedLuxuryDate.day}{" "}
+                          {selectedLuxuryDate.month} {selectedLuxuryDate.year}
                         </span>
                         {!isSelectedToday && (
                           <span className="inline-flex items-center rounded-md bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.2 text-[9px] font-bold text-amber-600 dark:text-amber-400">
@@ -730,17 +801,33 @@ function DashboardPage() {
                         </div>
                         <span className="font-bold text-foreground text-xs sm:text-sm">
                           {isSelectedToday
-                            ? (isAr ? "تدفق مبيعات اليوم" : "Today Sales Inflow")
-                            : (isAr ? `مبيعات (${selectedDateKey})` : `Inflow (${selectedDateKey})`)}
+                            ? isAr
+                              ? "تدفق مبيعات اليوم"
+                              : "Today Sales Inflow"
+                            : isAr
+                              ? `مبيعات (${selectedDateKey})`
+                              : `Inflow (${selectedDateKey})`}
                         </span>
                       </div>
-                      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold border ${
-                        isSelectedToday
-                          ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
-                          : "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400"
-                      }`}>
-                        <span className={`size-1.5 rounded-full ${isSelectedToday ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
-                        <span>{isSelectedToday ? (isAr ? "مباشر" : "Live") : (isAr ? "يوم محدد" : "Selected")}</span>
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold border ${
+                          isSelectedToday
+                            ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                            : "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400"
+                        }`}
+                      >
+                        <span
+                          className={`size-1.5 rounded-full ${isSelectedToday ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`}
+                        />
+                        <span>
+                          {isSelectedToday
+                            ? isAr
+                              ? "مباشر"
+                              : "Live"
+                            : isAr
+                              ? "يوم محدد"
+                              : "Selected"}
+                        </span>
                       </span>
                     </div>
 
@@ -753,7 +840,9 @@ function DashboardPage() {
                     <div className="mt-2 pt-2 border-t border-border/50 flex items-center justify-between text-xs text-muted-foreground">
                       <span className="flex items-center gap-1 text-[11px] font-medium">
                         <ShoppingCart className="size-3 text-muted-foreground/70" />
-                        <span>{num(selectedDayOrders)} {isAr ? "فواتير مسجلة" : "invoices recorded"}</span>
+                        <span>
+                          {num(selectedDayOrders)} {isAr ? "فواتير مسجلة" : "invoices recorded"}
+                        </span>
                       </span>
                       <Link
                         to="/sales"
@@ -824,7 +913,8 @@ function DashboardPage() {
                         <div className="flex items-center gap-2 rounded-xl bg-rose-500/10 border border-rose-500/20 px-3 py-1.5 text-rose-600 dark:text-rose-400 w-full">
                           <AlertTriangle className="size-4 shrink-0 animate-bounce" />
                           <span className="text-xs sm:text-sm font-bold truncate">
-                            {data.alerts} {isAr ? "أصناف دون حد الأمان" : "items below reorder point"}
+                            {data.alerts}{" "}
+                            {isAr ? "أصناف دون حد الأمان" : "items below reorder point"}
                           </span>
                         </div>
                       ) : (
@@ -840,8 +930,12 @@ function DashboardPage() {
                     <div className="mt-2 pt-2 border-t border-border/50 flex items-center justify-between text-xs text-muted-foreground">
                       <span className="text-[11px] font-medium truncate">
                         {(data.alerts ?? 0) > 0
-                          ? (isAr ? "تتطلب إصدار أمر شراء أو تحويل" : "Reorder or transfer needed")
-                          : (isAr ? "لا توجد نواقص حرجة تتطلب تدخلاً" : "All safety limits honored")}
+                          ? isAr
+                            ? "تتطلب إصدار أمر شراء أو تحويل"
+                            : "Reorder or transfer needed"
+                          : isAr
+                            ? "لا توجد نواقص حرجة تتطلب تدخلاً"
+                            : "All safety limits honored"}
                       </span>
                       <Link
                         to="/inventory"
@@ -1108,7 +1202,9 @@ function DashboardPage() {
                 <h3 className="text-sm sm:text-base font-bold flex items-center gap-1.5 text-foreground">
                   {t("dash.top_products")}
                 </h3>
-                <p className="text-[11px] text-muted-foreground font-medium">{t("dash.last_30_days")}</p>
+                <p className="text-[11px] text-muted-foreground font-medium">
+                  {t("dash.last_30_days")}
+                </p>
               </div>
             </div>
             <span className="rounded-full bg-amber-500/10 px-2.5 py-0.5 text-[11px] font-bold text-amber-600 dark:text-amber-400 border border-amber-500/20">
@@ -1135,16 +1231,24 @@ function DashboardPage() {
                   "bg-gradient-to-r from-slate-300 to-slate-400 text-slate-900 shadow-xs font-black ring-1 ring-slate-300/40",
                   "bg-gradient-to-r from-amber-700 to-amber-800 text-white shadow-xs font-black ring-1 ring-amber-700/40",
                 ];
-                const badgeClass = i < 3 ? rankBadges[i] : "bg-surface-2 text-muted-foreground font-bold";
+                const badgeClass =
+                  i < 3 ? rankBadges[i] : "bg-surface-2 text-muted-foreground font-bold";
 
                 return (
-                  <div key={i} className="group rounded-2xl border border-border/50 bg-surface/50 p-3 hover:bg-surface-2/60 transition-all">
+                  <div
+                    key={i}
+                    className="group rounded-2xl border border-border/50 bg-surface/50 p-3 hover:bg-surface-2/60 transition-all"
+                  >
                     <div className="mb-2 flex items-center justify-between text-xs">
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <span className={`grid size-6 place-items-center rounded-lg text-[11px] shrink-0 ${badgeClass}`}>
+                        <span
+                          className={`grid size-6 place-items-center rounded-lg text-[11px] shrink-0 ${badgeClass}`}
+                        >
                           {i + 1}
                         </span>
-                        <span className="truncate font-bold text-foreground text-xs sm:text-sm">{name}</span>
+                        <span className="truncate font-bold text-foreground text-xs sm:text-sm">
+                          {name}
+                        </span>
                       </div>
                       <div className="text-end shrink-0 ms-2">
                         <span className="font-mono font-black text-foreground text-xs sm:text-sm">
@@ -1180,14 +1284,17 @@ function DashboardPage() {
                 <h3 className="text-sm sm:text-base font-bold flex items-center gap-1.5 text-foreground">
                   {t("dash.recent_sales")}
                 </h3>
-                <p className="text-[11px] text-muted-foreground font-medium">{isAr ? "أحدث حركات الفواتير المسجلة" : "Latest invoice activity"}</p>
+                <p className="text-[11px] text-muted-foreground font-medium">
+                  {isAr ? "أحدث حركات الفواتير المسجلة" : "Latest invoice activity"}
+                </p>
               </div>
             </div>
             <Link
               to="/sales"
               className="text-xs font-bold text-amber-500 hover:text-amber-600 dark:hover:text-amber-400 hover:underline flex items-center gap-0.5"
             >
-              {lang === "ar" ? "عرض السجل كامل" : "Full log"} <ChevronLeft className="size-3.5 rtl:rotate-0 rotate-180" />
+              {lang === "ar" ? "عرض السجل كامل" : "Full log"}{" "}
+              <ChevronLeft className="size-3.5 rtl:rotate-0 rotate-180" />
             </Link>
           </div>
 
@@ -1203,14 +1310,20 @@ function DashboardPage() {
                 const statusCls = isPaid
                   ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
                   : isPartial
-                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
-                  : "bg-surface-2 text-muted-foreground border-border/60";
+                    ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+                    : "bg-surface-2 text-muted-foreground border-border/60";
 
                 const statusLabel = isPaid
-                  ? (isAr ? "مدفوعة" : "Paid")
+                  ? isAr
+                    ? "مدفوعة"
+                    : "Paid"
                   : isPartial
-                  ? (isAr ? "جزئي" : "Partial")
-                  : (isAr ? "معلقة" : "Pending");
+                    ? isAr
+                      ? "جزئي"
+                      : "Partial"
+                    : isAr
+                      ? "معلقة"
+                      : "Pending";
 
                 return (
                   <div
@@ -1228,7 +1341,12 @@ function DashboardPage() {
                         <div className="text-[11px] text-muted-foreground font-mono flex items-center gap-1.5">
                           <span>{r.invoice_number}</span>
                           <span>•</span>
-                          <span>{new Date(r.created_at).toLocaleDateString(isAr ? "ar-YE" : "en-US", { month: "short", day: "numeric" })}</span>
+                          <span>
+                            {new Date(r.created_at).toLocaleDateString(isAr ? "ar-YE" : "en-US", {
+                              month: "short",
+                              day: "numeric",
+                            })}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -1237,8 +1355,12 @@ function DashboardPage() {
                       <div className="font-black font-mono text-foreground text-xs sm:text-sm">
                         {money(Number(r.total))}
                       </div>
-                      <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold ${statusCls}`}>
-                        <span className={`size-1 rounded-full ${isPaid ? "bg-emerald-500" : isPartial ? "bg-amber-500" : "bg-muted-foreground"}`} />
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold ${statusCls}`}
+                      >
+                        <span
+                          className={`size-1 rounded-full ${isPaid ? "bg-emerald-500" : isPartial ? "bg-amber-500" : "bg-muted-foreground"}`}
+                        />
                         {statusLabel}
                       </span>
                     </div>
