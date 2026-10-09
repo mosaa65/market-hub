@@ -80,13 +80,20 @@ export function renderUnifiedDocument(request: PrintRequest): string {
     override?.templateId ??
     (theme === "formal" ? "formal" : theme === "luxury" ? "elegant" : "standard");
 
+  const customOptions = {
+    showFooter: settings.footerEnabled,
+    showBarcode: override?.showBarcode ?? settings.showBarcode ?? true,
+    showQrCode: override?.showQrCode ?? settings.showQrCode ?? true,
+    ...request.doc.options,
+  };
+
   const html =
     effectiveTemplateId === "formal"
       ? renderFormalTemplate(
           request.doc,
           labels,
           rtl,
-          { showFooter: settings.footerEnabled },
+          customOptions,
           getCachedCompanyProfile(),
         )
       : renderDocumentHTML(
@@ -94,7 +101,7 @@ export function renderUnifiedDocument(request: PrintRequest): string {
           effectiveTemplateId,
           labels,
           rtl,
-          { showFooter: settings.footerEnabled },
+          customOptions,
           paperId,
         );
   return html

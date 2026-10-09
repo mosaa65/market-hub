@@ -14,6 +14,8 @@ export interface DocumentPrintOverride {
   copies?: number;
   method?: PrintMethod;
   behavior?: PrintBehavior;
+  showBarcode?: boolean;
+  showQrCode?: boolean;
 }
 
 export interface UnifiedPrintSettings {
@@ -25,6 +27,8 @@ export interface UnifiedPrintSettings {
   orientation: PrintOrientation;
   theme: PrintTheme;
   footerEnabled: boolean;
+  showBarcode: boolean;
+  showQrCode: boolean;
   overrides: Partial<Record<PrintingDocumentType, DocumentPrintOverride>>;
 }
 
@@ -38,6 +42,8 @@ export const DEFAULT_UNIFIED_PRINT_SETTINGS: UnifiedPrintSettings = {
   orientation: "portrait",
   theme: "standard",
   footerEnabled: true,
+  showBarcode: true,
+  showQrCode: true,
   overrides: {},
 };
 

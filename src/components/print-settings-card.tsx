@@ -219,6 +219,21 @@ export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
     updateUnified({ overrides: nextOverrides });
   }
 
+  function handleDepartmentBarcodeToggle(
+    docType: PrintingDocumentType,
+    field: "showBarcode" | "showQrCode",
+  ) {
+    const currentVal = unified.overrides[docType]?.[field] ?? unified[field] ?? true;
+    const nextOverrides = {
+      ...unified.overrides,
+      [docType]: {
+        ...unified.overrides[docType],
+        [field]: !currentVal,
+      },
+    };
+    updateUnified({ overrides: nextOverrides });
+  }
+
   const sampleDoc = useMemo(() => sampleDocumentFor(previewDocType), [previewDocType]);
 
   const previewRequest = useMemo(() => {
@@ -529,6 +544,31 @@ export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
                             })}
                           </div>
                         </div>
+
+                        {/* Controls 4: تخصيص إظهار الباركود والـ QR لهذا القسم */}
+                        <div className="space-y-1.5 sm:col-span-2 pt-1 border-t border-border/50">
+                          <label className="text-xs font-semibold text-muted-foreground block">
+                            تخصيص الرموز والترميز لهذا القسم
+                          </label>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="flex items-center justify-between p-2 rounded-xl border border-border/60 bg-background/60">
+                              <span className="text-xs font-medium">طباعة الباركود</span>
+                              <Switch
+                                checked={override.showBarcode ?? unified.showBarcode ?? true}
+                                onCheckedChange={() => handleDepartmentBarcodeToggle(dept.id, "showBarcode")}
+                                disabled={!canEdit}
+                              />
+                            </div>
+                            <div className="flex items-center justify-between p-2 rounded-xl border border-border/60 bg-background/60">
+                              <span className="text-xs font-medium">رمز QR الإلكتروني</span>
+                              <Switch
+                                checked={override.showQrCode ?? unified.showQrCode ?? true}
+                                onCheckedChange={() => handleDepartmentBarcodeToggle(dept.id, "showQrCode")}
+                                disabled={!canEdit}
+                              />
+                            </div>
+                          </div>
+                        </div>
                       </div>
 
                       {/* Card Bottom: Summary + Live Preview Button */}
@@ -801,6 +841,8 @@ export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
                     ["showNotes", "الملاحظات والشروط وسياسة الإرجاع"],
                     ["showSignatures", "خانات التوقيع والاعتماد والختم"],
                     ["showFooter", "الهامش السفلي وتذييل الفاتورة"],
+                    ["showBarcode", "رمز الباركود للمستند (Barcode)"],
+                    ["showQrCode", "رمز الاستجابة السريعة (QR Code)"],
                   ] as [keyof PrintSettings, string][]
                 ).map(([key, label]) => (
                   <div

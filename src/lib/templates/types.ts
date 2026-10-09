@@ -58,6 +58,8 @@ export interface CustomFieldOptions {
   showNotes?: boolean;
   showSignatures?: boolean;
   showFooter?: boolean;
+  showBarcode?: boolean;
+  showQrCode?: boolean;
 }
 
 export interface UnifiedDocumentData {

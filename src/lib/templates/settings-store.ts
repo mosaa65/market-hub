@@ -19,6 +19,8 @@ export const DEFAULT_PRINT_SETTINGS: PrintSettings = {
   showNotes: true,
   showSignatures: true,
   showFooter: true,
+  showBarcode: true,
+  showQrCode: true,
 };
 
 const STORAGE_KEY = "vortex_print_settings";
