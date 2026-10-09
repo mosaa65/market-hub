@@ -46,11 +46,17 @@ import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import {
+  BUSINESS_PAYMENT_METHOD_IDS,
   getPaymentMethodDefinition,
+  getShippedPaymentMethod,
   paymentMethodLabel,
   type PaymentContext,
 } from "@/lib/payments/payment-methods";
-import { usePaymentMethodsForContext } from "@/hooks/use-payment-methods";
+import {
+  usePaymentMethods,
+  usePaymentMethodsForContext,
+  type ResolvedPaymentMethod,
+} from "@/hooks/use-payment-methods";
 import { PaymentMethodIcon } from "./payment-method-icon";
 
 export interface PaymentMethodPickerProps {
@@ -100,33 +106,71 @@ export function PaymentMethodPicker({
    * is appended rather than filtered away.
    */
   const options = useMemo(() => {
-    if (!ensureIds || ensureIds.length === 0) return methods;
-    const present = new Set(methods.map((m) => m.id));
-    const extra = ensureIds.filter(
-      (id) => id && !present.has(id) && getPaymentMethodDefinition(id),
+    const businessMethods = methods.filter((method) =>
+      BUSINESS_PAYMENT_METHOD_IDS.includes(
+        method.id as (typeof BUSINESS_PAYMENT_METHOD_IDS)[number],
+      ),
     );
-    if (extra.length === 0) return methods;
+    if (!ensureIds || ensureIds.length === 0) return businessMethods;
+    const present = new Set(businessMethods.map((method) => method.id));
+    const extra = ensureIds.filter(
+      (id) =>
+        BUSINESS_PAYMENT_METHOD_IDS.includes(id as (typeof BUSINESS_PAYMENT_METHOD_IDS)[number]) &&
+        id &&
+        !present.has(id) &&
+        getPaymentMethodDefinition(id),
+    );
+    if (extra.length === 0) return businessMethods;
     return [
-      ...methods,
+      ...businessMethods,
       ...extra
-        .map((id) => methods.find((m) => m.id === id))
-        .filter((m): m is (typeof methods)[number] => Boolean(m)),
+        .map((id) => businessMethods.find((method) => method.id === id))
+        .filter((method): method is (typeof businessMethods)[number] => Boolean(method)),
     ];
   }, [methods, ensureIds]);
 
   /**
    * The label for a method, preferring the key POS already shipped.
    *
-   * A named institution must NOT borrow the generic key: labelling بنك الكريمي
-   * as "تحويل بنكي" would hide the very choice the operator made.
+   * Two different rules, and the difference matters:
+   *
+   *   • A method still carrying its shipped identity uses its `pos.pm.*` key,
+   *     so "نقدي" and "بطاقة" keep meaning exactly what they meant yesterday in
+   *     both languages.
+   *   • A method the business renamed — or created — uses the business's own
+   *     word. Labelling «حوالات صنعاء» as "تحويل بنكي" would hide the very
+   *     choice the operator made, and labelling a created method with a generic
+   *     key is not possible at all: it has no key.
+   *
+   * `isAuthored` is the flag that separates the two, and it comes from the
+   * database rather than from guessing at the string.
    */
-  const labelFor = (id: string): string => {
-    const definition = getPaymentMethodDefinition(id);
-    const legacy = definition?.legacyValue;
-    const isNamedInstitution =
-      Boolean(definition) && definition?.nameAr !== paymentMethodLabel(legacy, "ar");
-    if (legacy && !isNamedInstitution) return t(`pos.pm.${legacy}`);
-    return isRtl ? (definition?.nameAr ?? id) : (definition?.nameEn ?? id);
+  const labelFor = (method: ResolvedPaymentMethod): string => {
+    const shipped = getShippedPaymentMethod(method.id);
+    const keepsShippedIdentity =
+      method.isSystem &&
+      shipped !== undefined &&
+      shipped.nameAr === method.nameAr &&
+      shipped.iconKey === method.iconKey;
+
+    if (keepsShippedIdentity) {
+      const labelById: Record<string, { ar: string; en: string }> = {
+        cash: { ar: "نقدًا", en: "Cash" },
+        credit: { ar: "آجل", en: "Credit" },
+        bank_transfer: { ar: "حوالة", en: "Transfer" },
+        kuraimi_bank: { ar: "بنك الكريمي", en: "Al-Kuraimi Bank" },
+        jaib: { ar: "جيب", en: "Jaib" },
+        one_cash: { ar: "ون كاش", en: "One Cash" },
+        jawali: { ar: "جوالي", en: "Jawali" },
+        floosak: { ar: "فلوسك", en: "Floosak" },
+        split: { ar: "دفع بأكثر من طريقة", en: "Split payment" },
+      };
+      const label = labelById[method.id];
+      if (label) return isRtl ? label.ar : label.en;
+      return t(`pos.pm.${method.legacyValue}`);
+    }
+
+    return isRtl ? method.nameAr : (method.nameEn ?? method.nameAr);
   };
 
   /** The icon of the currently selected method, shown as the field adornment. */
@@ -139,6 +183,7 @@ export function PaymentMethodPicker({
         <span className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2">
           <PaymentMethodIcon
             iconKey={selectedDefinition.iconKey}
+            methodId={value}
             ledgerKind={selectedDefinition.ledgerKind}
             className="h-4 w-4"
           />
@@ -146,6 +191,7 @@ export function PaymentMethodPicker({
       )}
 
       <select
+        dir={isRtl ? "rtl" : "ltr"}
         aria-label={ariaLabel ?? (isRtl ? "طريقة الدفع" : "Payment method")}
         disabled={disabled || isLoading}
         value={value ?? ""}
@@ -167,7 +213,7 @@ export function PaymentMethodPicker({
         )}
         {options.map((method) => (
           <option key={method.id} value={method.id}>
-            {labelFor(method.id)}
+            {labelFor(method)}
           </option>
         ))}
       </select>
@@ -188,29 +234,49 @@ export function PaymentMethodChip({
   note,
   lang = "ar",
   className,
+  methodId,
 }: {
   value: string | null | undefined;
   note?: string | null;
   lang?: "ar" | "en";
   className?: string;
+  /**
+   * The catalogue id of the method the document was written with, when the row
+   * knows it. A stored ENUM value alone cannot tell «بنك الكريمي» from a
+   * generic «تحويل بنكي» — both store `bank_transfer` — so a caller that has
+   * the id must pass it, and this component prefers it over the value.
+   */
+  methodId?: string | null;
 }) {
-  const { methods } = usePaymentMethodsForContext(
-    // Any context: this is a label, not an offer, so the widest list applies.
-    "sales",
-    { includeCredit: true },
-  );
+  const { methods } = usePaymentMethods();
 
   const isSplit = value === "split" || Boolean(note?.includes("[دفع مجزأ:"));
-  const method = methods.find((m) => m.id === value || m.legacyValue === value);
+  const method =
+    methods.find((m) => methodId && m.id === methodId) ??
+    methods.find((m) => m.id === value) ??
+    methods.find((m) => m.legacyValue === value);
+
+  // The business's own word wins over the catalogue's default. `methods` is the
+  // resolved list, so this is already the tenant's naming where one exists.
+  const label = isSplit
+    ? lang === "ar"
+      ? "دفع بأكثر من طريقة"
+      : "Split payment"
+    : method
+      ? lang === "ar"
+        ? method.nameAr
+        : (method.nameEn ?? method.nameAr)
+      : paymentMethodLabel(value, lang);
 
   return (
     <span className={cn("inline-flex items-center gap-1.5 text-xs", className)}>
       <PaymentMethodIcon
         iconKey={isSplit ? "split" : (method?.iconKey ?? "generic")}
+        methodId={methodId ?? method?.id}
         ledgerKind={isSplit ? "OTHER" : method?.ledgerKind}
         className="h-3.5 w-3.5"
       />
-      <span className="font-medium">{paymentMethodLabel(isSplit ? "split" : value, lang)}</span>
+      <span className="font-medium">{label}</span>
     </span>
   );
 }

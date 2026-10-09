@@ -203,7 +203,7 @@ const ALL_CONTEXTS: readonly PaymentContext[] = PAYMENT_CONTEXTS;
 export const PAYMENT_METHOD_CATALOG: readonly PaymentMethodDefinition[] = [
   {
     id: "cash",
-    nameAr: "نقداً",
+    nameAr: "نقدًا",
     nameEn: "Cash",
     iconKey: "cash",
     isActive: true,
@@ -375,6 +375,25 @@ export const PAYMENT_METHOD_CATALOG: readonly PaymentMethodDefinition[] = [
   },
 ];
 
+/** The nine methods the business-facing settings/pickers currently offer. */
+export const BUSINESS_PAYMENT_METHOD_IDS = [
+  "cash",
+  "credit",
+  "bank_transfer",
+  "kuraimi_bank",
+  "jaib",
+  "one_cash",
+  "jawali",
+  "floosak",
+  "split",
+] as const;
+
+const BUSINESS_PAYMENT_METHOD_ID_SET = new Set<string>(BUSINESS_PAYMENT_METHOD_IDS);
+
+export function isBusinessPaymentMethod(id: string): boolean {
+  return BUSINESS_PAYMENT_METHOD_ID_SET.has(id);
+}
+
 /** Index for O(1) lookups. Built once at module load. */
 const CATALOG_BY_ID = new Map<string, PaymentMethodDefinition>(
   PAYMENT_METHOD_CATALOG.map((m) => [m.id, m]),
@@ -500,6 +519,16 @@ export const PAYMENT_ICON_CHOICES: readonly { key: string; labelAr: string; labe
   { key: "credit", labelAr: "آجل", labelEn: "Credit" },
   { key: "generic", labelAr: "عام", labelEn: "Generic" },
 ];
+
+/** Human name of each account family, shared by the settings screen and reports. */
+export const LEDGER_KIND_LABELS: Record<LedgerKind, { ar: string; en: string }> = {
+  CASH: { ar: "صندوق", en: "Cash" },
+  BANK: { ar: "بنك", en: "Bank" },
+  WALLET: { ar: "محفظة", en: "Wallet" },
+  CARD: { ar: "بطاقة", en: "Card" },
+  CREDIT: { ar: "آجل", en: "Credit" },
+  OTHER: { ar: "أخرى", en: "Other" },
+};
 
 /** Fallback by ledger kind, so a new method with an unknown key still looks right. */
 const LEDGER_KIND_ICON: Record<LedgerKind, LucideIcon> = {

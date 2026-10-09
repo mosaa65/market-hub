@@ -32,6 +32,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   PAYMENT_METHOD_CATALOG,
+  BUSINESS_PAYMENT_METHOD_IDS,
   PAYMENT_CONTEXTS,
   hasAuthoredIdentity,
   type LedgerKind,
@@ -141,9 +142,17 @@ async function fetchPaymentMethods(): Promise<{
     settingsById.set(row.payment_method_id, row);
   }
 
-  const methods = catalogRows.map((row) => resolveRow(row, settingsById.get(row.id)));
+  // The business offer is a fixed, ordered whitelist: نقدًا، آجل، حوالة، بنك
+  // الكريمي، جيب، ون كاش، جوالي، فلوسك، ثم دفع بأكثر من طريقة. Menu, not a
+  // query result — so the presented order cannot drift when a catalogue seed
+  // changes a sort_order, and no other shipped method leaks into a picker.
+  const byId = new Map(catalogRows.map((row) => [row.id, row]));
+  const methods = BUSINESS_PAYMENT_METHOD_IDS.flatMap((id) => {
+    const row = byId.get(id);
+    return row ? [resolveRow(row, settingsById.get(row.id))] : [];
+  });
 
-  return { methods: methods.sort(byEffectiveOrder), isFallback: false };
+  return { methods, isFallback: false };
 }
 
 function resolveRow(row: CatalogRow, settings?: SettingsRow): ResolvedPaymentMethod {
@@ -197,17 +206,22 @@ function byEffectiveOrder(a: ResolvedPaymentMethod, b: ResolvedPaymentMethod): n
 
 /** The developer catalogue as shipped, used before the query resolves and on failure. */
 function fallbackMethods(): ResolvedPaymentMethod[] {
-  return [...PAYMENT_METHOD_CATALOG]
-    .map((def) => ({
-      ...def,
-      enabled: true,
-      effectiveSortOrder: def.sortOrder,
-      effectiveContexts: def.allowedContexts,
-      isConfigured: false,
-      isSystem: true,
-      isAuthored: false,
-    }))
-    .sort(byEffectiveOrder);
+  const byId = new Map(PAYMENT_METHOD_CATALOG.map((def) => [def.id, def]));
+  return BUSINESS_PAYMENT_METHOD_IDS.flatMap((id) => {
+    const def = byId.get(id);
+    if (!def) return [];
+    return [
+      {
+        ...def,
+        enabled: true,
+        effectiveSortOrder: def.sortOrder,
+        effectiveContexts: def.allowedContexts,
+        isConfigured: false,
+        isSystem: true,
+        isAuthored: false,
+      },
+    ];
+  });
 }
 
 /**
@@ -257,6 +271,9 @@ export function usePaymentMethodsForContext(
     () =>
       methods.filter(
         (m) =>
+          BUSINESS_PAYMENT_METHOD_IDS.includes(
+            m.id as (typeof BUSINESS_PAYMENT_METHOD_IDS)[number],
+          ) &&
           m.isActive &&
           m.enabled &&
           m.effectiveContexts.includes(context) &&

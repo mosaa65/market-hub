@@ -39,17 +39,16 @@ import {
   LayoutGrid,
   List,
   LoaderCircle,
-  Plus,
   RotateCcw,
   TableProperties,
-  Trash2,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import {
+  BUSINESS_PAYMENT_METHOD_IDS,
+  LEDGER_KIND_LABELS,
   PAYMENT_CONTEXTS,
   PAYMENT_CONTEXT_LABELS,
-  PAYMENT_METHOD_CATALOG,
   type PaymentContext,
 } from "@/lib/payments/payment-methods";
 import {
@@ -61,13 +60,11 @@ import {
 } from "@/components/ui/table-toolbar";
 import {
   usePaymentMethods,
-  useRemoveTenantPaymentMethod,
   useUpdatePaymentMethodSettings,
   type ResolvedPaymentMethod,
 } from "@/hooks/use-payment-methods";
 import { PaymentMethodIcon } from "@/components/ui/payment-method/payment-method-icon";
 import { PaymentMethodIdentityEditor } from "@/components/ui/payment-method/payment-method-identity-editor";
-import { AddPaymentMethodDialog } from "@/components/ui/payment-method/add-payment-method-dialog";
 
 /** The editable shape of one method. */
 interface DraftRow {
@@ -94,6 +91,14 @@ function buildDraft(methods: ResolvedPaymentMethod[]): DraftState {
   const order: string[] = [];
 
   for (const method of methods) {
+    // Only the explicitly supported business-facing methods are shown here.
+    if (
+      !BUSINESS_PAYMENT_METHOD_IDS.includes(
+        method.id as (typeof BUSINESS_PAYMENT_METHOD_IDS)[number],
+      )
+    ) {
+      continue;
+    }
     // A method the developers retired is not offered at all; showing it as a
     // switch the operator cannot use would be noise.
     if (!method.isActive) continue;
@@ -114,12 +119,9 @@ export function PaymentMethodsSection() {
   const isAr = lang === "ar";
   const { methods, isLoading, isFallback, refetch } = usePaymentMethods();
   const { save, isSaving } = useUpdatePaymentMethodSettings();
-  const { remove, isRemoving } = useRemoveTenantPaymentMethod();
 
   const [draft, setDraft] = useState<DraftState>({ rows: {}, order: [] });
   const [savedSnapshot, setSavedSnapshot] = useState<DraftState>({ rows: {}, order: [] });
-  const [addOpen, setAddOpen] = useState(false);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list" | "table">("grid");
   const [filters, setFilters] = useState<FilterValues>({});
@@ -141,6 +143,16 @@ export function PaymentMethodsSection() {
         .map((id) => methods.find((m) => m.id === id))
         .filter((m): m is ResolvedPaymentMethod => Boolean(m)),
     [draft.order, methods],
+  );
+
+  const businessMethods = useMemo(
+    () =>
+      methods.filter((method) =>
+        BUSINESS_PAYMENT_METHOD_IDS.includes(
+          method.id as (typeof BUSINESS_PAYMENT_METHOD_IDS)[number],
+        ),
+      ),
+    [methods],
   );
 
   const filterDefinitions = useMemo<FilterDefinition[]>(
@@ -167,10 +179,16 @@ export function PaymentMethodsSection() {
         key: "ledgerKind",
         label: isAr ? "عائلة التسوية" : "Settlement family",
         type: "select",
-        options: Array.from(new Set(methods.map((method) => method.ledgerKind))).map((kind) => ({
-          value: kind,
-          label: PAYMENT_METHOD_CATALOG.find((method) => method.id === kind)?.nameAr ?? kind,
-        })),
+        options: Array.from(new Set(businessMethods.map((method) => method.ledgerKind))).map(
+          (kind) => ({
+            value: kind,
+            label: LEDGER_KIND_LABELS[kind]
+              ? isAr
+                ? LEDGER_KIND_LABELS[kind].ar
+                : LEDGER_KIND_LABELS[kind].en
+              : kind,
+          }),
+        ),
       },
       {
         key: "context",
@@ -182,7 +200,7 @@ export function PaymentMethodsSection() {
         })),
       },
     ],
-    [isAr, methods],
+    [businessMethods, isAr],
   );
 
   const sortOptions = useMemo<SortOption[]>(
@@ -294,33 +312,6 @@ export function PaymentMethodsSection() {
 
   const reset = useCallback(() => setDraft(savedSnapshot), [savedSnapshot]);
 
-  /**
-   * Remove a method the business created.
-   *
-   * Only a tenant row can reach here — the button is not rendered for a
-   * developer row, and the database refuses it anyway. The draft is rebuilt
-   * from the freshly fetched list rather than patched by hand, so a removed row
-   * cannot survive in `order` and leave a phantom slot in the picker.
-   */
-  const handleDelete = useCallback(
-    async (id: string) => {
-      try {
-        await remove(id);
-        setConfirmDeleteId(null);
-        toast.success(isAr ? "تم حذف طريقة الدفع" : "Payment method removed");
-      } catch (error) {
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : isAr
-              ? "تعذّر حذف طريقة الدفع"
-              : "Could not remove the payment method",
-        );
-      }
-    },
-    [remove, isAr],
-  );
-
   const handleSave = useCallback(async () => {
     // Order is written as the array index times ten. Ten, not one, so a future
     // hand-inserted catalogue row can be placed between two existing methods
@@ -374,8 +365,8 @@ export function PaymentMethodsSection() {
       */}
       <div className="rounded-2xl border border-border/70 bg-surface/60 p-3.5 text-[11px] leading-relaxed text-muted-foreground">
         {isAr
-          ? "الطرق الأساسية يجهّزها النظام بأيقونات جاهزة. يمكنك تعديل اسم أي طريقة وأيقونتها كما تناسب منشأتك، وإضافة طريقة جديدة لم يشحنها النظام (شركة صرافة أو محفظة محلية). نوع الحساب المحاسبي لا يتغيّر بالتعديل، فيبقى الترحيل كما هو."
-          : "The core methods ship with the system. You can change any method's name and icon to suit your business, and add one the system does not ship (an exchange house, a local wallet). The accounting family is not affected by a rename, so posting stays exactly as it was."}
+          ? "هذه هي طرق الدفع المعتمدة في النظام. يمكنك تعديل اسم أي طريقة وأيقونتها كما تناسب منشأتك، وتفعيلها أو تعطيلها، واختيار الأقسام التي تظهر فيها. نوع الحساب المحاسبي لا يتغيّر بالتعديل، فيبقى الترحيل كما هو."
+          : "These are the system's approved payment methods. You can rename or re-icon any of them to suit your business, enable or disable them, and choose the sections they appear in. The accounting family is not affected by a rename, so posting stays exactly as it was."}
       </div>
 
       {/* A configuration that could not be read must never look like a choice. */}
@@ -455,14 +446,6 @@ export function PaymentMethodsSection() {
                     current === "grid" ? "list" : current === "list" ? "table" : "grid",
                   )
                 }
-              />
-            }
-            action={
-              <ToolbarAction
-                label={isAr ? "إضافة طريقة" : "Add method"}
-                icon={<Plus />}
-                tone="primary"
-                onClick={() => setAddOpen(true)}
               />
             }
           >
@@ -620,56 +603,6 @@ export function PaymentMethodsSection() {
                         onSaved={() => void refetch()}
                         className="flex-1"
                       />
-
-                      {/*
-                    Delete is offered ONLY for a method the business created. A
-                    shipped method is referenced by history and by the seed, so
-                    it is disabled rather than removed — and the database would
-                    refuse the delete even if this button were rendered.
-                  */}
-                      {!method.isSystem ? (
-                        confirmDeleteId === method.id ? (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] text-muted-foreground">
-                              {isAr ? "تأكيد الحذف؟" : "Delete?"}
-                            </span>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              disabled={isRemoving}
-                              onClick={() => void handleDelete(method.id)}
-                              className="h-7 text-[10px]"
-                            >
-                              {isRemoving ? (
-                                <LoaderCircle className="h-3 w-3 animate-spin" />
-                              ) : isAr ? (
-                                "نعم"
-                              ) : (
-                                "Yes"
-                              )}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              disabled={isRemoving}
-                              onClick={() => setConfirmDeleteId(null)}
-                              className="h-7 text-[10px]"
-                            >
-                              {isAr ? "لا" : "No"}
-                            </Button>
-                          </div>
-                        ) : (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setConfirmDeleteId(method.id)}
-                            className="h-7 gap-1 px-2 text-[11px] text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                            {isAr ? "حذف" : "Delete"}
-                          </Button>
-                        )
-                      ) : null}
                     </div>
 
                     {/* ── Row 3: contexts. Only those the developers allow. ── */}
@@ -720,17 +653,6 @@ export function PaymentMethodsSection() {
           )}
         </CardContent>
       </Card>
-
-      <AddPaymentMethodDialog
-        open={addOpen}
-        onOpenChange={setAddOpen}
-        onCreated={() => {
-          // The new row arrives with the refetched catalogue, so the draft is
-          // rebuilt from the server rather than guessed at here.
-          void refetch();
-          toast.success(isAr ? "تمت إضافة طريقة الدفع" : "Payment method added");
-        }}
-      />
 
       {/* ── Sticky action bar, matching the rest of Settings ── */}
       {(isDirty || isSaving) && (

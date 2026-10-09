@@ -51,8 +51,10 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { BarcodeScanner } from "@/components/barcode-scanner";
-import { PaymentMethodPicker } from "@/components/ui/payment-method";
+import { PaymentMethodPicker, PaymentMethodIcon } from "@/components/ui/payment-method";
+import { usePaymentMethodsForContext } from "@/hooks/use-payment-methods";
 import {
+  BUSINESS_PAYMENT_METHOD_IDS,
   getPaymentMethodDefinition,
   paymentMethodLabel,
   toLegacyPaymentValue,
@@ -284,6 +286,15 @@ function POSPage() {
   const { isModuleEnabled } = useModules();
   const { t, lang } = useI18n();
   const { config: catalogConfig } = useCatalogModules();
+  const { methods: posPaymentMethods } = usePaymentMethodsForContext("pos");
+  const splitTenderOptions = posPaymentMethods.filter(
+    (method) =>
+      BUSINESS_PAYMENT_METHOD_IDS.includes(
+        method.id as (typeof BUSINESS_PAYMENT_METHOD_IDS)[number],
+      ) &&
+      !method.isCreditTerm &&
+      method.id !== "split",
+  );
   const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
   const [stockMap, setStockMap] = useState<Record<string, number>>({});
@@ -368,8 +379,23 @@ function POSPage() {
   const [selectedTemplate, setSelectedTemplate] = useState<InvoiceTemplate>(defaultTemplate);
 
   const [isSplitPayment, setIsSplitPayment] = useState(false);
-  const [splitCash, setSplitCash] = useState("");
-  const [splitCard, setSplitCard] = useState("");
+  const [splitMethods, setSplitMethods] = useState<string[]>([]);
+  const [splitAmounts, setSplitAmounts] = useState<Record<string, string>>({});
+  const [splitRef, setSplitRef] = useState<Record<string, string>>({});
+
+  function toggleSplitMethod(methodId: string, checked: boolean) {
+    setSplitMethods((current) =>
+      checked ? [...new Set([...current, methodId])] : current.filter((id) => id !== methodId),
+    );
+    if (!checked) {
+      setSplitAmounts((current) => ({ ...current, [methodId]: "" }));
+      setSplitRef((current) => ({ ...current, [methodId]: "" }));
+    }
+  }
+
+  function setSplitAmount(methodId: string, amount: string) {
+    setSplitAmounts((current) => ({ ...current, [methodId]: amount }));
+  }
 
   const [newCustomerOpen, setNewCustomerOpen] = useState(false);
 
@@ -1037,13 +1063,12 @@ function POSPage() {
   const discountN = Math.round(Number(discount || 0) * 100) / 100;
   const total = Math.max(0, Math.round((subtotal + taxTotal - discountN) * 100) / 100);
 
-  // Split payment amounts
-  const splitCashN = Math.max(0, Number(splitCash || 0));
-  const splitCardN = Math.max(0, Number(splitCard || 0));
-  const splitPaidTotal = Math.round((splitCashN + splitCardN) * 100) / 100;
-  // عدد وسائل الدفع غير الصفرية في الدفع المجزأ:
-  //  0 -> لم يدفع شيء،  1 -> وسيلة واحدة (تُسجل بوسيلتها الحقيقية)،  2+ -> دفع مجزأ حقيقي
-  const splitMethodCount = (splitCashN > 0 ? 1 : 0) + (splitCardN > 0 ? 1 : 0);
+  // Split payment totals are derived from the explicitly selected tender methods.
+  const splitPaidTotal =
+    Math.round(
+      splitMethods.reduce((sum, id) => sum + Math.max(0, Number(splitAmounts[id] || 0)), 0) * 100,
+    ) / 100;
+  const splitMethodCount = splitMethods.filter((id) => Number(splitAmounts[id] || 0) > 0).length;
   const isMultiMethodSplit = isSplitPayment && splitMethodCount > 1;
 
   // Auto-Paid & Smart Payment Logic
@@ -1167,7 +1192,13 @@ function POSPage() {
       // التحويل يتم عبر الكتالوج: بنك الكريمي وبنك اليمن الدولي يُسجّلان
       // 'bank_transfer'، وجيب/فلوسك/ون كاش تُسجّل 'mobile_money'. أما أسماء
       // المؤسسات فتبقى ظاهرة في القسم والملاحظة، وهذا هو التصميم المقصود.
-      const singleSplitMethod = splitMethodCount === 1 ? (splitCashN > 0 ? "cash" : "card") : null;
+      const splitComponents = splitMethods
+        .map((methodId) => ({
+          method: methodId,
+          amount: Math.round(Number(splitAmounts[methodId] || 0) * 100) / 100,
+        }))
+        .filter((part) => part.amount > 0);
+      const singleSplitMethod = splitComponents.length === 1 ? splitComponents[0].method : null;
       let finalMethod: string = isSplitPayment
         ? isMultiMethodSplit
           ? "split"
@@ -1175,6 +1206,9 @@ function POSPage() {
         : toLegacyPaymentValue(paymentMethod);
 
       // تصحيح منطقي نهائي للوسيلة قبل الإرسال لمنع التناقض:
+      if (isSplitPayment && splitComponents.length === 1) {
+        finalMethod = toLegacyPaymentValue(splitComponents[0].method);
+      }
       if (!isSplitPayment) {
         if (effectivePaid >= total && total > 0 && finalMethod === "credit") {
           // إذا كان المدفوع يغطي الإجمالي بالكامل، لا يمكن أن تكون الفاتورة "آجل"
@@ -1188,23 +1222,24 @@ function POSPage() {
       // التوزيع المالي للدفع المجزأ يُرسل إلى قاعدة البيانات عبر customer_payment_splits
       // ليُسجّل كمدفوعات فعلية موثقة بدل النص الحر في الملاحظات.
       const paymentSplits: Array<{ method: string; amount: number }> = isSplitPayment
-        ? [
-            splitCashN > 0 ? { method: "cash", amount: splitCashN } : null,
-            splitCardN > 0 ? { method: "card", amount: splitCardN } : null,
-          ].filter((part): part is { method: string; amount: number } => part !== null)
+        ? splitComponents.map((part) => ({
+            method: toLegacyPaymentValue(part.method),
+            amount: part.amount,
+          }))
         : [];
 
       let splitNote = "";
       if (isSplitPayment) {
         const parts = [];
-        if (splitCashN > 0)
-          parts.push(
-            `${paymentMethodLabel("cash", lang === "ar" ? "ar" : "en")}: ${money(splitCashN)}`,
-          );
-        if (splitCardN > 0)
-          parts.push(
-            `${paymentMethodLabel("card", lang === "ar" ? "ar" : "en")}: ${money(splitCardN)}`,
-          );
+        for (const part of splitComponents) {
+          const methodDefinition = getPaymentMethodDefinition(part.method);
+          const methodName = methodDefinition
+            ? lang === "ar"
+              ? methodDefinition.nameAr
+              : (methodDefinition.nameEn ?? methodDefinition.nameAr)
+            : paymentMethodLabel(part.method, lang === "ar" ? "ar" : "en");
+          parts.push(`${methodName}: ${money(part.amount)}`);
+        }
         if (remainingDebt > 0)
           parts.push(
             `${paymentMethodLabel("credit", lang === "ar" ? "ar" : "en")}: ${money(remainingDebt)}`,
@@ -1221,7 +1256,18 @@ function POSPage() {
         // transfer number the cashier typed.
         const chosen = getPaymentMethodDefinition(paymentMethod);
         const chosenNeedsRef = Boolean(chosen?.requiresReference);
-        if (chosenNeedsRef && transferRef.trim()) {
+        if (isSplitPayment) {
+          for (const part of splitComponents) {
+            const partDefinition = getPaymentMethodDefinition(part.method);
+            const reference = splitRef[part.method]?.trim();
+            if (partDefinition?.requiresReference && reference) {
+              parts.push(
+                `${partDefinition.nameAr} — ${lang === "ar" ? "المرجع" : "Reference"}: ${reference}`,
+              );
+            }
+          }
+        }
+        if (!isSplitPayment && chosenNeedsRef && transferRef.trim()) {
           const electronicLabel =
             chosen?.ledgerKind === "WALLET"
               ? lang === "ar"
@@ -1477,8 +1523,9 @@ function POSPage() {
       setNote("");
       setTransferRef("");
       setIsSplitPayment(false);
-      setSplitCash("");
-      setSplitCard("");
+      setSplitMethods([]);
+      setSplitAmounts({});
+      setSplitRef({});
       setSaleDate(new Date().toISOString().slice(0, 10));
       await loadStock(warehouseId);
       searchRef.current?.focus();
@@ -2294,24 +2341,23 @@ function POSPage() {
                 </div>
               </div>
 
-              {/*
-                طريقة الدفع — المكوّن الموحّد.
-
-                The five hard-coded <option>s that used to live here are gone.
-                The picker reads the business's own configuration, so it offers
-                exactly the methods enabled for POS, in the operator's order.
-                "دفع بأكثر من طريقة" stays with the discount field below,
-                because it is a mode of the cart, not a tender.
-              */}
+              {/* قائمة الطرق مركزية ومقيدة بالقائمة التجارية المعتمدة. */}
               <div className="space-y-1.5">
                 <div className="flex items-start gap-2">
                   <PaymentMethodPicker
                     context="pos"
-                    value={isSplitPayment ? "" : paymentMethod}
+                    value={paymentMethod}
                     onChange={(method) => {
+                      if (method === "split") {
+                        setIsSplitPayment(true);
+                        setSplitMethods((current) => (current.length ? current : ["cash"]));
+                        setSplitAmounts((current) =>
+                          current.cash ? current : { ...current, cash: "" },
+                        );
+                        setPaid("");
+                        return;
+                      }
                       const definition = getPaymentMethodDefinition(method);
-                      // A new tender cancels the split: leaving both active
-                      // would send a breakdown the cashier did not intend.
                       setIsSplitPayment(false);
                       setPaymentMethod(method);
                       // Âجل means nothing is collected, so the paid amount must
@@ -2337,7 +2383,10 @@ function POSPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    setIsSplitPayment((prev) => !prev);
+                    const next = !isSplitPayment;
+                    setIsSplitPayment(next);
+                    setPaymentMethod(next ? "split" : "cash");
+                    if (next && splitMethods.length === 0) setSplitMethods(["cash"]);
                     setPaid("");
                   }}
                   aria-pressed={isSplitPayment}
@@ -2385,65 +2434,116 @@ function POSPage() {
                   <div className="flex items-center justify-between text-xs font-semibold text-violet-700 dark:text-violet-300">
                     <span>
                       {lang === "ar"
-                        ? "توزيع الدفعات (نقد / بطاقة أو حوالة / آجل):"
-                        : "Split Allocation:"}
+                        ? "اختر طرق الدفع ووزّع المبلغ"
+                        : "Choose tenders and allocate amounts"}
                     </span>
                     <button
                       type="button"
                       onClick={() => {
-                        setSplitCash(String(total));
-                        setSplitCard("");
+                        setSplitMethods(["cash"]);
+                        setSplitAmounts({ cash: String(total) });
                       }}
-                      className="text-[10px] text-violet-600 underline"
+                      className="rounded-full px-2.5 py-1 text-[10px] font-semibold text-violet-700 underline hover:bg-violet-500/10 dark:text-violet-300"
                     >
-                      {lang === "ar" ? "نقد كامل" : "All Cash"}
+                      {lang === "ar" ? "نقدًا كاملًا" : "All cash"}
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-[10px] text-muted-foreground block mb-0.5">
-                        {lang === "ar" ? "نقدًا:" : "Cash:"}
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        dir="ltr"
-                        value={splitCash}
-                        onChange={(e) => setSplitCash(e.target.value)}
-                        placeholder="0"
-                        className="h-8 w-full rounded-xl border border-border bg-surface px-2 text-xs font-mono outline-none focus:border-violet-500 [unicode-bidi:plaintext]"
-                      />
-                      {splitCash && Number(splitCash) > 0 && (
-                        <span className="text-[9px] text-muted-foreground font-mono block text-end">
-                          <span dir="ltr" className="[unicode-bidi:isolate]">
-                            {formatWithCommas(splitCash)}
-                          </span>
-                        </span>
-                      )}
+                  <fieldset className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    <legend className="sr-only">
+                      {lang === "ar" ? "اختر طرق الدفع" : "Select payment methods"}
+                    </legend>
+                    {splitTenderOptions.map((method) => {
+                      const checked = splitMethods.includes(method.id);
+                      const methodName =
+                        lang === "ar" ? method.nameAr : (method.nameEn ?? method.nameAr);
+                      return (
+                        <label
+                          key={method.id}
+                          className={`flex min-h-10 cursor-pointer items-center gap-2 rounded-xl border px-2.5 py-2 text-xs font-semibold transition focus-within:ring-2 focus-within:ring-violet-500/40 ${
+                            checked
+                              ? "border-violet-500 bg-violet-500/15 text-violet-800 shadow-sm dark:text-violet-200"
+                              : "border-border/70 bg-surface/80 text-muted-foreground hover:border-violet-500/40 hover:text-foreground"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(event) => toggleSplitMethod(method.id, event.target.checked)}
+                            className="size-4 accent-violet-600"
+                          />
+                          <PaymentMethodIcon
+                            iconKey={method.iconKey}
+                            methodId={method.id}
+                            ledgerKind={method.ledgerKind}
+                            className="size-4"
+                          />
+                          <span className="truncate">{methodName}</span>
+                        </label>
+                      );
+                    })}
+                  </fieldset>
+
+                  {splitMethods.length > 0 && (
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {splitMethods.map((methodId) => {
+                        const method = splitTenderOptions.find((item) => item.id === methodId);
+                        if (!method) return null;
+                        const methodName =
+                          lang === "ar" ? method.nameAr : (method.nameEn ?? method.nameAr);
+                        return (
+                          <div
+                            key={method.id}
+                            className="space-y-2 rounded-xl border-violet-500/25 bg-background/75 p-2.5"
+                          >
+                            <label
+                              htmlFor={`split-amount-${method.id}`}
+                              className="flex items-center gap-2 text-xs font-semibold"
+                            >
+                              <PaymentMethodIcon
+                                iconKey={method.iconKey}
+                                methodId={method.id}
+                                ledgerKind={method.ledgerKind}
+                              />
+                              <span>{methodName}</span>
+                              <span className="ms-auto text-muted-foreground">
+                                {lang === "ar" ? "المبلغ" : "Amount"}
+                              </span>
+                            </label>
+                            <input
+                              id={`split-amount-${method.id}`}
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              dir="ltr"
+                              value={splitAmounts[method.id] ?? ""}
+                              onChange={(event) => setSplitAmount(method.id, event.target.value)}
+                              placeholder="0.00"
+                              className="h-9 w-full rounded-lg border-border bg-surface px-2 text-end font-mono text-sm outline-none focus:border-violet-500 [unicode-bidi:plaintext]"
+                            />
+                            {method.requiresReference && (
+                              <input
+                                value={splitRef[method.id] ?? ""}
+                                onChange={(event) =>
+                                  setSplitRef((current) => ({
+                                    ...current,
+                                    [method.id]: event.target.value,
+                                  }))
+                                }
+                                aria-label={
+                                  lang === "ar" ? `مرجع ${methodName}` : `${methodName} reference`
+                                }
+                                placeholder={
+                                  lang === "ar" ? "رقم المرجع / الحوالة" : "Reference number"
+                                }
+                                className="h-8 w-full rounded-lg border-border bg-surface px-2 text-xs outline-none focus:border-violet-500"
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
-                    <div>
-                      <label className="text-[10px] text-muted-foreground block mb-0.5">
-                        {lang === "ar" ? "بطاقة/حوالة:" : "Card/Transfer:"}
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        dir="ltr"
-                        value={splitCard}
-                        onChange={(e) => setSplitCard(e.target.value)}
-                        placeholder="0"
-                        className="h-8 w-full rounded-xl border border-border bg-surface px-2 text-xs font-mono outline-none focus:border-violet-500 [unicode-bidi:plaintext]"
-                      />
-                      {splitCard && Number(splitCard) > 0 && (
-                        <span className="text-[9px] text-muted-foreground font-mono block text-end">
-                          <span dir="ltr" className="[unicode-bidi:isolate]">
-                            {formatWithCommas(splitCard)}
-                          </span>
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                  )}
 
                   {/* Split Summary Footer */}
                   <div className="pt-1.5 border-t border-violet-500/20 flex items-center justify-between text-xs">
