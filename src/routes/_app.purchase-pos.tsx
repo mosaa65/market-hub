@@ -30,8 +30,6 @@ import {
   PackagePlus,
   Coins,
 } from "lucide-react";
-import { PaymentMethodPicker } from "@/components/ui/payment-method";
-import { getPaymentMethodDefinition, toLegacyPaymentValue } from "@/lib/payments/payment-methods";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
@@ -290,7 +288,9 @@ function PurchasePOSPage() {
   const [cart, setCart] = useState<CartLine[]>([]);
   const [paid, setPaid] = useState<string>("");
   const [discount, setDiscount] = useState<string>("");
-  const [paymentMethod, setPaymentMethod] = useState<string>("cash");
+  const [paymentMethod, setPaymentMethod] = useState<
+    "cash" | "mobile_money" | "bank_transfer" | "credit"
+  >("cash");
   const [note, setNote] = useState("");
   const [purchaseDate, setPurchaseDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [transferRef, setTransferRef] = useState("");
@@ -552,9 +552,7 @@ function PurchasePOSPage() {
   const taxTotal = cart.reduce((s, l) => s + l.unit_cost * l.quantity * (l.tax_rate / 100), 0);
   const discountN = Number(discount || 0);
   const total = Math.max(0, subtotal + taxTotal - discountN);
-  // آجل collects nothing, so the paid amount is a hard zero rather than the total.
-  const isCreditMethod = getPaymentMethodDefinition(paymentMethod)?.isCreditTerm ?? false;
-  const paidN = isCreditMethod ? 0 : paid !== "" ? Number(paid) : total;
+  const paidN = paymentMethod === "credit" ? 0 : paid !== "" ? Number(paid) : total;
   const isOverpaid = Number.isFinite(paidN) && paidN > total;
 
   // Filter products
@@ -639,11 +637,12 @@ function PurchasePOSPage() {
       const composedNote = (() => {
         const parts: string[] = [];
         if (note.trim()) parts.push(note.trim());
-        // Reference for any method the catalogue flags, not two hard-coded ids.
-        const chosen = getPaymentMethodDefinition(paymentMethod);
-        if (chosen?.requiresReference && transferRef.trim()) {
+        if (
+          (paymentMethod === "bank_transfer" || paymentMethod === "mobile_money") &&
+          transferRef.trim()
+        ) {
           parts.push(
-            `${chosen.ledgerKind === "WALLET" ? (lang === "ar" ? "مرجع المحفظة" : "Wallet reference") : lang === "ar" ? "رقم الحوالة" : "Transfer no."}: ${transferRef.trim()}`,
+            `${paymentMethod === "mobile_money" ? (lang === "ar" ? "مرجع المحفظة" : "Wallet reference") : lang === "ar" ? "رقم الحوالة" : "Transfer no."}: ${transferRef.trim()}`,
           );
         }
         return parts.length ? parts.join(" — ") : null;
@@ -652,7 +651,7 @@ function PurchasePOSPage() {
       const { data: invoiceId, error } = await supabase.rpc("create_purchase", {
         _warehouse_id: warehouseId,
         _supplier_id: supplierId,
-        _payment_method: toLegacyPaymentValue(paymentMethod),
+        _payment_method: paymentMethod,
         _paid: paidN,
         _discount: discountN,
         _note: composedNote as any,
@@ -743,9 +742,9 @@ function PurchasePOSPage() {
   }
 
   return (
-    <div className="flex min-h-0 h-full flex-1 flex-col overflow-hidden bg-[radial-gradient(ellipse_at_top,_color-mix(in_oklab,var(--primary)_10%,transparent),transparent_48%)]">
+    <div className="grid h-full min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-2 overflow-hidden bg-[radial-gradient(ellipse_at_top,_color-mix(in_oklab,var(--primary)_10%,transparent),transparent_48%)] lg:grid-cols-[minmax(0,1fr)_minmax(400px,460px)] lg:grid-rows-[auto_minmax(0,1fr)]">
       {/* Top Bar / Header */}
-      <div className="m-2 flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-3xl border border-border/80 bg-surface/95 px-3 py-2.5 shadow-sm backdrop-blur-md sm:m-3 sm:px-4">
+      <div className="m-1.5 flex shrink-0 flex-col items-stretch gap-2 rounded-2xl border border-border/80 bg-surface/95 px-3 py-2 shadow-sm backdrop-blur-md sm:m-2 sm:px-4 lg:col-start-1 lg:row-start-1">
         <div className="flex items-center gap-3">
           <Link
             to="/purchases"
@@ -777,9 +776,9 @@ function PurchasePOSPage() {
         </div>
 
         {/* Global Toolbar Selectors */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-1.5 border-t border-border/60 pt-2">
           {/* Warehouse Selector */}
-          <div className="flex min-w-0 items-center gap-1.5 rounded-xl border border-border/80 bg-surface px-2.5 py-1 text-xs shadow-2xs">
+          <div className="order-2 flex h-9 min-w-0 items-center gap-1.5 rounded-xl border border-border/80 bg-surface px-2.5 text-xs shadow-2xs">
             <Building2 className="h-3.5 w-3.5 text-primary shrink-0" />
             <span className="text-muted-foreground font-medium hidden sm:inline">
               {lang === "ar" ? "المستودع:" : "Warehouse:"}
@@ -798,7 +797,7 @@ function PurchasePOSPage() {
           </div>
 
           {/* Supplier Selector with Cash Supplier Default */}
-          <div className="flex items-center gap-1.5 rounded-xl border border-border/80 bg-surface px-2.5 py-1 text-xs shadow-2xs">
+          <div className="order-1 flex h-9 min-w-0 items-center gap-1.5 rounded-xl border border-border/80 bg-surface px-2.5 text-xs shadow-2xs">
             <Truck className="h-3.5 w-3.5 text-primary shrink-0" />
             <span className="text-muted-foreground font-medium hidden sm:inline">
               {lang === "ar" ? "المورد:" : "Supplier:"}
@@ -806,7 +805,7 @@ function PurchasePOSPage() {
             <select
               value={supplierId}
               onChange={(e) => setSupplierId(e.target.value)}
-              className="h-9 w-72 max-w-[48vw] bg-transparent px-1 text-sm font-medium text-foreground outline-none cursor-pointer"
+              className="h-8 w-72 max-w-[48vw] bg-transparent px-1 text-sm font-medium text-foreground outline-none cursor-pointer"
             >
               {suppliers.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -826,7 +825,7 @@ function PurchasePOSPage() {
           </div>
 
           {/* Purchase Date */}
-          <div className="flex items-center gap-1.5 rounded-xl border border-border/80 bg-surface px-2.5 py-1 text-xs shadow-2xs">
+          <div className="order-3 flex h-9 items-center gap-1.5 rounded-xl border border-border/80 bg-surface px-2.5 text-xs shadow-2xs">
             <CalendarDays className="h-3.5 w-3.5 text-primary shrink-0" />
             <input
               type="date"
@@ -837,13 +836,13 @@ function PurchasePOSPage() {
           </div>
 
           {/* Page Guide Button */}
-          <PageGuideButton config={purchasePosGuideConfig} className="!h-8 !w-8" />
+          <PageGuideButton config={purchasePosGuideConfig} className="order-4 !h-9 !w-9" />
 
           {/* Barcode Camera Modal Trigger */}
           <button
             type="button"
             onClick={() => setScannerOpen(true)}
-            className="grid h-8 w-8 place-items-center rounded-xl border border-border/80 bg-surface text-muted-foreground hover:text-foreground hover:bg-surface-2 transition shadow-2xs"
+            className="order-5 grid h-9 w-9 place-items-center rounded-xl border border-border/80 bg-surface text-muted-foreground hover:text-foreground hover:bg-surface-2 transition shadow-2xs"
             title={lang === "ar" ? "مسح الباركود بالكاميرا" : "Scan barcode with camera"}
           >
             <ScanBarcode className="h-4 w-4" />
@@ -852,10 +851,10 @@ function PurchasePOSPage() {
       </div>
 
       {/* Main Content Area: Products Grid (Left) + Cart & Totals (Right) */}
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden px-2 pb-2 sm:px-3 sm:pb-3 lg:flex-row">
+      <div className="flex min-h-0 flex-col gap-2 overflow-hidden px-1.5 pb-1.5 sm:px-2 sm:pb-2 lg:contents">
         {/* Left Column: Search, Filters & Product Grid — desktop only. */}
         {isDesktop && (
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-border/80 bg-surface/95 shadow-sm ring-1 ring-background/40">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-border/80 bg-surface/95 shadow-sm ring-1 ring-background/40 lg:col-start-1 lg:row-start-2 lg:mx-2 lg:mb-2">
             {/* Search & Filter Bar */}
             <div className="p-3 border-b border-border/60 bg-surface/50 space-y-2">
               <div className="flex items-center gap-2">
@@ -1095,9 +1094,9 @@ function PurchasePOSPage() {
         )}
 
         {/* Right Column: Purchase Cart & Invoicing — the primary workspace. */}
-        <div className="flex min-h-0 w-full shrink-0 flex-col overflow-hidden rounded-3xl border border-primary/15 bg-surface/95 shadow-xl ring-1 ring-border/50 backdrop-blur-md lg:w-[420px] xl:w-[460px]">
+        <div className="flex min-h-0 w-full shrink-0 flex-col overflow-hidden rounded-3xl border border-primary/15 bg-surface/95 p-2.5 shadow-xl ring-1 ring-border/50 backdrop-blur-md sm:p-3 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:mx-2 lg:mb-2">
           {/* Cart Header */}
-          <div className="m-3 mb-2 shrink-0 rounded-2xl border border-border/70 bg-gradient-to-l from-primary/10 via-surface-2/40 to-transparent px-3.5 py-2.5 shadow-2xs flex items-center justify-between">
+          <div className="mb-2 flex shrink-0 items-center justify-between border-b border-border/60 px-1 pb-2">
             <div className="flex items-center gap-2">
               <ShoppingBag className="h-4 w-4 text-primary" />
               <span className="text-xs font-bold text-foreground">
@@ -1131,9 +1130,9 @@ function PurchasePOSPage() {
           </div>
 
           {/* Cart Lines Scrollable Area */}
-          <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-2 space-y-2.5 custom-scrollbar">
+          <div className="my-1 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 custom-scrollbar">
             {cart.length === 0 ? (
-              <div className="grid place-items-center py-20 text-center text-muted-foreground">
+              <div className="grid place-items-center py-14 text-center text-sm text-muted-foreground">
                 <div className="grid h-12 w-12 place-items-center rounded-2xl border border-dashed border-border bg-surface-2/50 mb-2">
                   <ShoppingBag className="h-6 w-6 opacity-40 text-muted-foreground" />
                 </div>
@@ -1170,172 +1169,175 @@ function PurchasePOSPage() {
                 />
               ))
             )}
-          </div>
 
-          {/* Payment & Financial Summary Footer */}
-          <div className="custom-scrollbar mt-auto max-h-[58%] shrink-0 overflow-y-auto border-t border-border/70 bg-surface/95 p-3 pr-2 space-y-2.5 backdrop-blur-xs">
-            {/* Financial Card */}
-            <div className="rounded-2xl border border-border/80 bg-surface-2/40 p-2.5 space-y-1.5 text-xs">
-              <div className="flex items-center justify-between text-muted-foreground">
-                <span>{lang === "ar" ? "المجموع الفرعي" : "Subtotal"}</span>
-                <span className="font-mono font-semibold text-foreground">{money(subtotal)}</span>
-              </div>
-
-              {discountN > 0 && (
-                <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400">
-                  <span className="font-medium">{lang === "ar" ? "الخصم" : "Discount"}</span>
-                  <span className="font-mono font-bold [unicode-bidi:isolate]">
-                    −{money(discountN)}
+            {/* Payment and totals share this same cart scroll area. */}
+            <div className="mt-3 space-y-2 border-t border-border/70 bg-surface/95 pt-2.5 pr-1">
+              {/* Payment Method Selector — 4 clear options incl. wallet & transfer. */}
+              <div className="grid grid-cols-[minmax(0,1fr)_7rem] gap-2">
+                <label className="relative min-w-0">
+                  <span className="sr-only">
+                    {lang === "ar" ? "طريقة الدفع" : "Payment method"}
                   </span>
-                </div>
-              )}
-
-              {taxTotal > 0 && (
-                <div className="flex items-center justify-between text-muted-foreground">
-                  <span>{lang === "ar" ? "الضريبة" : "Tax"}</span>
-                  <span className="font-mono font-semibold text-foreground">{money(taxTotal)}</span>
-                </div>
-              )}
-
-              {/* Net Total */}
-              <div className="pt-2 border-t border-border/70 flex items-center justify-between">
-                <span className="text-xs font-bold text-foreground">
-                  {lang === "ar" ? "الإجمالي الصافي" : "Net Total"}
-                </span>
-                <span className="text-base font-bold font-mono text-primary">{money(total)}</span>
-              </div>
-            </div>
-
-            {/*
-              طريقة الدفع — المكوّن الموحّد. The four hard-coded options are
-              replaced by whatever the business enabled for purchases.
-            */}
-            <div className="flex items-start gap-2">
-              <PaymentMethodPicker
-                context="purchases"
-                value={paymentMethod}
-                onChange={(method) => {
-                  setPaymentMethod(method);
-                  const definition = getPaymentMethodDefinition(method);
-                  if (definition?.isCreditTerm) setPaid("0");
-                }}
-                includeCredit
-                ensureIds={[paymentMethod]}
-                ariaLabel={lang === "ar" ? "طريقة الدفع" : "Payment method"}
-                className="min-w-0 flex-1"
-              />
-              <input
-                type="number"
-                min="0"
-                value={discount}
-                onChange={(e) => setDiscount(e.target.value)}
-                placeholder={lang === "ar" ? "الخصم" : "Discount"}
-                aria-label={lang === "ar" ? "الخصم" : "Discount"}
-                className="h-9 w-[7rem] shrink-0 rounded-xl border border-border/80 bg-surface px-2 text-end font-mono text-xs outline-none focus:border-primary"
-              />
-            </div>
-
-            {/* Transfer reference — for any method the catalogue flags. */}
-            {getPaymentMethodDefinition(paymentMethod)?.requiresReference && (
-              <input
-                type="text"
-                value={transferRef}
-                onChange={(e) => setTransferRef(e.target.value)}
-                placeholder={
-                  paymentMethod === "mobile_money"
-                    ? lang === "ar"
-                      ? "رقم عملية المحفظة / المرجع"
-                      : "Wallet transaction / reference number"
-                    : t("pos.pm.transfer_ref")
-                }
-                aria-label={
-                  paymentMethod === "mobile_money"
-                    ? lang === "ar"
-                      ? "مرجع المحفظة"
-                      : "Wallet reference"
-                    : t("pos.pm.transfer_ref")
-                }
-                className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2.5 text-xs text-foreground outline-none transition focus:border-primary"
-              />
-            )}
-
-            {/* Paid Amount */}
-            {paymentMethod !== "cash" && (
-              <div className="rounded-2xl border border-border/70 bg-surface-2/30 p-2.5">
-                <div className="mb-1.5 flex items-center justify-between text-xs">
-                  <span className="font-semibold text-muted-foreground">
-                    {lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}
-                  </span>
-                  <span className="font-mono font-bold text-primary">{money(total)}</span>
-                </div>
+                  <select
+                    value={paymentMethod}
+                    onChange={(e) => {
+                      const method = e.target.value as typeof paymentMethod;
+                      setPaymentMethod(method);
+                      setPaid(method === "credit" ? "0" : "");
+                    }}
+                    className="h-10 w-full appearance-none rounded-xl border border-border/80 bg-surface px-3 text-xs font-semibold text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  >
+                    <option value="cash">{lang === "ar" ? "نقدًا" : "Cash"}</option>
+                    <option value="mobile_money">{lang === "ar" ? "محفظة" : "Wallet"}</option>
+                    <option value="bank_transfer">{lang === "ar" ? "حوالة" : "Transfer"}</option>
+                    <option value="credit">{lang === "ar" ? "آجل" : "Credit"}</option>
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute end-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                </label>
                 <input
                   type="number"
                   min="0"
-                  value={paid}
-                  onChange={(e) => setPaid(e.target.value)}
-                  placeholder={total.toFixed(2)}
-                  className={`h-10 w-full rounded-xl border bg-surface px-3 text-end font-mono text-sm font-bold outline-none focus:border-primary ${
-                    isOverpaid
-                      ? "border-destructive text-destructive focus:border-destructive"
-                      : "border-border text-foreground"
-                  }`}
+                  value={discount}
+                  onChange={(e) => setDiscount(e.target.value)}
+                  placeholder={lang === "ar" ? "الخصم" : "Discount"}
+                  aria-label={lang === "ar" ? "الخصم" : "Discount"}
+                  className="h-10 w-full rounded-xl border border-border/80 bg-surface px-2 text-end font-mono text-xs outline-none focus:border-primary"
                 />
               </div>
-            )}
 
-            {isOverpaid && (
-              <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-2.5 py-1.5 text-[11px] font-medium text-destructive">
-                {lang === "ar"
-                  ? "المبلغ المدفوع أكبر من إجمالي الفاتورة"
-                  : "Paid amount exceeds the invoice total"}
-              </p>
-            )}
+              {/* Transfer reference — shown only for bank transfers. */}
+              {(paymentMethod === "bank_transfer" || paymentMethod === "mobile_money") && (
+                <input
+                  type="text"
+                  value={transferRef}
+                  onChange={(e) => setTransferRef(e.target.value)}
+                  placeholder={
+                    paymentMethod === "mobile_money"
+                      ? lang === "ar"
+                        ? "رقم عملية المحفظة / المرجع"
+                        : "Wallet transaction / reference number"
+                      : t("pos.pm.transfer_ref")
+                  }
+                  aria-label={
+                    paymentMethod === "mobile_money"
+                      ? lang === "ar"
+                        ? "مرجع المحفظة"
+                        : "Wallet reference"
+                      : t("pos.pm.transfer_ref")
+                  }
+                  className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2.5 text-xs text-foreground outline-none transition focus:border-primary"
+                />
+              )}
 
-            {/* Note Input */}
-            <input
-              type="text"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder={
-                lang === "ar" ? "ملاحظة على فاتورة الشراء (اختياري)..." : "Note (optional)..."
-              }
-              className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2.5 text-xs text-foreground placeholder:text-muted-foreground/70 outline-none focus:border-primary"
-            />
-
-            {/* Submit Action Button */}
-            <div className="sticky bottom-0 flex gap-2 bg-surface/95 pb-1 pt-2">
-              <button
-                type="button"
-                onClick={openPurchaseQuotation}
-                disabled={cart.length === 0}
-                className="flex h-11 shrink-0 items-center justify-center gap-2 rounded-2xl border border-transparent bg-foreground px-3 text-xs font-semibold text-background transition hover:opacity-90 disabled:opacity-50"
-              >
-                <FileText className="h-4 w-4" />
-                <span className="hidden sm:inline">
-                  {lang === "ar" ? "عرض الأسعار" : "Price preview"}
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={submitPurchase}
-                disabled={loading || cart.length === 0 || isOverpaid}
-                className="flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl bg-primary text-primary-foreground font-bold text-sm shadow-md transition hover:bg-primary/95 active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>{lang === "ar" ? "جاري تسجيل الشراء..." : "Recording purchase..."}</span>
-                  </>
-                ) : (
-                  <>
-                    <PackagePlus className="h-4 w-4" />
-                    <span>
-                      {lang === "ar" ? "تسجيل وحفظ فاتورة الشراء (F4)" : "Save Purchase Order (F4)"}
+              {/* Paid Amount */}
+              {paymentMethod !== "cash" && (
+                <div className="rounded-2xl border border-border/70 bg-surface-2/30 p-2.5">
+                  <div className="mb-1.5 flex items-center justify-between text-xs">
+                    <span className="font-semibold text-muted-foreground">
+                      {lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}
                     </span>
-                  </>
+                    <span className="font-mono font-bold text-primary">{money(total)}</span>
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    value={paid}
+                    onChange={(e) => setPaid(e.target.value)}
+                    placeholder={total.toFixed(2)}
+                    className={`h-10 w-full rounded-xl border bg-surface px-3 text-end font-mono text-sm font-bold outline-none focus:border-primary ${
+                      isOverpaid
+                        ? "border-destructive text-destructive focus:border-destructive"
+                        : "border-border text-foreground"
+                    }`}
+                  />
+                </div>
+              )}
+
+              {isOverpaid && (
+                <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-2.5 py-1.5 text-[11px] font-medium text-destructive">
+                  {lang === "ar"
+                    ? "المبلغ المدفوع أكبر من إجمالي الفاتورة"
+                    : "Paid amount exceeds the invoice total"}
+                </p>
+              )}
+
+              {/* Note Input */}
+              <input
+                type="text"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder={
+                  lang === "ar" ? "ملاحظة على فاتورة الشراء (اختياري)..." : "Note (optional)..."
+                }
+                className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2.5 text-xs text-foreground placeholder:text-muted-foreground/70 outline-none focus:border-primary"
+              />
+
+              <div className="space-y-1.5 rounded-2xl border border-primary/20 bg-primary/5 p-3">
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>{lang === "ar" ? "المجموع الفرعي" : "Subtotal"}</span>
+                  <span className="font-mono font-semibold text-foreground">{money(subtotal)}</span>
+                </div>
+
+                {discountN > 0 && (
+                  <div className="flex items-center justify-between text-xs text-emerald-600 dark:text-emerald-400">
+                    <span className="font-medium">{lang === "ar" ? "الخصم" : "Discount"}</span>
+                    <span className="font-mono font-bold [unicode-bidi:isolate]">
+                      −{money(discountN)}
+                    </span>
+                  </div>
                 )}
-              </button>
+
+                {taxTotal > 0 && (
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>{lang === "ar" ? "الضريبة" : "Tax"}</span>
+                    <span className="font-mono font-semibold text-foreground">
+                      {money(taxTotal)}
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between border-t border-primary/20 pt-2">
+                  <span className="text-xs font-bold text-foreground">
+                    {lang === "ar" ? "الإجمالي" : "Total"}
+                  </span>
+                  <span className="font-mono text-base font-extrabold tracking-tight text-primary">
+                    <span dir="ltr" className="[unicode-bidi:isolate]">
+                      {money(total)}
+                    </span>
+                  </span>
+                </div>
+              </div>
             </div>
+          </div>
+
+          {/* Actions stay outside the only scroll region. */}
+          <div className="mt-2 flex shrink-0 gap-2 border-t border-border/70 bg-surface/95 pb-1 pt-2">
+            <button
+              type="button"
+              onClick={openPurchaseQuotation}
+              disabled={cart.length === 0}
+              className="flex h-11 shrink-0 items-center justify-center gap-2 rounded-2xl border border-transparent bg-foreground px-4 text-sm font-semibold text-background transition hover:opacity-90 active:scale-[0.99] disabled:opacity-50"
+            >
+              <FileText className="h-4 w-4" />
+              <span className="hidden sm:inline">
+                {lang === "ar" ? "عرض الأسعار" : "Price preview"}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={submitPurchase}
+              disabled={loading || cart.length === 0 || isOverpaid}
+              className="flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-primary to-primary/90 px-4 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition hover:shadow-primary/35 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>{lang === "ar" ? "جاري تسجيل الشراء..." : "Recording purchase..."}</span>
+                </>
+              ) : (
+                <span>{lang === "ar" ? "تسجيل فاتورة الشراء" : "Save Purchase Order"}</span>
+              )}
+            </button>
           </div>
         </div>
       </div>
