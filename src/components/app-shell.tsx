@@ -67,7 +67,6 @@ import { useTheme } from "@/lib/theme";
 import { getSidebarSections, type SidebarSection } from "@/lib/navigation";
 import { routeIcon } from "@/lib/navigation/route-icons";
 
-
 const CATEGORY_STYLES: Record<
   string,
   {
@@ -89,11 +88,13 @@ const CATEGORY_STYLES: Record<
   },
   sales: {
     iconBoxActive: "bg-emerald-500/20 text-emerald-500 ring-1 ring-emerald-500/40",
-    iconBoxInactive: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-500/20",
+    iconBoxInactive:
+      "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-500/20",
     iconActive: "text-emerald-500 stroke-[2.4]",
     iconInactive: "text-emerald-600 dark:text-emerald-400 group-hover:scale-110",
     accentPill: "bg-emerald-500",
-    activeBg: "bg-gradient-to-r from-emerald-500/15 via-emerald-500/5 to-transparent border-emerald-500/20",
+    activeBg:
+      "bg-gradient-to-r from-emerald-500/15 via-emerald-500/5 to-transparent border-emerald-500/20",
   },
   inventory: {
     iconBoxActive: "bg-cyan-500/20 text-cyan-500 ring-1 ring-cyan-500/40",
@@ -105,27 +106,33 @@ const CATEGORY_STYLES: Record<
   },
   procurement: {
     iconBoxActive: "bg-amber-500/20 text-amber-500 ring-1 ring-amber-500/40",
-    iconBoxInactive: "bg-amber-500/10 text-amber-600 dark:text-amber-400 group-hover:bg-amber-500/20",
+    iconBoxInactive:
+      "bg-amber-500/10 text-amber-600 dark:text-amber-400 group-hover:bg-amber-500/20",
     iconActive: "text-amber-500 stroke-[2.4]",
     iconInactive: "text-amber-600 dark:text-amber-400 group-hover:scale-110",
     accentPill: "bg-amber-500",
-    activeBg: "bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-transparent border-amber-500/20",
+    activeBg:
+      "bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-transparent border-amber-500/20",
   },
   finance: {
     iconBoxActive: "bg-violet-500/20 text-violet-500 ring-1 ring-violet-500/40",
-    iconBoxInactive: "bg-violet-500/10 text-violet-600 dark:text-violet-400 group-hover:bg-violet-500/20",
+    iconBoxInactive:
+      "bg-violet-500/10 text-violet-600 dark:text-violet-400 group-hover:bg-violet-500/20",
     iconActive: "text-violet-500 stroke-[2.4]",
     iconInactive: "text-violet-600 dark:text-violet-400 group-hover:scale-110",
     accentPill: "bg-violet-500",
-    activeBg: "bg-gradient-to-r from-violet-500/15 via-violet-500/5 to-transparent border-violet-500/20",
+    activeBg:
+      "bg-gradient-to-r from-violet-500/15 via-violet-500/5 to-transparent border-violet-500/20",
   },
   milling: {
     iconBoxActive: "bg-orange-500/20 text-orange-500 ring-1 ring-orange-500/40",
-    iconBoxInactive: "bg-orange-500/10 text-orange-600 dark:text-orange-400 group-hover:bg-orange-500/20",
+    iconBoxInactive:
+      "bg-orange-500/10 text-orange-600 dark:text-orange-400 group-hover:bg-orange-500/20",
     iconActive: "text-orange-500 stroke-[2.4]",
     iconInactive: "text-orange-600 dark:text-orange-400 group-hover:scale-110",
     accentPill: "bg-orange-500",
-    activeBg: "bg-gradient-to-r from-orange-500/15 via-orange-500/5 to-transparent border-orange-500/20",
+    activeBg:
+      "bg-gradient-to-r from-orange-500/15 via-orange-500/5 to-transparent border-orange-500/20",
   },
   admin: {
     iconBoxActive: "bg-rose-500/20 text-rose-500 ring-1 ring-rose-500/40",
@@ -250,7 +257,8 @@ const SidebarContents = memo(function SidebarContents({
                 return (
                   <li key={it.id} className="relative">
                     {(() => {
-                      const catStyle = CATEGORY_STYLES[sec.category] || CATEGORY_STYLES.command_center;
+                      const catStyle =
+                        CATEGORY_STYLES[sec.category] || CATEGORY_STYLES.command_center;
                       return (
                         <Link
                           to={it.path}
@@ -264,7 +272,10 @@ const SidebarContents = memo(function SidebarContents({
                             active
                               ? collapsed
                                 ? cn("shadow-md ring-2 ring-white/10", catStyle.iconBoxActive)
-                                : cn("text-foreground font-semibold shadow-sm border", catStyle.activeBg)
+                                : cn(
+                                    "text-foreground font-semibold shadow-sm border",
+                                    catStyle.activeBg,
+                                  )
                               : collapsed
                                 ? "text-muted-foreground hover:bg-surface-2 hover:text-foreground hover:scale-105"
                                 : "text-muted-foreground hover:bg-sidebar-accent/70 hover:text-foreground",
@@ -287,7 +298,7 @@ const SidebarContents = memo(function SidebarContents({
                                 ? "h-full w-full"
                                 : cn(
                                     "h-7 w-7 rounded-lg",
-                                    active ? catStyle.iconBoxActive : catStyle.iconBoxInactive
+                                    active ? catStyle.iconBoxActive : catStyle.iconBoxInactive,
                                   ),
                             )}
                           >
@@ -321,7 +332,36 @@ const SidebarContents = memo(function SidebarContents({
         ))}
       </nav>
 
-      
+      {/* Settings Navigation Shortcut */}
+      <div className={cn("px-2.5 pb-1", collapsed && "flex justify-center p-2 pb-1")}>
+        <Link
+          to="/settings"
+          onClick={onNavigate}
+          className={cn(
+            "group relative flex items-center rounded-xl text-xs font-semibold transition-all duration-200 border",
+            pathname.startsWith("/settings")
+              ? "bg-primary text-primary-foreground border-primary shadow-sm"
+              : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground border-transparent",
+            collapsed ? "h-9 w-9 justify-center p-0" : "w-full gap-2.5 px-3 py-2",
+          )}
+          title={isAr ? "إعدادات النظام والطباعة" : "System & Printing Settings"}
+        >
+          <div
+            className={cn(
+              "grid h-6 w-6 shrink-0 place-items-center rounded-lg transition-transform",
+              pathname.startsWith("/settings")
+                ? "bg-white/20 text-white"
+                : "bg-primary/10 text-primary group-hover:scale-110",
+            )}
+          >
+            <Settings className="size-3.5" />
+          </div>
+          {!collapsed && (
+            <span className="truncate">{isAr ? "الإعدادات" : "Settings"}</span>
+          )}
+        </Link>
+      </div>
+
       {/* ERP Tour trigger button */}
       <div className={cn("px-2.5 pb-1", collapsed && "flex justify-center p-2 pb-1")}>
         <button

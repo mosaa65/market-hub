@@ -774,6 +774,9 @@ function InventoryPage() {
       <div className="pt-2 sm:pt-3.5">
         <TableToolbar
           sticky
+          lang={lang}
+          countMode="total"
+          loadedCount={displayRows.length}
           search={{
             value: query,
             onValueChange: setQuery,

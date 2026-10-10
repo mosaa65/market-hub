@@ -4,7 +4,7 @@
   "sideEffects": false,
   "type": "module",
   "scripts": {
-    "dev": "vite dev",
+    "dev": "vite dev --host 0.0.0.0 --port 3000",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
@@ -17,7 +17,8 @@
     "test:unified-printing": "npx tsx src/lib/printing/__tests__/unified-printing.test.ts",
     "test:transports": "npx tsx src/lib/printing/__tests__/transports.test.ts",
     "test:company-profile": "npx tsx src/lib/printing/__tests__/company-profile.test.ts",
-    "test:communication": "npx tsx src/lib/communication/__tests__/communication-engine.test.ts"
+    "test:communication": "npx tsx src/lib/communication/__tests__/communication-engine.test.ts",
+    "test:payment-methods": "npx tsx src/lib/payments/__tests__/payment-methods.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -64,6 +65,7 @@
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "lucide-react": "^0.575.0",
+    "qrcode": "^1.5.4",
     "react": "^19.2.0",
     "react-day-picker": "^9.14.0",
     "react-dom": "^19.2.0",
@@ -83,6 +85,7 @@
     "@eslint/js": "^9.32.0",
     "@lovable.dev/vite-tanstack-config": "^2.25.1",
     "@types/node": "^22.16.5",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.2.0",

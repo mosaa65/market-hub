@@ -37,11 +37,17 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
+import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
 import { money } from "@/lib/format";
 import { useDebtIndex } from "@/hooks/use-debts-overview";
 import { StatementIntegrityBadge } from "@/components/statements/statement-integrity-badge";
-import { VortexCollectionSheet, VortexMetricCard, type PaymentMethod } from "@/components/vortex-ui";
+import {
+  VortexCollectionSheet,
+  VortexMetricCard,
+  type PaymentMethod,
+} from "@/components/vortex-ui";
+import { toLegacyPaymentValue } from "@/lib/payments/payment-methods";
 import { toast } from "sonner";
 import { WhatsAppIcon } from "@/components/whatsapp-icon";
 import { Ltr } from "@/components/ltr-value";
@@ -54,6 +60,10 @@ import {
   type FilterValues,
   type SortOption,
 } from "@/components/ui/table-toolbar";
+import { DataTable, type DataTableColumn, type DataTableSort } from "@/components/ui/data-table";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { IconButton } from "@/components/ui/icon-button";
+import { useBreakpoint } from "@/design/breakpoints";
 import { useRealtimeTable } from "@/lib/realtime";
 import { QUERY_KEYS } from "@/lib/query-keys";
 import { CustomerFormDialog } from "@/components/contacts/customer-form-dialog";
@@ -107,6 +117,16 @@ function CustomersPage() {
   const [filters, setFilters] = useState<FilterValues>({});
   const [sortKey, setSortKey] = useState<string>("name_asc");
   const [viewMode, setViewMode] = useState<ViewMode>("cards");
+
+  /*
+   * Column-header sorting for the classic table, kept separate from the
+   * toolbar preset (`sortKey`). `filtered` decides precedence so a header
+   * click always wins over a stale dropdown value.
+   */
+  const [sort, setSort] = useState<DataTableSort | null>(null);
+  const breakpoint = useBreakpoint();
+  const tableUsesHorizontalScroll =
+    breakpoint === "xs" || breakpoint === "sm" || breakpoint === "md";
   const [edit, setEdit] = useState<Partial<Customer> | null>(null);
   const [selected, setSelected] = useState<Customer | null>(null);
   const [collectionCustomer, setCollectionCustomer] = useState<Customer | null>(null);
@@ -122,10 +142,18 @@ function CustomersPage() {
   // أرصدة مؤكَّدة من الدفتر
   const { index: ledgerIndex } = useDebtIndex("customer");
 
-  const { data: rows = [], isLoading: loading, refetch: load } = useQuery({
+  const {
+    data: rows = [],
+    isLoading: loading,
+    refetch: load,
+  } = useQuery({
     queryKey: QUERY_KEYS.customers,
     queryFn: async () => {
-      const { data, error } = await supabase.from("customers").select("*").order("name").limit(1000);
+      const { data, error } = await supabase
+        .from("customers")
+        .select("*")
+        .order("name")
+        .limit(1000);
       if (error) throw error;
       return (data ?? []) as Customer[];
     },
@@ -198,14 +226,238 @@ function CustomersPage() {
       { value: "name_asc", label: lang === "ar" ? "الاسم (أ - ي)" : "Name (A - Z)" },
       { value: "name_desc", label: lang === "ar" ? "الاسم (ي - أ)" : "Name (Z - A)" },
       { value: "debt_desc", label: lang === "ar" ? "الأعلى مديونية (عليه)" : "Highest Debt" },
-      { value: "credit_desc", label: lang === "ar" ? "الأعلى رصيداً دائناً (له)" : "Highest Credit" },
+      {
+        value: "credit_desc",
+        label: lang === "ar" ? "الأعلى رصيداً دائناً (له)" : "Highest Credit",
+      },
       { value: "limit_desc", label: lang === "ar" ? "أعلى حد ائتماني" : "Highest Credit Limit" },
-      { value: "points_desc", label: lang === "ar" ? "الأعلى نقاط ولاء" : "Highest Loyalty Points" },
+      {
+        value: "points_desc",
+        label: lang === "ar" ? "الأعلى نقاط ولاء" : "Highest Loyalty Points",
+      },
       { value: "date_desc", label: lang === "ar" ? "الأحدث تسجيلاً" : "Newest Registered" },
       { value: "date_asc", label: lang === "ar" ? "الأقدم تسجيلاً" : "Oldest Registered" },
     ],
     [lang],
   );
+
+  /*
+   * Classic table columns.
+   *
+   * Same contract as the products table: each column is independently
+   * sortable on its *displayed* value, values stay on one line and truncate,
+   * and money is rendered through `<Ltr>` so a number never gets mangled by
+   * bidi reordering inside an RTL layout.
+   */
+  const columns = useMemo<DataTableColumn<Customer>[]>(() => {
+    const cols: DataTableColumn<Customer>[] = [
+      {
+        key: "name",
+        header: t("common.name"),
+        sortable: true,
+        width: "w-[260px]",
+        sortValue: (r) => r.name,
+        cell: (r) => {
+          const meta = getRecordIndicator(r);
+          const limit = Number(r.credit_limit);
+          return (
+            <div className="flex items-center gap-3 py-0.5">
+              <span aria-hidden className={`h-9 w-1.5 shrink-0 rounded-full ${meta.barClass}`} />
+              <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-xs font-bold text-primary">
+                {r.name.slice(0, 1)}
+              </span>
+              <div className="min-w-0">
+                <span className="block truncate text-xs font-bold text-foreground">{r.name}</span>
+                {limit > 0 && (
+                  <span className="block truncate font-mono text-[10px] text-rose-400">
+                    {lang === "ar" ? "حد الائتمان:" : "Credit:"} <Ltr>{money(limit)}</Ltr>
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        key: "phone",
+        header: t("common.phone"),
+        sortable: true,
+        width: "w-[180px]",
+        sortValue: (r) => r.phone ?? "",
+        cell: (r) =>
+          r.phone ? (
+            <div
+              className="flex items-center gap-1.5"
+              dir="ltr"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <span className="truncate font-mono text-xs text-muted-foreground">{r.phone}</span>
+              <CustomerCommunicationMenu
+                customer={{
+                  id: r.id,
+                  name: r.name,
+                  phone: r.phone,
+                  balance: Number(r.balance),
+                  hasLedgerActivity: Boolean(
+                    ledgerIndex.get(r.id)?.lastMovementAt || Number(r.balance) !== 0,
+                  ),
+                }}
+                onSelectStatementPdf={() => goStatement(r)}
+                onSelectStatementExcel={() => goStatement(r)}
+                trigger={
+                  <button
+                    type="button"
+                    className="shrink-0 rounded-full p-1 text-emerald-400 transition hover:bg-emerald-500/10 hover:text-emerald-300"
+                    title={lang === "ar" ? "إجراءات المراسلة والتواصل" : "Communication actions"}
+                  >
+                    <WhatsAppIcon className="size-3.5" />
+                  </button>
+                }
+              />
+            </div>
+          ) : (
+            <span className="text-xs text-muted-foreground">—</span>
+          ),
+      },
+      {
+        key: "email",
+        header: t("common.email"),
+        sortable: true,
+        width: "w-[200px]",
+        sortValue: (r) => r.email ?? "",
+        cell: (r) => (
+          <Ltr className="block truncate text-xs text-muted-foreground">{r.email ?? "—"}</Ltr>
+        ),
+      },
+      {
+        key: "balance",
+        header: t("common.balance"),
+        align: "end",
+        sortable: true,
+        width: "w-[130px]",
+        sortValue: (r) => Number(r.balance),
+        cell: (r) => {
+          const bal = Number(r.balance);
+          return (
+            <span
+              className={`font-mono text-sm font-bold tabular-nums ${
+                bal > 0 ? "text-amber-400" : bal < 0 ? "text-emerald-400" : "text-muted-foreground"
+              }`}
+            >
+              <Ltr>{money(bal)}</Ltr>
+            </span>
+          );
+        },
+      },
+      {
+        key: "credit_limit",
+        header: lang === "ar" ? "حد الائتمان" : "Credit Limit",
+        align: "end",
+        sortable: true,
+        width: "w-[124px]",
+        sortValue: (r) => Number(r.credit_limit),
+        cell: (r) => (
+          <span className="font-mono text-xs tabular-nums text-muted-foreground">
+            <Ltr>{money(Number(r.credit_limit))}</Ltr>
+          </span>
+        ),
+      },
+      {
+        key: "loyalty_points",
+        header: lang === "ar" ? "نقاط الولاء" : "Loyalty",
+        align: "end",
+        sortable: true,
+        width: "w-[110px]",
+        sortValue: (r) => Number(r.loyalty_points),
+        cell: (r) => (
+          <span className="font-mono text-xs tabular-nums text-muted-foreground">
+            {Number(r.loyalty_points) || 0}
+          </span>
+        ),
+      },
+      {
+        key: "is_active",
+        header: t("common.status"),
+        sortable: true,
+        width: "w-[130px]",
+        sortValue: (r) => Number(r.is_active),
+        cell: (r) => {
+          const meta = getRecordIndicator(r);
+          return (
+            <span
+              className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${meta.toneClass}`}
+            >
+              <span className={`size-1.5 rounded-full ${meta.barClass}`} />
+              {meta.label}
+            </span>
+          );
+        },
+      },
+      {
+        key: "actions",
+        header: t("common.actions"),
+        align: "end",
+        width: "w-[150px]",
+        cell: (r) => (
+          <div className="inline-flex items-center gap-1.5 pe-2">
+            {isModuleEnabled("payments") && (
+              <IconButton
+                size="sm"
+                variant="outline"
+                tooltip
+                ariaLabel={lang === "ar" ? "تحصيل دفعة" : "Collect payment"}
+                icon={<Wallet />}
+                round
+                onClick={(event) => {
+                  event.stopPropagation();
+                  goPayment(r);
+                }}
+              />
+            )}
+            <IconButton
+              size="sm"
+              variant="outline"
+              tooltip
+              ariaLabel={lang === "ar" ? "كشف حساب" : "Statement"}
+              icon={<FileText />}
+              round
+              onClick={(event) => {
+                event.stopPropagation();
+                goStatement(r);
+              }}
+            />
+            <IconButton
+              size="sm"
+              variant="outline"
+              tooltip
+              ariaLabel={t("common.edit")}
+              icon={<Pencil />}
+              round
+              onClick={(event) => {
+                event.stopPropagation();
+                setEdit(r);
+              }}
+            />
+            <IconButton
+              size="sm"
+              variant="danger"
+              tooltip
+              ariaLabel={t("common.delete")}
+              icon={<Trash2 />}
+              round
+              onClick={(event) => {
+                event.stopPropagation();
+                void remove(r.id);
+              }}
+            />
+          </div>
+        ),
+      },
+    ];
+
+    return cols;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [t, lang, ledgerIndex, isModuleEnabled]);
 
   const filtered = useMemo(() => {
     let list = rows.filter((r) => {
@@ -240,7 +492,8 @@ function CustomersPage() {
       }
       if (filters.created_at && typeof filters.created_at === "object") {
         const rowTime = new Date(r.created_at).getTime();
-        if (filters.created_at.from && rowTime < new Date(filters.created_at.from).getTime()) return false;
+        if (filters.created_at.from && rowTime < new Date(filters.created_at.from).getTime())
+          return false;
         if (filters.created_at.to) {
           const toDate = new Date(filters.created_at.to);
           toDate.setHours(23, 59, 59, 999);
@@ -252,6 +505,38 @@ function CustomersPage() {
     });
 
     list = [...list].sort((a, b) => {
+      const aBal = Number(a.balance);
+      const bBal = Number(b.balance);
+
+      /*
+       * A column-header click (classic table) takes precedence over the
+       * toolbar preset, so the two controls can never disagree about the
+       * order the operator asked for.
+       */
+      if (sort) {
+        const dir = sort.direction === "asc" ? 1 : -1;
+        switch (sort.key) {
+          case "name":
+            return a.name.localeCompare(b.name, "ar") * dir;
+          case "phone":
+            return (a.phone ?? "").localeCompare(b.phone ?? "") * dir;
+          case "email":
+            return (a.email ?? "").localeCompare(b.email ?? "") * dir;
+          case "balance":
+            return (aBal - bBal) * dir;
+          case "credit_limit":
+            return (Number(a.credit_limit) - Number(b.credit_limit)) * dir;
+          case "loyalty_points":
+            return (Number(a.loyalty_points) - Number(b.loyalty_points)) * dir;
+          case "created_at":
+            return (new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) * dir;
+          case "is_active":
+            return (Number(a.is_active) - Number(b.is_active)) * dir;
+          default:
+            break;
+        }
+      }
+
       switch (sortKey) {
         case "name_asc":
           return a.name.localeCompare(b.name, "ar");
@@ -275,7 +560,7 @@ function CustomersPage() {
     });
 
     return list;
-  }, [rows, search, filterType, filters, sortKey]);
+  }, [rows, search, filterType, filters, sortKey, sort]);
 
   // Balance summaries
   const { totalOwed, totalCredit, activeCount, debtCount } = useMemo(() => {
@@ -358,13 +643,12 @@ function CustomersPage() {
     method: PaymentMethod;
     notes?: string;
   }) => {
-    const dbMethodMap: Record<PaymentMethod, "cash" | "bank_transfer"> = {
-      cash: "cash",
-      transfer: "bank_transfer",
-      card: "bank_transfer",
-      mobile_money: "bank_transfer",
-    };
-    const dbMethod = dbMethodMap[data.method] || "cash";
+    //
+    // The map that used to sit here collapsed card and mobile_money onto
+    // bank_transfer, so a wallet collection was recorded as a bank transfer and
+    // the ledger credited the wrong account. The catalogue now answers directly.
+    //
+    const dbMethod = toLegacyPaymentValue(data.method);
     const receiptNumber = String(Date.now()).slice(-6);
 
     // Call official security-definer RPC record_customer_payment
@@ -619,7 +903,11 @@ function CustomersPage() {
         sort={{
           options: customerSortOptions,
           value: sortKey,
-          onValueChange: setSortKey,
+          onValueChange: (value) => {
+            setSortKey(value);
+            // A preset replaces whatever the table header had selected.
+            setSort(null);
+          },
           label: lang === "ar" ? "ترتيب" : "Sort",
         }}
         viewToggle={
@@ -731,8 +1019,8 @@ function CustomersPage() {
           </button>
         </div>
       ) : viewMode === "cards" ? (
-        /* ─── Mullak Luxury Cards Grid ─── */
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
+        /* ─── Mullak Luxury Cards Grid — same 2-column mobile grid as products ─── */
+        <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 lg:grid-cols-4 sm:gap-4">
           {filtered.map((r, i) => {
             const meta = getRecordIndicator(r);
             const bal = Number(r.balance);
@@ -847,14 +1135,18 @@ function CustomersPage() {
                         name: r.name,
                         phone: r.phone,
                         balance: bal,
-                        hasLedgerActivity: Boolean(ledgerIndex.get(r.id)?.lastMovementAt || bal !== 0),
+                        hasLedgerActivity: Boolean(
+                          ledgerIndex.get(r.id)?.lastMovementAt || bal !== 0,
+                        ),
                       }}
                       onSelectStatementPdf={() => goStatement(r)}
                       onSelectStatementExcel={() => goStatement(r)}
                       trigger={
                         <button
                           type="button"
-                          title={lang === "ar" ? "إجراءات المراسلة والتواصل" : "Communication options"}
+                          title={
+                            lang === "ar" ? "إجراءات المراسلة والتواصل" : "Communication options"
+                          }
                           className={`grid size-8 place-items-center rounded-full border transition active:scale-95 ${
                             r.phone
                               ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border-emerald-500/20"
@@ -938,19 +1230,22 @@ function CustomersPage() {
                     </div>
                     <div className="mt-0.5 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                       {r.phone && (
-                        <span className="flex items-center gap-1 font-mono text-[11px]" dir="ltr">
-                          <Phone className="size-3 text-muted-foreground" />
-                          {r.phone}
+                        <span
+                          className="flex items-center gap-1 truncate font-mono text-[11px]"
+                          dir="ltr"
+                        >
+                          <Phone className="size-3 shrink-0 text-muted-foreground" />
+                          <span className="truncate">{r.phone}</span>
                         </span>
                       )}
                       {r.email && (
-                        <span className="flex items-center gap-1 truncate text-[11px] max-w-[150px]">
-                          <Mail className="size-3 text-muted-foreground" />
-                          {r.email}
+                        <span className="flex max-w-[150px] items-center gap-1 truncate text-[11px]">
+                          <Mail className="size-3 shrink-0 text-muted-foreground" />
+                          <span className="truncate">{r.email}</span>
                         </span>
                       )}
                       {limit > 0 && (
-                        <span className="font-mono text-[10px] text-rose-400">
+                        <span className="truncate font-mono text-[10px] text-rose-400">
                           {lang === "ar" ? "الحد:" : "Limit:"} <Ltr>{money(limit)}</Ltr>
                         </span>
                       )}
@@ -1018,165 +1313,43 @@ function CustomersPage() {
           })}
         </div>
       ) : (
-        /* ─── Advanced Desktop Table View (with Mullak Row Accents) ─── */
-        <div className="card-mullak overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-surface-2/40 text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border/80">
-                <tr>
-                  <th className="px-4 py-3.5 text-start font-bold">{t("common.name")}</th>
-                  <th className="px-4 py-3.5 text-start font-bold">{t("common.phone")}</th>
-                  <th className="px-4 py-3.5 text-start font-bold">{t("common.email")}</th>
-                  <th className="px-4 py-3.5 text-end font-bold">{t("common.balance")}</th>
-                  <th className="px-4 py-3.5 text-start font-bold">{t("common.status")}</th>
-                  <th className="px-4 py-3.5 text-end font-bold">
-                    {lang === "ar" ? "الإجراءات" : "Actions"}
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/40">
-                {filtered.map((r) => {
-                  const meta = getRecordIndicator(r);
-                  const bal = Number(r.balance);
-                  const limit = Number(r.credit_limit);
-
-                  return (
-                    <tr
-                      key={r.id}
-                      onClick={() => void openCustomer(r)}
-                      onMouseEnter={() => setHoveredRow(r.id)}
-                      onMouseLeave={() => setHoveredRow(null)}
-                      className={`cursor-pointer transition-colors ${
-                        hoveredRow === r.id ? "bg-surface-2/70" : "hover:bg-surface-2/40"
-                      }`}
-                    >
-                      {/* Name with colored indicator & avatar */}
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <span
-                            aria-hidden
-                            className={`h-9 w-1.5 shrink-0 rounded-full ${meta.barClass}`}
-                          />
-                          <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary font-bold text-xs border border-primary/20">
-                            {r.name.slice(0, 1)}
-                          </div>
-                          <div className="min-w-0">
-                            <span className="font-bold text-foreground block truncate">
-                              {r.name}
-                            </span>
-                            {limit > 0 && (
-                              <span className="text-[10px] text-rose-400 font-mono block">
-                                {lang === "ar" ? "حد الائتمان:" : "Credit:"}{" "}
-                                <Ltr>{money(limit)}</Ltr>
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Phone */}
-                      <td className="px-4 py-3 text-muted-foreground font-mono text-xs" dir="ltr">
-                        {r.phone ? (
-                          <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-                            <span>{r.phone}</span>
-                            <CustomerCommunicationMenu
-                              customer={{
-                                id: r.id,
-                                name: r.name,
-                                phone: r.phone,
-                                balance: bal,
-                                hasLedgerActivity: Boolean(ledgerIndex.get(r.id)?.lastMovementAt || bal !== 0),
-                              }}
-                              onSelectStatementPdf={() => goStatement(r)}
-                              onSelectStatementExcel={() => goStatement(r)}
-                              trigger={
-                                <button
-                                  type="button"
-                                  className="text-emerald-400 hover:text-emerald-300 p-1 rounded-full hover:bg-emerald-500/10 transition"
-                                  title={lang === "ar" ? "إجراءات المراسلة والتواصل" : "Communication actions"}
-                                >
-                                  <WhatsAppIcon className="size-3.5" />
-                                </button>
-                              }
-                            />
-                          </div>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-
-                      {/* Email */}
-                      <td className="px-4 py-3 text-muted-foreground text-xs">
-                        <Ltr className="block truncate">{r.email ?? "—"}</Ltr>
-                      </td>
-
-                      {/* Balance */}
-                      <td className="px-4 py-3 text-end">
-                        <span
-                          className={`font-mono font-bold text-sm ${
-                            bal > 0
-                              ? "text-amber-400"
-                              : bal < 0
-                                ? "text-emerald-400"
-                                : "text-muted-foreground"
-                          }`}
-                        >
-                          <Ltr>{money(bal)}</Ltr>
-                        </span>
-                      </td>
-
-                      {/* Status */}
-                      <td className="px-4 py-3">
-                        <span
-                          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${meta.toneClass}`}
-                        >
-                          <span className={`size-1.5 rounded-full ${meta.barClass}`} />
-                          {meta.label}
-                        </span>
-                      </td>
-
-                      {/* Actions */}
-                      <td className="px-4 py-3 text-end" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-1.5">
-                          {isModuleEnabled("payments") && (
-                            <button
-                              onClick={() => goPayment(r)}
-                              title={`${lang === "ar" ? "تحصيل" : "Payment"} (F3)`}
-                              className="h-7 px-2.5 rounded-lg bg-primary/10 hover:bg-primary hover:text-primary-foreground border border-primary/20 text-xs font-semibold text-primary transition active:scale-95"
-                            >
-                              <Wallet className="size-3" />
-                              {lang === "ar" ? "تحصيل" : "Pay"}
-                            </button>
-                          )}
-                          <button
-                            onClick={() => goStatement(r)}
-                            title={`${lang === "ar" ? "كشف حساب" : "Statement"} (F5)`}
-                            className="grid size-7 place-items-center rounded-lg border border-border bg-surface text-muted-foreground hover:bg-surface-2 hover:text-foreground transition"
-                          >
-                            <FileText className="size-3.5" />
-                          </button>
-                          <button
-                            onClick={() => setEdit(r)}
-                            title={`${t("common.edit")} (F2)`}
-                            className="grid size-7 place-items-center rounded-lg border border-border bg-surface text-muted-foreground hover:bg-surface-2 hover:text-foreground transition"
-                          >
-                            <Pencil className="size-3.5" />
-                          </button>
-                          <button
-                            onClick={() => void remove(r.id)}
-                            title={`${t("common.delete")} (F4)`}
-                            className="grid size-7 place-items-center rounded-lg border border-destructive/30 bg-destructive/5 text-destructive hover:bg-destructive/15 transition"
-                          >
-                            <Trash2 className="size-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+        /* ─── Classic Table View: same DataTable as products (sortable headers) ─── */
+        <div className="panel-elevated -mx-1 overflow-hidden rounded-2xl border border-border/70 sm:mx-0">
+          <DataTable
+            className="px-0"
+            columns={columns}
+            rows={filtered}
+            rowKey={(r) => r.id}
+            loading={loading}
+            initialLoading={loading}
+            error={null}
+            sort={sort}
+            onSortChange={setSort}
+            minWidth={1260}
+            horizontalScroll={tableUsesHorizontalScroll}
+            stickyHeader
+            onRowClick={(r) => void openCustomer(r)}
+            rowProps={(r) => ({
+              onMouseEnter: () => setHoveredRow(r.id),
+              onMouseLeave: () => setHoveredRow(null),
+            })}
+            empty={{
+              icon: <Users />,
+              title: lang === "ar" ? "لا توجد سجلات مطابقة" : "No matching customers",
+              description: search
+                ? lang === "ar"
+                  ? `لا توجد نتائج تطابق "${search}". جرب البحث بكلمة أخرى.`
+                  : `No results found for "${search}".`
+                : lang === "ar"
+                  ? "ابدأ بتسجيل العميل الأول لإصدار الفواتير ومتابعة الأرصدة والديون."
+                  : "Register your first customer to start tracking invoices and balances.",
+              action: (
+                <Button size="sm" icon={<Plus />} onClick={() => setEdit({})}>
+                  {lang === "ar" ? "عميل جديد" : "New Customer"}
+                </Button>
+              ),
+            }}
+          />
         </div>
       )}
 

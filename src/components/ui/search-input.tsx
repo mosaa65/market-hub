@@ -16,6 +16,17 @@ export interface SearchInputProps extends Omit<
   loading?: boolean;
   /** Result count rendered as a subtle suffix. */
   resultCount?: number;
+  /**
+   * Pre-formatted count text, taking precedence over `resultCount`.
+   * Used when the number needs a shape the component cannot guess — e.g.
+   * `"50/1200"` for "loaded of total", which must never be mistaken for a
+   * match count.
+   */
+  resultCountText?: string;
+  /** Accessible name + tooltip for the clear button. */
+  clearLabel?: string;
+  /** Placeholder text for the optional `/` shortcut hint (screen-reader only). */
+  searchLabel?: string;
   size?: FieldSize;
   containerClassName?: string;
   /** Focuses the field when the user presses `/` anywhere on the page. */
@@ -51,6 +62,9 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
       debounceMs,
       loading = false,
       resultCount,
+      resultCountText,
+      clearLabel = "مسح البحث",
+      searchLabel,
       size = "md",
       className,
       containerClassName,
@@ -153,6 +167,7 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
           ref={innerRef}
           type="search"
           role="searchbox"
+          aria-label={searchLabel ?? placeholder}
           value={local}
           onChange={handleChange}
           onFocus={(e) => {
@@ -173,6 +188,7 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
           placeholder={placeholder}
           className={cn(
             searchSize[size],
+            "w-full min-w-0 truncate placeholder:truncate",
             "rounded-full border-0 bg-transparent text-foreground shadow-none",
             // The input sits on a translucent glass layer, so a 70%-opacity token
             // made the placeholder practically invisible. Full muted-foreground
@@ -186,9 +202,9 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
         />
 
         <span className="absolute inset-y-0 end-0 z-10 flex items-center gap-1.5 pe-2">
-          {resultCount != null ? (
+          {resultCountText != null || resultCount != null ? (
             <span className="pointer-events-none hidden text-[11px] tabular-nums text-muted-foreground sm:inline">
-              {resultCount}
+              {resultCountText ?? resultCount}
             </span>
           ) : null}
 
@@ -196,8 +212,8 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
             <button
               type="button"
               onClick={clear}
-              aria-label="مسح البحث"
-              title="مسح البحث"
+              aria-label={clearLabel}
+              title={clearLabel}
               className={cn(
                 "grid h-6 w-6 place-items-center rounded-full transition-all duration-200 [&_svg]:size-3.5",
                 "bg-primary/15 text-primary hover:bg-primary/25",

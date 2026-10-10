@@ -717,7 +717,7 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
     ),
     category: "settings",
     moduleId: "core",
-    requiredRoles: ["owner", "manager"],
+    requiredRoles: ["owner", "manager", "accountant", "cashier", "warehouse"],
     i18nKey: "nav.settings",
   },
   {
@@ -799,14 +799,6 @@ export const SIDEBAR_HIDDEN_IDS = new Set<string>([
   "printing-settings",
   "company-settings",
   "backup-settings",
-  /**
-   * المدخل الرئيسي للإعدادات لا يُعرض في القائمة.
-   *
-   * للإعدادات زر مخصّص في تذييل القائمة يقود إلى /settings، ويصدُر
-   * بصلاحية owner/manager. لو تُرك المدخل هنا أيضاً لظهر «الإعدادات»
-   * مرتين في القائمة نفسها. الزر المخصّص هو المدخل الوحيد المقصود.
-   */
-  "settings",
 ]);
 
 /** قسم في القائمة الجانبية مُشتق من السجل المركزي. */

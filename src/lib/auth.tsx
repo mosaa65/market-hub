@@ -1,7 +1,9 @@
 /* eslint-disable react-refresh/only-export-components -- يصدّر AuthProvider مع useAuth والثوابت عمداً */
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { clearSessionQueryCache } from "@/lib/query-keys";
 
 type Role = "owner" | "manager" | "accountant" | "cashier" | "warehouse";
 
@@ -65,6 +67,7 @@ interface AuthCtx {
 const Ctx = createContext<AuthCtx | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [session, setSession] = useState<Session | null>(null);
   const [roles, setRoles] = useState<Role[]>([]);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
@@ -73,12 +76,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [isRefreshingPermissions, setIsRefreshingPermissions] = useState(false);
   const loadSeq = useRef(0);
+  /**
+   * Identity the in-memory Query cache currently belongs to. The query cache is
+   * session memory with a 2-minute stale window, so a second user signing in on
+   * the same terminal would otherwise see the previous user's rows until the
+   * first refetch resolves. The cache is dropped whenever this changes.
+   */
+  const scopedUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     let alive = true;
 
     async function applySession(nextSession: Session | null, isInitial = false) {
       const seq = ++loadSeq.current;
+      const nextUserId = nextSession?.user?.id ?? null;
+
+      // Drop cached business rows as soon as the identity changes — sign-out
+      // (null), a different user, or an inactive account. React Query keys are
+      // not user-scoped, so this is the only boundary that keeps them honest.
+      if (nextUserId !== scopedUserIdRef.current) {
+        clearSessionQueryCache(queryClient);
+        scopedUserIdRef.current = nextUserId;
+      }
 
       if (!nextSession?.user) {
         clearCachedAuth();
@@ -97,15 +116,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userId = nextSession.user.id;
       const cached = readCachedAuth(userId);
 
+      // ضبط الجلسة فوراً لمنع حراس المسارات من طرد المستخدم أثناء جلب الصلاحيات
+      setSession(nextSession);
+
       if (cached) {
-        setSession(nextSession);
         setRoles(cached.roles);
         setIsPlatformAdmin(cached.isAdmin);
         setIsPlatformSuperadmin(cached.isSuperadmin);
         setIsActive(cached.isActive);
         setLoading(false);
         setIsRefreshingPermissions(true);
-      } else if (isInitial) {
+      } else {
+        // إذا لم توجد صلاحيات مخزنة مسبقاً، نبقي التحميل شغالاً حتى تنتهي الاستعلامات
         setLoading(true);
       }
 
@@ -181,7 +203,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       alive = false;
       sub.subscription.unsubscribe();
     };
-  }, []);
+    // `queryClient` is a stable reference for the app's lifetime (created once in
+    // `createQueryClient`), so this effect still runs exactly once on mount.
+  }, [queryClient]);
 
   async function fetchRoles(userId: string): Promise<Role[]> {
     const { data, error } = await supabase.from("user_roles").select("role").eq("user_id", userId);
@@ -257,6 +281,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     hasRole: (r) => roles.includes(r),
     signOut: async () => {
       clearCachedAuth();
+      clearSessionQueryCache(queryClient);
+      scopedUserIdRef.current = null;
       await supabase.auth.signOut();
     },
   };

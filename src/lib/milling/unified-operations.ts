@@ -28,6 +28,7 @@ import {
   type MillingOutputType,
   type MillingStatus,
 } from "@/lib/milling";
+import { toStorablePaymentValue } from "@/lib/payments/payment-methods";
 // createAgreement lives in agreements.ts, not the base milling barrel. The
 // custody deposit and the milling contract are the same commercial act, so
 // this is the one place the two modules meet.
@@ -70,7 +71,18 @@ export interface DirectMillingTicketInput {
   millBagPrice?: number;
   millingFeeRate: number; // Fee per bag or per unit
   discount?: number;
-  paymentMethod: "cash" | "card" | "transfer" | "debt";
+  /**
+   * A CATALOGUE ID — not an ENUM value.
+   *
+   * This field used to be the union `"cash" | "card" | "transfer" | "debt"`,
+   * which invented two values the database ENUM has never held: `transfer`
+   * (the real one is `bank_transfer`) and `debt` (the real one is `credit`).
+   * The screen sent them straight to `issue_milling_service_invoice`, so
+   * «حوالة / تحويل» either failed the RPC or was coerced, and no wallet could be
+   * chosen at all. The union is gone: the picker hands in a catalogue id and
+   * this module converts it at the storage boundary.
+   */
+  paymentMethod: string;
   paidAmount?: number;
   notes?: string;
 }
@@ -390,9 +402,20 @@ export async function executeDirectMillingTicket(
     }
 
     // 6. Step 5: Issue Service & Packaging Invoice
+    //
+    // The catalogue id becomes the ENUM value HERE, in the one place the value
+    // crosses into storage — the same discipline every other write path follows.
+    // `toStorablePaymentValue` returns null for an id neither the catalogue nor
+    // the ENUM knows, so we report it instead of letting a bank transfer be
+    // recorded as a till payment.
+    const storablePaymentMethod = toStorablePaymentValue(input.paymentMethod);
+    if (!storablePaymentMethod) {
+      throw new Error(`طريقة دفع غير صالحة: ${input.paymentMethod}`);
+    }
+
     const invoiceRes = await invoiceJob({
       jobId,
-      paymentMethod: input.paymentMethod,
+      paymentMethod: storablePaymentMethod,
       paid: paidAmount,
       discount,
       note: `فاتورة طحن فوري — ${customerName} (${grainResolved.gradeName || input.grainType})`,

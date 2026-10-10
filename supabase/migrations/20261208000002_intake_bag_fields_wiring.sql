@@ -1,5 +1,11 @@
 -- ============================================================================
--- 20261204000000_intake_bag_fields_wiring.sql
+-- 20261208000002_intake_bag_fields_wiring.sql
+--
+-- VERSION NOTE: this file was authored as `20261204000000_...`, which collided
+-- with the already-applied `20261204000000_arabic_rpc_messages_and_data_cleanup`
+-- migration. Supabase keys `schema_migrations` on the version string alone, so the
+-- two could not coexist and `db push` refused the file. The version is now
+-- `20261208000002`, which collides with nothing.
 --
 -- WIRING THE BAG COLUMNS THE RECEIPT ALREADY HAS
 -- -----------------------------------------------

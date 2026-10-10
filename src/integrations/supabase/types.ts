@@ -1331,6 +1331,66 @@ export type Database = {
         };
         Relationships: [];
       };
+      document_numbering: {
+        Row: {
+          current_value: number;
+          date_part: string;
+          document_type: string;
+          format_tokens: string;
+          id: string;
+          is_active: boolean;
+          label_ar: string;
+          label_en: string;
+          padding: number;
+          prefix: string;
+          reset_policy: string;
+          scope: string;
+          scope_id: string | null;
+          section: string;
+          separator: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          current_value?: number;
+          date_part?: string;
+          document_type: string;
+          format_tokens?: string;
+          id?: string;
+          is_active?: boolean;
+          label_ar?: string;
+          label_en?: string;
+          padding?: number;
+          prefix?: string;
+          reset_policy?: string;
+          scope?: string;
+          scope_id?: string | null;
+          section?: string;
+          separator?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          current_value?: number;
+          date_part?: string;
+          document_type?: string;
+          format_tokens?: string;
+          id?: string;
+          is_active?: boolean;
+          label_ar?: string;
+          label_en?: string;
+          padding?: number;
+          prefix?: string;
+          reset_policy?: string;
+          scope?: string;
+          scope_id?: string | null;
+          section?: string;
+          separator?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -1403,6 +1463,31 @@ export type Database = {
         Returns: boolean;
       };
       is_staff: { Args: { _user_id: string }; Returns: boolean };
+      fn_document_numbering_sequence_name: {
+        Args: { p_document_type: string };
+        Returns: string;
+      };
+      fn_format_document_number: {
+        Args: {
+          p_document_type: string;
+          p_sequence: number;
+          p_at?: string;
+        };
+        Returns: string;
+      };
+      fn_set_document_numbering: {
+        Args: {
+          p_document_type: string;
+          p_prefix?: string | null;
+          p_format_tokens?: string | null;
+          p_padding?: number | null;
+          p_date_part?: string | null;
+          p_separator?: string | null;
+          p_reset_policy?: string | null;
+          p_next_value?: number | null;
+        };
+        Returns: Database["public"]["Tables"]["document_numbering"]["Row"];
+      };
       next_invoice_number: { Args: never; Returns: string };
       next_purchase_number: { Args: never; Returns: string };
       next_purchase_return_number: { Args: never; Returns: string };

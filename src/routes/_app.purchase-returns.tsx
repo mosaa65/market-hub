@@ -1,13 +1,13 @@
 import { ModuleGuard, useModules } from "@/lib/modules";
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/page-header";
 import { useI18n } from "@/lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
 import { money } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -31,9 +31,32 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { PaymentMethodPicker } from "@/components/ui/payment-method";
+import { paymentMethodLabel } from "@/lib/payments/payment-methods";
+import { usePaymentMethodOverrides } from "@/hooks/use-payment-methods";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Plus, Trash2, RotateCcw, Search } from "lucide-react";
+import {
+  LayoutGrid,
+  List,
+  Plus,
+  RotateCcw,
+  TableProperties,
+  Trash2,
+  Truck,
+  Wallet,
+} from "lucide-react";
+import { VortexMetricCard } from "@/components/vortex-ui";
+import { RecordsView, type RecordsViewMode } from "@/components/ui/records-view";
+import {
+  TableToolbar,
+  ToolbarAction,
+  type FilterDefinition,
+  type FilterValues,
+  type SortOption,
+} from "@/components/ui/table-toolbar";
+import { type DataTableColumn, type DataTableSort } from "@/components/ui/data-table";
+import { useBreakpoint } from "@/design/breakpoints";
 
 export const Route = createFileRoute("/_app/purchase-returns")({
   head: () => ({ meta: [{ title: "مرتجعات المشتريات — Vortex ERP" }] }),
@@ -52,125 +75,555 @@ interface Line {
   tax_rate: number;
 }
 
+interface PurchaseReturn {
+  id: string;
+  return_number: string;
+  supplier_id: string | null;
+  warehouse_id: string;
+  subtotal: number;
+  tax: number;
+  total: number;
+  refund_method: string | null;
+  note: string | null;
+  created_at: string;
+  suppliers?: { name: string | null } | null;
+  warehouses?: { name: string | null; name_ar: string | null } | null;
+}
+
+type ViewMode = RecordsViewMode;
+
 function PurchaseReturnsPage() {
   const { isModuleEnabled } = useModules();
   const hasMultiWarehouse = isModuleEnabled("multi_warehouse");
   const { t, lang } = useI18n();
-  const [purchaseReturns, setPurchaseReturns] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const isRtl = lang === "ar";
+  const qc = useQueryClient();
+  // The business's own names for methods it renamed, keyed by catalogue id, so a
+  // refund method reads the same here as it does at the till.
+  const overrides = usePaymentMethodOverrides();
+  const breakpoint = useBreakpoint();
+  const tableUsesHorizontalScroll =
+    breakpoint === "xs" || breakpoint === "sm" || breakpoint === "md";
+
   const [search, setSearch] = useState("");
+  const [filters, setFilters] = useState<FilterValues>({});
+  const [sortKey, setSortKey] = useState<string>("date_desc");
+  const [sort, setSort] = useState<DataTableSort | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>("cards");
 
-  const whName = (w?: { name: string; name_ar?: string | null } | null) =>
-    !w ? "—" : lang === "ar" ? w.name_ar || w.name : w.name || w.name_ar || "—";
-
-  async function load() {
-    setLoading(true);
-    const pr = await supabase
-      .from("purchase_returns")
-      .select("*, suppliers(name), warehouses(name,name_ar)")
-      .order("created_at", { ascending: false })
-      .limit(100);
-    setPurchaseReturns(pr.data ?? []);
-    setLoading(false);
-  }
-
-  useEffect(() => {
-    void load();
-  }, []);
-
-  const filtered = purchaseReturns.filter(
-    (r) =>
-      !search ||
-      r.return_number.toLowerCase().includes(search.toLowerCase()) ||
-      (r.suppliers?.name ?? "").toLowerCase().includes(search.toLowerCase()),
+  const whName = useCallback(
+    (w?: { name: string | null; name_ar?: string | null } | null) =>
+      !w ? "—" : (isRtl ? w.name_ar || w.name : w.name || w.name_ar) || "—",
+    [isRtl],
   );
 
-  return (
-    <>
-      <PageHeader
-        title={lang === "ar" ? "مرتجعات المشتريات" : "Purchase Returns"}
-        subtitle={
-          lang === "ar"
-            ? "سجل وأداء مرتجعات المشتريات إلى الموردين"
-            : "Track supplier purchase returns"
+  /*
+   * The returns ledger now flows through the shared QueryClient. The read is
+   * unchanged — same table, same joins, same 100-row cap and newest-first order
+   * — but a save can now invalidate exactly this key instead of a local load().
+   */
+  const {
+    data: purchaseReturns = [],
+    isLoading,
+    isFetching,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ["purchase-returns"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("purchase_returns")
+        .select("*, suppliers(name), warehouses(name,name_ar)")
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return (data ?? []) as PurchaseReturn[];
+    },
+    staleTime: 60_000,
+  });
+
+  /* ---------------- search + filter ---------------- */
+  const searched = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return purchaseReturns;
+    return purchaseReturns.filter(
+      (r) =>
+        r.return_number.toLowerCase().includes(q) ||
+        (r.suppliers?.name ?? "").toLowerCase().includes(q) ||
+        (r.note ?? "").toLowerCase().includes(q),
+    );
+  }, [purchaseReturns, search]);
+
+  /**
+   * A stored `refund_method` -> the name to show, read from the catalogue.
+   *
+   * The switch that used to be here was a third copy of the payment-method
+   * labels. It knew only four values, it had a `bank` branch for a value the
+   * ENUM does not contain, and anything else — `mobile_money`, `cheque`, a
+   * wallet the business added — was printed as its raw English key. The
+   * catalogue answers all of them, and `overrides` turns a renamed method into
+   * the business's own word.
+   */
+  const refundLabel = useCallback(
+    (method: string | null) => paymentMethodLabel(method ?? "cash", isRtl ? "ar" : "en", overrides),
+    [isRtl, overrides],
+  );
+
+  const filterDefinitions: FilterDefinition[] = useMemo(() => {
+    const defs: FilterDefinition[] = [];
+    const supplierOptions = Array.from(
+      new Map(
+        purchaseReturns
+          .filter((r) => r.supplier_id)
+          .map((r) => [
+            r.supplier_id,
+            { value: r.supplier_id as string, label: r.suppliers?.name || "—" },
+          ]),
+      ).values(),
+    );
+    if (supplierOptions.length) {
+      defs.push({
+        key: "supplier_id",
+        label: isRtl ? "المورد" : "Supplier",
+        type: "select",
+        options: supplierOptions,
+      });
+    }
+    if (hasMultiWarehouse) {
+      const whOptions = Array.from(
+        new Map(
+          purchaseReturns
+            .filter((r) => r.warehouse_id)
+            .map((r) => [r.warehouse_id, { value: r.warehouse_id, label: whName(r.warehouses) }]),
+        ).values(),
+      );
+      if (whOptions.length) {
+        defs.push({
+          key: "warehouse_id",
+          label: isRtl ? "المستودع" : "Warehouse",
+          type: "select",
+          options: whOptions,
+        });
+      }
+    }
+    const methodOptions = Array.from(
+      new Set(purchaseReturns.map((r) => r.refund_method ?? "cash")),
+    ).map((value) => ({ value, label: refundLabel(value) }));
+    if (methodOptions.length) {
+      defs.push({
+        key: "refund_method",
+        label: isRtl ? "طريقة الاسترداد" : "Refund method",
+        type: "select",
+        options: methodOptions,
+      });
+    }
+    defs.push({
+      key: "created_at",
+      label: isRtl ? "تاريخ المرتجع" : "Return date",
+      type: "date-range",
+    });
+    return defs;
+  }, [purchaseReturns, hasMultiWarehouse, isRtl, whName, refundLabel]);
+
+  const filtered = useMemo(() => {
+    return searched.filter((r) => {
+      if (filters.supplier_id && r.supplier_id !== filters.supplier_id) return false;
+      if (filters.warehouse_id && r.warehouse_id !== filters.warehouse_id) return false;
+      if (filters.refund_method && (r.refund_method ?? "cash") !== filters.refund_method)
+        return false;
+      if (filters.created_at && typeof filters.created_at === "object") {
+        const rowTime = new Date(r.created_at).getTime();
+        if (filters.created_at.from && rowTime < new Date(filters.created_at.from).getTime())
+          return false;
+        if (filters.created_at.to) {
+          const to = new Date(filters.created_at.to);
+          to.setHours(23, 59, 59, 999);
+          if (rowTime > to.getTime()) return false;
         }
-        actions={<NewPurchaseReturn onSaved={load} />}
+      }
+      return true;
+    });
+  }, [searched, filters]);
+
+  /* ---------------- KPI ---------------- */
+  const { totalValue, thisMonthCount, monthValue } = useMemo(() => {
+    let value = 0;
+    let count = 0;
+    let month = 0;
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+    for (const r of purchaseReturns) {
+      const total = Number(r.total) || 0;
+      value += total;
+      if (new Date(r.created_at).getTime() >= startOfMonth.getTime()) {
+        count++;
+        month += total;
+      }
+    }
+    return { totalValue: value, thisMonthCount: count, monthValue: month };
+  }, [purchaseReturns]);
+
+  /* ---------------- sort ---------------- */
+  const sortOptions: SortOption[] = useMemo(
+    () => [
+      { value: "date_desc", label: isRtl ? "الأحدث أولاً" : "Newest first" },
+      { value: "date_asc", label: isRtl ? "الأقدم أولاً" : "Oldest first" },
+      { value: "total_desc", label: isRtl ? "الإجمالي (الأعلى)" : "Total (high)" },
+      { value: "total_asc", label: isRtl ? "الإجمالي (الأقل)" : "Total (low)" },
+      { value: "number_asc", label: isRtl ? "رقم المرتجع" : "Return number" },
+    ],
+    [isRtl],
+  );
+
+  const sortedRows = useMemo(() => {
+    const list = [...filtered];
+    if (sort) {
+      const dir = sort.direction === "asc" ? 1 : -1;
+      switch (sort.key) {
+        case "number":
+          return list.sort((a, b) => a.return_number.localeCompare(b.return_number) * dir);
+        case "total":
+          return list.sort((a, b) => (Number(a.total) - Number(b.total)) * dir);
+        case "date":
+          return list.sort(
+            (a, b) => (new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) * dir,
+          );
+        default:
+          break;
+      }
+    }
+    switch (sortKey) {
+      case "date_asc":
+        return list.sort(
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+        );
+      case "total_desc":
+        return list.sort((a, b) => Number(b.total) - Number(a.total));
+      case "total_asc":
+        return list.sort((a, b) => Number(a.total) - Number(b.total));
+      case "number_asc":
+        return list.sort((a, b) => a.return_number.localeCompare(b.return_number));
+      default:
+        return list.sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        );
+    }
+  }, [filtered, sort, sortKey]);
+
+  /* ---------------- classic table columns ---------------- */
+  const columns = useMemo<DataTableColumn<PurchaseReturn>[]>(() => {
+    const cols: DataTableColumn<PurchaseReturn>[] = [
+      {
+        key: "number",
+        header: isRtl ? "رقم المرتجع" : "Return #",
+        sortable: true,
+        width: "w-[160px]",
+        sortValue: (r) => r.return_number,
+        cell: (r) => <span className="font-mono text-xs font-semibold">{r.return_number}</span>,
+      },
+      {
+        key: "date",
+        header: isRtl ? "التاريخ" : "Date",
+        sortable: true,
+        width: "w-[170px]",
+        sortValue: (r) => new Date(r.created_at).getTime(),
+        cell: (r) => (
+          <span className="text-xs text-muted-foreground">
+            {new Date(r.created_at).toLocaleString()}
+          </span>
+        ),
+      },
+      {
+        key: "supplier",
+        header: isRtl ? "المورد" : "Supplier",
+        width: "w-[200px]",
+        cell: (r) => <span>{r.suppliers?.name ?? "—"}</span>,
+      },
+    ];
+    if (hasMultiWarehouse) {
+      cols.push({
+        key: "warehouse",
+        header: isRtl ? "المستودع" : "Warehouse",
+        width: "w-[180px]",
+        cell: (r) => <span className="text-muted-foreground">{whName(r.warehouses)}</span>,
+      });
+    }
+    cols.push(
+      {
+        key: "refund",
+        header: isRtl ? "طريقة الاسترداد" : "Refund method",
+        width: "w-[160px]",
+        cell: (r) => (
+          <span className="text-xs text-muted-foreground">{refundLabel(r.refund_method)}</span>
+        ),
+      },
+      {
+        key: "total",
+        header: isRtl ? "الإجمالي" : "Total",
+        sortable: true,
+        align: "end",
+        width: "w-[140px]",
+        sortValue: (r) => Number(r.total),
+        cell: (r) => (
+          <span className="font-mono text-sm font-semibold">{money(Number(r.total))}</span>
+        ),
+      },
+    );
+    return cols;
+  }, [isRtl, hasMultiWarehouse, whName, refundLabel]);
+
+  const rendererProps = (r: PurchaseReturn) => ({
+    row: r,
+    isRtl,
+    hasMultiWarehouse,
+    warehouseName: whName(r.warehouses),
+    refundLabel: refundLabel(r.refund_method),
+  });
+
+  const hasActiveCriteria = Boolean(search.trim()) || Object.keys(filters).length > 0;
+
+  return (
+    <div className="space-y-4 pb-12">
+      <PageHeader
+        title={isRtl ? "مرتجعات المشتريات" : "Purchase Returns"}
+        subtitle={
+          isRtl ? "سجل وأداء مرتجعات المشتريات إلى الموردين" : "Track supplier purchase returns"
+        }
       />
 
-      <div className="panel-elevated p-4">
-        <div className="relative mb-4">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground rtl:left-auto rtl:right-3" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={
-              lang === "ar"
-                ? "ابحث برقم المرتجع أو اسم المورد..."
-                : "Search return # or supplier..."
-            }
-            className="h-10 w-full rounded-md border border-input bg-surface pl-9 pr-3 text-sm rtl:pl-3 rtl:pr-9 focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
-          />
-        </div>
-
-        <Card className="border-0 shadow-none bg-transparent">
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead># {lang === "ar" ? "رقم المرتجع" : "Return #"}</TableHead>
-                  <TableHead>{lang === "ar" ? "التاريخ" : "Date"}</TableHead>
-                  <TableHead>{lang === "ar" ? "المورد" : "Supplier"}</TableHead>
-                  {hasMultiWarehouse && (
-                    <TableHead>{lang === "ar" ? "المستودع" : "Warehouse"}</TableHead>
-                  )}
-                  <TableHead>{lang === "ar" ? "طريقة الاسترداد" : "Refund Method"}</TableHead>
-                  <TableHead className="text-end">{lang === "ar" ? "الإجمالي" : "Total"}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={hasMultiWarehouse ? 6 : 5}
-                      className="text-center text-muted-foreground py-8"
-                    >
-                      {t("common.loading")}
-                    </TableCell>
-                  </TableRow>
-                ) : filtered.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={hasMultiWarehouse ? 6 : 5}
-                      className="text-center text-muted-foreground py-12"
-                    >
-                      <RotateCcw className="mx-auto mb-2 h-8 w-8 opacity-40" />
-                      {lang === "ar" ? "لا توجد مرتجعات مشتريات" : "No purchase returns"}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filtered.map((r) => (
-                    <TableRow key={r.id}>
-                      <TableCell className="font-mono text-xs font-semibold">
-                        {r.return_number}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {new Date(r.created_at).toLocaleString()}
-                      </TableCell>
-                      <TableCell>{r.suppliers?.name ?? "—"}</TableCell>
-                      {hasMultiWarehouse && <TableCell>{whName(r.warehouses)}</TableCell>}
-                      <TableCell className="text-xs">{r.refund_method ?? "cash"}</TableCell>
-                      <TableCell className="text-end font-mono font-semibold">
-                        {money(Number(r.total))}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+      {/* ─── KPI cards ─── */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <VortexMetricCard
+          title={isRtl ? "إجمالي المرتجعات" : "Total returns"}
+          value={purchaseReturns.length}
+          subtitle={isRtl ? "المحمّلة حالياً" : "Currently loaded"}
+          icon={<RotateCcw className="size-5" />}
+          tone="info"
+        />
+        <VortexMetricCard
+          title={isRtl ? "قيمة المرتجعات" : "Returns value"}
+          value={money(totalValue)}
+          subtitle={isRtl ? "الإجمالي المُرجع للموردين" : "Total returned to suppliers"}
+          icon={<Wallet className="size-5" />}
+          tone="default"
+        />
+        <VortexMetricCard
+          title={isRtl ? "هذا الشهر" : "This month"}
+          value={thisMonthCount}
+          subtitle={isRtl ? "عدد المرتجعات" : "Return documents"}
+          icon={<Truck className="size-5" />}
+          tone="success"
+        />
+        <VortexMetricCard
+          title={isRtl ? "قيمة هذا الشهر" : "This month value"}
+          value={money(monthValue)}
+          subtitle={isRtl ? "إجمالي الشهر الحالي" : "Current month total"}
+          icon={<Wallet className="size-5" />}
+          tone="warning"
+        />
       </div>
-    </>
+
+      {/* ─── Standard VORTEX TableToolbar ─── */}
+      <TableToolbar
+        sticky
+        search={{
+          value: search,
+          onValueChange: setSearch,
+          placeholder: isRtl
+            ? "ابحث برقم المرتجع أو اسم المورد أو الملاحظة..."
+            : "Search return #, supplier or note…",
+          resultCount: filtered.length,
+          loading: isFetching && !isLoading,
+        }}
+        filters={{ definitions: filterDefinitions, values: filters, onValueChange: setFilters }}
+        sort={{
+          options: sortOptions,
+          value: sortKey,
+          onValueChange: (value) => {
+            setSortKey(value);
+            setSort(null);
+          },
+          label: isRtl ? "ترتيب" : "Sort",
+        }}
+        viewToggle={
+          <ToolbarAction
+            label={
+              viewMode === "cards"
+                ? isRtl
+                  ? "بطاقات"
+                  : "Cards"
+                : viewMode === "list"
+                  ? isRtl
+                    ? "قائمة"
+                    : "List"
+                  : isRtl
+                    ? "كلاسيكي"
+                    : "Classic"
+            }
+            icon={
+              viewMode === "cards" ? (
+                <LayoutGrid />
+              ) : viewMode === "list" ? (
+                <List />
+              ) : (
+                <TableProperties />
+              )
+            }
+            onClick={() =>
+              setViewMode((prev) =>
+                prev === "cards" ? "list" : prev === "list" ? "table" : "cards",
+              )
+            }
+            tone="ghost"
+          />
+        }
+        action={
+          <NewPurchaseReturn
+            onSaved={() => qc.invalidateQueries({ queryKey: ["purchase-returns"] })}
+            hasMultiWarehouse={hasMultiWarehouse}
+          />
+        }
+      />
+
+      {/* ─── Records: cards / list / classic table — shared scaffold ─── */}
+      <RecordsView<PurchaseReturn>
+        rows={sortedRows}
+        getRowId={(r) => r.id}
+        viewMode={viewMode}
+        loading={isLoading}
+        refreshing={isFetching && !isLoading}
+        error={error}
+        onRetry={() => void refetch()}
+        columns={columns}
+        sort={sort}
+        onSortChange={setSort}
+        minWidth={hasMultiWarehouse ? 1040 : 880}
+        horizontalScroll={tableUsesHorizontalScroll}
+        renderCard={(r) => <PurchaseReturnCard {...rendererProps(r)} />}
+        renderListRow={(r) => <PurchaseReturnListRow {...rendererProps(r)} />}
+        empty={{
+          icon: <RotateCcw />,
+          title: hasActiveCriteria
+            ? isRtl
+              ? "لا توجد مرتجعات مطابقة"
+              : "No matching returns"
+            : isRtl
+              ? "لا توجد مرتجعات مشتريات"
+              : "No purchase returns",
+          description: hasActiveCriteria
+            ? isRtl
+              ? "جرّب تعديل البحث أو الفلاتر."
+              : "Try adjusting your search or filters."
+            : isRtl
+              ? "سجّل مرتجع مشتريات جديداً لبدء التتبع."
+              : "Record a new purchase return to start tracking.",
+        }}
+      />
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Purchase-return renderers                                          */
+/* ------------------------------------------------------------------ */
+
+interface PurchaseReturnRendererProps {
+  row: PurchaseReturn;
+  isRtl: boolean;
+  hasMultiWarehouse: boolean;
+  warehouseName: string;
+  refundLabel: string;
+}
+
+function PurchaseReturnCard({
+  row: r,
+  isRtl,
+  hasMultiWarehouse,
+  warehouseName,
+  refundLabel,
+}: PurchaseReturnRendererProps) {
+  return (
+    <div className="card-mullak group relative flex h-full flex-col justify-between rounded-2xl p-3 transition-all duration-200 hover:shadow-md sm:p-4.5">
+      <div className="flex items-start gap-2.5">
+        <span
+          aria-hidden
+          className="h-12 w-1.5 shrink-0 rounded-full bg-primary shadow-[0_0_10px_rgba(59,130,246,0.3)]"
+        />
+        <div className="grid size-11 shrink-0 place-items-center rounded-2xl border border-primary/20 bg-primary/10 text-primary transition-transform group-hover:scale-105">
+          <RotateCcw className="size-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <span className="block truncate font-mono text-xs font-bold text-foreground">
+            {r.return_number}
+          </span>
+          <div className="truncate text-[11px] text-muted-foreground">
+            {r.suppliers?.name ?? "—"}
+          </div>
+          <span className="mt-1 inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[9px] font-bold text-muted-foreground">
+            {refundLabel}
+          </span>
+        </div>
+      </div>
+
+      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
+        <span className="font-mono">{new Date(r.created_at).toLocaleDateString()}</span>
+        {hasMultiWarehouse && <span className="truncate">{warehouseName}</span>}
+      </div>
+
+      <div className="mt-3 flex items-end justify-between border-t border-border/60 pt-2.5">
+        <span className="text-[10px] text-muted-foreground">{isRtl ? "الإجمالي" : "Total"}</span>
+        <span className="font-mono text-base font-bold text-primary">{money(Number(r.total))}</span>
+      </div>
+    </div>
+  );
+}
+
+function PurchaseReturnListRow({
+  row: r,
+  isRtl,
+  hasMultiWarehouse,
+  warehouseName,
+  refundLabel,
+}: PurchaseReturnRendererProps) {
+  return (
+    <div className="card-mullak group relative flex flex-col justify-between gap-3 rounded-2xl border p-3.5 transition-all duration-200 hover:border-primary/50 hover:shadow-md sm:p-4 md:flex-row md:items-center">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <span
+          aria-hidden
+          className="h-11 w-1.5 shrink-0 rounded-full bg-primary shadow-[0_0_8px_rgba(59,130,246,0.3)] sm:h-12"
+        />
+        <div className="grid size-11 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-primary transition-all group-hover:scale-105 group-hover:bg-primary group-hover:text-primary-foreground">
+          <RotateCcw className="size-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h4 className="truncate font-mono text-sm font-bold leading-snug text-foreground">
+              {r.return_number}
+            </h4>
+            <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[9px] font-bold text-muted-foreground">
+              {refundLabel}
+            </span>
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+            <span className="truncate">{r.suppliers?.name ?? "—"}</span>
+            {hasMultiWarehouse && <span className="truncate">— {warehouseName}</span>}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-4 border-t border-border/50 pt-2 ps-4 text-xs md:border-t-0 md:pt-0">
+        <span className="hidden font-mono text-[11px] text-muted-foreground sm:inline">
+          {new Date(r.created_at).toLocaleString()}
+        </span>
+        <div className="text-end">
+          <p className="font-mono text-base font-bold tracking-tight text-foreground">
+            {money(Number(r.total))}
+          </p>
+          <p className="text-[10px] text-muted-foreground">{isRtl ? "الإجمالي" : "Total"}</p>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -334,7 +787,10 @@ function NewPurchaseReturn({
     );
   }
 
-  const total = Math.round(lines.reduce((a, l) => a + l.quantity * l.unit_cost * (1 + l.tax_rate / 100), 0) * 100) / 100;
+  const total =
+    Math.round(
+      lines.reduce((a, l) => a + l.quantity * l.unit_cost * (1 + l.tax_rate / 100), 0) * 100,
+    ) / 100;
 
   async function save() {
     if (!warehouseId || !supplierId || lines.length === 0) {
@@ -436,19 +892,22 @@ function NewPurchaseReturn({
             </div>
             <div className="grid gap-1.5">
               <Label>{lang === "ar" ? "طريقة الاسترداد" : "Refund method"}</Label>
-              <Select value={refundMethod} onValueChange={setRefundMethod}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cash">{lang === "ar" ? "نقدًا" : "Cash"}</SelectItem>
-                  <SelectItem value="card">{lang === "ar" ? "بطاقة" : "Card"}</SelectItem>
-                  <SelectItem value="bank">{lang === "ar" ? "تحويل بنكي" : "Bank"}</SelectItem>
-                  <SelectItem value="credit">
-                    {lang === "ar" ? "خصم من رصيد المورد" : "Deduct Balance"}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+              {/*
+                الاسترداد ليس طريقة دفع، لكنه يستخدم نفس الكتالوج بنفس السياق
+                المستقل، فالطرق المتاحة هنا هي ما فعّله العميل لقسم المرتجعات.
+
+                This replaced a Radix Select whose "badge" option used value
+                "bank" — a value the payment_method ENUM does not contain, so
+                the return failed with a cast error.
+              */}
+              <PaymentMethodPicker
+                context="purchase_returns"
+                value={refundMethod}
+                onChange={setRefundMethod}
+                includeCredit
+                ensureIds={[refundMethod]}
+                ariaLabel={lang === "ar" ? "طريقة الاسترداد" : "Refund method"}
+              />
             </div>
           </div>
 

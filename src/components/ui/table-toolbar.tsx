@@ -40,6 +40,106 @@ export interface SortOption {
   label: string;
 }
 
+/**
+ * Locale-aware copy for the toolbar's own controls.
+ *
+ * The toolbar renders generic chrome (filter, sort, apply, clear…). Those words
+ * are not domain data, so a screen must not have to pass them — but they must
+ * also not be hard-coded Arabic, or an English screen shows a mixed-language
+ * panel. Screens with their own `t()` can override any string; everything else
+ * follows `dir`.
+ */
+export interface TableToolbarLabels {
+  filter?: string;
+  sort?: string;
+  /** Title of the filter panel. */
+  filterTitle?: string;
+  filterHint?: string;
+  /** `{count}` is replaced with the number of applied filters. */
+  filterApplied?: string;
+  sortTitle?: string;
+  sortHint?: string;
+  apply?: string;
+  clear?: string;
+  clearAll?: string;
+  /** `{label}` is replaced with the filter's label. */
+  removeFilter?: string;
+  all?: string;
+  yes?: string;
+  no?: string;
+  sortOptionsLabel?: string;
+  removeOptionLabel?: string;
+  /** Accessible name for the clear-search button. */
+  clearSearch?: string;
+}
+
+export const AR_TOOLBAR_LABELS: Required<TableToolbarLabels> = {
+  filter: "فلترة",
+  sort: "ترتيب",
+  filterTitle: "تصفية النتائج",
+  filterHint: "اختر المعايير لعرض سجلات محددة",
+  filterApplied: "{count} تصفية مُطبّقة",
+  sortTitle: "ترتيب النتائج",
+  sortHint: "اختر الحقل الذي تريد الترتيب حسبه",
+  apply: "تطبيق",
+  clear: "مسح",
+  clearAll: "مسح الكل",
+  removeFilter: "إزالة {label}",
+  all: "الكل",
+  yes: "نعم",
+  no: "لا",
+  sortOptionsLabel: "خيارات الترتيب",
+  removeOptionLabel: "تصفية ذكية",
+  clearSearch: "مسح البحث",
+};
+
+export const EN_TOOLBAR_LABELS: Required<TableToolbarLabels> = {
+  filter: "Filter",
+  sort: "Sort",
+  filterTitle: "Filter results",
+  filterHint: "Choose criteria to narrow the records",
+  filterApplied: "{count} filters applied",
+  sortTitle: "Sort results",
+  sortHint: "Choose the field to order by",
+  apply: "Apply",
+  clear: "Clear",
+  clearAll: "Clear all",
+  removeFilter: "Remove {label}",
+  all: "All",
+  yes: "Yes",
+  no: "No",
+  sortOptionsLabel: "Sort options",
+  removeOptionLabel: "Smart filter",
+  clearSearch: "Clear search",
+};
+
+/**
+ * Resolves the toolbar's copy. `lang` is optional so a caller that already has
+ * i18n can pass it; defaults to Arabic, which is the app's default direction.
+ */
+export function resolveToolbarLabels(
+  lang?: string,
+  overrides?: TableToolbarLabels,
+): Required<TableToolbarLabels> {
+  const base = lang === "en" ? EN_TOOLBAR_LABELS : AR_TOOLBAR_LABELS;
+  return overrides ? { ...base, ...stripUndefined(overrides) } : base;
+}
+
+function stripUndefined(labels: TableToolbarLabels): TableToolbarLabels {
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(labels)) {
+    if (value !== undefined) result[key] = value;
+  }
+  return result as TableToolbarLabels;
+}
+
+function format(template: string, values: Record<string, string | number>): string {
+  return Object.entries(values).reduce(
+    (text, [key, value]) => text.replaceAll(`{${key}}`, String(value)),
+    template,
+  );
+}
+
 export interface TableToolbarProps {
   /** Search bindings. Omit to hide the search field. */
   search?: {
@@ -74,6 +174,23 @@ export interface TableToolbarProps {
   className?: string;
   /** Children rendered inside the toolbar container (e.g. quick filter chips) */
   children?: React.ReactNode;
+  /** Current UI language (`"ar"` default). Drives the generic control copy. */
+  lang?: string;
+  /** Per-string overrides for the generic control copy. */
+  labels?: TableToolbarLabels;
+  /**
+   * What the number beside the search box means.
+   *
+   * - `"matching"` (default) — rows matching the current search/filters.
+   * - `"total"` — the server-side total, shown as `shown/total`.
+   *
+   * Picking the wrong one is how a screen ends up claiming "1200" while the
+   * search returned four rows. Screens that filter on the server should pass
+   * `"matching"` with the server's matched count.
+   */
+  countMode?: "matching" | "total";
+  /** Rows currently loaded into the view, used with `countMode="total"`. */
+  loadedCount?: number;
 }
 
 /**
@@ -98,9 +215,15 @@ export function TableToolbar({
   sticky = false,
   className,
   children,
+  lang,
+  labels,
+  countMode = "matching",
+  loadedCount,
 }: TableToolbarProps) {
   const [filterOpen, setFilterOpen] = React.useState(false);
   const [sortOpen, setSortOpen] = React.useState(false);
+
+  const copy = React.useMemo(() => resolveToolbarLabels(lang, labels), [lang, labels]);
 
   const activeFilterCount = React.useMemo(() => {
     if (!filters) return 0;
@@ -113,6 +236,20 @@ export function TableToolbar({
 
   const hasFilters = Boolean(filters && filters.definitions.length > 0);
   const hasSort = Boolean(sort && sort.options.length > 0);
+
+  /*
+   * Number shown beside the search box.
+   *
+   * `matching` → the value the screen passed (rows matching its criteria).
+   * `total`    → the server-side total, rendered `loaded/total` so a partially
+   *              loaded catalogue can never be read as the match count.
+   */
+  const resultCountText =
+    search?.resultCount == null
+      ? undefined
+      : countMode === "total" && loadedCount != null
+        ? `${loadedCount}/${search.resultCount}`
+        : String(search.resultCount);
 
   return (
     <div
@@ -128,7 +265,8 @@ export function TableToolbar({
             value={search.value}
             onValueChange={search.onValueChange}
             placeholder={search.placeholder}
-            resultCount={search.resultCount}
+            resultCountText={resultCountText}
+            clearLabel={copy.clearSearch}
             debounceMs={search.debounceMs}
             loading={search.loading}
             enableSlashShortcut
@@ -140,7 +278,7 @@ export function TableToolbar({
 
         {hasFilters ? (
           <ToolbarAction
-            label={filters!.definitions.length > 1 ? "فلترة" : filters!.definitions[0].label}
+            label={filters!.definitions.length > 1 ? copy.filter : filters!.definitions[0].label}
             icon={<FilterIcon />}
             badge={activeFilterCount}
             active={filterOpen || activeFilterCount > 0}
@@ -151,7 +289,7 @@ export function TableToolbar({
 
         {hasSort ? (
           <ToolbarAction
-            label={sort!.label ?? "ترتيب"}
+            label={sort!.label ?? copy.sort}
             icon={<ArrowDownUp />}
             active={sortOpen || sort!.value !== ""}
             onClick={() => setSortOpen(true)}
@@ -170,6 +308,7 @@ export function TableToolbar({
         <ActiveFilters
           definitions={filters!.definitions}
           values={filters!.values}
+          copy={copy}
           onRemove={(key) => {
             const next = { ...filters!.values };
             delete next[key];
@@ -185,6 +324,7 @@ export function TableToolbar({
           onClose={() => setFilterOpen(false)}
           definitions={filters!.definitions}
           values={filters!.values}
+          copy={copy}
           onSubmit={(v) => {
             filters!.onValueChange(v);
             setFilterOpen(false);
@@ -198,6 +338,7 @@ export function TableToolbar({
           onClose={() => setSortOpen(false)}
           options={sort.options}
           value={sort.value}
+          copy={copy}
           onSubmit={(v) => {
             sort.onValueChange(v);
             setSortOpen(false);
@@ -271,11 +412,12 @@ export function ToolbarAction({
 interface ActiveFiltersProps {
   definitions: FilterDefinition[];
   values: FilterValues;
+  copy: Required<TableToolbarLabels>;
   onRemove: (key: string) => void;
   onClearAll: () => void;
 }
 
-function ActiveFilters({ definitions, values, onRemove, onClearAll }: ActiveFiltersProps) {
+function ActiveFilters({ definitions, values, copy, onRemove, onClearAll }: ActiveFiltersProps) {
   const chips = definitions
     .map((def) => {
       const value = values[def.key];
@@ -304,7 +446,7 @@ function ActiveFilters({ definitions, values, onRemove, onClearAll }: ActiveFilt
           <button
             type="button"
             onClick={() => onRemove(chip.key)}
-            aria-label={`إزالة ${chip.label}`}
+            aria-label={format(copy.removeFilter, { label: chip.label })}
             className="grid h-4 w-4 place-items-center rounded-full transition-colors hover:bg-primary/25 [&_svg]:size-3"
           >
             <X />
@@ -316,7 +458,7 @@ function ActiveFilters({ definitions, values, onRemove, onClearAll }: ActiveFilt
         onClick={onClearAll}
         className="rounded-full px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
       >
-        مسح الكل
+        {copy.clearAll}
       </button>
     </div>
   );
@@ -331,10 +473,11 @@ interface FilterPanelProps {
   onClose: () => void;
   definitions: FilterDefinition[];
   values: FilterValues;
+  copy: Required<TableToolbarLabels>;
   onSubmit: (values: FilterValues) => void;
 }
 
-function FilterPanel({ open, onClose, definitions, values, onSubmit }: FilterPanelProps) {
+function FilterPanel({ open, onClose, definitions, values, copy, onSubmit }: FilterPanelProps) {
   const [draft, setDraft] = React.useState<FilterValues>(values);
 
   React.useEffect(() => {
@@ -347,14 +490,14 @@ function FilterPanel({ open, onClose, definitions, values, onSubmit }: FilterPan
     <Modal
       open={open}
       onClose={onClose}
-      title="تصفية النتائج"
+      title={copy.filterTitle}
       description={
-        activeCount > 0 ? `${activeCount} تصفية مُطبّقة` : "اختر المعايير لعرض سجلات محددة"
+        activeCount > 0 ? format(copy.filterApplied, { count: activeCount }) : copy.filterHint
       }
       size="sm"
       desktop="popover-start"
       sheetUntil="lg"
-      eyebrow="تصفية ذكية"
+      eyebrow={copy.removeOptionLabel}
       footer={
         <div className="flex w-full items-center gap-2">
           <Button
@@ -365,10 +508,10 @@ function FilterPanel({ open, onClose, definitions, values, onSubmit }: FilterPan
             className="flex-1"
             block={false}
           >
-            مسح
+            {copy.clear}
           </Button>
           <Button type="button" onClick={() => onSubmit(draft)} className="flex-1" block={false}>
-            تطبيق
+            {copy.apply}
           </Button>
         </div>
       }
@@ -379,6 +522,7 @@ function FilterPanel({ open, onClose, definitions, values, onSubmit }: FilterPan
             key={def.key}
             def={def}
             value={draft[def.key]}
+            copy={copy}
             onChange={(v) => setDraft((d) => ({ ...d, [def.key]: v }))}
           />
         ))}
@@ -404,22 +548,23 @@ interface SortPanelProps {
   onClose: () => void;
   options: SortOption[];
   value: string;
+  copy: Required<TableToolbarLabels>;
   onSubmit: (value: string) => void;
 }
 
-function SortPanel({ open, onClose, options, value, onSubmit }: SortPanelProps) {
+function SortPanel({ open, onClose, options, value, copy, onSubmit }: SortPanelProps) {
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title="ترتيب النتائج"
-      description="اختر الحقل الذي تريد الترتيب حسبه"
+      title={copy.sortTitle}
+      description={copy.sortHint}
       size="sm"
       desktop="popover-start"
       sheetUntil="lg"
-      eyebrow="خيارات العرض"
+      eyebrow={copy.sortOptionsLabel}
     >
-      <div className="flex flex-col gap-1" role="listbox" aria-label="خيارات الترتيب">
+      <div className="flex flex-col gap-1" role="listbox" aria-label={copy.sortOptionsLabel}>
         {options.map((o) => {
           const selected = o.value === value;
           return (
@@ -459,6 +604,7 @@ function SortPanel({ open, onClose, options, value, onSubmit }: SortPanelProps) 
 interface FilterControlProps {
   def: FilterDefinition;
   value: FilterValues[string];
+  copy: Required<TableToolbarLabels>;
   onChange: (value: FilterValues[string]) => void;
 }
 
@@ -477,7 +623,7 @@ function filterIcon(type: FilterDefinition["type"]) {
   return <Icon className="size-3.5" aria-hidden />;
 }
 
-function FilterControl({ def, value, onChange }: FilterControlProps) {
+function FilterControl({ def, value, copy, onChange }: FilterControlProps) {
   if (def.type === "select") {
     return (
       <div className="flex flex-col gap-1.5">
@@ -497,7 +643,7 @@ function FilterControl({ def, value, onChange }: FilterControlProps) {
             onChange={(e) => onChange(e.target.value || undefined)}
             className={`${controlClass} appearance-none pe-10`}
           >
-            <option value="">الكل</option>
+            <option value="">{copy.all}</option>
             {def.options?.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
@@ -525,9 +671,9 @@ function FilterControl({ def, value, onChange }: FilterControlProps) {
         </span>
         <div className="flex gap-1.5" role="radiogroup" aria-label={def.label}>
           {[
-            { v: "", l: "الكل" },
-            { v: "true", l: "نعم" },
-            { v: "false", l: "لا" },
+            { v: "", l: copy.all },
+            { v: "true", l: copy.yes },
+            { v: "false", l: copy.no },
           ].map((opt) => {
             const selected = current === opt.v;
             return (

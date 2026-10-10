@@ -9,23 +9,29 @@ import {
   Hash,
   ShieldCheck,
   Scale,
+  CreditCard,
+  Boxes,
   LucideIcon,
 } from "lucide-react";
 import { CompanySection } from "./sections/company-section";
 import { InvoicingSection } from "./sections/invoicing-section";
 import { PrintingSection } from "./sections/printing-section";
 import { CatalogSection } from "./sections/catalog-section";
+import { StockSettingsSection } from "./sections/stock-settings-section";
 import { MillingModeSection } from "./sections/milling-mode-section";
 import { SubscriptionSection } from "./sections/subscription-section";
 import { AppearanceSection } from "./sections/appearance-section";
 import { NumberFormatSection } from "./sections/number-format-section";
+import { PaymentMethodsSection } from "./sections/payment-methods-section";
 import { BackupSettingsCard } from "@/components/backup-settings-card";
 
 export type SettingsSectionId =
   | "company"
   | "invoicing"
+  | "payment-methods"
   | "printing"
   | "catalog"
+  | "stock-settings"
   | "subscription"
   | "backup"
   | "number-format"
@@ -80,6 +86,16 @@ registerSettingsSection({
 });
 
 registerSettingsSection({
+  id: "payment-methods",
+  titleAr: "طرق الدفع",
+  titleEn: "Payment Methods",
+  descriptionAr: "اختر الطرق التي تستخدمها، رتّبها، وحدّد الأقسام التي تظهر فيها",
+  descriptionEn: "Choose the methods you use, order them, and scope them per section",
+  icon: CreditCard,
+  component: PaymentMethodsSection,
+});
+
+registerSettingsSection({
   id: "printing",
   titleAr: "الطباعة والقوالب",
   titleEn: "Printing Architecture",
@@ -97,6 +113,16 @@ registerSettingsSection({
   descriptionEn: "Store industry profile and active catalog modules",
   icon: SlidersHorizontal,
   component: CatalogSection,
+});
+
+registerSettingsSection({
+  id: "stock-settings",
+  titleAr: "إعدادات المخزون والرموز (Stacks)",
+  titleEn: "Stock & Stacks Settings",
+  descriptionAr: "التحكم ببادئات الرموز (SKU, Stacks)، قواعد الترقيم، والتنبيهات المخزنية",
+  descriptionEn: "Manage stock prefixes (SKU, Stacks), numbering rules, and stock thresholds",
+  icon: Boxes,
+  component: StockSettingsSection,
 });
 
 registerSettingsSection({

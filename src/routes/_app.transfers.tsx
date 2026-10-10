@@ -651,6 +651,7 @@ function TransfersPage() {
       <div className="pt-2 sm:pt-3.5">
         <TableToolbar
           sticky
+          lang={lang}
           search={{
             value: query,
             onValueChange: setQuery,

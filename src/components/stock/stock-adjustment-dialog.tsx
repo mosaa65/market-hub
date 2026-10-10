@@ -229,16 +229,16 @@ export function StockAdjustmentDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto"
       onClick={onClose}
     >
       <form
         onSubmit={handleSubmit}
         onClick={(e) => e.stopPropagation()}
-        className="panel-elevated w-full max-w-lg overflow-hidden my-8 rounded-3xl border border-border/80 bg-surface shadow-xl"
+        className="flex max-h-[90dvh] w-full max-w-lg flex-col rounded-3xl border border-border/80 bg-surface shadow-2xl overflow-hidden"
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-border/80 px-6 py-4 bg-muted/20">
+        <div className="flex shrink-0 items-center justify-between border-b border-border/80 px-6 py-4 bg-muted/20">
           <div className="flex items-center gap-3">
             <div className="grid h-10 w-10 place-items-center rounded-2xl bg-sky-500/10 text-sky-500">
               <Scale className="h-5 w-5" />
@@ -264,7 +264,7 @@ export function StockAdjustmentDialog({
         </div>
 
         {/* Content */}
-        <div className="space-y-4 p-6 text-sm">
+        <div className="flex-1 overflow-y-auto space-y-4 p-6 text-sm custom-scrollbar">
           {/* Warehouse Selection */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
@@ -499,7 +499,7 @@ export function StockAdjustmentDialog({
         </div>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-between border-t border-border/80 bg-muted/20 px-6 py-3.5">
+        <div className="flex shrink-0 items-center justify-between border-t border-border/80 bg-muted/20 px-6 py-3.5">
           <button
             type="button"
             onClick={onClose}

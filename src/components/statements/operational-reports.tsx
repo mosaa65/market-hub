@@ -22,6 +22,7 @@ import {
 } from "@/components/statements/report-tools";
 import type { ReportType } from "@/lib/statements/report-registry";
 import type { StatementFieldKey } from "@/lib/statements/types";
+import { LEGACY_PAYMENT_VALUES, paymentMethodLabel } from "@/lib/payments/payment-methods";
 
 type AnyRow = Record<string, unknown>;
 
@@ -117,7 +118,10 @@ export function OperationalReports({
           return {
             ...e,
             amount: e.total_amount,
-            expense_categories: firstLine?.expense_categories ?? { name: "General", name_ar: "عام" },
+            expense_categories: firstLine?.expense_categories ?? {
+              name: "General",
+              name_ar: "عام",
+            },
             note: e.description || e.note || e.reference,
           };
         });
@@ -273,15 +277,22 @@ export function OperationalReports({
               onChange={(event) => setMethodFilter(event.target.value)}
               className="h-8 rounded-md border-input bg-background px-2 text-xs"
             >
+              {/*
+                Every value the ENUM can hold, labelled by the catalogue.
+
+                A literal list used to sit here and it drifted from the
+                database: it offered `mobile_money` and `split` but silently
+                omitted `cheque`, so a filtered report could not select a
+                cheque payment at all. `LEGACY_PAYMENT_VALUES` is the same set
+                the write guard accepts, so a filter can never name a value
+                that does not exist — the duplication is what broke.
+              */}
               <option value="all">{ar ? "كل طرق الدفع" : "All methods"}</option>
-              <option value="cash">{ar ? "نقدي" : "Cash"}</option>
-              <option value="card">{ar ? "بطاقة" : "Card"}</option>
-              <option value="bank_transfer">{ar ? "تحويل بنكي" : "Bank transfer"}</option>
-              <option value="mobile_money">{ar ? "محفظة إلكترونية" : "Mobile money"}</option>
-              {type === "sales-invoices" && <option value="credit">{ar ? "آجل" : "Credit"}</option>}
-              {type === "sales-invoices" && (
-                <option value="split">{ar ? "دفع مجزأ" : "Split payment"}</option>
-              )}
+              {LEGACY_PAYMENT_VALUES.map((value) => (
+                <option key={value} value={value}>
+                  {paymentMethodLabel(value, ar ? "ar" : "en")}
+                </option>
+              ))}
             </select>
           )}
           <ReportFilterMenu

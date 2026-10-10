@@ -16,6 +16,9 @@ import {
   type PaperProfileId,
 } from "./paper-profiles";
 import { renderThermalTemplate } from "./thermal";
+import { renderThermalMillingTemplate } from "./thermal-milling";
+import { renderThermalQrTemplate } from "./thermal-qr";
+import { renderMillingCleanTemplate } from "./milling-clean";
 import { renderStandardTemplate } from "./standard";
 import { renderElegantTemplate } from "./elegant";
 import { renderInventoryThermalTemplate, renderInventoryStandardTemplate } from "./inventory";
@@ -26,6 +29,9 @@ export * from "./types";
 export * from "./settings-store";
 export * from "./paper-profiles";
 export { renderThermalTemplate } from "./thermal";
+export { renderThermalMillingTemplate } from "./thermal-milling";
+export { renderThermalQrTemplate } from "./thermal-qr";
+export { renderMillingCleanTemplate } from "./milling-clean";
 export { renderStandardTemplate } from "./standard";
 export { renderElegantTemplate } from "./elegant";
 export { renderInventoryThermalTemplate, renderInventoryStandardTemplate } from "./inventory";
@@ -59,6 +65,9 @@ export function getTemplateRenderer(
     if (id === "standard" || id === "elegant" || id === "unified-modern")
       return renderInventoryStandardTemplate;
   }
+  if (id === "thermal-milling") return renderThermalMillingTemplate;
+  if (id === "thermal-qr") return renderThermalQrTemplate;
+  if (id === "milling-clean") return renderMillingCleanTemplate;
   if (id === "formal")
     return (doc, labels, rtl, options) => renderFormalTemplate(doc, labels, rtl, options);
 
@@ -69,6 +78,12 @@ export function getTemplateRenderer(
 
   // Default customer invoice fallbacks
   switch (id) {
+    case "thermal-milling":
+      return renderThermalMillingTemplate;
+    case "thermal-qr":
+      return renderThermalQrTemplate;
+    case "milling-clean":
+      return renderMillingCleanTemplate;
     case "thermal":
       return renderThermalTemplate;
     case "elegant":
@@ -143,60 +158,82 @@ export function resolvePrintProfile(
   return { documentType, templateId: template.id, paperProfileId: resolvedPaper };
 }
 
+const ALL_SUPPORTED_DOC_TYPES: DocumentType[] = [
+  "customer_invoice",
+  "purchase_invoice",
+  "sales_return",
+  "purchase_return",
+  "stock_transfer",
+  "stock_receipt",
+  "stock_issue",
+  "payment_receipt",
+  "quotation",
+  "delivery_note",
+  "inventory_document",
+];
+
 // Register built-in default templates
 registerTemplate(
   {
-    id: "thermal",
-    nameAr: "حراري (POS 80mm)",
-    nameEn: "Thermal (POS 80mm)",
+    id: "thermal-milling",
+    nameAr: "قالب كاونتر المطحنة الأنيق",
+    nameEn: "Milling Counter Modern",
     category: "thermal",
     paperSize: "80mm",
     supportedPaperProfiles: ["thermal-80", "thermal-58"],
-    supportedDocTypes: ["customer_invoice", "inventory_document"],
+    supportedDocTypes: ALL_SUPPORTED_DOC_TYPES,
+  },
+  renderThermalMillingTemplate,
+);
+
+registerTemplate(
+  {
+    id: "thermal",
+    nameAr: "قالب الكاشير القياسي",
+    nameEn: "Standard Cashier",
+    category: "thermal",
+    paperSize: "80mm",
+    supportedPaperProfiles: ["thermal-80", "thermal-58"],
+    supportedDocTypes: ALL_SUPPORTED_DOC_TYPES,
   },
   renderThermalTemplate,
 );
 
 registerTemplate(
   {
-    id: "standard",
-    nameAr: "موحد حديث (A4)",
-    nameEn: "Unified Modern (A4)",
-    category: "standard",
-    paperSize: "A4",
-    supportedPaperProfiles: ["a4"],
-    supportedDocTypes: [
-      "customer_invoice",
-      "purchase_invoice",
-      "sales_return",
-      "purchase_return",
-      "payment_receipt",
-      "quotation",
-      "delivery_note",
-      "inventory_document",
-    ],
+    id: "thermal-qr",
+    nameAr: "قالب الإيصال مع باركود و QR",
+    nameEn: "Thermal QR & Barcode",
+    category: "thermal",
+    paperSize: "80mm",
+    supportedPaperProfiles: ["thermal-80", "thermal-58"],
+    supportedDocTypes: ALL_SUPPORTED_DOC_TYPES,
   },
-  renderStandardTemplate,
+  renderThermalQrTemplate,
 );
 
 registerTemplate(
   {
-    id: "unified-modern",
-    nameAr: "موحد حديث",
-    nameEn: "Unified Modern",
+    id: "milling-clean",
+    nameAr: "قالب الكاونتر المبسط والأنيق",
+    nameEn: "Milling Clean Minimalist",
     category: "standard",
     paperSize: "A4",
-    supportedPaperProfiles: ["a4"],
-    supportedDocTypes: [
-      "customer_invoice",
-      "purchase_invoice",
-      "sales_return",
-      "purchase_return",
-      "payment_receipt",
-      "quotation",
-      "delivery_note",
-      "inventory_document",
-    ],
+    supportedPaperProfiles: ["a4", "a5"],
+    supportedDocTypes: ALL_SUPPORTED_DOC_TYPES,
+  },
+  renderMillingCleanTemplate,
+);
+
+registerTemplate(
+  {
+    id: "standard",
+    nameAr: "قالب مؤسسي قياسي",
+    nameEn: "Standard Corporate",
+    category: "standard",
+    paperSize: "A4",
+    supportedPaperProfiles: ["a4", "a5"],
+    supportedDocTypes: ALL_SUPPORTED_DOC_TYPES,
   },
   renderStandardTemplate,
 );
@@ -204,20 +241,12 @@ registerTemplate(
 registerTemplate(
   {
     id: "elegant",
-    nameAr: "أنيق فاخر (A4)",
-    nameEn: "Elegant Luxury (A4)",
+    nameAr: "قالب تنفيذي فاخر",
+    nameEn: "Executive Luxury",
     category: "standard",
     paperSize: "A4",
-    supportedPaperProfiles: ["a4"],
-    supportedDocTypes: [
-      "customer_invoice",
-      "purchase_invoice",
-      "sales_return",
-      "purchase_return",
-      "payment_receipt",
-      "quotation",
-      "delivery_note",
-    ],
+    supportedPaperProfiles: ["a4", "a5"],
+    supportedDocTypes: ALL_SUPPORTED_DOC_TYPES,
   },
   renderElegantTemplate,
 );
@@ -225,24 +254,12 @@ registerTemplate(
 registerTemplate(
   {
     id: "formal",
-    nameAr: "رسمي مؤسسي",
+    nameAr: "قالب رسمي معتمد",
     nameEn: "Formal Corporate",
     category: "standard",
     paperSize: "A4",
-    supportedPaperProfiles: ["a4"],
-    supportedDocTypes: [
-      "customer_invoice",
-      "purchase_invoice",
-      "sales_return",
-      "purchase_return",
-      "stock_transfer",
-      "stock_receipt",
-      "stock_issue",
-      "payment_receipt",
-      "quotation",
-      "delivery_note",
-      "inventory_document",
-    ],
+    supportedPaperProfiles: ["a4", "a5"],
+    supportedDocTypes: ALL_SUPPORTED_DOC_TYPES,
   },
   (doc, labels, rtl, options) => renderFormalTemplate(doc, labels, rtl, options),
 );

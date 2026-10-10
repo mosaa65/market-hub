@@ -58,6 +58,7 @@ import { toast } from "sonner";
 import { printInvoice, type InvoiceTemplate } from "@/lib/invoice-print";
 import type { InvoiceDoc } from "@/lib/pdf";
 import { OperationSuccessModal } from "@/components/communication";
+import { LuxuryPrintPreviewModal } from "@/components/luxury-print-preview-modal";
 import {
   createSalesInvoice,
   fetchSellableProducts,
@@ -68,6 +69,12 @@ import {
   type ServiceLineInput,
 } from "@/lib/sales-invoice";
 import { MILLING_BAG_SIZES } from "@/components/milling/milling-terms-fields";
+import { PaymentMethodPicker } from "@/components/ui/payment-method";
+import {
+  getPaymentMethodDefinition,
+  paymentMethodLabel,
+  toLegacyPaymentValue,
+} from "@/lib/payments/payment-methods";
 
 export const Route = createFileRoute("/_app/sales-invoice")({
   head: () => ({ meta: [{ title: "فاتورة المبيعات — فورتيكس ERP" }] }),
@@ -218,7 +225,12 @@ function SalesInvoicePage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<SellableProduct[]>([]);
 
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
+  //
+  // Holds a CATALOGUE id (e.g. 'kuraimi_bank'), because that is what the picker
+  // produces. It is converted to the stored ENUM value with toLegacyPaymentValue
+  // at the point of submission, so the RPC contract never changes.
+  //
+  const [paymentMethod, setPaymentMethod] = useState<string>("cash");
   const [paid, setPaid] = useState("");
   const [discount, setDiscount] = useState("");
   const [note, setNote] = useState("");
@@ -237,6 +249,7 @@ function SalesInvoicePage() {
     doc: InvoiceDoc;
   } | null>(null);
   const [successModalOpen, setSuccessModalOpen] = useState(false);
+  const [luxuryPreviewOpen, setLuxuryPreviewOpen] = useState(false);
 
   const setT = <K extends keyof TicketForm>(key: K, value: TicketForm[K]) =>
     setTicket((current) => ({ ...current, [key]: value }));
@@ -478,7 +491,7 @@ function SalesInvoicePage() {
       const result = await createSalesInvoice({
         warehouseId,
         customerId: customerId || null,
-        paymentMethod,
+        paymentMethod: toLegacyPaymentValue(paymentMethod) as PaymentMethod,
         paid: effectivePaid,
         discount: discountN,
         // On a ticket the negotiated terms belong on the document, not only on
@@ -1225,21 +1238,23 @@ function SalesInvoicePage() {
 
             <div className="space-y-2">
               <Field label={isRtl ? "طريقة السداد" : "Payment method"}>
-                <select
+                {/*
+                  The sales invoice form has its own context, so a business can
+                  offer a different set here than at the till. The picker returns
+                  a catalogue id; toLegacyPaymentValue converts it to the value
+                  the RPC expects.
+                */}
+                <PaymentMethodPicker
+                  context="sales"
                   value={paymentMethod}
-                  onChange={(e) => {
-                    const m = e.target.value as PaymentMethod;
-                    setPaymentMethod(m);
-                    if (m === "credit") setPaid("0");
+                  onChange={(method) => {
+                    setPaymentMethod(method);
+                    const definition = getPaymentMethodDefinition(method);
+                    if (definition?.isCreditTerm) setPaid("0");
                   }}
-                  className={inputClass}
-                >
-                  <option value="cash">{isRtl ? "نقداً" : "Cash"}</option>
-                  <option value="card">{isRtl ? "شبكة / بطاقة" : "Card"}</option>
-                  <option value="bank_transfer">{isRtl ? "تحويل بنكي" : "Bank transfer"}</option>
-                  <option value="mobile_money">{isRtl ? "محفظة إلكترونية" : "Mobile money"}</option>
-                  <option value="credit">{isRtl ? "آجل" : "Credit"}</option>
-                </select>
+                  ensureIds={[paymentMethod]}
+                  ariaLabel={isRtl ? "طريقة السداد" : "Payment method"}
+                />
               </Field>
 
               <div className="grid grid-cols-2 gap-2">
@@ -1356,7 +1371,13 @@ function SalesInvoicePage() {
         open={successModalOpen}
         onClose={() => setSuccessModalOpen(false)}
         title={isRtl ? "تم إصدار الفاتورة بنجاح" : "Invoice Issued Successfully"}
-        subtitle={lastInvoice ? (isRtl ? `فاتورة مبيعات #${lastInvoice.number}` : `Sales Invoice #${lastInvoice.number}`) : undefined}
+        subtitle={
+          lastInvoice
+            ? isRtl
+              ? `فاتورة مبيعات #${lastInvoice.number}`
+              : `Sales Invoice #${lastInvoice.number}`
+            : undefined
+        }
         amount={lastInvoice?.total}
         referenceNumber={lastInvoice?.number}
         customer={
@@ -1383,8 +1404,20 @@ function SalesInvoicePage() {
             : null
         }
         eventType="invoice_created"
-        onPrint={() => printLast("standard")}
+        onPrint={() => setLuxuryPreviewOpen(true)}
       />
+
+      {lastInvoice && (
+        <LuxuryPrintPreviewModal
+          open={luxuryPreviewOpen}
+          onClose={() => setLuxuryPreviewOpen(false)}
+          doc={lastInvoice.doc}
+          documentType="customer_invoice"
+          title={isRtl ? "معاينة وطباعة الفاتورة" : "Invoice Print Preview"}
+          customerPhone={selectedCustomer?.phone || undefined}
+          customerName={selectedCustomer?.name || undefined}
+        />
+      )}
     </div>
   );
 }
@@ -1423,14 +1456,8 @@ function Row({ label, value, muted }: { label: string; value: string; muted?: bo
   );
 }
 
-function pmLabel(method: PaymentMethod, isRtl: boolean): string {
-  const map: Record<PaymentMethod, { ar: string; en: string }> = {
-    cash: { ar: "نقداً", en: "Cash" },
-    card: { ar: "شبكة / بطاقة", en: "Card" },
-    bank_transfer: { ar: "تحويل بنكي", en: "Bank transfer" },
-    credit: { ar: "آجل", en: "Credit" },
-    mobile_money: { ar: "محفظة إلكترونية", en: "Mobile money" },
-    split: { ar: "دفع مجزأ", en: "Split" },
-  };
-  return isRtl ? map[method].ar : map[method].en;
+function pmLabel(method: string, isRtl: boolean): string {
+  // Reads the catalogue instead of a local map, so a method added to the
+  // catalogue is labelled correctly here without touching this file.
+  return paymentMethodLabel(method, isRtl ? "ar" : "en");
 }

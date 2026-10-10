@@ -34,6 +34,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { FieldInput } from "@/components/ui/input";
 import { VortexDrawerDialog } from "@/components/vortex-ui";
+import { PaymentMethodPicker } from "@/components/ui/payment-method";
 import { useExpenseMutations, type ExpenseLineInput } from "@/hooks/use-expenses";
 import {
   ACTIVE_EXPENSE_ENTRY_TYPES,
@@ -767,16 +768,15 @@ export function ExpenseFormDialog({
           {payNow ? (
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <Field label={t("common.method")}>
-                <select
+                {/* Same catalogue, expenses context, independent scoping. */}
+                <PaymentMethodPicker
+                  context="expenses"
                   value={paymentMethod}
-                  onChange={(event) => setPaymentMethod(event.target.value)}
-                  className={selectClass}
-                >
-                  <option value="cash">{t("pos.pm.cash")}</option>
-                  <option value="bank_transfer">{t("pos.pm.bank_transfer")}</option>
-                  <option value="card">{t("pos.pm.card")}</option>
-                  <option value="mobile_money">{t("pos.pm.mobile_money")}</option>
-                </select>
+                  onChange={setPaymentMethod}
+                  includeCredit={false}
+                  ensureIds={[paymentMethod]}
+                  ariaLabel={t("common.method")}
+                />
               </Field>
 
               {(lookups?.financial_accounts ?? []).length > 0 ? (

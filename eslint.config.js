@@ -16,6 +16,10 @@ export default tseslint.config(
       "public",
       "screenshots",
       "docs",
+      "supabase",
+      "backups",
+      "backup-before-repair",
+      ".aistudio",
     ],
   },
   {

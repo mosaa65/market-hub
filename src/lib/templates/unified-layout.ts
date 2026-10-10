@@ -27,6 +27,7 @@ import { numberToArabicWords } from "./tafqeet";
 import { PRINT_THEMES, type PrintTheme } from "@/lib/printing/themes";
 import { renderUniversalFooter, UNIVERSAL_FOOTER_CSS } from "@/lib/printing/footer";
 import { getCachedCompanyProfile, type CompanyProfile } from "@/lib/printing/company-profile";
+import { generateBarcodeSvg, generateQrCodeSvg } from "@/lib/printing/barcode-qr";
 
 export interface UnifiedLayoutOptions extends CustomFieldOptions {
   /** نمط المستند — يغيّر الألوان والحدود فقط. */
@@ -196,11 +197,23 @@ export function renderUnifiedLayout(
     showNotes: true,
     showSignatures: true,
     showFooter: true,
+    showBarcode: true,
+    showQrCode: true,
     ...options,
     ...doc.options,
   };
   // `doc.options` must not be able to re-enable a footer the caller disabled.
   if (options?.showFooter === false) opts.showFooter = false;
+
+  const qrPayload = [
+    `Seller: ${options?.company?.name || getCachedCompanyProfile().name}`,
+    `Invoice: ${doc.number}`,
+    `Date: ${doc.date}`,
+    `Total: ${doc.total || 0} ${c}`,
+  ].join("\n");
+
+  const barcodeSvg = (opts.showBarcode !== false && doc.number) ? generateBarcodeSvg(doc.number, 32) : "";
+  const qrSvg = (opts.showQrCode !== false) ? generateQrCodeSvg(qrPayload, 80) : "";
 
   // Company Profile is the single source of company data — never a constant.
   // The document may carry a snapshot, but the profile is authoritative when
@@ -306,7 +319,13 @@ export function renderUnifiedLayout(
       ${
         opts.showDocNumberDate
           ? `
-      <div class="inv-number-badge">#${esc(doc.number)}</div>
+      <div style="display: flex; align-items: center; gap: 10px;">
+        ${qrSvg ? `<div style="display: flex; align-items: center; background: #fff; padding: 2px; border-radius: 4px;">${qrSvg}</div>` : ""}
+        <div>
+          <div class="inv-number-badge">#${esc(doc.number)}</div>
+          ${barcodeSvg ? `<div style="margin-top: 3px; text-align: center;">${barcodeSvg}</div>` : ""}
+        </div>
+      </div>
 
       <div class="inv-date-tag">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>

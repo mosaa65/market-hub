@@ -1,6 +1,6 @@
 import type { PaperSize } from "./types";
 
-export type PaperProfileId = "a4" | "thermal-80" | "thermal-58";
+export type PaperProfileId = "a4" | "a5" | "thermal-80" | "thermal-58";
 
 export interface PaperProfile {
   id: PaperProfileId;
@@ -23,6 +23,16 @@ export const PAPER_PROFILES: Record<PaperProfileId, PaperProfile> = {
     orientation: "portrait",
     margins: { top: 0, right: 0, bottom: 0, left: 0 },
     legacySize: "A4",
+  },
+  a5: {
+    id: "a5",
+    nameAr: "A5",
+    nameEn: "A5",
+    widthMm: 148,
+    heightMm: 210,
+    orientation: "portrait",
+    margins: { top: 0, right: 0, bottom: 0, left: 0 },
+    legacySize: "A5",
   },
   "thermal-80": {
     id: "thermal-80",
@@ -51,7 +61,8 @@ export function getPaperProfile(id: PaperProfileId): PaperProfile {
 }
 
 export function paperProfileForLegacySize(size: PaperSize): PaperProfileId {
-  if (size === "A4" || size === "A5") return "a4";
+  if (size === "A5") return "a5";
+  if (size === "A4") return "a4";
   return size === "58mm" ? "thermal-58" : "thermal-80";
 }
 

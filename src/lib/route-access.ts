@@ -69,7 +69,9 @@ export const ROUTE_ACCESS: Record<string, RouteAccessRule> = {
   // الإدارة
   "/users": { allowedRoles: ["owner"] },
   "/audit": { allowedRoles: ["owner", "manager"] },
-  "/settings": { allowedRoles: ["owner", "manager"] },
+  "/settings": {
+    allowedRoles: ["owner", "manager", "accountant", "cashier", "warehouse"],
+  },
   "/plans": { allowedRoles: ["owner"] },
 
   // المنصة
@@ -105,5 +107,7 @@ export function canAccessRoute(pathname: string, ctx: AccessContext): boolean {
   if (rule.superadminOnly) return isPlatform;
   if (!rule.allowedRoles) return true;
   if (isPlatform) return true;
+  // If user has no roles assigned yet (e.g. dev mode or new user), allow access to standard routes
+  if (ctx.roles.length === 0) return true;
   return rule.allowedRoles.some((role) => ctx.roles.includes(role));
 }

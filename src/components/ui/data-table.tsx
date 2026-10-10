@@ -289,15 +289,43 @@ export function DataTable<T>({
   const showEmpty = !showSkeleton && displayRows.length === 0;
 
   /* ---- infinite scroll sentinel ---- */
+  /*
+   * `onLoadMore` is read through a ref so the observer is created once per
+   * (infinite, hasMore) change instead of once per parent render. Callers pass
+   * inline arrows (`onLoadMore={() => fetchNextPage()}`), and rebuilding an
+   * IntersectionObserver on every render re-fires the callback while the
+   * sentinel stays visible — which is how a single scroll ends up issuing
+   * repeated page requests.
+   *
+   * The `loadingMore` guard is applied inside the callback (not as an effect
+   * dependency) for the same reason, and a ref-level latch swallows the extra
+   * intersection callbacks the browser delivers before React has re-rendered
+   * with `loadingMore = true`.
+   */
+  const onLoadMoreRef = React.useRef(onLoadMore);
+  onLoadMoreRef.current = onLoadMore;
+  const loadingMoreRef = React.useRef(loadingMore);
+  loadingMoreRef.current = loadingMore;
+  const loadMoreLatchRef = React.useRef(false);
+
   React.useEffect(() => {
-    if (!infinite || !hasMore || !onLoadMore) return;
+    if (!loadingMore) loadMoreLatchRef.current = false;
+  }, [loadingMore]);
+
+  React.useEffect(() => {
+    if (!infinite || !hasMore) return;
     const sentinel = sentinelRef.current;
     if (!sentinel) return;
 
     const root = scrollRef.current;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting && !loadingMore) onLoadMore();
+        if (!entries[0]?.isIntersecting) return;
+        if (loadingMoreRef.current || loadMoreLatchRef.current) return;
+        const loadMore = onLoadMoreRef.current;
+        if (!loadMore) return;
+        loadMoreLatchRef.current = true;
+        loadMore();
       },
       // Begin loading slightly before the user actually reaches the bottom.
       {
@@ -308,7 +336,7 @@ export function DataTable<T>({
 
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [infinite, hasMore, onLoadMore, loadingMore]);
+  }, [infinite, hasMore]);
 
   /* ---- error ---- */
   if (error) {
@@ -355,10 +383,8 @@ export function DataTable<T>({
 
   /* مع min-width يبقى التخطيط تلقائيًا ليتسع المحتوى؛ مع ثبات الأعمدة
    * نستخدم table-fixed ليكون الجدولان متطابقين تمامًا وعمودًا بعمود. */
-  const allColsWidths =
-    visibleColumns.length > 0 && visibleColumns.every((c) => /w-\[[\d.]+px\]/.test(c.width ?? ""));
-  const alignedTableClassName =
-    minWidth && allColsWidths ? cn(tableClassName, "table-fixed") : tableClassName;
+  // السماح للجدول بالتوسع تلقائياً حسب أطول نص في كل عمود (table-auto) دون إجبار العرض الثابت
+  const alignedTableClassName = cn(tableClassName, "table-auto");
 
   // مزامنة أفقية موحدة وفورية تمنع حلقة الصدى (echo loop) والتقطع،
   // وتسمح للمتصفح بالاحتفاظ بعزم الحركة الطبيعي (120Hz momentum) والمطاطية (rubber-band)
@@ -488,9 +514,9 @@ export function DataTable<T>({
                              * wide table past the viewport. Let text wrap under
                              * `sm` and keep the single-line ERP look from `sm`
                              * up, where there is room for it. */
-                            !col.wrap && "whitespace-normal sm:whitespace-nowrap",
+                            !col.wrap ? "whitespace-nowrap" : "break-words",
                             col.align === "end"
-                              ? "text-end"
+                              ? "text-end tabular-nums"
                               : col.align === "center"
                                 ? "text-center"
                                 : "text-start",
@@ -612,9 +638,9 @@ function TableHead<T>({
               }
               className={cn(
                 "h-10 px-3 align-middle text-[11px] font-semibold uppercase tracking-wider text-muted-foreground first:rounded-s-xl first:ps-4 last:rounded-e-xl last:pe-5",
-                "whitespace-normal sm:whitespace-nowrap",
+                !column.wrap ? "whitespace-nowrap" : "break-words",
                 column.align === "end"
-                  ? "text-end"
+                  ? "text-end tabular-nums"
                   : column.align === "center"
                     ? "text-center"
                     : "text-start",
@@ -634,7 +660,8 @@ function TableHead<T>({
                   className={cn(
                     "inline-flex items-center gap-1 rounded-sm transition-colors hover:text-foreground",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-                    column.align === "end" && "flex-row-reverse",
+                    column.align === "end" && "justify-end w-full",
+                    column.align === "center" && "justify-center w-full",
                     active && "text-primary",
                   )}
                 >

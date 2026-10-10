@@ -10,7 +10,7 @@ import { toSystemDigits } from "@/lib/format-preferences";
 import { useModules } from "@/lib/modules";
 import { createFileRoute } from "@tanstack/react-router";
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
@@ -84,7 +84,8 @@ import { useProductFieldVisibility } from "@/hooks/use-product-field-visibility"
 import type { ProductFieldKey } from "@/lib/product-field-visibility";
 import { useBreakpoint } from "@/design/breakpoints";
 import { useRealtimeTable } from "@/lib/realtime";
-import { QUERY_KEYS } from "@/lib/query-keys";
+import { registerRealtimeRowPatcher } from "@/lib/realtime";
+import { productKeys } from "@/lib/query-keys";
 import {
   DEFAULT_USER_ITEM_POLICY_PREFERENCES,
   readUserItemPolicyPreferences,
@@ -184,6 +185,25 @@ const EMPTY_COUNTS: ReferenceCounts = {
   hasHistory: false,
 };
 
+type QuickFilter = "all" | "active" | "inactive" | "has_min_stock";
+
+/*
+ * Realtime row contract for products.
+ *
+ * A catalogue row carries joined display data (`category`, `unit`, `brand`) that
+ * a raw `postgres_changes` payload does not contain. Merging a payload over a
+ * row that is already in the stream is fine — the joins survive the spread.
+ * *Inserting* a brand-new raw row is not: the new product would appear with no
+ * category and no unit until the next refetch.
+ *
+ * Returning `null` for that case tells the shared hook to skip the patch and
+ * reconcile from the server instead, which is the only way to get a complete
+ * row. UPDATE and DELETE stay on the cheap path.
+ */
+registerRealtimeRowPatcher<ProductRow>("products", ({ eventType }) =>
+  eventType === "INSERT" ? null : ({} as ProductRow),
+);
+
 function ProductsPage() {
   const { checkQuota } = useModules();
   const { t, lang } = useI18n();
@@ -207,9 +227,7 @@ function ProductsPage() {
   const [editing, setEditing] = useState<ProductRow | null>(null);
   const [open, setOpen] = useState(false);
   const [prefillBarcode, setPrefillBarcode] = useState<string | undefined>(undefined);
-  const [quickFilter, setQuickFilter] = useState<"all" | "active" | "inactive" | "low_stock">(
-    "all",
-  );
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
   const [viewMode, setViewMode] = useState<"grid" | "list" | "table">("grid");
   const [selectedProductDetail, setSelectedProductDetail] = useState<ProductRow | null>(null);
   const [copiedBarcode, setCopiedBarcode] = useState<string | null>(null);
@@ -242,7 +260,11 @@ function ProductsPage() {
             ? "تم تعطيل المنتج بنجاح"
             : "Product deactivated",
       );
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.products });
+      // Only the stream and its count changed. The taxonomy lookups
+      // (categories/brands/units) are untouched by a status toggle and must not
+      // be re-read for it.
+      void qc.invalidateQueries({ queryKey: productKeys.list() });
+      void qc.invalidateQueries({ queryKey: productKeys.count() });
     },
     onError: (err: any) => {
       toast.error(
@@ -268,7 +290,7 @@ function ProductsPage() {
     isFetching,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: QUERY_KEYS.products,
+    queryKey: productKeys.list(),
     initialPageParam: 0,
     queryFn: async ({ pageParam }) => {
       const from = pageParam * PRODUCTS_PAGE_SIZE;
@@ -280,7 +302,13 @@ function ProductsPage() {
         .select(
           "id, name, name_ar, sku, barcode, sale_price, cost_price, tax_rate, min_stock, is_active, category_id, brand_id, unit_id, item_nature, item_class, inventory_policy, tracking, costing_method, is_sellable, is_purchasable",
         )
+        // `created_at` alone is not a total order: two products inserted in the
+        // same millisecond (a bulk import, a sync) have no defined relative
+        // order, so the database may return them differently for page 1 and
+        // page 2 — duplicating one row and dropping another. `id` is the
+        // tie-breaker that makes the ordering stable across pages.
         .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
         .range(from, to);
 
       if (productError) throw productError;
@@ -308,7 +336,15 @@ function ProductsPage() {
       // Category and unit share a read because a card cannot be read without
       // them. Brand is isolated: it is optional in this catalogue, and it must
       // never be able to cost the category.
-      const [enrichmentResult, brandResult, compatibilityResult] = await Promise.all([
+      //
+      // Vehicle compatibility is deliberately NOT read here. It was fetched on
+      // every page — a third parallel request carrying a row per model per
+      // product — and nothing on the grid, the list, the table or the detail
+      // drawer renders it (`compatibilities` is only ever defaulted to `[]`).
+      // The field stays on `ProductRow` so a detail query can populate it when
+      // a screen actually needs the data; paying for it on every catalogue page
+      // does not.
+      const [enrichmentResult, brandResult] = await Promise.all([
         productIds.length
           ? (supabase.from("products") as any)
               .select(
@@ -328,30 +364,18 @@ function ProductsPage() {
               .select("id, brand:brands!products_brand_id_fkey(name, name_ar)")
               .in("id", productIds)
           : Promise.resolve({ data: [], error: null } as any),
-
-        productIds.length
-          ? (supabase as any)
-              .from("product_compatibilities")
-              .select("product_id, vehicle_model_id")
-              .in("product_id", productIds)
-          : Promise.resolve({ data: [], error: null } as any),
       ]);
 
       const enrichmentRows = enrichmentResult.data;
       const enrichmentError = enrichmentResult.error;
       const brandRows = brandResult.data;
       const brandError = brandResult.error;
-      const compatibilityRows = compatibilityResult.data;
-      const compatibilityError = compatibilityResult.error;
 
       if (enrichmentError) {
         console.warn("[products] تعذّر جلب التصنيف/الوحدة:", enrichmentError.message);
       }
       if (brandError) {
         console.warn("[products] تعذّر جلب العلامة التجارية:", brandError.message);
-      }
-      if (compatibilityError) {
-        console.warn("[products] تعذّر جلب التوافقات:", compatibilityError.message);
       }
 
       const enrichmentByProduct = new Map<string, Partial<ProductRow>>(
@@ -363,20 +387,10 @@ function ProductsPage() {
         brandError ? [] : (brandRows ?? []).map((row: ProductRow) => [row.id, row.brand ?? null]),
       );
 
-      const compatibilityByProduct: Record<string, { vehicle_model_id: string }[]> = {};
-      if (!compatibilityError) {
-        for (const compatibility of compatibilityRows ?? []) {
-          (compatibilityByProduct[compatibility.product_id] ??= []).push({
-            vehicle_model_id: compatibility.vehicle_model_id,
-          });
-        }
-      }
-
       const rows = baseRows.map((product) => ({
         ...product,
         ...enrichmentByProduct.get(product.id),
         brand: brandByProduct.get(product.id) ?? null,
-        compatibilities: compatibilityByProduct[product.id] ?? [],
       }));
       return { rows, hasMore: rows.length === PRODUCTS_PAGE_SIZE };
     },
@@ -387,7 +401,7 @@ function ProductsPage() {
   // from the database separately so the number beside search never pretends that
   // the first page is the whole catalogue.
   const { data: productCount } = useQuery({
-    queryKey: ["products", "count"],
+    queryKey: productKeys.count(),
     queryFn: async () => {
       const { count, error: countError } = await (supabase.from("products") as any).select("id", {
         count: "exact",
@@ -407,21 +421,26 @@ function ProductsPage() {
   useRealtimeTable<ProductRow>(
     {
       table: "products",
-      queryKey: QUERY_KEYS.products,
-      debounceMs: 100,
+      queryKey: productKeys.list(),
+      // Catalogue rows are enriched beyond the table (category, unit, brand are
+      // joined in the query). Patching a raw payload is correct for rows already
+      // in the stream and wrong for an INSERT of a product this screen has never
+      // seen, so the shared patcher defers to reconciliation for inserts.
+      debounceMs: 150,
     },
     qc,
   );
 
   useEffect(() => {
     if (!searchParams.barcode) return;
-    setEditing(null);
-    setPrefillBarcode(searchParams.barcode);
-    setOpen(true);
+    // A barcode deep-link is also a creation entry point, so it must pass the
+    // same quota/access check as the buttons rather than opening the form raw.
+    openNew(searchParams.barcode);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams.barcode]);
 
   const { data: meta } = useQuery({
-    queryKey: ["products-meta"],
+    queryKey: productKeys.meta(),
     staleTime: 10 * 60 * 1000,
     queryFn: async () => {
       const [c, b, u, origins, qualities] = await Promise.all([
@@ -477,7 +496,22 @@ function ProductsPage() {
     return filtered.filter((p) => {
       if (quickFilter === "active") return Boolean(p.is_active);
       if (quickFilter === "inactive") return !p.is_active;
-      if (quickFilter === "low_stock") return p.min_stock != null && Number(p.min_stock) > 0;
+      /*
+       * Named `has_min_stock`, not "low stock".
+       *
+       * This predicate is `min_stock > 0` — "a reorder threshold is
+       * configured". It does NOT compare an available quantity against that
+       * threshold, because the catalogue read carries no stock position. The
+       * old label ("Stock Alert" / "Near or below min") claimed a comparison
+       * that was never performed, so a product with 900 units on hand and a
+       * threshold of 5 was reported as a stock alert.
+       *
+       * Getting a true low-stock count needs the stock engine
+       * (`stock_positions`, as on the inventory screen) — a different query and
+       * a different definition of ownership/warehouse. Until that is built,
+       * the honest thing is to name what is actually computed.
+       */
+      if (quickFilter === "has_min_stock") return p.min_stock != null && Number(p.min_stock) > 0;
       return true;
     });
   }, [filtered, quickFilter]);
@@ -516,25 +550,31 @@ function ProductsPage() {
   }, [displayRows, sort, lang]);
 
   // Luxury KPI calculations
-  const { totalProducts, activeCount, inactiveCount, lowStockCount, categoriesCount, brandsCount } =
-    useMemo(() => {
-      let active = 0;
-      let inactive = 0;
-      let lowStock = 0;
-      for (const p of products) {
-        if (p.is_active) active++;
-        else inactive++;
-        if (p.min_stock != null && Number(p.min_stock) > 0) lowStock++;
-      }
-      return {
-        totalProducts: productCount ?? products.length,
-        activeCount: active,
-        inactiveCount: inactive,
-        lowStockCount: lowStock,
-        categoriesCount: meta?.categories?.length ?? 0,
-        brandsCount: meta?.brands?.length ?? 0,
-      };
-    }, [products, productCount, meta]);
+  const {
+    totalProducts,
+    activeCount,
+    inactiveCount,
+    hasMinStockCount,
+    categoriesCount,
+    brandsCount,
+  } = useMemo(() => {
+    let active = 0;
+    let inactive = 0;
+    let withMinStock = 0;
+    for (const p of products) {
+      if (p.is_active) active++;
+      else inactive++;
+      if (p.min_stock != null && Number(p.min_stock) > 0) withMinStock++;
+    }
+    return {
+      totalProducts: productCount ?? products.length,
+      activeCount: active,
+      inactiveCount: inactive,
+      hasMinStockCount: withMinStock,
+      categoriesCount: meta?.categories?.length ?? 0,
+      brandsCount: meta?.brands?.length ?? 0,
+    };
+  }, [products, productCount, meta]);
 
   /* ---------------- filter + sort definitions (localized) ---------------- */
   const productFilterDefinitions = useMemo<FilterDefinition[]>(() => {
@@ -872,16 +912,40 @@ function ProductsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config, canViewCost, lang, t, visibility]);
 
-  const openNew = () => {
-    const qCheck = checkQuota("products", productCount ?? products.length);
-    if (!qCheck.allowed) {
-      toast.error(lang === "ar" ? qCheck.message?.ar : qCheck.message?.en);
-      return;
-    }
-    setEditing(null);
-    setPrefillBarcode(undefined);
-    setOpen(true);
-  };
+  /*
+   * The single entry point for creating a product.
+   *
+   * Every trigger must go through here — the toolbar action, the header
+   * "Quick Add" button, a barcode deep-link and the empty-state button. They
+   * used to call `setOpen(true)` directly, which bypassed the plan quota check
+   * and let an account create past its limit through any of those paths.
+   * Refusing *before* the form opens is the honest behaviour: the operator is
+   * told why instead of filling in a form that cannot be saved.
+   *
+   * `barcode` seeds the barcode field for a scan-to-create flow.
+   */
+  const openNew = useCallback(
+    (barcode?: string) => {
+      const qCheck = checkQuota("products", productCount ?? products.length);
+      if (!qCheck.allowed) {
+        toast.error(lang === "ar" ? qCheck.message?.ar : qCheck.message?.en);
+        return;
+      }
+      setEditing(null);
+      setPrefillBarcode(barcode);
+      setOpen(true);
+    },
+    [checkQuota, productCount, products.length, lang],
+  );
+
+  /* Stable load-more callback: `DataTable` holds it in a ref, but the identity
+   * still changes per render unless it is memoised here. */
+  const loadMoreProducts = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  /* Stable retry callback for the error state. */
+  const retryProducts = useCallback(() => void refetch(), [refetch]);
 
   return (
     <div className="space-y-4 pb-12">
@@ -900,11 +964,7 @@ function ProductsPage() {
               variant="outline"
               size="sm"
               icon={<ScanBarcode className="size-4" />}
-              onClick={() => {
-                setEditing(null);
-                setPrefillBarcode(undefined);
-                setOpen(true);
-              }}
+              onClick={() => openNew()}
               className="rounded-xl border-border/80 shadow-xs"
             >
               <span className="hidden sm:inline">
@@ -915,7 +975,7 @@ function ProductsPage() {
               variant="primary"
               size="sm"
               icon={<Plus className="size-4" />}
-              onClick={openNew}
+              onClick={() => openNew()}
               className="rounded-xl font-bold shadow-xs shadow-primary/20"
             >
               {t("common.new")}
@@ -970,15 +1030,15 @@ function ProductsPage() {
         />
 
         <VortexMetricCard
-          title={lang === "ar" ? "تنبيه حد الطلب" : "Low Stock Alert"}
-          value={toSystemDigits(lowStockCount)}
+          title={lang === "ar" ? "له حد أدنى محدد" : "Has Reorder Threshold"}
+          value={toSystemDigits(hasMinStockCount)}
           currency=""
-          subtitle={lang === "ar" ? "تحت أو قرب الحد الأدنى" : "Near or below min"}
+          subtitle={lang === "ar" ? "منتجات لها حد إعادة الطلب" : "products with a min stock"}
           icon={<Boxes className="size-5" />}
           iconClassName="bg-amber-500/10 text-amber-500 border border-amber-500/20"
-          badge={lowStockCount > 0 ? (lang === "ar" ? "تنبيه" : "Alert") : undefined}
-          onClick={() => setQuickFilter("low_stock")}
-          highlight={quickFilter === "low_stock"}
+          badge={hasMinStockCount > 0 ? (lang === "ar" ? "محدد" : "Set") : undefined}
+          onClick={() => setQuickFilter("has_min_stock")}
+          highlight={quickFilter === "has_min_stock"}
           className="cursor-pointer"
         />
       </div>
@@ -990,8 +1050,12 @@ function ProductsPage() {
           search={{
             value: query,
             onValueChange: setQuery,
-            placeholder: "ابحث في المنتجات",
-            resultCount: productCount ?? sortedRows.length,
+            placeholder: lang === "ar" ? "ابحث في المنتجات" : "Search products",
+            // The number beside search must be the MATCH count, not the
+            // server-side catalogue total — those are different numbers and
+            // showing the total made an empty search look like it had results.
+            resultCount: sortedRows.length,
+            loading: isFetching && !isLoading,
           }}
           filters={{
             definitions: productFilterDefinitions,
@@ -1042,7 +1106,7 @@ function ProductsPage() {
               label={t("common.new")}
               icon={<Plus />}
               tone="primary"
-              onClick={openNew}
+              onClick={() => openNew()}
             />
           }
         >
@@ -1061,9 +1125,9 @@ function ProductsPage() {
                   count: inactiveCount,
                 },
                 {
-                  id: "low_stock",
-                  label: lang === "ar" ? "تنبيه المخزون" : "Stock Alert",
-                  count: lowStockCount,
+                  id: "has_min_stock",
+                  label: lang === "ar" ? "له حد أدنى" : "Has threshold",
+                  count: hasMinStockCount,
                 },
               ].map((filter) => (
                 <button
@@ -1114,7 +1178,7 @@ function ProductsPage() {
               </div>
               <h4 className="text-base font-bold text-foreground">{t("products.no_products")}</h4>
               <p className="text-xs text-muted-foreground max-w-sm">{t("products.empty_hint")}</p>
-              <Button size="sm" icon={<Plus />} onClick={openNew}>
+              <Button size="sm" icon={<Plus />} onClick={() => openNew()}>
                 {t("common.new")}
               </Button>
             </div>
@@ -1370,7 +1434,7 @@ function ProductsPage() {
               </div>
               <h4 className="text-base font-bold text-foreground">{t("products.no_products")}</h4>
               <p className="text-xs text-muted-foreground max-w-sm">{t("products.empty_hint")}</p>
-              <Button size="sm" icon={<Plus />} onClick={openNew}>
+              <Button size="sm" icon={<Plus />} onClick={() => openNew()}>
                 {t("common.new")}
               </Button>
             </div>
@@ -1612,14 +1676,12 @@ function ProductsPage() {
             initialLoading={isLoading}
             refreshing={isFetching && !isLoading && !isFetchingNextPage}
             error={(error as Error) ?? null}
-            onRetry={() => refetch()}
+            onRetry={retryProducts}
             sort={sort}
             onSortChange={setSort}
             infinite
             hasMore={Boolean(hasNextPage)}
-            onLoadMore={() => {
-              if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
-            }}
+            onLoadMore={loadMoreProducts}
             loadingMore={isFetchingNextPage}
             pageSize={PRODUCTS_PAGE_SIZE}
             totalCount={productCount}
@@ -1634,7 +1696,7 @@ function ProductsPage() {
               title: t("products.no_products"),
               description: t("products.empty_hint"),
               action: (
-                <Button size="sm" icon={<Plus />} onClick={openNew}>
+                <Button size="sm" icon={<Plus />} onClick={() => openNew()}>
                   {t("common.new")}
                 </Button>
               ),
@@ -1906,9 +1968,10 @@ function ProductsPage() {
           onSaved={() => {
             setOpen(false);
             setPrefillBarcode(undefined);
-            void qc.invalidateQueries({ queryKey: QUERY_KEYS.products, refetchType: "active" });
-            qc.invalidateQueries({ queryKey: ["products", "count"] });
-            qc.invalidateQueries({ queryKey: ["products-meta"] });
+            // The list and its count changed. Taxonomy lookups are deliberately
+            // NOT invalidated here: saving a product never adds a category, and
+            // re-reading all five lookup tables on every save is pure waste.
+            void qc.invalidateQueries({ queryKey: productKeys.all, refetchType: "active" });
           }}
         />
       )}
@@ -2141,65 +2204,87 @@ function ProductDialog({
       return;
     }
     setSaving(true);
-    const payload = {
-      name: form.name.trim() || form.name_ar.trim(),
-      name_ar: form.name_ar.trim() || null,
-      sku: form.sku.trim() || null,
-      barcode: form.barcode.trim() || null,
-      category_id: form.category_id || null,
-      brand_id: config.enableBrands ? form.brand_id || null : null,
-      unit_id: config.enableUnits ? form.unit_id || null : null,
-      cost_price: Number(form.cost_price) || 0,
-      sale_price: Number(form.sale_price) || 0,
-      tax_rate: Number(form.tax_rate) || 0,
-      min_stock: Number(form.min_stock) || 1,
-      shelf_location: form.shelf_location.trim() || null,
-      origin_id: config.enableOrigins ? form.origin_id || null : null,
-      quality_grade_id: config.enableQualityGrades ? form.quality_grade_id || null : null,
-      is_active: form.is_active,
-      item_nature: policy.item_nature,
-      inventory_policy: policy.inventory_policy,
-      tracking: policy.tracking,
-      costing_method: policy.costing_method,
-      is_sellable: policy.is_sellable,
-      is_purchasable: policy.is_purchasable,
-    };
-    const request: any = initial
-      ? (supabase.from("products") as any)
-          .update(payload)
-          .eq("id", initial.id)
-          .select("id")
-          .single()
-      : (supabase.from("products") as any).insert(payload).select("id").single();
-    const { error: writeError } = await request;
-    setSaving(false);
-    if (writeError) {
-      const databaseError = writeError as { code?: string; message?: string };
-      if (
-        databaseError.code === "23505" ||
-        /duplicate key|products_barcode_key/i.test(databaseError.message ?? "")
-      ) {
-        toast.error(
-          lang === "ar"
-            ? "هذا الباركود مستخدم لمنتج آخر بالفعل."
-            : "This barcode is already used by another product.",
-        );
+    /*
+     * `try/finally` is what actually guarantees the form unlocks.
+     *
+     * Before this, `setSaving(false)` ran after the awaited write and *before*
+     * the error branch — so a rejected promise (offline, DNS failure, aborted
+     * fetch) skipped it entirely and left the Save button spinning forever with
+     * no way to retry except closing the drawer. `finally` runs on success, on a
+     * returned PostgREST error, and on a thrown network error alike.
+     */
+    try {
+      const payload = {
+        name: form.name.trim() || form.name_ar.trim(),
+        name_ar: form.name_ar.trim() || null,
+        sku: form.sku.trim() || null,
+        barcode: form.barcode.trim() || null,
+        category_id: form.category_id || null,
+        brand_id: config.enableBrands ? form.brand_id || null : null,
+        unit_id: config.enableUnits ? form.unit_id || null : null,
+        cost_price: Number(form.cost_price) || 0,
+        sale_price: Number(form.sale_price) || 0,
+        tax_rate: Number(form.tax_rate) || 0,
+        min_stock: Number(form.min_stock) || 1,
+        shelf_location: form.shelf_location.trim() || null,
+        origin_id: config.enableOrigins ? form.origin_id || null : null,
+        quality_grade_id: config.enableQualityGrades ? form.quality_grade_id || null : null,
+        is_active: form.is_active,
+        item_nature: policy.item_nature,
+        inventory_policy: policy.inventory_policy,
+        tracking: policy.tracking,
+        costing_method: policy.costing_method,
+        is_sellable: policy.is_sellable,
+        is_purchasable: policy.is_purchasable,
+      };
+      const request: any = initial
+        ? (supabase.from("products") as any)
+            .update(payload)
+            .eq("id", initial.id)
+            .select("id")
+            .single()
+        : (supabase.from("products") as any).insert(payload).select("id").single();
+      const { error: writeError } = await request;
+
+      if (writeError) {
+        const databaseError = writeError as { code?: string; message?: string };
+        if (
+          databaseError.code === "23505" ||
+          /duplicate key|products_barcode_key/i.test(databaseError.message ?? "")
+        ) {
+          toast.error(
+            lang === "ar"
+              ? "هذا الباركود مستخدم لمنتج آخر بالفعل."
+              : "This barcode is already used by another product.",
+          );
+          return;
+        }
+        toast.error(databaseError.message ?? "Unable to save the product.");
         return;
       }
-      toast.error(databaseError.message ?? "Unable to save the product.");
-      return;
+
+      if (userId) saveUserItemPolicyPreferences(userId, policy);
+      toast.success(
+        lang === "ar"
+          ? initial
+            ? "تم تحديث المنتج وحفظ إعداداتك لهذا المستخدم"
+            : "تم إنشاء المنتج وحفظ إعداداتك لهذا المستخدم"
+          : initial
+            ? "Product updated; your settings were saved for this user"
+            : "Product created; your settings were saved for this user",
+      );
+      onSaved();
+    } catch (unexpectedError) {
+      // Never surface a raw stack or driver payload to the operator.
+      console.error("[products] save failed", unexpectedError);
+      toast.error(
+        lang === "ar"
+          ? "تعذّر الاتصال بالخادم أثناء الحفظ. تحقق من الاتصال ثم أعد المحاولة."
+          : "Could not reach the server while saving. Check the connection and try again.",
+      );
+    } finally {
+      setSaving(false);
     }
-    if (userId) saveUserItemPolicyPreferences(userId, policy);
-    toast.success(
-      lang === "ar"
-        ? initial
-          ? "تم تحديث المنتج وحفظ إعداداتك لهذا المستخدم"
-          : "تم إنشاء المنتج وحفظ إعداداتك لهذا المستخدم"
-        : initial
-          ? "Product updated; your settings were saved for this user"
-          : "Product created; your settings were saved for this user",
-    );
-    onSaved();
   }
 
   const labelOf = (en: string, ar: string | null) => (lang === "ar" ? ar || en : en || ar || "");

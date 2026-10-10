@@ -7,6 +7,7 @@ import { generateUUIDv7, generateLocalDocRef, getOrCreateDeviceId } from "../ide
 import { globalSyncEngine } from "../sync-engine";
 import { inventoryRepo } from "../repositories/inventory-repository";
 import { getOfflineStorageAdapter } from "../storage-adapter";
+import type { LegacyPaymentValue } from "@/lib/payments/payment-methods";
 
 export interface POSCartItem {
   product_id: string;
@@ -25,9 +26,14 @@ export interface CreateOfflinePOSSalePayload {
   tax: number;
   total: number;
   paid: number;
-  // Keep local/offline payloads aligned with the existing online POS methods.
-  // These values are already passed through to the queued RPC payload.
-  payment_method: "cash" | "card" | "credit" | "split" | "mobile_money" | "bank_transfer";
+  // This is the STORED ENUM value, already converted from the catalogue id at
+  // the call site — the queue replays the same RPC the online path calls.
+  /**
+   * Typed as `LegacyPaymentValue` rather than a hand-written literal union: the
+   * previous union omitted `cheque`, which the unified catalogue shipped, so a
+   * cheque rung up offline could not be represented at all.
+   */
+  payment_method: LegacyPaymentValue;
   notes?: string;
 }
 

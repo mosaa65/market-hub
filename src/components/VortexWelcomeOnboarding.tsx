@@ -3,6 +3,7 @@ import { Link, useLocation } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
+import { useAuth } from "@/lib/auth";
 import { money, num } from "@/lib/format";
 import {
   Sparkles,
@@ -22,6 +23,7 @@ import {
   ArrowRightLeft,
   ClipboardList,
   Check,
+  LogIn,
   ChevronLeft,
   ChevronRight,
   X,
@@ -37,29 +39,23 @@ export function VortexWelcomeOnboarding() {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
   const location = useLocation();
+  const { session } = useAuth();
   const { dir, lang } = useI18n();
   const isAr = lang === "ar";
 
-  const path = location.pathname.replace(/\/+$/, "") || "/";
-  const isAppRoute =
-    path !== "/" &&
-    !/^\/(login|register|forgot-password|reset-password|verify|auth|404|500)/.test(path);
-
   useEffect(() => {
-    if (!isAppRoute) {
-      setOpen(false);
-      return;
-    }
     let seen = false;
     try {
       seen = localStorage.getItem("vortex_welcome_seen") === "true";
     } catch {
       return;
     }
-    if (seen) return;
-    const timer = setTimeout(() => setOpen(true), 1500);
-    return () => clearTimeout(timer);
-  }, [isAppRoute]);
+    // تظهر الواجهة الترحيبية تلقائياً لأول تشغيل قبل تسجيل الدخول (بعد انتهاء تحميل شاشة البداية)
+    if (!seen && !session) {
+      const timer = setTimeout(() => setOpen(true), 1300);
+      return () => clearTimeout(timer);
+    }
+  }, [session]);
 
   // Support re-opening via custom event anywhere in the app
   useEffect(() => {
@@ -74,16 +70,33 @@ export function VortexWelcomeOnboarding() {
   const handleFinish = () => {
     try {
       localStorage.setItem("vortex_welcome_seen", "true");
-    } catch {}
+    } catch {
+      // Ignore localStorage write failures in restricted contexts
+    }
     setOpen(false);
   };
 
-  // Queries for live system overview
+  // Queries for live system overview (فقط في حال وجود جلسة مصادقة لتجنب أخطاء 401 قبل تسجيل الدخول)
   const { data: stats } = useQuery({
-    queryKey: ["vortex-welcome-overview-stats"],
+    queryKey: ["vortex-welcome-overview-stats", Boolean(session)],
     enabled: open,
     staleTime: 60_000,
     queryFn: async () => {
+      if (!session) {
+        return {
+          productsCount: 1420,
+          lowStockCount: 3,
+          warehousesCount: 4,
+          transfersCount: 12,
+          totalSales: 485000,
+          paidSales: 410000,
+          receivables: 75000,
+          customersCount: 260,
+          suppliersCount: 45,
+          purchasesCount: 88,
+          companyName: isAr ? "نظام فورتكس لإدارة الأعمال" : "Vortex Business ERP",
+        };
+      }
       const [
         productsRes,
         inventoryRes,
@@ -119,7 +132,10 @@ export function VortexWelcomeOnboarding() {
       // Calculate low stock items
       const stockMap = new Map<string, number>();
       inventory.forEach((row: any) => {
-        stockMap.set(row.product_id, (stockMap.get(row.product_id) || 0) + Number(row.quantity || 0));
+        stockMap.set(
+          row.product_id,
+          (stockMap.get(row.product_id) || 0) + Number(row.quantity || 0),
+        );
       });
 
       let lowStockCount = 0;
@@ -131,10 +147,22 @@ export function VortexWelcomeOnboarding() {
       });
 
       // Sales calculations
-      const totalSalesAmount = sales.reduce((sum: number, inv: any) => sum + Number(inv.total || 0), 0);
-      const totalPaidSales = sales.reduce((sum: number, inv: any) => sum + Number(inv.paid || 0), 0);
-      const totalReceivables = customers.reduce((sum: number, c: any) => sum + Math.max(0, Number(c.balance || 0)), 0);
-      const totalPurchasesAmount = purchases.reduce((sum: number, p: any) => sum + Number(p.total || 0), 0);
+      const totalSalesAmount = sales.reduce(
+        (sum: number, inv: any) => sum + Number(inv.total || 0),
+        0,
+      );
+      const totalPaidSales = sales.reduce(
+        (sum: number, inv: any) => sum + Number(inv.paid || 0),
+        0,
+      );
+      const totalReceivables = customers.reduce(
+        (sum: number, c: any) => sum + Math.max(0, Number(c.balance || 0)),
+        0,
+      );
+      const totalPurchasesAmount = purchases.reduce(
+        (sum: number, p: any) => sum + Number(p.total || 0),
+        0,
+      );
 
       return {
         productsCount: products.length,
@@ -154,7 +182,7 @@ export function VortexWelcomeOnboarding() {
     },
   });
 
-  if (!open || !isAppRoute) return null;
+  if (!open) return null;
 
   const totalSteps = 7;
 
@@ -172,7 +200,9 @@ export function VortexWelcomeOnboarding() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-black uppercase tracking-wider text-primary">VORTEX ERP</span>
+                <span className="text-xs font-black uppercase tracking-wider text-primary">
+                  VORTEX ERP
+                </span>
                 <span className="h-1.5 w-1.5 rounded-full bg-border" />
                 <span className="text-xs font-semibold text-muted-foreground">
                   {isAr ? `خطوة ${step + 1} من ${totalSteps}` : `Step ${step + 1} of ${totalSteps}`}
@@ -218,10 +248,16 @@ export function VortexWelcomeOnboarding() {
                   <div className="space-y-3 max-w-xl">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/15 border border-primary/30 text-primary text-xs font-bold">
                       <Sparkles className="size-3.5" />
-                      <span>{isAr ? "منظومة الأعمال السحابية المتقدمة" : "Advanced Cloud Business Suite"}</span>
+                      <span>
+                        {isAr
+                          ? "منظومة الأعمال السحابية المتقدمة"
+                          : "Advanced Cloud Business Suite"}
+                      </span>
                     </div>
                     <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground leading-tight">
-                      {isAr ? "أهلاً بك في فورتكس ERP — مركز قيادة منشأتك" : "Welcome to Vortex ERP — Your Command Center"}
+                      {isAr
+                        ? "أهلاً بك في فورتكس ERP — مركز قيادة منشأتك"
+                        : "Welcome to Vortex ERP — Your Command Center"}
                     </h2>
                     <p className="text-sm leading-relaxed text-muted-foreground">
                       {isAr
@@ -246,9 +282,13 @@ export function VortexWelcomeOnboarding() {
                     <Gauge className="size-5" />
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-foreground">{isAr ? "لوحة تحكم لحظية" : "Live Dashboard"}</h4>
+                    <h4 className="text-sm font-bold text-foreground">
+                      {isAr ? "لوحة تحكم لحظية" : "Live Dashboard"}
+                    </h4>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {isAr ? "مؤشرات أداء مالية وتشغيلية تتبع نبض عملك لحظة بلحظة." : "Real-time KPIs tracking sales and operations."}
+                      {isAr
+                        ? "مؤشرات أداء مالية وتشغيلية تتبع نبض عملك لحظة بلحظة."
+                        : "Real-time KPIs tracking sales and operations."}
                     </p>
                   </div>
                 </div>
@@ -258,9 +298,13 @@ export function VortexWelcomeOnboarding() {
                     <Receipt className="size-5" />
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-foreground">{isAr ? "مبيعات ونقاط بيع فورية" : "POS & Fast Sales"}</h4>
+                    <h4 className="text-sm font-bold text-foreground">
+                      {isAr ? "مبيعات ونقاط بيع فورية" : "POS & Fast Sales"}
+                    </h4>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {isAr ? "إصدار فواتير نقدية وآجلة مع دعم الباركود والطباعة الحرارية." : "Rapid billing with barcode and thermal receipts."}
+                      {isAr
+                        ? "إصدار فواتير نقدية وآجلة مع دعم الباركود والطباعة الحرارية."
+                        : "Rapid billing with barcode and thermal receipts."}
                     </p>
                   </div>
                 </div>
@@ -270,9 +314,13 @@ export function VortexWelcomeOnboarding() {
                     <Warehouse className="size-5" />
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-foreground">{isAr ? "مخزون ومستودعات دقيقة" : "Stock & Warehouses"}</h4>
+                    <h4 className="text-sm font-bold text-foreground">
+                      {isAr ? "مخزون ومستودعات دقيقة" : "Stock & Warehouses"}
+                    </h4>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {isAr ? "متابعة الكميات، التحويلات، التسويات وتنبيهات نواقص المخزون." : "Accurate stock levels, transfers and reorder alerts."}
+                      {isAr
+                        ? "متابعة الكميات، التحويلات، التسويات وتنبيهات نواقص المخزون."
+                        : "Accurate stock levels, transfers and reorder alerts."}
                     </p>
                   </div>
                 </div>
@@ -289,7 +337,9 @@ export function VortexWelcomeOnboarding() {
                   <span>{isAr ? "إدارة المخزون والمستودعات" : "Inventory & Warehouses"}</span>
                 </div>
                 <h3 className="text-xl sm:text-2xl font-black text-foreground">
-                  {isAr ? "حركة البضاعة تحت السيطرة الكاملة" : "Total Control Over Inventory Movements"}
+                  {isAr
+                    ? "حركة البضاعة تحت السيطرة الكاملة"
+                    : "Total Control Over Inventory Movements"}
                 </h3>
                 <p className="text-xs sm:text-sm text-muted-foreground">
                   {isAr
@@ -315,12 +365,15 @@ export function VortexWelcomeOnboarding() {
                       {num(stats?.productsCount ?? 0)}
                     </div>
                     <div className="text-xs font-semibold text-muted-foreground mt-1">
-                      {isAr ? "إجمالي المنتجات المسجلة في النظام" : "Registered products in catalog"}
+                      {isAr
+                        ? "إجمالي المنتجات المسجلة في النظام"
+                        : "Registered products in catalog"}
                     </div>
                   </div>
                   <div className="mt-4 pt-3 border-t border-cyan-500/20 flex items-center justify-between text-xs">
                     <Link
-                      to={"/products" as any} search={({} as any)}
+                      to={"/products" as any}
+                      search={{} as any}
                       onClick={handleFinish}
                       className="text-cyan-600 dark:text-cyan-400 font-bold hover:underline inline-flex items-center gap-1"
                     >
@@ -328,7 +381,9 @@ export function VortexWelcomeOnboarding() {
                       <ArrowUpRight className="size-3.5" />
                     </Link>
                     <span className="text-muted-foreground text-[11px]">
-                      {isAr ? `${num(stats?.warehousesCount ?? 0)} مستودع نشط` : `${num(stats?.warehousesCount ?? 0)} Warehouses`}
+                      {isAr
+                        ? `${num(stats?.warehousesCount ?? 0)} مستودع نشط`
+                        : `${num(stats?.warehousesCount ?? 0)} Warehouses`}
                     </span>
                   </div>
                 </div>
@@ -339,8 +394,12 @@ export function VortexWelcomeOnboarding() {
                     <Boxes className="size-4.5" />
                   </div>
                   <div className="mt-3">
-                    <div className="text-2xl font-black text-foreground">{num(stats?.warehousesCount ?? 0)}</div>
-                    <div className="text-xs text-muted-foreground font-medium">{isAr ? "المستودعات" : "Warehouses"}</div>
+                    <div className="text-2xl font-black text-foreground">
+                      {num(stats?.warehousesCount ?? 0)}
+                    </div>
+                    <div className="text-xs text-muted-foreground font-medium">
+                      {isAr ? "المستودعات" : "Warehouses"}
+                    </div>
                   </div>
                   <Link
                     to="/warehouses"
@@ -358,8 +417,12 @@ export function VortexWelcomeOnboarding() {
                     <AlertTriangle className="size-4.5" />
                   </div>
                   <div className="mt-3">
-                    <div className="text-2xl font-black text-foreground">{num(stats?.lowStockCount ?? 0)}</div>
-                    <div className="text-xs text-muted-foreground font-medium">{isAr ? "نواقص المخزون" : "Low Stock Alerts"}</div>
+                    <div className="text-2xl font-black text-foreground">
+                      {num(stats?.lowStockCount ?? 0)}
+                    </div>
+                    <div className="text-xs text-muted-foreground font-medium">
+                      {isAr ? "نواقص المخزون" : "Low Stock Alerts"}
+                    </div>
                   </div>
                   <Link
                     to="/inventory"
@@ -416,7 +479,9 @@ export function VortexWelcomeOnboarding() {
                   <span>{isAr ? "المبيعات ونقاط البيع" : "Sales & POS Engine"}</span>
                 </div>
                 <h3 className="text-xl sm:text-2xl font-black text-foreground">
-                  {isAr ? "دورة بيع متكاملة من نقطة البيع حتى التحصيل" : "Seamless Sales Cycle from POS to Settlement"}
+                  {isAr
+                    ? "دورة بيع متكاملة من نقطة البيع حتى التحصيل"
+                    : "Seamless Sales Cycle from POS to Settlement"}
                 </h3>
                 <p className="text-xs sm:text-sm text-muted-foreground">
                   {isAr
@@ -504,7 +569,9 @@ export function VortexWelcomeOnboarding() {
                   <span>{isAr ? "العملاء والديون والتحصيل" : "Customers & Receivables"}</span>
                 </div>
                 <h3 className="text-xl sm:text-2xl font-black text-foreground">
-                  {isAr ? "من البيع إلى التحصيل — كل مستحق واضح أمامك" : "From Sale to Settlement — Every Balance Tracked"}
+                  {isAr
+                    ? "من البيع إلى التحصيل — كل مستحق واضح أمامك"
+                    : "From Sale to Settlement — Every Balance Tracked"}
                 </h3>
                 <p className="text-xs sm:text-sm text-muted-foreground">
                   {isAr
@@ -528,7 +595,9 @@ export function VortexWelcomeOnboarding() {
                       {money(stats?.totalReceivables ?? 0)}
                     </div>
                     <div className="text-xs font-semibold text-muted-foreground mt-1">
-                      {isAr ? "إجمالي ديون العملاء المتبقية للتحصيل" : "Total outstanding customer balance"}
+                      {isAr
+                        ? "إجمالي ديون العملاء المتبقية للتحصيل"
+                        : "Total outstanding customer balance"}
                     </div>
                   </div>
                   <div className="mt-4 pt-3 border-t border-violet-500/20 flex items-center justify-between text-xs">
@@ -591,7 +660,9 @@ export function VortexWelcomeOnboarding() {
                   <span>{isAr ? "المشتريات والموردون" : "Procurement & Suppliers"}</span>
                 </div>
                 <h3 className="text-xl sm:text-2xl font-black text-foreground">
-                  {isAr ? "سلسلة توريد منضبطة والتزامات مالية واضحة" : "Structured Supply Chain & Clear Payables"}
+                  {isAr
+                    ? "سلسلة توريد منضبطة والتزامات مالية واضحة"
+                    : "Structured Supply Chain & Clear Payables"}
                 </h3>
                 <p className="text-xs sm:text-sm text-muted-foreground">
                   {isAr
@@ -676,10 +747,16 @@ export function VortexWelcomeOnboarding() {
               <div className="space-y-1">
                 <div className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-500">
                   <BarChart3 className="size-3.5" />
-                  <span>{isAr ? "التقارير والمحاسبة والذكاء المالي" : "Accounting & Financial Analytics"}</span>
+                  <span>
+                    {isAr
+                      ? "التقارير والمحاسبة والذكاء المالي"
+                      : "Accounting & Financial Analytics"}
+                  </span>
                 </div>
                 <h3 className="text-xl sm:text-2xl font-black text-foreground">
-                  {isAr ? "بيانات تشغيلية تتحول إلى قرارات ربحية مدروسة" : "Data-Driven Insights for Confident Decisions"}
+                  {isAr
+                    ? "بيانات تشغيلية تتحول إلى قرارات ربحية مدروسة"
+                    : "Data-Driven Insights for Confident Decisions"}
                 </h3>
                 <p className="text-xs sm:text-sm text-muted-foreground">
                   {isAr
@@ -697,7 +774,9 @@ export function VortexWelcomeOnboarding() {
                   <div className="size-9 rounded-xl bg-emerald-500/10 text-emerald-500 grid place-items-center group-hover:scale-110 transition">
                     <TrendingUp className="size-4.5" />
                   </div>
-                  <h4 className="text-sm font-bold text-foreground mt-3">{isAr ? "قائمة الدخل والأرباح" : "Income Statement"}</h4>
+                  <h4 className="text-sm font-bold text-foreground mt-3">
+                    {isAr ? "قائمة الدخل والأرباح" : "Income Statement"}
+                  </h4>
                   <p className="text-xs text-muted-foreground mt-1">
                     {isAr ? "صافي الربح وهامش المبيعات" : "Net profit & margins"}
                   </p>
@@ -711,7 +790,9 @@ export function VortexWelcomeOnboarding() {
                   <div className="size-9 rounded-xl bg-blue-500/10 text-blue-500 grid place-items-center group-hover:scale-110 transition">
                     <Building className="size-4.5" />
                   </div>
-                  <h4 className="text-sm font-bold text-foreground mt-3">{isAr ? "الميزانية العمومية" : "Balance Sheet"}</h4>
+                  <h4 className="text-sm font-bold text-foreground mt-3">
+                    {isAr ? "الميزانية العمومية" : "Balance Sheet"}
+                  </h4>
                   <p className="text-xs text-muted-foreground mt-1">
                     {isAr ? "الأصول والخصوم ورأس المال" : "Assets & liabilities"}
                   </p>
@@ -725,7 +806,9 @@ export function VortexWelcomeOnboarding() {
                   <div className="size-9 rounded-xl bg-violet-500/10 text-violet-500 grid place-items-center group-hover:scale-110 transition">
                     <FileSpreadsheet className="size-4.5" />
                   </div>
-                  <h4 className="text-sm font-bold text-foreground mt-3">{isAr ? "ميزان المراجعة" : "Trial Balance"}</h4>
+                  <h4 className="text-sm font-bold text-foreground mt-3">
+                    {isAr ? "ميزان المراجعة" : "Trial Balance"}
+                  </h4>
                   <p className="text-xs text-muted-foreground mt-1">
                     {isAr ? "توازن الحسابات المدينة والدائنة" : "Debits & credits integrity"}
                   </p>
@@ -739,7 +822,9 @@ export function VortexWelcomeOnboarding() {
                   <div className="size-9 rounded-xl bg-purple-500/10 text-purple-500 grid place-items-center group-hover:scale-110 transition">
                     <BarChart3 className="size-4.5" />
                   </div>
-                  <h4 className="text-sm font-bold text-foreground mt-3">{isAr ? "التحليلات والمؤشرات" : "Analytics Hub"}</h4>
+                  <h4 className="text-sm font-bold text-foreground mt-3">
+                    {isAr ? "التحليلات والمؤشرات" : "Analytics Hub"}
+                  </h4>
                   <p className="text-xs text-muted-foreground mt-1">
                     {isAr ? "رسوم بيانية ومقارنات زمنية" : "Visual charts & trends"}
                   </p>
@@ -754,10 +839,14 @@ export function VortexWelcomeOnboarding() {
               <div className="space-y-1 text-center">
                 <div className="inline-flex items-center gap-1.5 text-xs font-bold text-primary">
                   <ShieldCheck className="size-4" />
-                  <span>{isAr ? "الهوية المؤسسية والجاهزية" : "Enterprise Identity & Ready Status"}</span>
+                  <span>
+                    {isAr ? "الهوية المؤسسية والجاهزية" : "Enterprise Identity & Ready Status"}
+                  </span>
                 </div>
                 <h3 className="text-xl sm:text-2xl font-black text-foreground">
-                  {isAr ? "نظامك جاهز بكامل إمكانياته" : "Your System is Ready to Empower Your Business"}
+                  {isAr
+                    ? "نظامك جاهز بكامل إمكانياته"
+                    : "Your System is Ready to Empower Your Business"}
                 </h3>
                 <p className="text-xs sm:text-sm text-muted-foreground max-w-lg mx-auto">
                   {isAr
@@ -782,10 +871,16 @@ export function VortexWelcomeOnboarding() {
                     </div>
                     <div>
                       <h4 className="text-base font-black text-foreground">
-                        {stats?.company?.name || stats?.company?.name_ar || (isAr ? "فورتكس للأنشطة التجارية" : "Vortex Commercial Hub")}
+                        {stats?.company?.name ||
+                          stats?.company?.name_ar ||
+                          (isAr ? "فورتكس للأنشطة التجارية" : "Vortex Commercial Hub")}
                       </h4>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        {stats?.company?.tax_number ? `${isAr ? "الرقم الضريبي:" : "Tax ID:"} ${stats?.company?.tax_number}` : (isAr ? "حساب تجاري نشط" : "Active Commercial Account")}
+                        {stats?.company?.tax_number
+                          ? `${isAr ? "الرقم الضريبي:" : "Tax ID:"} ${stats?.company?.tax_number}`
+                          : isAr
+                            ? "حساب تجاري نشط"
+                            : "Active Commercial Account"}
                       </p>
                     </div>
                   </div>
@@ -797,14 +892,18 @@ export function VortexWelcomeOnboarding() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                   <div className="p-3 rounded-xl bg-muted/40 border border-border/60">
-                    <span className="text-muted-foreground block text-[11px]">{isAr ? "هاتف المنشأة:" : "Phone:"}</span>
+                    <span className="text-muted-foreground block text-[11px]">
+                      {isAr ? "هاتف المنشأة:" : "Phone:"}
+                    </span>
                     <span className="font-bold text-foreground mt-0.5 block" dir="ltr">
                       {stats?.company?.phone || "+967 772 217 218"}
                     </span>
                   </div>
 
                   <div className="p-3 rounded-xl bg-muted/40 border border-border/60">
-                    <span className="text-muted-foreground block text-[11px]">{isAr ? "العملة الافتراضية:" : "Currency:"}</span>
+                    <span className="text-muted-foreground block text-[11px]">
+                      {isAr ? "العملة الافتراضية:" : "Currency:"}
+                    </span>
                     <span className="font-bold text-foreground mt-0.5 block">
                       {stats?.company?.currency_symbol || (isAr ? "ريال يمني (YER)" : "YER")}
                     </span>
@@ -817,10 +916,14 @@ export function VortexWelcomeOnboarding() {
                     <ShieldCheck className="size-5 text-primary shrink-0" />
                     <div>
                       <span className="font-bold text-foreground block">
-                        {isAr ? "تطوير ودعم إنما سوفت (Inama Soft)" : "Engineered & Supported by Inama Soft"}
+                        {isAr
+                          ? "تطوير ودعم إنما سوفت (Inama Soft)"
+                          : "Engineered & Supported by Inama Soft"}
                       </span>
                       <span className="text-[11px] text-muted-foreground">
-                        {isAr ? "شريكك التقني للأنظمة المحاسبية والسحابية" : "Your enterprise software partner"}
+                        {isAr
+                          ? "شريكك التقني للأنظمة المحاسبية والسحابية"
+                          : "Your enterprise software partner"}
                       </span>
                     </div>
                   </div>
@@ -868,8 +971,17 @@ export function VortexWelcomeOnboarding() {
               onClick={handleFinish}
               className="h-11 px-7 rounded-xl bg-primary text-primary-foreground font-extrabold text-sm hover:opacity-95 transition flex items-center gap-2 shadow-lg shadow-primary/25 cursor-pointer mr-auto"
             >
-              <Check className="size-4" />
-              <span>{isAr ? "ابدأ العمل الآن" : "Launch ERP"}</span>
+              {session ? (
+                <>
+                  <Check className="size-4" />
+                  <span>{isAr ? "ابدأ العمل الآن" : "Launch ERP"}</span>
+                </>
+              ) : (
+                <>
+                  <LogIn className="size-4" />
+                  <span>{isAr ? "الانتقال إلى تسجيل الدخول" : "Proceed to Sign In"}</span>
+                </>
+              )}
             </button>
           )}
         </div>

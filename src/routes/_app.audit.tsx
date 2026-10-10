@@ -236,12 +236,19 @@ const VALUE_TRANSLATIONS: Record<string, string> = {
   cancelled: "ملغي",
   draft: "مسودة غير معتمدة",
   posted: "مرحل ومعتمد",
+  // Payment ENUM values, mirroring the `audit.value.*` keys in the i18n
+  // dictionary. This is a generic value dictionary for the audit log — the same
+  // table also translates statuses, roles and booleans — not an option list, so
+  // it stays a lookup rather than calling the catalogue (an audit row can carry
+  // any value, payment or not). `split` is included so the two dictionaries
+  // cannot drift: it was the one ENUM value missing from the pair.
   cash: "نقداً (كاش)",
   card: "بطاقة مدى / شبكة",
   bank_transfer: "حوالة بنكية",
   credit: "آجل / ذمم",
   mobile_money: "محفظة إلكترونية",
   cheque: "شيك مصرفي",
+  split: "دفع بأكثر من طريقة",
   admin: "مدير النظام",
   manager: "مشرف عام",
   cashier: "كاشير / بائع",

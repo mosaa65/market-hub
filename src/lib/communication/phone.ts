@@ -52,7 +52,7 @@ export function normalizeWhatsAppPhone(
   if (!raw) return null;
 
   const ascii = toAsciiDigits(String(raw).trim());
-  let digits = ascii.replace(/[^\d+]/g, "");
+  const digits = ascii.replace(/[^\d+]/g, "");
   if (!digits) return null;
 
   const defaultDial = cleanDialCode(defaultCountryDialCode);
