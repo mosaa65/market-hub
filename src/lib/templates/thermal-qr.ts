@@ -7,7 +7,11 @@ import {
 } from "./types";
 import { generateBarcodeSvg, generateQrCodeSvg } from "@/lib/printing/barcode-qr";
 import { getCachedCompanyProfile } from "@/lib/printing/company-profile";
-import { renderUniversalFooter, UNIVERSAL_FOOTER_CSS } from "@/lib/printing/footer";
+import {
+  renderUniversalFooter,
+  UNIVERSAL_FOOTER_CSS,
+  companyCreditLine,
+} from "@/lib/printing/footer";
 
 /**
  * قالب الإيصال الحراري مع باركود و QR (Thermal QR & Electronic Receipt).
@@ -78,8 +82,9 @@ export function renderThermalQrTemplate(
     `Tax: ${doc.tax || 0} ${c}`,
   ].join("\n");
 
-  const qrSvg = (opts.showQrCode !== false) ? generateQrCodeSvg(qrPayload, 115) : "";
-  const barcodeSvg = (opts.showBarcode !== false && doc.number) ? generateBarcodeSvg(doc.number, 32) : "";
+  const qrSvg = opts.showQrCode !== false ? generateQrCodeSvg(qrPayload, 115) : "";
+  const barcodeSvg =
+    opts.showBarcode !== false && doc.number ? generateBarcodeSvg(doc.number, 32) : "";
 
   return `<!doctype html>
 <html dir="${rtl ? "rtl" : "ltr"}" lang="${rtl ? "ar" : "en"}">
@@ -106,6 +111,14 @@ export function renderThermalQrTemplate(
     .font-mono { font-family: ui-monospace, 'Courier New', monospace; }
     .divider { border-bottom: 1px dashed #64748b; margin: 6px 0; }
     .flex-between { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; }
+    .credit-line {
+      margin-top: 4px;
+      padding-top: 4px;
+      border-top: 1px dotted #94a3b8;
+      font-weight: 700;
+      color: #334155;
+      break-inside: avoid;
+    }
     .qr-box {
       display: flex;
       flex-direction: column;
@@ -302,6 +315,8 @@ export function renderThermalQrTemplate(
     <div class="text-center" style="font-size: 9.5px; color: #64748b;">
       <div style="font-weight: 700; color: #0f172a;">${esc(L.thanks)}</div>
       ${opts.showFooter ? renderUniversalFooter(company, true, true) : ""}
+      <!-- اعتماد المؤسسة الثابت: العبارة + الرقمان المعتمدان -->
+      <div class="credit-line">${esc(companyCreditLine())}</div>
     </div>
   </div>
 </body>

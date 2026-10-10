@@ -5,6 +5,7 @@ import {
   formatMoney,
   CustomFieldOptions,
 } from "./types";
+import { companyCreditLine } from "@/lib/printing/footer";
 
 export function renderThermalTemplate(
   doc: UnifiedDocumentData,
@@ -57,7 +58,7 @@ export function renderThermalTemplate(
   .tot { display:flex; justify-content:space-between; font-size: 12px; margin: 2px 0; }
   .grand { font-size: 15px; font-weight: 700; margin-top: 4px; }
   .foot { text-align:center; font-size: 10px; margin-top: 8px; }
-  .branding { text-align:center; font-size: 9px; color:#555; margin-top: 6px; border-top: 1px dotted #aaa; padding-top: 4px; font-weight: 500; }
+  .selly-credit { text-align:center; font-size: 8.5px; color:#555; margin-top: 6px; border-top: 1px dotted #aaa; padding-top: 4px; font-weight: 700; }
   @media screen { body { background:#eee; padding: 20px 0; } .r { margin: 0 auto; background:#fff; box-shadow: 0 2px 20px rgba(0,0,0,.15); } }
 </style></head><body onload="window.print()">
 <div class="r">
@@ -101,5 +102,7 @@ export function renderThermalTemplate(
       : ""
   }
   ${opts.showFooter ? `<div class="foot">${L.thanks}</div>` : ""}
+  <!-- اعتماد المؤسسة الثابت: العبارة + الرقمان المعتمدان -->
+  <div class="selly-credit">${esc(companyCreditLine())}</div>
 </div></body></html>`;
 }

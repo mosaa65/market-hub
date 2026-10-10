@@ -9,7 +9,7 @@ export function statementPrintStyles(lang: "ar" | "en"): string {
   const start = lang === "ar" ? "right" : "left";
 
   return `
-@page { size: A4 portrait; margin: 0; }
+@page { size: A4 portrait; margin: 12mm 10mm 14mm; }
 * { box-sizing: border-box; }
 :root {
   --ink: #0a1128; --gold: #b8935a; --line: #e2dfd6; --muted: #6b6860;
@@ -18,7 +18,9 @@ export function statementPrintStyles(lang: "ar" | "en"): string {
 html, body { margin:0; padding:0; background:var(--bg); color:var(--ink);
   font-family:'Cairo','Segoe UI',Tahoma,sans-serif; font-size:11.5px; line-height:1.45;
   -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-.page { max-width:210mm; margin:0 auto; padding:20px 22px; position:relative; }
+/* الملء الأفقي داخل الورقة فقط: مقاس A4 (210 مم) ناقص هوامش @page.
+   عرض 210 مم السابق مع هوامش المتصفح كان يدفع الجدول خارج الورق. */
+.page { width:100%; max-width:186mm; margin:0 auto; padding:0 0 14px; position:relative; }
 
 /* ── Header ── */
 .rpt-head { display:flex; justify-content:space-between; align-items:flex-start; gap:18px;

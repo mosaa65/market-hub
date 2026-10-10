@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth";
 import { SettingsLayout } from "@/components/settings/settings-layout";
 import { supabase } from "@/integrations/supabase/client";
 import { setCompanySettingsCache } from "@/lib/format";
-import { cacheCompanyProfile } from "@/lib/printing";
+import { cacheCompanyProfile, COMPANY_SUPPORT_CONTACT_LINE } from "@/lib/printing";
 
 export const Route = createFileRoute("/_app/settings")({
   head: () => ({ meta: [{ title: "الإعدادات — فورتيكس ERP" }] }),
@@ -84,7 +84,9 @@ function SettingsPage() {
         ...form,
         id: form.id ?? 1,
         tax_rate: Number(form.tax_rate),
-        footer_contact: form.footer_contact ?? "784795104 · 772217218",
+        // أرقام المؤسسة المعتمدة ثابتة: تُفرض هنا على أي كتابة للفواتير
+        // ولا يمكن تغييرها أو حذفها من الإعدادات.
+        footer_contact: COMPANY_SUPPORT_CONTACT_LINE,
         catalog_modules: updatedCatalog,
       };
       try {

@@ -947,6 +947,9 @@ function POSPage() {
     if (e.key !== "Enter") return;
     const q = search.trim();
     if (!q) return;
+    // Enter في حقل البحث يعمل كمسح مباشر فقط عندما يكون الباركود مفعّلاً؛
+    // وإلا يُترك للبحث العادي.
+    if (!catalogConfig.enableBarcode) return;
     handleCode(q);
   }
 
@@ -988,6 +991,9 @@ function POSPage() {
 
   // Wedge scans go through handleCode, then report a brief "received" feedback.
   function handleWedgeCode(code: string) {
+    // عندما يكون قارئ الباركود معطلاً من الإعدادات لا نعالج التقاطات القارئ
+    // الشبكي/البلوتوث إطلاقاً — الإعداد يقود السلوك الفعلي لا الزر وحده.
+    if (!catalogConfig.enableBarcode) return;
     const matched = handleCode(code);
     if (matched) {
       navigator.vibrate?.(35);
@@ -1006,8 +1012,12 @@ function POSPage() {
   // Global USB/Bluetooth keyboard-wedge support: a scanner connected to a
   // desktop/laptop can type a barcode even when no field is focused. It is
   // routed through the same `handleCode` used by the search field and camera,
-  // and is disabled while the camera dialog is open to avoid double reads.
-  useKeyboardWedge({ onScan: handleWedgeCode, disabled: scannerOpen });
+  // and is disabled while the camera dialog is open or the barcode reader is
+  // switched off in settings.
+  useKeyboardWedge({
+    onScan: handleWedgeCode,
+    disabled: scannerOpen || !catalogConfig.enableBarcode,
+  });
 
   function formatWithCommas(val: number | string): string {
     const n = typeof val === "number" ? val : Number(val);
@@ -1082,6 +1092,8 @@ function POSPage() {
         searchRef.current?.focus();
       } else if (e.key === "F4") {
         e.preventDefault();
+        // لا يُفتح قارئ الكاميرا عندما يكون الباركود معطلاً من الإعدادات.
+        if (!catalogConfig.enableBarcode) return;
         setScannerOpen((v) => !v);
       } else if (e.key === "F9" || (e.ctrlKey && e.key === "Enter")) {
         e.preventDefault();
@@ -1103,6 +1115,7 @@ function POSPage() {
     discount,
     isOverpaid,
     total,
+    catalogConfig.enableBarcode,
     isSplitPayment,
     splitPaidTotal,
   ]);
@@ -1661,8 +1674,8 @@ function POSPage() {
                   )}
                 </button>
 
-                {/* Barcode Camera Scanner */}
-                {isModuleEnabled("barcode") && (
+                {/* Barcode Camera Scanner — يظهر فقط عند تفعيل الباركود فعلياً */}
+                {isModuleEnabled("barcode") && catalogConfig.enableBarcode && (
                   <button
                     type="button"
                     onClick={() => setScannerOpen(true)}
@@ -1702,7 +1715,7 @@ function POSPage() {
                   <span className="hidden md:inline">{t("scan.ready")}</span>
                   <span className="md:hidden">{t("scan.use_device_camera")}</span>
                 </span>
-                {isModuleEnabled("barcode") && (
+                {isModuleEnabled("barcode") && catalogConfig.enableBarcode && (
                   <button
                     type="button"
                     onClick={() => setScannerOpen(true)}

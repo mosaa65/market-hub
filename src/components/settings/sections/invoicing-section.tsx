@@ -28,6 +28,7 @@ import { FlagIcon, currencyToCountryCode } from "@/components/ui/flag-icon";
 import { toast } from "sonner";
 import type { InvoiceTemplate } from "@/lib/invoice-print";
 import { getPrintSettings, savePrintSettings } from "@/lib/templates";
+import { useCatalogModules } from "@/lib/catalog-modules";
 import { DocumentNumberingCard } from "./document-numbering-card";
 
 interface InvoicingSectionProps {
@@ -53,6 +54,10 @@ export function InvoicingSection({
   const [defaultPrintTemplate, setDefaultPrintTemplateState] = useState<InvoiceTemplate>("thermal");
   const [logoUploading, setLogoUploading] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
+  // علم الباركود له مصدر واحد فعلي (`catalog_modules.enableBarcode`) يقرأه
+  // الكاشير والفاتورة. هنا نحفظ فيه مباشرة بدل تعديل نموذج الإعدادات فقط،
+  // حتى ينعكس التفعيل على الواجهة والمطبوع لا على حالة الزر وحده.
+  const { config: catalogConfig, updateConfig: updateCatalogConfig } = useCatalogModules();
   const currencyOptions = useMemo(() => getCurrencyOptions(lang), [lang]);
   const currencyPreviewSymbol =
     form.currency_symbol?.trim() ||
@@ -244,8 +249,11 @@ export function InvoicingSection({
               </div>
             </div>
             <Switch
-              checked={!!form.barcode_enabled}
-              onCheckedChange={(v) => setForm({ ...form, barcode_enabled: v })}
+              checked={catalogConfig.enableBarcode}
+              onCheckedChange={(v) => {
+                updateCatalogConfig({ enableBarcode: v });
+                setForm({ ...form, barcode_enabled: v });
+              }}
               disabled={!canEdit}
             />
           </div>

@@ -15,6 +15,14 @@ export interface CatalogModulesConfig {
   enablePackagingBags: boolean; // مستلزمات التعبئة والتغليف
 
   /**
+   * تفعيل الباركود و QR فعلياً في الكاشير والفاتورة المطبوعة.
+   * كان هذا المفتاح يُحفظ في `company_settings.barcode_enabled` دون أن يقرأه
+   * أي مسار تشغيلي، فيبدو التفعيل بلا أثر. الآن هو مصدر الحقيقة للحالة،
+   * ويكتب أيضاً في `company_settings` للتوافق مع الأجهزة الأخرى.
+   */
+  enableBarcode: boolean;
+
+  /**
    * أبعاد不属于 مطحنة: ماركات وموديلات المركبات وتوافق القطع (قطع غيار)،
    * وبلدان المنشأ ودرجات الجودة والعلامات التجارية (بقالة).
    *
@@ -36,6 +44,7 @@ export const DEFAULT_CATALOG_CONFIG: CatalogModulesConfig = {
   enableUnits: true,
   enableGrainGrades: true,
   enablePackagingBags: true,
+  enableBarcode: true,
   enableMakesAndModels: false,
   enableOrigins: false,
   enableQualityGrades: false,
@@ -62,12 +71,16 @@ function coerceConfig(raw: unknown): CatalogModulesConfig | null {
   const units = pick("enableUnits");
   const grades = pick("enableGrainGrades");
   const bags = pick("enablePackagingBags");
-  if (units === undefined && grades === undefined && bags === undefined) return null;
+  // `barcodeEnabled` اسم تاريخي مبكر — يُقرأ للترحيل فقط.
+  const barcode = pick("enableBarcode") ?? (source.barcodeEnabled === true ? true : undefined);
+  if (units === undefined && grades === undefined && bags === undefined && barcode === undefined)
+    return null;
 
   const config: CatalogModulesConfig = {
     enableUnits: units ?? DEFAULT_CATALOG_CONFIG.enableUnits,
     enableGrainGrades: grades ?? DEFAULT_CATALOG_CONFIG.enableGrainGrades,
     enablePackagingBags: bags ?? DEFAULT_CATALOG_CONFIG.enablePackagingBags,
+    enableBarcode: barcode ?? DEFAULT_CATALOG_CONFIG.enableBarcode,
   };
   // القوالب القديمة (قطع غيار / بقالة) لم تعد موجودة، فلا يجوز أن يعيد
   // إحياء أبعادها عبر قيمة مخزّنة من زمن القوالب.
@@ -99,7 +112,12 @@ export function saveCatalogModulesConfig(config: CatalogModulesConfig): void {
 
     void supabase
       .from("company_settings")
-      .update({ catalog_modules: config } as any)
+      .update({
+        catalog_modules: config,
+        // مزامنة علم الباركود مع عمود المنشأة المحفوظ ليكون المصدر
+        // متسقاً على كل الأجهزة (كان يُحفظ ولا يُقرأ).
+        barcode_enabled: config.enableBarcode,
+      } as any)
       .eq("id", 1)
       .then(
         () => {},
@@ -134,12 +152,17 @@ export function useCatalogModules() {
   useEffect(() => {
     supabase
       .from("company_settings")
-      .select("catalog_modules" as any)
+      .select("catalog_modules, barcode_enabled" as any)
       .eq("id", 1)
       .maybeSingle()
       .then(({ data, error }) => {
         if (error || !data) return;
-        const remote = coerceConfig((data as any).catalog_modules);
+        const row = data as any;
+        const remote = coerceConfig({
+          ...(row.catalog_modules as Record<string, unknown> | null),
+          // علم المنشأة القديم يشارك في الترحيل حين لا يوجد المفتاح الأحدث.
+          barcodeEnabled: row.barcode_enabled,
+        });
         if (!remote) return;
         setConfigState(remote);
         if (typeof window !== "undefined") {

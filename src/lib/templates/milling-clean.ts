@@ -11,10 +11,10 @@ import { numberToArabicWords } from "./tafqeet";
 import { generateBarcodeSvg, generateQrCodeSvg } from "@/lib/printing/barcode-qr";
 
 /**
- * قالب الكاونتر المبسط والأنيق (Milling Clean Minimalist Layout A4 / A5).
- * مستوحى مباشرة من واجهة كاونتر المطحنة: هادئ، شديد الأناقة، غير معقد،
- * وخالٍ تماماً من الألوان المشوشة والتدرجات الزائدة.
- * مناسب لجميع أقسام وفواتير النظام ومصمم لطباعة A4 و A5 بدقة عالية.
+ * قالب الفاتورة الرسمية المبسطة (Simplified Official Invoice — A4 / A5).
+ * المعرّف البرمجي القديم `milling-clean` محفوظ كما هو للتوافق مع الإعدادات
+ * المحفوظة. تخطيط مؤسسي هادئ وغير معقد، خالٍ من الألوان المشوشة والتدرجات
+ * الزائدة، ومصمم لطباعة A4 و A5 بدقة عالية بلا قص أو تداخل.
  */
 export function renderMillingCleanTemplate(
   doc: UnifiedDocumentData,

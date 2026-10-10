@@ -10,9 +10,10 @@ import { getCachedCompanyProfile } from "@/lib/printing/company-profile";
 import { renderUniversalFooter, UNIVERSAL_FOOTER_CSS } from "@/lib/printing/footer";
 
 /**
- * قالب كاونتر المطحنة الحراري الأنيق (Modern Minimalist Thermal Receipt).
- * مستوحى مباشرة من كاونتر المطحنة: مريح للعين، واضح التبويب، بطاقات منظمة،
- * وتفاصيل مالية محددة بدقة. يعمل مع أي مستند في النظام وبمقاسات 80 مم و 58 مم.
+ * قالب الإيصال الحراري الاحترافي (Professional Thermal Receipt).
+ * المعرّف البرمجي القديم `thermal-milling` محفوظ كما هو للتوافق مع الإعدادات
+ * المحفوظة. التخطيط مريح للعين، واضح التبويب، بطاقات منظمة، وتفاصيل مالية
+ * محددة بدقة. يعمل مع أي مستند في النظام وبمقاسات 80 مم و 58 مم.
  */
 export function renderThermalMillingTemplate(
   doc: UnifiedDocumentData,
@@ -82,8 +83,9 @@ export function renderThermalMillingTemplate(
     `Total: ${doc.total || 0} ${c}`,
   ].join("\n");
 
-  const qrHtml = (opts.showQrCode !== false) ? generateQrCodeSvg(qrPayload, 100) : "";
-  const barcodeHtml = (opts.showBarcode !== false && doc.number) ? generateBarcodeSvg(doc.number, 36) : "";
+  const qrHtml = opts.showQrCode !== false ? generateQrCodeSvg(qrPayload, 100) : "";
+  const barcodeHtml =
+    opts.showBarcode !== false && doc.number ? generateBarcodeSvg(doc.number, 36) : "";
 
   return `<!doctype html>
 <html dir="${rtl ? "rtl" : "ltr"}" lang="${rtl ? "ar" : "en"}">

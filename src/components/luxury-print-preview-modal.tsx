@@ -158,8 +158,11 @@ export function LuxuryPrintPreviewModal({
   }, [request?.paperId, defaultFormat, initialMethod]);
 
   const [activePaper, setActivePaper] = useState<PrintPaperId>(initialPaperId);
-  const [showBarcode, setShowBarcode] = useState<boolean>(true);
-  const [showQrCode, setShowQrCode] = useState<boolean>(true);
+  // الباركود/QR يتبعان إعدادات قسم المستند الفعلي، لا قيمة ثابتة. القيمة تصل
+  // من `request` (الذي يبنيها المحرك من الإعدادات + overrides) فتظهر المعاينة
+  // والطباعة بنفس الحالة التي اختارها المستخدم في الإعدادات.
+  const [showBarcode, setShowBarcode] = useState<boolean>(request?.showBarcode ?? true);
+  const [showQrCode, setShowQrCode] = useState<boolean>(request?.showQrCode ?? true);
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [isPrinting, setIsPrinting] = useState(false);
 
@@ -168,9 +171,18 @@ export function LuxuryPrintPreviewModal({
       setPrintMethod(initialMethod);
       setActiveTemplate(initialTemplateId);
       setActivePaper(initialPaperId);
+      setShowBarcode(request?.showBarcode ?? true);
+      setShowQrCode(request?.showQrCode ?? true);
       setZoomLevel(100);
     }
-  }, [open, initialMethod, initialTemplateId, initialPaperId]);
+  }, [
+    open,
+    initialMethod,
+    initialTemplateId,
+    initialPaperId,
+    request?.showBarcode,
+    request?.showQrCode,
+  ]);
 
   // When switching method, adjust template and paper to match the method
   const handleMethodChange = (newMethod: PrintMethodType) => {
@@ -212,11 +224,23 @@ export function LuxuryPrintPreviewModal({
       paperId: activePaper,
       templateId: activeTemplate,
       theme: activeTheme,
+      // تجاوز صريح: القالب يطبّق `doc.options` بعد options المحرك، فتمرّر
+      // القيمتين داخل اللقطة لتفوز دائماً في المعاينة والطباعة.
       showBarcode,
       showQrCode,
       labels: request?.labels,
     };
-  }, [unifiedDoc, documentType, rtl, activePaper, activeTemplate, activeTheme, showBarcode, showQrCode, request]);
+  }, [
+    unifiedDoc,
+    documentType,
+    rtl,
+    activePaper,
+    activeTemplate,
+    activeTheme,
+    showBarcode,
+    showQrCode,
+    request,
+  ]);
 
   // Generate HTML preview without window.print() auto-run
   const previewHtml = useMemo(() => {
@@ -408,7 +432,7 @@ export function LuxuryPrintPreviewModal({
                       }`}
                     >
                       <Scale className="h-3 w-3 text-amber-300" />
-                      <span>كاونتر المطحنة الأنيق</span>
+                      <span>الإيصال الحراري الاحترافي</span>
                     </button>
 
                     <button
@@ -420,7 +444,7 @@ export function LuxuryPrintPreviewModal({
                           : "text-muted-foreground hover:text-foreground hover:bg-surface"
                       }`}
                     >
-                      <span>الكاشير القياسي</span>
+                      <span>إيصال نقطة البيع</span>
                     </button>
 
                     <button
@@ -448,7 +472,7 @@ export function LuxuryPrintPreviewModal({
                       }`}
                     >
                       <Scale className="h-3 w-3 text-amber-300" />
-                      <span>الكاونتر المبسط والأنيق</span>
+                      <span>الفاتورة الرسمية المبسطة</span>
                     </button>
 
                     <button

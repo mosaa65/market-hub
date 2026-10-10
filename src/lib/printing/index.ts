@@ -1,6 +1,7 @@
 export * from "./document-types";
 export * from "./paper";
 export * from "./themes";
+export * from "./identity";
 export * from "./company-profile";
 export * from "./footer";
 export * from "./settings";

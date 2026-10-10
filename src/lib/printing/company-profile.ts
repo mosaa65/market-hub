@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { SUPPORT_CONTACTS, SUPPORT_CONTACT_LINE } from "@/lib/company-credit";
 
 export interface CompanyProfile {
   name: string;
@@ -24,9 +25,9 @@ const CACHE_KEY = "company_settings_cache";
  */
 const DEFAULT_PROFILE: CompanyProfile = {
   name: "",
-  contacts: ["784795104", "772217218"],
+  contacts: [...SUPPORT_CONTACTS],
   footerText: "",
-  footerContact: "784795104 · 772217218",
+  footerContact: SUPPORT_CONTACT_LINE,
   logoUrl: "/inama-soft-logo.ico",
 };
 
@@ -139,3 +140,10 @@ export async function loadCompanyProfile(): Promise<CompanyProfile> {
 }
 
 export const DEFAULT_COMPANY_PROFILE = DEFAULT_PROFILE;
+
+/**
+ * الأرقام المعتمدة للمؤسسة — ثابتة ومحمية.
+ * أي عرض لهذه الأرقام في الواجهات يجب أن يقرأها من هنا، لا أن يكرّر النص.
+ */
+export const COMPANY_SUPPORT_CONTACTS: readonly string[] = SUPPORT_CONTACTS;
+export const COMPANY_SUPPORT_CONTACT_LINE = SUPPORT_CONTACT_LINE;

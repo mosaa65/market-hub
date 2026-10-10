@@ -78,8 +78,8 @@ const DEPARTMENTS: DepartmentConfig[] = [
   },
   {
     id: "delivery_note",
-    titleAr: "قسم كاونتر وخدمات المطحنة",
-    descAr: "إيصالات وسندات الطحن الفوري، تذاكر الحجز، وأذونات تسليم النواتج",
+    titleAr: "قسم خدمات العملاء والتسليم",
+    descAr: "إيصالات وسندات التسليم الفوري، تذاكر الحجز، وأذونات تسليم النواتج",
     icon: Scale,
     defaultMethod: "thermal",
     defaultTemplate: "thermal-milling",
@@ -254,8 +254,11 @@ export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
       templateId,
       theme,
       rtl: true,
+      // حتى ينعكس تفعيل/إلغاء الباركود و QR لهذا القسم فعلياً على المعاينة.
+      showBarcode: override?.showBarcode ?? unified.showBarcode ?? true,
+      showQrCode: override?.showQrCode ?? unified.showQrCode ?? true,
     };
-  }, [sampleDoc, previewDocType, unified.overrides]);
+  }, [sampleDoc, previewDocType, unified.overrides, unified.showBarcode, unified.showQrCode]);
 
   return (
     <>
@@ -346,9 +349,9 @@ export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
                     الهيكلة المعيارية للطباعة (طريقة الطباعة ➔ قالب التصميم ➔ مقاس الورق)
                   </div>
                   <div className="text-[11px] text-muted-foreground leading-relaxed">
-                    الطباعة الحرارية هي طريقة واحدة لها مقاسات (80 مم و 58 مم) وقوالب تصميم (كاونتر
-                    المطحنة الأنيق، الكاشير القياسي، باركود و QR). وكذلك طباعة الصفحات تتيح مقاسات
-                    (A4 و A5) وقوالب تصميم (كاونتر المطحنة المبسط، قياسي، فاخر، رسمي).
+                    الطباعة الحرارية هي طريقة واحدة لها مقاسات (80 مم و 58 مم) وقوالب تصميم (الإيصال
+                    الحراري الاحترافي، إيصال نقطة البيع، باركود و QR). وكذلك طباعة الصفحات تتيح
+                    مقاسات (A4 و A5) وقوالب تصميم (الفاتورة الرسمية المبسطة، قياسي، فاخر، رسمي).
                   </div>
                 </div>
                 <div className="text-xs font-semibold px-2.5 py-1 rounded-xl bg-primary/10 text-primary border border-primary/20">
@@ -460,15 +463,15 @@ export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
                             {isThermal ? (
                               <>
                                 <option value="thermal-milling">
-                                  ⭐ قالب كاونتر المطحنة الأنيق
+                                  ⭐ قالب الإيصال الحراري الاحترافي
                                 </option>
-                                <option value="thermal">🧾 قالب الكاشير القياسي</option>
+                                <option value="thermal">🧾 قالب إيصال نقطة البيع</option>
                                 <option value="thermal-qr">📱 قالب الإيصال مع باركود و QR</option>
                               </>
                             ) : (
                               <>
                                 <option value="milling-clean">
-                                  ⭐ قالب الكاونتر المبسط والأنيق
+                                  ⭐ قالب الفاتورة الرسمية المبسطة
                                 </option>
                                 <option value="standard">📄 قالب مؤسسي قياسي</option>
                                 <option value="elegant">✨ قالب تنفيذي فاخر</option>
@@ -518,8 +521,12 @@ export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
                           <label className="text-xs font-semibold text-muted-foreground flex items-center justify-between">
                             <span>عدد النسخ المطبوعة تلقائياً لهذا القسم</span>
                             <span className="text-[10px] text-primary font-mono font-bold">
-                              {(override.copies ?? unified.copies)}{" "}
-                              {(override.copies ?? unified.copies) === 1 ? "نسخة واحدة" : (override.copies ?? unified.copies) === 2 ? "نسختين" : "نسخ"}
+                              {override.copies ?? unified.copies}{" "}
+                              {(override.copies ?? unified.copies) === 1
+                                ? "نسخة واحدة"
+                                : (override.copies ?? unified.copies) === 2
+                                  ? "نسختين"
+                                  : "نسخ"}
                             </span>
                           </label>
                           <div className="flex items-center gap-1.5">
@@ -555,7 +562,9 @@ export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
                               <span className="text-xs font-medium">طباعة الباركود</span>
                               <Switch
                                 checked={override.showBarcode ?? unified.showBarcode ?? true}
-                                onCheckedChange={() => handleDepartmentBarcodeToggle(dept.id, "showBarcode")}
+                                onCheckedChange={() =>
+                                  handleDepartmentBarcodeToggle(dept.id, "showBarcode")
+                                }
                                 disabled={!canEdit}
                               />
                             </div>
@@ -563,7 +572,9 @@ export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
                               <span className="text-xs font-medium">رمز QR الإلكتروني</span>
                               <Switch
                                 checked={override.showQrCode ?? unified.showQrCode ?? true}
-                                onCheckedChange={() => handleDepartmentBarcodeToggle(dept.id, "showQrCode")}
+                                onCheckedChange={() =>
+                                  handleDepartmentBarcodeToggle(dept.id, "showQrCode")
+                                }
                                 disabled={!canEdit}
                               />
                             </div>
@@ -576,13 +587,13 @@ export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
                         <span className="text-[11px] text-muted-foreground flex items-center gap-1.5">
                           <span className="font-medium text-foreground">
                             {rawTemplate === "thermal-milling"
-                              ? "كاونتر المطحنة الأنيق"
+                              ? "الإيصال الحراري الاحترافي"
                               : rawTemplate === "thermal"
-                                ? "الكاشير القياسي"
+                                ? "إيصال نقطة البيع"
                                 : rawTemplate === "thermal-qr"
                                   ? "إيصال باركود وQR"
                                   : rawTemplate === "milling-clean"
-                                    ? "الكاونتر المبسط والأنيق"
+                                    ? "الفاتورة الرسمية المبسطة"
                                     : rawTemplate === "elegant"
                                       ? "تنفيذي فاخر"
                                       : rawTemplate === "formal"

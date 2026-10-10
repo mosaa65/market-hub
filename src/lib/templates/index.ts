@@ -176,8 +176,10 @@ const ALL_SUPPORTED_DOC_TYPES: DocumentType[] = [
 registerTemplate(
   {
     id: "thermal-milling",
-    nameAr: "قالب كاونتر المطحنة الأنيق",
-    nameEn: "Milling Counter Modern",
+    // الاسم المؤسسي المعروض — يُحفظ المعرّف "thermal-milling" كما هو
+    // لأن الإعدادات والمخازن والتجاوزات المحفوظة تعتمد عليه.
+    nameAr: "قالب الإيصال الحراري الاحترافي",
+    nameEn: "Professional Thermal Receipt",
     category: "thermal",
     paperSize: "80mm",
     supportedPaperProfiles: ["thermal-80", "thermal-58"],
@@ -189,8 +191,8 @@ registerTemplate(
 registerTemplate(
   {
     id: "thermal",
-    nameAr: "قالب الكاشير القياسي",
-    nameEn: "Standard Cashier",
+    nameAr: "قالب إيصال نقطة البيع",
+    nameEn: "Point-of-Sale Receipt",
     category: "thermal",
     paperSize: "80mm",
     supportedPaperProfiles: ["thermal-80", "thermal-58"],
@@ -215,8 +217,8 @@ registerTemplate(
 registerTemplate(
   {
     id: "milling-clean",
-    nameAr: "قالب الكاونتر المبسط والأنيق",
-    nameEn: "Milling Clean Minimalist",
+    nameAr: "قالب الفاتورة الرسمية المبسطة",
+    nameEn: "Simplified Official Invoice",
     category: "standard",
     paperSize: "A4",
     supportedPaperProfiles: ["a4", "a5"],
