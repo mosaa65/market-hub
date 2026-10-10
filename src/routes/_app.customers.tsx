@@ -47,6 +47,7 @@ import {
   VortexMetricCard,
   type PaymentMethod,
 } from "@/components/vortex-ui";
+import { toLegacyPaymentValue } from "@/lib/payments/payment-methods";
 import { toast } from "sonner";
 import { WhatsAppIcon } from "@/components/whatsapp-icon";
 import { Ltr } from "@/components/ltr-value";
@@ -642,13 +643,12 @@ function CustomersPage() {
     method: PaymentMethod;
     notes?: string;
   }) => {
-    const dbMethodMap: Record<PaymentMethod, "cash" | "bank_transfer"> = {
-      cash: "cash",
-      transfer: "bank_transfer",
-      card: "bank_transfer",
-      mobile_money: "bank_transfer",
-    };
-    const dbMethod = dbMethodMap[data.method] || "cash";
+    //
+    // The map that used to sit here collapsed card and mobile_money onto
+    // bank_transfer, so a wallet collection was recorded as a bank transfer and
+    // the ledger credited the wrong account. The catalogue now answers directly.
+    //
+    const dbMethod = toLegacyPaymentValue(data.method);
     const receiptNumber = String(Date.now()).slice(-6);
 
     // Call official security-definer RPC record_customer_payment

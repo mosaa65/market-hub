@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { FieldInput } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { VortexDrawerDialog } from "@/components/vortex-ui";
+import { PaymentMethodPicker } from "@/components/ui/payment-method";
 import { ExpenseStatusBadge, ExpensePaymentBadge } from "./expense-status-badge";
 import { useExpenseDetail, useExpenseLookups, useExpenseMutations } from "@/hooks/use-expenses";
 import { isOverdue, paymentProgress, parseAmount, today } from "@/lib/expenses/query-keys";
@@ -864,16 +865,16 @@ function PaymentModal({
             <span className="text-[11px] font-medium text-muted-foreground">
               {t("common.method")}
             </span>
-            <select
+            {/* Same catalogue, expenses context. */}
+            <PaymentMethodPicker
+              context="expenses"
               value={method}
-              onChange={(event) => setMethod(event.target.value)}
-              className="h-9 rounded-[12px] border border-input bg-surface/70 px-3 text-sm text-foreground focus:border-primary/60 focus:outline-none focus:ring-4 focus:ring-primary/10"
-            >
-              <option value="cash">{t("pos.pm.cash")}</option>
-              <option value="bank_transfer">{t("pos.pm.bank_transfer")}</option>
-              <option value="card">{t("pos.pm.card")}</option>
-              <option value="mobile_money">{t("pos.pm.mobile_money")}</option>
-            </select>
+              onChange={setMethod}
+              includeCredit={false}
+              ensureIds={[method]}
+              ariaLabel={t("common.method")}
+              className="h-9"
+            />
           </label>
 
           {(financialAccounts ?? []).length > 0 ? (
@@ -904,7 +905,11 @@ function PaymentModal({
               <span className="text-[11px] font-medium text-muted-foreground">
                 {ar ? "المصدر" : "Source"}
               </span>
-              <FieldInput value={label} onValueChange={setLabel} placeholder={t("common.optional")} />
+              <FieldInput
+                value={label}
+                onValueChange={setLabel}
+                placeholder={t("common.optional")}
+              />
             </label>
           )}
         </div>

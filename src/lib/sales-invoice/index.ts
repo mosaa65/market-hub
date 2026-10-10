@@ -32,6 +32,15 @@ import { supabase } from "@/integrations/supabase/client";
 
 const db = supabase as any;
 
+/**
+ * The value a document stores.
+ *
+ * Kept as a union of the ENUM's own labels — NOT widened to `string` — because
+ * `createSalesInvoice` passes it straight to a Postgres function that casts to
+ * the payment_method type. A named Yemeni method such as بنك الكريمي is
+ * converted to its stored value by `toLegacyPaymentValue` at the call site, so
+ * this type stays an honest description of what the column can hold.
+ */
 export type PaymentMethod = "cash" | "card" | "bank_transfer" | "credit" | "mobile_money" | "split";
 
 /** A ready-made catalogue line, as POS sells it. */

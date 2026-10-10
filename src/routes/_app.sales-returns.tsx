@@ -33,6 +33,10 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+// Payment-method picker (this branch) alongside the unified print preview (main).
+import { PaymentMethodPicker, PaymentMethodChip } from "@/components/ui/payment-method";
+import { paymentMethodLabel } from "@/lib/payments/payment-methods";
+import { usePaymentMethodOverrides } from "@/hooks/use-payment-methods";
 import { Plus, Trash2, RotateCcw, Search, Loader2, Printer } from "lucide-react";
 import { LuxuryPrintPreviewModal } from "@/components/luxury-print-preview-modal";
 import type { UnifiedDocumentData } from "@/lib/templates";
@@ -58,6 +62,8 @@ function SalesReturnsPage() {
   const { isModuleEnabled } = useModules();
   const hasMultiWarehouse = isModuleEnabled("multi_warehouse");
   const { t, lang } = useI18n();
+  // The business's own method names, for the credit-note print path below.
+  const overrides = usePaymentMethodOverrides();
   const [salesReturns, setSalesReturns] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -96,7 +102,13 @@ function SalesReturnsPage() {
       partyLabel: lang === "ar" ? "العميل" : "Customer",
       partyName: r.customers?.name ?? (lang === "ar" ? "عميل نقدي" : "Walk-in"),
       warehouse: hasMultiWarehouse ? whName(r.warehouses) : undefined,
-      payment: r.refund_method ? `استرداد (${r.refund_method})` : "نقداً",
+      // The catalogue names the method; the raw ENUM key used to be printed
+      // verbatim, so a wallet refund read "استرداد (mobile_money)" on paper.
+      payment: paymentMethodLabel(
+        r.refund_method ?? "cash",
+        lang === "ar" ? "ar" : "en",
+        overrides,
+      ),
       status: "معتمد ومسترد",
       lines: (items || []).map((it: any) => ({
         product:
@@ -200,7 +212,19 @@ function SalesReturnsPage() {
                         {r.customers?.name ?? (lang === "ar" ? "عميل نقدي" : "Walk-in")}
                       </TableCell>
                       {hasMultiWarehouse && <TableCell>{whName(r.warehouses)}</TableCell>}
-                      <TableCell className="text-xs">{r.refund_method ?? "cash"}</TableCell>
+                      <TableCell className="text-xs">
+                        {/*
+                          Was `{r.refund_method ?? "cash"}` — the raw ENUM value.
+                          An operator read "bank_transfer" and "mobile_money" as
+                          English machine words. The chip resolves the stored
+                          value through the catalogue, so it prints the method's
+                          Arabic name and shows its shape.
+                        */}
+                        <PaymentMethodChip
+                          value={r.refund_method}
+                          lang={lang === "ar" ? "ar" : "en"}
+                        />
+                      </TableCell>
                       <TableCell className="text-end font-mono font-semibold">
                         {money(Number(r.total))}
                       </TableCell>
@@ -503,19 +527,22 @@ function NewSalesReturn({
             </div>
             <div className="grid gap-1.5">
               <Label>{lang === "ar" ? "طريقة الاسترداد" : "Refund method"}</Label>
-              <Select value={refundMethod} onValueChange={setRefundMethod}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cash">{lang === "ar" ? "نقدًا" : "Cash"}</SelectItem>
-                  <SelectItem value="card">{lang === "ar" ? "بطاقة" : "Card"}</SelectItem>
-                  <SelectItem value="bank">{lang === "ar" ? "تحويل بنكي" : "Bank"}</SelectItem>
-                  <SelectItem value="credit">
-                    {lang === "ar" ? "خصم من الدين" : "Credit Balance"}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+              {/*
+                Same catalogue, different context: the returns section has its
+                own scoping, so a business can refund in cash while it never
+                takes cash at the till.
+
+                Replaces a Select whose "bank" option could not be cast to the
+                payment_method ENUM.
+              */}
+              <PaymentMethodPicker
+                context="sales_returns"
+                value={refundMethod}
+                onChange={setRefundMethod}
+                includeCredit
+                ensureIds={[refundMethod]}
+                ariaLabel={lang === "ar" ? "طريقة الاسترداد" : "Refund method"}
+              />
             </div>
           </div>
 

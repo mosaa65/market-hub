@@ -52,6 +52,7 @@ import { exportStatementToCsv, statementFilename } from "@/lib/statements/export
 import { Ltr } from "@/components/ltr-value";
 import { fmtAmount, fmtOrDash } from "@/lib/statements/format";
 import { directionLabel } from "@/lib/statements/format";
+import { paymentMethodLabel as paymentMethodLabelFromCatalog } from "@/lib/payments/payment-methods";
 import { kindLabel } from "@/lib/statements/engine";
 import {
   DEFAULT_COMPANY_INFO,
@@ -415,16 +416,10 @@ function AccountStatementPage() {
           .trim()
           .toLowerCase();
         const breakdown = String(row.meta?.paymentBreakdown ?? "").trim();
-        const labels: Record<string, string> = {
-          cash: ar ? "نقدي" : "Cash",
-          card: ar ? "بطاقة" : "Card",
-          bank_transfer: ar ? "تحويل بنكي" : "Bank transfer",
-          bank: ar ? "تحويل بنكي" : "Bank transfer",
-          mobile_money: ar ? "محفظة إلكترونية" : "Mobile money",
-          credit: ar ? "آجل" : "Credit",
-          split: ar ? "دفع مجزأ" : "Split payment",
-        };
-        const pmLabel = labels[rawPm] ?? (rawPm || "—");
+        // The catalogue, not a local map. This map knew seven values and would
+        // have rendered anything else — including every method a business
+        // creates — as its raw English key.
+        const pmLabel = paymentMethodLabelFromCatalog(rawPm, ar ? "ar" : "en");
         return (
           <span
             className={`text-xs ${rawPm ? "font-medium text-foreground" : "text-muted-foreground"}`}

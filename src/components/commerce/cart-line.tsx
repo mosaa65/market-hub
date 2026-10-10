@@ -68,7 +68,7 @@ export function CartLine({
   return (
     <div
       className={cn(
-        "group relative rounded-2xl border px-3 py-2.5 transition-colors",
+        "group relative rounded-xl border px-2.5 py-2 transition-colors",
         line.isService
           ? "border-violet-500/30 bg-violet-500/5 hover:border-violet-500/50"
           : "border-border/70 bg-surface-2/40 hover:border-primary/40 hover:bg-surface-2/70",
@@ -81,7 +81,7 @@ export function CartLine({
           <div className="flex items-center gap-1.5">
             {line.isService ? <Wrench className="h-3 w-3 shrink-0 text-violet-500" /> : null}
             <span
-              className="line-clamp-2 text-sm font-semibold leading-5 text-foreground"
+              className="line-clamp-2 text-sm font-semibold leading-4 text-foreground"
               title={line.name}
             >
               {line.name}
@@ -111,9 +111,9 @@ export function CartLine({
       </div>
 
       {/* One calm control row: quantity, the only visible unit price, then total. */}
-      <div className="mt-3 grid grid-cols-[auto_minmax(0,1fr)_auto] items-end gap-2 border-t border-border/50 pt-2">
+      <div className="mt-2 grid grid-cols-[auto_minmax(0,1fr)_auto] items-end gap-1.5 border-t border-border/50 pt-1.5">
         <div>
-          <span className="mb-1 block text-[10px] font-medium text-muted-foreground">
+          <span className="mb-0.5 block text-[9px] font-medium text-muted-foreground">
             {labels.quantity}
           </span>
           <QuantityStepper
@@ -125,7 +125,7 @@ export function CartLine({
           />
         </div>
         <div className="min-w-0" title={labels.price}>
-          <span className="mb-1 block text-[10px] font-medium text-muted-foreground">
+          <span className="mb-0.5 block text-[9px] font-medium text-muted-foreground">
             {labels.price}
           </span>
           <PriceField
@@ -133,18 +133,21 @@ export function CartLine({
             onChange={onPriceChange}
             modified={line.priceModified}
             ariaLabel={labels.price}
+            className="h-7 px-1.5 text-[11px]"
           />
         </div>
-        <div className="min-w-[5.25rem] text-end">
-          <span className="mb-1 block text-[10px] font-medium text-muted-foreground">الإجمالي</span>
-          <div className="h-8 whitespace-nowrap rounded-lg bg-primary/8 px-2 py-1.5 font-mono text-xs font-extrabold tabular-nums text-primary [unicode-bidi:isolate]">
+        <div className="min-w-[4.75rem] text-end">
+          <span className="mb-0.5 block text-[9px] font-medium text-muted-foreground">
+            الإجمالي
+          </span>
+          <div className="h-7 whitespace-nowrap rounded-lg bg-primary/8 px-1.5 py-1 font-mono text-[11px] font-extrabold tabular-nums text-primary [unicode-bidi:isolate]">
             {formatMoney(lineTotal)}
           </div>
         </div>
       </div>
 
       {line.stock != null && !line.isService && labels.stockLabel ? (
-        <div className="mt-1 text-[10px] text-muted-foreground/70">
+        <div className="mt-0.5 text-[9px] text-muted-foreground/70">
           {labels.stockLabel}: <span className="font-mono">{line.stock}</span>
         </div>
       ) : null}
