@@ -45,7 +45,6 @@ import {
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import {
-  BUSINESS_PAYMENT_METHOD_IDS,
   LEDGER_KIND_LABELS,
   PAYMENT_CONTEXTS,
   PAYMENT_CONTEXT_LABELS,
@@ -91,14 +90,9 @@ function buildDraft(methods: ResolvedPaymentMethod[]): DraftState {
   const order: string[] = [];
 
   for (const method of methods) {
-    // Only the explicitly supported business-facing methods are shown here.
-    if (
-      !BUSINESS_PAYMENT_METHOD_IDS.includes(
-        method.id as (typeof BUSINESS_PAYMENT_METHOD_IDS)[number],
-      )
-    ) {
-      continue;
-    }
+    // EVERY active catalogue row is listed, including the ones this business
+    // created. A filter against a shipped-id whitelist used to hide them from
+    // the very screen whose job is to configure them.
     // A method the developers retired is not offered at all; showing it as a
     // switch the operator cannot use would be noise.
     if (!method.isActive) continue;
@@ -145,15 +139,8 @@ export function PaymentMethodsSection() {
     [draft.order, methods],
   );
 
-  const businessMethods = useMemo(
-    () =>
-      methods.filter((method) =>
-        BUSINESS_PAYMENT_METHOD_IDS.includes(
-          method.id as (typeof BUSINESS_PAYMENT_METHOD_IDS)[number],
-        ),
-      ),
-    [methods],
-  );
+  /** Active methods only — the retired ones belong to history, not to a menu. */
+  const businessMethods = useMemo(() => methods.filter((method) => method.isActive), [methods]);
 
   const filterDefinitions = useMemo<FilterDefinition[]>(
     () => [

@@ -32,9 +32,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   PAYMENT_METHOD_CATALOG,
-  BUSINESS_PAYMENT_METHOD_IDS,
   PAYMENT_CONTEXTS,
   hasAuthoredIdentity,
+  isLegacyPaymentValue,
   type LedgerKind,
   type LegacyPaymentValue,
   type PaymentContext,
@@ -68,6 +68,24 @@ export interface ResolvedPaymentMethod extends PaymentMethodDefinition {
   isAuthored: boolean;
 }
 
+/**
+ * The catalogue row AS THE DATABASE ACTUALLY DEFINES IT.
+ *
+ * The column is `legacy_ids` (text[]), declared by
+ * `20261208000000_payment_methods_catalog_unified.sql` section 2 and retained by
+ * `20261208000001` section 1.5. There is no `legacy_values` and no base
+ * `legacy_id` column on `public.payment_methods`:
+ *
+ *   • `legacy_ids`  — text[], the ENUM value(s) a row represents historically
+ *   • `legacy_id`   — exists ONLY as an output column of the
+ *                     `payment_method_catalog_view()` function, not as a table
+ *                     column; PostgREST cannot select it from the table.
+ *
+ * So the select below must ask for `legacy_ids`. Asking for a column that does
+ * not exist makes PostgREST fail the whole request, which — because the failure
+ * was treated as "fall back silently" — meant every picker showed the shipped
+ * nine methods from the fallback bundle while pretending nothing was wrong.
+ */
 interface CatalogRow {
   id: string;
   name_ar: string;
@@ -80,10 +98,27 @@ interface CatalogRow {
   default_account_code: string | null;
   is_credit_term: boolean;
   requires_reference: boolean;
-  legacy_values: string[] | null;
-  legacy_id: string | null;
+  /** text[] NOT NULL DEFAULT '{}'. A named institution carries an empty list. */
+  legacy_ids: string[] | null;
   is_system: boolean | null;
 }
+
+/** The catalogue columns the app reads. One list, used by every query. */
+const PAYMENT_METHOD_COLUMNS = [
+  "id",
+  "name_ar",
+  "name_en",
+  "icon_key",
+  "is_active",
+  "sort_order",
+  "allowed_contexts",
+  "ledger_kind",
+  "default_account_code",
+  "is_credit_term",
+  "requires_reference",
+  "legacy_ids",
+  "is_system",
+].join(",");
 
 interface SettingsRow {
   payment_method_id: string;
@@ -114,45 +149,60 @@ const db = supabase as unknown as {
 async function fetchPaymentMethods(): Promise<{
   methods: ResolvedPaymentMethod[];
   isFallback: boolean;
+  /**
+   * Why the fallback was used, so the UI can say something true instead of a
+   * blanket "something went wrong". `null` when the catalogue loaded.
+   */
+  fallbackReason: string | null;
 }> {
   const [catalogRes, settingsRes] = await Promise.all([
-    db
-      .from("payment_methods")
-      .select(
-        "id,name_ar,name_en,icon_key,is_active,sort_order,allowed_contexts,ledger_kind,default_account_code,is_credit_term,requires_reference,legacy_values,legacy_id,is_system",
-      )
-      .order("sort_order"),
+    db.from("payment_methods").select(PAYMENT_METHOD_COLUMNS).order("sort_order"),
     db
       .from("payment_method_settings")
       .select("payment_method_id,enabled,sort_order,enabled_contexts,default_account_id"),
   ]);
 
-  // The settings table is not the source of truth for whether a method EXISTS,
-  // so its failure alone must not blank the catalogue — it only means nobody has
-  // configured anything yet.
   const catalogRows: CatalogRow[] = Array.isArray(catalogRes.data) ? catalogRes.data : [];
-  if (catalogRes.error || settingsRes.error || catalogRows.length === 0) {
-    // Settings are tenant-specific. Treat a failed read as fallback so the UI
-    // warns that enabled contexts/order may not reflect the saved configuration.
-    return { methods: fallbackMethods(), isFallback: true };
+
+  // ── The catalogue is the authority. If it cannot be read, say so. ────────
+  //
+  // This used to fold every failure — a missing column, RLS, an unapplied
+  // migration — into an anonymous fallback, so a cashier saw the shipped nine
+  // methods and had no way to know the business's own ones were missing. The
+  // fallback still renders (nobody should be unable to take money), but it now
+  // carries a reason the UI is required to surface.
+  if (catalogRes.error || catalogRows.length === 0) {
+    return {
+      methods: fallbackMethods(),
+      isFallback: true,
+      fallbackReason: catalogRes.error
+        ? `catalogue read failed: ${catalogRes.error.message}`
+        : "catalogue is empty",
+    };
   }
 
+  // The settings table is tenant configuration, not the source of truth for
+  // whether a method EXISTS. Its failure means "nothing is configured yet", so
+  // the catalogue defaults apply — but it is still reported, because enabled
+  // contexts and order may then differ from what the business saved.
   const settingsById = new Map<string, SettingsRow>();
   for (const row of (settingsRes.data ?? []) as SettingsRow[]) {
     settingsById.set(row.payment_method_id, row);
   }
 
-  // The business offer is a fixed, ordered whitelist: نقدًا، آجل، حوالة، بنك
-  // الكريمي، جيب، ون كاش، جوالي، فلوسك، ثم دفع بأكثر من طريقة. Menu, not a
-  // query result — so the presented order cannot drift when a catalogue seed
-  // changes a sort_order, and no other shipped method leaks into a picker.
-  const byId = new Map(catalogRows.map((row) => [row.id, row]));
-  const methods = BUSINESS_PAYMENT_METHOD_IDS.flatMap((id) => {
-    const row = byId.get(id);
-    return row ? [resolveRow(row, settingsById.get(row.id))] : [];
-  });
+  // EVERY active row in the database, not a hard-coded whitelist. A method the
+  // business created in Settings exists in `payment_methods` and must appear in
+  // the pickers that its contexts allow — the fixed list used to hide it.
+  const methods = catalogRows
+    .filter((row) => row.is_active !== false)
+    .map((row) => resolveRow(row, settingsById.get(row.id)))
+    .sort(byEffectiveOrder);
 
-  return { methods, isFallback: false };
+  return {
+    methods,
+    isFallback: false,
+    fallbackReason: settingsRes.error ? `settings read failed: ${settingsRes.error.message}` : null,
+  };
 }
 
 function resolveRow(row: CatalogRow, settings?: SettingsRow): ResolvedPaymentMethod {
@@ -171,11 +221,16 @@ function resolveRow(row: CatalogRow, settings?: SettingsRow): ResolvedPaymentMet
     defaultAccountCode: row.default_account_code ?? undefined,
     isCreditTerm: row.is_credit_term,
     requiresReference: row.requires_reference,
-    // The explicit column first, then the historical list. The migration
-    // backfilled `legacy_id` from `legacy_ids[1]` for every pre-existing row, so
-    // reading it first is a no-op for the shipped methods and the ONLY correct
-    // answer for one a business created (whose list is empty on purpose).
-    legacyValue: (row.legacy_id ?? row.legacy_values?.[0] ?? "cash") as LegacyPaymentValue,
+    // The stored value, in the order the DATABASE resolves it
+    // (`payment_method_legacy_id` section 5 of the authoring migration):
+    //   1. the first declared legacy id, for a shipped row that declares one;
+    //   2. otherwise the account family — a named institution carries an EMPTY
+    //      list on purpose and shares the generic bank_transfer / mobile_money
+    //      value rather than redefining it.
+    // A row that has neither is left undefined rather than silently becoming
+    // `cash`: guessing here is what would repoint a bank onto the till.
+    legacyValue: resolveLegacyValue(row),
+    legacyIds: toLegacyIds(row.legacy_ids),
 
     enabled: settings ? settings.enabled : true,
     effectiveSortOrder: settings ? settings.sort_order : row.sort_order,
@@ -197,6 +252,34 @@ function resolveRow(row: CatalogRow, settings?: SettingsRow): ResolvedPaymentMet
   return definition;
 }
 
+/** The account family's canonical stored value, mirroring the SQL CASE. */
+const LEDGER_KIND_LEGACY_VALUE: Record<LedgerKind, LegacyPaymentValue> = {
+  CASH: "cash",
+  BANK: "bank_transfer",
+  WALLET: "mobile_money",
+  CARD: "card",
+  CREDIT: "credit",
+  OTHER: "cash",
+};
+
+/** Narrow a `text[]` column to the ENUM values we actually know about. */
+function toLegacyIds(values: string[] | null | undefined): LegacyPaymentValue[] {
+  return (values ?? []).filter(isLegacyPaymentValue);
+}
+
+/**
+ * The value a document stores for this catalogue row.
+ *
+ * Mirrors `public.payment_method_legacy_id()` so the client and the database
+ * cannot disagree about what a method settles as.
+ */
+function resolveLegacyValue(row: CatalogRow): LegacyPaymentValue {
+  const declared = toLegacyIds(row.legacy_ids)[0];
+  if (declared) return declared;
+  const kind = isLedgerKind(row.ledger_kind) ? row.ledger_kind : "OTHER";
+  return LEDGER_KIND_LEGACY_VALUE[kind];
+}
+
 function byEffectiveOrder(a: ResolvedPaymentMethod, b: ResolvedPaymentMethod): number {
   if (a.effectiveSortOrder !== b.effectiveSortOrder) {
     return a.effectiveSortOrder - b.effectiveSortOrder;
@@ -206,22 +289,15 @@ function byEffectiveOrder(a: ResolvedPaymentMethod, b: ResolvedPaymentMethod): n
 
 /** The developer catalogue as shipped, used before the query resolves and on failure. */
 function fallbackMethods(): ResolvedPaymentMethod[] {
-  const byId = new Map(PAYMENT_METHOD_CATALOG.map((def) => [def.id, def]));
-  return BUSINESS_PAYMENT_METHOD_IDS.flatMap((id) => {
-    const def = byId.get(id);
-    if (!def) return [];
-    return [
-      {
-        ...def,
-        enabled: true,
-        effectiveSortOrder: def.sortOrder,
-        effectiveContexts: def.allowedContexts,
-        isConfigured: false,
-        isSystem: true,
-        isAuthored: false,
-      },
-    ];
-  });
+  return PAYMENT_METHOD_CATALOG.map((def) => ({
+    ...def,
+    enabled: true,
+    effectiveSortOrder: def.sortOrder,
+    effectiveContexts: def.allowedContexts,
+    isConfigured: false,
+    isSystem: true,
+    isAuthored: false,
+  })).sort(byEffectiveOrder);
 }
 
 /**
@@ -248,6 +324,12 @@ export function usePaymentMethods() {
     isLoading: query.isLoading,
     /** True when the tenant's own configuration could not be read. */
     isFallback,
+    /**
+     * Why the shipped catalogue is being shown instead of the database's.
+     * Present whenever `isFallback` is true, so a caller can surface the real
+     * cause rather than telling the operator only that something failed.
+     */
+    fallbackReason: query.data?.fallbackReason ?? null,
     refetch: query.refetch,
   };
 }
@@ -262,27 +344,29 @@ export function usePaymentMethods() {
  */
 export function usePaymentMethodsForContext(
   context: PaymentContext,
-  options?: { includeCredit?: boolean },
+  options?: { includeCredit?: boolean; includeSplit?: boolean },
 ) {
-  const { methods, isLoading, isFallback } = usePaymentMethods();
+  const { methods, isLoading, isFallback, fallbackReason } = usePaymentMethods();
   const includeCredit = options?.includeCredit ?? true;
+  // `split` is not a tender an operator picks — it is what an invoice records
+  // when the cashier split the payment. It is excluded by default so no picker
+  // can offer it as a single method.
+  const includeSplit = options?.includeSplit ?? false;
 
   const available = useMemo(
     () =>
       methods.filter(
         (m) =>
-          BUSINESS_PAYMENT_METHOD_IDS.includes(
-            m.id as (typeof BUSINESS_PAYMENT_METHOD_IDS)[number],
-          ) &&
           m.isActive &&
           m.enabled &&
           m.effectiveContexts.includes(context) &&
+          (includeSplit || m.id !== "split") &&
           (includeCredit || !m.isCreditTerm),
       ),
-    [methods, context, includeCredit],
+    [methods, context, includeCredit, includeSplit],
   );
 
-  return { methods: available, isLoading, isFallback };
+  return { methods: available, isLoading, isFallback, fallbackReason };
 }
 
 /**

@@ -54,7 +54,6 @@ import { BarcodeScanner } from "@/components/barcode-scanner";
 import { PaymentMethodPicker, PaymentMethodIcon } from "@/components/ui/payment-method";
 import { usePaymentMethodsForContext } from "@/hooks/use-payment-methods";
 import {
-  BUSINESS_PAYMENT_METHOD_IDS,
   getPaymentMethodDefinition,
   paymentMethodLabel,
   toLegacyPaymentValue,
@@ -286,14 +285,15 @@ function POSPage() {
   const { isModuleEnabled } = useModules();
   const { t, lang } = useI18n();
   const { config: catalogConfig } = useCatalogModules();
+  // The split tender rows are EVERY method the business enabled for POS except
+  // credit (nothing was collected) and `split` (the result of a split, not one of
+  // its components). No shipped-id whitelist: a wallet the business added in
+  // Settings must be splittable like any other. `usePaymentMethodsForContext`
+  // already excludes `split`; the filter is kept explicit so the rule is visible
+  // at the call site rather than implied by a default.
   const { methods: posPaymentMethods } = usePaymentMethodsForContext("pos");
   const splitTenderOptions = posPaymentMethods.filter(
-    (method) =>
-      BUSINESS_PAYMENT_METHOD_IDS.includes(
-        method.id as (typeof BUSINESS_PAYMENT_METHOD_IDS)[number],
-      ) &&
-      !method.isCreditTerm &&
-      method.id !== "split",
+    (method) => !method.isCreditTerm && method.id !== "split",
   );
   const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
@@ -1389,17 +1389,13 @@ function POSPage() {
         partyLabel: lang === "ar" ? "العميل" : "Bill To",
         partyName: customer?.name ?? (lang === "ar" ? "عميل نقدي" : "Walk-in Customer"),
         warehouse: lang === "ar" ? (warehouse as any)?.name_ar || warehouse?.name : warehouse?.name,
-        payment:
-          lang === "ar"
-            ? ({
-                cash: "نقدًا",
-                card: "بطاقة",
-                bank_transfer: "حوالة",
-                credit: "آجل",
-                split: "الدفع بأكثر من طريقة",
-                mobile_money: "محفظة",
-              }[finalMethod] ?? finalMethod)
-            : finalMethod.replace("_", " "),
+        // From the catalogue, so a method added later is labelled without
+        // touching this file. The local map that used to sit here printed the
+        // raw ENUM value for anything it did not list.
+        payment: paymentMethodLabel(
+          isSplitPayment ? "split" : paymentMethod,
+          lang === "ar" ? "ar" : "en",
+        ),
         status:
           remainingDebt > 0
             ? effectivePaid > 0

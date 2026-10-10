@@ -192,6 +192,42 @@ export interface PaymentMethodDefinition {
    * sanctioned way a catalogue id becomes a database value.
    */
   legacyValue: LegacyPaymentValue;
+  /**
+   * The ENUM values this row REPRESENTS historically, mirroring the database's
+   * `payment_methods.legacy_ids`. A named method that was never a distinct ENUM
+   * value (بنك الكريمي، جيب، فلوسك، ون كاش) carries an empty list on purpose:
+   * it shares the generic `bank_transfer` / `mobile_money` value rather than
+   * redefining it. Used to resolve a stored document back to a method.
+   */
+  legacyIds?: readonly LegacyPaymentValue[];
+}
+
+/**
+ * Every value `public.payment_method` can hold. Kept in one place so the
+ * runtime guard below and the compile-time union cannot drift apart.
+ */
+export const LEGACY_PAYMENT_VALUES: readonly LegacyPaymentValue[] = [
+  "cash",
+  "card",
+  "bank_transfer",
+  "credit",
+  "mobile_money",
+  "split",
+  "cheque",
+] as const;
+
+const LEGACY_PAYMENT_VALUE_SET = new Set<string>(LEGACY_PAYMENT_VALUES);
+
+/**
+ * Is this a value the ENUM (`public.payment_method`) can actually store?
+ *
+ * Exists because the columns are enums: writing `"transfer"` or `"bank"` to
+ * one raises at the database, and writing an arbitrary string would only be
+ * caught at runtime. A guard here lets the app fail honestly and in Arabic
+ * before the round-trip.
+ */
+export function isLegacyPaymentValue(value: string): value is LegacyPaymentValue {
+  return LEGACY_PAYMENT_VALUE_SET.has(value);
 }
 
 const ALL_CONTEXTS: readonly PaymentContext[] = PAYMENT_CONTEXTS;
@@ -253,6 +289,9 @@ export const PAYMENT_METHOD_CATALOG: readonly PaymentMethodDefinition[] = [
     defaultAccountCode: "1111",
     requiresReference: true,
     legacyValue: "bank_transfer",
+    // No legacy id: this method was never its own ENUM value. Storing the
+    // generic `bank_transfer` is deliberate — see the migration seed.
+    legacyIds: [],
   },
   {
     id: "yemen_kuwait_bank",
@@ -266,6 +305,7 @@ export const PAYMENT_METHOD_CATALOG: readonly PaymentMethodDefinition[] = [
     defaultAccountCode: "1121",
     requiresReference: true,
     legacyValue: "bank_transfer",
+    legacyIds: [],
   },
   {
     id: "jawali",
@@ -278,6 +318,9 @@ export const PAYMENT_METHOD_CATALOG: readonly PaymentMethodDefinition[] = [
     ledgerKind: "WALLET",
     requiresReference: true,
     legacyValue: "mobile_money",
+    // The FIRST wallet carries the historical `mobile_money` value; the others
+    // deliberately do not, so a stored `mobile_money` resolves to جوالي only.
+    legacyIds: ["mobile_money"],
   },
   {
     id: "jaib",
@@ -290,6 +333,7 @@ export const PAYMENT_METHOD_CATALOG: readonly PaymentMethodDefinition[] = [
     ledgerKind: "WALLET",
     requiresReference: true,
     legacyValue: "mobile_money",
+    legacyIds: [],
   },
   {
     id: "floosak",
@@ -302,6 +346,7 @@ export const PAYMENT_METHOD_CATALOG: readonly PaymentMethodDefinition[] = [
     ledgerKind: "WALLET",
     requiresReference: true,
     legacyValue: "mobile_money",
+    legacyIds: [],
   },
   {
     id: "one_cash",
@@ -314,6 +359,7 @@ export const PAYMENT_METHOD_CATALOG: readonly PaymentMethodDefinition[] = [
     ledgerKind: "WALLET",
     requiresReference: true,
     legacyValue: "mobile_money",
+    legacyIds: [],
   },
   {
     id: "card",
@@ -357,6 +403,7 @@ export const PAYMENT_METHOD_CATALOG: readonly PaymentMethodDefinition[] = [
     defaultAccountCode: "1111",
     requiresReference: true,
     legacyValue: "cheque",
+    legacyIds: ["cheque"],
   },
   {
     // Not a tender the operator picks — it is what an invoice records when the
@@ -372,27 +419,49 @@ export const PAYMENT_METHOD_CATALOG: readonly PaymentMethodDefinition[] = [
     allowedContexts: ["pos", "sales"],
     ledgerKind: "OTHER",
     legacyValue: "split",
+    legacyIds: ["split"],
   },
 ];
 
-/** The nine methods the business-facing settings/pickers currently offer. */
-export const BUSINESS_PAYMENT_METHOD_IDS = [
+/**
+ * Is this id something an OPERATOR may pick as a single tender?
+ *
+ * `split` is excluded on purpose and for one reason: it is not a payment, it is
+ * the RESULT of paying with more than one method, written by the split engine.
+ * Offering it in a picker would let an operator record "دفع بأكثر من طريقة" as
+ * the sole tender of an invoice that was in fact settled once, and `credit` is
+ * excluded where it is meaningless (see `isCreditTerm`).
+ */
+export function isSelectableTender(method: Pick<PaymentMethodDefinition, "id">): boolean {
+  return method.id !== "split";
+}
+
+/**
+ * The methods the settings screen manages, IN PRESENTATION ORDER.
+ *
+ * ── This is NOT a whitelist of what may be offered ──────────────────────────
+ * It used to be, and that was the bug: a filter against this array meant a
+ * method a business created in Settings — which lives in `payment_methods` and
+ * is returned by the catalogue query — never reached a picker, and neither did
+ * `card`, `cheque` or the generic `mobile_money`. The database is the authority
+ * for which methods exist; this array only decides the ORDER the settings
+ * screen lists the shipped ones in.
+ */
+export const SHIPPED_PAYMENT_METHOD_ORDER = [
   "cash",
   "credit",
   "bank_transfer",
   "kuraimi_bank",
+  "yemen_kuwait_bank",
   "jaib",
   "one_cash",
   "jawali",
   "floosak",
+  "card",
+  "mobile_money",
+  "cheque",
   "split",
 ] as const;
-
-const BUSINESS_PAYMENT_METHOD_ID_SET = new Set<string>(BUSINESS_PAYMENT_METHOD_IDS);
-
-export function isBusinessPaymentMethod(id: string): boolean {
-  return BUSINESS_PAYMENT_METHOD_ID_SET.has(id);
-}
 
 /** Index for O(1) lookups. Built once at module load. */
 const CATALOG_BY_ID = new Map<string, PaymentMethodDefinition>(
@@ -432,12 +501,45 @@ export function isShippedPaymentMethod(id: string): boolean {
 }
 
 /**
- * The ENUM value a document must store for a catalogue id. An unknown id falls
- * back to itself, which is what the database already expects for the `split`
- * case and is the only honest answer for a value we do not recognise.
+ * The ENUM value a document must store for a catalogue id.
+ *
+ * An id the catalogue does not know is passed through UNCHANGED rather than
+ * quietly rewritten to 'cash'. Coercing it would record a bank transfer as a
+ * till payment with no error anywhere — the exact bug the catalogue exists to
+ * remove. Callers that must GUARANTEE a storable value use
+ * `toStorablePaymentValue`, and the database's `resolve_writable_payment_method`
+ * is the final authority that rejects an unknown value outright.
  */
 export function toLegacyPaymentValue(id: string): LegacyPaymentValue {
-  return CATALOG_BY_ID.get(id)?.legacyValue ?? (id as LegacyPaymentValue);
+  const known = CATALOG_BY_ID.get(id)?.legacyValue;
+  if (known) return known;
+  return id as LegacyPaymentValue;
+}
+
+/**
+ * Convert a catalogue id to a value the database ENUM can actually hold, or
+ * `null` when it cannot be converted at all. The honest alternative to
+ * `toLegacyPaymentValue` for write paths that must NOT guess: a caller that
+ * gets `null` reports the problem instead of silently booking cash.
+ */
+export function toStorablePaymentValue(id: string | null | undefined): LegacyPaymentValue | null {
+  if (!id) return null;
+  const known = CATALOG_BY_ID.get(id)?.legacyValue;
+  if (known) return known;
+  return isLegacyPaymentValue(id) ? id : null;
+}
+
+/**
+ * Does this method need a transfer / wallet / cheque reference to be meaningful?
+ *
+ * Reads the catalogue rather than matching two hard-coded ids, so a method a
+ * business adds later inherits the behaviour without a code change. A method
+ * supplied by the database at runtime is checked by the caller against its own
+ * resolved row, because this registry only knows the shipped set.
+ */
+export function requiresPaymentReference(id: string | null | undefined): boolean {
+  if (!id) return false;
+  return Boolean(CATALOG_BY_ID.get(id)?.requiresReference);
 }
 
 /** The catalogue id that represents an ENUM value found on an old document. */

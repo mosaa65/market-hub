@@ -36,6 +36,8 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/feedback";
 import { money } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
+import { PaymentMethodPicker } from "@/components/ui/payment-method";
+import { toLegacyPaymentValue } from "@/lib/payments/payment-methods";
 import { toast } from "sonner";
 
 /* ------------------------------------------------------------------ */
@@ -71,9 +73,17 @@ export interface CartLine {
   quantity: number;
 }
 
-type PaymentMethod = "cash" | "card" | "bank_transfer" | "credit";
-
-const PAYMENT_METHODS: PaymentMethod[] = ["cash", "card", "bank_transfer", "credit"];
+/*
+ * A four-button literal list used to live here — cash / card / bank_transfer /
+ * credit — which meant بنك الكريمي، جيب، فلوسك، ون كاش، شيك and any method the
+ * business created in Settings could not be chosen on a purchase at all. The
+ * field is now the shared `PaymentMethodPicker`, so this sheet offers exactly
+ * what the catalogue and the business's own settings allow for «purchases».
+ *
+ * The value held in state is therefore a CATALOGUE ID, not an ENUM value, and it
+ * is converted at the RPC boundary below — the same rule every other write path
+ * follows.
+ */
 
 export interface PurchaseFormSheetProps {
   open: boolean;
@@ -127,7 +137,7 @@ export function PurchaseFormSheet({
 
   const [discount, setDiscount] = useState<number | null>(null);
   const [paid, setPaid] = useState<number | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("bank_transfer");
+  const [paymentMethod, setPaymentMethod] = useState<string>("bank_transfer");
   const [note, setNote] = useState("");
 
   const [catalogueLoading, setCatalogueLoading] = useState(true);
@@ -289,7 +299,8 @@ export function PurchaseFormSheet({
       const { error } = await supabase.rpc("create_purchase", {
         _warehouse_id: warehouseId,
         _supplier_id: supplierId,
-        _payment_method: paymentMethod,
+        // Catalogue id -> the value the ENUM stores, at the RPC boundary only.
+        _payment_method: toLegacyPaymentValue(paymentMethod),
         _paid: paymentMethod === "credit" ? 0 : (paid ?? total),
         _discount: Number(discount ?? 0),
         _note: (note || null) as never,
@@ -311,8 +322,6 @@ export function PurchaseFormSheet({
       setSaving(false);
     }
   }
-
-  const pmKey = (m: PaymentMethod) => (m === "bank_transfer" ? t("pos.pm.bank") : t(`pos.pm.${m}`));
 
   /* ── Totals block, reused in the sheet footer summary ── */
   const totalsBlock = (
@@ -657,22 +666,18 @@ export function PurchaseFormSheet({
           <div className="space-y-3">
             <div>
               <p className="mb-1.5 text-label text-muted-foreground">{t("sales.payment")}</p>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {PAYMENT_METHODS.map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => setPaymentMethod(m)}
-                    className={`h-9 rounded-xl border text-xs font-semibold transition ${
-                      paymentMethod === m
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border/80 text-muted-foreground hover:bg-muted hover:text-foreground"
-                    }`}
-                  >
-                    {pmKey(m)}
-                  </button>
-                ))}
-              </div>
+              {/*
+                The shared picker, purchases context. It returns a catalogue id;
+                `ensureIds` keeps a method already on the draft selectable even
+                if the business has since narrowed this context.
+              */}
+              <PaymentMethodPicker
+                context="purchases"
+                value={paymentMethod}
+                onChange={setPaymentMethod}
+                ensureIds={[paymentMethod]}
+                ariaLabel={isAr ? "طريقة الدفع" : "Payment method"}
+              />
             </div>
 
             {paymentMethod !== "credit" && (

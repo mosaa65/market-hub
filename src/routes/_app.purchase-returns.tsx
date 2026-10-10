@@ -32,6 +32,8 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { PaymentMethodPicker } from "@/components/ui/payment-method";
+import { paymentMethodLabel } from "@/lib/payments/payment-methods";
+import { usePaymentMethodOverrides } from "@/hooks/use-payment-methods";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import {
@@ -96,6 +98,9 @@ function PurchaseReturnsPage() {
   const { t, lang } = useI18n();
   const isRtl = lang === "ar";
   const qc = useQueryClient();
+  // The business's own names for methods it renamed, keyed by catalogue id, so a
+  // refund method reads the same here as it does at the till.
+  const overrides = usePaymentMethodOverrides();
   const breakpoint = useBreakpoint();
   const tableUsesHorizontalScroll =
     breakpoint === "xs" || breakpoint === "sm" || breakpoint === "md";
@@ -149,24 +154,19 @@ function PurchaseReturnsPage() {
     );
   }, [purchaseReturns, search]);
 
+  /**
+   * A stored `refund_method` -> the name to show, read from the catalogue.
+   *
+   * The switch that used to be here was a third copy of the payment-method
+   * labels. It knew only four values, it had a `bank` branch for a value the
+   * ENUM does not contain, and anything else — `mobile_money`, `cheque`, a
+   * wallet the business added — was printed as its raw English key. The
+   * catalogue answers all of them, and `overrides` turns a renamed method into
+   * the business's own word.
+   */
   const refundLabel = useCallback(
-    (method: string | null) => {
-      const value = method ?? "cash";
-      switch (value) {
-        case "cash":
-          return isRtl ? "نقداً" : "Cash";
-        case "card":
-          return isRtl ? "بطاقة" : "Card";
-        case "bank":
-        case "bank_transfer":
-          return isRtl ? "تحويل بنكي" : "Bank transfer";
-        case "credit":
-          return isRtl ? "خصم من رصيد المورد" : "Deduct balance";
-        default:
-          return value;
-      }
-    },
-    [isRtl],
+    (method: string | null) => paymentMethodLabel(method ?? "cash", isRtl ? "ar" : "en", overrides),
+    [isRtl, overrides],
   );
 
   const filterDefinitions: FilterDefinition[] = useMemo(() => {

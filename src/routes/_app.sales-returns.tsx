@@ -35,6 +35,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 // Payment-method picker (this branch) alongside the unified print preview (main).
 import { PaymentMethodPicker, PaymentMethodChip } from "@/components/ui/payment-method";
+import { paymentMethodLabel } from "@/lib/payments/payment-methods";
+import { usePaymentMethodOverrides } from "@/hooks/use-payment-methods";
 import { Plus, Trash2, RotateCcw, Search, Loader2, Printer } from "lucide-react";
 import { LuxuryPrintPreviewModal } from "@/components/luxury-print-preview-modal";
 import type { UnifiedDocumentData } from "@/lib/templates";
@@ -60,6 +62,8 @@ function SalesReturnsPage() {
   const { isModuleEnabled } = useModules();
   const hasMultiWarehouse = isModuleEnabled("multi_warehouse");
   const { t, lang } = useI18n();
+  // The business's own method names, for the credit-note print path below.
+  const overrides = usePaymentMethodOverrides();
   const [salesReturns, setSalesReturns] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -98,7 +102,13 @@ function SalesReturnsPage() {
       partyLabel: lang === "ar" ? "العميل" : "Customer",
       partyName: r.customers?.name ?? (lang === "ar" ? "عميل نقدي" : "Walk-in"),
       warehouse: hasMultiWarehouse ? whName(r.warehouses) : undefined,
-      payment: r.refund_method ? `استرداد (${r.refund_method})` : "نقداً",
+      // The catalogue names the method; the raw ENUM key used to be printed
+      // verbatim, so a wallet refund read "استرداد (mobile_money)" on paper.
+      payment: paymentMethodLabel(
+        r.refund_method ?? "cash",
+        lang === "ar" ? "ar" : "en",
+        overrides,
+      ),
       status: "معتمد ومسترد",
       lines: (items || []).map((it: any) => ({
         product:

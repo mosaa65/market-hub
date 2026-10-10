@@ -46,10 +46,11 @@ import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import {
-  BUSINESS_PAYMENT_METHOD_IDS,
   getPaymentMethodDefinition,
   getShippedPaymentMethod,
+  isSplitPaymentValue,
   paymentMethodLabel,
+  toCatalogId,
   type PaymentContext,
 } from "@/lib/payments/payment-methods";
 import {
@@ -58,6 +59,27 @@ import {
   type ResolvedPaymentMethod,
 } from "@/hooks/use-payment-methods";
 import { PaymentMethodIcon } from "./payment-method-icon";
+
+/**
+ * Resolve one `ensureIds` entry to a method, accepting EITHER a catalogue id or
+ * a residual ENUM value.
+ *
+ * A historic sales return stored `mobile_money`, not `jawali`; a document
+ * edited today must still show its method. The catalogue id is tried first, and
+ * a stored value then resolves through the same index the read-only chip uses.
+ * An entry that resolves to nothing — a value this build does not know — is
+ * dropped rather than shown as a blank option.
+ */
+function resolveEnsureId(
+  id: string | null | undefined,
+  methods: ResolvedPaymentMethod[],
+): ResolvedPaymentMethod | undefined {
+  if (!id) return undefined;
+  const byId = methods.find((method) => method.id === id);
+  if (byId) return byId;
+  const catalogId = toCatalogId(id);
+  return catalogId ? methods.find((method) => method.id === catalogId) : undefined;
+}
 
 export interface PaymentMethodPickerProps {
   /** Which section is asking. Decides what the business has allowed here. */
@@ -72,8 +94,12 @@ export interface PaymentMethodPickerProps {
    * Extra catalogue ids to keep selectable even if this context would exclude
    * them — for a method already recorded on the document being edited, so
    * changing the settings cannot silently rewrite history.
+   *
+   * A residual ENUM value (an old invoice that stored `mobile_money`) also
+   * works: it is resolved to its canonical catalogue id and shown under that
+   * id, so a historic document stays editable instead of losing its method.
    */
-  ensureIds?: string[];
+  ensureIds?: (string | null | undefined)[];
   className?: string;
   /** Accessible name for the select. */
   ariaLabel?: string;
@@ -106,75 +132,52 @@ export function PaymentMethodPicker({
    * is appended rather than filtered away.
    */
   const options = useMemo(() => {
-    const businessMethods = methods.filter((method) =>
-      BUSINESS_PAYMENT_METHOD_IDS.includes(
-        method.id as (typeof BUSINESS_PAYMENT_METHOD_IDS)[number],
-      ),
-    );
-    if (!ensureIds || ensureIds.length === 0) return businessMethods;
-    const present = new Set(businessMethods.map((method) => method.id));
-    const extra = ensureIds.filter(
-      (id) =>
-        BUSINESS_PAYMENT_METHOD_IDS.includes(id as (typeof BUSINESS_PAYMENT_METHOD_IDS)[number]) &&
-        id &&
-        !present.has(id) &&
-        getPaymentMethodDefinition(id),
-    );
-    if (extra.length === 0) return businessMethods;
-    return [
-      ...businessMethods,
-      ...extra
-        .map((id) => businessMethods.find((method) => method.id === id))
-        .filter((method): method is (typeof businessMethods)[number] => Boolean(method)),
-    ];
+    // EVERY method the catalogue returned for this context — a business-created
+    // one included. Filtering against a shipped-id list here is what previously
+    // hid tenant methods and `card`/`cheque` from every picker.
+    if (!ensureIds || ensureIds.length === 0) return methods;
+
+    const present = new Set(methods.map((method) => method.id));
+    const extra = ensureIds
+      .map((id) => resolveEnsureId(id, methods))
+      .filter((method): method is ResolvedPaymentMethod => Boolean(method))
+      .filter(
+        (method, index, all) =>
+          // Deduplicate: two residual ENUM values may resolve to one method.
+          !present.has(method.id) && all.findIndex((m) => m.id === method.id) === index,
+      );
+
+    return extra.length === 0 ? methods : [...methods, ...extra];
   }, [methods, ensureIds]);
 
   /**
-   * The label for a method, preferring the key POS already shipped.
+   * The label for a method, read from the ONE authority: the catalogue row.
    *
-   * Two different rules, and the difference matters:
-   *
-   *   • A method still carrying its shipped identity uses its `pos.pm.*` key,
-   *     so "نقدي" and "بطاقة" keep meaning exactly what they meant yesterday in
-   *     both languages.
-   *   • A method the business renamed — or created — uses the business's own
-   *     word. Labelling «حوالات صنعاء» as "تحويل بنكي" would hide the very
-   *     choice the operator made, and labelling a created method with a generic
-   *     key is not possible at all: it has no key.
-   *
-   * `isAuthored` is the flag that separates the two, and it comes from the
-   * database rather than from guessing at the string.
+   * A `labelById` literal map used to sit inside this function. It was a second
+   * source of truth for names, it could not know a method the business created,
+   * and it drifted from the catalogue whenever a name changed — so a shipped
+   * method now simply uses its own `nameAr`/`nameEn`, which the seed defines and
+   * the settings screen may override. `pos.pm.*` remains only as the fallback
+   * for a shipped method the database named nothing for, which cannot happen but
+   * costs nothing to honour.
    */
   const labelFor = (method: ResolvedPaymentMethod): string => {
-    const shipped = getShippedPaymentMethod(method.id);
-    const keepsShippedIdentity =
-      method.isSystem &&
-      shipped !== undefined &&
-      shipped.nameAr === method.nameAr &&
-      shipped.iconKey === method.iconKey;
-
-    if (keepsShippedIdentity) {
-      const labelById: Record<string, { ar: string; en: string }> = {
-        cash: { ar: "نقدًا", en: "Cash" },
-        credit: { ar: "آجل", en: "Credit" },
-        bank_transfer: { ar: "حوالة", en: "Transfer" },
-        kuraimi_bank: { ar: "بنك الكريمي", en: "Al-Kuraimi Bank" },
-        jaib: { ar: "جيب", en: "Jaib" },
-        one_cash: { ar: "ون كاش", en: "One Cash" },
-        jawali: { ar: "جوالي", en: "Jawali" },
-        floosak: { ar: "فلوسك", en: "Floosak" },
-        split: { ar: "دفع بأكثر من طريقة", en: "Split payment" },
-      };
-      const label = labelById[method.id];
-      if (label) return isRtl ? label.ar : label.en;
-      return t(`pos.pm.${method.legacyValue}`);
-    }
-
-    return isRtl ? method.nameAr : (method.nameEn ?? method.nameAr);
+    const name = isRtl ? method.nameAr : (method.nameEn ?? method.nameAr);
+    if (name && name.trim()) return name;
+    return t(`pos.pm.${method.legacyValue}`);
   };
 
-  /** The icon of the currently selected method, shown as the field adornment. */
-  const selectedDefinition = value ? getPaymentMethodDefinition(value) : undefined;
+  /**
+   * The currently selected method, for the field's adornment.
+   *
+   * Read from the RESOLVED list — which includes a method this business created
+   * and any row the database returned — before falling back to the shipped
+   * registry. `getPaymentMethodDefinition` alone would drop the icon of a
+   * tenant-created method that is in fact selected.
+   */
+  const selectedDefinition =
+    (value ? options.find((method) => method.id === value) : undefined) ??
+    (value ? getPaymentMethodDefinition(value) : undefined);
 
   return (
     <div className={cn("relative min-w-0", className)}>
@@ -250,7 +253,19 @@ export function PaymentMethodChip({
 }) {
   const { methods } = usePaymentMethods();
 
-  const isSplit = value === "split" || Boolean(note?.includes("[دفع مجزأ:"));
+  // `isSplitPaymentValue` rather than a one-off string test: it also recognises
+  // the English `[Split:` marker, which the inline check here missed, so an
+  // English-mode split invoice used to render its raw note marker instead of
+  // «دفع بأكثر من طريقة».
+  //
+  // The note is consulted ONLY when the stored value is absent.
+  // `customer_payment_splits` is the authoritative breakdown for every invoice
+  // written since the split engine shipped; the note is a compatibility path for
+  // records that predate it, and treating it as the primary source would let a
+  // free-text remark decide what the chip claims the payment was.
+  const isSplit =
+    value === "split" ||
+    ((value === null || value === undefined) && isSplitPaymentValue(value, note));
   const method =
     methods.find((m) => methodId && m.id === methodId) ??
     methods.find((m) => m.id === value) ??
