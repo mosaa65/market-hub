@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 240 240" role="img" aria-labelledby="title desc">
+  <title id="title">Jaib wallet icon</title>
+  <desc id="desc">Vector recreation of the red Jaib wallet app mark on a white background.</desc>
+  <rect width="240" height="240" fill="#ffffff"/>
+  <g fill="#c8102e">
+    <path d="M39 58h22v49c0 3.3-2.7 5-5.6 5H39z"/>
+    <path d="M108 58h89c2.2 0 4 1.8 4 4v15c0 2.2-1.8 4-4 4h-89c-2.2 0-4-1.8-4-4V62c0-2.2 1.8-4 4-4z"/>
+    <path d="M89 93.5c8.4 0 15.2 6.8 15.2 15.2s-6.8 15.2-15.2 15.2-15.2-6.8-15.2-15.2 6.8-15.2 15.2-15.2z"/>
+    <path d="M39 113h22v11.3c0 24.1 17.7 39.7 45.8 39.7h38.3c20.5 0 33.9-13.7 33.9-32.2V81h22v50.8c0 33.2-22 54.2-55.9 54.2h-38.3C65.7 186 39 162.4 39 124.3z"/>
+  </g>
+</svg>

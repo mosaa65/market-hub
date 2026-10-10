@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import { useStoredViewMode } from "@/lib/view-mode-storage";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Receipt,
@@ -12,15 +12,12 @@ import {
   Printer,
   Sparkles,
   ScrollText,
-  CreditCard,
-  Banknote,
-  Landmark,
-  Clock,
   CheckCircle2,
   AlertCircle,
   XCircle,
   Plus,
   RefreshCw,
+  Clock,
   LayoutGrid,
   List,
   TableProperties,
@@ -29,7 +26,6 @@ import {
   Check,
   Phone,
   Building2,
-  Coins,
   ChevronRight,
   TrendingUp,
   SlidersHorizontal,
@@ -76,6 +72,12 @@ import { IconButton } from "@/components/ui/icon-button";
 import { useBreakpoint } from "@/design/breakpoints";
 import { useRealtimeTable } from "@/lib/realtime";
 import { QUERY_KEYS } from "@/lib/query-keys";
+import {
+  isSplitPaymentValue,
+  paymentMethodLabel,
+  toLegacyPaymentValue,
+} from "@/lib/payments/payment-methods";
+import { PaymentMethodChip } from "@/components/ui/payment-method";
 
 export const Route = createFileRoute("/_app/sales")({
   head: () => ({ meta: [{ title: "المبيعات والفواتير — فورتيكس ERP" }] }),
@@ -175,8 +177,11 @@ export function SalesPage() {
 
   const isRtl = lang === "ar";
 
-  const whName = (w: { name: string; name_ar: string | null } | null | undefined) =>
-    !w ? undefined : lang === "ar" ? w.name_ar || w.name : w.name || w.name_ar || undefined;
+  const whName = useCallback(
+    (w: { name: string; name_ar: string | null } | null | undefined) =>
+      !w ? undefined : lang === "ar" ? w.name_ar || w.name : w.name || w.name_ar || undefined,
+    [lang],
+  );
 
   // ─── Paginated / Infinite Streamed Data Fetching (Exact pattern from Products) ───
   const {
@@ -286,7 +291,9 @@ export function SalesPage() {
     try {
       const { data, error } = await supabase
         .from("sales_invoice_items")
-        .select("id,quantity,unit_price,tax,total,line_type,stock_effect,products(name,name_ar,sku)")
+        .select(
+          "id,quantity,unit_price,tax,total,line_type,stock_effect,products(name,name_ar,sku)",
+        )
         .eq("invoice_id", inv.id);
       if (error) throw error;
 
@@ -295,7 +302,9 @@ export function SalesPage() {
       const doc = await buildDoc(inv, invoiceLines);
       if (doc) setPrintDoc(doc);
     } catch {
-      toast.error(isRtl ? "تعذر تحميل بنود الفاتورة للطباعة" : "Could not load invoice items for printing.");
+      toast.error(
+        isRtl ? "تعذر تحميل بنود الفاتورة للطباعة" : "Could not load invoice items for printing.",
+      );
     } finally {
       setLoadingLines(false);
     }
@@ -308,40 +317,25 @@ export function SalesPage() {
     setTimeout(() => setCopiedInvoiceId(null), 2000);
   };
 
-  const pmLabel = (m: string, note?: string | null) => {
-    const isSplit = Boolean(note && (note.includes("[دفع مجزأ:") || note.includes("[Split:")));
-    if (isSplit || m === "split") {
-      return isRtl ? "دفع مجزأ" : "Split";
-    }
-    const map: Record<string, string> = {
-      cash: t("pos.pm.cash") || (isRtl ? "نقداً" : "Cash"),
-      card: t("pos.pm.card") || (isRtl ? "شبكة/بطاقة" : "Card"),
-      bank_transfer: t("pos.pm.bank") || (isRtl ? "تحويل بنكي" : "Bank Transfer"),
-      bank: t("pos.pm.bank") || (isRtl ? "تحويل بنكي" : "Bank"),
-      credit: t("pos.pm.credit") || (isRtl ? "آجل" : "Credit"),
-      cheque: isRtl ? "شيك" : "Cheque",
-      mobile_money: isRtl ? "محفظة إلكترونية" : "Mobile Money",
-    };
-    return map[m] ?? m;
-  };
-
-  const pmIcon = (m: string, note?: string | null) => {
-    const isSplit = Boolean(note && (note.includes("[دفع مجزأ:") || note.includes("[Split:")));
-    if (isSplit || m === "split") return <Coins className="h-3.5 w-3.5 text-amber-500" />;
-    switch (m) {
-      case "cash":
-        return <Banknote className="h-3.5 w-3.5 text-emerald-500" />;
-      case "card":
-        return <CreditCard className="h-3.5 w-3.5 text-blue-500" />;
-      case "bank":
-      case "bank_transfer":
-        return <Landmark className="h-3.5 w-3.5 text-indigo-500" />;
-      case "credit":
-        return <Clock className="h-3.5 w-3.5 text-purple-500" />;
-      default:
-        return <Receipt className="h-3.5 w-3.5 text-muted-foreground" />;
-    }
-  };
+  const pmLabel = useCallback(
+    (m: string, note?: string | null) => {
+      // Split detection and naming both come from the catalogue module, so this
+      // screen no longer keeps its own copy of either.
+      if (isSplitPaymentValue(m, note)) {
+        return paymentMethodLabel("split", isRtl ? "ar" : "en");
+      }
+      return paymentMethodLabel(m, isRtl ? "ar" : "en");
+    },
+    [isRtl],
+  );
+  const pmChip = (m: string, note?: string | null, className?: string) => (
+    <PaymentMethodChip
+      value={isSplitPaymentValue(m, note) ? "split" : m}
+      note={note}
+      lang={isRtl ? "ar" : "en"}
+      className={className}
+    />
+  );
 
   const statusLabel = (s: string) => {
     const map: Record<string, string> = {
@@ -480,13 +474,11 @@ export function SalesPage() {
   }) => {
     if (!collectionTarget) throw new Error("No collection target selected");
 
-    const dbMethodMap: Record<PaymentMethod, "cash" | "bank_transfer"> = {
-      cash: "cash",
-      transfer: "bank_transfer",
-      card: "bank_transfer",
-      mobile_money: "bank_transfer",
-    };
-    const dbMethod = dbMethodMap[payment.method];
+    // This legacy write keeps the selected method's actual enum family instead
+    // of coercing card and wallet payments to bank_transfer. It still cannot
+    // retain provider identity or atomically post the invoice; those limitations
+    // require the additive payment-id/account storage path planned for the DB.
+    const dbMethod = toLegacyPaymentValue(payment.method);
 
     // 1. Record customer payment if customer exists
     if (collectionTarget.customerId) {
@@ -655,7 +647,7 @@ export function SalesPage() {
       }
     });
     return Array.from(map.entries());
-  }, [rows, lang]);
+  }, [rows, whName]);
 
   const salesFilterDefinitions: FilterDefinition[] = useMemo(() => {
     const defs: FilterDefinition[] = [
@@ -791,8 +783,14 @@ export function SalesPage() {
         sortValue: (inv) => pmLabel(inv.payment_method, inv.note),
         cell: (inv) => (
           <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg border border-border/80 bg-surface-2/60 px-2 py-0.5 text-[11px] text-muted-foreground">
-            {pmIcon(inv.payment_method, inv.note)}
-            <span>{pmLabel(inv.payment_method, inv.note)}</span>
+            <PaymentMethodChip
+              value={
+                isSplitPaymentValue(inv.payment_method, inv.note) ? "split" : inv.payment_method
+              }
+              note={inv.note}
+              lang={isRtl ? "ar" : "en"}
+              className="whitespace-nowrap rounded-lg border-border/80 bg-surface-2/60 px-2 py-0.5 text-[11px] text-muted-foreground"
+            />
           </span>
         ),
       },
@@ -1054,6 +1052,7 @@ export function SalesPage() {
     maxAmount,
     filterDatePreset,
     sort,
+    pmLabel,
   ]);
 
   // Count active filters
@@ -1413,8 +1412,11 @@ export function SalesPage() {
                           </div>
                         </div>
                         <div className="inline-flex max-w-[45%] shrink-0 items-center gap-1 truncate rounded-lg border border-border/80 bg-surface-2/60 px-2 py-1 text-[11px] text-muted-foreground">
-                          {pmIcon(inv.payment_method, inv.note)}
-                          <span className="truncate">{pmLabel(inv.payment_method, inv.note)}</span>
+                          {pmChip(
+                            inv.payment_method,
+                            inv.note,
+                            "max-w-[45%] shrink-0 truncate rounded-lg border-border/80 bg-surface-2/60 px-2 py-1 text-[11px] text-muted-foreground",
+                          )}
                         </div>
                       </div>
 
@@ -1575,12 +1577,11 @@ export function SalesPage() {
                             {inv.invoice_number}
                           </span>
                           <div className="shrink-0">{statusBadge(inv.status)}</div>
-                          <div className="inline-flex items-center gap-1 truncate text-[11px] text-muted-foreground">
-                            {pmIcon(inv.payment_method, inv.note)}
-                            <span className="truncate">
-                              {pmLabel(inv.payment_method, inv.note)}
-                            </span>
-                          </div>
+                          {pmChip(
+                            inv.payment_method,
+                            inv.note,
+                            "truncate text-[11px] text-muted-foreground",
+                          )}
                         </div>
                         <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
                           <span className="truncate font-medium text-foreground">
@@ -1875,6 +1876,346 @@ export function SalesPage() {
         </VortexFilterSection>
       </VortexFilterSheet>
 
+  {false && selected && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-end bg-black/65 backdrop-blur-xs animate-in fade-in duration-200"
+          onClick={() => setSelected(null)}
+        >
+          <div
+            className="h-full w-full max-w-2xl border-s border-border/80 bg-background/95 backdrop-blur-md p-6 shadow-2xl overflow-y-auto animate-in slide-in-from-left duration-200 relative flex flex-col justify-between"
+            onClick={(e) => e.stopPropagation()}
+            dir={isRtl ? "rtl" : "ltr"}
+          >
+            {/* Ambient decorative glow */}
+            <div className="absolute -top-12 -right-12 size-48 rounded-full bg-primary/20 blur-3xl pointer-events-none" />
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-border/80 bg-surface-2/40 px-6 py-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <Receipt className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-mono text-lg font-bold text-foreground">
+                      {selected.invoice_number}
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => copyInvoiceNumber(selected.invoice_number, selected.id)}
+                      className="rounded p-1 text-muted-foreground hover:text-foreground"
+                    >
+                      {copiedInvoiceId === selected.id ? (
+                        <Check className="h-3.5 w-3.5 text-emerald-500" />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  </div>
+                  <div className="mt-0.5">
+                    <VortexDateBadge date={selected.created_at} variant="subtle" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div>{statusBadge(selected.status)}</div>
+                <button
+                  onClick={() => setSelected(null)}
+                  className="rounded-lg p-1.5 text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+              {/* Info Grid */}
+              <div
+                className={`grid gap-3 rounded-xl border border-border/80 bg-surface-2/30 p-4 text-xs ${
+                  hasMultiWarehouse ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-1 sm:grid-cols-3"
+                }`}
+              >
+                <div>
+                  <span className="text-[10px] uppercase font-semibold text-muted-foreground">
+                    {isRtl ? "العميل" : "Customer"}
+                  </span>
+                  <p className="mt-0.5 text-sm font-semibold text-foreground">
+                    {selected.customers?.name ?? (isRtl ? "عميل نقدي" : "Walk-in")}
+                  </p>
+                  {selected.customers?.phone && (
+                    <p className="text-[11px] text-muted-foreground dir-ltr">
+                      {toSystemDigits(selected.customers.phone)}
+                    </p>
+                  )}
+                </div>
+
+                {hasMultiWarehouse && (
+                  <div>
+                    <span className="text-[10px] uppercase font-semibold text-muted-foreground">
+                      {isRtl ? "المستودع / الفرع" : "Warehouse"}
+                    </span>
+                    <p className="mt-0.5 text-sm font-semibold text-foreground">
+                      {whName(selected.warehouses) ?? "—"}
+                    </p>
+                  </div>
+                )}
+
+                <div>
+                  <span className="text-[10px] uppercase font-semibold text-muted-foreground">
+                    {isRtl ? "طريقة السداد" : "Payment Method"}
+                  </span>
+                  <div className="mt-0.5 text-sm font-medium text-foreground">
+                    {pmChip(selected.payment_method, selected.note)}
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-[10px] uppercase font-semibold text-muted-foreground">
+                    {isRtl ? "حالة السداد" : "Payment Status"}
+                  </span>
+                  <p className="mt-0.5 text-sm font-semibold text-foreground">
+                    {statusLabel(selected.status)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Note / Split details if present */}
+              {selected.note && (
+                <div className="rounded-xl border border-border/80 bg-surface-2/40 p-3 text-xs text-muted-foreground">
+                  <span className="font-semibold text-foreground me-1">
+                    {isRtl ? "الملاحظات وتفاصيل الدفع:" : "Note & Payment Details:"}
+                  </span>
+                  {selected.note}
+                </div>
+              )}
+
+              {/* Items Table */}
+              <div>
+                <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  {isRtl ? "بنود الفاتورة والمنتجات" : "Invoice Items"}
+                </h4>
+                <div className="overflow-hidden rounded-xl border border-border">
+                  <table className="w-full text-xs">
+                    <thead className="bg-surface-2/70 text-muted-foreground">
+                      <tr>
+                        <th className="px-3 py-2.5 text-start font-medium">
+                          {isRtl ? "المنتج / الصنف" : "Item"}
+                        </th>
+                        <th className="px-3 py-2.5 text-center font-medium">
+                          {isRtl ? "الكمية" : "Qty"}
+                        </th>
+                        <th className="px-3 py-2.5 text-end font-medium">
+                          {isRtl ? "سعر الوحدة" : "Unit Price"}
+                        </th>
+                        <th className="px-3 py-2.5 text-end font-medium">
+                          {isRtl ? "الإجمالي" : "Total"}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/60">
+                      {loadingLines ? (
+                        <tr>
+                          <td colSpan={4} className="py-6 text-center text-muted-foreground">
+                            <RefreshCw className="mx-auto h-4 w-4 animate-spin mb-1 text-primary" />
+                            {isRtl ? "جاري جلب تفاصيل البنود..." : "Loading items..."}
+                          </td>
+                        </tr>
+                      ) : lines.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="py-6 text-center text-muted-foreground">
+                            {isRtl ? "لا توجد بنود مسجلة لهذه الفاتورة" : "No items recorded"}
+                          </td>
+                        </tr>
+                      ) : (
+                        lines.map((l) => (
+                          <tr key={l.id} className="hover:bg-surface-2/30">
+                            <td className="px-3 py-2.5">
+                              {/* الاسم العربي أولاً — أسماء المنتجات الإنجليزية
+                                  كانت تظهر في واجهة عربية عند غياب name_ar. */}
+                              <div className="font-medium text-foreground">
+                                {l.products?.name_ar || l.products?.name || "—"}
+                              </div>
+                              {/* بند خدمة الطحن (line_type = SERVICE) لا يخصم مخزوناً؛
+                                  إظهاره يمنع افتراض أنه بضاعة مخزنية. */}
+                              {l.line_type === "SERVICE" && (
+                                <div className="mt-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                                  {isRtl
+                                    ? "بند خدمة — لا يخصم مخزوناً"
+                                    : "Service line — no stock impact"}
+                                </div>
+                              )}
+                              {l.products?.sku && (
+                                <div className="text-[10px] font-mono text-muted-foreground">
+                                  SKU: {l.products.sku}
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-3 py-2.5 text-center">
+                              <span className="inline-block rounded-md bg-surface-2 px-2 py-0.5 font-mono font-semibold text-foreground">
+                                {toSystemDigits(l.quantity.toString())}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2.5 text-end font-mono">
+                              {toSystemDigits(money(Number(l.unit_price)))}
+                            </td>
+                            <td className="px-3 py-2.5 text-end font-mono font-semibold text-foreground">
+                              {toSystemDigits(money(Number(l.total)))}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Financial Totals Breakdown */}
+              <div className="rounded-xl border border-border/80 bg-surface-2/30 p-4 text-xs space-y-1.5">
+                <div className="flex justify-between text-muted-foreground">
+                  <span>{isRtl ? "المجموع الفرعي (قبل الضريبة):" : "Subtotal:"}</span>
+                  <span className="font-mono">
+                    {toSystemDigits(money(Number(selected.subtotal)))}
+                  </span>
+                </div>
+                {Number(selected.discount) > 0 && (
+                  <div className="flex justify-between text-emerald-500">
+                    <span>{isRtl ? "الخصم الممنوح:" : "Discount:"}</span>
+                    <span className="font-mono">
+                      -{toSystemDigits(money(Number(selected.discount)))}
+                    </span>
+                  </div>
+                )}
+                {Number(selected.tax) > 0 && (
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>{isRtl ? "ضريبة القيمة المضافة:" : "VAT / Tax:"}</span>
+                    <span className="font-mono">{toSystemDigits(money(Number(selected.tax)))}</span>
+                  </div>
+                )}
+                <div className="flex justify-between border-t border-border pt-1.5 text-sm font-bold text-foreground">
+                  <span>{isRtl ? "الإجمالي الكلي:" : "Grand Total:"}</span>
+                  <span className="font-mono text-base">
+                    {toSystemDigits(money(Number(selected.total)))}
+                  </span>
+                </div>
+                <div className="flex justify-between text-emerald-500 font-medium">
+                  <span>{isRtl ? "المسدد نقداً / مدفوع:" : "Paid:"}</span>
+                  <span className="font-mono">{toSystemDigits(money(Number(selected.paid)))}</span>
+                </div>
+                {Math.max(0, Number(selected.total) - Number(selected.paid)) > 0 && (
+                  <div className="flex justify-between text-rose-500 font-bold border-t border-border/60 pt-1 text-xs">
+                    <span>{isRtl ? "المتبقي (دين آجل مستحق):" : "Remaining Due:"}</span>
+                    <span className="font-mono">
+                      {toSystemDigits(
+                        money(Math.max(0, Number(selected.total) - Number(selected.paid))),
+                      )}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer / Actions */}
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/80 bg-surface-2/40 px-6 py-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  disabled={!selected.customers?.phone}
+                  onClick={() => shareInvoiceWhatsApp(selected)}
+                  title={
+                    !selected.customers?.phone
+                      ? isRtl
+                        ? "هذا العميل لا يوجد لديه رقم هاتف مسجل في النظام"
+                        : "This customer has no phone number registered"
+                      : isRtl
+                        ? "مشاركة واتساب"
+                        : "WhatsApp"
+                  }
+                  className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition ${
+                    selected.customers?.phone
+                      ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 cursor-pointer"
+                      : "border border-border/60 bg-muted/40 text-muted-foreground/40 cursor-not-allowed opacity-50"
+                  }`}
+                >
+                  <WhatsAppIcon className="h-4 w-4" />
+                  <span>{isRtl ? "واتساب" : "WhatsApp"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={!selected.customers?.phone}
+                  onClick={() => shareInvoiceSms(selected)}
+                  title={
+                    !selected.customers?.phone
+                      ? isRtl
+                        ? "هذا العميل لا يوجد لديه رقم هاتف مسجل في النظام"
+                        : "This customer has no phone number registered"
+                      : isRtl
+                        ? "مشاركة SMS"
+                        : "SMS"
+                  }
+                  className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition ${
+                    selected.customers?.phone
+                      ? "border border-blue-500/30 bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 cursor-pointer"
+                      : "border border-border/60 bg-muted/40 text-muted-foreground/40 cursor-not-allowed opacity-50"
+                  }`}
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  <span>{isRtl ? "رسالة SMS" : "SMS"}</span>
+                </button>
+
+                {/* PDF */}
+                <button
+                  type="button"
+                  onClick={doPDF}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-xs font-medium text-foreground hover:bg-surface-2 transition"
+                >
+                  <FileDown className="h-4 w-4" />
+                  <span>{isRtl ? "تحميل PDF" : "PDF"}</span>
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {/* Quick Collect Button if invoice has balance */}
+                {Math.max(0, Number(selected.total) - Number(selected.paid)) > 0 &&
+                  selected.status !== "cancelled" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        triggerQuickCollect(selected);
+                        setSelected(null);
+                      }}
+                      className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-amber-500 px-4 text-xs font-semibold text-amber-950 shadow-sm hover:bg-amber-400 transition"
+                    >
+                      <Wallet className="h-4 w-4" />
+                      <span>{isRtl ? "تحصيل الدفعة الآن" : "Collect Payment"}</span>
+                    </button>
+                  )}
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const doc = await buildDoc();
+                    if (doc) setPrintDoc(doc);
+                  }}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm hover:opacity-95 transition"
+                >
+                  <Printer className="h-4 w-4" />
+                  <span>{isRtl ? "طباعة الفاتورة" : "Print"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSelected(null)}
+                  className="h-9 rounded-lg border border-border bg-surface px-4 text-xs font-medium text-foreground hover:bg-surface-2 transition"
+                >
+                  {isRtl ? "إغلاق" : "Close"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {/* ─── Luxury Invoice Details Sheet (Vortex UI) ─── */}
       <VortexInvoiceDetailsSheet
         open={Boolean(selected)}

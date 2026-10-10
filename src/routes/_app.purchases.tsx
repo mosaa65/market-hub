@@ -47,6 +47,12 @@ import { DataTable, type DataTableColumn, type DataTableSort } from "@/component
 import { IconButton } from "@/components/ui/icon-button";
 import { useBreakpoint } from "@/design/breakpoints";
 import { toast } from "sonner";
+import { PaymentMethodPicker } from "@/components/ui/payment-method";
+import {
+  getPaymentMethodDefinition,
+  paymentMethodLabel,
+  toLegacyPaymentValue,
+} from "@/lib/payments/payment-methods";
 
 export const Route = createFileRoute("/_app/purchases")({
   head: () => ({ meta: [{ title: "Purchases — Vortex ERP" }] }),
@@ -253,17 +259,8 @@ function PurchasesPage() {
   }
 
   const pmLabel = useCallback(
-    (m: string) => {
-      const map: Record<string, string> = {
-        cash: t("pos.pm.cash"),
-        card: t("pos.pm.card"),
-        bank_transfer: t("pos.pm.bank"),
-        bank: t("pos.pm.bank"),
-        credit: t("pos.pm.credit"),
-      };
-      return map[m] ?? m;
-    },
-    [t],
+    (m: string) => paymentMethodLabel(m, lang === "ar" ? "ar" : "en"),
+    [lang],
   );
 
   const statusLabel = useCallback(
@@ -375,12 +372,7 @@ function PurchasesPage() {
         const sup = r.suppliers?.name?.toLowerCase() || "";
         const phone = r.suppliers?.phone?.toLowerCase() || "";
         const note = r.note?.toLowerCase() || "";
-        return (
-          invNum.includes(q) ||
-          sup.includes(q) ||
-          phone.includes(q) ||
-          note.includes(q)
-        );
+        return invNum.includes(q) || sup.includes(q) || phone.includes(q) || note.includes(q);
       });
     }
 
@@ -410,8 +402,10 @@ function PurchasesPage() {
 
     list = [...list].sort((a, b) => {
       if (sort) {
-        const aVal = sort.key === "created_at" ? new Date(a.created_at).getTime() : (a as any)[sort.key];
-        const bVal = sort.key === "created_at" ? new Date(b.created_at).getTime() : (b as any)[sort.key];
+        const aVal =
+          sort.key === "created_at" ? new Date(a.created_at).getTime() : (a as any)[sort.key];
+        const bVal =
+          sort.key === "created_at" ? new Date(b.created_at).getTime() : (b as any)[sort.key];
         if (aVal == null && bVal == null) return 0;
         if (aVal == null) return 1;
         if (bVal == null) return -1;
@@ -675,7 +669,10 @@ function PurchasesPage() {
             </span>
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {t("purchases.subtitle") || (isRtl ? "إدارة وتتبع فواتير المشتريات والتوريد والموردين" : "Manage and track purchase invoices, supplies, and vendors")}
+            {t("purchases.subtitle") ||
+              (isRtl
+                ? "إدارة وتتبع فواتير المشتريات والتوريد والموردين"
+                : "Manage and track purchase invoices, supplies, and vendors")}
           </p>
         </div>
 
@@ -768,7 +765,6 @@ function PurchasesPage() {
       {/* ─── Standard VORTEX TableToolbar: Search + Filters + Sort + View Toggle + Action ─── */}
       <TableToolbar
         sticky
-        lang={isRtl ? "ar" : "en"}
         search={{
           value: search,
           onValueChange: setSearch,
@@ -983,7 +979,12 @@ function PurchasesPage() {
                         </button>
                       </div>
                       <div className="mt-1">
-                        <VortexDateBadge date={inv.created_at} variant="formal" size="sm" showTime />
+                        <VortexDateBadge
+                          date={inv.created_at}
+                          variant="formal"
+                          size="sm"
+                          showTime
+                        />
                       </div>
                     </div>
                     <div className="shrink-0">{statusBadge(inv.status)}</div>
@@ -1333,7 +1334,9 @@ function PurchasesPage() {
             docType: "purchase_invoice",
             title: t("purchases.title") || "فاتورة مشتريات وتوريد",
             number: directPrintInvoice.invoice_number,
-            date: new Date(directPrintInvoice.created_at).toLocaleString(lang === "ar" ? "ar-EG" : "en-US"),
+            date: new Date(directPrintInvoice.created_at).toLocaleString(
+              lang === "ar" ? "ar-EG" : "en-US",
+            ),
             partyLabel: t("common.supplier") || "المورد",
             partyName: directPrintInvoice.suppliers?.name ?? "",
             partyPhone: directPrintInvoice.suppliers?.phone ?? "",
@@ -1352,7 +1355,10 @@ function PurchasesPage() {
             discount: Number(directPrintInvoice.discount),
             total: Number(directPrintInvoice.total),
             paid: Number(directPrintInvoice.paid),
-            balance: Math.max(0, Number(directPrintInvoice.total) - Number(directPrintInvoice.paid)),
+            balance: Math.max(
+              0,
+              Number(directPrintInvoice.total) - Number(directPrintInvoice.paid),
+            ),
           }}
           documentType="purchase_invoice"
           title={
@@ -1371,6 +1377,369 @@ function PurchasesPage() {
             void load();
           }}
           hasMultiWarehouse={hasMultiWarehouse}
+        />
+      )}
+    </div>
+  );
+}
+
+function ViewDialog({
+  invoice,
+  lines,
+  loadingLines,
+  onClose,
+  pmLabel,
+  statusLabel,
+  hasMultiWarehouse,
+  onWhatsApp,
+  onSms,
+  copyInvoiceNumber,
+  copiedInvoiceId,
+}: {
+  invoice: Invoice;
+  lines: Line[];
+  loadingLines: boolean;
+  onClose: () => void;
+  pmLabel: (m: string) => string;
+  statusLabel: (s: string) => string;
+  hasMultiWarehouse?: boolean;
+  onWhatsApp: () => void;
+  onSms: () => void;
+  copyInvoiceNumber: (num: string, id: string) => void;
+  copiedInvoiceId: string | null;
+}) {
+  const { t, lang } = useI18n();
+  const isRtl = lang === "ar";
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const wh = invoice.warehouses;
+  const whLabel = !wh ? "—" : lang === "ar" ? wh.name_ar || wh.name : wh.name || wh.name_ar || "—";
+  const supplierName = invoice.suppliers?.name ?? (isRtl ? "مورد عام" : "General Vendor");
+  const remaining = Math.max(0, Number(invoice.total) - Number(invoice.paid));
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-end bg-black/65 backdrop-blur-xs animate-in fade-in duration-200"
+      onClick={onClose}
+    >
+      <div
+        className="h-full w-full max-w-2xl border-s border-border/80 bg-background/95 backdrop-blur-md p-6 shadow-2xl overflow-y-auto animate-in slide-in-from-left duration-200 relative flex flex-col justify-between"
+        onClick={(e) => e.stopPropagation()}
+        dir={isRtl ? "rtl" : "ltr"}
+      >
+        {/* Ambient decorative glow */}
+        <div className="absolute -top-12 -right-12 size-48 rounded-full bg-primary/20 blur-3xl pointer-events-none" />
+
+        {/* Modal Header */}
+        <div className="flex items-center justify-between border-b border-border/80 bg-surface-2/40 px-6 py-4 -mx-6 -mt-6 mb-5">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Receipt className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-mono text-lg font-bold text-foreground">
+                  {invoice.invoice_number}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => copyInvoiceNumber(invoice.invoice_number, invoice.id)}
+                  className="rounded p-1 text-muted-foreground hover:text-foreground"
+                >
+                  {copiedInvoiceId === invoice.id ? (
+                    <Check className="h-3.5 w-3.5 text-emerald-500" />
+                  ) : (
+                    <Copy className="h-3.5 w-3.5" />
+                  )}
+                </button>
+              </div>
+              <div className="mt-0.5">
+                <VortexDateBadge date={invoice.created_at} variant="formal" showTime />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onClose}
+              className="rounded-lg p-1.5 text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Modal Body */}
+        <div className="flex-1 overflow-y-auto space-y-5">
+          {/* Info Grid */}
+          <div
+            className={`grid gap-3 rounded-xl border border-border/80 bg-surface-2/30 p-4 text-xs ${
+              hasMultiWarehouse ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-1 sm:grid-cols-3"
+            }`}
+          >
+            <div>
+              <span className="text-[10px] uppercase font-semibold text-muted-foreground">
+                {isRtl ? "المورد" : "Supplier"}
+              </span>
+              <p className="mt-0.5 text-sm font-semibold text-foreground">{supplierName}</p>
+              {invoice.suppliers?.phone && (
+                <p className="text-[11px] text-muted-foreground dir-ltr font-mono">
+                  {toSystemDigits(invoice.suppliers.phone)}
+                </p>
+              )}
+            </div>
+
+            {hasMultiWarehouse && (
+              <div>
+                <span className="text-[10px] uppercase font-semibold text-muted-foreground">
+                  {isRtl ? "المستودع / الفرع" : "Warehouse"}
+                </span>
+                <p className="mt-0.5 text-sm font-semibold text-foreground">{whLabel}</p>
+              </div>
+            )}
+
+            <div>
+              <span className="text-[10px] uppercase font-semibold text-muted-foreground">
+                {isRtl ? "طريقة السداد" : "Payment Method"}
+              </span>
+              <p className="mt-0.5 text-sm font-medium text-foreground">
+                {pmLabel(invoice.payment_method)}
+              </p>
+            </div>
+
+            <div>
+              <span className="text-[10px] uppercase font-semibold text-muted-foreground">
+                {isRtl ? "حالة الفاتورة" : "Status"}
+              </span>
+              <p className="mt-0.5 text-sm font-semibold text-foreground">
+                {statusLabel(invoice.status)}
+              </p>
+            </div>
+          </div>
+
+          {/* Note / Terms if present */}
+          {invoice.note && (
+            <div className="rounded-xl border border-border/80 bg-surface-2/40 p-3 text-xs text-muted-foreground">
+              <span className="font-semibold text-foreground me-1">
+                {isRtl ? "الملاحظات وشروط التوريد:" : "Note & Terms:"}
+              </span>
+              {invoice.note}
+            </div>
+          )}
+
+          {/* Items Table */}
+          <div>
+            <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              {isRtl ? "أصناف وبنود أمر الشراء" : "Purchase Items"}
+            </h4>
+            <div className="overflow-hidden rounded-xl border border-border">
+              <table className="w-full text-xs">
+                <thead className="bg-surface-2/70 text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2.5 text-start font-medium">
+                      {isRtl ? "المنتج / الصنف" : "Item"}
+                    </th>
+                    <th className="px-3 py-2.5 text-center font-medium">
+                      {isRtl ? "الكمية" : "Qty"}
+                    </th>
+                    <th className="px-3 py-2.5 text-end font-medium">
+                      {isRtl ? "تكلفة الوحدة" : "Unit Cost"}
+                    </th>
+                    <th className="px-3 py-2.5 text-end font-medium">
+                      {isRtl ? "الإجمالي" : "Total"}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60">
+                  {loadingLines ? (
+                    <tr>
+                      <td colSpan={4} className="py-6 text-center text-muted-foreground">
+                        <RefreshCw className="mx-auto h-4 w-4 animate-spin mb-1 text-primary" />
+                        {isRtl ? "جاري جلب تفاصيل البنود..." : "Loading items..."}
+                      </td>
+                    </tr>
+                  ) : lines.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="py-6 text-center text-muted-foreground">
+                        {isRtl ? "لا توجد بنود مسجلة لهذه الفاتورة" : "No items recorded"}
+                      </td>
+                    </tr>
+                  ) : (
+                    lines.map((l) => (
+                      <tr key={l.id} className="hover:bg-surface-2/30">
+                        <td className="px-3 py-2.5">
+                          <div className="font-medium text-foreground">
+                            {l.products?.name_ar || l.products?.name || "—"}
+                          </div>
+                          {l.products?.sku && (
+                            <div className="text-[10px] font-mono text-muted-foreground">
+                              SKU: {l.products.sku}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5 text-center">
+                          <span className="inline-block rounded-md bg-surface-2 px-2 py-0.5 font-mono font-semibold text-foreground">
+                            {toSystemDigits(l.quantity.toString())}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5 text-end font-mono">
+                          {toSystemDigits(money(Number(l.unit_cost)))}
+                        </td>
+                        <td className="px-3 py-2.5 text-end font-mono font-semibold text-foreground">
+                          {toSystemDigits(money(Number(l.total)))}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Financial Breakdown */}
+          <div className="rounded-xl border border-border/80 bg-surface-2/30 p-4 text-xs space-y-1.5">
+            <div className="flex justify-between text-muted-foreground">
+              <span>{isRtl ? "المجموع الفرعي (قبل الضريبة):" : "Subtotal:"}</span>
+              <span className="font-mono">{toSystemDigits(money(Number(invoice.subtotal)))}</span>
+            </div>
+            {Number(invoice.discount) > 0 && (
+              <div className="flex justify-between text-emerald-500">
+                <span>{isRtl ? "الخصم المكتسب:" : "Discount:"}</span>
+                <span className="font-mono">
+                  -{toSystemDigits(money(Number(invoice.discount)))}
+                </span>
+              </div>
+            )}
+            {Number(invoice.tax) > 0 && (
+              <div className="flex justify-between text-muted-foreground">
+                <span>{isRtl ? "ضريبة القيمة المضافة:" : "VAT / Tax:"}</span>
+                <span className="font-mono">{toSystemDigits(money(Number(invoice.tax)))}</span>
+              </div>
+            )}
+            <div className="flex justify-between border-t border-border pt-1.5 text-sm font-bold text-foreground">
+              <span>{isRtl ? "الإجمالي الكلي:" : "Grand Total:"}</span>
+              <span className="font-mono text-base">
+                {toSystemDigits(money(Number(invoice.total)))}
+              </span>
+            </div>
+            <div className="flex justify-between text-emerald-500 font-medium">
+              <span>{isRtl ? "المسدد نقداً للمورد:" : "Paid:"}</span>
+              <span className="font-mono">{toSystemDigits(money(Number(invoice.paid)))}</span>
+            </div>
+            {remaining > 0 && (
+              <div className="flex justify-between text-rose-500 font-bold border-t border-border/60 pt-1 text-xs">
+                <span>{isRtl ? "المتبقي (دين آجل للمورد):" : "Remaining Due:"}</span>
+                <span className="font-mono">{toSystemDigits(money(remaining))}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Modal Footer / Actions */}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/80 bg-surface-2/40 px-6 py-4 -mx-6 -mb-6 mt-5">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={!invoice.suppliers?.phone}
+              onClick={onWhatsApp}
+              title={
+                !invoice.suppliers?.phone
+                  ? isRtl
+                    ? "هذا المورد لا يوجد لديه رقم هاتف مسجل في النظام"
+                    : "This supplier has no phone number registered"
+                  : isRtl
+                    ? "مشاركة واتساب"
+                    : "WhatsApp"
+              }
+              className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition ${
+                invoice.suppliers?.phone
+                  ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 cursor-pointer"
+                  : "border border-border/60 bg-muted/40 text-muted-foreground/40 cursor-not-allowed opacity-50"
+              }`}
+            >
+              <WhatsAppIcon className="h-4 w-4" />
+              <span>{isRtl ? "واتساب للمورد" : "WhatsApp"}</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={!invoice.suppliers?.phone}
+              onClick={onSms}
+              title={
+                !invoice.suppliers?.phone
+                  ? isRtl
+                    ? "هذا المورد لا يوجد لديه رقم هاتف مسجل في النظام"
+                    : "This supplier has no phone number registered"
+                  : isRtl
+                    ? "مشاركة عبر SMS"
+                    : "SMS"
+              }
+              className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition ${
+                invoice.suppliers?.phone
+                  ? "border border-blue-500/30 bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 cursor-pointer"
+                  : "border border-border/60 bg-muted/40 text-muted-foreground/40 cursor-not-allowed opacity-50"
+              }`}
+            >
+              <MessageSquare className="h-4 w-4" />
+              <span>{isRtl ? "رسالة SMS" : "SMS"}</span>
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPreviewOpen(true)}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm hover:opacity-95 transition"
+            >
+              <Printer className="h-4 w-4" />
+              <span>{isRtl ? "طباعة الفاتورة" : "Print"}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-9 items-center rounded-lg border border-border bg-surface px-4 text-xs font-medium text-foreground hover:bg-surface-2 transition"
+            >
+              {t("common.close")}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {previewOpen && (
+        <LuxuryPrintPreviewModal
+          open={previewOpen}
+          onClose={() => setPreviewOpen(false)}
+          doc={{
+            docType: "purchase_invoice",
+            title: t("purchases.title") || "فاتورة مشتريات وتوريد",
+            number: invoice.invoice_number,
+            date: new Date(invoice.created_at).toLocaleString(lang === "ar" ? "ar-EG" : "en-US"),
+            partyLabel: t("common.supplier") || "المورد",
+            partyName: invoice.suppliers?.name ?? "",
+            partyPhone: invoice.suppliers?.phone ?? "",
+            warehouse: hasMultiWarehouse ? whLabel : undefined,
+            payment: pmLabel(invoice.payment_method),
+            status: statusLabel(invoice.status),
+            lines: lines.map((l) => ({
+              product: l.products?.name_ar || l.products?.name || "—",
+              qty: Number(l.quantity),
+              price: Number(l.unit_cost),
+              total: Number(l.total),
+              code: l.products?.sku || undefined,
+            })),
+            subtotal: Number(invoice.subtotal),
+            tax: Number(invoice.tax),
+            discount: Number(invoice.discount),
+            total: Number(invoice.total),
+            paid: Number(invoice.paid),
+            balance: Math.max(0, Number(invoice.total) - Number(invoice.paid)),
+          }}
+          documentType="purchase_invoice"
+          title={
+            lang === "ar" ? "معاينة وطباعة فاتورة المشتريات" : "Purchase Invoice Print Preview"
+          }
+          defaultFormat="standard"
+          customerName={invoice.suppliers?.name ?? undefined}
         />
       )}
     </div>
@@ -1397,9 +1766,7 @@ function CreateDialog({
   const [cart, setCart] = useState<CartLine[]>([]);
   const [paid, setPaid] = useState("");
   const [discount, setDiscount] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "bank_transfer" | "credit">(
-    "bank_transfer",
-  );
+  const [paymentMethod, setPaymentMethod] = useState<string>("bank_transfer");
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
   const productLabel = (p?: Pick<Product, "name" | "name_ar"> | null) =>
@@ -1536,7 +1903,10 @@ function CreateDialog({
       const { error } = await supabase.rpc("create_purchase", {
         _warehouse_id: warehouseId,
         _supplier_id: supplierId,
-        _payment_method: paymentMethod,
+        // The picker holds a catalogue id. Convert at the boundary, exactly as
+        // the POS screen does, so `create_purchase` receives the stored value it
+        // casts into the ENUM.
+        _payment_method: toLegacyPaymentValue(paymentMethod),
         _paid: paymentMethod === "credit" ? 0 : paidN || total,
         _discount: discountN,
         _note: (note || null) as any,
@@ -1557,7 +1927,7 @@ function CreateDialog({
     }
   }
 
-  const pmKey = (m: string) => (m === "bank_transfer" ? t("pos.pm.bank") : t(`pos.pm.${m}`));
+  const pmKey = (m: string) => paymentMethodLabel(m, lang === "ar" ? "ar" : "en");
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur-sm p-4">
@@ -1725,18 +2095,26 @@ function CreateDialog({
 
         <div className="mt-4 grid grid-cols-2 gap-3 border-t border-border pt-3 text-sm">
           <div className="space-y-2">
-            <div className="grid grid-cols-4 gap-1">
-              {(["cash", "card", "bank_transfer", "credit"] as const).map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setPaymentMethod(m)}
-                  className={`h-8 rounded-md border text-xs transition ${paymentMethod === m ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-surface-2"}`}
-                >
-                  {pmKey(m)}
-                </button>
-              ))}
-            </div>
-            {paymentMethod !== "credit" && (
+            {/*
+              طريقة دفع المشتريات — المكوّن الموحّد.
+
+              These four hard-coded buttons were a fourth, independent copy of
+              the payment-method list. The picker now offers whatever the
+              business enabled for purchases, and آجل appears only because the
+              catalogue allows it here.
+            */}
+            <PaymentMethodPicker
+              context="purchases"
+              value={paymentMethod}
+              onChange={(method) => {
+                setPaymentMethod(method);
+                const definition = getPaymentMethodDefinition(method);
+                if (definition?.isCreditTerm) setPaid("0");
+              }}
+              ensureIds={[paymentMethod]}
+              ariaLabel={t("common.method")}
+            />
+            {!(getPaymentMethodDefinition(paymentMethod)?.isCreditTerm ?? false) && (
               <input
                 type="number"
                 value={paid}

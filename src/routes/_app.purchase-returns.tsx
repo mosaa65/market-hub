@@ -31,6 +31,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { PaymentMethodPicker } from "@/components/ui/payment-method";
+import { paymentMethodLabel } from "@/lib/payments/payment-methods";
+import { usePaymentMethodOverrides } from "@/hooks/use-payment-methods";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import {
@@ -95,6 +98,9 @@ function PurchaseReturnsPage() {
   const { t, lang } = useI18n();
   const isRtl = lang === "ar";
   const qc = useQueryClient();
+  // The business's own names for methods it renamed, keyed by catalogue id, so a
+  // refund method reads the same here as it does at the till.
+  const overrides = usePaymentMethodOverrides();
   const breakpoint = useBreakpoint();
   const tableUsesHorizontalScroll =
     breakpoint === "xs" || breakpoint === "sm" || breakpoint === "md";
@@ -148,24 +154,19 @@ function PurchaseReturnsPage() {
     );
   }, [purchaseReturns, search]);
 
+  /**
+   * A stored `refund_method` -> the name to show, read from the catalogue.
+   *
+   * The switch that used to be here was a third copy of the payment-method
+   * labels. It knew only four values, it had a `bank` branch for a value the
+   * ENUM does not contain, and anything else — `mobile_money`, `cheque`, a
+   * wallet the business added — was printed as its raw English key. The
+   * catalogue answers all of them, and `overrides` turns a renamed method into
+   * the business's own word.
+   */
   const refundLabel = useCallback(
-    (method: string | null) => {
-      const value = method ?? "cash";
-      switch (value) {
-        case "cash":
-          return isRtl ? "نقداً" : "Cash";
-        case "card":
-          return isRtl ? "بطاقة" : "Card";
-        case "bank":
-        case "bank_transfer":
-          return isRtl ? "تحويل بنكي" : "Bank transfer";
-        case "credit":
-          return isRtl ? "خصم من رصيد المورد" : "Deduct balance";
-        default:
-          return value;
-      }
-    },
-    [isRtl],
+    (method: string | null) => paymentMethodLabel(method ?? "cash", isRtl ? "ar" : "en", overrides),
+    [isRtl, overrides],
   );
 
   const filterDefinitions: FilterDefinition[] = useMemo(() => {
@@ -426,7 +427,6 @@ function PurchaseReturnsPage() {
       {/* ─── Standard VORTEX TableToolbar ─── */}
       <TableToolbar
         sticky
-        lang={lang}
         search={{
           value: search,
           onValueChange: setSearch,
@@ -892,19 +892,22 @@ function NewPurchaseReturn({
             </div>
             <div className="grid gap-1.5">
               <Label>{lang === "ar" ? "طريقة الاسترداد" : "Refund method"}</Label>
-              <Select value={refundMethod} onValueChange={setRefundMethod}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cash">{lang === "ar" ? "نقدًا" : "Cash"}</SelectItem>
-                  <SelectItem value="card">{lang === "ar" ? "بطاقة" : "Card"}</SelectItem>
-                  <SelectItem value="bank">{lang === "ar" ? "تحويل بنكي" : "Bank"}</SelectItem>
-                  <SelectItem value="credit">
-                    {lang === "ar" ? "خصم من رصيد المورد" : "Deduct Balance"}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+              {/*
+                الاسترداد ليس طريقة دفع، لكنه يستخدم نفس الكتالوج بنفس السياق
+                المستقل، فالطرق المتاحة هنا هي ما فعّله العميل لقسم المرتجعات.
+
+                This replaced a Radix Select whose "badge" option used value
+                "bank" — a value the payment_method ENUM does not contain, so
+                the return failed with a cast error.
+              */}
+              <PaymentMethodPicker
+                context="purchase_returns"
+                value={refundMethod}
+                onChange={setRefundMethod}
+                includeCredit
+                ensureIds={[refundMethod]}
+                ariaLabel={lang === "ar" ? "طريقة الاسترداد" : "Refund method"}
+              />
             </div>
           </div>
 

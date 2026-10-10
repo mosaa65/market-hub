@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/page-header";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { money, num } from "@/lib/format";
+import { paymentMethodLabel as paymentMethodLabelFromCatalog } from "@/lib/payments/payment-methods";
 import { VortexMetricCard } from "@/components/vortex-ui/finance/vortex-metric-card";
 import {
   Sparkles,
@@ -383,7 +384,9 @@ function AnalyticsPage() {
       expByCat,
       totalOrders: sales.length,
     };
-  }, [data, days, lang, isAr]);
+    // `lang` is read through `isAr` above, which is derived from it — the memo
+    // only depends on the derived flag, not on the raw value as well.
+  }, [data, days, isAr]);
 
   const dayRanges = [7, 14, 30, 90];
 
@@ -1148,13 +1151,9 @@ function localDayKey(input: string | Date): string {
 }
 
 function paymentMethodLabel(method: string | null | undefined, isAr: boolean): string {
-  const map: Record<string, string> = {
-    cash: isAr ? "نقدًا" : "Cash",
-    card: isAr ? "بطاقة" : "Card",
-    bank_transfer: isAr ? "تحويل بنكي" : "Bank transfer",
-    bank: isAr ? "تحويل بنكي" : "Bank",
-    credit: isAr ? "آجل" : "Credit",
-  };
-  if (!method) return isAr ? "غير محدد" : "Unspecified";
-  return map[method] ?? method;
+  // Reads the catalogue instead of a local map. The map that used to sit here
+  // knew cash/card/bank_transfer/bank/credit only, so a mobile-money sale —
+  // which the till has been able to take for a long time — rendered as the raw
+  // string "mobile_money", and a cheque rendered as "cheque".
+  return paymentMethodLabelFromCatalog(method, isAr ? "ar" : "en");
 }

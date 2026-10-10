@@ -232,7 +232,9 @@ BEGIN
 
   -- If the template mentions a date token that is empty (e.g. a preset with
   -- no date), collapse duplicated separators and trim stray edges.
-  v_result := regexp_replace(v_result, regexp_replace(regexp_replace(v_sep, '([\.\^\$\*\+\?\(\)\[\]\{\}\|\\])', '\\\1', 'g') || '{2,}', v_sep, 'g');
+  WHILE position(v_sep || v_sep IN v_result) > 0 LOOP
+    v_result := replace(v_result, v_sep || v_sep, v_sep);
+  END LOOP;
   v_result := btrim(v_result, v_sep || ' ');
   v_result := btrim(v_result);
 

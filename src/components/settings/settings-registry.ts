@@ -9,6 +9,7 @@ import {
   Hash,
   ShieldCheck,
   Scale,
+  CreditCard,
   Boxes,
   LucideIcon,
 } from "lucide-react";
@@ -21,11 +22,13 @@ import { MillingModeSection } from "./sections/milling-mode-section";
 import { SubscriptionSection } from "./sections/subscription-section";
 import { AppearanceSection } from "./sections/appearance-section";
 import { NumberFormatSection } from "./sections/number-format-section";
+import { PaymentMethodsSection } from "./sections/payment-methods-section";
 import { BackupSettingsCard } from "@/components/backup-settings-card";
 
 export type SettingsSectionId =
   | "company"
   | "invoicing"
+  | "payment-methods"
   | "printing"
   | "catalog"
   | "stock-settings"
@@ -80,6 +83,16 @@ registerSettingsSection({
   descriptionEn: "Currency, tax, invoice numbering, logo, and POS cart options",
   icon: Receipt,
   component: InvoicingSection,
+});
+
+registerSettingsSection({
+  id: "payment-methods",
+  titleAr: "طرق الدفع",
+  titleEn: "Payment Methods",
+  descriptionAr: "اختر الطرق التي تستخدمها، رتّبها، وحدّد الأقسام التي تظهر فيها",
+  descriptionEn: "Choose the methods you use, order them, and scope them per section",
+  icon: CreditCard,
+  component: PaymentMethodsSection,
 });
 
 registerSettingsSection({

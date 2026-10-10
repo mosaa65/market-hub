@@ -7,6 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { useI18n } from "@/lib/i18n";
 import { money } from "@/lib/format";
+import { paymentMethodLabel, toLegacyPaymentValue } from "@/lib/payments/payment-methods";
+import { PaymentMethodPicker } from "@/components/ui/payment-method";
 import { toast } from "sonner";
 import { WhatsAppButton } from "@/components/whatsapp-button";
 import { paymentReceiptMessage, debtReminderMessage } from "@/lib/whatsapp-templates";
@@ -81,7 +83,16 @@ function PaymentsPage() {
     invoiceNumber?: string | null;
   } | null>(null);
   const [amount, setAmount] = useState("");
-  const [method, setMethod] = useState<"cash" | "card" | "bank_transfer">("cash");
+  /**
+   * A CATALOGUE ID, held as a plain string.
+   *
+   * This used to be the union `"cash" | "card" | "bank_transfer"` and was sent
+   * to `record_customer_payment` unconverted — so the collection screen could
+   * only ever take three kinds of money, never a wallet, and had no way to name
+   * بنك الكريمي. The picker now decides what exists and the RPC boundary below
+   * converts the id to the value the ENUM stores.
+   */
+  const [method, setMethod] = useState<string>("cash");
   const [note, setNote] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [saving, setSaving] = useState(false);
@@ -183,7 +194,10 @@ function PaymentsPage() {
         _customer_id: selected.id,
         _invoice_id: invoiceId || null,
         _amount: amt,
-        _method: method,
+        // Catalogue id -> the value the ENUM stores, at the boundary only. The
+        // RPC's own `resolve_writable_payment_method` guard is the authority
+        // that then rejects anything the business has disabled.
+        _method: toLegacyPaymentValue(method),
         _payment_date: date,
         _note: note || null,
       });
@@ -218,20 +232,9 @@ function PaymentsPage() {
     });
   }
 
-  const pmLabel = (m: string) =>
-    m === "cash"
-      ? lang === "ar"
-        ? "نقدي"
-        : "Cash"
-      : m === "card"
-        ? lang === "ar"
-          ? "بطاقة"
-          : "Card"
-        : m === "bank_transfer"
-          ? lang === "ar"
-            ? "تحويل بنكي"
-            : "Bank"
-          : m;
+  // The catalogue, not a local map: a map defaulted everything it did not know
+  // to the raw key, and it did not know mobile_money or a tenant-created method.
+  const pmLabel = (m: string) => paymentMethodLabel(m, lang === "ar" ? "ar" : "en");
 
   return (
     <>
@@ -381,15 +384,19 @@ function PaymentsPage() {
                   />
                 </Field>
                 <Field label={lang === "ar" ? "طريقة الدفع" : "Method"}>
-                  <select
+                  {/*
+                    The shared picker, collection context. `includeCredit` is off:
+                    neither the RPC nor the business permits آجل here, so offering
+                    it would produce a value the guard rejects.
+                  */}
+                  <PaymentMethodPicker
+                    context="customer_collection"
                     value={method}
-                    onChange={(e) => setMethod(e.target.value as any)}
-                    className="h-9 w-full rounded-md border border-input bg-surface px-2 text-sm"
-                  >
-                    <option value="cash">{lang === "ar" ? "نقدي" : "Cash"}</option>
-                    <option value="card">{lang === "ar" ? "بطاقة" : "Card"}</option>
-                    <option value="bank_transfer">{lang === "ar" ? "تحويل بنكي" : "Bank"}</option>
-                  </select>
+                    onChange={setMethod}
+                    includeCredit={false}
+                    ensureIds={[method]}
+                    ariaLabel={lang === "ar" ? "طريقة الدفع" : "Payment method"}
+                  />
                 </Field>
                 <Field label={lang === "ar" ? "التاريخ" : "Date"}>
                   <input
@@ -616,7 +623,10 @@ function PaymentsPage() {
                 receiptNumber: successModalData.receiptNumber || "",
                 date: successModalData.date,
                 amount: successModalData.amount,
-                method: method === "cash" ? "نقداً" : method === "bank_transfer" ? "تحويل بنكي" : "بطاقة",
+                // From the catalogue — the ternary that sat here printed
+                // «بطاقة» for every non-cash, non-transfer method, so a wallet
+                // collection was receipted as a card payment.
+                method: paymentMethodLabel(method, lang === "ar" ? "ar" : "en"),
                 remainingBalance: successModalData.remaining,
                 invoiceNumber: successModalData.invoiceNumber,
               }

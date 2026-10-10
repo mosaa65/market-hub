@@ -5,6 +5,7 @@ import {
   VortexFilterSection,
   type PaymentMethod,
 } from "@/components/vortex-ui";
+import { toLegacyPaymentValue, paymentMethodLabel } from "@/lib/payments/payment-methods";
 import { SlidersHorizontal, Wallet, AlertTriangle, UserCheck } from "lucide-react";
 /**
  * شاشة الديون — تعرض الأرصدة **من الدفتر** لا من العمود المخزَّن.
@@ -99,13 +100,10 @@ function DebtsPage() {
     method: PaymentMethod;
     notes?: string;
   }) => {
-    const dbMethodMap: Record<PaymentMethod, "cash" | "bank_transfer"> = {
-      cash: "cash",
-      transfer: "bank_transfer",
-      card: "bank_transfer",
-      mobile_money: "bank_transfer",
-    };
-    const dbMethod = dbMethodMap[data.method] || "cash";
+    // Same fix as the customers screen: the old map silently rewrote card and
+    // mobile_money as bank_transfer, which credited the bank account for money
+    // that arrived in a wallet.
+    const dbMethod = toLegacyPaymentValue(data.method);
     const receiptNumber = String(Date.now()).slice(-6);
 
     const { error: pError } = await (supabase as any).rpc("record_customer_payment", {
@@ -215,14 +213,8 @@ function DebtsPage() {
     return { totalDebt, debtors, overLimit };
   }, [rows, ledgerIndex]);
 
-  const pmLabel = (m: string) =>
-    m === "cash"
-      ? t("pos.pm.cash")
-      : m === "card"
-        ? t("pos.pm.card")
-        : m === "bank_transfer"
-          ? t("pos.pm.bank")
-          : m;
+  // The catalogue, not a local map — same change as the payments screen.
+  const pmLabel = (m: string) => paymentMethodLabel(m, lang === "ar" ? "ar" : "en");
 
   /** الرصيد المعتمد للعميل المحدد — من الدفتر لا من العمود المخزَّن */
   const selectedLedgerRow = selected ? ledgerIndex.get(selected.id) : undefined;

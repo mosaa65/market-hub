@@ -15,6 +15,7 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
+import { toLegacyPaymentValue } from "@/lib/payments/payment-methods";
 
 /* الأنواع المولّدة لا تعرف مخطط `milling_*` بعد.
  * نفس الموقف الذي يأخذه `lib/milling/index.ts`: مخرج واحد موثّق. */
@@ -283,7 +284,12 @@ export async function invoiceJobV2(input: InvoiceJobV2Input): Promise<OpResult> 
 
   const { data, error } = await db.rpc("issue_milling_service_invoice_v2", {
     _job_id: input.jobId,
-    _payment_method: input.paymentMethod,
+    // The picker hands back a catalogue id ('kuraimi_bank', 'jaib', …). Convert
+    // it to the value the document stores HERE, at the boundary — the same thing
+    // every other screen does. It happens to work without the conversion today,
+    // because the database resolves a catalogue id too, but relying on that
+    // makes this the one call site with a different contract from all the rest.
+    _payment_method: toLegacyPaymentValue(input.paymentMethod),
     _paid: input.paid ?? 0,
     _discount: input.discount ?? 0,
     _note: input.note ?? null,

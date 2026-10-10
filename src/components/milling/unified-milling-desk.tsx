@@ -29,6 +29,8 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { PaymentMethodPicker } from "@/components/ui/payment-method";
+import { paymentMethodLabel } from "@/lib/payments/payment-methods";
 import {
   executeDirectMillingTicket,
   executeBulkCustodyIntake,
@@ -143,7 +145,16 @@ export function UnifiedMillingDesk() {
   const [selectedMillBagId, setSelectedMillBagId] = useState<string>("");
   const [millBagPrice, setMillBagPrice] = useState(500);
   const [discount, setDiscount] = useState(0);
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "transfer" | "debt">("cash");
+  /**
+   * A CATALOGUE ID, held as a plain string.
+   *
+   * The union that used to be spelled here — `"cash" | "card" | "transfer" |
+   * "debt"` — was the screen inventing its own payment vocabulary: the database
+   * ENUM has never contained `transfer` or `debt`. Holding a catalogue id means
+   * the picker decides what exists, and `executeDirectMillingTicket` converts to
+   * the ENUM at the storage boundary.
+   */
+  const [paymentMethod, setPaymentMethod] = useState<string>("cash");
   const [directNotes, setDirectNotes] = useState("");
 
   /*
@@ -338,14 +349,10 @@ export function UnifiedMillingDesk() {
           grandTotal: res.details.grandTotal,
           paidAmount: res.paidAmount || res.details.grandTotal,
           remainingAmount: res.remainingAmount || 0,
-          paymentMethodLabel:
-            paymentMethod === "cash"
-              ? "نقداً"
-              : paymentMethod === "card"
-                ? "شبكة"
-                : paymentMethod === "transfer"
-                  ? "تحويل"
-                  : "آجل",
+          // From the catalogue, so a wallet or a named bank prints its own
+          // name. The three-branch literal that used to sit here could only
+          // ever print «نقداً / شبكة / تحويل / آجل».
+          paymentMethodLabel: paymentMethodLabel(paymentMethod, "ar"),
           createdAt: res.details.createdAt,
           notes: directNotes,
           companyName: "مطحنة الحبوب الحديثة",
@@ -691,16 +698,27 @@ export function UnifiedMillingDesk() {
 
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-foreground">طريقة الدفع</label>
-                <select
+                {/*
+                  The shared picker, sales context — a milling fee invoice IS a
+                  sale. The select that used to sit here offered «حوالة / تحويل»
+                  with the value `transfer` and «آجل على الحساب» with `debt`:
+                  NEITHER value exists in `public.payment_method` (the ENUM holds
+                  bank_transfer and credit), so choosing either either raised at
+                  the RPC or was coerced, and a wallet could not be chosen at
+                  all. The picker returns a catalogue id and the boundary below
+                  converts it.
+
+                  `includeCredit` stays on because «آجل على الحساب» is a real
+                  milling case: the customer takes the flour and settles later.
+                */}
+                <PaymentMethodPicker
+                  context="sales"
                   value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value as any)}
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs font-bold"
-                >
-                  <option value="cash">نقداً</option>
-                  <option value="card">شبكة / مدى</option>
-                  <option value="transfer">حوالة / تحويل</option>
-                  <option value="debt">آجل على الحساب</option>
-                </select>
+                  onChange={setPaymentMethod}
+                  includeCredit
+                  ensureIds={[paymentMethod]}
+                  ariaLabel="طريقة الدفع"
+                />
               </div>
 
               {/* Grand Total Display */}

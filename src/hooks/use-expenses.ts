@@ -19,6 +19,7 @@ import {
 } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
+import { toLegacyPaymentValue } from "@/lib/payments/payment-methods";
 import { toast } from "sonner";
 import {
   EMPTY_EXPENSE_FILTERS,
@@ -451,7 +452,13 @@ export function useExpenseMutations() {
         p_entry_id: input.id,
         p_expected_version: input.version,
         p_pay_now: input.payNow,
-        p_payment_method: input.paymentMethod ?? "cash",
+        // `post_expense` and `record_expense_payment` take a
+        // `public.payment_method`, not a catalogue id, and are NOT among the
+        // functions the unified migration redefined — so unlike create_sale
+        // they cannot resolve 'kuraimi_bank' themselves and would fail on the
+        // cast. Converting here is what makes a new Yemeni method usable in
+        // the expense screens at all.
+        p_payment_method: toLegacyPaymentValue(input.paymentMethod ?? "cash"),
         p_account_label: input.accountLabel || null,
         p_payment_date: input.paymentDate || null,
         p_idempotency_key: input.payNow ? makeIdempotencyKey(`post:${input.id}`) : null,
@@ -490,7 +497,8 @@ export function useExpenseMutations() {
         p_entry_id: input.id,
         p_amount: input.amount,
         p_payment_date: input.paymentDate || null,
-        p_payment_method: input.paymentMethod ?? "cash",
+        // Same conversion, same reason as `post_expense` above.
+        p_payment_method: toLegacyPaymentValue(input.paymentMethod ?? "cash"),
         p_account_label: input.accountLabel || null,
         p_reference_no: input.referenceNo || null,
         p_note: input.note || null,
