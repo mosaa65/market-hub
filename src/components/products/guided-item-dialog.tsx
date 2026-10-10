@@ -172,14 +172,14 @@ export function GuidedItemDialog({ onClose, onCreated, units, categories }: Guid
 
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm overflow-y-auto"
       onClick={onClose}
     >
       <div
         onClick={(event) => event.stopPropagation()}
-        className="panel-elevated w-full max-w-2xl overflow-hidden"
+        className="flex max-h-[90dvh] w-full max-w-2xl flex-col rounded-3xl border border-border bg-card shadow-2xl overflow-hidden"
       >
-        <div className="border-b border-border px-5 py-4">
+        <div className="flex shrink-0 flex-col border-b border-border px-5 py-4">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-sm font-semibold text-foreground">
@@ -208,7 +208,7 @@ export function GuidedItemDialog({ onClose, onCreated, units, categories }: Guid
           </div>
         </div>
 
-        <div className="max-h-[65vh] overflow-y-auto p-5">
+        <div className="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar">
           {/* ---------------------------------------------------- step 1 */}
           {step === 1 && (
             <div className="space-y-3">
@@ -521,7 +521,7 @@ export function GuidedItemDialog({ onClose, onCreated, units, categories }: Guid
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-t border-border bg-surface/40 px-5 py-3">
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border bg-surface/40 px-5 py-3">
           <Button type="button" variant="outline" onClick={onClose}>
             {ar ? "إلغاء" : "Cancel"}
           </Button>

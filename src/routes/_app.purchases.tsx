@@ -1,3 +1,5 @@
+import { useStoredViewMode } from "@/lib/view-mode-storage";
+import { cn } from "@/lib/utils";
 import { ModuleGuard, useModules } from "@/lib/modules";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, useCallback } from "react";
@@ -33,7 +35,7 @@ import { toSystemDigits } from "@/lib/format-preferences";
 import { Ltr } from "@/components/ltr-value";
 import { LuxuryPrintPreviewModal } from "@/components/luxury-print-preview-modal";
 import { WhatsAppIcon } from "@/components/whatsapp-icon";
-import { VortexMetricCard, VortexDateBadge } from "@/components/vortex-ui";
+import { VortexMetricCard, VortexDateBadge, VortexInvoiceDetailsSheet } from "@/components/vortex-ui";
 import {
   TableToolbar,
   ToolbarAction,
@@ -134,7 +136,7 @@ function PurchasesPage() {
   const [statusTab, setStatusTab] = useState<StatusTab>("all");
   const [filters, setFilters] = useState<FilterValues>({});
   const [sortKey, setSortKey] = useState<string>("date_desc");
-  const [viewMode, setViewMode] = useState<ViewMode>("cards");
+  const [viewMode, setViewMode] = useStoredViewMode<ViewMode>("purchases", "cards", ["cards", "list", "table"]);
   const [selected, setSelected] = useState<Invoice | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
   const [loadingLines, setLoadingLines] = useState(false);
@@ -475,57 +477,58 @@ function PurchasesPage() {
         key: "invoice_number",
         header: isRtl ? "رقم الفاتورة" : "Invoice #",
         sortable: true,
-        width: "w-[170px]",
+        width: "w-[190px]",
         sortValue: (inv) => inv.invoice_number,
         cell: (inv) => (
-          <div className="flex items-center gap-1.5 font-mono text-xs font-bold text-foreground">
-            <span>{inv.invoice_number}</span>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                copyInvoiceNumber(inv.invoice_number, inv.id);
-              }}
-              className="rounded p-1 text-muted-foreground hover:text-foreground"
-              title={isRtl ? "نسخ" : "Copy"}
-            >
-              {copiedInvoiceId === inv.id ? (
-                <Check className="h-3 w-3 text-emerald-500" />
-              ) : (
-                <Copy className="h-3 w-3" />
-              )}
-            </button>
+          <div className="flex flex-col py-0.5">
+            <div className="flex items-center gap-1.5 font-mono text-xs font-bold text-foreground">
+              <span>{inv.invoice_number}</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  copyInvoiceNumber(inv.invoice_number, inv.id);
+                }}
+                className="rounded p-1 text-muted-foreground hover:text-foreground"
+                title={isRtl ? "نسخ" : "Copy"}
+              >
+                {copiedInvoiceId === inv.id ? (
+                  <Check className="h-3 w-3 text-emerald-500" />
+                ) : (
+                  <Copy className="h-3 w-3" />
+                )}
+              </button>
+            </div>
+            <VortexDateBadge date={inv.created_at} variant="subtle" size="sm" showTime />
           </div>
-        ),
-      },
-      {
-        key: "created_at",
-        header: isRtl ? "التاريخ والوقت" : "Date & Time",
-        sortable: true,
-        width: "w-[180px]",
-        sortValue: (inv) => new Date(inv.created_at).getTime(),
-        cell: (inv) => (
-          <VortexDateBadge date={inv.created_at} variant="formal" size="sm" showTime />
         ),
       },
       {
         key: "supplier",
         header: t("common.supplier"),
         sortable: true,
-        width: "w-[180px]",
+        width: "w-[200px]",
         sortValue: (inv) => inv.suppliers?.name ?? "",
-        cell: (inv) => (
-          <div className="flex flex-col">
-            <span className="truncate font-medium text-foreground">
-              {inv.suppliers?.name ?? "—"}
-            </span>
-            {inv.suppliers?.phone && (
-              <span className="dir-ltr truncate font-mono text-[10px] text-muted-foreground">
-                {toSystemDigits(inv.suppliers.phone)}
+        cell: (inv) => {
+          const supplierName = inv.suppliers?.name ?? "—";
+          return (
+            <div className="flex items-center gap-2 py-0.5">
+              <span className="grid size-7 shrink-0 place-items-center rounded-full bg-surface-2 text-[10px] font-bold text-muted-foreground">
+                {supplierName.slice(0, 1).toUpperCase()}
               </span>
-            )}
-          </div>
-        ),
+              <div className="min-w-0">
+                <span className="block truncate text-xs font-medium text-foreground">
+                  {supplierName}
+                </span>
+                {inv.suppliers?.phone && (
+                  <span className="dir-ltr block truncate font-mono text-[10px] text-muted-foreground">
+                    {toSystemDigits(inv.suppliers.phone)}
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        },
       },
     ];
 
@@ -537,7 +540,9 @@ function PurchasesPage() {
         width: "w-[130px]",
         sortValue: (inv) => whName(inv.warehouses),
         cell: (inv) => (
-          <span className="truncate text-xs text-muted-foreground">{whName(inv.warehouses)}</span>
+          <span className="block truncate text-xs text-muted-foreground">
+            {whName(inv.warehouses)}
+          </span>
         ),
       });
     }
@@ -572,7 +577,7 @@ function PurchasesPage() {
         sortValue: (inv) => Number(inv.total) || 0,
         cell: (inv) => (
           <span className="font-mono text-xs font-bold tabular-nums text-foreground">
-            <Ltr>{money(Number(inv.total) || 0)}</Ltr>
+            {toSystemDigits(money(Number(inv.total) || 0))}
           </span>
         ),
       },
@@ -590,11 +595,11 @@ function PurchasesPage() {
           return (
             <div className="flex flex-col py-0.5">
               <span className="font-mono text-xs font-medium tabular-nums text-emerald-500">
-                <Ltr>{money(paid)}</Ltr>
+                {toSystemDigits(money(paid))}
               </span>
               {remaining > 0 ? (
                 <span className="font-mono text-[10px] font-semibold tabular-nums text-rose-500">
-                  <Ltr>{money(remaining)}</Ltr>
+                  {toSystemDigits(money(remaining))}
                 </span>
               ) : (
                 <span className="text-[10px] text-muted-foreground">
@@ -616,11 +621,12 @@ function PurchasesPage() {
               type="button"
               disabled={!inv.suppliers?.phone}
               onClick={() => shareInvoiceWhatsApp(inv)}
-              className={`rounded-lg p-1.5 transition ${
+              className={cn(
+                "rounded-lg p-1.5 transition",
                 inv.suppliers?.phone
                   ? "text-muted-foreground hover:bg-surface-2 hover:text-emerald-500 cursor-pointer"
-                  : "text-muted-foreground/30 cursor-not-allowed opacity-50"
-              }`}
+                  : "text-muted-foreground/30 cursor-not-allowed opacity-50",
+              )}
               title={isRtl ? "واتساب للمورد" : "WhatsApp"}
             >
               <WhatsAppIcon className="h-4 w-4" />
@@ -651,8 +657,8 @@ function PurchasesPage() {
 
   return (
     <div className="space-y-5 pb-12">
-      {/* ─── Unified Top Header — Matches Sales and POS styling ─── */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      {/* ─── Unified Top Header & Quick Action Bar — Full width & responsive ─── */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl sm:text-2xl font-black text-foreground tracking-tight">
@@ -670,34 +676,43 @@ function PurchasesPage() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => void load()}
-            disabled={loading}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-xs font-medium text-foreground hover:bg-surface-2 transition disabled:opacity-50"
-            title={isRtl ? "تحديث الفواتير" : "Refresh"}
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-            <span className="hidden sm:inline">{isRtl ? "تحديث" : "Refresh"}</span>
-          </button>
+        {/* Quick action buttons row: stretched full width on mobile with refresh on the left */}
+        <div className="flex w-full sm:w-auto items-center justify-between sm:justify-end gap-2">
+          {/* Main action buttons */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <Link
+              to="/purchase-pos"
+              className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-2.5 sm:px-3 text-xs font-semibold text-primary hover:bg-primary/20 transition shadow-xs"
+              title={isRtl ? "شراء سريع (POS)" : "Fast Purchase (POS)"}
+            >
+              <ShoppingCart className="h-3.5 w-3.5 shrink-0 text-primary" />
+              <span className="hidden xs:inline sm:inline">{t("purchases.fast_purchase") || (isRtl ? "شراء سريع (POS)" : "Fast Purchase")}</span>
+              <span className="xs:hidden sm:hidden">POS</span>
+            </Link>
 
-          <Link
-            to="/purchase-pos"
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-3 text-xs font-semibold text-primary hover:bg-primary/20 transition"
-          >
-            <ShoppingCart className="h-3.5 w-3.5 text-primary" />
-            <span>{isRtl ? "شراء سريع (POS)" : "Fast Purchase"}</span>
-          </Link>
+            <button
+              type="button"
+              onClick={() => setCreating(true)}
+              className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-primary px-3 sm:px-3.5 text-xs font-semibold text-primary-foreground shadow-xs hover:opacity-95 transition"
+              title={isRtl ? "فاتورة شراء جديدة" : "New Purchase"}
+            >
+              <Plus className="h-3.5 w-3.5 shrink-0" />
+              <span className="hidden xs:inline sm:inline">{t("purchases.new_invoice") || (isRtl ? "فاتورة شراء جديدة" : "New Purchase")}</span>
+              <span className="xs:hidden sm:hidden">{isRtl ? "جديدة" : "New"}</span>
+            </button>
+          </div>
 
+          {/* Refresh Button placed on the left edge (end in RTL) */}
           <button
             type="button"
-            onClick={() => setCreating(true)}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-xs font-semibold text-primary-foreground shadow-sm hover:opacity-90 transition"
+            onClick={() => void load()}
+            disabled={loading}
+            className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-border/80 bg-surface px-2.5 sm:px-3.5 text-xs font-medium text-foreground transition hover:bg-surface-2 hover:border-primary/40 disabled:opacity-50 shadow-xs"
+            title={t("common.refresh") || (isRtl ? "تحديث الفواتير" : "Refresh")}
+            aria-label={t("common.refresh") || (isRtl ? "تحديث" : "Refresh")}
           >
-            <Plus className="h-3.5 w-3.5" />
-            <span>
-              {t("purchases.newInvoice") || (isRtl ? "فاتورة شراء جديدة" : "New Purchase")}
-            </span>
+            <RefreshCw className={cn("h-3.5 w-3.5 shrink-0", loading && "animate-spin text-primary")} />
+            <span className="hidden sm:inline font-semibold">{t("common.refresh") || (isRtl ? "تحديث" : "Refresh")}</span>
           </button>
         </div>
       </div>
@@ -813,43 +828,76 @@ function PurchasesPage() {
           />
         }
       >
-        {/* Quick Filter Tabs — visible in all view modes */}
+        {/* Quick Filter Tabs with custom dedicated colors for each status — Visible in ALL view modes */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-x-none">
           {[
-            { id: "all", label: isRtl ? "الكل" : "All", count: metrics.totalCount },
-            { id: "paid", label: isRtl ? "مسددة" : "Paid", count: metrics.paidCount },
-            { id: "partial", label: isRtl ? "دفع جزئي" : "Partial", count: metrics.partialCount },
+            {
+              id: "all",
+              label: isRtl ? "الكل" : "All",
+              count: metrics.totalCount,
+              activeCls:
+                "border-primary bg-primary text-primary-foreground shadow-xs shadow-primary/20",
+              inactiveCls:
+                "border-border/70 bg-surface/70 text-muted-foreground hover:bg-surface-2 hover:text-foreground",
+              pillCls: "bg-muted text-muted-foreground",
+            },
+            {
+              id: "paid",
+              label: isRtl ? "مسددة" : "Paid",
+              count: metrics.paidCount,
+              activeCls:
+                "border-emerald-600 bg-emerald-600 text-white shadow-xs shadow-emerald-600/20",
+              inactiveCls:
+                "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20",
+              pillCls: "bg-emerald-500/20 text-emerald-600",
+            },
+            {
+              id: "partial",
+              label: isRtl ? "دفع جزئي" : "Partial",
+              count: metrics.partialCount,
+              activeCls: "border-amber-600 bg-amber-600 text-white shadow-xs shadow-amber-600/20",
+              inactiveCls:
+                "border-amber-500/30 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20",
+              pillCls: "bg-amber-500/20 text-amber-600",
+            },
             {
               id: "unpaid",
               label: isRtl ? "غير مسددة (آجلة)" : "Unpaid",
               count: metrics.unpaidCount,
+              activeCls: "border-rose-600 bg-rose-600 text-white shadow-xs shadow-rose-600/20",
+              inactiveCls: "border-rose-500/30 bg-rose-500/10 text-rose-600 hover:bg-rose-500/20",
+              pillCls: "bg-rose-500/20 text-rose-600",
             },
             {
               id: "cancelled",
               label: isRtl ? "ملغاة" : "Cancelled",
               count: metrics.cancelledCount,
+              activeCls: "border-red-600 bg-red-600 text-white shadow-xs shadow-red-600/20",
+              inactiveCls: "border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20",
+              pillCls: "bg-red-500/20 text-red-500",
             },
-          ].map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              onClick={() => setStatusTab(f.id as StatusTab)}
-              className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold transition ${
-                statusTab === f.id
-                  ? "border-primary bg-primary text-primary-foreground shadow-xs shadow-primary/20"
-                  : "border-border/70 bg-surface/70 text-muted-foreground hover:bg-surface-2 hover:text-foreground"
-              }`}
-            >
-              <span>{f.label}</span>
-              <span
-                className={`rounded-full px-1.5 py-0.2 text-[10px] font-mono ${
-                  statusTab === f.id ? "bg-white/20 text-white" : "bg-muted text-muted-foreground"
+          ].map((f) => {
+            const isSelected = statusTab === f.id;
+            return (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => setStatusTab(f.id as StatusTab)}
+                className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold transition ${
+                  isSelected ? f.activeCls : f.inactiveCls
                 }`}
               >
-                {toSystemDigits(f.count.toString())}
-              </span>
-            </button>
-          ))}
+                <span>{f.label}</span>
+                <span
+                  className={`rounded-full px-1.5 py-0.2 text-[10px] font-mono ${
+                    isSelected ? "bg-white/20 text-white" : f.pillCls
+                  }`}
+                >
+                  {toSystemDigits(f.count.toString())}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </TableToolbar>
 
@@ -1217,22 +1265,65 @@ function PurchasesPage() {
         </div>
       )}
 
-      {/* ─── Luxury Invoice Details Drawer (Unified with Sales Drawer) ─── */}
-      {selected && (
-        <ViewDialog
-          invoice={selected}
-          lines={lines}
-          loadingLines={loadingLines}
-          onClose={() => setSelected(null)}
-          pmLabel={pmLabel}
-          statusLabel={statusLabel}
-          hasMultiWarehouse={hasMultiWarehouse}
-          onWhatsApp={() => shareInvoiceWhatsApp(selected)}
-          onSms={() => shareInvoiceSms(selected)}
-          copyInvoiceNumber={copyInvoiceNumber}
-          copiedInvoiceId={copiedInvoiceId}
-        />
-      )}
+      {/* ─── Luxury Invoice Details Sheet (Vortex UI) ─── */}
+      <VortexInvoiceDetailsSheet
+        open={Boolean(selected)}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setSelected(null);
+        }}
+        type="purchase"
+        invoice={
+          selected
+            ? {
+                id: selected.id,
+                invoice_number: selected.invoice_number,
+                created_at: selected.created_at,
+                status: selected.status,
+                subtotal: selected.subtotal,
+                discount: selected.discount,
+                tax: selected.tax,
+                total: selected.total,
+                paid: selected.paid,
+                payment_method: selected.payment_method,
+                note: selected.note,
+                warehouseName: whName(selected.warehouses),
+              }
+            : null
+        }
+        party={{
+          name: selected?.suppliers?.name ?? (lang === "ar" ? "مورد عام" : "General Vendor"),
+          phone: selected?.suppliers?.phone,
+          roleLabel: t("common.supplier") || (lang === "ar" ? "المورد" : "Supplier"),
+        }}
+        items={lines.map((l) => ({
+          id: l.id,
+          name: l.products?.name || "—",
+          name_ar: l.products?.name_ar,
+          sku: l.products?.sku,
+          quantity: l.quantity,
+          unitPrice: l.unit_cost,
+          total: l.total,
+        }))}
+        loadingItems={loadingLines}
+        hasMultiWarehouse={hasMultiWarehouse}
+        pmLabel={pmLabel}
+        statusLabel={statusLabel}
+        statusBadge={statusBadge}
+        onPrint={() => {
+          if (selected) {
+            setDirectPrintInvoice(selected);
+            setDirectPrintLines(lines);
+          }
+        }}
+        onWhatsApp={() => {
+          if (selected) shareInvoiceWhatsApp(selected);
+        }}
+        onSms={() => {
+          if (selected) shareInvoiceSms(selected);
+        }}
+        copyInvoiceNumber={copyInvoiceNumber}
+        copiedInvoiceId={copiedInvoiceId}
+      />
 
       {/* Direct print modal when opened from card or table */}
       {directPrintInvoice && (

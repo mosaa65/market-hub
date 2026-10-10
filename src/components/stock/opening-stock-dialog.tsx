@@ -100,15 +100,15 @@ export function OpeningStockDialog({ warehouseId, onClose, onSaved }: OpeningSto
 
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4 backdrop-blur-sm overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm overflow-y-auto"
       onClick={onClose}
     >
       <form
         onSubmit={submit}
         onClick={(event) => event.stopPropagation()}
-        className="panel-elevated my-8 w-full max-w-lg overflow-hidden rounded-3xl border border-border/80 bg-surface shadow-xl"
+        className="flex max-h-[90dvh] w-full max-w-lg flex-col rounded-3xl border border-border/80 bg-surface shadow-2xl overflow-hidden"
       >
-        <div className="flex items-center justify-between border-b border-border/80 px-5 py-3">
+        <div className="flex shrink-0 items-center justify-between border-b border-border/80 px-5 py-3.5">
           <div>
             <h2 className="text-sm font-bold text-foreground">
               {ar ? "رصيد أول المدة" : "Opening stock"}
@@ -128,7 +128,7 @@ export function OpeningStockDialog({ warehouseId, onClose, onSaved }: OpeningSto
           </button>
         </div>
 
-        <div className="max-h-[70vh] space-y-3 overflow-y-auto p-5 text-sm">
+        <div className="flex-1 overflow-y-auto space-y-3.5 p-5 text-sm custom-scrollbar">
           <div className="grid grid-cols-2 gap-3">
             <label className="flex flex-col gap-1.5">
               <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
@@ -209,7 +209,7 @@ export function OpeningStockDialog({ warehouseId, onClose, onSaved }: OpeningSto
           </p>
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-t border-border/80 px-5 py-3">
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border/80 px-5 py-3">
           <button
             type="button"
             onClick={onClose}

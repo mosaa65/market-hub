@@ -10,12 +10,14 @@ import {
   ShieldCheck,
   Scale,
   CreditCard,
+  Boxes,
   LucideIcon,
 } from "lucide-react";
 import { CompanySection } from "./sections/company-section";
 import { InvoicingSection } from "./sections/invoicing-section";
 import { PrintingSection } from "./sections/printing-section";
 import { CatalogSection } from "./sections/catalog-section";
+import { StockSettingsSection } from "./sections/stock-settings-section";
 import { MillingModeSection } from "./sections/milling-mode-section";
 import { SubscriptionSection } from "./sections/subscription-section";
 import { AppearanceSection } from "./sections/appearance-section";
@@ -29,6 +31,7 @@ export type SettingsSectionId =
   | "payment-methods"
   | "printing"
   | "catalog"
+  | "stock-settings"
   | "subscription"
   | "backup"
   | "number-format"
@@ -110,6 +113,16 @@ registerSettingsSection({
   descriptionEn: "Store industry profile and active catalog modules",
   icon: SlidersHorizontal,
   component: CatalogSection,
+});
+
+registerSettingsSection({
+  id: "stock-settings",
+  titleAr: "إعدادات المخزون والرموز (Stacks)",
+  titleEn: "Stock & Stacks Settings",
+  descriptionAr: "التحكم ببادئات الرموز (SKU, Stacks)، قواعد الترقيم، والتنبيهات المخزنية",
+  descriptionEn: "Manage stock prefixes (SKU, Stacks), numbering rules, and stock thresholds",
+  icon: Boxes,
+  component: StockSettingsSection,
 });
 
 registerSettingsSection({

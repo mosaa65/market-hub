@@ -28,11 +28,12 @@ import {
   type PrintingDocumentType,
 } from "@/lib/printing";
 import type { UnifiedDocumentData, InvoiceTemplateId } from "@/lib/templates";
+
+export type LuxuryPaperFormat = PrintPaperId;
 import type { InvoiceDoc } from "@/lib/pdf";
 import { toast } from "sonner";
 
 export type PrintMethodType = "thermal" | "page";
-export type LuxuryPaperFormat = PrintPaperId;
 
 export interface LuxuryPrintPreviewModalProps {
   open: boolean;
@@ -157,6 +158,8 @@ export function LuxuryPrintPreviewModal({
   }, [request?.paperId, defaultFormat, initialMethod]);
 
   const [activePaper, setActivePaper] = useState<PrintPaperId>(initialPaperId);
+  const [showBarcode, setShowBarcode] = useState<boolean>(true);
+  const [showQrCode, setShowQrCode] = useState<boolean>(true);
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [isPrinting, setIsPrinting] = useState(false);
 
@@ -196,15 +199,24 @@ export function LuxuryPrintPreviewModal({
   // Construct active print request
   const activeRequest: PrintRequest = useMemo(() => {
     return {
-      doc: unifiedDoc,
+      doc: {
+        ...unifiedDoc,
+        options: {
+          ...unifiedDoc.options,
+          showBarcode,
+          showQrCode,
+        },
+      },
       documentType,
       rtl,
       paperId: activePaper,
       templateId: activeTemplate,
       theme: activeTheme,
+      showBarcode,
+      showQrCode,
       labels: request?.labels,
     };
-  }, [unifiedDoc, documentType, rtl, activePaper, activeTemplate, activeTheme, request]);
+  }, [unifiedDoc, documentType, rtl, activePaper, activeTemplate, activeTheme, showBarcode, showQrCode, request]);
 
   // Generate HTML preview without window.print() auto-run
   const previewHtml = useMemo(() => {
@@ -540,6 +552,41 @@ export function LuxuryPrintPreviewModal({
                     </button>
                   </>
                 )}
+              </div>
+            </div>
+
+            {/* Step 4: Quick Barcode & QR Code Toggles */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-bold text-muted-foreground shrink-0 hidden sm:inline">
+                الترميز:
+              </span>
+              <div className="flex items-center rounded-2xl bg-surface-2/90 p-1 border border-border/70 shadow-xs gap-1">
+                <button
+                  type="button"
+                  onClick={() => setShowBarcode((prev) => !prev)}
+                  className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
+                    showBarcode
+                      ? "bg-primary/20 text-primary border border-primary/30"
+                      : "text-muted-foreground hover:text-foreground line-through opacity-60"
+                  }`}
+                  title="تفعيل / إلغاء تفعيل الباركود"
+                >
+                  <span>|||| الباركود</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowQrCode((prev) => !prev)}
+                  className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
+                    showQrCode
+                      ? "bg-primary/20 text-primary border border-primary/30"
+                      : "text-muted-foreground hover:text-foreground line-through opacity-60"
+                  }`}
+                  title="تفعيل / إلغاء تفعيل الـ QR code"
+                >
+                  <QrCode className="h-3.5 w-3.5" />
+                  <span>QR</span>
+                </button>
               </div>
             </div>
           </div>

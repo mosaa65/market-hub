@@ -1,3 +1,5 @@
+import { cn } from "@/lib/utils";
+import { useStoredViewMode } from "@/lib/view-mode-storage";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -46,6 +48,7 @@ import {
   VortexFilterSheet,
   VortexFilterSection,
   VortexCollectionSheet,
+  VortexInvoiceDetailsSheet,
   type PaymentMethod,
 } from "@/components/vortex-ui";
 import { toast } from "sonner";
@@ -134,7 +137,7 @@ export function SalesPage() {
   const [statusTab, setStatusTab] = useState<StatusTab>("all");
   const [filters, setFilters] = useState<FilterValues>({});
   const [sortKey, setSortKey] = useState<string>("date_desc");
-  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [viewMode, setViewMode] = useStoredViewMode<ViewMode>("sales", "grid", ["grid", "list", "table"]);
 
   /*
    * Two sort channels on purpose. The toolbar's sort dropdown writes
@@ -1076,34 +1079,50 @@ export function SalesPage() {
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Header & Quick Action Buttons */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <PageHeader
-          title={isRtl ? "المبيعات والفواتير" : "Sales & Invoices"}
-          subtitle={
-            isRtl
+      {/* ─── Unified Top Header & Quick Action Bar — Full width & responsive ─── */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-black text-foreground tracking-tight">
+              {t("sales.title") || (isRtl ? "المبيعات والفواتير" : "Sales & Invoices")}
+            </h1>
+            <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
+              {toSystemDigits(totalInvoiceCount != null ? totalInvoiceCount.toString() : rows.length.toString())}
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {t("sales.subtitle") || (isRtl
               ? "متابعة فواتير المبيعات، المدفوعات، التحصيلات الفورية والطباعة الفاخرة"
-              : "Track sales invoices, collections, payment statuses and luxury printing"
-          }
-        />
-        <div className="flex items-center gap-2">
+              : "Track sales invoices, collections, payment statuses and luxury printing")}
+          </p>
+        </div>
+
+        {/* Quick action buttons row: stretched full width on mobile with refresh on the left */}
+        <div className="flex w-full sm:w-auto items-center justify-between sm:justify-end gap-2">
+          {/* Main Action buttons */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <Link
+              to="/pos"
+              className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-primary px-3 sm:px-3.5 text-xs font-semibold text-primary-foreground shadow-xs transition hover:opacity-95"
+              title={isRtl ? "فاتورة جديدة (نقطة البيع)" : "New Invoice (POS)"}
+            >
+              <Plus className="h-4 w-4 shrink-0" />
+              <span>{t("sales.new_invoice") || (isRtl ? "فاتورة جديدة (نقطة البيع)" : "New Invoice (POS)")}</span>
+            </Link>
+          </div>
+
+          {/* Refresh Button placed on the left edge (end in RTL) */}
           <button
+            type="button"
             onClick={() => void load()}
             disabled={loading}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-xs font-medium text-foreground transition hover:bg-surface-2 disabled:opacity-50"
-            title={isRtl ? "تحديث البيانات" : "Refresh"}
+            className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-border/80 bg-surface px-2.5 sm:px-3.5 text-xs font-medium text-foreground transition hover:bg-surface-2 hover:border-primary/40 disabled:opacity-50 shadow-xs"
+            title={t("common.refresh") || (isRtl ? "تحديث البيانات" : "Refresh")}
+            aria-label={t("common.refresh") || (isRtl ? "تحديث" : "Refresh")}
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin text-primary" : ""}`} />
-            <span className="hidden sm:inline">{isRtl ? "تحديث" : "Refresh"}</span>
+            <RefreshCw className={cn("h-3.5 w-3.5 shrink-0", loading && "animate-spin text-primary")} />
+            <span className="hidden sm:inline font-semibold">{t("common.refresh") || (isRtl ? "تحديث" : "Refresh")}</span>
           </button>
-
-          <Link
-            to="/pos"
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-xs font-semibold text-primary-foreground shadow-sm transition hover:opacity-95"
-          >
-            <Plus className="h-4 w-4" />
-            <span>{isRtl ? "فاتورة جديدة (نقطة البيع)" : "New Invoice (POS)"}</span>
-          </Link>
         </div>
       </div>
 
@@ -1857,8 +1876,7 @@ export function SalesPage() {
         </VortexFilterSection>
       </VortexFilterSheet>
 
-      {/* Luxury Invoice Details Drawer */}
-      {selected && (
+  {false && selected && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-end bg-black/65 backdrop-blur-xs animate-in fade-in duration-200"
           onClick={() => setSelected(null)}
@@ -2198,6 +2216,71 @@ export function SalesPage() {
           </div>
         </div>
       )}
+      {/* ─── Luxury Invoice Details Sheet (Vortex UI) ─── */}
+      <VortexInvoiceDetailsSheet
+        open={Boolean(selected)}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setSelected(null);
+        }}
+        type="sale"
+        invoice={
+          selected
+            ? {
+                id: selected.id,
+                invoice_number: selected.invoice_number,
+                created_at: selected.created_at,
+                status: selected.status,
+                subtotal: selected.subtotal,
+                discount: selected.discount,
+                tax: selected.tax,
+                total: selected.total,
+                paid: selected.paid,
+                payment_method: selected.payment_method,
+                note: selected.note,
+                warehouseName: whName(selected.warehouses),
+              }
+            : null
+        }
+        party={{
+          name: selected?.customers?.name ?? (isRtl ? "عميل نقدي" : "Walk-in"),
+          phone: selected?.customers?.phone,
+          roleLabel: isRtl ? "العميل" : "Customer",
+        }}
+        items={lines.map((l) => ({
+          id: l.id,
+          name: l.products?.name || "—",
+          name_ar: l.products?.name_ar,
+          sku: l.products?.sku,
+          quantity: l.quantity,
+          unitPrice: l.unit_price,
+          total: l.total,
+          line_type: l.line_type,
+        }))}
+        loadingItems={loadingLines}
+        hasMultiWarehouse={hasMultiWarehouse}
+        pmLabel={pmLabel}
+        statusLabel={statusLabel}
+        statusBadge={statusBadge}
+        onPrint={async () => {
+          const doc = await buildDoc();
+          if (doc) setPrintDoc(doc);
+        }}
+        onWhatsApp={() => {
+          if (selected) shareInvoiceWhatsApp(selected);
+        }}
+        onSms={() => {
+          if (selected) shareInvoiceSms(selected);
+        }}
+        onPdf={doPDF}
+        onQuickCollect={() => {
+          if (selected) {
+            triggerQuickCollect(selected);
+            setSelected(null);
+          }
+        }}
+        copyInvoiceNumber={copyInvoiceNumber}
+        copiedInvoiceId={copiedInvoiceId}
+      />
 
       {/* Luxury Print Preview Modal */}
       {printDoc && (
