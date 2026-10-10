@@ -1,3 +1,5 @@
+import { cn } from "@/lib/utils";
+import { useStoredViewMode } from "@/lib/view-mode-storage";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -50,6 +52,7 @@ import {
   VortexFilterSheet,
   VortexFilterSection,
   VortexCollectionSheet,
+  VortexInvoiceDetailsSheet,
   type PaymentMethod,
 } from "@/components/vortex-ui";
 import { toast } from "sonner";
@@ -132,7 +135,7 @@ export function SalesPage() {
   const [statusTab, setStatusTab] = useState<StatusTab>("all");
   const [filters, setFilters] = useState<FilterValues>({});
   const [sortKey, setSortKey] = useState<string>("date_desc");
-  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [viewMode, setViewMode] = useStoredViewMode<ViewMode>("sales", "grid", ["grid", "list", "table"]);
 
   /*
    * Two sort channels on purpose. The toolbar's sort dropdown writes
@@ -1077,34 +1080,50 @@ export function SalesPage() {
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Header & Quick Action Buttons */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <PageHeader
-          title={isRtl ? "المبيعات والفواتير" : "Sales & Invoices"}
-          subtitle={
-            isRtl
+      {/* ─── Unified Top Header & Quick Action Bar — Full width & responsive ─── */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-black text-foreground tracking-tight">
+              {t("sales.title") || (isRtl ? "المبيعات والفواتير" : "Sales & Invoices")}
+            </h1>
+            <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
+              {toSystemDigits(totalInvoiceCount != null ? totalInvoiceCount.toString() : rows.length.toString())}
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {t("sales.subtitle") || (isRtl
               ? "متابعة فواتير المبيعات، المدفوعات، التحصيلات الفورية والطباعة الفاخرة"
-              : "Track sales invoices, collections, payment statuses and luxury printing"
-          }
-        />
-        <div className="flex items-center gap-2">
+              : "Track sales invoices, collections, payment statuses and luxury printing")}
+          </p>
+        </div>
+
+        {/* Quick action buttons row: stretched full width on mobile with refresh on the left */}
+        <div className="flex w-full sm:w-auto items-center justify-between sm:justify-end gap-2">
+          {/* Main Action buttons */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <Link
+              to="/pos"
+              className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-primary px-3 sm:px-3.5 text-xs font-semibold text-primary-foreground shadow-xs transition hover:opacity-95"
+              title={isRtl ? "فاتورة جديدة (نقطة البيع)" : "New Invoice (POS)"}
+            >
+              <Plus className="h-4 w-4 shrink-0" />
+              <span>{t("sales.new_invoice") || (isRtl ? "فاتورة جديدة (نقطة البيع)" : "New Invoice (POS)")}</span>
+            </Link>
+          </div>
+
+          {/* Refresh Button placed on the left edge (end in RTL) */}
           <button
+            type="button"
             onClick={() => void load()}
             disabled={loading}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-xs font-medium text-foreground transition hover:bg-surface-2 disabled:opacity-50"
-            title={isRtl ? "تحديث البيانات" : "Refresh"}
+            className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-border/80 bg-surface px-2.5 sm:px-3.5 text-xs font-medium text-foreground transition hover:bg-surface-2 hover:border-primary/40 disabled:opacity-50 shadow-xs"
+            title={t("common.refresh") || (isRtl ? "تحديث البيانات" : "Refresh")}
+            aria-label={t("common.refresh") || (isRtl ? "تحديث" : "Refresh")}
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin text-primary" : ""}`} />
-            <span className="hidden sm:inline">{isRtl ? "تحديث" : "Refresh"}</span>
+            <RefreshCw className={cn("h-3.5 w-3.5 shrink-0", loading && "animate-spin text-primary")} />
+            <span className="hidden sm:inline font-semibold">{t("common.refresh") || (isRtl ? "تحديث" : "Refresh")}</span>
           </button>
-
-          <Link
-            to="/pos"
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-xs font-semibold text-primary-foreground shadow-sm transition hover:opacity-95"
-          >
-            <Plus className="h-4 w-4" />
-            <span>{isRtl ? "فاتورة جديدة (نقطة البيع)" : "New Invoice (POS)"}</span>
-          </Link>
         </div>
       </div>
 
@@ -1856,348 +1875,71 @@ export function SalesPage() {
         </VortexFilterSection>
       </VortexFilterSheet>
 
-      {/* Luxury Invoice Details Drawer */}
-      {selected && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-end bg-black/65 backdrop-blur-xs animate-in fade-in duration-200"
-          onClick={() => setSelected(null)}
-        >
-          <div
-            className="h-full w-full max-w-2xl border-s border-border/80 bg-background/95 backdrop-blur-md p-6 shadow-2xl overflow-y-auto animate-in slide-in-from-left duration-200 relative flex flex-col justify-between"
-            onClick={(e) => e.stopPropagation()}
-            dir={isRtl ? "rtl" : "ltr"}
-          >
-            {/* Ambient decorative glow */}
-            <div className="absolute -top-12 -right-12 size-48 rounded-full bg-primary/20 blur-3xl pointer-events-none" />
-            {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-border/80 bg-surface-2/40 px-6 py-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                  <Receipt className="h-5 w-5" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-mono text-lg font-bold text-foreground">
-                      {selected.invoice_number}
-                    </h3>
-                    <button
-                      type="button"
-                      onClick={() => copyInvoiceNumber(selected.invoice_number, selected.id)}
-                      className="rounded p-1 text-muted-foreground hover:text-foreground"
-                    >
-                      {copiedInvoiceId === selected.id ? (
-                        <Check className="h-3.5 w-3.5 text-emerald-500" />
-                      ) : (
-                        <Copy className="h-3.5 w-3.5" />
-                      )}
-                    </button>
-                  </div>
-                  <div className="mt-0.5">
-                    <VortexDateBadge date={selected.created_at} variant="subtle" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <div>{statusBadge(selected.status)}</div>
-                <button
-                  onClick={() => setSelected(null)}
-                  className="rounded-lg p-1.5 text-muted-foreground hover:bg-surface-2 hover:text-foreground"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Modal Body */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-5">
-              {/* Info Grid */}
-              <div
-                className={`grid gap-3 rounded-xl border border-border/80 bg-surface-2/30 p-4 text-xs ${
-                  hasMultiWarehouse ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-1 sm:grid-cols-3"
-                }`}
-              >
-                <div>
-                  <span className="text-[10px] uppercase font-semibold text-muted-foreground">
-                    {isRtl ? "العميل" : "Customer"}
-                  </span>
-                  <p className="mt-0.5 text-sm font-semibold text-foreground">
-                    {selected.customers?.name ?? (isRtl ? "عميل نقدي" : "Walk-in")}
-                  </p>
-                  {selected.customers?.phone && (
-                    <p className="text-[11px] text-muted-foreground dir-ltr">
-                      {toSystemDigits(selected.customers.phone)}
-                    </p>
-                  )}
-                </div>
-
-                {hasMultiWarehouse && (
-                  <div>
-                    <span className="text-[10px] uppercase font-semibold text-muted-foreground">
-                      {isRtl ? "المستودع / الفرع" : "Warehouse"}
-                    </span>
-                    <p className="mt-0.5 text-sm font-semibold text-foreground">
-                      {whName(selected.warehouses) ?? "—"}
-                    </p>
-                  </div>
-                )}
-
-                <div>
-                  <span className="text-[10px] uppercase font-semibold text-muted-foreground">
-                    {isRtl ? "طريقة السداد" : "Payment Method"}
-                  </span>
-                  <div className="mt-0.5 flex items-center gap-1.5 text-sm font-medium text-foreground">
-                    {pmIcon(selected.payment_method, selected.note)}
-                    <span>{pmLabel(selected.payment_method, selected.note)}</span>
-                  </div>
-                </div>
-
-                <div>
-                  <span className="text-[10px] uppercase font-semibold text-muted-foreground">
-                    {isRtl ? "حالة السداد" : "Payment Status"}
-                  </span>
-                  <p className="mt-0.5 text-sm font-semibold text-foreground">
-                    {statusLabel(selected.status)}
-                  </p>
-                </div>
-              </div>
-
-              {/* Note / Split details if present */}
-              {selected.note && (
-                <div className="rounded-xl border border-border/80 bg-surface-2/40 p-3 text-xs text-muted-foreground">
-                  <span className="font-semibold text-foreground me-1">
-                    {isRtl ? "الملاحظات وتفاصيل الدفع:" : "Note & Payment Details:"}
-                  </span>
-                  {selected.note}
-                </div>
-              )}
-
-              {/* Items Table */}
-              <div>
-                <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  {isRtl ? "بنود الفاتورة والمنتجات" : "Invoice Items"}
-                </h4>
-                <div className="overflow-hidden rounded-xl border border-border">
-                  <table className="w-full text-xs">
-                    <thead className="bg-surface-2/70 text-muted-foreground">
-                      <tr>
-                        <th className="px-3 py-2.5 text-start font-medium">
-                          {isRtl ? "المنتج / الصنف" : "Item"}
-                        </th>
-                        <th className="px-3 py-2.5 text-center font-medium">
-                          {isRtl ? "الكمية" : "Qty"}
-                        </th>
-                        <th className="px-3 py-2.5 text-end font-medium">
-                          {isRtl ? "سعر الوحدة" : "Unit Price"}
-                        </th>
-                        <th className="px-3 py-2.5 text-end font-medium">
-                          {isRtl ? "الإجمالي" : "Total"}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/60">
-                      {loadingLines ? (
-                        <tr>
-                          <td colSpan={4} className="py-6 text-center text-muted-foreground">
-                            <RefreshCw className="mx-auto h-4 w-4 animate-spin mb-1 text-primary" />
-                            {isRtl ? "جاري جلب تفاصيل البنود..." : "Loading items..."}
-                          </td>
-                        </tr>
-                      ) : lines.length === 0 ? (
-                        <tr>
-                          <td colSpan={4} className="py-6 text-center text-muted-foreground">
-                            {isRtl ? "لا توجد بنود مسجلة لهذه الفاتورة" : "No items recorded"}
-                          </td>
-                        </tr>
-                      ) : (
-                        lines.map((l) => (
-                          <tr key={l.id} className="hover:bg-surface-2/30">
-                            <td className="px-3 py-2.5">
-                              {/* الاسم العربي أولاً — أسماء المنتجات الإنجليزية
-                                  كانت تظهر في واجهة عربية عند غياب name_ar. */}
-                              <div className="font-medium text-foreground">
-                                {l.products?.name_ar || l.products?.name || "—"}
-                              </div>
-                              {/* بند خدمة الطحن (line_type = SERVICE) لا يخصم مخزوناً؛
-                                  إظهاره يمنع افتراض أنه بضاعة مخزنية. */}
-                              {l.line_type === "SERVICE" && (
-                                <div className="mt-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400">
-                                  {isRtl
-                                    ? "بند خدمة — لا يخصم مخزوناً"
-                                    : "Service line — no stock impact"}
-                                </div>
-                              )}
-                              {l.products?.sku && (
-                                <div className="text-[10px] font-mono text-muted-foreground">
-                                  SKU: {l.products.sku}
-                                </div>
-                              )}
-                            </td>
-                            <td className="px-3 py-2.5 text-center">
-                              <span className="inline-block rounded-md bg-surface-2 px-2 py-0.5 font-mono font-semibold text-foreground">
-                                {toSystemDigits(l.quantity.toString())}
-                              </span>
-                            </td>
-                            <td className="px-3 py-2.5 text-end font-mono">
-                              {toSystemDigits(money(Number(l.unit_price)))}
-                            </td>
-                            <td className="px-3 py-2.5 text-end font-mono font-semibold text-foreground">
-                              {toSystemDigits(money(Number(l.total)))}
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Financial Totals Breakdown */}
-              <div className="rounded-xl border border-border/80 bg-surface-2/30 p-4 text-xs space-y-1.5">
-                <div className="flex justify-between text-muted-foreground">
-                  <span>{isRtl ? "المجموع الفرعي (قبل الضريبة):" : "Subtotal:"}</span>
-                  <span className="font-mono">
-                    {toSystemDigits(money(Number(selected.subtotal)))}
-                  </span>
-                </div>
-                {Number(selected.discount) > 0 && (
-                  <div className="flex justify-between text-emerald-500">
-                    <span>{isRtl ? "الخصم الممنوح:" : "Discount:"}</span>
-                    <span className="font-mono">
-                      -{toSystemDigits(money(Number(selected.discount)))}
-                    </span>
-                  </div>
-                )}
-                {Number(selected.tax) > 0 && (
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>{isRtl ? "ضريبة القيمة المضافة:" : "VAT / Tax:"}</span>
-                    <span className="font-mono">{toSystemDigits(money(Number(selected.tax)))}</span>
-                  </div>
-                )}
-                <div className="flex justify-between border-t border-border pt-1.5 text-sm font-bold text-foreground">
-                  <span>{isRtl ? "الإجمالي الكلي:" : "Grand Total:"}</span>
-                  <span className="font-mono text-base">
-                    {toSystemDigits(money(Number(selected.total)))}
-                  </span>
-                </div>
-                <div className="flex justify-between text-emerald-500 font-medium">
-                  <span>{isRtl ? "المسدد نقداً / مدفوع:" : "Paid:"}</span>
-                  <span className="font-mono">{toSystemDigits(money(Number(selected.paid)))}</span>
-                </div>
-                {Math.max(0, Number(selected.total) - Number(selected.paid)) > 0 && (
-                  <div className="flex justify-between text-rose-500 font-bold border-t border-border/60 pt-1 text-xs">
-                    <span>{isRtl ? "المتبقي (دين آجل مستحق):" : "Remaining Due:"}</span>
-                    <span className="font-mono">
-                      {toSystemDigits(
-                        money(Math.max(0, Number(selected.total) - Number(selected.paid))),
-                      )}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Modal Footer / Actions */}
-            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/80 bg-surface-2/40 px-6 py-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  disabled={!selected.customers?.phone}
-                  onClick={() => shareInvoiceWhatsApp(selected)}
-                  title={
-                    !selected.customers?.phone
-                      ? isRtl
-                        ? "هذا العميل لا يوجد لديه رقم هاتف مسجل في النظام"
-                        : "This customer has no phone number registered"
-                      : isRtl
-                        ? "مشاركة واتساب"
-                        : "WhatsApp"
-                  }
-                  className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition ${
-                    selected.customers?.phone
-                      ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 cursor-pointer"
-                      : "border border-border/60 bg-muted/40 text-muted-foreground/40 cursor-not-allowed opacity-50"
-                  }`}
-                >
-                  <WhatsAppIcon className="h-4 w-4" />
-                  <span>{isRtl ? "واتساب" : "WhatsApp"}</span>
-                </button>
-
-                <button
-                  type="button"
-                  disabled={!selected.customers?.phone}
-                  onClick={() => shareInvoiceSms(selected)}
-                  title={
-                    !selected.customers?.phone
-                      ? isRtl
-                        ? "هذا العميل لا يوجد لديه رقم هاتف مسجل في النظام"
-                        : "This customer has no phone number registered"
-                      : isRtl
-                        ? "مشاركة SMS"
-                        : "SMS"
-                  }
-                  className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition ${
-                    selected.customers?.phone
-                      ? "border border-blue-500/30 bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 cursor-pointer"
-                      : "border border-border/60 bg-muted/40 text-muted-foreground/40 cursor-not-allowed opacity-50"
-                  }`}
-                >
-                  <MessageSquare className="h-4 w-4" />
-                  <span>{isRtl ? "رسالة SMS" : "SMS"}</span>
-                </button>
-
-                {/* PDF */}
-                <button
-                  type="button"
-                  onClick={doPDF}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-xs font-medium text-foreground hover:bg-surface-2 transition"
-                >
-                  <FileDown className="h-4 w-4" />
-                  <span>{isRtl ? "تحميل PDF" : "PDF"}</span>
-                </button>
-              </div>
-
-              <div className="flex items-center gap-2">
-                {/* Quick Collect Button if invoice has balance */}
-                {Math.max(0, Number(selected.total) - Number(selected.paid)) > 0 &&
-                  selected.status !== "cancelled" && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        triggerQuickCollect(selected);
-                        setSelected(null);
-                      }}
-                      className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-amber-500 px-4 text-xs font-semibold text-amber-950 shadow-sm hover:bg-amber-400 transition"
-                    >
-                      <Wallet className="h-4 w-4" />
-                      <span>{isRtl ? "تحصيل الدفعة الآن" : "Collect Payment"}</span>
-                    </button>
-                  )}
-
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const doc = await buildDoc();
-                    if (doc) setPrintDoc(doc);
-                  }}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm hover:opacity-95 transition"
-                >
-                  <Printer className="h-4 w-4" />
-                  <span>{isRtl ? "طباعة الفاتورة" : "Print"}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setSelected(null)}
-                  className="h-9 rounded-lg border border-border bg-surface px-4 text-xs font-medium text-foreground hover:bg-surface-2 transition"
-                >
-                  {isRtl ? "إغلاق" : "Close"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ─── Luxury Invoice Details Sheet (Vortex UI) ─── */}
+      <VortexInvoiceDetailsSheet
+        open={Boolean(selected)}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setSelected(null);
+        }}
+        type="sale"
+        invoice={
+          selected
+            ? {
+                id: selected.id,
+                invoice_number: selected.invoice_number,
+                created_at: selected.created_at,
+                status: selected.status,
+                subtotal: selected.subtotal,
+                discount: selected.discount,
+                tax: selected.tax,
+                total: selected.total,
+                paid: selected.paid,
+                payment_method: selected.payment_method,
+                note: selected.note,
+                warehouseName: whName(selected.warehouses),
+              }
+            : null
+        }
+        party={{
+          name: selected?.customers?.name ?? (isRtl ? "عميل نقدي" : "Walk-in"),
+          phone: selected?.customers?.phone,
+          roleLabel: isRtl ? "العميل" : "Customer",
+        }}
+        items={lines.map((l) => ({
+          id: l.id,
+          name: l.products?.name || "—",
+          name_ar: l.products?.name_ar,
+          sku: l.products?.sku,
+          quantity: l.quantity,
+          unitPrice: l.unit_price,
+          total: l.total,
+          line_type: l.line_type,
+        }))}
+        loadingItems={loadingLines}
+        hasMultiWarehouse={hasMultiWarehouse}
+        pmLabel={pmLabel}
+        statusLabel={statusLabel}
+        statusBadge={statusBadge}
+        onPrint={async () => {
+          const doc = await buildDoc();
+          if (doc) setPrintDoc(doc);
+        }}
+        onWhatsApp={() => {
+          if (selected) shareInvoiceWhatsApp(selected);
+        }}
+        onSms={() => {
+          if (selected) shareInvoiceSms(selected);
+        }}
+        onPdf={doPDF}
+        onQuickCollect={() => {
+          if (selected) {
+            triggerQuickCollect(selected);
+            setSelected(null);
+          }
+        }}
+        copyInvoiceNumber={copyInvoiceNumber}
+        copiedInvoiceId={copiedInvoiceId}
+      />
 
       {/* Luxury Print Preview Modal */}
       {printDoc && (
