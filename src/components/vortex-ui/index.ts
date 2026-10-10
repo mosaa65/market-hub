@@ -12,3 +12,4 @@ export * from "./inputs/vortex-search-input";
 export * from "./table/vortex-streaming-table";
 export * from "./table/vortex-table-header";
 export * from "./state/use-vortex-table-cache";
+export * from "./finance/vortex-invoice-details-sheet";
