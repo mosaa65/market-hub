@@ -5,7 +5,7 @@ import {
   formatMoney,
   CustomFieldOptions,
 } from "./types";
-import { generateBarcodeSvg } from "@/lib/printing/barcode-qr";
+import { generateBarcodeSvg, generateQrCodeSvg } from "@/lib/printing/barcode-qr";
 import { getCachedCompanyProfile } from "@/lib/printing/company-profile";
 import { renderUniversalFooter, UNIVERSAL_FOOTER_CSS } from "@/lib/printing/footer";
 
@@ -36,6 +36,8 @@ export function renderThermalMillingTemplate(
     showNotes: true,
     showSignatures: false,
     showFooter: true,
+    showBarcode: true,
+    showQrCode: true,
     ...options,
     ...doc.options,
   };
@@ -72,7 +74,16 @@ export function renderThermalMillingTemplate(
     )
     .join("");
 
-  const barcodeHtml = doc.number ? generateBarcodeSvg(doc.number, 36) : "";
+  const qrPayload = [
+    `Seller: ${companyName}`,
+    `TaxNo: ${companyVat || "N/A"}`,
+    `Invoice: ${doc.number}`,
+    `Date: ${doc.date}`,
+    `Total: ${doc.total || 0} ${c}`,
+  ].join("\n");
+
+  const qrHtml = (opts.showQrCode !== false) ? generateQrCodeSvg(qrPayload, 100) : "";
+  const barcodeHtml = (opts.showBarcode !== false && doc.number) ? generateBarcodeSvg(doc.number, 36) : "";
 
   return `<!doctype html>
 <html dir="${rtl ? "rtl" : "ltr"}" lang="${rtl ? "ar" : "en"}">
@@ -315,7 +326,16 @@ export function renderThermalMillingTemplate(
         : ""
     }
 
-    <!-- Barcode -->
+    <!-- QR Code & Barcode -->
+    ${
+      qrHtml
+        ? `
+      <div style="text-align: center; margin: 8px 0 4px;">
+        ${qrHtml}
+      </div>
+    `
+        : ""
+    }
     ${
       barcodeHtml
         ? `

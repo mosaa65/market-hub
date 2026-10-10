@@ -80,13 +80,20 @@ export function renderUnifiedDocument(request: PrintRequest): string {
     override?.templateId ??
     (theme === "formal" ? "formal" : theme === "luxury" ? "elegant" : "standard");
 
+  const customOptions = {
+    showFooter: settings.footerEnabled,
+    showBarcode: override?.showBarcode ?? settings.showBarcode ?? true,
+    showQrCode: override?.showQrCode ?? settings.showQrCode ?? true,
+    ...request.doc.options,
+  };
+
   const html =
     effectiveTemplateId === "formal"
       ? renderFormalTemplate(
           request.doc,
           labels,
           rtl,
-          { showFooter: settings.footerEnabled },
+          customOptions,
           getCachedCompanyProfile(),
         )
       : renderDocumentHTML(
@@ -94,7 +101,7 @@ export function renderUnifiedDocument(request: PrintRequest): string {
           effectiveTemplateId,
           labels,
           rtl,
-          { showFooter: settings.footerEnabled },
+          customOptions,
           paperId,
         );
   return html
@@ -140,13 +147,16 @@ export async function printUnifiedDocument(
   context?: PrintAdapterContext,
 ): Promise<PrintResult> {
   const settings = request.settings ?? getUnifiedPrintSettings();
+  const type = request.documentType ?? request.doc.docType ?? "customer_invoice";
+  const override = settings.overrides[type];
   const method = request.method ?? settings.method;
   const adapter = ADAPTERS.find((a) => a.id === method);
   if (!adapter) return { ok: false, copiesSent: 0, reason: "transport_error" };
 
   const html = renderUnifiedDocument(request);
+  const resolvedCopies = request.copies ?? override?.copies ?? settings.copies;
   const copies = adapter.capabilities.supportsCopies
-    ? Math.max(1, Math.min(20, request.copies ?? settings.copies))
+    ? Math.max(1, Math.min(20, resolvedCopies))
     : 1;
 
   const transportId = transportForMethod(method);
@@ -169,7 +179,10 @@ export async function printEscPos(
   context?: PrintAdapterContext,
 ): Promise<PrintResult> {
   const settings = request.settings ?? getUnifiedPrintSettings();
-  const copies = Math.max(1, Math.min(20, request.copies ?? settings.copies));
+  const type = request.documentType ?? request.doc.docType ?? "customer_invoice";
+  const override = settings.overrides[type];
+  const resolvedCopies = request.copies ?? override?.copies ?? settings.copies;
+  const copies = Math.max(1, Math.min(20, resolvedCopies));
   const escpos = renderThermalEscPos(request);
   const transport = getPrintTransport("escpos");
   return transport.print({ output: { escpos }, copies, title: request.doc?.title }, context);

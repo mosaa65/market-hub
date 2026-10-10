@@ -8,6 +8,7 @@ import {
 import { getCachedCompanyProfile } from "@/lib/printing/company-profile";
 import { renderUniversalFooter, UNIVERSAL_FOOTER_CSS } from "@/lib/printing/footer";
 import { numberToArabicWords } from "./tafqeet";
+import { generateBarcodeSvg, generateQrCodeSvg } from "@/lib/printing/barcode-qr";
 
 /**
  * قالب الكاونتر المبسط والأنيق (Milling Clean Minimalist Layout A4 / A5).
@@ -37,6 +38,8 @@ export function renderMillingCleanTemplate(
     showNotes: true,
     showSignatures: true,
     showFooter: true,
+    showBarcode: true,
+    showQrCode: true,
     ...options,
     ...doc.options,
   };

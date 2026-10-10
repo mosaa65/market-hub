@@ -78,8 +78,8 @@ export function renderThermalQrTemplate(
     `Tax: ${doc.tax || 0} ${c}`,
   ].join("\n");
 
-  const qrSvg = generateQrCodeSvg(qrPayload, 115);
-  const barcodeSvg = doc.number ? generateBarcodeSvg(doc.number, 32) : "";
+  const qrSvg = (opts.showQrCode !== false) ? generateQrCodeSvg(qrPayload, 115) : "";
+  const barcodeSvg = (opts.showBarcode !== false && doc.number) ? generateBarcodeSvg(doc.number, 32) : "";
 
   return `<!doctype html>
 <html dir="${rtl ? "rtl" : "ltr"}" lang="${rtl ? "ar" : "en"}">
