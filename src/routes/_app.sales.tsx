@@ -1018,8 +1018,8 @@ export function SalesPage() {
           </p>
         </div>
 
-        {/* Quick action buttons row: stretched full width on mobile with refresh on the left */}
-        <div className="flex w-full sm:w-auto items-center justify-between sm:justify-end gap-2">
+        {/* Quick action buttons row */}
+        <div className="flex w-full sm:w-auto items-center justify-end gap-2">
           {/* Main Action buttons */}
           <div className="flex items-center gap-1.5 sm:gap-2">
             <Link
@@ -1034,23 +1034,6 @@ export function SalesPage() {
               </span>
             </Link>
           </div>
-
-          {/* Refresh Button placed on the left edge (end in RTL) */}
-          <button
-            type="button"
-            onClick={() => void load()}
-            disabled={loading}
-            className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-border/80 bg-surface px-2.5 sm:px-3.5 text-xs font-medium text-foreground transition hover:bg-surface-2 hover:border-primary/40 disabled:opacity-50 shadow-xs"
-            title={t("common.refresh") || (isRtl ? "تحديث البيانات" : "Refresh")}
-            aria-label={t("common.refresh") || (isRtl ? "تحديث" : "Refresh")}
-          >
-            <RefreshCw
-              className={cn("h-3.5 w-3.5 shrink-0", loading && "animate-spin text-primary")}
-            />
-            <span className="hidden sm:inline font-semibold">
-              {t("common.refresh") || (isRtl ? "تحديث" : "Refresh")}
-            </span>
-          </button>
         </div>
       </div>
 

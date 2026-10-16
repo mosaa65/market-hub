@@ -60,6 +60,13 @@ import { Route as AppMillingIntakeRouteImport } from './routes/_app.milling.inta
 import { Route as AppMillingJobsRouteImport } from './routes/_app.milling.jobs'
 import { Route as AppMillingOperationsGuideRouteImport } from './routes/_app.milling.operations-guide'
 import { Route as AppMillingReportsRouteImport } from './routes/_app.milling.reports'
+import { Route as AppReportsCustomersRouteImport } from './routes/_app.reports.customers'
+import { Route as AppReportsInventoryRouteImport } from './routes/_app.reports.inventory'
+import { Route as AppReportsOperationsAuditRouteImport } from './routes/_app.reports.operations-audit'
+import { Route as AppReportsPurchasesRouteImport } from './routes/_app.reports.purchases'
+import { Route as AppReportsSalesRouteImport } from './routes/_app.reports.sales'
+import { Route as AppReportsSuppliersRouteImport } from './routes/_app.reports.suppliers'
+import { Route as AppStatementsEntityTypeRouteImport } from './routes/_app.statements.$entityType'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -317,6 +324,42 @@ const AppMillingReportsRoute = AppMillingReportsRouteImport.update({
   path: '/reports',
   getParentRoute: () => AppMillingRoute,
 } as any)
+const AppReportsCustomersRoute = AppReportsCustomersRouteImport.update({
+  id: '/customers',
+  path: '/customers',
+  getParentRoute: () => AppReportsRoute,
+} as any)
+const AppReportsInventoryRoute = AppReportsInventoryRouteImport.update({
+  id: '/inventory',
+  path: '/inventory',
+  getParentRoute: () => AppReportsRoute,
+} as any)
+const AppReportsOperationsAuditRoute =
+  AppReportsOperationsAuditRouteImport.update({
+    id: '/operations-audit',
+    path: '/operations-audit',
+    getParentRoute: () => AppReportsRoute,
+  } as any)
+const AppReportsPurchasesRoute = AppReportsPurchasesRouteImport.update({
+  id: '/purchases',
+  path: '/purchases',
+  getParentRoute: () => AppReportsRoute,
+} as any)
+const AppReportsSalesRoute = AppReportsSalesRouteImport.update({
+  id: '/sales',
+  path: '/sales',
+  getParentRoute: () => AppReportsRoute,
+} as any)
+const AppReportsSuppliersRoute = AppReportsSuppliersRouteImport.update({
+  id: '/suppliers',
+  path: '/suppliers',
+  getParentRoute: () => AppReportsRoute,
+} as any)
+const AppStatementsEntityTypeRoute = AppStatementsEntityTypeRouteImport.update({
+  id: '/statements/$entityType',
+  path: '/statements/$entityType',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -350,7 +393,7 @@ export interface FileRoutesByFullPath {
   '/purchase-pos': typeof AppPurchasePosRoute
   '/purchase-returns': typeof AppPurchaseReturnsRoute
   '/purchases': typeof AppPurchasesRoute
-  '/reports': typeof AppReportsRoute
+  '/reports': typeof AppReportsRouteWithChildren
   '/returns': typeof AppReturnsRoute
   '/sales': typeof AppSalesRoute
   '/sales-invoice': typeof AppSalesInvoiceRoute
@@ -369,6 +412,13 @@ export interface FileRoutesByFullPath {
   '/milling/jobs': typeof AppMillingJobsRoute
   '/milling/operations-guide': typeof AppMillingOperationsGuideRoute
   '/milling/reports': typeof AppMillingReportsRoute
+  '/reports/customers': typeof AppReportsCustomersRoute
+  '/reports/inventory': typeof AppReportsInventoryRoute
+  '/reports/operations-audit': typeof AppReportsOperationsAuditRoute
+  '/reports/purchases': typeof AppReportsPurchasesRoute
+  '/reports/sales': typeof AppReportsSalesRoute
+  '/reports/suppliers': typeof AppReportsSuppliersRoute
+  '/statements/$entityType': typeof AppStatementsEntityTypeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -402,7 +452,7 @@ export interface FileRoutesByTo {
   '/purchase-pos': typeof AppPurchasePosRoute
   '/purchase-returns': typeof AppPurchaseReturnsRoute
   '/purchases': typeof AppPurchasesRoute
-  '/reports': typeof AppReportsRoute
+  '/reports': typeof AppReportsRouteWithChildren
   '/returns': typeof AppReturnsRoute
   '/sales': typeof AppSalesRoute
   '/sales-invoice': typeof AppSalesInvoiceRoute
@@ -421,6 +471,13 @@ export interface FileRoutesByTo {
   '/milling/jobs': typeof AppMillingJobsRoute
   '/milling/operations-guide': typeof AppMillingOperationsGuideRoute
   '/milling/reports': typeof AppMillingReportsRoute
+  '/reports/customers': typeof AppReportsCustomersRoute
+  '/reports/inventory': typeof AppReportsInventoryRoute
+  '/reports/operations-audit': typeof AppReportsOperationsAuditRoute
+  '/reports/purchases': typeof AppReportsPurchasesRoute
+  '/reports/sales': typeof AppReportsSalesRoute
+  '/reports/suppliers': typeof AppReportsSuppliersRoute
+  '/statements/$entityType': typeof AppStatementsEntityTypeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -456,7 +513,7 @@ export interface FileRoutesById {
   '/_app/purchase-pos': typeof AppPurchasePosRoute
   '/_app/purchase-returns': typeof AppPurchaseReturnsRoute
   '/_app/purchases': typeof AppPurchasesRoute
-  '/_app/reports': typeof AppReportsRoute
+  '/_app/reports': typeof AppReportsRouteWithChildren
   '/_app/returns': typeof AppReturnsRoute
   '/_app/sales': typeof AppSalesRoute
   '/_app/sales-invoice': typeof AppSalesInvoiceRoute
@@ -475,6 +532,13 @@ export interface FileRoutesById {
   '/_app/milling/jobs': typeof AppMillingJobsRoute
   '/_app/milling/operations-guide': typeof AppMillingOperationsGuideRoute
   '/_app/milling/reports': typeof AppMillingReportsRoute
+  '/_app/reports/customers': typeof AppReportsCustomersRoute
+  '/_app/reports/inventory': typeof AppReportsInventoryRoute
+  '/_app/reports/operations-audit': typeof AppReportsOperationsAuditRoute
+  '/_app/reports/purchases': typeof AppReportsPurchasesRoute
+  '/_app/reports/sales': typeof AppReportsSalesRoute
+  '/_app/reports/suppliers': typeof AppReportsSuppliersRoute
+  '/_app/statements/$entityType': typeof AppStatementsEntityTypeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -529,6 +593,13 @@ export interface FileRouteTypes {
     | '/milling/jobs'
     | '/milling/operations-guide'
     | '/milling/reports'
+    | '/reports/customers'
+    | '/reports/inventory'
+    | '/reports/operations-audit'
+    | '/reports/purchases'
+    | '/reports/sales'
+    | '/reports/suppliers'
+    | '/statements/$entityType'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -581,6 +652,13 @@ export interface FileRouteTypes {
     | '/milling/jobs'
     | '/milling/operations-guide'
     | '/milling/reports'
+    | '/reports/customers'
+    | '/reports/inventory'
+    | '/reports/operations-audit'
+    | '/reports/purchases'
+    | '/reports/sales'
+    | '/reports/suppliers'
+    | '/statements/$entityType'
   id:
     | '__root__'
     | '/'
@@ -634,6 +712,13 @@ export interface FileRouteTypes {
     | '/_app/milling/jobs'
     | '/_app/milling/operations-guide'
     | '/_app/milling/reports'
+    | '/_app/reports/customers'
+    | '/_app/reports/inventory'
+    | '/_app/reports/operations-audit'
+    | '/_app/reports/purchases'
+    | '/_app/reports/sales'
+    | '/_app/reports/suppliers'
+    | '/_app/statements/$entityType'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1001,6 +1086,55 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMillingReportsRouteImport
       parentRoute: typeof AppMillingRoute
     }
+    '/_app/reports/customers': {
+      id: '/_app/reports/customers'
+      path: '/customers'
+      fullPath: '/reports/customers'
+      preLoaderRoute: typeof AppReportsCustomersRouteImport
+      parentRoute: typeof AppReportsRoute
+    }
+    '/_app/reports/inventory': {
+      id: '/_app/reports/inventory'
+      path: '/inventory'
+      fullPath: '/reports/inventory'
+      preLoaderRoute: typeof AppReportsInventoryRouteImport
+      parentRoute: typeof AppReportsRoute
+    }
+    '/_app/reports/operations-audit': {
+      id: '/_app/reports/operations-audit'
+      path: '/operations-audit'
+      fullPath: '/reports/operations-audit'
+      preLoaderRoute: typeof AppReportsOperationsAuditRouteImport
+      parentRoute: typeof AppReportsRoute
+    }
+    '/_app/reports/purchases': {
+      id: '/_app/reports/purchases'
+      path: '/purchases'
+      fullPath: '/reports/purchases'
+      preLoaderRoute: typeof AppReportsPurchasesRouteImport
+      parentRoute: typeof AppReportsRoute
+    }
+    '/_app/reports/sales': {
+      id: '/_app/reports/sales'
+      path: '/sales'
+      fullPath: '/reports/sales'
+      preLoaderRoute: typeof AppReportsSalesRouteImport
+      parentRoute: typeof AppReportsRoute
+    }
+    '/_app/reports/suppliers': {
+      id: '/_app/reports/suppliers'
+      path: '/suppliers'
+      fullPath: '/reports/suppliers'
+      preLoaderRoute: typeof AppReportsSuppliersRouteImport
+      parentRoute: typeof AppReportsRoute
+    }
+    '/_app/statements/$entityType': {
+      id: '/_app/statements/$entityType'
+      path: '/statements/$entityType'
+      fullPath: '/statements/$entityType'
+      preLoaderRoute: typeof AppStatementsEntityTypeRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
@@ -1024,6 +1158,28 @@ const AppMillingRouteChildren: AppMillingRouteChildren = {
 
 const AppMillingRouteWithChildren = AppMillingRoute._addFileChildren(
   AppMillingRouteChildren,
+)
+
+interface AppReportsRouteChildren {
+  AppReportsCustomersRoute: typeof AppReportsCustomersRoute
+  AppReportsInventoryRoute: typeof AppReportsInventoryRoute
+  AppReportsOperationsAuditRoute: typeof AppReportsOperationsAuditRoute
+  AppReportsPurchasesRoute: typeof AppReportsPurchasesRoute
+  AppReportsSalesRoute: typeof AppReportsSalesRoute
+  AppReportsSuppliersRoute: typeof AppReportsSuppliersRoute
+}
+
+const AppReportsRouteChildren: AppReportsRouteChildren = {
+  AppReportsCustomersRoute: AppReportsCustomersRoute,
+  AppReportsInventoryRoute: AppReportsInventoryRoute,
+  AppReportsOperationsAuditRoute: AppReportsOperationsAuditRoute,
+  AppReportsPurchasesRoute: AppReportsPurchasesRoute,
+  AppReportsSalesRoute: AppReportsSalesRoute,
+  AppReportsSuppliersRoute: AppReportsSuppliersRoute,
+}
+
+const AppReportsRouteWithChildren = AppReportsRoute._addFileChildren(
+  AppReportsRouteChildren,
 )
 
 interface AppRouteChildren {
@@ -1056,7 +1212,7 @@ interface AppRouteChildren {
   AppPurchasePosRoute: typeof AppPurchasePosRoute
   AppPurchaseReturnsRoute: typeof AppPurchaseReturnsRoute
   AppPurchasesRoute: typeof AppPurchasesRoute
-  AppReportsRoute: typeof AppReportsRoute
+  AppReportsRoute: typeof AppReportsRouteWithChildren
   AppReturnsRoute: typeof AppReturnsRoute
   AppSalesRoute: typeof AppSalesRoute
   AppSalesInvoiceRoute: typeof AppSalesInvoiceRoute
@@ -1069,6 +1225,7 @@ interface AppRouteChildren {
   AppUsersRoute: typeof AppUsersRoute
   AppVortexUiRoute: typeof AppVortexUiRoute
   AppWarehousesRoute: typeof AppWarehousesRoute
+  AppStatementsEntityTypeRoute: typeof AppStatementsEntityTypeRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -1101,7 +1258,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppPurchasePosRoute: AppPurchasePosRoute,
   AppPurchaseReturnsRoute: AppPurchaseReturnsRoute,
   AppPurchasesRoute: AppPurchasesRoute,
-  AppReportsRoute: AppReportsRoute,
+  AppReportsRoute: AppReportsRouteWithChildren,
   AppReturnsRoute: AppReturnsRoute,
   AppSalesRoute: AppSalesRoute,
   AppSalesInvoiceRoute: AppSalesInvoiceRoute,
@@ -1114,6 +1271,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppUsersRoute: AppUsersRoute,
   AppVortexUiRoute: AppVortexUiRoute,
   AppWarehousesRoute: AppWarehousesRoute,
+  AppStatementsEntityTypeRoute: AppStatementsEntityTypeRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

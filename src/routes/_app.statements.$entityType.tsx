@@ -1,28 +1,20 @@
 /**
- * /account-statement — مركز الكشوفات والتقارير
+ * /statements/$entityType — شاشة كشف الحساب
  *
- * شاشة موحدة تجمع:
- *   1. تبويب الكشوفات: كشوف الحسابات الأساسية (العملاء، الموردون، الصندوق والبنك).
- *   2. تبويب التقارير: جميع التقارير التشغيلية والتحليلية الموحدة بتصميم جدول موحد:
- *      (الأكثر مبيعاً، المبيعات، طرق الدفع، مخزون منخفض، المشتريات، الديون والمستحقات،
- *       فواتير العملاء، الأرباح والمبيعات، حركة المخزون، المرتجعات، المصروفات، كشف الصنف).
+ * لكل نوع كشف مسار مستقل في القائمة الجانبية: العملاء، الموردون، والصندوق/البنك.
+ * التقارير التشغيلية لها قسم مستقل تماماً تحت /reports ولا تُعرض هنا.
  */
 
 import { ModuleGuard } from "@/lib/modules";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import {
   FileSpreadsheet,
   Loader2,
   Printer,
-  UserCheck,
-  Building2,
-  Wallet,
   Eye,
   Share2,
-  FileText,
-  BarChart3,
   ArrowDownUp,
   ArrowUp,
   ArrowDown,
@@ -67,7 +59,6 @@ import {
 } from "@/components/statements/statement-integrity-badge";
 import { CASH_ENTITY_ID } from "@/lib/statements/adapters/cash";
 import type {
-  StatementEntityType,
   StatementFieldKey,
   StatementTransaction,
 } from "@/lib/statements/types";
@@ -89,24 +80,34 @@ import {
   saveReportPreferences,
 } from "@/lib/statements/local-storage";
 import { reportTypeForEntity, type ReportType } from "@/lib/statements/report-registry";
-import { ReportsHubTab, type ReportCategory } from "@/components/statements/reports-hub-tab";
 import { SearchInput } from "@/components/ui/search-input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { VortexDateBadge } from "@/components/vortex-ui";
+import {
+  CustomerFormDialog,
+  type CustomerRecord,
+} from "@/components/contacts/customer-form-dialog";
+import {
+  SupplierFormDialog,
+  type SupplierRecord,
+} from "@/components/contacts/supplier-form-dialog";
 
 const accountStatementSearchSchema = z.object({
   customerId: z.string().optional(),
-  entityType: z.string().optional(),
   entityId: z.string().optional(),
-  tab: z.enum(["statements", "reports"]).optional(),
-  reportSection: z.string().optional(),
 });
 
-export const Route = createFileRoute("/_app/account-statement")({
+const statementParamsSchema = z.object({
+  entityType: z.enum(["customer", "supplier", "cash"]),
+});
+
+export const Route = createFileRoute("/_app/statements/$entityType")({
+  parseParams: (params) => statementParamsSchema.parse(params),
   validateSearch: (search: Record<string, unknown>) => accountStatementSearchSchema.parse(search),
-  head: () => ({ meta: [{ title: "مركز الكشوفات والتقارير — Market Hub" }] }),
+  head: () => ({ meta: [{ title: "كشوفات الحسابات — Vortex ERP" }] }),
   component: () => (
     <ModuleGuard moduleId="payments">
-      <AccountStatementPage />
+      <StatementPage />
     </ModuleGuard>
   ),
 });
@@ -137,23 +138,15 @@ function periodPresets() {
   ];
 }
 
-type MainTab = "statements" | "reports";
-
-export function AccountStatementPage() {
+export function StatementPage() {
   const { t, lang } = useI18n();
   const ar = lang === "ar";
   const searchParams = Route.useSearch();
-  const navigate = useNavigate();
+  const { entityType: partyType } = Route.useParams();
   const { settings } = useStatementSettings();
   const savedPreferences = useMemo(() => getReportPreferences(), []);
 
-  // ── التبويب الرئيسي: [الكشوفات | التقارير] ──
-  const [mainTab, setMainTab] = useState<MainTab>(searchParams.tab ?? "statements");
-
-  // ── كشوفات الحسابات الأساسية فقط في تبويب الكشوفات ──
-  const [partyType, setPartyType] = useState<StatementEntityType>(
-    (searchParams.entityType as StatementEntityType) || savedPreferences.entityType || "customer",
-  );
+  // مسار كل نوع كشف هو مصدر الحقيقة؛ لا تختلط الأنواع في شاشة واحدة.
   const [partyId, setPartyId] = useState<string>(
     searchParams.entityId ?? searchParams.customerId ?? savedPreferences.entityId ?? "",
   );
@@ -161,6 +154,8 @@ export function AccountStatementPage() {
   const [loadingParties, setLoadingParties] = useState(false);
   const [detailEntry, setDetailEntry] = useState<StatementTransaction | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
+  const [customerFormOpen, setCustomerFormOpen] = useState(false);
+  const [supplierFormOpen, setSupplierFormOpen] = useState(false);
 
   // ── البحث والفرز في جدول كشف الحساب ──
   const [tableSearch, setTableSearch] = useState("");
@@ -200,14 +195,6 @@ export function AccountStatementPage() {
       visibleColumns,
     });
   }, [partyType, partyId, from, to, activePreset, includeZero, visibleColumns]);
-
-  const handleTabChange = (tab: MainTab) => {
-    setMainTab(tab);
-    void navigate({
-      search: (prev: Record<string, unknown>) => ({ ...prev, tab }),
-      replace: true,
-    });
-  };
 
   // جلب أطراف الحسابات
   useEffect(() => {
@@ -257,7 +244,7 @@ export function AccountStatementPage() {
     from: from || null,
     to: to || null,
     includeZeroRows: includeZero,
-    enabled: Boolean(partyId) && mainTab === "statements",
+    enabled: Boolean(partyId),
   });
 
   const currencySymbol = useMemo(
@@ -431,11 +418,7 @@ export function AccountStatementPage() {
       case "index":
         return <Ltr className="font-mono text-xs text-muted-foreground">{row.index}</Ltr>;
       case "date":
-        return (
-          <Ltr className="text-xs text-muted-foreground">
-            {new Date(row.occurredAt).toLocaleString(ar ? "ar-YE" : "en-GB")}
-          </Ltr>
-        );
+        return <VortexDateBadge date={row.occurredAt} size="sm" showWeekday={false} />;
       case "kind":
         return (
           <span className="text-xs font-semibold">{kindLabel(row.kind, partyType, lang)}</span>
@@ -482,16 +465,27 @@ export function AccountStatementPage() {
   return (
     <>
       <PageHeader
-        title={ar ? "مركز الكشوفات والتقارير" : "Statements & Reports Center"}
+        title={
+          ar
+            ? partyType === "customer"
+              ? "كشف حساب العملاء"
+              : partyType === "supplier"
+                ? "كشف حساب الموردين"
+                : "كشف الصندوق والبنك"
+            : partyType === "customer"
+              ? "Customer Statements"
+              : partyType === "supplier"
+                ? "Supplier Statements"
+                : "Cash & Bank Statement"
+        }
         subtitle={
           ar
-            ? "منظومة موحدة لاستعراض كشوفات الحسابات التفصيلية، تقارير الأداء، المبيعات والمخزون"
-            : "Unified center for financial statements, performance analytics, sales and stock reports"
+            ? "حركات الحساب والرصيد المتسلسل مع الطباعة والتصدير والمشاركة"
+            : "Account movements and running balance with printing, export, and sharing"
         }
         actions={
           <div className="flex items-center gap-2">
-            {mainTab === "statements" && (
-              <>
+            <>
                 <Button
                   onClick={handleShareStatement}
                   variant="outline"
@@ -521,97 +515,15 @@ export function AccountStatementPage() {
                   <Printer className="h-3.5 w-3.5" />
                   {ar ? "طباعة PDF فاخر" : "Print PDF"}
                 </Button>
-              </>
-            )}
+            </>
           </div>
         }
       />
 
-      {/* ═══ الشريط العلوي الموحد للتنقل بين [الكشوفات | التقارير] ═══ */}
-      <div className="mb-4 flex items-center justify-between border-b border-border/70 pb-3">
-        <div className="flex items-center gap-2 p-1 rounded-2xl bg-surface-2 border border-border/80 shadow-inner">
-          <button
-            type="button"
-            onClick={() => handleTabChange("statements")}
-            className={cn(
-              "flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200",
-              mainTab === "statements"
-                ? "bg-surface text-primary shadow-md shadow-primary/5 ring-1 ring-border/80"
-                : "text-muted-foreground hover:text-foreground hover:bg-surface/60",
-            )}
-          >
-            <FileText className="h-4 w-4" />
-            <span>{ar ? "الكشوفات" : "Statements"}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleTabChange("reports")}
-            className={cn(
-              "flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200",
-              mainTab === "reports"
-                ? "bg-surface text-primary shadow-md shadow-primary/5 ring-1 ring-border/80"
-                : "text-muted-foreground hover:text-foreground hover:bg-surface/60",
-            )}
-          >
-            <BarChart3 className="h-4 w-4" />
-            <span>{ar ? "التقارير" : "Reports"}</span>
-            <span className="rounded-full bg-primary/10 px-1.5 text-[10px] text-primary">12</span>
-          </button>
-        </div>
-      </div>
-
-      {/* ═══════════════════════════════════════════════════════════════
-          تبويب التقارير الموحد: يضم جميع التقارير الـ 12 بتصميم جدول موحد
-         ═══════════════════════════════════════════════════════════════ */}
-      {mainTab === "reports" && (
-        <ReportsHubTab
-          ar={ar}
-          initialReport={(searchParams.reportSection as ReportCategory) ?? "top"}
-        />
-      )}
-
-      {/* ═══════════════════════════════════════════════════════════════
-          تبويب الكشوفات: مخصص حصرياً لكشوفات الحسابات الأساسية النظيفة
-         ═══════════════════════════════════════════════════════════════ */}
-      {mainTab === "statements" && (
-        <div className="space-y-4">
+      <div className="space-y-4">
           {/* بطاقة اختيار الحساب النظيفة والمرتبة بقوائم منسدلة */}
           <div className="panel-elevated p-3.5 sm:p-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2.5">
-              {/* قائمة منسدلة لنوع الحساب */}
-              <Select
-                value={partyType}
-                onValueChange={(val) => {
-                  const nextType = val as StatementEntityType;
-                  setPartyType(nextType);
-                }}
-              >
-                <SelectTrigger className="h-9 w-40 sm:w-44 text-xs font-semibold bg-surface rounded-xl border-border/80 shadow-sm">
-                  <SelectValue placeholder={ar ? "نوع الحساب" : "Account type"} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="customer">
-                    <div className="flex items-center gap-2">
-                      <UserCheck className="h-3.5 w-3.5 text-primary" />
-                      <span>{ar ? "كشف حساب عميل" : "Customer account"}</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="supplier">
-                    <div className="flex items-center gap-2">
-                      <Building2 className="h-3.5 w-3.5 text-blue-500" />
-                      <span>{ar ? "كشف حساب مورد" : "Supplier account"}</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="cash">
-                    <div className="flex items-center gap-2">
-                      <Wallet className="h-3.5 w-3.5 text-emerald-500" />
-                      <span>{ar ? "الصندوق والبنك" : "Treasury / Bank"}</span>
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-
               {/* قائمة منسدلة لاختيار الطرف */}
               {partyType !== "cash" && (
                 <Select value={partyId} onValueChange={setPartyId}>
@@ -627,18 +539,53 @@ export function AccountStatementPage() {
                     />
                   </SelectTrigger>
                   <SelectContent className="max-h-[300px]">
-                    {partyList.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        <div className="flex items-center justify-between gap-4 w-full text-xs">
-                          <span className="font-medium truncate">{p.name}</span>
-                          {p.balance !== undefined && (
-                            <span className="font-mono text-[11px] text-muted-foreground">
-                              {money(Number(p.balance))}
-                            </span>
-                          )}
-                        </div>
-                      </SelectItem>
-                    ))}
+                    {partyList.length > 0 ? (
+                      partyList.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          <div className="flex w-full items-center justify-between gap-4 text-xs">
+                            <span className="truncate font-medium">{p.name}</span>
+                            {p.balance !== undefined && (
+                              <span className="font-mono text-[11px] text-muted-foreground">
+                                {money(Number(p.balance))}
+                              </span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <div className="space-y-2 p-2 text-center">
+                        <p className="text-xs text-muted-foreground">
+                          {loadingParties
+                            ? t("common.loading")
+                            : ar
+                              ? partyType === "customer"
+                                ? "لا يوجد عملاء حتى الآن"
+                                : "لا يوجد موردون حتى الآن"
+                              : partyType === "customer"
+                                ? "No customers yet"
+                                : "No suppliers yet"}
+                        </p>
+                        {!loadingParties && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="h-8 w-full rounded-xl text-xs"
+                            onClick={() => {
+                              setCustomerFormOpen(partyType === "customer");
+                              setSupplierFormOpen(partyType === "supplier");
+                            }}
+                          >
+                            {ar
+                              ? partyType === "customer"
+                                ? "إضافة عميل"
+                                : "إضافة مورد"
+                              : partyType === "customer"
+                                ? "Add customer"
+                                : "Add supplier"}
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </SelectContent>
                 </Select>
               )}
@@ -983,10 +930,14 @@ export function AccountStatementPage() {
                                 </span>
                               );
                             else if (col.key === "date")
-                              content = (
-                                <span className="font-mono text-xs text-muted-foreground">
-                                  <Ltr>{result?.period.from ?? "—"}</Ltr>
-                                </span>
+                              content = result?.period.from ? (
+                                <VortexDateBadge
+                                  date={result.period.from}
+                                  size="sm"
+                                  showWeekday={false}
+                                />
+                              ) : (
+                                <span className="text-xs text-muted-foreground">—</span>
                               );
                             else if (col.key === "balance")
                               content = (
@@ -1066,14 +1017,10 @@ export function AccountStatementPage() {
                     {money(closingBalance)} {currencySymbol}
                   </b>
                 </span>
-                <button type="button" onClick={refetch} className="text-primary hover:underline">
-                  {ar ? "تحديث الحساب" : "Refresh"}
-                </button>
               </div>
             )}
           </div>
-        </div>
-      )}
+      </div>
 
       {/* تفاصيل القيد المنبثقة */}
       <StatementEntryDetails
@@ -1101,6 +1048,25 @@ export function AccountStatementPage() {
           onExportExcel={handleExportCsv}
         />
       )}
+
+      <CustomerFormDialog
+        open={customerFormOpen}
+        onClose={() => setCustomerFormOpen(false)}
+        onSaved={(record: CustomerRecord) => {
+          setPartyList((current) => [...current, record]);
+          setPartyId(record.id);
+          setCustomerFormOpen(false);
+        }}
+      />
+      <SupplierFormDialog
+        open={supplierFormOpen}
+        onClose={() => setSupplierFormOpen(false)}
+        onSaved={(record: SupplierRecord) => {
+          setPartyList((current) => [...current, record]);
+          setPartyId(record.id);
+          setSupplierFormOpen(false);
+        }}
+      />
     </>
   );
 }

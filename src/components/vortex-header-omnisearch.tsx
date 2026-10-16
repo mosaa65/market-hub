@@ -124,8 +124,10 @@ export const VortexHeaderOmnisearch = memo(function VortexHeaderOmnisearch({
         (activeElement.tagName === "INPUT" || activeElement.tagName === "TEXTAREA");
 
       // اختصار البحث الرئيسي المخصص: Ctrl+K أو Cmd+K حصراً لمنع التعارض مع حقول بحث الصفحات المنفصلة
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+      if ((e.metaKey || e.ctrlKey) && (e.key.toLowerCase() === "k" || e.code === "KeyK")) {
         e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
         setIsOpen(true);
         setTimeout(() => inputRef.current?.focus(), 50);
       }
@@ -138,8 +140,8 @@ export const VortexHeaderOmnisearch = memo(function VortexHeaderOmnisearch({
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown, { capture: true });
+    return () => window.removeEventListener("keydown", handleKeyDown, { capture: true });
   }, [isOpen]);
 
   // البحث التسامحي في البيانات عبر Supabase

@@ -662,7 +662,7 @@ function CustomersPage() {
         );
         return;
       }
-      void navigate({ to: "/account-statement", search: { customerId: c.id } as never });
+      void navigate({ to: "/statements/customer", search: { customerId: c.id } as never });
     },
     [navigate, ledgerIndex, lang],
   );

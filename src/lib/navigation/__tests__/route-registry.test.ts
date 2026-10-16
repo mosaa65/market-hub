@@ -29,12 +29,26 @@ check("route ids are unique", new Set(ids).size === ids.length);
 const paths = ROUTE_REGISTRY.map((e) => e.path);
 check("full paths are unique", new Set(paths).size === paths.length);
 
-// المسارات الأساسية قد تتكرر فقط لأقسام الإعدادات المختلفة (/settings?section=…).
+// المسارات الأساسية قد تتكرر فقط لأقسام الإعدادات أو لتقارير فرعية تستخدم
+// المجال نفسه مع `?report=`؛ يجب أن تعلن الأخيرة أباً مرئياً في القائمة.
 const basePaths = ROUTE_REGISTRY.map((e) => e.path.split("?")[0]);
-const duplicateBase = basePaths.filter((p, i) => basePaths.indexOf(p) !== i);
+const duplicateBaseEntries = ROUTE_REGISTRY.filter(
+  (entry) => basePaths.filter((path) => path === entry.path.split("?")[0]).length > 1,
+);
 check(
-  "duplicate base paths are limited to settings sections",
-  duplicateBase.every((p) => p === "/settings"),
+  "duplicate base paths are limited to settings sections and report children",
+  duplicateBaseEntries.every(
+    (entry) =>
+      entry.path.split("?")[0] === "/settings" ||
+      Boolean(entry.sidebarParentId) ||
+      entry.category === "reports",
+  ),
+);
+check(
+  "every report child points to an existing sidebar domain",
+  ROUTE_REGISTRY.filter((entry) => entry.sidebarParentId).every((entry) =>
+    ROUTE_REGISTRY.some((parent) => parent.id === entry.sidebarParentId),
+  ),
 );
 
 check(
@@ -62,13 +76,14 @@ const REQUIRED_ROUTES = [
   "/debts",
   "/payments",
   "/expenses",
-  "/reports",
   "/inventory",
   "/warehouses",
   "/transfers",
   "/batches",
   "/barcodes",
-  "/account-statement",
+  "/statements/customer",
+  "/statements/supplier",
+  "/statements/cash",
   "/audit",
   "/settings",
   "/milling",
@@ -98,14 +113,14 @@ check("permission filter hides audit", !cashierOnly.some((e) => e.id === "audit"
 check("Arabic search: تحويلات → transfers", searchRoutes("تحويلات", true)[0]?.id === "transfers");
 check(
   "Arabic search: كشف حساب → statements",
-  searchRoutes("كشف حساب", true)[0]?.id === "account-statement",
+  searchRoutes("كشف حساب", true)[0]?.id === "statement-customers",
 );
 check("Arabic search: مطحنة → milling", searchRoutes("مطحنة", true)[0]?.id === "milling");
 check("Arabic search: سجل الأحداث → audit", searchRoutes("سجل الأحداث", true)[0]?.id === "audit");
 
 /** البحث بالإنجليزية. */
 check("English search: transfers", searchRoutes("transfers", false)[0]?.id === "transfers");
-check("English search: audit", searchRoutes("audit", false)[0]?.id === "audit");
+check("English search: audit", searchRoutes("audit", false).some((entry) => entry.id === "audit"));
 check("English search: inventory", searchRoutes("inventory", false)[0]?.id === "inventory");
 
 /** البحث بالمرادفات. */
@@ -113,7 +128,10 @@ check(
   "synonym search: طباعة → printing settings",
   searchRoutes("طباعة", true).some((e) => e.id === "printing-settings"),
 );
-check("synonym search: مخزون → inventory", searchRoutes("مخزون", true)[0]?.id === "inventory");
+check(
+  "synonym search: مخزون → inventory",
+  searchRoutes("مخزون", true).some((entry) => entry.id === "inventory"),
+);
 
 /** Enter يفتح المسار الصحيح: أول نتيجة لها path صالح يبدأ بـ '/'. */
 const firstHit = searchRoutes("كشف", true)[0];
@@ -150,6 +168,24 @@ const sidebarSections = getSidebarSections();
 check(
   "every sidebar section has entries",
   sidebarSections.every((section) => section.entries.length > 0),
+);
+
+/**
+ * «التقارير» هو الأب في القائمة، وتحته المجالات الستة فقط. التقرير الفردي
+ * يختار من شاشة مجاله حتى لا تتحول القائمة الجانبية إلى قائمة طويلة.
+ */
+const reportsSection = sidebarSections.find((section) => section.category === "reports");
+check(
+  "reports sidebar lists the six domains only",
+  Boolean(reportsSection) &&
+    reportsSection!.entries.length === 6 &&
+    reportsSection!.entries.every((entry) => !entry.sidebarParentId),
+);
+check(
+  "individual report links stay searchable but are absent from the sidebar",
+  ROUTE_REGISTRY.some((entry) => entry.sidebarParentId) &&
+    Boolean(reportsSection) &&
+    !reportsSection!.entries.some((entry) => Boolean(entry.sidebarParentId)),
 );
 
 /**

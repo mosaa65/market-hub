@@ -205,7 +205,7 @@ function DebtsPage() {
   /** ينتقل إلى شاشة كشف الحساب — بلا قالب محلي مكرر */
   function goStatement(customerIdToOpen: string) {
     void navigate({
-      to: "/account-statement",
+      to: "/statements/customer",
       search: { customerId: customerIdToOpen } as never,
     });
   }

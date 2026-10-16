@@ -144,10 +144,12 @@ const SidebarContents = memo(function SidebarContents({
     select: (s) => s.location.pathname,
   });
 
-  /** `?section=` of the settings route, used to highlight the right link. */
-  const currentSection = useRouterState({
-    select: (s) => new URLSearchParams(s.location.searchStr ?? "").get("section"),
+  /** معاملات الرابط الحالية، لتفعيل عناصر الإعدادات والتقارير بدقة. */
+  const currentSearch = useRouterState({
+    select: (s) => s.location.searchStr ?? "",
   });
+  const currentSearchParams = useMemo(() => new URLSearchParams(currentSearch), [currentSearch]);
+  const currentSection = currentSearchParams.get("section");
 
   // Navigation belongs to the application itself, not to an individual tenant.
   // The company logo remains available in invoices and printable documents.
@@ -186,7 +188,9 @@ const SidebarContents = memo(function SidebarContents({
 
   const { isOpen: isSectionOpen, toggle: toggleSection } = useSidebarSections({
     userId: user?.id,
-    forceOpenKeys: activeCategory ? [activeCategory] : [],
+    // لا نجبر القسم النشط على البقاء مفتوحاً؛ زر القسم يجب أن يفتح ويغلق
+    // كل الأقسام بنفس السلوك حتى أثناء الوقوف داخل إحدى شاشاته.
+    forceOpenKeys: [],
     // First run: only the section you are standing in is expanded.
     defaultOpen: (key) => key === activeCategory,
   });
@@ -251,7 +255,7 @@ const SidebarContents = memo(function SidebarContents({
                     aria-expanded={sectionOpen}
                     aria-controls={`sidebar-section-${sectionKey}`}
                     className={cn(
-                      "flex w-full items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em]",
+                      "flex w-full items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-[0.12em]",
                       "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
                       activeInSection
                         ? "text-foreground"
@@ -290,10 +294,14 @@ const SidebarContents = memo(function SidebarContents({
                    * stays active for the hub itself.
                    */
                   const [entryPath, entryQuery] = it.path.split("?");
-                  const entrySection = new URLSearchParams(entryQuery ?? "").get("section");
+                  const entrySearch = new URLSearchParams(entryQuery ?? "");
+                  const hasEntryQuery = Array.from(entrySearch.keys()).length > 0;
+                  const queryMatches = Array.from(entrySearch.entries()).every(
+                    ([key, value]) => currentSearchParams.get(key) === value,
+                  );
 
-                  const active = entrySection
-                    ? pathname === entryPath && currentSection === entrySection
+                  const active = hasEntryQuery
+                    ? pathname === entryPath && queryMatches
                     : entryPath === "/settings"
                       ? // The hub itself: active only when no section is chosen,
                         // otherwise the sectioned link below it takes the mark.
@@ -314,14 +322,16 @@ const SidebarContents = memo(function SidebarContents({
                       >
                         <Link
                           /*
-                           * `to` is the path only; a sectioned settings entry
-                           * carries its section as `search`. Passing the full
-                           * "/settings?section=x" as `to` would make the router
-                           * treat the query as part of the pathname and fail to
-                           * match the route.
+                           * `to` هو المسار فقط؛ معاملات كل رابط (قسم إعدادات
+                           * أو تقرير محدد) تمرر عبر `search`، وإلا يعاملها
+                           * الموجّه كجزء من pathname ولا يجد المسار.
                            */
                           to={entryPath}
-                          search={entrySection ? { section: entrySection } : undefined}
+                          search={
+                            hasEntryQuery
+                              ? (Object.fromEntries(entrySearch.entries()) as any)
+                              : undefined
+                          }
                           onClick={onNavigate}
                           className={cn(
                             "group relative flex items-center transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary/50",

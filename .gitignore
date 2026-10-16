@@ -9,6 +9,7 @@ lerna-debug.log*
 
 node_modules
 dist
+ui-ux-pro-max-skill-main
 dist-ssr
 .output
 .vinxi

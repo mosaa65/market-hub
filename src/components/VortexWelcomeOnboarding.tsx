@@ -639,7 +639,7 @@ export function VortexWelcomeOnboarding() {
                       <ArrowUpRight className="size-3.5" />
                     </Link>
                     <Link
-                      to="/account-statement"
+                      to="/statements/customer"
                       onClick={handleFinish}
                       className="text-muted-foreground hover:text-foreground font-medium"
                     >

@@ -111,8 +111,14 @@ export const SYSTEM_MODULES: PlatformModule[] = [
     },
     category: "module",
     dependencies: ["core"],
-    navItems: ["/payments", "/debts", "/account-statement"],
-    routes: ["/_app/payments", "/_app/debts", "/_app/account-statement"],
+    navItems: [
+      "/payments",
+      "/debts",
+      "/statements/customer",
+      "/statements/supplier",
+      "/statements/cash",
+    ],
+    routes: ["/_app/payments", "/_app/debts", "/_app/statements/$entityType"],
   },
   {
     id: "expenses",

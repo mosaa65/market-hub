@@ -24,6 +24,7 @@ export const ROUTE_ACCESS: Record<string, RouteAccessRule> = {
   // لوحة القيادة
   "/analytics": { allowedRoles: FINANCE },
   "/reports": { allowedRoles: FINANCE },
+  "/statements": { allowedRoles: FINANCE },
 
   // المبيعات
   "/pos": { allowedRoles: ["owner", "manager", "cashier"] },
@@ -34,7 +35,6 @@ export const ROUTE_ACCESS: Record<string, RouteAccessRule> = {
   "/customers": { allowedRoles: SALES },
   "/payments": { allowedRoles: FINANCE },
   "/debts": { allowedRoles: FINANCE },
-  "/account-statement": { allowedRoles: FINANCE },
   "/loyalty": { allowedRoles: ["owner", "manager", "cashier"] },
 
   // المنتجات والمخزون

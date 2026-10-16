@@ -135,7 +135,7 @@ function AnalyticsPage() {
         supabase
           .from("products")
           .select(
-            "id,name,name_ar,cost,sale_price,min_stock,category_id,brand_id,categories(name,name_ar),brands(name,name_ar)",
+            "id,name,name_ar,cost_price,sale_price,min_stock,category_id,brand_id,categories(name,name_ar),brands(name,name_ar)",
           )
           .limit(2000),
         supabase
@@ -192,7 +192,7 @@ function AnalyticsPage() {
       const key = it.sales_invoices?.created_at ? localDayKey(it.sales_invoices.created_at) : null;
       if (!key || !daily[key]) return;
       const p = prodMap.get(it.product_id) as any;
-      const cost = p ? Number(p.cost ?? 0) : 0;
+      const cost = p ? Number(p.cost_price ?? 0) : 0;
       daily[key].profit += Number(it.total) - cost * Number(it.quantity);
     });
     data.expenses.forEach((e: any) => {
@@ -283,7 +283,7 @@ function AnalyticsPage() {
     let invValue = 0;
     (data.inv as any[]).forEach((r) => {
       const p = prodMap.get(r.product_id) as any;
-      if (p) invValue += Number(p.cost ?? 0) * Number(r.quantity);
+      if (p) invValue += Number(p.cost_price ?? 0) * Number(r.quantity);
     });
 
     // Warehouse distribution

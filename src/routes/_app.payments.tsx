@@ -275,7 +275,7 @@ function PaymentsPage() {
   /** الانتقال إلى شاشة كشف الحساب — بلا منطق حسابي محلي */
   function goStatement(customerId: string) {
     void navigate({
-      to: "/account-statement",
+      to: "/statements/customer",
       search: { customerId } as never,
     });
   }

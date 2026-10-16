@@ -65,7 +65,9 @@ const ICONS: Record<string, LucideIcon> = {
   customers: Users,
   payments: Wallet,
   debts: AlertTriangle,
-  "account-statement": FileText,
+  "statement-customers": Users,
+  "statement-suppliers": Building2,
+  "statement-cash": Wallet,
   loyalty: Gift,
   products: Package,
   inventory: Warehouse,
@@ -123,6 +125,8 @@ export function routeIcon(id: string): LucideIcon {
 export function routeCategoryLabel(category: string, isAr: boolean): string {
   const labels: Record<string, [string, string]> = {
     command_center: ["لوحة القيادة", "Command center"],
+    reports: ["التقارير", "Reports"],
+    statements: ["الكشوفات", "Statements"],
     sales: ["المبيعات", "Sales"],
     inventory: ["المخزون", "Inventory"],
     procurement: ["المشتريات", "Procurement"],
