@@ -12,7 +12,6 @@ export function renderFormalTemplate(
   company: CompanyProfile = getCachedCompanyProfile(),
 ): string {
   const e = escapeHtml;
-  const money = (n?: number) => formatMoney(n ?? 0, doc.currency ?? resolvedCompany.currency ?? "");
   const opts = {
     showCompanyInfo: true,
     showCustomerInfo: true,
@@ -28,6 +27,8 @@ export function renderFormalTemplate(
   if (options?.showFooter === false) opts.showFooter = false;
   // An explicit `options.company` (or the 5th argument) wins over the cache.
   const resolvedCompany = options?.company ?? company;
+  // `money` يُعرّف بعد resolvedCompany لأنه يعتمد عليها.
+  const money = (n?: number) => formatMoney(n ?? 0, doc.currency ?? resolvedCompany.currency ?? "");
   const companyName = resolvedCompany.name || doc.company?.name || "";
   const rows = doc.lines
     .map(
