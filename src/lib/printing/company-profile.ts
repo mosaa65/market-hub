@@ -11,8 +11,6 @@ export interface CompanyProfile {
   email?: string;
   taxNumber?: string;
   logoUrl?: string;
-  footerText?: string;
-  footerContact?: string;
   currency?: string;
 }
 
@@ -24,7 +22,7 @@ const CACHE_KEY = "company_settings_cache";
 const DEFAULT_PROFILE: CompanyProfile = {
   name: "",
   contacts: [],
-  logoUrl: "/vortex-erp-mark.png",
+  logoUrl: "/vortex-erp-wordmark.png",
 };
 
 function fromRow(row: Record<string, unknown> | null | undefined): CompanyProfile {

@@ -277,7 +277,7 @@ export function CustomerFormDialog({
                       disabled={saving}
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      placeholder="772217218"
+                      placeholder="770000000"
                       maxLength={15}
                       className="h-12 w-full rounded-2xl border border-border/80 bg-surface/80 px-4 ps-10 text-right text-sm font-medium transition placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                     />

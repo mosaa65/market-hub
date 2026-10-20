@@ -349,19 +349,28 @@ BEGIN
   INSERT INTO public.stock_movements
     (product_id, warehouse_id, movement_type, quantity, unit_cost, reference,
      note, created_by, movement_kind, source_type, source_id, owner_type, owner_id,
-     total_cost)
+     adjustment_reason)
   VALUES
     (p_product_id, p_warehouse_id, v_mt, p_signed_qty, p_unit_cost,
      coalesce(p_source_type, '') || coalesce(':' || p_source_id::text, ''),
      p_note, v_user, p_movement_kind, p_source_type, p_source_id, p_owner_type,
      p_owner_id,
-     CASE WHEN p_unit_cost IS NULL THEN NULL
-          ELSE round(abs(p_signed_qty) * p_unit_cost, 2) END);
+     -- الشرط يقرأ movement_type (لا movement_kind): أي حركة adjustment تحتاج سبباً.
+     CASE WHEN v_mt = 'adjustment'::public.movement_type
+          THEN coalesce(nullif(btrim(p_note), ''), nullif(btrim(p_source_type), ''), 'Stock adjustment')
+          ELSE NULL END);
 
   -- P0-3: التقييم في نفس المعاملة وبنفس المصدر — لا حركة كمية بلا قيمة.
   PERFORM public.apply_cost_movement(
-    p_product_id, p_warehouse_id, p_signed_qty, p_unit_cost,
-    p_source_type, p_source_id, p_note, p_owner_type, p_owner_id);
+    p_product_id => p_product_id,
+    p_warehouse_id => p_warehouse_id,
+    p_signed_qty => p_signed_qty,
+    p_incoming_cost => p_unit_cost,
+    p_source_type => p_source_type,
+    p_source_id => p_source_id,
+    p_note => p_note,
+    p_owner_type => p_owner_type,
+    p_owner_id => p_owner_id);
 
   PERFORM set_config('app.stock_engine', 'off', true);
 END $function$;
@@ -628,17 +637,17 @@ BEGIN
 
         IF v_effect = 'STOCK_ISSUE' THEN
           PERFORM public.post_stock_delta(
-            v_line.product_id,
-            _warehouse_id,
-            -v_line.quantity,
-            NULL,                       -- P0-3: المحرّك يقيّم من الطبقة الفعلية
-            'ISSUE'::public.stock_movement_kind,
-            'sales_invoice',
-            v_invoice_id,
-            'POS sale',
-            'COMPANY'::public.owner_type,
-            NULL,
-            'sale'::public.movement_type
+            p_product_id => v_line.product_id,
+            p_warehouse_id => _warehouse_id,
+            p_signed_qty => -v_line.quantity,
+            p_unit_cost => NULL,        -- P0-3: المحرّك يقيّم من الطبقة الفعلية
+            p_movement_kind => 'ISSUE'::public.stock_movement_kind,
+            p_source_type => 'sales_invoice',
+            p_source_id => v_invoice_id,
+            p_note => 'POS sale',
+            p_owner_type => 'COMPANY'::public.owner_type,
+            p_owner_id => NULL,
+            p_movement_type_legacy => 'sale'::public.movement_type
           );
         END IF;
       END IF;
@@ -709,16 +718,43 @@ BEGIN
   COMMENT ON FUNCTION public.create_sale(uuid, uuid, text, numeric, numeric, text, jsonb) IS
     'T-06 + P0-3: إنشاء فاتورة مبيعات وتقييم مخزونها وترحيلها للأستاذ في نفس المعاملة.';
 
-  
+
 -- ════════════════════════════════════════════════════════════════════════════
 -- P0-4 — قيد إيراد المبيعات: لا يختفي بند خدمة
 -- ════════════════════════════════════════════════════════════════════════════
+-- أسماء الوسائط في القاعدة المتصلة هي p_memo/p_entry_date/p_source_type/
+-- p_source_id/p_is_system/p_system_lines (أو p_lines حسب النسخة)، ووسيط الغلاف
+-- p_payment_method؛ لذلك كل النداءات أدناه تمرّر الوسائط بالاسم بدل الموضع.
+
+CREATE OR REPLACE FUNCTION public.ledger_account_code_for_payment_method(p_payment_method text)
+RETURNS text
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT public.payment_method_ledger_account($1);
+$$;
+
+COMMENT ON FUNCTION public.ledger_account_code_for_payment_method(text) IS
+  'الحساب الذي تُسوّى إليه طريقة الدفع في القيود. يعيد NULL للآجل، ويأتي من الكتالوج لا من قائمة مضمّنة.';
+
 -- JOIN products كان يستبعد البند الحر (product_id = NULL) وبند الصنف الذي لم
 -- يُصنَّف (item_class = NULL)، فيفشل الترحيل أو يخرج بلا إيراد. الآن:
 --   • الخدمة الحرة تُجمع من ad_hoc_service_lines على حساب الخدمات 4311.
 --   • البند بلا تصنيف يذهب إلى 4111 (إيراد مبيعات) بدل أن يسقط.
 --   • COGS يقرأ total_cost من الحركة (P0-3) بدل resolve_unit_cost.
 --   • سطور الذمم تحمل partner_type/partner_id (P1-7).
+CREATE OR REPLACE FUNCTION public.ledger_account_code_for_payment_method(p_payment_method text)
+RETURNS text
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT public.payment_method_ledger_account($1);
+$$;
+
 CREATE OR REPLACE FUNCTION public.post_sales_invoice(p_invoice_id uuid)
 RETURNS uuid
 LANGUAGE plpgsql
@@ -775,7 +811,8 @@ BEGIN
     RAISE EXCEPTION 'Invoice % has already been posted to the ledger', v_inv.invoice_number;
   END IF;
 
-  v_cash_acct := public.ledger_account_code_for_payment_method(v_inv.payment_method);
+  -- نداء بتحويل نوع صريح: يمنع التباس اسم العمود payment_method مع الوسيط.
+  v_cash_acct := public.payment_method_ledger_account(v_inv.payment_method::text);
   v_collectable := greatest(v_inv.total - v_inv.paid, 0);
 
   -- ── الإيراد دائن: بند مُصنَّف حسب item_class ──
@@ -869,9 +906,12 @@ BEGIN
   END LOOP;
 
   v_entry := public.create_journal_entry(
-    'فاتورة مبيعات ' || v_inv.invoice_number,
-    v_inv.created_at::date,
-    'sales_invoice', p_invoice_id, true, v_lines);
+    p_memo => 'فاتورة مبيعات ' || v_inv.invoice_number,
+    p_entry_date => v_inv.created_at::date,
+    p_source_type => 'sales_invoice',
+    p_source_id => p_invoice_id,
+    p_is_system => true,
+    p_lines => v_lines);
 
   RETURN v_entry;
 END $$;
@@ -905,7 +945,6 @@ DECLARE
   v_system         boolean := false;
   v_supplier_balance numeric;
   v_paid           numeric;
-  v_credit_limit   numeric;
 BEGIN
   IF v_user IS NULL THEN
     RAISE EXCEPTION 'Not authenticated';
@@ -1008,17 +1047,17 @@ BEGIN
 
     IF v_effect = 'STOCK_RECEIPT' AND v_product IS NOT NULL THEN
       PERFORM public.post_stock_delta(
-        v_product,
-        _warehouse_id,
-        v_qty,
-        v_cost,
-        'RECEIPT'::public.stock_movement_kind,
-        'purchase_invoice',
-        v_invoice_id,
-        'Purchase receipt',
-        'COMPANY'::public.owner_type,
-        NULL,
-        'purchase'::public.movement_type
+        p_product_id => v_product,
+        p_warehouse_id => _warehouse_id,
+        p_signed_qty => v_qty,
+        p_unit_cost => v_cost,
+        p_movement_kind => 'RECEIPT'::public.stock_movement_kind,
+        p_source_type => 'purchase_invoice',
+        p_source_id => v_invoice_id,
+        p_note => 'Purchase receipt',
+        p_owner_type => 'COMPANY'::public.owner_type,
+        p_owner_id => NULL,
+        p_movement_type_legacy => 'purchase'::public.movement_type
       );
     END IF;
   END LOOP;
@@ -1165,18 +1204,22 @@ BEGIN
 
   -- ── المجاميع من بنود الفاتورة، لا من الطلب ─────────────────────────────
   FOR r IN
-    SELECT (src.item ->> 'product_id')::uuid AS product_id,
-           sum(coalesce((src.item ->> 'quantity')::numeric, 0)) AS quantity,
-           (SELECT sum(sit.unit_price * sit.quantity) / nullif(sum(sit.quantity), 0)
-              FROM public.sales_invoice_items sit
-             WHERE sit.invoice_id = _invoice_id
-               AND sit.product_id = (src.item ->> 'product_id')::uuid) AS unit_price,
-           (SELECT sum(sit.tax) / nullif(sum(sit.quantity), 0)
-              FROM public.sales_invoice_items sit
-             WHERE sit.invoice_id = _invoice_id
-               AND sit.product_id = (src.item ->> 'product_id')::uuid) AS unit_tax
-      FROM jsonb_array_elements(_items) AS src(item)
-     GROUP BY (src.item ->> 'product_id')::uuid
+    WITH req AS (
+      SELECT (src.item ->> 'product_id')::uuid AS product_id,
+             sum(coalesce((src.item ->> 'quantity')::numeric, 0)) AS quantity
+        FROM jsonb_array_elements(_items) AS src(item)
+       GROUP BY (src.item ->> 'product_id')::uuid
+    ),
+    sold AS (
+      SELECT sit.product_id,
+             sum(sit.unit_price * sit.quantity) / nullif(sum(sit.quantity), 0) AS unit_price,
+             sum(sit.tax) / nullif(sum(sit.quantity), 0) AS unit_tax
+        FROM public.sales_invoice_items sit
+       WHERE sit.invoice_id = _invoice_id
+       GROUP BY sit.product_id
+    )
+    SELECT req.product_id, req.quantity, sold.unit_price, sold.unit_tax
+      FROM req LEFT JOIN sold ON sold.product_id = req.product_id
   LOOP
     v_sub := v_sub + round(coalesce(r.unit_price, 0) * r.quantity, 2);
     v_tax := v_tax + round(coalesce(r.unit_tax, 0) * r.quantity, 2);
@@ -1234,17 +1277,17 @@ BEGIN
 
     IF v_effect = 'STOCK_RECEIPT' THEN
       PERFORM public.post_stock_delta(
-        v_p,
-        v_inv.warehouse_id,
-        v_qty,
-        NULL,  -- التقييم بمتوسط الطبقة الحالية (P0-3)
-        'RECEIPT'::public.stock_movement_kind,
-        'sales_return',
-        v_id,
-        'Sales return',
-        'COMPANY'::public.owner_type,
-        NULL,
-        'sale_return'::public.movement_type
+        p_product_id => v_p,
+        p_warehouse_id => v_inv.warehouse_id,
+        p_signed_qty => v_qty,
+        p_unit_cost => NULL,   -- التقييم بمتوسط الطبقة (P0-3)
+        p_movement_kind => 'RECEIPT'::public.stock_movement_kind,
+        p_source_type => 'sales_return',
+        p_source_id => v_id,
+        p_note => 'Sales return ' || v_no,
+        p_owner_type => 'COMPANY'::public.owner_type,
+        p_owner_id => NULL,
+        p_movement_type_legacy => 'sale_return'::public.movement_type
       );
     END IF;
   END LOOP;
@@ -1291,7 +1334,7 @@ BEGIN
       'memo', 'عكس ضريبة القيمة المضافة');
   END IF;
 
-  v_cash_acct := public.payment_method_ledger_account(_refund_method);
+  v_cash_acct := public.payment_method_ledger_account(_refund_method::text);
   IF v_cash_acct IS NOT NULL THEN
     v_lines := v_lines || jsonb_build_object(
       'account_code', v_cash_acct, 'credit', round(v_tot, 2),
@@ -1340,7 +1383,11 @@ BEGIN
 
   IF v_debits > 0 OR v_credits > 0 THEN
     v_entry := public.balance_and_post_return(
-      'مرتجع مبيعات ' || v_no, CURRENT_DATE, 'sales_return', v_id, v_lines);
+      p_memo => 'مرتجع مبيعات ' || v_no,
+      p_date => CURRENT_DATE,
+      p_source_type => 'sales_return',
+      p_source_id => v_id,
+      p_lines => v_lines);
   END IF;
 
   INSERT INTO public.audit_logs (actor_id, action, entity_type, entity_id, payload)
@@ -1477,10 +1524,17 @@ BEGIN
 
   -- 1) صادر القمح (ينقص المخزون ويقيَّم بنفس المعاملة)
   PERFORM public.post_stock_delta(
-    _grain_item_id, _warehouse_id, -coalesce(_grain_qty, 0), v_grain_cost,
-    'PRODUCTION'::public.stock_movement_kind, 'smart_manufacture', v_doc_id,
-    'تصنيع ذكي ' || v_ref || coalesce(' — ' || _notes, ''),
-    'COMPANY'::public.owner_type, NULL, 'production_out'::public.movement_type);
+    p_product_id => _grain_item_id,
+    p_warehouse_id => _warehouse_id,
+    p_signed_qty => -coalesce(_grain_qty, 0),
+    p_unit_cost => v_grain_cost,
+    p_movement_kind => 'PRODUCTION'::public.stock_movement_kind,
+    p_source_type => 'smart_manufacture',
+    p_source_id => v_doc_id,
+    p_note => 'تصنيع ذكي ' || v_ref || coalesce(' — ' || _notes, ''),
+    p_owner_type => 'COMPANY'::public.owner_type,
+    p_owner_id => NULL,
+    p_movement_type_legacy => 'production_out'::public.movement_type);
 
   -- 2) وارد النواتج بتكلفة موزعة وبناء أطراف القيد المدين للنواتج
   FOR r IN SELECT * FROM jsonb_to_recordset(_outputs) AS o(item_id uuid, qty numeric)
@@ -1505,10 +1559,17 @@ BEGIN
       v_unit_cost := round(v_line_allocated / nullif(coalesce(r.qty, 0), 0), 4);
 
       PERFORM public.post_stock_delta(
-        r.item_id, _warehouse_id, coalesce(r.qty, 0), v_unit_cost,
-        'PRODUCTION'::public.stock_movement_kind, 'smart_manufacture', v_doc_id,
-        'تصنيع ذكي ' || v_ref || coalesce(' — ' || _notes, ''),
-        'COMPANY'::public.owner_type, NULL, 'production_in'::public.movement_type);
+        p_product_id => r.item_id,
+        p_warehouse_id => _warehouse_id,
+        p_signed_qty => coalesce(r.qty, 0),
+        p_unit_cost => v_unit_cost,
+        p_movement_kind => 'PRODUCTION'::public.stock_movement_kind,
+        p_source_type => 'smart_manufacture',
+        p_source_id => v_doc_id,
+        p_note => 'تصنيع ذكي ' || v_ref || coalesce(' — ' || _notes, ''),
+        p_owner_type => 'COMPANY'::public.owner_type,
+        p_owner_id => NULL,
+        p_movement_type_legacy => 'production_in'::public.movement_type);
 
       IF v_item_class = 'BY_PRODUCT' THEN
         v_acct_code := '1314';
@@ -1545,12 +1606,12 @@ BEGIN
     );
 
     PERFORM public.create_journal_entry(
-      'تصنيع ذكي ' || v_ref || coalesce(' — ' || _notes, ''),
-      CURRENT_DATE,
-      'smart_manufacture',
-      v_doc_id,                -- P0-2: معرّف الدفعة لا معرّف صنف القمح
-      true,
-      v_journal_lines
+      p_memo => 'تصنيع ذكي ' || v_ref || coalesce(' — ' || _notes, ''),
+      p_entry_date => CURRENT_DATE,
+      p_source_type => 'smart_manufacture',
+      p_source_id => v_doc_id,   -- P0-2: معرّف الدفعة لا معرّف صنف القمح
+      p_is_system => true,
+      p_lines => v_journal_lines
     );
   END IF;
 
@@ -1636,10 +1697,22 @@ BEGIN
     v_total_cost := v_total_cost + v_line_cost;
 
     PERFORM public.post_stock_delta(
-      r.item_id, _warehouse_id, -coalesce(r.qty, 0), v_unit_cost,
-      'ISSUE'::public.stock_movement_kind, 'internal_consumables', v_doc_id,
-      'صرف مستهلكات داخلي ' || v_ref || coalesce(' — ' || _notes, ''),
-      'COMPANY'::public.owner_type, NULL, 'adjustment'::public.movement_type);
+      p_product_id => r.item_id,
+      p_warehouse_id => _warehouse_id,
+      p_signed_qty => -coalesce(r.qty, 0),
+      p_unit_cost => v_unit_cost,
+      p_movement_kind => 'ISSUE'::public.stock_movement_kind,
+      p_source_type => 'internal_consumables',
+      p_source_id => v_doc_id,
+      p_note => 'صرف مستهلكات داخلي ' || v_ref || coalesce(' — ' || _notes, ''),
+      p_owner_type => 'COMPANY'::public.owner_type,
+      p_owner_id => NULL,
+      p_movement_type_legacy => 'adjustment'::public.movement_type);
+    -- شرط stock_movements_adjustment_reason_required: سبب الحركة إلزامي.
+    UPDATE public.stock_movements
+       SET adjustment_reason = coalesce(adjustment_reason, 'Internal consumables ' || v_ref)
+     WHERE source_type = 'internal_consumables' AND source_id = v_doc_id
+       AND adjustment_reason IS NULL;
   END LOOP;
 
   IF v_total_cost > 0 THEN
@@ -1659,12 +1732,12 @@ BEGIN
     );
 
     PERFORM public.create_journal_entry(
-      'صرف مستهلكات تعبئة وتشغيل ' || v_ref || coalesce(' — ' || _notes, ''),
-      CURRENT_DATE,
-      'consume_internal_supplies',
-      v_doc_id,                -- P0-2: معرّف العملية لا معرّف المستودع
-      true,
-      v_journal_lines
+      p_memo => 'صرف مستهلكات تعبئة وتشغيل ' || v_ref || coalesce(' — ' || _notes, ''),
+      p_entry_date => CURRENT_DATE,
+      p_source_type => 'consume_internal_supplies',
+      p_source_id => v_doc_id,  -- P0-2: معرّف العملية لا معرّف المستودع
+      p_is_system => true,
+      p_lines => v_journal_lines
     );
   END IF;
 
@@ -2012,3 +2085,203 @@ BEGIN
 END $$;
 
 COMMIT;
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- تصحيح النداءات على دالة حساب طريقة الدفع
+-- ════════════════════════════════════════════════════════════════════════════
+-- ⚠️ لا نعيد تعريف payment_method_ledger_account هنا: هي دالة قائمة وسليمة،
+-- وإعادة تعريفها من هذا الملف كانت ستستبدلها بنسخة مُخمَّنة. التصحيح المطلوب
+-- هو فقط التأكد من أن كل المستدعيين ينادونها موضعياً، وقد تم ذلك أعلاه.
+
+-- نُسقط الغلاف ونعيده بنفس التوقيع، فيدخل التغيير على وظيفة جديدة بدل
+-- تعديل جسم قديم محفوظ في الذاكرة المؤقتة.
+DO $$
+DECLARE
+  v_sig text;
+BEGIN
+  FOR v_sig IN
+    SELECT p.oid::regprocedure::text
+    FROM pg_proc p
+    WHERE p.pronamespace = 'public'::regnamespace
+      AND p.proname = 'ledger_account_code_for_payment_method'
+  LOOP
+    EXECUTE format('DROP FUNCTION IF EXISTS %s', v_sig);
+  END LOOP;
+END $$;
+
+CREATE OR REPLACE FUNCTION public.ledger_account_code_for_payment_method(p_payment_method text)
+RETURNS text
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT public.payment_method_ledger_account($1);
+$$;
+
+CREATE OR REPLACE FUNCTION public.post_purchase_invoice(p_invoice_id uuid)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user    uuid := auth.uid();
+  v_inv     record;
+  v_existing uuid;
+  v_entry   uuid;
+  v_lines   jsonb := '[]'::jsonb;
+  v_cash_acct text;
+  v_owed     numeric := 0;
+  r         record;
+BEGIN
+  IF v_user IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+  IF NOT (public.has_role(v_user,'owner') OR public.has_role(v_user,'manager')
+          OR public.has_role(v_user,'accountant')) THEN
+    RAISE EXCEPTION 'Only an owner, manager or accountant may post a purchase invoice';
+  END IF;
+
+  SELECT * INTO v_inv FROM public.purchase_invoices WHERE id = p_invoice_id FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Purchase invoice not found';
+  END IF;
+
+  IF v_inv.status IN ('draft','cancelled') THEN
+    RAISE EXCEPTION 'Purchase % is % - only confirmed, paid or partial invoices post',
+      v_inv.invoice_number, v_inv.status;
+  END IF;
+
+  IF v_inv.paid < 0 THEN
+    RAISE EXCEPTION 'Purchase % carries a negative payment (%). A supplier return is a return document, not a negative payment.',
+      v_inv.invoice_number, v_inv.paid;
+  END IF;
+  IF v_inv.paid > v_inv.total THEN
+    RAISE EXCEPTION 'Purchase % was paid % against a total of %. Fix the invoice before posting - a payment cannot exceed the invoice.',
+      v_inv.invoice_number, v_inv.paid, v_inv.total;
+  END IF;
+
+  SELECT id INTO v_existing
+    FROM public.journal_entries
+   WHERE source_type = 'purchase_invoice' AND source_id = p_invoice_id
+     AND status <> 'REVERSED';
+  IF v_existing IS NOT NULL THEN
+    RAISE EXCEPTION 'Purchase % has already been posted to the ledger', v_inv.invoice_number;
+  END IF;
+
+  -- P0: نداء موضعي على المصدر مباشرة، فلا يتأثر بأي اسم وسيط.
+  v_cash_acct := public.payment_method_ledger_account(v_inv.payment_method::text);
+  v_owed := greatest(v_inv.total - v_inv.paid, 0);
+
+  FOR r IN
+    SELECT coalesce(p.item_class::text, 'UNCLASSIFIED') AS item_class,
+           coalesce(it.stock_effect, 'NONE') AS effect,
+           sum(it.total)                     AS amount,
+           sum(it.tax)                       AS line_tax
+      FROM public.purchase_invoice_items it
+      LEFT JOIN public.products p ON p.id = it.product_id
+     WHERE it.invoice_id = p_invoice_id
+     GROUP BY coalesce(p.item_class::text, 'UNCLASSIFIED'), coalesce(it.stock_effect, 'NONE')
+    HAVING sum(it.total) <> 0 OR sum(it.tax) <> 0
+  LOOP
+    IF r.amount <> 0 THEN
+      v_lines := v_lines || jsonb_build_object(
+        'account_code', CASE
+          WHEN r.effect <> 'STOCK_RECEIPT' THEN '5911'
+          ELSE CASE r.item_class
+                 WHEN 'RAW_MATERIAL'  THEN '1311'
+                 WHEN 'BY_PRODUCT'    THEN '1314'
+                 WHEN 'FINISHED_GOOD' THEN '1313'
+                 ELSE '1315' END END,
+        'debit', round(r.amount, 2),
+        'memo', CASE WHEN r.effect <> 'STOCK_RECEIPT'
+                     THEN 'مصروف مشتريات ' || r.item_class
+                     ELSE 'شراء ' || r.item_class END);
+    END IF;
+
+    IF r.line_tax <> 0 THEN
+      v_lines := v_lines || jsonb_build_object(
+        'account_code', '1316', 'debit', round(r.line_tax, 2),
+        'memo', 'ضريبة مدخلات قابلة للاسترداد');
+    END IF;
+  END LOOP;
+
+  IF v_inv.tax <> 0 AND NOT EXISTS (
+       SELECT 1 FROM public.purchase_invoice_items it
+        WHERE it.invoice_id = p_invoice_id AND it.tax <> 0) THEN
+    v_lines := v_lines || jsonb_build_object(
+      'account_code', '1316', 'debit', round(v_inv.tax, 2),
+      'memo', 'ضريبة مدخلات قابلة للاسترداد');
+  END IF;
+
+  IF jsonb_array_length(v_lines) = 0 THEN
+    RAISE EXCEPTION 'Purchase % has nothing to post - its lines are empty or zero',
+      v_inv.invoice_number;
+  END IF;
+
+  IF v_owed > 0 THEN
+    v_lines := v_lines || jsonb_build_object(
+      'account_code', '2111', 'credit', round(v_owed, 2),
+      'memo', 'مستحق للمورد',
+      'partner_type', 'supplier',
+      'partner_id', v_inv.supplier_id);
+  END IF;
+
+  IF v_inv.paid > 0 AND v_cash_acct IS NOT NULL THEN
+    v_lines := v_lines || jsonb_build_object(
+      'account_code', v_cash_acct, 'credit', round(v_inv.paid, 2),
+      'memo', 'سداد للمورد');
+  END IF;
+
+  v_entry := public.create_journal_entry(
+    p_memo => 'فاتورة مشتريات ' || v_inv.invoice_number,
+    p_entry_date => v_inv.created_at::date,
+    p_source_type => 'purchase_invoice',
+    p_source_id => p_invoice_id,
+    p_is_system => true,
+    p_lines => v_lines);
+
+  RETURN v_entry;
+END $$;
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- نسخة create_sale(date) — نفس الجسم، مع الحفاظ على تاريخ البيع
+-- ════════════════════════════════════════════════════════════════════════════
+-- هذه النسخة كانت تحتفظ بجسم قديم يشير إلى payment_method_ledger_account
+-- باسم وسيط غير موجود. نعيد تعريفها لتستدعي النسخة الجذرية ثم تضبط التاريخ.
+CREATE OR REPLACE FUNCTION public.create_sale(_warehouse_id uuid, _customer_id uuid, _payment_method text, _paid numeric, _discount numeric, _note text, _items jsonb, _sale_date date)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_invoice_id uuid;
+  v_posted_at  timestamptz;
+BEGIN
+  IF _sale_date IS NULL THEN
+    RAISE EXCEPTION 'Sale date is required';
+  END IF;
+
+  IF coalesce(jsonb_typeof(_items), '') <> 'array'
+     OR coalesce(jsonb_array_length(_items), 0) = 0 THEN
+    RAISE EXCEPTION 'Cart is empty';
+  END IF;
+
+  v_invoice_id := public.create_sale(
+    _warehouse_id, _customer_id, _payment_method, _paid, _discount, _note, _items
+  );
+
+  v_posted_at := _sale_date::timestamp + localtime;
+
+  UPDATE public.sales_invoices
+  SET created_at = v_posted_at, updated_at = now()
+  WHERE id = v_invoice_id;
+
+  UPDATE public.stock_movements
+  SET created_at = v_posted_at
+  WHERE source_type = 'sales_invoice' AND source_id = v_invoice_id;
+
+  RETURN v_invoice_id;
+END $function$;

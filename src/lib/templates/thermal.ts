@@ -5,6 +5,7 @@ import {
   formatMoney,
   CustomFieldOptions,
 } from "./types";
+import { renderInvoiceRightsFooter } from "@/lib/printing/footer";
 
 export function renderThermalTemplate(
   doc: UnifiedDocumentData,
@@ -100,5 +101,6 @@ export function renderThermalTemplate(
       : ""
   }
   ${opts.showFooter ? `<div class="foot">${L.thanks}</div>` : ""}
+  ${renderInvoiceRightsFooter()}
 </div></body></html>`;
 }

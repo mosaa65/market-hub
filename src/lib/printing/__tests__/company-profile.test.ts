@@ -25,6 +25,7 @@ import { renderThermalEscPos } from "../thermal-escpos";
 import { renderFormalTemplate } from "../formal";
 import type { PrintRequest } from "../engine";
 import { getDefaultArabicLabels } from "@/lib/pdf";
+import { COMPANY_RIGHTS_TEXT } from "../footer";
 
 let passed = 0;
 const failures: string[] = [];
@@ -74,8 +75,6 @@ check("cacheCompanyProfile keeps email", cached.email === "info@alnoor.ye");
 check("cacheCompanyProfile keeps address", cached.address === "صنعاء - شارع تعز");
 check("cacheCompanyProfile keeps tax number", cached.taxNumber === "300123456700003");
 check("cacheCompanyProfile keeps logo", cached.logoUrl === "/logo.png");
-check("legacy footer contact is not loaded into the profile", cached.footerContact === undefined);
-check("legacy footer text is not loaded into the profile", cached.footerText === undefined);
 check("cacheCompanyProfile keeps currency", cached.currency === "ر.ي");
 
 // القراءة اللاحقة ترى نفس البيانات (نفس المصدر)
@@ -109,7 +108,6 @@ const nullish = cacheCompanyProfile({
 check("null name falls back instead of rendering 'null'", !String(nullish.name).includes("null"));
 check("null phone becomes undefined", nullish.phone === undefined);
 check("null email becomes undefined", nullish.email === undefined);
-check("null footer_contact does not create a fallback", nullish.footerContact === undefined);
 
 // مسح الكاش
 clearCompanyProfileCache();
@@ -136,13 +134,24 @@ const request = (over: Partial<PrintRequest> = {}): PrintRequest =>
   ({ doc: { ...baseDoc, docType: "customer_invoice" }, rtl: true, ...over }) as PrintRequest;
 
 // القالب الموحد (بدون doc.company → يسقط إلى Company Profile)
-const unifiedHtml = renderUnifiedDocument(request({ paperId: "a4" }));
+const unifiedHtml = renderUnifiedDocument(
+  request({ paperId: "a4", templateId: "standard", theme: "standard" }),
+);
 check(
   "unified layout renders the company name from Company Profile",
   unifiedHtml.includes("شركة النور للتجارة"),
 );
 check("unified layout renders the company address", unifiedHtml.includes("صنعاء - شارع تعز"));
 check("unified layout omits fixed support contacts", !unifiedHtml.includes("784795104"));
+check(
+  "unified invoice includes the approved company rights line",
+  unifiedHtml.includes("تطوير وبرمجة إنما سوفت") && unifiedHtml.includes("772217218 - 784795101"),
+);
+check(
+  "unified invoice includes the approved company rights line",
+  (unifiedHtml.match(/تطوير وبرمجة إنما سوفت/g) ?? []).length === 1 &&
+    unifiedHtml.includes("772217218 - 784795101"),
+);
 check(
   "unified layout omits the removed universal footer",
   !unifiedHtml.includes('class="universal-footer"'),
@@ -296,7 +305,7 @@ check(
 );
 
 // لا نصوص منتج ثابتة داخل المستندات المطبوعة
-const productNames = ["إنما سوفت", "موسى العواضي", "طاحونتي", "مؤسسة فورتكس"];
+const productNames = ["موسى العواضي", "طاحونتي", "مؤسسة فورتكس"];
 const docOffenders: string[] = [];
 for (const file of files) {
   const normalized = file.replace(/\\/g, "/");

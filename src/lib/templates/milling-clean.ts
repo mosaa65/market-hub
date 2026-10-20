@@ -6,7 +6,7 @@ import {
   CustomFieldOptions,
 } from "./types";
 import { getCachedCompanyProfile } from "@/lib/printing/company-profile";
-import { renderUniversalFooter, UNIVERSAL_FOOTER_CSS } from "@/lib/printing/footer";
+import { renderInvoiceRightsFooter, UNIVERSAL_FOOTER_CSS } from "@/lib/printing/footer";
 import { numberToArabicWords } from "./tafqeet";
 import { generateBarcodeSvg, generateQrCodeSvg } from "@/lib/printing/barcode-qr";
 
@@ -426,7 +426,7 @@ export function renderMillingCleanTemplate(
           : ""
       }
     </div>
-
+    ${renderInvoiceRightsFooter()}
   </div>
 </body>
 </html>`;

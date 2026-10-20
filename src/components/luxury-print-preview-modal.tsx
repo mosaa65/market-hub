@@ -199,6 +199,7 @@ export function LuxuryPrintPreviewModal({
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [isPrinting, setIsPrinting] = useState(false);
   const previewFrameRef = useRef<HTMLIFrameElement>(null);
+  const [previewContentHeight, setPreviewContentHeight] = useState<number | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -213,6 +214,7 @@ export function LuxuryPrintPreviewModal({
           request?.settings?.showSignatures ??
           false,
       );
+      setPreviewContentHeight(null);
       setZoomLevel(100);
     }
   }, [
@@ -226,6 +228,17 @@ export function LuxuryPrintPreviewModal({
     request?.settings,
     documentType,
   ]);
+
+  const syncPreviewHeight = () => {
+    const frameDocument = previewFrameRef.current?.contentDocument;
+    if (!frameDocument) return;
+    const contentHeight = Math.max(
+      frameDocument.body.scrollHeight,
+      frameDocument.documentElement.scrollHeight,
+      Number.parseInt(iframeMinHeight, 10),
+    );
+    setPreviewContentHeight(contentHeight);
+  };
 
   // When switching method, adjust template and paper to match the method
   const handleMethodChange = (newMethod: PrintMethodType) => {
@@ -363,35 +376,55 @@ export function LuxuryPrintPreviewModal({
   const handlePdfShare = async () => {
     setIsSharingPdf(true);
     try {
-      const invDoc: InvoiceDoc = {
-        title: unifiedDoc.title || "مستند رسمي",
-        number: unifiedDoc.number || "—",
-        date: unifiedDoc.date || new Date().toLocaleDateString("ar-YE"),
-        partyLabel: unifiedDoc.partyLabel || "العميل",
-        partyName: customerName || unifiedDoc.partyName || "",
-        partyPhone: customerPhone || unifiedDoc.partyPhone || "",
-        warehouse: unifiedDoc.warehouse || "",
-        payment: unifiedDoc.payment || "",
-        status: unifiedDoc.status || "",
-        subtotal: unifiedDoc.subtotal || unifiedDoc.total || 0,
-        tax: unifiedDoc.tax || 0,
-        discount: unifiedDoc.discount || 0,
-        total: unifiedDoc.total || 0,
-        paid: unifiedDoc.paid,
-        balance: unifiedDoc.balance,
-        notes: unifiedDoc.notes,
-        currency: unifiedDoc.currency || "ر.ي",
-        lines: (unifiedDoc.lines || []).map((l) => ({
-          product: l.product,
-          qty: Number(l.qty || 1),
-          price: Number(l.price || 0),
-          total: Number(l.total || Number(l.qty || 1) * Number(l.price || 0)),
-          code: l.code || l.unit || "",
-        })),
+      const previewDocument = previewFrameRef.current?.contentDocument;
+      if (!previewDocument?.body) {
+        throw new Error(
+          rtl ? "تعذر الوصول إلى معاينة المستند." : "The document preview is unavailable.",
+        );
+      }
+
+      await previewDocument.fonts?.ready;
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      await Promise.all(
+        Array.from(previewDocument.images).map((image) => {
+          if (image.complete) return Promise.resolve();
+          return new Promise<void>((resolve) => {
+            image.addEventListener("load", () => resolve(), { once: true });
+            image.addEventListener("error", () => resolve(), { once: true });
+          });
+        }),
+      );
+
+      const paper = PRINT_PAPERS[activePaper];
+      const contentHeightMm = Math.max(
+        paper.heightMm ?? 0,
+        (previewDocument.documentElement.scrollHeight * 25.4) / 96,
+      );
+      const fileName = `${(unifiedDoc.number || "document").replace(/[^\p{L}\p{N}_-]/gu, "_")}.pdf`;
+      const pdfOptions = {
+        margin: 0,
+        filename: fileName,
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          allowTaint: false,
+          backgroundColor: "#ffffff",
+          logging: false,
+        },
+        jsPDF: {
+          unit: "mm",
+          format: paper.heightMm ? activePaper : [paper.widthMm, contentHeightMm],
+          orientation: "portrait",
+          compress: true,
+        },
+        pagebreak: { mode: ["css", "legacy"], avoid: ["tr", ".signatures-row"] },
       };
 
-      const blob = await generateInvoicePdfBlob(invDoc);
-      const fileName = `${unifiedDoc.number || "document"}.pdf`;
+      const blob = (await (html2pdf() as any)
+        .set(pdfOptions)
+        .from(previewDocument.body)
+        .outputPdf("blob")) as Blob;
       const file = new File([blob], fileName, { type: "application/pdf" });
 
       if (
@@ -400,7 +433,7 @@ export function LuxuryPrintPreviewModal({
         navigator.canShare({ files: [file] })
       ) {
         await navigator.share({
-          title: `${unifiedDoc.title || "مستند"} #${unifiedDoc.number}`,
+          title: `${unifiedDoc.title || "مستند"} ${unifiedDoc.number}`,
           text: `مرفق ملف PDF الخاص بـ ${unifiedDoc.title || "المستند"} رقم: ${unifiedDoc.number}`,
           files: [file],
         });
@@ -783,11 +816,13 @@ export function LuxuryPrintPreviewModal({
 
               {/* Sandboxed iframe rendering exact printable HTML */}
               <iframe
+                ref={previewFrameRef}
                 title={modalTitle}
                 srcDoc={previewHtml}
+                onLoad={syncPreviewHeight}
                 className="w-full border-0 bg-white"
                 style={{
-                  height: iframeMinHeight,
+                  height: previewContentHeight ?? iframeMinHeight,
                   minHeight: iframeMinHeight,
                 }}
                 sandbox="allow-same-origin"
