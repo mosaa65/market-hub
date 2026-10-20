@@ -33,10 +33,7 @@ export interface PaymentCustomer {
 }
 
 export type PaymentBlockingReason =
-  | "overpaid"
-  | "customer_required_for_credit"
-  | "credit_customer_locked"
-  | "credit_limit";
+  "overpaid" | "customer_required_for_credit" | "credit_customer_locked" | "credit_limit";
 
 export interface PaymentResolution {
   definition: PaymentMethodDefinition | undefined;

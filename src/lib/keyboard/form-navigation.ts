@@ -23,7 +23,8 @@
  *   3. الأسهم ↑/↓ في حقل NUMBER تعدّل القيمة كما هي العادة — لا نسرقها.
  *   4. Enter = "تالٍ": يثبّت القيمة وينتقل. على زر أو رابط، يتركه للمتصفح.
  *   5. Shift+Enter = "سابق".
- *   6. Escape = مغادرة الحقل بلا انتقال.
+ *   6. Escape = يُلغي التعديل في الحقل ويعيد القيمة إلى ما كانت قبل الكتابة
+ *      (سلوك الحقول الأصلي في المتصفح)، ولا يقفز إلى حقل آخر.
  *
  * ⚠️ الأتوباص الأهم: لا شيء يعمل أثناء الكتابة:
  *   • داخل حقل إدخال: الأسهم الأفقية تبقى للمؤشر (تحرير النص).
@@ -127,12 +128,16 @@ export function shouldHandleFormKey(
   const isEditable =
     active instanceof HTMLInputElement ||
     active instanceof HTMLTextAreaElement ||
-    (active !== null && active.isContentEditable);
+    active?.isContentEditable === true;
 
   switch (event.key) {
     case "Enter":
-    case "Escape":
+      // Only an editable field can "advance"; on a button Enter activates it.
       return isEditable;
+    case "Escape":
+      // Reverting the field's own value is the browser's job. Navigating away
+      // here would throw the operator into an unrelated field mid-correction.
+      return false;
     case "ArrowLeft":
     case "ArrowRight": {
       // In a text field both horizontal arrows move the caret (RTL or LTR), so
@@ -161,14 +166,8 @@ export function attachFormNavigation(scope: HTMLElement): () => void {
     const active = document.activeElement as HTMLElement | null;
     if (!active || !scope.contains(active)) return;
 
-    if (event.key === "Escape" && active instanceof HTMLElement) {
-      if (active.matches(FIELD_SELECTOR)) {
-        active.blur();
-        event.preventDefault();
-      }
-      return;
-    }
-
+    // Escape is deliberately NOT intercepted: the browser reverts the field's
+    // pending edit and leaves focus where it is (see rule 6 above).
     if (!shouldHandleFormKey(event, active, scope)) return;
 
     if (event.key === "Enter") {

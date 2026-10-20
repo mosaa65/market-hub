@@ -45,7 +45,7 @@ export function CartLine({
   const lineTotal = line.quantity * line.unitPrice;
 
   return (
-    <div className="group relative grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-2 rounded-lg border border-border/70 bg-card/75 px-2 py-1.5 transition-colors hover:border-primary/40 hover:bg-card">
+    <div className="group relative grid grid-cols-[minmax(0,1fr)_auto_auto_1.75rem] items-center gap-1 rounded-md border-b border-border/60 bg-transparent px-1.5 py-1 transition-colors hover:bg-primary/[0.035] sm:gap-1.5 sm:px-2">
       <div className="flex min-w-0 items-center gap-1.5">
         {line.isService ? (
           <span
@@ -59,7 +59,7 @@ export function CartLine({
 
         <div className="min-w-0 flex-1">
           <span
-            className="block truncate text-xs font-semibold text-foreground/90 transition-colors group-hover:text-foreground"
+            className="block truncate text-[11px] font-semibold leading-4 text-foreground/90 transition-colors group-hover:text-foreground sm:text-xs"
             title={line.name}
           >
             {line.name}
@@ -97,11 +97,11 @@ export function CartLine({
           onChange={onPriceChange}
           modified={line.priceModified}
           ariaLabel={labels.price}
-          className="h-7 w-[4.5rem] text-xs"
+          className="h-7 w-[3.5rem] px-1 text-[11px]"
         />
       </div>
 
-      <span className="min-w-[4.5rem] text-end font-mono text-xs font-bold tabular-nums text-primary [unicode-bidi:isolate]">
+      <span className="min-w-[3.25rem] text-end font-mono text-[11px] font-bold tabular-nums text-primary [unicode-bidi:isolate] sm:min-w-[4rem] sm:text-xs">
         {formatMoney(lineTotal)}
       </span>
       <button
@@ -109,7 +109,7 @@ export function CartLine({
         onClick={onRemove}
         aria-label={labels.remove}
         title={labels.remove}
-        className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-muted-foreground/60 transition hover:bg-destructive/15 hover:text-destructive active:scale-90"
+        className="grid size-7 shrink-0 place-items-center rounded-full text-muted-foreground/60 transition hover:bg-destructive/15 hover:text-destructive active:scale-90"
       >
         <Trash2 className="h-3.5 w-3.5" />
       </button>

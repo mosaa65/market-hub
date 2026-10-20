@@ -30,7 +30,7 @@ import {
   type PrintingDocumentType,
 } from "@/lib/printing";
 import type { UnifiedDocumentData, InvoiceTemplateId } from "@/lib/templates";
-import html2pdf from "html2pdf.js";
+// import html2pdf from "html2pdf.js"; // Prevent SSR evaluation
 
 export type LuxuryPaperFormat = PrintPaperId;
 import type { InvoiceDoc } from "@/lib/pdf";
@@ -376,6 +376,7 @@ export function LuxuryPrintPreviewModal({
   const handlePdfShare = async () => {
     setIsSharingPdf(true);
     try {
+      const { default: html2pdf } = await import("html2pdf.js");
       const previewDocument = previewFrameRef.current?.contentDocument;
       if (!previewDocument?.body) {
         throw new Error(

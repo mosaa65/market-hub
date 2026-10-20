@@ -95,7 +95,10 @@ export function RecordsFilterPanel({
       title={title ?? t("common.filter")}
       activeFiltersCount={activeCount}
       onApply={() => onSubmit(draft)}
-      onReset={() => setDraft({})}
+      onReset={() => {
+        setDraft({});
+        onSubmit({});
+      }}
       applyLabel={t("records.apply")}
       resetLabel={t("records.filters.clear_all")}
     >
@@ -330,17 +333,30 @@ export function RecordsSortPanel({
   onSubmit,
   title,
 }: RecordsSortPanelProps) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
 
   /* Draft selection: tapping an option only moves the highlight — the sort
-   * commits on "Apply", the same contract as the filter sheet. Reset returns
-   * to whatever is currently applied. */
+   * commits on "Apply", the same contract as the filter sheet. Reset applies
+   * the default order immediately. */
   const [draft, setDraft] = React.useState(value);
   React.useEffect(() => {
     if (open) setDraft(value);
   }, [open, value]);
 
   const changed = draft !== value;
+  const sortOptions = React.useMemo(
+    () =>
+      options.some((option) => option.value === "")
+        ? options
+        : [
+            {
+              value: "",
+              label: lang === "ar" ? "الترتيب الافتراضي" : "Default order",
+            },
+            ...options,
+          ],
+    [options, lang],
+  );
 
   return (
     <VortexFilterSheet
@@ -350,14 +366,17 @@ export function RecordsSortPanel({
       }}
       title={title ?? t("common.sort")}
       subtitle={changed ? undefined : t("common.sort")}
-      activeFiltersCount={changed ? 1 : 0}
+      activeFiltersCount={draft ? 1 : 0}
       onApply={() => onSubmit(draft)}
-      onReset={() => setDraft(value)}
+      onReset={() => {
+        setDraft("");
+        onSubmit("");
+      }}
       applyLabel={t("records.apply")}
       resetLabel={t("records.filters.clear_all")}
     >
       <div className="flex flex-col gap-0.5" role="listbox" aria-label={t("common.sort")}>
-        {options.map((option) => {
+        {sortOptions.map((option) => {
           const selected = option.value === draft;
           return (
             <button

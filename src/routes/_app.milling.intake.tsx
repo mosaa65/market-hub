@@ -308,8 +308,6 @@ function MillingIntakePage() {
   const currentDiscount = Number(discount) || 0;
   const grandTotal = Math.max(0, currentSubtotal - currentDiscount);
 
-  const isCredit = paymentMethod === "credit";
-
   // P1-4: the payment arithmetic is the shared panel's — the same rules the
   // till and the invoice form use. Milling no longer has its own copy.
   const payment = usePaymentPanel({
@@ -319,7 +317,6 @@ function MillingIntakePage() {
   });
   const currentPaid = payment.paid;
   const remainingDue = payment.remaining;
-  const isOverpaid = payment.isOverpaid;
 
   const canSubmit = Boolean(
     customerId &&

@@ -774,11 +774,11 @@ function PurchasePOSPage() {
   return (
     <div className="grid h-full min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-2 overflow-hidden bg-[radial-gradient(ellipse_at_top,_color-mix(in_oklab,var(--primary)_10%,transparent),transparent_48%)] lg:grid-cols-[minmax(0,1fr)_minmax(400px,460px)] lg:grid-rows-[auto_minmax(0,1fr)]">
       {/* Top Bar / Header */}
-      <div className="col-span-full m-1.5 flex min-w-0 shrink-0 items-center gap-2 overflow-hidden rounded-2xl border border-border/80 bg-surface/95 px-2 py-2 shadow-sm backdrop-blur-md sm:m-2 sm:px-3 lg:row-start-1">
-        <div className="hidden shrink-0 items-center gap-2 sm:flex">
+      <div className="m-1.5 flex min-w-0 shrink-0 items-center gap-2 overflow-hidden rounded-2xl border border-border/80 bg-surface/95 px-2 py-2 shadow-sm backdrop-blur-md sm:m-2 sm:px-3 lg:col-start-1 lg:row-start-1">
+        <div className="hidden min-w-0 shrink-0 items-center gap-2 xl:flex">
           <Link
             to="/purchases"
-            className="grid h-9 w-9 place-items-center rounded-xl border border-border/80 bg-surface-2/60 text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
+            className="grid size-9 place-items-center rounded-full border border-border/80 bg-surface-2/60 text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
             title={lang === "ar" ? "العودة إلى سجل المشتريات" : "Back to purchases list"}
           >
             <ArrowRight className={`h-4 w-4 ${dir === "rtl" ? "" : "rotate-180"}`} />
@@ -806,9 +806,9 @@ function PurchasePOSPage() {
         </div>
 
         {/* Global Toolbar Selectors */}
-        <div className="flex min-w-0 flex-1 flex-nowrap items-center justify-end gap-1 overflow-hidden">
+        <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(0,1fr)_2.25rem_2.25rem_2.25rem] items-center justify-end gap-1 overflow-hidden sm:flex sm:flex-nowrap sm:gap-1.5">
           {/* Warehouse Selector */}
-          <div className="flex h-9 min-w-0 items-center gap-1 rounded-xl border border-border/80 bg-surface px-1.5 text-xs shadow-2xs sm:gap-1.5 sm:px-2.5">
+          <div className="flex h-9 min-w-0 items-center gap-1 rounded-full border border-border/80 bg-surface px-1.5 text-xs shadow-2xs sm:gap-1.5 sm:rounded-full sm:px-2.5">
             <Building2 className="h-3.5 w-3.5 text-primary shrink-0" />
             <span className="sr-only sm:not-sr-only sm:inline text-muted-foreground font-medium">
               {lang === "ar" ? "المستودع:" : "Warehouse:"}
@@ -816,7 +816,7 @@ function PurchasePOSPage() {
             <select
               value={warehouseId}
               onChange={(e) => setWarehouseId(e.target.value)}
-              className="bg-transparent font-medium text-foreground outline-none text-xs cursor-pointer"
+              className="min-w-0 max-w-full bg-transparent font-medium text-foreground outline-none text-[10px] cursor-pointer sm:text-xs"
             >
               {warehouses.map((w) => (
                 <option key={w.id} value={w.id}>
@@ -827,7 +827,7 @@ function PurchasePOSPage() {
           </div>
 
           {/* Supplier Selector with Cash Supplier Default */}
-          <div className="flex h-9 min-w-0 items-center gap-1 rounded-xl border border-border/80 bg-surface px-1.5 text-xs shadow-2xs sm:gap-1.5 sm:px-2.5">
+          <div className="flex h-9 min-w-0 items-center gap-1 rounded-full border border-border/80 bg-surface px-1.5 text-xs shadow-2xs sm:gap-1.5 sm:rounded-full sm:px-2.5">
             <Truck className="h-3.5 w-3.5 text-primary shrink-0" />
             <span className="sr-only sm:not-sr-only sm:inline text-muted-foreground font-medium">
               {lang === "ar" ? "المورد:" : "Supplier:"}
@@ -835,7 +835,7 @@ function PurchasePOSPage() {
             <select
               value={supplierId}
               onChange={(e) => setSupplierId(e.target.value)}
-              className="h-8 min-w-0 w-24 bg-transparent px-0.5 text-[11px] font-medium text-foreground outline-none cursor-pointer sm:w-56 sm:px-1 sm:text-sm"
+              className="h-8 min-w-0 w-full bg-transparent px-0.5 text-[10px] font-medium text-foreground outline-none cursor-pointer sm:w-56 sm:px-1 sm:text-sm"
             >
               {suppliers.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -847,7 +847,7 @@ function PurchasePOSPage() {
               type="button"
               onClick={() => setNewSupplierOpen(true)}
               title={lang === "ar" ? "إضافة مورد جديد" : "Add new supplier"}
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition disabled:opacity-40"
+              className="grid size-8 shrink-0 place-items-center rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition disabled:opacity-40"
               disabled={!canManageSuppliers}
             >
               <UserPlus className="h-3 w-3" />
@@ -855,7 +855,7 @@ function PurchasePOSPage() {
           </div>
 
           {/* Purchase Date */}
-          <label className="relative grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-border/80 bg-surface text-xs shadow-2xs sm:flex sm:w-auto sm:items-center sm:gap-1.5 sm:px-2.5">
+          <label className="relative grid size-9 shrink-0 place-items-center rounded-full border border-border/80 bg-surface text-xs shadow-2xs sm:flex sm:w-auto sm:items-center sm:gap-1.5 sm:rounded-full sm:px-2.5">
             <CalendarDays className="h-3.5 w-3.5 text-primary shrink-0" />
             <input
               type="date"
@@ -867,7 +867,7 @@ function PurchasePOSPage() {
           </label>
 
           {/* Page Guide Button */}
-          <PageGuideButton config={purchasePosGuideConfig} className="!h-9 !w-9 shrink-0" />
+          <PageGuideButton config={purchasePosGuideConfig} className="!size-9 !rounded-full shrink-0" />
 
           {/* Barcode Camera Modal Trigger */}
           {isDesktop && !isTouchDevice && catalogConfig.enableBarcode ? (
@@ -888,7 +888,7 @@ function PurchasePOSPage() {
                     ? "Disable barcode reader"
                     : "Enable barcode reader"
               }
-              className={`grid h-9 w-9 shrink-0 place-items-center rounded-full border transition ${barcodeReaderEnabled ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600" : "border-border bg-surface text-muted-foreground"}`}
+              className={`grid size-9 shrink-0 place-items-center rounded-full border transition ${barcodeReaderEnabled ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600" : "border-border bg-surface text-muted-foreground"}`}
             >
               <ScanBarcode className="h-4 w-4" />
             </button>
@@ -896,7 +896,7 @@ function PurchasePOSPage() {
             <button
               type="button"
               onClick={() => setScannerOpen(true)}
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-border/80 bg-surface text-muted-foreground hover:text-foreground hover:bg-surface-2 transition shadow-2xs"
+              className="grid size-9 shrink-0 place-items-center rounded-full border border-border/80 bg-surface text-muted-foreground hover:text-foreground hover:bg-surface-2 transition shadow-2xs"
               title={lang === "ar" ? "مسح الباركود بالكاميرا" : "Scan barcode with camera"}
             >
               <ScanBarcode className="h-4 w-4" />
@@ -1045,7 +1045,7 @@ function PurchasePOSPage() {
                   },
                 ],
               }}
-              viewToggle={<RecordsViewToggle value={viewMode} onChange={setViewMode} />}
+              viewToggle={<RecordsViewToggle value={viewMode} onChange={setViewMode} cycle />}
             >
               <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
                 <button
@@ -1382,7 +1382,7 @@ function PurchasePOSPage() {
         )}
 
         {/* Right Column: Purchase Cart & Invoicing — the primary workspace. */}
-        <div className="flex min-h-0 w-full shrink-0 flex-col overflow-hidden rounded-3xl border border-primary/15 bg-surface/95 p-2.5 shadow-xl ring-1 ring-border/50 backdrop-blur-md sm:p-3 lg:col-start-2 lg:row-start-2 lg:mx-2 lg:mb-2">
+        <div className="flex min-h-0 w-full shrink-0 flex-col overflow-hidden rounded-3xl border border-primary/15 bg-surface/95 p-2 shadow-xl ring-1 ring-border/50 backdrop-blur-md sm:p-2.5 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:mx-2 lg:mb-2">
           {/* Cart Header */}
           <div className="mb-2 flex shrink-0 items-center justify-between border-b border-border/60 px-1 pb-2">
             <div className="flex items-center gap-2">
@@ -1399,20 +1399,20 @@ function PurchasePOSPage() {
                 <button
                   type="button"
                   onClick={() => setCart([])}
-                  className="flex items-center gap-1 text-[11px] text-destructive hover:underline"
+                  className="grid size-8 shrink-0 place-items-center rounded-full border border-destructive/20 text-destructive transition hover:bg-destructive/10"
+                  title={lang === "ar" ? "إفراغ السلة" : "Clear cart"}
                 >
-                  <Trash2 className="h-3 w-3" />
-                  {lang === "ar" ? "إفراغ السلة" : "Clear cart"}
+                  <Trash2 className="h-3.5 w-3.5" />
                 </button>
               )
             ) : (
               <button
                 type="button"
                 onClick={() => setMobilePickerOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm active:scale-95"
+                className="grid size-9 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm active:scale-95"
+                title={t("pos.add_product")}
               >
                 <Plus className="h-3.5 w-3.5" />
-                <span>{t("pos.add_product")}</span>
               </button>
             )}
           </div>

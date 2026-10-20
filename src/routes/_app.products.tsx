@@ -2489,7 +2489,6 @@ function ProductDialog({
       size="full"
       className="sm:max-w-5xl sm:h-[min(92vh,900px)]"
       bodyClassName="bg-muted/[0.12] px-4 py-4 sm:px-7 sm:py-6"
-      desktopSide="right"
       title={
         <div className="flex items-center gap-2">
           <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -2501,15 +2500,15 @@ function ProductDialog({
       subtitle={
         initial
           ? lang === "ar"
-            ? "تعديل مواصفات الصنف وهوامش التسعير والسياسات"
-            : "Update product specs, margins, and policies"
+            ? "تعديل بيانات الصنف وسياساته"
+            : "Update product details and policies"
           : lang === "ar"
-            ? "تعريف صنف جديد بأسلوب بطاقة المكونات الأنيقة"
-            : "Define a new catalog item with its details and policies"
+            ? "أدخل بيانات الصنف وسياسات المخزون"
+            : "Enter product details and stock policy"
       }
       footer={
         <div className="flex w-full flex-col gap-3 border-t border-border/40 pt-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2 sm:ms-auto">
+          <div className="flex items-center gap-2">
             <label className="relative inline-flex cursor-pointer items-center gap-2">
               <input
                 type="checkbox"
@@ -2528,23 +2527,25 @@ function ProductDialog({
               </span>
             </label>
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              className="min-h-10 min-w-[90px] flex-1 rounded-xl text-xs font-medium sm:flex-none"
-            >
-              {t("common.cancel")}
-            </Button>
+          <div className="flex w-full items-center gap-2 sm:ms-auto sm:w-auto">
             <Button
               type="submit"
               form="product-form"
               loading={saving}
-              className="min-h-10 min-w-[130px] flex-1 rounded-xl bg-primary text-xs font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/95 hover:shadow-md active:scale-[0.98] sm:flex-none"
+              className="min-h-12 flex-1 rounded-full bg-primary px-6 text-sm font-bold text-primary-foreground shadow-sm transition-all hover:bg-primary/95 hover:shadow-md active:scale-[0.98] sm:flex-none"
             >
-              <Check className="me-1 size-3.5" />
+              <Check className="me-1 size-4" />
               {t("common.save")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              aria-label={t("common.cancel")}
+              className="min-h-12 min-w-12 rounded-full px-0 text-xs font-medium sm:min-w-28 sm:rounded-full sm:px-5"
+            >
+              <X className="size-4 sm:me-1" />
+              <span className="hidden sm:inline">{t("common.cancel")}</span>
             </Button>
           </div>
         </div>
@@ -2578,28 +2579,6 @@ function ProductDialog({
           newTitlePlaceholder={lang === "ar" ? "اسم المنتج الجديد..." : "New Product Name..."}
         />
 
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-border/50 bg-card/70 px-3.5 py-2.5 text-xs">
-          <span className="font-semibold text-foreground">
-            {lang === "ar" ? "اكتمال البيانات المطلوبة" : "Required details"}
-          </span>
-          <span
-            className={cn(
-              "rounded-full px-2.5 py-1 font-semibold tabular-nums",
-              formIssues.length === 0
-                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                : "bg-amber-500/10 text-amber-700 dark:text-amber-300",
-            )}
-          >
-            {formIssues.length === 0
-              ? lang === "ar"
-                ? "جاهز للحفظ"
-                : "Ready to save"
-              : lang === "ar"
-                ? `${formIssues.length} ملاحظات`
-                : `${formIssues.length} items to review`}
-          </span>
-        </div>
-
         {/* Live validation — issues jump to their owning tab. */}
         <FormIssuesBar issues={formIssues} onJump={jumpToSection} />
 
@@ -2611,9 +2590,6 @@ function ProductDialog({
           <SectionHeading
             icon={<Package className="size-4" />}
             title={lang === "ar" ? "البيانات الأساسية" : "Basic information"}
-            description={
-              lang === "ar" ? "اسم الصنف ورموزه وتصنيفه" : "Product name, identifiers and category"
-            }
           />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField label={t("products.name_ar")} required>
@@ -2628,6 +2604,7 @@ function ProductDialog({
                   placeholder={
                     lang === "ar" ? "أدخل اسم الصنف بالعربية..." : "Arabic product name..."
                   }
+                  className="rounded-full"
                 />
               )}
             </FormField>
@@ -2645,15 +2622,16 @@ function ProductDialog({
                     placeholder={
                       lang === "ar" ? "English product name..." : "English product name..."
                     }
+                    className="rounded-full"
                   />
                 )}
               </FormField>
             )}
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {showForm("category") && (
-              <FormField label={t("products.category")}>
+              <FormField label={t("products.category")} className="sm:col-span-2">
                 {(p) => (
                   <div className="space-y-2">
                     <div className="flex gap-2">
@@ -2678,7 +2656,7 @@ function ProductDialog({
                         variant="outline"
                         aria-expanded={categoryQuickAddOpen}
                         onClick={() => setCategoryQuickAddOpen((open) => !open)}
-                        className="h-10 shrink-0 gap-1.5 rounded-xl px-3 text-xs"
+                        className="size-10 shrink-0 rounded-full p-0 sm:h-10 sm:w-auto sm:gap-1.5 sm:px-4"
                       >
                         <Plus className="size-3.5" />
                         <span className="hidden sm:inline">{lang === "ar" ? "جديد" : "New"}</span>
@@ -2742,10 +2720,12 @@ function ProductDialog({
                   <VortexTextInput
                     id={p.id}
                     aria-describedby={p["aria-describedby"]}
+                    dir="ltr"
                     clearable
                     value={form.sku}
                     onChange={(e) => setForm({ ...form, sku: e.target.value })}
                     placeholder="PRD-001"
+                    className="rounded-full"
                   />
                 )}
               </FormField>
@@ -2757,10 +2737,10 @@ function ProductDialog({
                   <VortexTextInput
                     id={p.id}
                     aria-describedby={p["aria-describedby"]}
-                    clearable
                     value={form.shelf_location}
                     onChange={(e) => setForm({ ...form, shelf_location: e.target.value })}
                     placeholder={lang === "ar" ? "رف A-12" : "Shelf A-12"}
+                    className="rounded-full"
                   />
                 )}
               </FormField>
@@ -2782,7 +2762,7 @@ function ProductDialog({
                     value={form.barcode}
                     onChange={(e) => setForm({ ...form, barcode: e.target.value })}
                     placeholder="628100..."
-                    className="min-w-0 flex-1 font-mono"
+                    className="min-w-0 flex-1 rounded-full font-mono"
                   />
                   <IconButton
                     type="button"
@@ -2806,9 +2786,6 @@ function ProductDialog({
           <SectionHeading
             icon={<DollarSign className="size-4" />}
             title={lang === "ar" ? "التسعير" : "Pricing"}
-            description={
-              lang === "ar" ? "أسعار البيع والتكلفة والضريبة" : "Sale price, cost and tax"
-            }
           />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField
@@ -2827,6 +2804,7 @@ function ProductDialog({
                   min={0}
                   currencySymbol={getCompanyCurrencySymbol()}
                   placeholder="0.00"
+                  className="rounded-full"
                 />
               )}
             </FormField>
@@ -2844,6 +2822,7 @@ function ProductDialog({
                   min={0}
                   currencySymbol={getCompanyCurrencySymbol()}
                   placeholder="0.00"
+                  className="rounded-full"
                 />
               </FormField>
             )}
@@ -2901,11 +2880,6 @@ function ProductDialog({
           <SectionHeading
             icon={<Layers className="size-4" />}
             title={lang === "ar" ? "المخزون والمواصفات" : "Inventory & specifications"}
-            description={
-              lang === "ar"
-                ? "حدود المخزون والعبوة والخصائص"
-                : "Stock thresholds, package and attributes"
-            }
           />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {showForm("minStock") && (
@@ -3037,11 +3011,6 @@ function ProductDialog({
           <SectionHeading
             icon={<SlidersHorizontal className="size-4" />}
             title={lang === "ar" ? "طبيعة وسياسة الصنف" : "Item nature & policy"}
-            description={
-              lang === "ar"
-                ? "حدد أثر الصنف على البيع والشراء والمخزون"
-                : "Choose how the item participates in sales, purchasing and stock"
-            }
           />
           <div className="space-y-4">
             <SettingsChoice
@@ -3102,24 +3071,14 @@ function ProductDialog({
               />
             )}
 
-            <div className="grid grid-cols-1 gap-2 pt-2 sm:grid-cols-2">
+            <div className="grid grid-cols-2 gap-2 pt-2">
               <SettingsToggle
                 label={lang === "ar" ? "متاح للبيع" : "Available for sales"}
-                description={
-                  lang === "ar"
-                    ? "إظهار الصنف في نقطة البيع وفواتير المبيعات"
-                    : "Show in sales & POS"
-                }
                 checked={policy.is_sellable}
                 onChange={(checked) => setPolicy((c) => ({ ...c, is_sellable: checked }))}
               />
               <SettingsToggle
                 label={lang === "ar" ? "متاح للشراء" : "Available for purchase"}
-                description={
-                  lang === "ar"
-                    ? "إظهار الصنف في فواتير المشتريات والتوريد"
-                    : "Show in purchases & supply"
-                }
                 checked={policy.is_purchasable}
                 onChange={(checked) => setPolicy((c) => ({ ...c, is_purchasable: checked }))}
               />
@@ -3143,25 +3102,14 @@ function ProductDialog({
   );
 }
 
-function SectionHeading({
-  icon,
-  title,
-  description,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-}) {
+function SectionHeading({ icon, title }: { icon: React.ReactNode; title: string }) {
   return (
     <header className="flex items-start gap-3 border-b border-border/60 pb-3">
       <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
         {icon}
       </span>
-      <span className="min-w-0 pt-0.5">
+      <span className="min-w-0 self-center">
         <span className="block text-sm font-bold text-foreground">{title}</span>
-        <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
-          {description}
-        </span>
       </span>
     </header>
   );
@@ -3184,10 +3132,7 @@ function SettingsChoice({
       <div
         role="radiogroup"
         aria-label={label}
-        className={cn(
-          "grid gap-2",
-          options.length === 2 ? "grid-cols-2" : "grid-cols-1 sm:grid-cols-3",
-        )}
+        className={cn("grid gap-2", options.length === 2 ? "grid-cols-2" : "grid-cols-3")}
       >
         {options.map((option) => {
           const selected = value === option.value;
@@ -3199,13 +3144,13 @@ function SettingsChoice({
               aria-checked={selected}
               onClick={() => onChange(option.value)}
               className={cn(
-                "flex min-h-11 items-center justify-between gap-2 rounded-xl border px-3 py-2 text-start text-xs font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.99]",
+                "flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-xl border px-2 py-2 text-center text-[11px] font-semibold leading-tight transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.99] sm:gap-2 sm:px-3 sm:text-xs",
                 selected
                   ? "border-primary/50 bg-primary/10 text-primary shadow-xs"
                   : "border-border/70 bg-background/70 text-muted-foreground hover:border-primary/30 hover:bg-muted/50 hover:text-foreground",
               )}
             >
-              <span>{option.label}</span>
+              <span className="min-w-0">{option.label}</span>
               <span
                 className={cn(
                   "grid size-4 shrink-0 place-items-center rounded-full border",
@@ -3235,14 +3180,14 @@ function SettingsToggle({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="flex cursor-pointer items-start gap-3 rounded-xl border-border bg-surface p-3 text-sm">
+    <label className="flex min-w-0 cursor-pointer items-center gap-2 rounded-xl border border-border/70 bg-surface p-2.5 text-xs sm:p-3 sm:text-sm">
       <input
         type="checkbox"
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
-        className="mt-0.5 size-4 accent-[var(--primary)]"
+        className="size-4 shrink-0 accent-[var(--primary)]"
       />
-      <span>
+      <span className="min-w-0 leading-tight">
         <span>{label}</span>
         {description && (
           <span className="mt-0.5 block text-[11px] text-muted-foreground">{description}</span>

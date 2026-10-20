@@ -1,48 +1,48 @@
 /**
-* PaymentPanel — المكوّن الموحّد الوحيد لمنطق الدفع (طريقة الدفع + المدفوع + المتبقي).
-*
-* ════════════════════════════════════════════════════════════════════════════
-* WHY THIS FILE EXISTS (P1-4 في تقرير التسليم)
-* ════════════════════════════════════════════════════════════════════════════
-* Before this component, each screen rebuilt the same payment rules in its own
-* words:
-*
-*   POS            `_app.pos.tsx`          smart cash<->credit switching, split,
-*                                          change, overpaid guard
-*   Sales invoice  `_app.sales-invoice.tsx` `paid` clamped by `total`, credit
-*                                          zeroes it, remaining recomputed
-*   Milling intake `_app.milling.intake.tsx` `isCredit`, `remainingDue`,
-*                                          overpaid warning
-*
-* Three implementations of one rule is how the same sale comes out different on
-* two screens — and that is precisely the kind of drift the delivery audit
-* flagged. The rules now live here, ONCE, and every screen renders this panel
-* and reads the state it returns.
-*
-* WHAT IS AND IS NOT IN HERE
-* --------------------------
-* In:  the method picker (the shared `PaymentMethodPicker` + catalogue), the
-*      paid field, the remaining line, the cash-change line, the overpaid
-*      error, the "pay in full" / "full credit" helpers, the rule that a debt
-*      needs a real (non-system) customer, and the credit-limit hint.
-* Out: the submit button, the receipt, the RPC. Those differ per screen on
-*      purpose and belong to the screen.
-*
-* THE RULES THE PANEL ENFORCES (one place, all screens)
-* -----------------------------------------------------
-*  1. A credit-term method collects nothing now: `paid` is forced to 0.
-*  2. `paid` is never negative and never above the total, except cash, where a
-*     larger tender is CHANGE — displayed, and clamped to the total on release.
-*  3. Any remaining amount is debt, and debt needs a customer that can carry
-*     it. The system cash customer cannot, so the panel blocks it by name.
-*  4. The credit limit is shown when the customer's balance would exceed it.
-*  5. A customer change cannot leave the panel on a method the customer is
-*     not allowed to use (see `usePaymentPanel`).
-*
-* The panel is CONTROLLED: state lives in the screen so its submit path keeps
-* working exactly as before. `usePaymentPanel` is the single implementation of
-* the arithmetic, usable by a screen that renders its own layout.
-*/
+ * PaymentPanel — المكوّن الموحّد الوحيد لمنطق الدفع (طريقة الدفع + المدفوع + المتبقي).
+ *
+ * ════════════════════════════════════════════════════════════════════════════
+ * WHY THIS FILE EXISTS (P1-4 في تقرير التسليم)
+ * ════════════════════════════════════════════════════════════════════════════
+ * Before this component, each screen rebuilt the same payment rules in its own
+ * words:
+ *
+ *   POS            `_app.pos.tsx`          smart cash<->credit switching, split,
+ *                                          change, overpaid guard
+ *   Sales invoice  `_app.sales-invoice.tsx` `paid` clamped by `total`, credit
+ *                                          zeroes it, remaining recomputed
+ *   Milling intake `_app.milling.intake.tsx` `isCredit`, `remainingDue`,
+ *                                          overpaid warning
+ *
+ * Three implementations of one rule is how the same sale comes out different on
+ * two screens — and that is precisely the kind of drift the delivery audit
+ * flagged. The rules now live here, ONCE, and every screen renders this panel
+ * and reads the state it returns.
+ *
+ * WHAT IS AND IS NOT IN HERE
+ * --------------------------
+ * In:  the method picker (the shared `PaymentMethodPicker` + catalogue), the
+ *      paid field, the remaining line, the cash-change line, the overpaid
+ *      error, the "pay in full" / "full credit" helpers, the rule that a debt
+ *      needs a real (non-system) customer, and the credit-limit hint.
+ * Out: the submit button, the receipt, the RPC. Those differ per screen on
+ *      purpose and belong to the screen.
+ *
+ * THE RULES THE PANEL ENFORCES (one place, all screens)
+ * -----------------------------------------------------
+ *  1. A credit-term method collects nothing now: `paid` is forced to 0.
+ *  2. `paid` is never negative and never above the total, except cash, where a
+ *     larger tender is CHANGE — displayed, and clamped to the total on release.
+ *  3. Any remaining amount is debt, and debt needs a customer that can carry
+ *     it. The system cash customer cannot, so the panel blocks it by name.
+ *  4. The credit limit is shown when the customer's balance would exceed it.
+ *  5. A customer change cannot leave the panel on a method the customer is
+ *     not allowed to use (see `usePaymentPanel`).
+ *
+ * The panel is CONTROLLED: state lives in the screen so its submit path keeps
+ * working exactly as before. `usePaymentPanel` is the single implementation of
+ * the arithmetic, usable by a screen that renders its own layout.
+ */
 
 import { useEffect, useMemo, useRef } from "react";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
@@ -55,18 +55,16 @@ import {
   roundMoney,
   type PaymentCustomer,
   type PaymentResolution,
+  type ResolvePaymentInput,
 } from "@/lib/payments/payment-rules";
 import { PaymentMethodPicker } from "@/components/ui/payment-method";
 
 export { roundMoney };
 export type { PaymentCustomer };
 
-export interface PaymentPanelState {
-  method: string;
-  /** What the operator typed. Empty means "not decided yet". */
-  paidRaw: string;
-  customerId: string | null | undefined;
-}
+// The hooks below are consumed under their familiar names by the three
+// screens; the pure state/result shapes live in `payment-rules`.
+export type PaymentPanelState = Pick<ResolvePaymentInput, "method" | "paidRaw" | "customerId">;
 
 export interface PaymentPanelInput {
   total: number;
@@ -88,7 +86,11 @@ export interface PaymentPanelResult extends Omit<PaymentResolution, "blockingRea
  * DOM, unit-tested). This wrapper only adds the translated sentence a screen
  * shows when the payment cannot be posted.
  */
-export function usePaymentPanel({ total, state, customers }: PaymentPanelInput): PaymentPanelResult {
+export function usePaymentPanel({
+  total,
+  state,
+  customers,
+}: PaymentPanelInput): PaymentPanelResult {
   const { t, lang } = useI18n();
   const isRtl = lang === "ar";
 
@@ -152,6 +154,11 @@ export function usePaymentMethodReconcile({
   enabled?: boolean;
 }) {
   const lastTarget = useRef<string | null>(null);
+  // The callback is read through a ref so a screen's inline arrow function
+  // cannot retrigger the reconciliation on every render.
+  const changeRef = useRef(onMethodChange);
+  changeRef.current = onMethodChange;
+  const hasDefinition = Boolean(result.definition);
 
   useEffect(() => {
     if (!enabled) return;
@@ -159,7 +166,7 @@ export function usePaymentMethodReconcile({
     let target: string | null = null;
 
     if (result.isCredit && result.paid >= result.total) target = "cash";
-    else if (!result.isCredit && result.paid <= 0 && result.definition) target = "credit";
+    else if (!result.isCredit && result.paid <= 0 && hasDefinition) target = "credit";
 
     if (!target || target === method) {
       lastTarget.current = null;
@@ -169,11 +176,8 @@ export function usePaymentMethodReconcile({
     // the catalogue actually offers it for this context.
     if (lastTarget.current === target) return;
     lastTarget.current = target;
-    onMethodChange(target);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the target is a pure
-    // function of paid/total/method; `onMethodChange` is a screen callback that
-    // is recreated every render and must not retrigger the reconciliation.
-  }, [enabled, result.isCredit, result.paid, result.total, method]);
+    changeRef.current(target);
+  }, [enabled, result.isCredit, result.paid, result.total, method, hasDefinition]);
 }
 
 export interface PaymentPanelProps {
@@ -240,8 +244,7 @@ export function PaymentPanel(props: PaymentPanelProps) {
   // The screen may opt into the automatic cash<->credit reconciliation.
   usePaymentMethodReconcile({ result, method, onMethodChange, enabled: autoMethod });
 
-  const fmt = (n: number) =>
-    currency ? `${money(n)} ${currency}` : money(n);
+  const fmt = (n: number) => (currency ? `${money(n)} ${currency}` : money(n));
 
   return (
     <div className={cn("space-y-3", className)}>

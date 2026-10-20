@@ -2,6 +2,7 @@ import { ModuleGuard, useModules } from "@/lib/modules";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
+  ArrowDownUp,
   Plus,
   Trash2,
   ScanBarcode,
@@ -58,6 +59,7 @@ import { CartLine as CartLineRow } from "@/components/commerce/cart-line";
 import { MobileProductPicker } from "@/components/commerce/mobile-product-picker";
 import { TableToolbar, type FilterValues } from "@/components/ui/table-toolbar";
 import { RecordsViewToggle } from "@/components/ui/records-view-toggle";
+import type { DataTableSort } from "@/components/ui/data-table";
 import { CustomerFormDialog } from "@/components/contacts/customer-form-dialog";
 import { UniversalPrintPreview } from "@/components/universal-print-preview";
 import { printUnifiedDocument, type PrintRequest } from "@/lib/printing";
@@ -67,68 +69,8 @@ import { OperationSuccessModal } from "@/components/communication";
 import type { CustomerContext, InvoiceContext } from "@/lib/communication";
 import { translateRpcError } from "@/lib/errors/rpc-errors";
 import { usePaymentPanel } from "@/components/payments/payment-panel";
-import { PaymentMethodIcon, PaymentMethodPicker } from "@/components/ui/payment-method";
-import { usePaymentMethodsForContext } from "@/hooks/use-payment-methods";
-
-/**
- * The five methods the till shows as its own tabs. Anything else the business
- * enabled lives behind the "أخرى" tab, so adding a method in Settings never
- * requires touching the till again.
- */
-const POS_QUICK_METHODS = new Set(["cash", "card", "mobile_money", "bank_transfer", "credit"]);
-
-function OTHER_METHOD_TAB_ACTIVE(isSplitPayment: boolean, method: string): boolean {
-  return !isSplitPayment && !POS_QUICK_METHODS.has(method);
-}
-
-/**
- * The sixth till tab: every catalogue method the five fixed tabs do not cover.
- * It renders as a native select underneath, so it is keyboard- and touch-correct
- * and inherits the business's own names and icons from the same catalogue.
- */
-function PaymentPanelMiniPicker({
-  selectedId,
-  onPick,
-  label,
-}: {
-  /** The current catalogue id, so an extra method stays visibly selected. */
-  selectedId: string;
-  onPick: (id: string) => void;
-  label: string;
-}) {
-  const { methods } = usePaymentMethodsForContext("pos");
-  const selected = OTHER_METHOD_TAB_ACTIVE(false, selectedId);
-  const extras = methods.filter((m) => !POS_QUICK_METHODS.has(m.id) && m.id !== "split");
-  if (extras.length === 0) return null;
-  // When the selected method is one of these extras, the picker must still
-  // DISPLAY it - its own value is the selected id, otherwise empty.
-  const selectedExtra = extras.find((m) => m.id === selectedId);
-  return (
-    <label
-      className={`relative flex cursor-pointer flex-col items-center justify-center gap-0.5 rounded-lg border border-dashed py-1.5 text-[11px] font-bold transition ${
-        selected
-          ? "border-primary/40 bg-background text-primary shadow-xs"
-          : "border-border/70 text-muted-foreground hover:bg-background/50 hover:text-foreground"
-      }`}
-    >
-      <PaymentMethodIcon iconKey="generic" className="h-4 w-4" />
-      <span>{label}</span>
-      <select
-        aria-label={label}
-        value={selectedExtra?.id ?? ""}
-        onChange={(e) => e.target.value && onPick(e.target.value)}
-        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-      >
-        <option value="" />
-        {extras.map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.nameAr}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
+import { useFormNavigationScope } from "@/hooks/use-form-navigation";
+import { PaymentMethodPicker } from "@/components/ui/payment-method";
 
 export const Route = createFileRoute("/_app/pos")({
   head: () => ({ meta: [{ title: "نقطة البيع — فورتيكس ERP" }] }),
@@ -162,7 +104,6 @@ interface Product {
   origin?: { name: string; name_ar: string | null; code?: string } | null;
   quality?: { name: string; name_ar: string | null; code?: string } | null;
 }
-
 interface CartLine {
   product_id: string;
   name: string;
@@ -174,23 +115,19 @@ interface CartLine {
   item_nature?: string;
   inventory_policy?: string;
 }
-
 interface Warehouse {
   id: string;
   name: string;
   name_ar: string | null;
 }
-
 interface Customer {
   id: string;
   name: string;
   phone?: string | null;
   balance?: number;
   credit_limit?: number;
-  /** P1-6: the seeded cash customer, which must never carry debt. */
   is_system?: boolean | null;
 }
-
 interface MetaOption {
   id: string;
   name: string;
@@ -199,7 +136,6 @@ interface MetaOption {
   code?: string;
   make_id?: string;
 }
-
 interface Compatibility {
   product_id: string;
   vehicle_model_id: string;
@@ -233,7 +169,7 @@ const posGuideConfig: PageGuideConfig = {
       icon: <Scale className="h-4 w-4" />,
     },
     {
-      title: "طباعة وحفظ فوري",
+      title: "حفظ وطباعة",
       description:
         "إتمام الفاتورة وطباعة الإيصال الحراري بضغطة زر واحدة أو باختصار لوحة المفاتيح (F4).",
       icon: <Zap className="h-4 w-4" />,
@@ -363,6 +299,10 @@ function POSPage() {
   const [customerId, setCustomerId] = useState<string>("");
   const [search, setSearch] = useState("");
   const [catalogSort, setCatalogSort] = useState("name_asc");
+  const [catalogTableSort, setCatalogTableSort] = useState<DataTableSort>({
+    key: "name",
+    direction: "asc",
+  });
   const [filterOpen] = useState(false);
   /* Unified records vocabulary: cards (was "grid"), list (was "compact"), table. */
   const [viewMode, setViewMode] = usePersistedViewMode("pos-catalog", "cards");
@@ -394,6 +334,10 @@ function POSPage() {
 
   // Mobile workspace: catalogue is never mounted behind the cart on phones.
   const isDesktop = useIsDesktop();
+  // Keyboard-only operation: the checkout column is one navigation scope, so
+  // arrows/Enter walk method → reference → paid → discount → note → pay without
+  // ever touching the pointer. The product catalogue is deliberately outside it.
+  const posFormScopeRef = useFormNavigationScope<HTMLDivElement>();
   const isTouchDevice = useMediaQuery("(pointer: coarse)");
   const [mobilePickerOpen, setMobilePickerOpen] = useState(false);
 
@@ -904,6 +848,32 @@ function POSPage() {
     stockMap,
     lang,
   ]);
+
+  const tableRows = useMemo(() => {
+    const label = (product: Product, key: string): string | number => {
+      if (key === "code") return product.barcode || product.sku || "";
+      if (key === "stock") return stockMap[product.id] ?? 0;
+      if (key === "price") return Number(product.sale_price) || 0;
+      if (key === "category") {
+        const category = lang === "ar"
+          ? product.category?.name_ar || product.category?.name
+          : product.category?.name || product.category?.name_ar;
+        const brand = product.brand
+          ? lang === "ar" ? product.brand.name_ar || product.brand.name : product.brand.name || product.brand.name_ar
+          : "";
+        return `${category ?? ""} ${brand}`.trim();
+      }
+      return lang === "ar" ? product.name_ar || product.name : product.name || product.name_ar;
+    };
+    const direction = catalogTableSort.direction === "asc" ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      const left = label(a, catalogTableSort.key);
+      const right = label(b, catalogTableSort.key);
+      return typeof left === "number" && typeof right === "number"
+        ? (left - right) * direction
+        : String(left).localeCompare(String(right), lang, { numeric: true, sensitivity: "base" }) * direction;
+    });
+  }, [filtered, catalogTableSort, stockMap, lang]);
 
   function addToCart(p: Product) {
     const prodName = lang === "ar" && p.name_ar ? p.name_ar : p.name;
@@ -1640,9 +1610,9 @@ function POSPage() {
       {/* ─── Compact Executive POS Workspace Shell ─── */}
       <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-2 overflow-hidden bg-[radial-gradient(ellipse_at_top,_color-mix(in_oklab,var(--primary)_8%,transparent),transparent_48%)] p-1.5 sm:p-2.5 lg:grid-cols-[minmax(0,1fr)_minmax(390px,450px)] lg:grid-rows-[auto_minmax(0,1fr)]">
         {/* ─── Top Executive Command Deck ─── */}
-        <header className="col-span-full flex min-w-0 shrink-0 items-center justify-between gap-2 overflow-hidden rounded-2xl border border-border/80 bg-surface/95 px-2 py-2 shadow-xs backdrop-blur-md sm:px-3 lg:row-start-1">
+        <header className="flex min-w-0 shrink-0 items-center justify-between gap-2 overflow-hidden rounded-2xl border border-border/80 bg-surface/95 px-2 py-2 shadow-xs backdrop-blur-md sm:px-3 lg:col-start-1 lg:row-start-1">
           {/* Identity & Status */}
-          <div className="hidden min-w-0 shrink-0 items-center gap-2.5 sm:flex sm:gap-3">
+          <div className="hidden min-w-0 max-w-[10rem] shrink-0 items-center gap-2.5 xl:flex xl:gap-3 xl:max-w-[18rem]">
             <div className="relative grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-primary/25 bg-gradient-to-br from-primary via-primary to-primary/85 text-primary-foreground shadow-sm">
               <ShoppingBag className="h-4 w-4" />
               <span className="absolute -top-1 -right-1 flex h-3 w-3">
@@ -1666,10 +1636,10 @@ function POSPage() {
           </div>
 
           {/* Quick Command Controls: Customer, Balance, Date, Warehouse, Service */}
-          <div className="flex min-w-0 flex-1 items-center justify-end gap-1 sm:gap-1.5">
+          <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto_auto_auto_auto_auto] items-center justify-end gap-1 sm:flex sm:flex-nowrap sm:gap-1.5">
             {/* Customer Selector with VIP Badge */}
             <div className="flex items-center gap-1 min-w-0">
-              <div className="relative min-w-0 flex-1 sm:flex-none sm:min-w-[150px] sm:max-w-[210px]">
+              <div className="relative min-w-0 sm:w-[clamp(8rem,15vw,13rem)] sm:shrink-0">
                 <select
                   aria-label={lang === "ar" ? "العميل" : "Customer"}
                   value={customerId}
@@ -1689,7 +1659,7 @@ function POSPage() {
               <button
                 type="button"
                 onClick={() => setNewCustomerOpen(true)}
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-primary/30 bg-primary/10 text-primary transition hover:bg-primary/20 active:scale-95 shadow-2xs"
+                className="grid size-9 shrink-0 place-items-center rounded-full border border-primary/30 bg-primary/10 text-primary transition hover:bg-primary/20 active:scale-95 shadow-2xs"
                 title={lang === "ar" ? "إضافة عميل جديد" : "Add customer"}
               >
                 <UserPlus className="h-4 w-4" />
@@ -1728,7 +1698,7 @@ function POSPage() {
                   aria-label={lang === "ar" ? "المستودع" : "Warehouse"}
                   value={warehouseId}
                   onChange={(e) => setWarehouseId(e.target.value)}
-                  className="h-9 appearance-none rounded-xl border border-amber-500/30 bg-amber-500/10 pl-6 pr-6 text-xs font-semibold text-amber-700 dark:text-amber-300 outline-none hover:bg-amber-500/20 rtl:pl-6 rtl:pr-6 cursor-pointer transition"
+                  className="h-9 max-w-28 appearance-none rounded-full border border-amber-500/30 bg-amber-500/10 pl-6 pr-6 text-[11px] font-semibold text-amber-700 dark:text-amber-300 outline-none hover:bg-amber-500/20 rtl:pl-6 rtl:pr-6 cursor-pointer transition sm:max-w-36 sm:rounded-xl sm:text-xs"
                 >
                   {warehouses.map((w) => (
                     <option key={w.id} value={w.id}>
@@ -1741,7 +1711,7 @@ function POSPage() {
             )}
 
             {/* Invoice Date */}
-            <label className="relative grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-border/80 bg-surface text-xs text-muted-foreground shadow-2xs hover:border-primary/40 transition sm:flex sm:w-auto sm:items-center sm:gap-1.5 sm:px-2.5">
+            <label className="relative grid size-9 shrink-0 place-items-center rounded-full border border-border/80 bg-surface text-xs text-muted-foreground shadow-2xs hover:border-primary/40 transition sm:flex sm:w-auto sm:items-center sm:gap-1.5 sm:rounded-full sm:px-2.5">
               <CalendarDays className="h-3.5 w-3.5 text-primary shrink-0" />
               <input
                 type="date"
@@ -1771,7 +1741,7 @@ function POSPage() {
                         ? "Disable barcode reader"
                         : "Enable barcode reader"
                   }
-                  className={`grid h-9 w-9 shrink-0 place-items-center rounded-full border transition ${barcodeReaderEnabled ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600" : "border-border bg-surface text-muted-foreground"}`}
+                  className={`grid size-9 shrink-0 place-items-center rounded-full border transition ${barcodeReaderEnabled ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600" : "border-border bg-surface text-muted-foreground"}`}
                 >
                   <Barcode className="h-4 w-4" />
                 </button>
@@ -1780,7 +1750,7 @@ function POSPage() {
                   type="button"
                   onClick={() => setScannerOpen(true)}
                   title={lang === "ar" ? "مسح بالكاميرا" : "Scan with camera"}
-                  className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-primary/30 bg-primary/10 text-primary transition hover:bg-primary/20"
+                  className="grid size-9 shrink-0 place-items-center rounded-full border border-primary/30 bg-primary/10 text-primary transition hover:bg-primary/20"
                 >
                   <ScanBarcode className="h-4 w-4" />
                 </button>
@@ -1791,7 +1761,7 @@ function POSPage() {
               <button
                 type="button"
                 onClick={() => setServiceOpen(true)}
-                className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-full border border-violet-500/30 bg-violet-500/10 text-violet-700 transition hover:bg-violet-500/20 dark:text-violet-300 md:inline-flex xl:w-auto xl:gap-1.5 xl:rounded-xl xl:px-2.5"
+                className="hidden size-9 shrink-0 items-center justify-center rounded-full border border-violet-500/30 bg-violet-500/10 text-violet-700 transition hover:bg-violet-500/20 dark:text-violet-300 md:inline-flex xl:w-auto xl:gap-1.5 xl:px-2.5"
                 title={lang === "ar" ? "إضافة خدمة أو أجرة تركيب" : "Add custom labor/service"}
               >
                 <Wrench className="h-3.5 w-3.5" />
@@ -1955,7 +1925,7 @@ function POSPage() {
                     );
                   },
                 }}
-                sort={{
+                sort={viewMode === "table" ? undefined : {
                   value: catalogSort,
                   onValueChange: setCatalogSort,
                   options: [
@@ -1982,7 +1952,7 @@ function POSPage() {
                     },
                   ],
                 }}
-                viewToggle={<RecordsViewToggle value={viewMode} onChange={setViewMode} />}
+                viewToggle={<RecordsViewToggle value={viewMode} onChange={setViewMode} cycle />}
               />
 
               {/* Quick Category Chips Bar */}
@@ -2426,28 +2396,43 @@ function POSPage() {
                     <table className="w-full text-start text-xs">
                       <thead>
                         <tr className="border-b border-border/80 bg-muted/50 text-[11px] font-bold text-muted-foreground">
-                          <th className="py-2 px-3 text-start">
-                            {lang === "ar" ? "الباركود / الرمز" : "Barcode / SKU"}
-                          </th>
-                          <th className="py-2 px-3 text-start">
-                            {lang === "ar" ? "اسم المنتج" : "Product Name"}
-                          </th>
-                          <th className="py-2 px-3 text-start">
-                            {lang === "ar" ? "التصنيف والماركة" : "Category & Brand"}
-                          </th>
-                          <th className="py-2 px-3 text-center">
-                            {lang === "ar" ? "المتوفر" : "Stock"}
-                          </th>
-                          <th className="py-2 px-3 text-end">
-                            {lang === "ar" ? "سعر البيع" : "Price"}
-                          </th>
+                          {([
+                            { key: "code", label: lang === "ar" ? "الباركود / الرمز" : "Barcode / SKU", align: "start" },
+                            { key: "name", label: lang === "ar" ? "اسم المنتج" : "Product Name", align: "start" },
+                            { key: "category", label: lang === "ar" ? "التصنيف والماركة" : "Category & Brand", align: "start" },
+                            { key: "stock", label: lang === "ar" ? "المتوفر" : "Stock", align: "center" },
+                            { key: "price", label: lang === "ar" ? "سعر البيع" : "Price", align: "end" },
+                          ] as const).map((column) => {
+                            const active = catalogTableSort.key === column.key;
+                            const sortLabel = active
+                              ? catalogTableSort.direction === "asc"
+                                ? lang === "ar" ? "تصاعدي" : "ascending"
+                                : lang === "ar" ? "تنازلي" : "descending"
+                              : lang === "ar" ? "غير مرتب" : "not sorted";
+                            return (
+                              <th key={column.key} aria-sort={active ? catalogTableSort.direction === "asc" ? "ascending" : "descending" : "none"} className={`py-2 px-3 text-${column.align}`}>
+                                <button
+                                  type="button"
+                                  onClick={() => setCatalogTableSort((current) => ({
+                                    key: column.key,
+                                    direction: current.key === column.key && current.direction === "asc" ? "desc" : "asc",
+                                  }))}
+                                  className="inline-flex items-center gap-1 rounded-full px-1.5 py-1 transition hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                                  title={`${column.label} · ${sortLabel}`}
+                                >
+                                  {column.label}
+                                  <ArrowDownUp className={`size-3 ${active ? "text-primary" : "opacity-40"}`} aria-hidden />
+                                </button>
+                              </th>
+                            );
+                          })}
                           <th className="py-2 px-3 text-center">
                             {lang === "ar" ? "إجراء" : "Action"}
                           </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border/50">
-                        {filtered.map((p) => {
+                        {tableRows.map((p) => {
                           const stock = stockMap[p.id] ?? 0;
                           const low = p.is_service !== true && stock <= 0;
                           const catLabel =
@@ -2515,11 +2500,11 @@ function POSPage() {
           )}
 
           {/* ─── Cart Panel (Primary Workspace on All Devices) ─── */}
-          <div className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-primary/20 bg-surface/95 p-2.5 sm:p-3 shadow-xl ring-1 ring-border/50 backdrop-blur-md lg:col-start-2 lg:row-start-2">
+          <div className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-primary/20 bg-surface/95 p-2 sm:p-2.5 shadow-xl ring-1 ring-border/50 backdrop-blur-md lg:col-start-2 lg:row-span-2 lg:row-start-1">
             {/* Cart Header */}
-            <div className="mb-2 flex shrink-0 items-center justify-between border-b border-border/60 px-1 pb-2">
+            <div className="mb-1 flex shrink-0 items-center justify-between border-b border-border/60 px-1 pb-1.5">
               <div className="flex items-center gap-2">
-                <div className="grid h-7 w-7 place-items-center rounded-lg bg-primary/10 text-primary">
+                <div className="grid size-7 place-items-center rounded-full bg-primary/10 text-primary">
                   <ShoppingCart className="h-4 w-4" />
                 </div>
                 <h2 className="flex items-center gap-2 text-xs sm:text-sm font-bold text-foreground">
@@ -2535,65 +2520,23 @@ function POSPage() {
                   <button
                     type="button"
                     onClick={() => setCart([])}
-                    className="inline-flex items-center gap-1 rounded-xl border border-border/80 bg-surface/80 px-2.5 py-1 text-xs text-muted-foreground transition hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive active:scale-95"
+                    className="grid size-8 shrink-0 place-items-center rounded-full border border-destructive/20 text-destructive transition hover:bg-destructive/10 active:scale-95"
                     title={lang === "ar" ? "تفريغ سلة المبيعات" : "Clear Cart"}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
-                    <span>{t("pos.clear")}</span>
                   </button>
                 )
               ) : (
                 <button
                   type="button"
                   onClick={() => setMobilePickerOpen(true)}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm active:scale-95"
+                  className="grid size-9 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm active:scale-95"
+                  title={t("pos.add_product")}
                 >
                   <Plus className="h-3.5 w-3.5" />
-                  <span>{t("pos.add_product")}</span>
                 </button>
               )}
             </div>
-
-            {/* Mobile Header: Customer & Date controls */}
-            {false && (
-              <div className="hidden">
-                <div className="relative min-w-0 flex-1">
-                  <select
-                    aria-label={lang === "ar" ? "العميل" : "Customer"}
-                    value={customerId}
-                    onChange={(e) => setCustomerId(e.target.value)}
-                    className="h-9 w-full appearance-none rounded-xl border border-border/80 bg-surface px-3 text-xs font-medium outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                  >
-                    <option value="">{t("pos.walkin")}</option>
-                    {customers.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute end-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setNewCustomerOpen(true)}
-                  title={lang === "ar" ? "إضافة عميل جديد" : "Add new customer"}
-                  className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-primary/30 bg-primary/10 text-primary transition hover:bg-primary/20 active:scale-95 shadow-2xs"
-                >
-                  <UserPlus className="h-4 w-4" />
-                </button>
-
-                <label className="flex h-9 items-center gap-1 rounded-xl border border-border/80 bg-surface px-2 text-xs text-muted-foreground shrink-0">
-                  <CalendarDays className="h-3.5 w-3.5 text-primary shrink-0" />
-                  <input
-                    type="date"
-                    value={saleDate}
-                    onChange={(e) => setSaleDate(e.target.value)}
-                    className="w-24 bg-transparent text-[11px] font-mono text-foreground outline-none"
-                  />
-                </label>
-              </div>
-            )}
 
             {/* Cart Items List & Payment Scrollable Section */}
             <div className="min-h-0 flex-1 space-y-1 overflow-y-auto px-0.5 pb-2">
@@ -2618,10 +2561,10 @@ function POSPage() {
                     <button
                       type="button"
                       onClick={() => setMobilePickerOpen(true)}
-                      className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-sm active:scale-95"
+                      className="mt-3 grid size-10 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm active:scale-95"
+                      title={t("pos.add_product")}
                     >
                       <Plus className="h-4 w-4" />
-                      <span>{t("pos.add_product")}</span>
                     </button>
                   )}
                 </div>
@@ -2658,7 +2601,14 @@ function POSPage() {
             </div>
 
             {/* Fixed payment, totals, and note footer */}
-            <div className="shrink-0 space-y-1.5 border-t border-border/70 bg-surface/95 pt-2 pr-0.5">
+            {/* data-form-nav-scope: the counter's keyboard order. Tab and Enter
+                walk method → reference → paid → discount → note → pay, so no
+                mouse is needed. See src/lib/keyboard/form-navigation.ts. */}
+            <div
+              ref={posFormScopeRef}
+              data-form-nav-scope
+              className="shrink-0 space-y-1.5 border-t border-border/70 bg-surface/95 pt-2 pr-0.5"
+            >
               {/* ─── Payment & Summary Section ─── */}
               {/* Compact payment method selector */}
               <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
@@ -2676,6 +2626,7 @@ function POSPage() {
                 />
                 <button
                   type="button"
+                  data-form-nav
                   onClick={() => {
                     setIsSplitPayment((current) => {
                       const next = !current;
@@ -2710,6 +2661,7 @@ function POSPage() {
                       dir="ltr"
                       value={paid}
                       onChange={(event) => handlePaidChange(event.target.value)}
+                      data-form-nav
                       placeholder={paymentMethod === "credit" ? "0" : String(total)}
                       className={`h-9 w-full rounded-lg border bg-background px-2.5 text-end font-mono text-xs font-semibold outline-none focus:border-primary ${isOverpaid ? "border-destructive text-destructive" : "border-border text-foreground"}`}
                     />
@@ -2721,123 +2673,11 @@ function POSPage() {
                       min="0"
                       value={discount}
                       onChange={(event) => setDiscount(event.target.value)}
+                      data-form-nav
                       placeholder={lang === "ar" ? "الخصم" : "Discount"}
                       className="h-9 w-full rounded-lg border border-border bg-background px-2.5 text-end font-mono text-xs font-semibold text-foreground outline-none focus:border-primary"
                     />
                   </label>
-                </div>
-              )}
-              {paymentMethod === "__legacy_payment_buttons__" && (
-                <div>
-                  <div className="grid grid-cols-5 gap-1 p-1 rounded-xl bg-muted/50 border border-border/80 shadow-2xs">
-                    {/* Cash */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsSplitPayment(false);
-                        setPaymentMethod("cash");
-                        setPaid("");
-                      }}
-                      className={`flex flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 text-[11px] font-bold transition ${
-                        !isSplitPayment && paymentMethod === "cash"
-                          ? "bg-background text-primary shadow-xs ring-1 ring-primary/25"
-                          : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-                      }`}
-                    >
-                      <Banknote className="h-4 w-4" />
-                      <span>{t("pos.pm.cash")}</span>
-                    </button>
-
-                    {/* Card */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsSplitPayment(false);
-                        setPaymentMethod("card");
-                        setPaid("");
-                      }}
-                      className={`flex flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 text-[11px] font-bold transition ${
-                        !isSplitPayment && paymentMethod === "card"
-                          ? "bg-background text-primary shadow-xs ring-1 ring-primary/25"
-                          : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-                      }`}
-                    >
-                      <CreditCard className="h-4 w-4" />
-                      <span>{lang === "ar" ? "شبكة" : "Card"}</span>
-                    </button>
-
-                    {/* Mobile / Bank */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsSplitPayment(false);
-                        setPaymentMethod("mobile_money");
-                        setPaid("");
-                      }}
-                      className={`flex flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 text-[11px] font-bold transition ${
-                        !isSplitPayment &&
-                        (paymentMethod === "mobile_money" || paymentMethod === "bank_transfer")
-                          ? "bg-background text-primary shadow-xs ring-1 ring-primary/25"
-                          : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-                      }`}
-                    >
-                      <Smartphone className="h-4 w-4" />
-                      <span>{lang === "ar" ? "محفظة/بنك" : "Mobile"}</span>
-                    </button>
-
-                    {/* Credit (Debt) */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsSplitPayment(false);
-                        setPaymentMethod("credit");
-                        setPaid("0");
-                      }}
-                      className={`flex flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 text-[11px] font-bold transition ${
-                        !isSplitPayment && paymentMethod === "credit"
-                          ? "bg-background text-amber-600 dark:text-amber-400 shadow-xs ring-1 ring-amber-500/30"
-                          : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-                      }`}
-                    >
-                      <Clock className="h-4 w-4" />
-                      <span>{t("pos.pm.credit")}</span>
-                    </button>
-
-                    {/* Every other method the business enabled (P1-4): the till
-                        used to offer only five hard-coded methods, so a method
-                        added in Settings — or كريمي/جيب/شيك — could be chosen on
-                        the invoice form but never at the counter. This sixth
-                        tab is the shared catalogue picker, and it stays out of
-                        the way (dashed, neutral) until one of its methods is in
-                        effect. */}
-                    <PaymentPanelMiniPicker
-                      selectedId={isSplitPayment ? "" : paymentMethod}
-                      onPick={(next) => {
-                        setIsSplitPayment(false);
-                        setPaymentMethod(next);
-                        setPaid("");
-                      }}
-                      label={lang === "ar" ? "أخرى" : "Other"}
-                    />
-
-                    {/* Split Payment */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsSplitPayment(true);
-                        setSplitCash(String(total));
-                        setSplitCard("");
-                      }}
-                      className={`flex flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 text-[11px] font-bold transition ${
-                        isSplitPayment
-                          ? "bg-background text-violet-600 dark:text-violet-400 shadow-xs ring-1 ring-violet-500/30"
-                          : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-                      }`}
-                    >
-                      <Layers className="h-4 w-4" />
-                      <span>{t("pos.pm.split")}</span>
-                    </button>
-                  </div>
                 </div>
               )}
 
@@ -2847,6 +2687,7 @@ function POSPage() {
                   <input
                     value={transferRef}
                     onChange={(e) => setTransferRef(e.target.value)}
+                    data-form-nav
                     placeholder={
                       paymentMethod === "mobile_money"
                         ? lang === "ar"
@@ -3094,6 +2935,7 @@ function POSPage() {
               <input
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
+                data-form-nav
                 placeholder={t("pos.notes_placeholder")}
                 aria-label={t("pos.notes_placeholder")}
                 className="h-8 w-full rounded-xl border border-input/80 bg-background px-3 text-xs outline-none transition focus:border-primary focus:ring-1 focus:ring-primary/20"

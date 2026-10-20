@@ -168,6 +168,11 @@ BEGIN
     END IF;
   END IF;
 
+  -- مستند واحد = قيد واحد نشط. غير الرقمي يُطبَّع إلى NULL فيُستثنى من
+  -- uq_journal_source_active (لأن NULL لا يُفهرَس): مصدر نصي بلا معناه الرقمي
+  -- كان يمنع القيد الثاني لأي مستند آخر يحمل نفس النص.
+  p_source_id := CASE WHEN p_source_id::text ~ '^[0-9a-fA-F-]{36}$' THEN p_source_id END;
+
   v_num := public.next_journal_number(coalesce(p_entry_date, CURRENT_DATE));
 
   INSERT INTO public.journal_entries

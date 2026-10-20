@@ -28,8 +28,8 @@ function key(k: string, extra: Partial<KeyboardEvent> = {}) {
 }
 
 /** Minimal stand-ins — the predicate only uses `instanceof`. */
-class FakeInput { }
-class FakeTextarea { }
+class FakeInput {}
+class FakeTextarea {}
 
 // The predicate checks real DOM classes; provide them for this process.
 const g = globalThis as unknown as Record<string, unknown>;
@@ -89,13 +89,23 @@ function button() {
   assert.equal(shouldHandleFormKey(key("ArrowUp"), button()), false);
 }
 
-/* ── 7. Enter / Escape advance and leave a field, but not an on-screen ──── */
+/* ── 7. Enter advances from an editable field, but never from nowhere ────── */
 {
   assert.equal(shouldHandleFormKey(key("Enter"), input()), true);
   assert.equal(shouldHandleFormKey(key("Enter", { shiftKey: true }), input()), true);
-  assert.equal(shouldHandleFormKey(key("Escape"), input()), true);
+  assert.equal(shouldHandleFormKey(key("Enter"), textarea()), true);
   // Nothing to "advance" from when focus is nowhere.
   assert.equal(shouldHandleFormKey(key("Enter"), null), false);
+  // On a button Enter must activate it, not move focus.
+  assert.equal(shouldHandleFormKey(key("Enter"), button()), false);
+}
+
+/* ── 7b. Escape is the browser's: it reverts, it does not navigate ──────── */
+{
+  assert.equal(shouldHandleFormKey(key("Escape"), input()), false);
+  assert.equal(shouldHandleFormKey(key("Escape"), textarea()), false);
+  assert.equal(shouldHandleFormKey(key("Escape"), button()), false);
+  assert.equal(shouldHandleFormKey(key("Escape"), null), false);
 }
 
 /* ── 8. An IME composition in progress is untouchable (Arabic typing) ───── */

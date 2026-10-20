@@ -501,7 +501,9 @@ function SalesInvoicePage() {
     // The panel's rules (overpaid, debt on the cash customer, credit limit) are
     // the same ones the server enforces — fail here with the same sentence.
     if (!payment.isPayable) {
-      return toast.error(payment.blockingReason ?? (isRtl ? "بيانات دفع غير صالحة" : "Invalid payment"));
+      return toast.error(
+        payment.blockingReason ?? (isRtl ? "بيانات دفع غير صالحة" : "Invalid payment"),
+      );
     }
 
     setSubmitting(true);
