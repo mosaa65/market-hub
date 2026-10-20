@@ -27,7 +27,6 @@ import {
   Settings,
   ExternalLink,
   Power,
-  Camera,
   ScanBarcode,
   LayoutGrid,
   List,
@@ -39,14 +38,10 @@ import {
   Tag,
   Barcode,
   MapPin,
-  Sparkles,
   Loader2,
   Check,
   DollarSign,
-  TrendingUp,
   SlidersHorizontal,
-  ShieldCheck,
-  Percent,
   X,
   Copy,
 } from "lucide-react";
@@ -64,9 +59,8 @@ import { fuzzySearch, buildSearchIndex } from "@/design/fuzzy";
 import { getCompanyCurrencySymbol, moneyCell, qtyCell } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
-import { FieldInput, NumberInput, fieldSurfaceClass } from "@/components/ui/input";
+import { NumberInput, fieldSurfaceClass } from "@/components/ui/input";
 import { FormField } from "@/components/ui/form-field";
-import { FormActions, FormGrid, FormSection } from "@/components/ui/form-layout";
 import { Modal, ConfirmDialog } from "@/components/ui/modal";
 import { DataTable, type DataTableColumn, type DataTableSort } from "@/components/ui/data-table";
 import {
@@ -85,12 +79,6 @@ import { quietChipClass } from "@/components/ui/action-button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ItemRoleBadge, resolveItemClass } from "@/components/item-role-badge";
 import { ProductFieldSettings } from "@/components/products/product-field-settings";
-import {
-  ProductPreviewCard,
-  FormIssuesBar,
-  type ProductFormTab,
-  type FormIssue,
-} from "@/components/products/product-form-shell";
 import { useProductFieldVisibility } from "@/hooks/use-product-field-visibility";
 import { usePersistedViewMode } from "@/hooks/use-persisted-view-mode";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
@@ -2227,12 +2215,6 @@ function ProductDialog({
   const [categoryNameAr, setCategoryNameAr] = useState("");
   const [categoryNameEn, setCategoryNameEn] = useState("");
   const [savingCategory, setSavingCategory] = useState(false);
-  const jumpToSection = (section: ProductFormTab) => {
-    document.getElementById(`product-section-${section}`)?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
-  };
   const policyFromProduct = (product: ProductRow): UserItemPolicyPreferences => ({
     item_nature: product.item_nature ?? "GOOD",
     inventory_policy: product.inventory_policy ?? "TRACKED",
@@ -2286,11 +2268,6 @@ function ProductDialog({
     disabled: !isModuleEnabled("barcode") || scannerOpen,
   });
 
-  const costNum = Number(form.cost_price) || 0;
-  const saleNum = Number(form.sale_price) || 0;
-  const profitNum = saleNum - costNum;
-  const marginPercent = saleNum > 0 ? Math.round((profitNum / saleNum) * 100) : 0;
-
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (saving) return;
@@ -2300,13 +2277,11 @@ function ProductDialog({
           ? "اسم المنتج بالعربية مطلوب لظهوره بشكل صحيح في بطاقات النظام."
           : "An Arabic product name is required for the Yemen catalogue.",
       );
-      jumpToSection("general");
       return;
     }
     const policyCheck = validateItemPolicy(policy);
     if (!policyCheck.valid) {
       toast.error(lang === "ar" ? policyCheck.errors[0] : "The selected item policy is not valid.");
-      jumpToSection("policy");
       return;
     }
     setSaving(true);
@@ -2396,10 +2371,8 @@ function ProductDialog({
   }
 
   const labelOf = (en: string, ar: string | null) => (lang === "ar" ? ar || en : en || ar || "");
-  const currentCategory = meta.categories.find((c) => c.id === form.category_id);
 
-  async function addCategoryQuickly(event: React.FormEvent) {
-    event.preventDefault();
+  async function addCategoryQuickly() {
     if (savingCategory) return;
     if (!categoryNameAr.trim() && !categoryNameEn.trim()) {
       toast.error(lang === "ar" ? "أدخل اسم التصنيف" : "Enter a category name");
@@ -2440,149 +2413,51 @@ function ProductDialog({
     }
   }
 
-  /*
-   * Live validation — the issues the operator sees BEFORE pressing Save.
-   * Each entry points at the tab that owns it, so the strip (and the amber
-   * count badge on the tab itself) can jump straight to the field.
-   * The same rules the submit guard enforces, surfaced one step earlier.
-   */
-  const policyCheckQuiet = useMemo(() => validateItemPolicy(policy), [policy]);
-  const formIssues = useMemo<FormIssue[]>(() => {
-    const issues: FormIssue[] = [];
-    if (!form.name_ar.trim()) {
-      issues.push({
-        tab: "general",
-        message: lang === "ar" ? "الاسم بالعربية مطلوب" : "Arabic name is required",
-      });
-    }
-    if (form.sale_price.trim() === "" || Number(form.sale_price) <= 0) {
-      issues.push({
-        tab: "pricing",
-        message: lang === "ar" ? "سعر البيع غير محدد" : "Sale price is not set",
-      });
-    }
-    if (
-      canViewCost &&
-      form.cost_price.trim() !== "" &&
-      Number(form.cost_price) > Number(form.sale_price || 0)
-    ) {
-      issues.push({
-        tab: "pricing",
-        message: lang === "ar" ? "التكلفة أعلى من سعر البيع" : "Cost exceeds the sale price",
-      });
-    }
-    if (!policyCheckQuiet.valid) {
-      issues.push({
-        tab: "policy",
-        message: lang === "ar" ? policyCheckQuiet.errors[0] : "The item policy is invalid",
-      });
-    }
-    return issues;
-  }, [form.name_ar, form.sale_price, form.cost_price, policyCheckQuiet, canViewCost, lang]);
-
   return (
     <VortexDrawerDialog
       open={true}
       onOpenChange={(isOpen) => {
         if (!isOpen) onClose();
       }}
-      size="full"
-      className="sm:max-w-5xl sm:h-[min(92vh,900px)]"
-      bodyClassName="bg-muted/[0.12] px-4 py-4 sm:px-7 sm:py-6"
-      title={
-        <div className="flex items-center gap-2">
-          <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <Package className="size-4" />
-          </span>
-          <span>{initial ? t("products.edit_product") : t("products.new_product")}</span>
-        </div>
-      }
+      size="xl"
+      className="sm:max-w-4xl sm:h-[min(90vh,820px)]"
+      bodyClassName="bg-muted/[0.16] px-4 py-4 sm:px-6 sm:py-5"
+      icon={<Package className="size-5" />}
+      title={initial ? t("products.edit_product") : t("products.new_product")}
       subtitle={
-        initial
-          ? lang === "ar"
-            ? "تعديل بيانات الصنف وسياساته"
-            : "Update product details and policies"
-          : lang === "ar"
-            ? "أدخل بيانات الصنف وسياسات المخزون"
-            : "Enter product details and stock policy"
+        lang === "ar" ? "بيانات الصنف والتسعير والمخزون" : "Item details, pricing and inventory"
       }
       footer={
-        <div className="flex w-full flex-col gap-3 border-t border-border/40 pt-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2">
-            <label className="relative inline-flex cursor-pointer items-center gap-2">
-              <input
-                type="checkbox"
-                checked={form.is_active}
-                onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
-                className="size-4 rounded border-border accent-primary"
-              />
-              <span className="text-xs font-semibold text-foreground/80">
-                {form.is_active
-                  ? lang === "ar"
-                    ? "صنف نشط"
-                    : "Active"
-                  : lang === "ar"
-                    ? "صنف معطل"
-                    : "Inactive"}
-              </span>
-            </label>
-          </div>
-          <div className="flex w-full items-center gap-2 sm:ms-auto sm:w-auto">
-            <Button
-              type="submit"
-              form="product-form"
-              loading={saving}
-              className="min-h-12 flex-1 rounded-full bg-primary px-6 text-sm font-bold text-primary-foreground shadow-sm transition-all hover:bg-primary/95 hover:shadow-md active:scale-[0.98] sm:flex-none"
-            >
-              <Check className="me-1 size-4" />
-              {t("common.save")}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              aria-label={t("common.cancel")}
-              className="min-h-12 min-w-12 rounded-full px-0 text-xs font-medium sm:min-w-28 sm:rounded-full sm:px-5"
-            >
-              <X className="size-4 sm:me-1" />
-              <span className="hidden sm:inline">{t("common.cancel")}</span>
-            </Button>
-          </div>
+        <div className="flex w-full items-center gap-2">
+          <button
+            type="submit"
+            form="product-form"
+            disabled={saving}
+            className="flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-foreground text-xs font-bold text-background shadow-lg shadow-foreground/15 transition hover:opacity-95 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 sm:text-sm"
+          >
+            <Check className="size-4 text-primary" />
+            <span>
+              {saving ? (lang === "ar" ? "جارٍ الحفظ..." : "Saving...") : t("common.save")}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-12 items-center gap-1.5 rounded-2xl bg-muted/80 px-4 text-xs font-bold text-muted-foreground transition hover:text-foreground active:scale-[0.98] sm:text-sm"
+            aria-label={t("common.cancel")}
+          >
+            <X className="size-3.5" />
+            <span>{t("common.cancel")}</span>
+          </button>
         </div>
       }
     >
       <form
         id="product-form"
         onSubmit={submit}
-        className="mx-auto flex w-full max-w-4xl flex-col gap-4 sm:gap-5"
+        className="mx-auto flex w-full max-w-3xl flex-col gap-4 sm:gap-5"
       >
-        {/* Live Product Preview — shared shell (same card in every entry path). */}
-        <ProductPreviewCard
-          nameAr={form.name_ar}
-          nameEn={form.name}
-          categoryLabel={
-            currentCategory
-              ? labelOf(currentCategory.name, currentCategory.name_ar)
-              : lang === "ar"
-                ? "بدون تصنيف"
-                : "Uncategorized"
-          }
-          barcode={form.barcode || undefined}
-          isActive={form.is_active}
-          canViewCost={canViewCost}
-          profit={profitNum}
-          marginPercent={marginPercent}
-          currencySymbol={getCompanyCurrencySymbol()}
-          formatDigits={toSystemDigits}
-          activeLabel={lang === "ar" ? "نشط" : "Active"}
-          inactiveLabel={lang === "ar" ? "معطل" : "Inactive"}
-          newTitlePlaceholder={lang === "ar" ? "اسم المنتج الجديد..." : "New Product Name..."}
-        />
-
-        {/* Live validation — issues jump to their owning tab. */}
-        <FormIssuesBar issues={formIssues} onJump={jumpToSection} />
-
-        {/* Tab 1: General Info */}
+        {/* One form only. Each group is a visual fieldset, never a nested form. */}
         <section
           id="product-section-general"
           className="scroll-mt-4 animate-in fade-in-0 slide-in-from-bottom-1 duration-200 space-y-4 rounded-2xl border border-border/60 bg-card/80 p-4 shadow-xs sm:p-5"
@@ -2590,6 +2465,17 @@ function ProductDialog({
           <SectionHeading
             icon={<Package className="size-4" />}
             title={lang === "ar" ? "البيانات الأساسية" : "Basic information"}
+            action={
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-muted/70 px-2.5 py-1 text-[11px] font-semibold text-muted-foreground transition hover:text-foreground">
+                <input
+                  type="checkbox"
+                  checked={form.is_active}
+                  onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
+                  className="size-3.5 rounded border-border accent-primary"
+                />
+                <span>{lang === "ar" ? "نشط" : "Active"}</span>
+              </label>
+            }
           />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField label={t("products.name_ar")} required>
@@ -2631,7 +2517,7 @@ function ProductDialog({
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {showForm("category") && (
-              <FormField label={t("products.category")} className="sm:col-span-2">
+              <FormField label={t("products.category")}>
                 {(p) => (
                   <div className="space-y-2">
                     <div className="flex gap-2">
@@ -2640,7 +2526,10 @@ function ProductDialog({
                         aria-describedby={p["aria-describedby"]}
                         value={form.category_id}
                         onChange={(e) => setForm({ ...form, category_id: e.target.value })}
-                        className={cn(fieldSurfaceClass, "min-w-0 flex-1 text-sm font-medium")}
+                        className={cn(
+                          fieldSurfaceClass,
+                          "h-10 min-w-0 flex-1 px-4 text-sm font-medium",
+                        )}
                       >
                         <option value="">
                           {lang === "ar" ? "اختر التصنيف..." : "Select category..."}
@@ -2651,22 +2540,20 @@ function ProductDialog({
                           </option>
                         ))}
                       </select>
-                      <Button
+                      <IconButton
                         type="button"
+                        size="lg"
+                        round
                         variant="outline"
+                        tooltip
+                        ariaLabel={lang === "ar" ? "إضافة تصنيف جديد" : "Add category"}
                         aria-expanded={categoryQuickAddOpen}
                         onClick={() => setCategoryQuickAddOpen((open) => !open)}
-                        className="size-10 shrink-0 rounded-full p-0 sm:h-10 sm:w-auto sm:gap-1.5 sm:px-4"
-                      >
-                        <Plus className="size-3.5" />
-                        <span className="hidden sm:inline">{lang === "ar" ? "جديد" : "New"}</span>
-                      </Button>
+                        icon={<Plus />}
+                      />
                     </div>
                     {categoryQuickAddOpen && (
-                      <form
-                        onSubmit={addCategoryQuickly}
-                        className="animate-in fade-in-0 slide-in-from-top-1 space-y-2 rounded-xl border border-primary/20 bg-primary/[0.035] p-3 duration-150"
-                      >
+                      <div className="animate-in fade-in-0 slide-in-from-top-1 space-y-2 rounded-2xl border border-primary/20 bg-primary/[0.035] p-3 duration-150">
                         <div className="grid gap-2 sm:grid-cols-2">
                           <VortexTextInput
                             value={categoryNameAr}
@@ -2700,22 +2587,47 @@ function ProductDialog({
                           >
                             {t("common.cancel")}
                           </Button>
-                          <Button type="submit" size="sm" loading={savingCategory}>
+                          <Button
+                            type="button"
+                            size="sm"
+                            loading={savingCategory}
+                            onClick={() => void addCategoryQuickly()}
+                          >
                             {lang === "ar" ? "إضافة التصنيف" : "Add category"}
                           </Button>
                         </div>
-                      </form>
+                      </div>
                     )}
                   </div>
                 )}
               </FormField>
             )}
 
+            {config.enableUnits && showForm("unit") && (
+              <FormField label={t("products.unit")}>
+                {(p) => (
+                  <select
+                    id={p.id}
+                    aria-describedby={p["aria-describedby"]}
+                    value={form.unit_id}
+                    onChange={(e) => setForm({ ...form, unit_id: e.target.value })}
+                    className={cn(fieldSurfaceClass, "h-10 px-4 text-sm font-medium")}
+                  >
+                    <option value="">
+                      {lang === "ar" ? "اختر وحدة القياس..." : "Select unit..."}
+                    </option>
+                    {meta.units.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {labelOf(u.name, u.name_ar)}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </FormField>
+            )}
+
             {showForm("sku") && (
-              <FormField
-                label={t("products.sku")}
-                hint={lang === "ar" ? "معرّف الصنف الفريد" : "Unique SKU code"}
-              >
+              <FormField label={t("products.sku")}>
                 {(p) => (
                   <VortexTextInput
                     id={p.id}
@@ -2748,10 +2660,7 @@ function ProductDialog({
           </div>
 
           {isModuleEnabled("barcode") && showForm("barcode") && (
-            <FormField
-              label={t("products.barcode")}
-              hint={lang === "ar" ? "رمز الباركود للمسح السريع" : "Fast scan barcode"}
-            >
+            <FormField label={t("products.barcode")}>
               {(p) => (
                 <div className="flex items-center gap-2">
                   <VortexTextInput
@@ -2766,10 +2675,12 @@ function ProductDialog({
                   />
                   <IconButton
                     type="button"
-                    size="md"
+                    size="lg"
+                    round
                     variant="outline"
+                    tooltip
                     ariaLabel={lang === "ar" ? "مسح الباركود بالكاميرا" : "Scan barcode"}
-                    icon={<Camera className="size-4" />}
+                    icon={<ScanBarcode />}
                     onClick={() => setScannerOpen(true)}
                   />
                 </div>
@@ -2788,11 +2699,7 @@ function ProductDialog({
             title={lang === "ar" ? "التسعير" : "Pricing"}
           />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormField
-              label={t("common.price")}
-              required
-              hint={lang === "ar" ? "سعر البيع النهائي للعميل" : "Retail sale price"}
-            >
+            <FormField label={t("common.price")} required>
               {(p) => (
                 <VortexCurrencyInput
                   id={p.id}
@@ -2810,10 +2717,7 @@ function ProductDialog({
             </FormField>
 
             {canViewCost && showForm("cost") && (
-              <FormField
-                label={t("common.cost")}
-                hint={lang === "ar" ? "تكلفة الشراء الأساسية" : "Unit cost price"}
-              >
+              <FormField label={t("common.cost")}>
                 <VortexCurrencyInput
                   value={form.cost_price === "" ? null : Number(form.cost_price)}
                   onValueChange={(num) =>
@@ -2846,29 +2750,6 @@ function ProductDialog({
                 )}
               </FormField>
             )}
-
-            {config.enableUnits && showForm("unit") && (
-              <FormField label={t("products.unit")}>
-                {(p) => (
-                  <select
-                    id={p.id}
-                    aria-describedby={p["aria-describedby"]}
-                    value={form.unit_id}
-                    onChange={(e) => setForm({ ...form, unit_id: e.target.value })}
-                    className={cn(fieldSurfaceClass, "text-sm font-medium")}
-                  >
-                    <option value="">
-                      {lang === "ar" ? "اختر وحدة القياس..." : "Select unit..."}
-                    </option>
-                    {meta.units.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {labelOf(u.name, u.name_ar)}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </FormField>
-            )}
           </div>
         </section>
 
@@ -2883,14 +2764,7 @@ function ProductDialog({
           />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {showForm("minStock") && (
-              <FormField
-                label={t("products.min")}
-                hint={
-                  lang === "ar"
-                    ? "حد التنبيه عند وصول المخزون لهذه الكمية"
-                    : "Low-stock alert threshold"
-                }
-              >
+              <FormField label={t("products.min")}>
                 {(p) => (
                   <NumberInput
                     {...p}
@@ -2907,14 +2781,7 @@ function ProductDialog({
             )}
 
             {showForm("packageWeight") && (
-              <FormField
-                label={lang === "ar" ? "سعة العبوة (كجم)" : "Package size (kg)"}
-                hint={
-                  lang === "ar"
-                    ? "الوزن الافتراضي للكيس (مثال 50 أو 25). يُستخدم لتعبئة الوزن في شاشات الطحن والتسليم فقط."
-                    : "Default bag weight (e.g. 50 or 25). Used to prefill the weight on milling and delivery screens only."
-                }
-              >
+              <FormField label={lang === "ar" ? "سعة العبوة (كجم)" : "Package size (kg)"}>
                 {(p) => (
                   <NumberInput
                     {...p}
@@ -2938,7 +2805,7 @@ function ProductDialog({
                     aria-describedby={p["aria-describedby"]}
                     value={form.brand_id}
                     onChange={(e) => setForm({ ...form, brand_id: e.target.value })}
-                    className={cn(fieldSurfaceClass, "text-sm font-medium")}
+                    className={cn(fieldSurfaceClass, "h-10 px-4 text-sm font-medium")}
                   >
                     <option value="">
                       {lang === "ar" ? "اختر العلامة التجارية..." : "Select brand..."}
@@ -2963,7 +2830,7 @@ function ProductDialog({
                     aria-describedby={p["aria-describedby"]}
                     value={form.origin_id}
                     onChange={(e) => setForm({ ...form, origin_id: e.target.value })}
-                    className={cn(fieldSurfaceClass, "text-sm font-medium")}
+                    className={cn(fieldSurfaceClass, "h-10 px-4 text-sm font-medium")}
                   >
                     <option value="">
                       {lang === "ar" ? "اختر بلد المنشأ..." : "Select origin..."}
@@ -2986,7 +2853,7 @@ function ProductDialog({
                     aria-describedby={p["aria-describedby"]}
                     value={form.quality_grade_id}
                     onChange={(e) => setForm({ ...form, quality_grade_id: e.target.value })}
-                    className={cn(fieldSurfaceClass, "text-sm font-medium")}
+                    className={cn(fieldSurfaceClass, "h-10 px-4 text-sm font-medium")}
                   >
                     <option value="">
                       {lang === "ar" ? "اختر درجة الجودة..." : "Select quality grade..."}
@@ -3102,15 +2969,24 @@ function ProductDialog({
   );
 }
 
-function SectionHeading({ icon, title }: { icon: React.ReactNode; title: string }) {
+function SectionHeading({
+  icon,
+  title,
+  action,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  action?: React.ReactNode;
+}) {
   return (
-    <header className="flex items-start gap-3 border-b border-border/60 pb-3">
-      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
-        {icon}
+    <header className="flex items-center justify-between gap-3 border-b border-border/60 pb-3">
+      <span className="flex min-w-0 items-center gap-3">
+        <span className="grid size-9 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary">
+          {icon}
+        </span>
+        <span className="truncate text-sm font-bold text-foreground">{title}</span>
       </span>
-      <span className="min-w-0 self-center">
-        <span className="block text-sm font-bold text-foreground">{title}</span>
-      </span>
+      {action}
     </header>
   );
 }

@@ -2,6 +2,9 @@ import { ModuleGuard, useModules } from "@/lib/modules";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
+  ArrowDown,
+  ArrowDownUp,
+  ArrowUp,
   Search,
   Plus,
   Minus,
@@ -46,6 +49,9 @@ import { CartLine as CartLineRow } from "@/components/commerce/cart-line";
 import { MobileProductPicker } from "@/components/commerce/mobile-product-picker";
 import { TableToolbar, type FilterValues } from "@/components/ui/table-toolbar";
 import { RecordsViewToggle } from "@/components/ui/records-view-toggle";
+import { PaymentMethodPicker } from "@/components/ui/payment-method";
+import { AmountInput } from "@/components/commerce/amount-input";
+import { usePaymentMethodsForContext } from "@/hooks/use-payment-methods";
 import { usePersistedViewMode } from "@/hooks/use-persisted-view-mode";
 import { SupplierFormDialog } from "@/components/contacts/supplier-form-dialog";
 import { UniversalPrintPreview } from "@/components/universal-print-preview";
@@ -252,6 +258,7 @@ function PurchasePOSPage() {
   const { isModuleEnabled } = useModules();
   const { t, lang, dir } = useI18n();
   const { config: catalogConfig } = useCatalogModules();
+  const { methods: purchasePaymentMethods } = usePaymentMethodsForContext("purchases");
   const navigate = useNavigate();
   const { roles } = useAuth();
   // Suppliers are RLS-restricted to owner/manager/accountant; cashiers must not
@@ -278,6 +285,13 @@ function PurchasePOSPage() {
   const [supplierId, setSupplierId] = useState<string>("");
   const [search, setSearch] = useState("");
   const [catalogSort, setCatalogSort] = useState("name_asc");
+  const [catalogTableSort, setCatalogTableSort] = useState<{
+    key: string;
+    direction: "asc" | "desc";
+  }>({
+    key: "name",
+    direction: "asc",
+  });
   const [viewMode, setViewMode] = usePersistedViewMode("purchase-pos-catalog", "cards");
   const [filterOpen, setFilterOpen] = useState(false);
 
@@ -293,9 +307,8 @@ function PurchasePOSPage() {
   const [cart, setCart] = useState<CartLine[]>([]);
   const [paid, setPaid] = useState<string>("");
   const [discount, setDiscount] = useState<string>("");
-  const [paymentMethod, setPaymentMethod] = useState<
-    "cash" | "mobile_money" | "bank_transfer" | "credit"
-  >("cash");
+  const [paymentMethod, setPaymentMethod] = useState<string>("cash");
+  const selectedPurchasePaymentMethod = purchasePaymentMethods.find((method) => method.id === paymentMethod);
   const [note, setNote] = useState("");
   const [purchaseDate, setPurchaseDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [transferRef, setTransferRef] = useState("");
@@ -620,6 +633,29 @@ function PurchasePOSPage() {
     lang,
   ]);
 
+  const tableRows = useMemo(() => {
+    const valueFor = (product: Product): string | number => {
+      switch (catalogTableSort.key) {
+        case "code":
+          return product.sku || product.barcode || "";
+        case "cost":
+          return Number(product.cost_price) || 0;
+        case "stock":
+          return Number(stockMap[product.id] ?? 0);
+        default:
+          return lang === "ar" ? product.name_ar || product.name : product.name || product.name_ar || "";
+      }
+    };
+    const factor = catalogTableSort.direction === "asc" ? 1 : -1;
+    return [...filtered].sort((left, right) => {
+      const a = valueFor(left);
+      const b = valueFor(right);
+      return typeof a === "number" && typeof b === "number"
+        ? (a - b) * factor
+        : String(a).localeCompare(String(b), lang, { numeric: true, sensitivity: "base" }) * factor;
+    });
+  }, [filtered, catalogTableSort, stockMap, lang]);
+
   // Create Supplier — the SAME form used by the Suppliers page.
   function handleSupplierSaved(record: { id: string; name: string; phone?: string | null }) {
     setSuppliers((prev) => [record as Supplier, ...prev]);
@@ -667,12 +703,9 @@ function PurchasePOSPage() {
       const composedNote = (() => {
         const parts: string[] = [];
         if (note.trim()) parts.push(note.trim());
-        if (
-          (paymentMethod === "bank_transfer" || paymentMethod === "mobile_money") &&
-          transferRef.trim()
-        ) {
+        if ((selectedPurchasePaymentMethod?.requiresReference || paymentMethod === "bank_transfer" || paymentMethod === "mobile_money") && transferRef.trim()) {
           parts.push(
-            `${paymentMethod === "mobile_money" ? (lang === "ar" ? "مرجع المحفظة" : "Wallet reference") : lang === "ar" ? "رقم الحوالة" : "Transfer no."}: ${transferRef.trim()}`,
+            `${selectedPurchasePaymentMethod?.nameAr ?? (paymentMethod === "mobile_money" ? (lang === "ar" ? "مرجع المحفظة" : "Wallet reference") : lang === "ar" ? "رقم الحوالة" : "Transfer no.")}: ${transferRef.trim()}`,
           );
         }
         return parts.length ? parts.join(" — ") : null;
@@ -681,7 +714,7 @@ function PurchasePOSPage() {
       const { data: invoiceId, error } = await supabase.rpc("create_purchase", {
         _warehouse_id: warehouseId,
         _supplier_id: supplierId,
-        _payment_method: paymentMethod,
+        _payment_method: selectedPurchasePaymentMethod?.legacyValue ?? paymentMethod,
         _paid: paidN,
         _discount: discountN,
         _note: composedNote as any,
@@ -910,6 +943,14 @@ function PurchasePOSPage() {
         {/* Left Column: Search, Filters & Product Grid — desktop only. */}
         {isDesktop && (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-border/80 bg-surface/95 shadow-sm ring-1 ring-background/40 lg:col-start-1 lg:row-start-2 lg:mx-2 lg:mb-2">
+            <div className="flex min-w-0 items-center gap-2 px-3 pt-2">
+              <div className="grid size-7 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
+                <PackagePlus className="size-3.5" />
+              </div>
+              <h1 className="truncate text-xs font-bold text-foreground">
+                {lang === "ar" ? "نقطة المشتريات" : "Purchase workspace"}
+              </h1>
+            </div>
             <TableToolbar
               className="border-b border-border/60 bg-surface/50 p-3"
               lang={lang}
@@ -1021,7 +1062,7 @@ function PurchasePOSPage() {
                   setSelectedQuality(typeof values.quality === "string" ? values.quality : "");
                 },
               }}
-              sort={{
+              sort={viewMode === "table" ? undefined : {
                 value: catalogSort,
                 onValueChange: setCatalogSort,
                 options: [
@@ -1348,14 +1389,41 @@ function PurchasePOSPage() {
                   <table className="w-full text-start text-xs">
                     <thead className="sticky top-0 bg-surface-2 text-muted-foreground">
                       <tr>
-                        <th className="p-2 text-start">{lang === "ar" ? "الصنف" : "Product"}</th>
-                        <th className="p-2 text-start">{lang === "ar" ? "الرمز" : "Code"}</th>
-                        <th className="p-2 text-end">{lang === "ar" ? "التكلفة" : "Cost"}</th>
-                        <th className="p-2 text-end">{lang === "ar" ? "المخزون" : "Stock"}</th>
+                        {([
+                          { key: "name", label: lang === "ar" ? "الصنف" : "Product", align: "start" },
+                          { key: "code", label: lang === "ar" ? "الرمز" : "Code", align: "start" },
+                          { key: "cost", label: lang === "ar" ? "التكلفة" : "Cost", align: "end" },
+                          { key: "stock", label: lang === "ar" ? "المخزون" : "Stock", align: "end" },
+                        ] as const).map((column) => {
+                          const active = catalogTableSort.key === column.key;
+                          const DirectionIcon = active
+                            ? catalogTableSort.direction === "asc" ? ArrowUp : ArrowDown
+                            : ArrowDownUp;
+                          return (
+                            <th
+                              key={column.key}
+                              aria-sort={active ? catalogTableSort.direction === "asc" ? "ascending" : "descending" : "none"}
+                              className={`p-1.5 sm:p-2 ${column.align === "end" ? "text-end" : "text-start"}`}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => setCatalogTableSort((current) => ({
+                                  key: column.key,
+                                  direction: current.key === column.key && current.direction === "asc" ? "desc" : "asc",
+                                }))}
+                                title={column.label}
+                                className="inline-flex items-center gap-1 rounded-full px-1.5 py-1 transition hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                              >
+                                {column.label}
+                                <DirectionIcon className={`size-3 ${active ? "text-primary" : "opacity-40"}`} aria-hidden />
+                              </button>
+                            </th>
+                          );
+                        })}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/60">
-                      {filtered.map((product) => (
+                      {tableRows.map((product) => (
                         <tr
                           key={product.id}
                           onClick={() => addToCart(product)}
@@ -1464,46 +1532,37 @@ function PurchasePOSPage() {
           <div className="shrink-0 space-y-1.5 border-t border-border/70 bg-surface/95 pt-2 pr-1">
             {/* Payment Method Selector — 4 clear options incl. wallet & transfer. */}
             <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)_6rem] gap-1.5">
-              <label className="relative min-w-0">
-                <span className="sr-only">{lang === "ar" ? "طريقة الدفع" : "Payment method"}</span>
-                <select
-                  value={paymentMethod}
-                  onChange={(e) => {
-                    const method = e.target.value as typeof paymentMethod;
-                    setPaymentMethod(method);
-                    setPaid(method === "credit" ? "0" : "");
-                  }}
-                  className="h-10 w-full appearance-none rounded-xl border border-border/80 bg-surface px-3 text-xs font-semibold text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                >
-                  <option value="cash">{lang === "ar" ? "نقدًا" : "Cash"}</option>
-                  <option value="mobile_money">{lang === "ar" ? "محفظة" : "Wallet"}</option>
-                  <option value="bank_transfer">{lang === "ar" ? "حوالة" : "Transfer"}</option>
-                  <option value="credit">{lang === "ar" ? "آجل" : "Credit"}</option>
-                </select>
-                <ChevronDown className="pointer-events-none absolute end-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={paid}
-                onChange={(e) => setPaid(e.target.value)}
-                placeholder={lang === "ar" ? "المدفوع" : "Paid"}
-                aria-label={lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}
-                className={`h-10 w-full min-w-0 rounded-xl border bg-surface px-2 text-end font-mono text-xs outline-none focus:border-primary ${isOverpaid ? "border-destructive text-destructive" : "border-border/80"}`}
+              <PaymentMethodPicker
+                context="purchases"
+                value={paymentMethod}
+                onChange={(method) => {
+                  setPaymentMethod(method);
+                  setPaid(method === "credit" ? "0" : "");
+                }}
+                ensureIds={[paymentMethod]}
+                allowedLegacyValues={["cash", "card", "bank_transfer", "credit", "mobile_money", "split"]}
+                ariaLabel={lang === "ar" ? "طريقة الدفع" : "Payment method"}
+                className="h-8 min-w-0 rounded-full text-[10px] sm:h-9 sm:text-xs"
               />
-              <input
-                type="number"
-                min="0"
+              <AmountInput
+                label={lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}
+                value={paymentMethod === "credit" ? "0" : paid === "" ? String(total) : paid}
+                onValueChange={setPaid}
+                invalid={isOverpaid}
+                placeholder={lang === "ar" ? "المدفوع" : "Paid"}
+                className="h-8 rounded-full border border-border/80 bg-surface px-2 text-[10px] outline-none focus:border-primary sm:h-9 sm:text-xs"
+              />
+              <AmountInput
+                label={lang === "ar" ? "الخصم" : "Discount"}
                 value={discount}
-                onChange={(e) => setDiscount(e.target.value)}
+                onValueChange={setDiscount}
                 placeholder={lang === "ar" ? "الخصم" : "Discount"}
-                aria-label={lang === "ar" ? "الخصم" : "Discount"}
-                className="h-10 w-full rounded-xl border border-border/80 bg-surface px-2 text-end font-mono text-xs outline-none focus:border-primary"
+                className="h-8 rounded-full border border-border/80 bg-surface px-2 text-[10px] outline-none focus:border-primary sm:h-9 sm:text-xs"
               />
             </div>
 
             {/* Transfer reference — shown only for bank transfers. */}
-            {(paymentMethod === "bank_transfer" || paymentMethod === "mobile_money") && (
+            {(selectedPurchasePaymentMethod?.requiresReference || paymentMethod === "bank_transfer" || paymentMethod === "mobile_money") && (
               <input
                 type="text"
                 value={transferRef}
@@ -1545,7 +1604,7 @@ function PurchasePOSPage() {
               className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2.5 text-xs text-foreground placeholder:text-muted-foreground/70 outline-none focus:border-primary"
             />
 
-            <div className="space-y-1.5 rounded-2xl border border-primary/20 bg-primary/5 p-3">
+              <div className="space-y-1 rounded-xl border border-primary/20 bg-primary/5 p-2">
               <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span>{lang === "ar" ? "المجموع الفرعي" : "Subtotal"}</span>
                 <span className="font-mono font-semibold text-foreground">{money(subtotal)}</span>
@@ -1566,6 +1625,15 @@ function PurchasePOSPage() {
                   <span className="font-mono font-semibold text-foreground">{money(taxTotal)}</span>
                 </div>
               )}
+
+              <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                <span>{lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}</span>
+                <span className="font-mono font-semibold text-foreground">{money(paidN)}</span>
+              </div>
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-muted-foreground">{lang === "ar" ? "المتبقي للمورد" : "Supplier balance"}</span>
+                <span className="font-mono font-bold text-amber-600">{money(Math.max(0, total - paidN))}</span>
+              </div>
 
               <div className="flex items-center justify-between border-t border-primary/20 pt-2">
                 <span className="text-xs font-bold text-foreground">

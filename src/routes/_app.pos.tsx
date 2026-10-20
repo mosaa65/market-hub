@@ -2,7 +2,9 @@ import { ModuleGuard, useModules } from "@/lib/modules";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
+  ArrowDown,
   ArrowDownUp,
+  ArrowUp,
   Plus,
   Trash2,
   ScanBarcode,
@@ -71,6 +73,9 @@ import { translateRpcError } from "@/lib/errors/rpc-errors";
 import { usePaymentPanel } from "@/components/payments/payment-panel";
 import { useFormNavigationScope } from "@/hooks/use-form-navigation";
 import { PaymentMethodPicker } from "@/components/ui/payment-method";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { usePaymentMethodsForContext } from "@/hooks/use-payment-methods";
+import { AmountInput } from "@/components/commerce/amount-input";
 
 export const Route = createFileRoute("/_app/pos")({
   head: () => ({ meta: [{ title: "نقطة البيع — فورتيكس ERP" }] }),
@@ -141,6 +146,14 @@ interface Compatibility {
   vehicle_model_id: string;
 }
 
+interface SplitPaymentLine {
+  key: string;
+  methodId: string;
+  amount: string;
+  autoAmount?: boolean;
+  reference?: string;
+}
+
 const posGuideConfig: PageGuideConfig = {
   title: "دليل نقطة البيع والكاشير المتقدم (POS)",
   subtitle:
@@ -164,113 +177,49 @@ const posGuideConfig: PageGuideConfig = {
     },
     {
       title: "الخصم الفوري والتحكم المالي",
-      description:
-        "خصم تلقائي لكميات المنتجات من مستودع نقطة البيع المختار فور تأكيد العملية لمنع العجز والبيع الزائد.",
+      description: "يتم خصم الكميات من المستودع المحدد عند اعتماد عملية البيع.",
       icon: <Scale className="h-4 w-4" />,
     },
     {
-      title: "حفظ وطباعة",
-      description:
-        "إتمام الفاتورة وطباعة الإيصال الحراري بضغطة زر واحدة أو باختصار لوحة المفاتيح (F4).",
+      title: "حفظ وطباعة فوري",
+      description: "إتمام الفاتورة وطباعة الإيصال الحراري من شاشة الكاشير.",
       icon: <Zap className="h-4 w-4" />,
     },
   ],
   matrixTitle: "مصفوفة الأثر المالي والمخزني لعمليات الكاشير",
-  matrixDescription:
-    "جدول تفصيلي يوضح كيفية تأثير كل طريقة دفع وحركة في نقطة البيع على القيود المحاسبية ورصيد المخزون:",
+  matrixDescription: "تأثير طرق الدفع وحركة نقطة البيع على الحسابات والمخزون.",
   impactMatrix: {
     columns: [
       { key: "paymentType", label: "طريقة العملية", className: "w-[20%]" },
       { key: "inventoryImpact", label: "التأثير المخزني", className: "w-[25%]" },
-      { key: "accountingImpact", label: "القيد المحاسبي والأثر المالي", className: "w-[30%]" },
-      { key: "controls", label: "شروط وضوابط العملية", className: "w-[25%]" },
+      { key: "accountingImpact", label: "الأثر المالي", className: "w-[30%]" },
+      { key: "controls", label: "الضوابط", className: "w-[25%]" },
     ],
     rows: [
-      {
-        badge: { label: "سداد نقدي (Cash)", variant: "emerald" },
-        fields: {
-          paymentType: "فاتورة كاش فورية",
-          inventoryImpact: "خصم الكميات من مستودع الفرع فوراً وتحديث الرصيد الفعلي.",
-          accountingImpact:
-            "من حـ/ الصندوق (مدين) إلى حـ/ المبيعات (دائن) + إثبات تكلفة البضاعة المباعة.",
-          controls: "تسجيل المبلغ المستلم وحساب الفكة/المتبقي للعميل آلياً.",
-        },
-      },
-      {
-        badge: { label: "دفع إلكتروني (Card/Network)", variant: "blue" },
-        fields: {
-          paymentType: "شبكة / مدى / بطاقة",
-          inventoryImpact: "خصم الكميات فوراً من مستودع الفرع.",
-          accountingImpact: "من حـ/ البنك أو وسيط الدفع (مدين) إلى حـ/ المبيعات (دائن).",
-          controls: "مطابقة إشعار جهاز الدفع الإلكتروني قبل اعتماد الفاتورة.",
-        },
-      },
-      {
-        badge: { label: "مبيعات آجلة (Credit)", variant: "purple" },
-        fields: {
-          paymentType: "على الحساب (ذمم عملاء)",
-          inventoryImpact: "خصم الكميات فوراً من مستودع الفرع.",
-          accountingImpact:
-            "من حـ/ العميل (مدين) إلى حـ/ المبيعات (دائن) بزيادة رصيد مديونية العميل.",
-          controls: "اشتراط اختيار عميل حقيقي غير نقدي والتحقق من عدم تجاوز الحد الائتماني.",
-        },
-      },
-      {
-        badge: { label: "تحويل بنكي (Transfer)", variant: "amber" },
-        fields: {
-          paymentType: "حوالة / إيداع بنكي",
-          inventoryImpact: "خصم الكميات فوراً من المستودع.",
-          accountingImpact: "من حـ/ الحساب الجاري بالبنك (مدين) إلى حـ/ المبيعات (دائن).",
-          controls: "إدخال رقم الحوالة أو المرجع في حقل الملاحظات لسهولة المطابقة البنكية.",
-        },
-      },
+      { badge: { label: "نقدي", variant: "emerald" }, fields: { paymentType: "بيع نقدي", inventoryImpact: "خصم الكمية", accountingImpact: "إثبات التحصيل", controls: "مطابقة المقبوض" } },
+      { badge: { label: "إلكتروني", variant: "blue" }, fields: { paymentType: "شبكة/بطاقة", inventoryImpact: "خصم الكمية", accountingImpact: "إثبات تحصيل البنك", controls: "مطابقة إشعار الدفع" } },
+      { badge: { label: "آجل", variant: "purple" }, fields: { paymentType: "ذمم العميل", inventoryImpact: "خصم الكمية", accountingImpact: "إثبات الدين", controls: "التحقق من الحد الائتماني" } },
+      { badge: { label: "تحويل", variant: "amber" }, fields: { paymentType: "حوالة بنكية", inventoryImpact: "خصم الكمية", accountingImpact: "إثبات التحصيل البنكي", controls: "حفظ مرجع الحوالة" } },
     ],
   },
-  stepsTitle: "خطوات إتمام عملية بيع نموذجية في الكاشير",
+  stepsTitle: "خطوات البيع",
   steps: [
-    {
-      number: "1",
-      title: "تجهيز السلة والأصناف",
-      description:
-        "امسح الباركود بالقارئ السريع أو ابحث بالاسم بالضغط على (F2) وانقر لإضافة المنتج للسلة.",
-    },
-    {
-      number: "2",
-      title: "تعديل الكميات والخصومات",
-      description: "عدل كمية كل صنف، وطبق الخصم الإجمالي إن وجد وفق الصلاحيات المخولة لك.",
-    },
-    {
-      number: "3",
-      title: "تحديد العميل وطريقة الدفع",
-      description:
-        "اترك العميل الافتراضي للمبيعات النقدية، أو اختر العميل المسجل للمبيعات الآجلة، وحدد طريقة السداد.",
-    },
-    {
-      number: "4",
-      title: "الحفظ والطباعة (F4)",
-      description: "اضغط زر حفظ الفاتورة أو F4 لإصدار الفاتورة فوراً وطباعة إيصال الكاشير الحراري.",
-    },
+    { number: "1", title: "إضافة الأصناف", description: "ابحث باسم الصنف أو امسح باركوده لإضافته." },
+    { number: "2", title: "مراجعة السلة", description: "راجع الكمية والسعر والخصم." },
+    { number: "3", title: "تحديد العميل والدفع", description: "اختر العميل وطريقة الدفع المناسبة." },
+    { number: "4", title: "اعتماد الفاتورة", description: "اعتمد البيع واطبع الإيصال عند الحاجة." },
   ],
   rulesTitle: "إرشادات السلامة والرقابة التشغيلية",
   rules: [
-    {
-      type: "danger",
-      title: "التحقق من الرصيد لمنع المخزون السالب",
-      description:
-        "النظام يمنع استكمال البيع إذا كانت الكمية المطلوبة غير متوفرة في المستودع المختار إلا إذا كان البيع على المكشوف مصرحاً به.",
-    },
-    {
-      type: "warning",
-      title: "تدقيق أسعار البيع والخصم",
-      description:
-        "لا يُسمح بتعديل سعر البيع إلى أقل من سعر التكلفة إلا بموافقة إدارية لحماية هوامش الربحية.",
-    },
-    {
-      type: "info",
-      title: "حفظ فوري دون فقدان الجلسة",
-      description:
-        "جميع بنود السلة محمية محلياً في الذاكرة السريعة لمنع ضياع الفاتورة في حال انقطاع الاتصال المؤقت.",
-    },
+    { type: "danger", title: "توفر المخزون", description: "تحقق من الكميات المتاحة قبل اعتماد البيع." },
+    { type: "warning", title: "الأسعار والخصومات", description: "تخضع لتفويض المستخدم." },
+    { type: "info", title: "حفظ الجلسة", description: "السلة محفوظة في ذاكرة الشاشة خلال الجلسة الحالية." },
+  ],
+  footerTip: "فورتيكس ERP — نظام الكاشير ونقاط البيع السريعة المعتمد",
+};
+
+function POSPage() {
+  // ...existing code...
   ],
   footerTip: "فورتيكس ERP — نظام الكاشير ونقاط البيع السريعة المعتمد",
 };
@@ -279,6 +228,9 @@ function POSPage() {
   const { isModuleEnabled } = useModules();
   const { t, lang } = useI18n();
   const { config: catalogConfig } = useCatalogModules();
+  const { methods: posPaymentMethods } = usePaymentMethodsForContext("pos", {
+    includeCredit: true,
+  });
   const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
   const [stockMap, setStockMap] = useState<Record<string, number>>({});
@@ -374,8 +326,8 @@ function POSPage() {
   const [selectedTemplate, setSelectedTemplate] = useState<InvoiceTemplate>(defaultTemplate);
 
   const [isSplitPayment, setIsSplitPayment] = useState(false);
-  const [splitCash, setSplitCash] = useState("");
-  const [splitCard, setSplitCard] = useState("");
+  const [splitEditorOpen, setSplitEditorOpen] = useState(false);
+  const [splitPayments, setSplitPayments] = useState<SplitPaymentLine[]>([]);
 
   const [newCustomerOpen, setNewCustomerOpen] = useState(false);
 
@@ -863,7 +815,9 @@ function POSPage() {
           : "";
         return `${category ?? ""} ${brand}`.trim();
       }
-      return lang === "ar" ? product.name_ar || product.name : product.name || product.name_ar;
+      return lang === "ar"
+        ? product.name_ar || product.name
+        : product.name || product.name_ar || "";
     };
     const direction = catalogTableSort.direction === "asc" ? 1 : -1;
     return [...filtered].sort((a, b) => {
@@ -1094,12 +1048,6 @@ function POSPage() {
     disabled: scannerOpen || !catalogConfig.enableBarcode || !barcodeReaderEnabled,
   });
 
-  function formatWithCommas(val: number | string): string {
-    const n = typeof val === "number" ? val : Number(val);
-    if (!Number.isFinite(n)) return "0";
-    return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(n);
-  }
-
   // Financial Computations with strict 2-decimal precision
   const subtotal = Math.round(cart.reduce((s, l) => s + l.unit_price * l.quantity, 0) * 100) / 100;
   const taxTotal =
@@ -1108,14 +1056,73 @@ function POSPage() {
   const discountN = Math.round(Number(discount || 0) * 100) / 100;
   const total = Math.max(0, Math.round((subtotal + taxTotal - discountN) * 100) / 100);
 
-  // Split payment amounts
-  const splitCashN = Math.max(0, Number(splitCash || 0));
-  const splitCardN = Math.max(0, Number(splitCard || 0));
-  const splitPaidTotal = Math.round((splitCashN + splitCardN) * 100) / 100;
-  // عدد وسائل الدفع غير الصفرية في الدفع المجزأ:
-  //  0 -> لم يدفع شيء،  1 -> وسيلة واحدة (تُسجل بوسيلتها الحقيقية)،  2+ -> دفع مجزأ حقيقي
-  const splitMethodCount = (splitCashN > 0 ? 1 : 0) + (splitCardN > 0 ? 1 : 0);
-  const isMultiMethodSplit = isSplitPayment && splitMethodCount > 1;
+  const supportedSplitMethods = useMemo(
+    () =>
+      posPaymentMethods.filter(
+        (method) =>
+          !method.isCreditTerm &&
+          ["cash", "card", "bank_transfer", "mobile_money", "cheque"].includes(method.legacyValue),
+      ),
+    [posPaymentMethods],
+  );
+  const splitRows = useMemo(
+    () =>
+      splitPayments
+        .map((line) => ({
+          ...line,
+          method: supportedSplitMethods.find((method) => method.id === line.methodId),
+          amount: Math.max(0, Number(line.amount) || 0),
+        }))
+        .filter((line) => line.method && line.amount > 0),
+    [splitPayments, supportedSplitMethods],
+  );
+  const splitPaidTotal = Math.round(splitRows.reduce((sum, line) => sum + line.amount, 0) * 100) / 100;
+  const splitMethodCount = splitRows.length;
+  const missingSplitReference = isSplitPayment && splitRows.some(
+    (line) => line.method?.requiresReference && !line.reference?.trim(),
+  );
+  const paymentSplits = splitRows.map((line) => ({
+    method: line.method!.legacyValue,
+    amount: Math.round(line.amount * 100) / 100,
+  }));
+
+  function startSplitPayment() {
+    const defaultMethod = supportedSplitMethods.find((method) => method.legacyValue === "cash") ?? supportedSplitMethods[0];
+    setIsSplitPayment(true);
+    setSplitEditorOpen(true);
+    setPaid("");
+    setSplitPayments(
+      defaultMethod
+        ? [{ key: crypto.randomUUID(), methodId: defaultMethod.id, amount: String(total), autoAmount: true }]
+        : [],
+    );
+  }
+
+  function addSplitPaymentLine() {
+    const usedLegacyValues = new Set(
+      splitPayments
+        .map((line) => supportedSplitMethods.find((method) => method.id === line.methodId)?.legacyValue)
+        .filter(Boolean),
+    );
+    const nextMethod = supportedSplitMethods.find((method) => !usedLegacyValues.has(method.legacyValue));
+    if (!nextMethod) return;
+    setSplitPayments((current) => [
+      ...current,
+      { key: crypto.randomUUID(), methodId: nextMethod.id, amount: "", autoAmount: false },
+    ]);
+  }
+
+  function updateSplitPayment(key: string, patch: Partial<SplitPaymentLine>) {
+    setSplitPayments((current) => current.map((line) => line.key === key ? { ...line, ...patch } : line));
+  }
+
+  useEffect(() => {
+    setSplitPayments((current) => current.map((line) => line.autoAmount ? { ...line, amount: String(total) } : line));
+  }, [total]);
+
+  function removeSplitPayment(key: string) {
+    setSplitPayments((current) => current.filter((line) => line.key !== key));
+  }
 
   // Auto-Paid & Smart Payment Logic
   // إذا كانت وسيلة الدفع "آجل" وترك حقل المدفوع فارغاً، فالافتراضي هو 0 (دين بالكامل)
@@ -1127,15 +1134,8 @@ function POSPage() {
       : total
     : Math.max(0, Number(paid));
   const effectivePaid = isSplitPayment ? splitPaidTotal : singlePaidNum;
-  const isCashChange =
-    !isSplitPayment && paymentMethod === "cash" && !isPaidEmpty && Number(paid) > total;
-  const changeDue = isCashChange ? Math.round((Number(paid) - total) * 100) / 100 : 0;
-  const isOverpaid = isSplitPayment
-    ? splitPaidTotal > total
-    : !isCashChange && !isPaidEmpty && Number(paid) > total;
-  const remainingDebt = isCashChange
-    ? 0
-    : Math.max(0, Math.round((total - effectivePaid) * 100) / 100);
+  const isOverpaid = effectivePaid > total;
+  const remainingDebt = Math.max(0, Math.round((total - effectivePaid) * 100) / 100);
 
   // P1-4: the shared engine's verdict on the NON-split payment. The till keeps
   // its own split allocation (two tenders by design), but a single tender now
@@ -1256,18 +1256,20 @@ function POSPage() {
           : "Please allocate the payment to at least one method",
       );
     }
+    if (missingSplitReference) {
+      return toast.error(
+        lang === "ar" ? "أدخل مرجع كل طريقة دفع تتطلب رقماً مرجعياً" : "Enter a reference for each payment method that requires one",
+      );
+    }
 
     setLoading(true);
     try {
-      // وسيلة الدفع المحفوظة على الفاتورة:
-      //  * وسيلة واحدة -> تُسجل باسمها الحقيقي (نقد/بطاقة/بنك/آجل)
-      //  * أكثر من وسيلة -> 'split' كي تبقى قابلة للفلترة والتقارير
-      const singleSplitMethod = splitMethodCount === 1 ? (splitCashN > 0 ? "cash" : "card") : null;
+      // Split allocations always go through the guarded split RPC overload.
+      // The individual tender methods are stored in customer_payment_splits.
+      const selectedSingleMethod = posPaymentMethods.find((method) => method.id === paymentMethod);
       let finalMethod: string = isSplitPayment
-        ? isMultiMethodSplit
-          ? "split"
-          : (singleSplitMethod ?? "cash")
-        : paymentMethod;
+        ? "split"
+        : selectedSingleMethod?.legacyValue ?? paymentMethod;
 
       // تصحيح منطقي نهائي للوسيلة قبل الإرسال لمنع التناقض:
       if (!isSplitPayment) {
@@ -1282,19 +1284,9 @@ function POSPage() {
 
       // التوزيع المالي للدفع المجزأ يُرسل إلى قاعدة البيانات عبر customer_payment_splits
       // ليُسجّل كمدفوعات فعلية موثقة بدل النص الحر في الملاحظات.
-      const paymentSplits: Array<{ method: string; amount: number }> = isSplitPayment
-        ? [
-            splitCashN > 0 ? { method: "cash", amount: splitCashN } : null,
-            splitCardN > 0 ? { method: "card", amount: splitCardN } : null,
-          ].filter((part): part is { method: string; amount: number } => part !== null)
-        : [];
-
       let splitNote = "";
       if (isSplitPayment) {
-        const parts = [];
-        if (splitCashN > 0) parts.push(`${lang === "ar" ? "نقد" : "Cash"}: ${money(splitCashN)}`);
-        if (splitCardN > 0)
-          parts.push(`${lang === "ar" ? "شبكة/بطاقة" : "Card"}: ${money(splitCardN)}`);
+        const parts = splitRows.map((line) => `${line.method!.nameAr}: ${money(line.amount)}`);
         if (remainingDebt > 0)
           parts.push(`${lang === "ar" ? "آجل" : "Debt"}: ${money(remainingDebt)}`);
         splitNote = `[${lang === "ar" ? "الدفع بأكثر من طريقة" : "Split"}: ${parts.join(" | ")}]`;
@@ -1303,17 +1295,27 @@ function POSPage() {
       const finalNote = (() => {
         const parts: string[] = [];
         if (note.trim()) parts.push(note.trim());
+        if (isSplitPayment) {
+          for (const line of splitPayments) {
+            const method = supportedSplitMethods.find((item) => item.id === line.methodId);
+            if (method?.requiresReference && line.reference?.trim()) {
+              parts.push(`${method.nameAr}: ${line.reference.trim()}`);
+            }
+          }
+        }
         // Electronic references are carried in the existing note field; this
         // preserves the RPC/offline contract while keeping the cashier context.
         if (
           (finalMethod === "bank_transfer" ||
             finalMethod === "mobile_money" ||
+            selectedSingleMethod?.requiresReference ||
             paymentMethod === "bank_transfer" ||
             paymentMethod === "mobile_money") &&
           transferRef.trim()
         ) {
           const electronicLabel =
             finalMethod === "mobile_money" || paymentMethod === "mobile_money"
+              || selectedSingleMethod?.legacyValue === "mobile_money"
               ? lang === "ar"
                 ? "مرجع المحفظة"
                 : "Wallet reference"
@@ -1346,7 +1348,11 @@ function POSPage() {
           _discount: discountN,
           _note: finalNote as any,
           _sale_date: saleDate,
-          _payment_splits: paymentSplits as any,
+          _payment_splits: (isSplitPayment
+            ? paymentSplits
+            : finalMethod === "cheque" && effectivePaid > 0
+              ? [{ method: "cheque", amount: Math.min(effectivePaid, total) }]
+              : []) as any,
           _items: cart.map((l) => ({
             product_id: l.product_id,
             quantity: l.quantity,
@@ -1528,8 +1534,7 @@ function POSPage() {
       setNote("");
       setTransferRef("");
       setIsSplitPayment(false);
-      setSplitCash("");
-      setSplitCard("");
+      setSplitPayments([]);
       setSaleDate(new Date().toISOString().slice(0, 10));
       await loadStock(warehouseId);
       searchRef.current?.focus();
@@ -1761,11 +1766,10 @@ function POSPage() {
               <button
                 type="button"
                 onClick={() => setServiceOpen(true)}
-                className="hidden size-9 shrink-0 items-center justify-center rounded-full border border-violet-500/30 bg-violet-500/10 text-violet-700 transition hover:bg-violet-500/20 dark:text-violet-300 md:inline-flex xl:w-auto xl:gap-1.5 xl:px-2.5"
+                className="hidden size-9 shrink-0 items-center justify-center rounded-full border border-violet-500/30 bg-violet-500/10 text-violet-700 transition hover:bg-violet-500/20 dark:text-violet-300 md:inline-flex"
                 title={lang === "ar" ? "إضافة خدمة أو أجرة تركيب" : "Add custom labor/service"}
               >
                 <Wrench className="h-3.5 w-3.5" />
-                <span className="hidden xl:inline">{lang === "ar" ? "إضافة خدمة" : "Service"}</span>
               </button>
             )}
 
@@ -1779,6 +1783,15 @@ function POSPage() {
           {/* ─── Products Panel (Desktop & Tablet) ─── */}
           {isDesktop && (
             <div className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-border/80 bg-surface/95 p-3 shadow-sm ring-1 ring-background/40 lg:col-start-1 lg:row-start-2">
+              <div className="mb-2 flex min-w-0 items-center gap-2 px-1">
+                <div className="grid size-7 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
+                  <ShoppingBag className="size-3.5" />
+                </div>
+                <div className="min-w-0">
+                  <h1 className="truncate text-xs font-bold text-foreground">{t("pos.title")}</h1>
+                  <p className="truncate text-[10px] text-muted-foreground">{lang === "ar" ? "امسح، أضف، وأصدر الفاتورة" : "Scan, add, and issue the invoice"}</p>
+                </div>
+              </div>
               <TableToolbar
                 className="mb-2.5"
                 lang={lang}
@@ -2016,7 +2029,7 @@ function POSPage() {
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
                     {/* Category */}
                     <div>
-                      <label className="text-[10px] font-medium text-muted-foreground block mb-1">
+                      className="hidden size-9 shrink-0 items-center justify-center rounded-full border border-violet-500/30 bg-violet-500/10 text-violet-700 transition hover:bg-violet-500/20 dark:text-violet-300 md:inline-flex"
                         {t("products.category")}
                       </label>
                       <select
@@ -2410,7 +2423,11 @@ function POSPage() {
                                 : lang === "ar" ? "تنازلي" : "descending"
                               : lang === "ar" ? "غير مرتب" : "not sorted";
                             return (
-                              <th key={column.key} aria-sort={active ? catalogTableSort.direction === "asc" ? "ascending" : "descending" : "none"} className={`py-2 px-3 text-${column.align}`}>
+                              <th
+                                key={column.key}
+                                aria-sort={active ? catalogTableSort.direction === "asc" ? "ascending" : "descending" : "none"}
+                                className={`py-2 px-3 ${column.align === "end" ? "text-end" : column.align === "center" ? "text-center" : "text-start"}`}
+                              >
                                 <button
                                   type="button"
                                   onClick={() => setCatalogTableSort((current) => ({
@@ -2421,7 +2438,9 @@ function POSPage() {
                                   title={`${column.label} · ${sortLabel}`}
                                 >
                                   {column.label}
-                                  <ArrowDownUp className={`size-3 ${active ? "text-primary" : "opacity-40"}`} aria-hidden />
+                                  {active ? (
+                                    catalogTableSort.direction === "asc" ? <ArrowUp className="size-3 text-primary" aria-hidden /> : <ArrowDown className="size-3 text-primary" aria-hidden />
+                                  ) : <ArrowDownUp className="size-3 opacity-40" aria-hidden />}
                                 </button>
                               </th>
                             );
@@ -2515,27 +2534,51 @@ function POSPage() {
                 </h2>
               </div>
 
-              {isDesktop ? (
-                cart.length > 0 && (
+              <div className="flex shrink-0 items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isSplitPayment) {
+                      setIsSplitPayment(false);
+                      setSplitPayments([]);
+                      setSplitEditorOpen(false);
+                    } else startSplitPayment();
+                  }}
+                  disabled={cart.length === 0 || supportedSplitMethods.length === 0}
+                  aria-pressed={isSplitPayment}
+                  aria-label={lang === "ar" ? "الدفع بأكثر من طريقة" : "Split payment"}
+                  title={lang === "ar" ? "الدفع بأكثر من طريقة" : "Split payment"}
+                  className={`grid size-8 place-items-center rounded-full border transition disabled:opacity-40 ${isSplitPayment ? "border-primary/40 bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-primary/10 hover:text-primary"}`}
+                >
+                  <Layers className="size-4" />
+                </button>
+                {cart.length > 0 && (
                   <button
                     type="button"
-                    onClick={() => setCart([])}
+                    onClick={() => {
+                      setCart([]);
+                      setIsSplitPayment(false);
+                      setSplitPayments([]);
+                    }}
                     className="grid size-8 shrink-0 place-items-center rounded-full border border-destructive/20 text-destructive transition hover:bg-destructive/10 active:scale-95"
                     title={lang === "ar" ? "تفريغ سلة المبيعات" : "Clear Cart"}
+                    aria-label={lang === "ar" ? "تفريغ سلة المبيعات" : "Clear Cart"}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
-                )
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setMobilePickerOpen(true)}
-                  className="grid size-9 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm active:scale-95"
-                  title={t("pos.add_product")}
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                </button>
-              )}
+                )}
+                {!isDesktop && (
+                  <button
+                    type="button"
+                    onClick={() => setMobilePickerOpen(true)}
+                    className="grid size-8 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm active:scale-95"
+                    title={t("pos.add_product")}
+                    aria-label={t("pos.add_product")}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Cart Items List & Payment Scrollable Section */}
@@ -2611,73 +2654,41 @@ function POSPage() {
             >
               {/* ─── Payment & Summary Section ─── */}
               {/* Compact payment method selector */}
-              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-                <PaymentMethodPicker
+              <div className="min-w-0">
+                {!isSplitPayment ? <PaymentMethodPicker
                   context="pos"
                   value={isSplitPayment ? "" : paymentMethod}
                   onChange={(method) => {
                     setIsSplitPayment(false);
+                    setSplitPayments([]);
                     setPaymentMethod(method);
                     setPaid(method === "credit" ? "0" : "");
                   }}
                   ensureIds={[paymentMethod]}
                   ariaLabel={lang === "ar" ? "طريقة الدفع" : "Payment method"}
-                  className="h-9 min-w-0 rounded-lg text-xs"
-                />
-                <button
-                  type="button"
                   data-form-nav
-                  onClick={() => {
-                    setIsSplitPayment((current) => {
-                      const next = !current;
-                      if (next) {
-                        setSplitCash(String(total));
-                        setSplitCard("");
-                      }
-                      return next;
-                    });
-                  }}
-                  aria-pressed={isSplitPayment}
-                  className={`h-9 shrink-0 rounded-lg border px-2.5 text-[11px] font-semibold transition ${isSplitPayment ? "border-primary/40 bg-primary/10 text-primary" : "border-border bg-surface text-muted-foreground hover:text-foreground"}`}
-                >
-                  {t("pos.pm.split")}
-                </button>
+                  className="h-8 min-w-0 rounded-full text-[11px]"
+                /> : <div className="flex h-8 items-center rounded-full border border-primary/20 bg-primary/[0.04] px-3 text-[11px] font-medium text-primary">{lang === "ar" ? "طرق دفع متعددة" : "Multiple methods"}</div>}
               </div>
               {!isSplitPayment && (
                 <div className="grid grid-cols-2 gap-2">
-                  <label className="min-w-0">
-                    <span className="sr-only">
-                      {paymentMethod === "cash"
-                        ? lang === "ar"
-                          ? "المبلغ المستلم"
-                          : "Cash tendered"
-                        : lang === "ar"
-                          ? "المبلغ المدفوع"
-                          : "Amount paid"}
-                    </span>
-                    <input
-                      type="number"
-                      min="0"
-                      dir="ltr"
-                      value={paid}
-                      onChange={(event) => handlePaidChange(event.target.value)}
-                      data-form-nav
-                      placeholder={paymentMethod === "credit" ? "0" : String(total)}
-                      className={`h-9 w-full rounded-lg border bg-background px-2.5 text-end font-mono text-xs font-semibold outline-none focus:border-primary ${isOverpaid ? "border-destructive text-destructive" : "border-border text-foreground"}`}
-                    />
-                  </label>
-                  <label className="min-w-0">
-                    <span className="sr-only">{t("pos.discount")}</span>
-                    <input
-                      type="number"
-                      min="0"
-                      value={discount}
-                      onChange={(event) => setDiscount(event.target.value)}
-                      data-form-nav
-                      placeholder={lang === "ar" ? "الخصم" : "Discount"}
-                      className="h-9 w-full rounded-lg border border-border bg-background px-2.5 text-end font-mono text-xs font-semibold text-foreground outline-none focus:border-primary"
-                    />
-                  </label>
+                  <AmountInput
+                    label={lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}
+                    value={isPaidEmpty ? paymentMethod === "credit" ? "0" : String(total) : paid}
+                    onValueChange={handlePaidChange}
+                    invalid={isOverpaid}
+                    data-form-nav
+                    placeholder={lang === "ar" ? "المدفوع" : "Paid"}
+                    className="h-8 rounded-full border border-border bg-background px-2.5 text-[11px] font-semibold outline-none focus:border-primary"
+                  />
+                  <AmountInput
+                    label={t("pos.discount")}
+                    value={discount}
+                    onValueChange={setDiscount}
+                    data-form-nav
+                    placeholder={lang === "ar" ? "الخصم" : "Discount"}
+                    className="h-8 rounded-full border border-border bg-background px-2.5 text-[11px] font-semibold outline-none focus:border-primary"
+                  />
                 </div>
               )}
 
@@ -2702,180 +2713,16 @@ function POSPage() {
 
               {/* Split Payment Details */}
               {isSplitPayment ? (
-                <div className="rounded-2xl border border-violet-500/30 bg-violet-500/5 p-2.5 space-y-2 animate-in fade-in duration-200">
-                  <div className="flex items-center justify-between text-xs font-semibold text-violet-700 dark:text-violet-300">
-                    <span>
-                      {lang === "ar" ? "توزيع الدفعات (نقد / شبكة / آجل):" : "Split Allocation:"}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSplitCash(String(total));
-                        setSplitCard("");
-                      }}
-                      className="text-[10px] text-violet-600 dark:text-violet-400 font-semibold underline"
-                    >
-                      {lang === "ar" ? "كامل نقد" : "All Cash"}
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-[10px] text-muted-foreground block mb-0.5">
-                        {lang === "ar" ? "نقدًا:" : "Cash:"}
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        dir="ltr"
-                        value={splitCash}
-                        onChange={(e) => setSplitCash(e.target.value)}
-                        placeholder="0"
-                        aria-label={lang === "ar" ? "نقدًا" : "Cash"}
-                        className="h-8 w-full rounded-xl border border-border bg-background px-2 text-xs font-mono font-bold outline-none focus:border-violet-500 [unicode-bidi:plaintext]"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-muted-foreground block mb-0.5">
-                        {lang === "ar" ? "شبكة/حوالة:" : "Card/Bank:"}
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        dir="ltr"
-                        value={splitCard}
-                        onChange={(e) => setSplitCard(e.target.value)}
-                        placeholder="0"
-                        aria-label={lang === "ar" ? "شبكة/حوالة" : "Card/Bank"}
-                        className="h-8 w-full rounded-xl border border-border bg-background px-2 text-xs font-mono font-bold outline-none focus:border-violet-500 [unicode-bidi:plaintext]"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="pt-1 border-t border-violet-500/20 flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground font-medium">
-                      {lang === "ar" ? "إجمالي المدفوع:" : "Total Paid:"}
-                    </span>
-                    <span className="font-mono font-bold text-foreground [unicode-bidi:isolate]">
-                      {money(splitPaidTotal)}
-                    </span>
-                  </div>
-
-                  {remainingDebt > 0 && (
-                    <div className="flex items-center justify-between rounded-xl bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 text-xs font-mono text-amber-700 dark:text-amber-300">
-                      <span>{lang === "ar" ? "المتبقي كدين آجل:" : "Remaining Debt:"}</span>
-                      <span className="font-bold [unicode-bidi:isolate]">
-                        {money(remainingDebt)}
-                      </span>
-                    </div>
-                  )}
+                <div className="flex items-center justify-between gap-2 rounded-lg bg-primary/[0.04] px-2 py-1 text-[10px]">
+                  <span className="text-muted-foreground">
+                    {lang === "ar" ? `دفع متعدد · ${splitRows.length} طرق` : `Split payment · ${splitRows.length} methods`}
+                  </span>
+                  <span className="font-mono font-semibold">{money(splitPaidTotal)}</span>
                 </div>
-              ) : paymentMethod === "cash" ? (
-                /* ─── Cash Tender & Change Due Section ─── */
-                <div className="space-y-1.5 rounded-2xl border border-border/80 bg-surface/80 p-2.5 shadow-2xs">
-                  <div className="flex items-center justify-between text-xs font-semibold text-foreground">
-                    <span className="flex items-center gap-1.5">
-                      <Banknote className="h-3.5 w-3.5 text-primary" />
-                      {lang === "ar" ? "المبلغ المستلم من العميل:" : "Cash Tendered:"}
-                    </span>
-                    <span className="text-[11px] text-muted-foreground">
-                      {isPaidEmpty ? (
-                        <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
-                          {lang === "ar" ? "مسدد بالكامل" : "Exact Amount"}
-                        </span>
-                      ) : (
-                        <span className="font-mono font-bold [unicode-bidi:isolate]">
-                          {money(Number(paid))}
-                        </span>
-                      )}
-                    </span>
-                  </div>
-
-                  {/* Quick Banknote Denomination Shortcuts */}
-                  <div className="flex flex-wrap items-center gap-1 pt-0.5 text-[10px]">
-                    <button
-                      type="button"
-                      onClick={() => setPaid("")}
-                      className={`rounded-lg px-2 py-0.5 font-mono font-semibold transition ${
-                        isPaidEmpty
-                          ? "bg-primary text-primary-foreground shadow-2xs"
-                          : "bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground"
-                      }`}
-                    >
-                      {lang === "ar" ? "المبلغ تماماً" : "Exact"}
-                    </button>
-                    {[500, 1000, 2000, 5000, 10000].map((denom) => (
-                      <button
-                        key={denom}
-                        type="button"
-                        onClick={() => {
-                          setPaid(String(denom));
-                          syncMethodWithPaid(denom);
-                        }}
-                        className="rounded-lg bg-muted/70 px-2 py-0.5 font-mono font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition active:scale-95"
-                      >
-                        {denom.toLocaleString("en-US")}
-                      </button>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const half = Math.round((total / 2) * 100) / 100;
-                        setPaid(String(half));
-                        syncMethodWithPaid(half);
-                      }}
-                      className="rounded-lg bg-muted/70 px-2 py-0.5 text-muted-foreground hover:bg-muted hover:text-foreground transition"
-                    >
-                      {lang === "ar" ? "النصف" : "Half"}
-                    </button>
-                  </div>
-
-                  {/* Dynamic Change Due or Debt Status */}
-                  {isCashChange ? (
-                    <div className="flex items-center justify-between rounded-xl bg-emerald-500/15 border border-emerald-500/30 px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300 animate-in fade-in">
-                      <span className="flex items-center gap-1.5">
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                        {lang === "ar" ? "الباقي للعميل (الصرف):" : "Change Due:"}
-                      </span>
-                      <span className="font-mono text-sm font-black [unicode-bidi:isolate]">
-                        {money(changeDue)}
-                      </span>
-                    </div>
-                  ) : remainingDebt > 0 ? (
-                    <div className="flex items-center justify-between rounded-xl bg-amber-500/15 border border-amber-500/30 px-3 py-1.5 text-xs font-semibold text-amber-700 dark:text-amber-300 animate-in fade-in">
-                      <span className="flex items-center gap-1.5">
-                        <AlertCircle className="h-3.5 w-3.5" />
-                        {lang === "ar" ? "المتبقي كدين آجل:" : "Remaining Debt:"}
-                      </span>
-                      <span className="font-mono text-xs font-bold [unicode-bidi:isolate]">
-                        {money(remainingDebt)}
-                      </span>
-                    </div>
-                  ) : null}
-                </div>
-              ) : (
-                /* ─── Credit / Non-Cash Paid Input ─── */
-                <div className="space-y-1.5 rounded-2xl border border-border/80 bg-surface/80 p-2.5 shadow-2xs">
-                  <div className="flex items-center justify-between text-xs font-semibold text-foreground">
-                    <span>{lang === "ar" ? "المبلغ المدفوع:" : "Amount Paid:"}</span>
-                    <span className="font-mono font-bold text-primary [unicode-bidi:isolate]">
-                      {money(effectivePaid)}
-                    </span>
-                  </div>
-
-                  {paymentMethod === "credit" || remainingDebt > 0 ? (
-                    <div className="flex items-center justify-between rounded-xl bg-amber-500/15 border border-amber-500/30 px-3 py-1 text-xs font-mono text-amber-700 dark:text-amber-300">
-                      <span>{lang === "ar" ? "يسجل كدين على العميل:" : "Recorded as Debt:"}</span>
-                      <span className="font-bold [unicode-bidi:isolate]">
-                        {money(remainingDebt)}
-                      </span>
-                    </div>
-                  ) : null}
-                </div>
-              )}
+              ) : null}
 
               {/* ─── Royal Totals Summary Card ─── */}
-              <div className="space-y-2 rounded-2xl border border-primary/25 bg-gradient-to-br from-card via-card to-primary/[0.04] p-3.5 shadow-sm">
+              <div className="space-y-1.5 rounded-xl border border-primary/25 bg-gradient-to-br from-card via-card to-primary/[0.04] p-2 sm:p-2.5 shadow-sm">
                 {/* Subtotal */}
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>{t("pos.subtotal")}</span>
@@ -2902,8 +2749,23 @@ function POSPage() {
                   </div>
                 )}
 
+                <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                  <span>{lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}</span>
+                  <span className="font-mono font-semibold text-foreground">{money(effectivePaid)}</span>
+                </div>
+
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-muted-foreground">{lang === "ar" ? "المتبقي على العميل" : "Customer balance"}</span>
+                  <span className={`font-mono font-bold ${remainingDebt > 0 ? "text-amber-600" : "text-foreground"}`}>{money(remainingDebt)}</span>
+                </div>
+                {isOverpaid && (
+                  <p role="alert" className="rounded-lg bg-destructive/10 px-2 py-1 text-[10px] font-semibold text-destructive">
+                    {lang === "ar" ? "مجموع المدفوع أكبر من إجمالي الفاتورة" : "Paid amount exceeds the invoice total"}
+                  </p>
+                )}
+
                 {/* Grand Total */}
-                <div className="flex items-center justify-between border-t border-primary/20 pt-2.5">
+                  <div className="flex items-center justify-between border-t border-primary/20 pt-1.5">
                   <div>
                     <span className="text-xs font-black text-foreground">{t("pos.total")}</span>
                     {cart.length > 0 && (
@@ -2913,7 +2775,7 @@ function POSPage() {
                       </span>
                     )}
                   </div>
-                  <span className="font-mono text-lg font-black tracking-tight text-primary [unicode-bidi:isolate]">
+                    <span className="font-mono text-base font-black tracking-tight text-primary [unicode-bidi:isolate]">
                     {money(total)}
                   </span>
                 </div>
@@ -2983,11 +2845,7 @@ function POSPage() {
                     ) : (
                       <CheckCircle2 className="h-4 w-4" />
                     )}
-                    <span>
-                      {isCashChange
-                        ? `${t("pos.checkout")} (${lang === "ar" ? "الباقي:" : "Change:"} ${money(changeDue)})`
-                        : `${t("pos.checkout")} (F9)`}
-                    </span>
+                    <span>{`${t("pos.checkout")} (F9)`}</span>
                   </button>
                 </div>
               )}
@@ -2995,6 +2853,112 @@ function POSPage() {
           </div>
         </div>
       </div>
+
+      <Dialog
+        open={splitEditorOpen}
+        onOpenChange={(open) => {
+          setSplitEditorOpen(open);
+          if (!open && splitPayments.length === 0) setIsSplitPayment(false);
+        }}
+      >
+        <DialogContent className="max-h-[88dvh] w-[calc(100vw-1rem)] max-w-lg overflow-y-auto rounded-2xl p-3 sm:p-5">
+          <DialogHeader>
+            <DialogTitle className="text-sm sm:text-base">
+              {lang === "ar" ? "توزيع الدفع على أكثر من طريقة" : "Split payment methods"}
+            </DialogTitle>
+            <p className="text-[11px] text-muted-foreground">
+              {lang === "ar" ? "أضف كل وسيلة والمبلغ المدفوع بها. المتبقي يسجل على العميل." : "Add each tender and its amount. The remaining amount is recorded against the customer."}
+            </p>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            {splitPayments.map((line) => {
+              const chosen = supportedSplitMethods.find((method) => method.id === line.methodId);
+              const choices = supportedSplitMethods.filter((method) =>
+                method.id === line.methodId || !splitPayments.some((other) =>
+                  other.key !== line.key &&
+                  supportedSplitMethods.find((candidate) => candidate.id === other.methodId)?.legacyValue === method.legacyValue,
+                ),
+              );
+              return (
+                <div key={line.key} className="grid grid-cols-[minmax(0,1fr)_minmax(6rem,0.8fr)_2.25rem] items-center gap-1.5 rounded-lg border border-border/60 p-1.5 sm:gap-2 sm:p-2">
+                  <select
+                    value={line.methodId}
+                    onChange={(event) => updateSplitPayment(line.key, { methodId: event.target.value, reference: "" })}
+                    aria-label={lang === "ar" ? "طريقة الدفع" : "Payment method"}
+                    className="h-9 min-w-0 rounded-full border border-border bg-background px-2 text-[11px] font-medium outline-none focus:border-primary"
+                  >
+                    {choices.map((method) => <option key={method.id} value={method.id}>{lang === "ar" ? method.nameAr : method.nameEn || method.nameAr}</option>)}
+                  </select>
+                  <AmountInput
+                    label={lang === "ar" ? `مبلغ ${chosen?.nameAr ?? "الدفع"}` : `${chosen?.nameEn ?? chosen?.nameAr ?? "Payment"} amount`}
+                    value={line.amount}
+                    onValueChange={(amount) => updateSplitPayment(line.key, { amount, autoAmount: false })}
+                    invalid={isOverpaid}
+                    placeholder="0"
+                    className="h-9 rounded-full border border-border bg-background px-2 text-xs font-semibold outline-none focus:border-primary"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeSplitPayment(line.key)}
+                    aria-label={lang === "ar" ? "حذف طريقة الدفع" : "Remove payment method"}
+                    title={lang === "ar" ? "حذف" : "Remove"}
+                    className="grid size-8 place-items-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                  {chosen?.requiresReference && (
+                    <input
+                      type="text"
+                      value={line.reference ?? ""}
+                      onChange={(event) => updateSplitPayment(line.key, { reference: event.target.value })}
+                      aria-label={lang === "ar" ? `مرجع ${chosen.nameAr}` : `${chosen.nameEn || chosen.nameAr} reference`}
+                      placeholder={lang === "ar" ? "رقم المرجع" : "Reference"}
+                      className="col-span-3 h-8 min-w-0 rounded-full border border-border bg-background px-3 text-[11px] outline-none focus:border-primary"
+                    />
+                  )}
+                </div>
+              );
+            })}
+            <button
+              type="button"
+              onClick={addSplitPaymentLine}
+              disabled={splitPayments.length >= supportedSplitMethods.length}
+              className="inline-flex h-9 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-3 text-xs font-semibold text-primary hover:bg-primary/10 disabled:opacity-40"
+            >
+              <Plus className="size-4" />
+              {lang === "ar" ? "إضافة طريقة دفع" : "Add payment method"}
+            </button>
+          </div>
+
+          <div className="space-y-1 rounded-xl border border-primary/20 bg-primary/[0.04] p-2.5 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">{lang === "ar" ? "إجمالي الفاتورة" : "Invoice total"}</span>
+              <span className="font-mono font-semibold">{money(total)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">{lang === "ar" ? "المدفوع" : "Paid"}</span>
+              <span className="font-mono font-semibold">{money(splitPaidTotal)}</span>
+            </div>
+            <div className="flex items-center justify-between border-t border-border/50 pt-1">
+              <span className="text-muted-foreground">{lang === "ar" ? "المتبقي على العميل" : "Customer balance"}</span>
+              <span className="font-mono font-bold text-amber-600">{money(remainingDebt)}</span>
+            </div>
+            {isOverpaid && <p role="alert" className="pt-1 text-[11px] font-semibold text-destructive">{lang === "ar" ? "مجموع الدفعات يتجاوز إجمالي الفاتورة" : "Payment total exceeds invoice total"}</p>}
+          </div>
+
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => setSplitEditorOpen(false)}
+              disabled={splitMethodCount === 0 || isOverpaid || missingSplitReference || (!customerId && remainingDebt > 0)}
+              className="h-9 rounded-full bg-primary px-5 text-xs font-semibold text-primary-foreground disabled:opacity-40"
+            >
+              {lang === "ar" ? "تم" : "Done"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Barcode Scanner Dialog */}
       <BarcodeScanner

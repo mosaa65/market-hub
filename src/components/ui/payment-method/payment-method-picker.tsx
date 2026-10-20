@@ -100,6 +100,8 @@ export interface PaymentMethodPickerProps {
    * id, so a historic document stays editable instead of losing its method.
    */
   ensureIds?: (string | null | undefined)[];
+  /** Restrict options to values accepted by the current screen's write contract. */
+  allowedLegacyValues?: readonly string[];
   className?: string;
   /** Accessible name for the select. */
   ariaLabel?: string;
@@ -121,6 +123,7 @@ export function PaymentMethodPicker({
   includeCredit = true,
   disabled = false,
   ensureIds,
+  allowedLegacyValues,
   className,
   ariaLabel,
   placeholder,
@@ -157,6 +160,13 @@ export function PaymentMethodPicker({
 
     return extra.length === 0 ? methods : [...methods, ...extra];
   }, [methods, ensureIds]);
+
+  const selectableOptions = useMemo(() => {
+    if (!allowedLegacyValues) return options;
+    return options.filter(
+      (method) => method.id === value || allowedLegacyValues.includes(method.legacyValue),
+    );
+  }, [options, allowedLegacyValues, value]);
 
   /**
    * The label for a method, read from the ONE authority: the catalogue row.
@@ -223,7 +233,7 @@ export function PaymentMethodPicker({
             {placeholder ?? (isRtl ? "طريقة الدفع" : "Payment method")}
           </option>
         )}
-        {options.map((method) => (
+        {selectableOptions.map((method) => (
           <option key={method.id} value={method.id}>
             {labelFor(method)}
           </option>
