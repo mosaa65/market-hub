@@ -41,7 +41,7 @@ import { toast } from "sonner";
 import { BarcodeScanner } from "@/components/barcode-scanner";
 import { useKeyboardWedge } from "@/hooks/use-keyboard-wedge";
 import { useCatalogModules } from "@/lib/catalog-modules";
-import { useIsDesktop } from "@/hooks/use-media-query";
+import { useIsDesktop, useMediaQuery } from "@/hooks/use-media-query";
 import { CartLine as CartLineRow } from "@/components/commerce/cart-line";
 import { MobileProductPicker } from "@/components/commerce/mobile-product-picker";
 import { TableToolbar, type FilterValues } from "@/components/ui/table-toolbar";
@@ -302,6 +302,7 @@ function PurchasePOSPage() {
 
   // Mobile workspace: cart-first, catalogue opened on demand.
   const isDesktop = useIsDesktop();
+  const isTouchDevice = useMediaQuery("(pointer: coarse)");
   const [mobilePickerOpen, setMobilePickerOpen] = useState(false);
 
   // Modals
@@ -309,6 +310,10 @@ function PurchasePOSPage() {
 
   const [loading, setLoading] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [barcodeReaderEnabled, setBarcodeReaderEnabled] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem("purchase_pos_barcode_reader_enabled") !== "false";
+  });
   const [successInvoice, setSuccessInvoice] = useState<{
     id: string;
     number?: string;
@@ -535,6 +540,7 @@ function PurchasePOSPage() {
     onScan: (scanned) => {
       scanHandlerRef.current(scanned);
     },
+    disabled: scannerOpen || !catalogConfig.enableBarcode || !barcodeReaderEnabled,
   });
 
   // Hotkeys: F2 search, F4 submit, Esc clear
@@ -768,8 +774,8 @@ function PurchasePOSPage() {
   return (
     <div className="grid h-full min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-2 overflow-hidden bg-[radial-gradient(ellipse_at_top,_color-mix(in_oklab,var(--primary)_10%,transparent),transparent_48%)] lg:grid-cols-[minmax(0,1fr)_minmax(400px,460px)] lg:grid-rows-[auto_minmax(0,1fr)]">
       {/* Top Bar / Header */}
-      <div className="m-1.5 flex shrink-0 flex-col items-stretch gap-2 rounded-2xl border border-border/80 bg-surface/95 px-3 py-2 shadow-sm backdrop-blur-md sm:m-2 sm:px-4 lg:col-start-1 lg:row-start-1">
-        <div className="flex items-center gap-3">
+      <div className="col-span-full m-1.5 flex min-w-0 shrink-0 items-center gap-2 overflow-hidden rounded-2xl border border-border/80 bg-surface/95 px-2 py-2 shadow-sm backdrop-blur-md sm:m-2 sm:px-3 lg:row-start-1">
+        <div className="hidden shrink-0 items-center gap-2 sm:flex">
           <Link
             to="/purchases"
             className="grid h-9 w-9 place-items-center rounded-xl border border-border/80 bg-surface-2/60 text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
@@ -777,7 +783,7 @@ function PurchasePOSPage() {
           >
             <ArrowRight className={`h-4 w-4 ${dir === "rtl" ? "" : "rotate-180"}`} />
           </Link>
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
             <div className="grid h-10 w-10 place-items-center rounded-2xl border border-primary/25 bg-primary text-primary-foreground shadow-sm">
               <PackagePlus className="h-5 w-5" />
             </div>
@@ -790,7 +796,7 @@ function PurchasePOSPage() {
                   {lang === "ar" ? "مساحة المشتريات" : "Purchase workspace"}
                 </span>
               </div>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="hidden text-[11px] text-muted-foreground xl:block">
                 {lang === "ar"
                   ? "تسجيل مشتريات وتحديث فوري للمخزون مع إسناد المورد النقدي"
                   : "Rapid purchase receiving & stock increment"}
@@ -800,11 +806,11 @@ function PurchasePOSPage() {
         </div>
 
         {/* Global Toolbar Selectors */}
-        <div className="flex w-full flex-wrap items-center gap-1.5 border-t border-border/60 pt-2">
+        <div className="flex min-w-0 flex-1 flex-nowrap items-center justify-end gap-1 overflow-hidden">
           {/* Warehouse Selector */}
-          <div className="order-2 flex h-9 min-w-0 items-center gap-1.5 rounded-xl border border-border/80 bg-surface px-2.5 text-xs shadow-2xs">
+          <div className="flex h-9 min-w-0 items-center gap-1 rounded-xl border border-border/80 bg-surface px-1.5 text-xs shadow-2xs sm:gap-1.5 sm:px-2.5">
             <Building2 className="h-3.5 w-3.5 text-primary shrink-0" />
-            <span className="text-muted-foreground font-medium hidden sm:inline">
+            <span className="sr-only sm:not-sr-only sm:inline text-muted-foreground font-medium">
               {lang === "ar" ? "المستودع:" : "Warehouse:"}
             </span>
             <select
@@ -821,15 +827,15 @@ function PurchasePOSPage() {
           </div>
 
           {/* Supplier Selector with Cash Supplier Default */}
-          <div className="order-1 flex h-9 min-w-0 items-center gap-1.5 rounded-xl border border-border/80 bg-surface px-2.5 text-xs shadow-2xs">
+          <div className="flex h-9 min-w-0 items-center gap-1 rounded-xl border border-border/80 bg-surface px-1.5 text-xs shadow-2xs sm:gap-1.5 sm:px-2.5">
             <Truck className="h-3.5 w-3.5 text-primary shrink-0" />
-            <span className="text-muted-foreground font-medium hidden sm:inline">
+            <span className="sr-only sm:not-sr-only sm:inline text-muted-foreground font-medium">
               {lang === "ar" ? "المورد:" : "Supplier:"}
             </span>
             <select
               value={supplierId}
               onChange={(e) => setSupplierId(e.target.value)}
-              className="h-8 w-72 max-w-[48vw] bg-transparent px-1 text-sm font-medium text-foreground outline-none cursor-pointer"
+              className="h-8 min-w-0 w-24 bg-transparent px-0.5 text-[11px] font-medium text-foreground outline-none cursor-pointer sm:w-56 sm:px-1 sm:text-sm"
             >
               {suppliers.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -841,7 +847,7 @@ function PurchasePOSPage() {
               type="button"
               onClick={() => setNewSupplierOpen(true)}
               title={lang === "ar" ? "إضافة مورد جديد" : "Add new supplier"}
-              className="grid h-8 w-8 place-items-center rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition disabled:opacity-40"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition disabled:opacity-40"
               disabled={!canManageSuppliers}
             >
               <UserPlus className="h-3 w-3" />
@@ -849,28 +855,53 @@ function PurchasePOSPage() {
           </div>
 
           {/* Purchase Date */}
-          <div className="order-3 flex h-9 items-center gap-1.5 rounded-xl border border-border/80 bg-surface px-2.5 text-xs shadow-2xs">
+          <label className="relative grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-border/80 bg-surface text-xs shadow-2xs sm:flex sm:w-auto sm:items-center sm:gap-1.5 sm:px-2.5">
             <CalendarDays className="h-3.5 w-3.5 text-primary shrink-0" />
             <input
               type="date"
               value={purchaseDate}
               onChange={(e) => setPurchaseDate(e.target.value)}
-              className="bg-transparent text-xs text-foreground outline-none cursor-pointer font-mono"
+              aria-label={lang === "ar" ? "تاريخ الفاتورة" : "Purchase date"}
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0 sm:static sm:h-auto sm:w-28 sm:opacity-100 sm:bg-transparent sm:text-xs sm:text-foreground sm:outline-none sm:font-mono"
             />
-          </div>
+          </label>
 
           {/* Page Guide Button */}
-          <PageGuideButton config={purchasePosGuideConfig} className="order-4 !h-9 !w-9" />
+          <PageGuideButton config={purchasePosGuideConfig} className="!h-9 !w-9 shrink-0" />
 
           {/* Barcode Camera Modal Trigger */}
-          <button
-            type="button"
-            onClick={() => setScannerOpen(true)}
-            className="order-5 grid h-9 w-9 place-items-center rounded-xl border border-border/80 bg-surface text-muted-foreground hover:text-foreground hover:bg-surface-2 transition shadow-2xs"
-            title={lang === "ar" ? "مسح الباركود بالكاميرا" : "Scan barcode with camera"}
-          >
-            <ScanBarcode className="h-4 w-4" />
-          </button>
+          {isDesktop && !isTouchDevice && catalogConfig.enableBarcode ? (
+            <button
+              type="button"
+              onClick={() => {
+                const next = !barcodeReaderEnabled;
+                setBarcodeReaderEnabled(next);
+                localStorage.setItem("purchase_pos_barcode_reader_enabled", String(next));
+              }}
+              aria-pressed={barcodeReaderEnabled}
+              title={
+                lang === "ar"
+                  ? barcodeReaderEnabled
+                    ? "إيقاف قارئ الباركود"
+                    : "تفعيل قارئ الباركود"
+                  : barcodeReaderEnabled
+                    ? "Disable barcode reader"
+                    : "Enable barcode reader"
+              }
+              className={`grid h-9 w-9 shrink-0 place-items-center rounded-full border transition ${barcodeReaderEnabled ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600" : "border-border bg-surface text-muted-foreground"}`}
+            >
+              <ScanBarcode className="h-4 w-4" />
+            </button>
+          ) : (!isDesktop || isTouchDevice) && catalogConfig.enableBarcode ? (
+            <button
+              type="button"
+              onClick={() => setScannerOpen(true)}
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-border/80 bg-surface text-muted-foreground hover:text-foreground hover:bg-surface-2 transition shadow-2xs"
+              title={lang === "ar" ? "مسح الباركود بالكاميرا" : "Scan barcode with camera"}
+            >
+              <ScanBarcode className="h-4 w-4" />
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -1351,7 +1382,7 @@ function PurchasePOSPage() {
         )}
 
         {/* Right Column: Purchase Cart & Invoicing — the primary workspace. */}
-        <div className="flex min-h-0 w-full shrink-0 flex-col overflow-hidden rounded-3xl border border-primary/15 bg-surface/95 p-2.5 shadow-xl ring-1 ring-border/50 backdrop-blur-md sm:p-3 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:mx-2 lg:mb-2">
+        <div className="flex min-h-0 w-full shrink-0 flex-col overflow-hidden rounded-3xl border border-primary/15 bg-surface/95 p-2.5 shadow-xl ring-1 ring-border/50 backdrop-blur-md sm:p-3 lg:col-start-2 lg:row-start-2 lg:mx-2 lg:mb-2">
           {/* Cart Header */}
           <div className="mb-2 flex shrink-0 items-center justify-between border-b border-border/60 px-1 pb-2">
             <div className="flex items-center gap-2">
@@ -1387,7 +1418,7 @@ function PurchasePOSPage() {
           </div>
 
           {/* Cart Lines Scrollable Area */}
-          <div className="my-1 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 custom-scrollbar">
+          <div className="my-1 min-h-0 flex-1 space-y-1 overflow-y-auto pr-1 custom-scrollbar">
             {cart.length === 0 ? (
               <div className="grid place-items-center py-14 text-center text-sm text-muted-foreground">
                 <div className="grid h-12 w-12 place-items-center rounded-2xl border border-dashed border-border bg-surface-2/50 mb-2">
@@ -1413,6 +1444,7 @@ function PurchasePOSPage() {
                     unitPrice: line.unit_cost,
                     taxRate: line.tax_rate,
                     stock: stockMap[line.product_id],
+                    unboundedQuantity: true,
                   }}
                   labels={{
                     price: lang === "ar" ? "سعر الشراء" : "Cost",
@@ -1426,143 +1458,124 @@ function PurchasePOSPage() {
                 />
               ))
             )}
+          </div>
 
-            {/* Payment and totals share this same cart scroll area. */}
-            <div className="mt-3 space-y-2 border-t border-border/70 bg-surface/95 pt-2.5 pr-1">
-              {/* Payment Method Selector — 4 clear options incl. wallet & transfer. */}
-              <div className="grid grid-cols-[minmax(0,1fr)_7rem] gap-2">
-                <label className="relative min-w-0">
-                  <span className="sr-only">
-                    {lang === "ar" ? "طريقة الدفع" : "Payment method"}
-                  </span>
-                  <select
-                    value={paymentMethod}
-                    onChange={(e) => {
-                      const method = e.target.value as typeof paymentMethod;
-                      setPaymentMethod(method);
-                      setPaid(method === "credit" ? "0" : "");
-                    }}
-                    className="h-10 w-full appearance-none rounded-xl border border-border/80 bg-surface px-3 text-xs font-semibold text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                  >
-                    <option value="cash">{lang === "ar" ? "نقدًا" : "Cash"}</option>
-                    <option value="mobile_money">{lang === "ar" ? "محفظة" : "Wallet"}</option>
-                    <option value="bank_transfer">{lang === "ar" ? "حوالة" : "Transfer"}</option>
-                    <option value="credit">{lang === "ar" ? "آجل" : "Credit"}</option>
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute end-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={discount}
-                  onChange={(e) => setDiscount(e.target.value)}
-                  placeholder={lang === "ar" ? "الخصم" : "Discount"}
-                  aria-label={lang === "ar" ? "الخصم" : "Discount"}
-                  className="h-10 w-full rounded-xl border border-border/80 bg-surface px-2 text-end font-mono text-xs outline-none focus:border-primary"
-                />
-              </div>
+          {/* Fixed payment and totals footer */}
+          <div className="shrink-0 space-y-1.5 border-t border-border/70 bg-surface/95 pt-2 pr-1">
+            {/* Payment Method Selector — 4 clear options incl. wallet & transfer. */}
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)_6rem] gap-1.5">
+              <label className="relative min-w-0">
+                <span className="sr-only">{lang === "ar" ? "طريقة الدفع" : "Payment method"}</span>
+                <select
+                  value={paymentMethod}
+                  onChange={(e) => {
+                    const method = e.target.value as typeof paymentMethod;
+                    setPaymentMethod(method);
+                    setPaid(method === "credit" ? "0" : "");
+                  }}
+                  className="h-10 w-full appearance-none rounded-xl border border-border/80 bg-surface px-3 text-xs font-semibold text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                >
+                  <option value="cash">{lang === "ar" ? "نقدًا" : "Cash"}</option>
+                  <option value="mobile_money">{lang === "ar" ? "محفظة" : "Wallet"}</option>
+                  <option value="bank_transfer">{lang === "ar" ? "حوالة" : "Transfer"}</option>
+                  <option value="credit">{lang === "ar" ? "آجل" : "Credit"}</option>
+                </select>
+                <ChevronDown className="pointer-events-none absolute end-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={paid}
+                onChange={(e) => setPaid(e.target.value)}
+                placeholder={lang === "ar" ? "المدفوع" : "Paid"}
+                aria-label={lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}
+                className={`h-10 w-full min-w-0 rounded-xl border bg-surface px-2 text-end font-mono text-xs outline-none focus:border-primary ${isOverpaid ? "border-destructive text-destructive" : "border-border/80"}`}
+              />
+              <input
+                type="number"
+                min="0"
+                value={discount}
+                onChange={(e) => setDiscount(e.target.value)}
+                placeholder={lang === "ar" ? "الخصم" : "Discount"}
+                aria-label={lang === "ar" ? "الخصم" : "Discount"}
+                className="h-10 w-full rounded-xl border border-border/80 bg-surface px-2 text-end font-mono text-xs outline-none focus:border-primary"
+              />
+            </div>
 
-              {/* Transfer reference — shown only for bank transfers. */}
-              {(paymentMethod === "bank_transfer" || paymentMethod === "mobile_money") && (
-                <input
-                  type="text"
-                  value={transferRef}
-                  onChange={(e) => setTransferRef(e.target.value)}
-                  placeholder={
-                    paymentMethod === "mobile_money"
-                      ? lang === "ar"
-                        ? "رقم عملية المحفظة / المرجع"
-                        : "Wallet transaction / reference number"
-                      : t("pos.pm.transfer_ref")
-                  }
-                  aria-label={
-                    paymentMethod === "mobile_money"
-                      ? lang === "ar"
-                        ? "مرجع المحفظة"
-                        : "Wallet reference"
-                      : t("pos.pm.transfer_ref")
-                  }
-                  className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2.5 text-xs text-foreground outline-none transition focus:border-primary"
-                />
-              )}
-
-              {/* Paid Amount */}
-              {paymentMethod !== "cash" && (
-                <div className="rounded-2xl border border-border/70 bg-surface-2/30 p-2.5">
-                  <div className="mb-1.5 flex items-center justify-between text-xs">
-                    <span className="font-semibold text-muted-foreground">
-                      {lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}
-                    </span>
-                    <span className="font-mono font-bold text-primary">{money(total)}</span>
-                  </div>
-                  <input
-                    type="number"
-                    min="0"
-                    value={paid}
-                    onChange={(e) => setPaid(e.target.value)}
-                    placeholder={total.toFixed(2)}
-                    className={`h-10 w-full rounded-xl border bg-surface px-3 text-end font-mono text-sm font-bold outline-none focus:border-primary ${
-                      isOverpaid
-                        ? "border-destructive text-destructive focus:border-destructive"
-                        : "border-border text-foreground"
-                    }`}
-                  />
-                </div>
-              )}
-
-              {isOverpaid && (
-                <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-2.5 py-1.5 text-[11px] font-medium text-destructive">
-                  {lang === "ar"
-                    ? "المبلغ المدفوع أكبر من إجمالي الفاتورة"
-                    : "Paid amount exceeds the invoice total"}
-                </p>
-              )}
-
-              {/* Note Input */}
+            {/* Transfer reference — shown only for bank transfers. */}
+            {(paymentMethod === "bank_transfer" || paymentMethod === "mobile_money") && (
               <input
                 type="text"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
+                value={transferRef}
+                onChange={(e) => setTransferRef(e.target.value)}
                 placeholder={
-                  lang === "ar" ? "ملاحظة على فاتورة الشراء (اختياري)..." : "Note (optional)..."
+                  paymentMethod === "mobile_money"
+                    ? lang === "ar"
+                      ? "رقم عملية المحفظة / المرجع"
+                      : "Wallet transaction / reference number"
+                    : t("pos.pm.transfer_ref")
                 }
-                className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2.5 text-xs text-foreground placeholder:text-muted-foreground/70 outline-none focus:border-primary"
+                aria-label={
+                  paymentMethod === "mobile_money"
+                    ? lang === "ar"
+                      ? "مرجع المحفظة"
+                      : "Wallet reference"
+                    : t("pos.pm.transfer_ref")
+                }
+                className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2.5 text-xs text-foreground outline-none transition focus:border-primary"
               />
+            )}
 
-              <div className="space-y-1.5 rounded-2xl border border-primary/20 bg-primary/5 p-3">
+            {isOverpaid && (
+              <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-2.5 py-1.5 text-[11px] font-medium text-destructive">
+                {lang === "ar"
+                  ? "المبلغ المدفوع أكبر من إجمالي الفاتورة"
+                  : "Paid amount exceeds the invoice total"}
+              </p>
+            )}
+
+            {/* Note Input */}
+            <input
+              type="text"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder={
+                lang === "ar" ? "ملاحظة على فاتورة الشراء (اختياري)..." : "Note (optional)..."
+              }
+              className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2.5 text-xs text-foreground placeholder:text-muted-foreground/70 outline-none focus:border-primary"
+            />
+
+            <div className="space-y-1.5 rounded-2xl border border-primary/20 bg-primary/5 p-3">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>{lang === "ar" ? "المجموع الفرعي" : "Subtotal"}</span>
+                <span className="font-mono font-semibold text-foreground">{money(subtotal)}</span>
+              </div>
+
+              {discountN > 0 && (
+                <div className="flex items-center justify-between text-xs text-emerald-600 dark:text-emerald-400">
+                  <span className="font-medium">{lang === "ar" ? "الخصم" : "Discount"}</span>
+                  <span className="font-mono font-bold [unicode-bidi:isolate]">
+                    −{money(discountN)}
+                  </span>
+                </div>
+              )}
+
+              {taxTotal > 0 && (
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>{lang === "ar" ? "المجموع الفرعي" : "Subtotal"}</span>
-                  <span className="font-mono font-semibold text-foreground">{money(subtotal)}</span>
+                  <span>{lang === "ar" ? "الضريبة" : "Tax"}</span>
+                  <span className="font-mono font-semibold text-foreground">{money(taxTotal)}</span>
                 </div>
+              )}
 
-                {discountN > 0 && (
-                  <div className="flex items-center justify-between text-xs text-emerald-600 dark:text-emerald-400">
-                    <span className="font-medium">{lang === "ar" ? "الخصم" : "Discount"}</span>
-                    <span className="font-mono font-bold [unicode-bidi:isolate]">
-                      −{money(discountN)}
-                    </span>
-                  </div>
-                )}
-
-                {taxTotal > 0 && (
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{lang === "ar" ? "الضريبة" : "Tax"}</span>
-                    <span className="font-mono font-semibold text-foreground">
-                      {money(taxTotal)}
-                    </span>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between border-t border-primary/20 pt-2">
-                  <span className="text-xs font-bold text-foreground">
-                    {lang === "ar" ? "الإجمالي" : "Total"}
+              <div className="flex items-center justify-between border-t border-primary/20 pt-2">
+                <span className="text-xs font-bold text-foreground">
+                  {lang === "ar" ? "الإجمالي" : "Total"}
+                </span>
+                <span className="font-mono text-base font-extrabold tracking-tight text-primary">
+                  <span dir="ltr" className="[unicode-bidi:isolate]">
+                    {money(total)}
                   </span>
-                  <span className="font-mono text-base font-extrabold tracking-tight text-primary">
-                    <span dir="ltr" className="[unicode-bidi:isolate]">
-                      {money(total)}
-                    </span>
-                  </span>
-                </div>
+                </span>
               </div>
             </div>
           </div>

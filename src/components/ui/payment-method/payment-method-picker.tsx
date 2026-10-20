@@ -105,6 +105,13 @@ export interface PaymentMethodPickerProps {
   ariaLabel?: string;
   /** Placeholder shown when `value` is empty. */
   placeholder?: string;
+  /**
+   * Include the select in the screen's keyboard field order
+   * (`data-form-nav`, see `src/lib/keyboard/form-navigation.ts`). On by
+   * default: a payment method is a field like any other, and a counter that
+   * works without a mouse must be able to land on it.
+   */
+  "data-form-nav"?: boolean;
 }
 
 export function PaymentMethodPicker({
@@ -117,6 +124,7 @@ export function PaymentMethodPicker({
   className,
   ariaLabel,
   placeholder,
+  "data-form-nav": formNav = true,
 }: PaymentMethodPickerProps) {
   const { t, lang } = useI18n();
   const isRtl = lang === "ar";
@@ -196,6 +204,7 @@ export function PaymentMethodPicker({
       <select
         dir={isRtl ? "rtl" : "ltr"}
         aria-label={ariaLabel ?? (isRtl ? "طريقة الدفع" : "Payment method")}
+        data-form-nav={formNav ? "" : undefined}
         disabled={disabled || isLoading}
         value={value ?? ""}
         onChange={(event) => onChange(event.target.value)}

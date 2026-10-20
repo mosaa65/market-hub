@@ -52,12 +52,9 @@ import {
   type MillingServiceDocument,
   type MillingDocumentDetails,
 } from "@/lib/milling";
-import { PaymentMethodPicker } from "@/components/ui/payment-method";
-import {
-  getPaymentMethodDefinition,
-  toLegacyPaymentValue,
-  paymentMethodLabel,
-} from "@/lib/payments/payment-methods";
+import { PaymentPanel, usePaymentPanel } from "@/components/payments/payment-panel";
+import { useFormNavigationScope } from "@/hooks/use-form-navigation";
+import { toLegacyPaymentValue, paymentMethodLabel } from "@/lib/payments/payment-methods";
 import { MillingDocumentWorkflow } from "@/components/milling/milling-document-workflow";
 import {
   MillingPanel,
@@ -88,6 +85,9 @@ interface CustomerOption {
   name: string;
   phone?: string | null;
   balance?: number | null;
+  credit_limit?: number | null;
+  /** P1-6: the seeded cash customer, which must never carry debt. */
+  is_system?: boolean | null;
 }
 
 interface WarehouseOption {
@@ -107,6 +107,9 @@ function MillingIntakePage() {
   const currencySymbol = useMemo(() => getCompanyCurrencySymbol(), []);
 
   // الحقول الأساسية — تبدأ فارغة لتفادي إزعاج الـ 0
+  // Keyboard-only operation: arrows/Enter walk the intake form and the payment
+  // block in reading order, so the counter needs no mouse.
+  const formScopeRef = useFormNavigationScope<HTMLDivElement>();
   const [customerId, setCustomerId] = useState("");
   const [quickCustomerOpen, setQuickCustomerOpen] = useState(false);
   const [warehouseId, setWarehouseId] = useState("");
@@ -140,7 +143,7 @@ function MillingIntakePage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("customers")
-        .select("id, name, phone, balance")
+        .select("id, name, phone, balance, credit_limit, is_system")
         .eq("is_active", true)
         .order("name");
       if (error) throw error;
@@ -152,6 +155,9 @@ function MillingIntakePage() {
     () => (customers.data ?? []).find((c) => c.id === customerId),
     [customers.data, customerId],
   );
+
+  // قائمة العملاء لحساب الدفع المشترك (ذمة/حد ائتمان) — دفعة واحدة.
+  const customerList = customers.data ?? [];
 
   // استعلام المستودعات
   const warehouses = useQuery({
@@ -303,21 +309,17 @@ function MillingIntakePage() {
   const grandTotal = Math.max(0, currentSubtotal - currentDiscount);
 
   const isCredit = paymentMethod === "credit";
-  const currentPaid = isCredit ? 0 : Number(paid) || 0;
-  const remainingDue = Math.max(0, grandTotal - currentPaid);
 
-  // مساعدة سريعة لتسديد كامل المبلغ أو جعله آجلاً
-  function handlePayFull() {
-    setPaid(String(grandTotal));
-    if (paymentMethod === "credit") setPaymentMethod("cash");
-  }
-
-  function handleSetFullCredit() {
-    setPaymentMethod("credit");
-    setPaid("");
-  }
-
-  const isOverpaid = !isCredit && currentPaid > grandTotal;
+  // P1-4: the payment arithmetic is the shared panel's — the same rules the
+  // till and the invoice form use. Milling no longer has its own copy.
+  const payment = usePaymentPanel({
+    total: grandTotal,
+    state: { method: paymentMethod, paidRaw: paid, customerId },
+    customers: customerList,
+  });
+  const currentPaid = payment.paid;
+  const remainingDue = payment.remaining;
+  const isOverpaid = payment.isOverpaid;
 
   const canSubmit = Boolean(
     customerId &&
@@ -325,12 +327,17 @@ function MillingIntakePage() {
     itemId &&
     Boolean(serviceItem.data?.id) &&
     (bagCount > 0 || Number(kg) > 0) &&
-    !isOverpaid,
+    payment.isPayable,
   );
 
   const submit = useMutation({
-    mutationFn: async () =>
-      createMillingServiceDocument({
+    mutationFn: async () => {
+      // The shared payment rules are also the server's rules — block here with
+      // the same sentence instead of letting the RPC fail with a raw error.
+      if (!payment.isPayable) {
+        throw new Error(payment.blockingReason ?? "بيانات الدفع غير صالحة.");
+      }
+      return createMillingServiceDocument({
         customerId,
         warehouseId,
         grainItemId: itemId,
@@ -340,9 +347,10 @@ function MillingIntakePage() {
         serviceUnitPrice: currentSubtotal,
         discount: currentDiscount,
         paymentMethod: toLegacyPaymentValue(paymentMethod),
-        paid: isCredit ? 0 : Number(paid) || 0,
+        paid: currentPaid,
         notes: notes.trim() || undefined,
-      }),
+      });
+    },
     onSuccess: async (res) => {
       if (!res.ok) {
         toast.error(res.message || "تعذر تسجيل الاستلام.");
@@ -509,7 +517,7 @@ function MillingIntakePage() {
         )}
 
         {/* الكاونتر الرئيسي: شبكة استلام وحبوب (يمين) + سلة فواتير ودفع كاشير (يسار) */}
-        <div className="grid gap-4 lg:grid-cols-12">
+        <div ref={formScopeRef} data-form-nav-scope className="grid gap-4 lg:grid-cols-12">
           {/* الجانب الأيمن: بيانات الاستلام وحبوب العميل (7 أعمدة) */}
           <MillingPanel className="lg:col-span-7">
             <MillingSectionTitle
@@ -526,6 +534,7 @@ function MillingIntakePage() {
                     <MillingSelect
                       value={customerId}
                       onChange={(e) => setCustomerId(e.target.value)}
+                      autoFocus
                       className="flex-1 font-medium"
                     >
                       <option value="">اختر العميل…</option>
@@ -880,129 +889,21 @@ function MillingIntakePage() {
                   </div>
                 </div>
 
-                {/* طريقة الدفع بنمط الكاشير */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-muted-foreground">
-                      طريقة السداد *
-                    </label>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={handlePayFull}
-                        className="rounded-lg bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20"
-                      >
-                        سداد كامل
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleSetFullCredit}
-                        className="rounded-lg bg-purple-500/10 px-2 py-0.5 text-[11px] font-bold text-purple-700 dark:text-purple-300 hover:bg-purple-500/20"
-                      >
-                        آجل بالكامل
-                      </button>
-                    </div>
-                  </div>
-
-                  <PaymentMethodPicker
-                    context="sales"
-                    value={paymentMethod}
-                    onChange={(method) => {
-                      setPaymentMethod(method);
-                      if (getPaymentMethodDefinition(method)?.isCreditTerm) {
-                        setPaid("");
-                      }
-                    }}
-                    ensureIds={[paymentMethod]}
-                    ariaLabel="طريقة دفع فاتورة الاستلام"
-                  />
-                </div>
-
-                {/* المدفوع والمتبقي */}
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-semibold text-muted-foreground">
-                        المبلغ المستلم (المدفوع)
-                      </label>
-                      {!isCredit && grandTotal > 0 && (
-                        <button
-                          type="button"
-                          onClick={handlePayFull}
-                          className="rounded-lg bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20"
-                        >
-                          تعبئة كامل المبلغ
-                        </button>
-                      )}
-                    </div>
-                    <div className="relative">
-                      <MillingInput
-                        type="number"
-                        min={0}
-                        step="1"
-                        disabled={isCredit}
-                        placeholder={isCredit ? "0.00" : "0.00"}
-                        value={isCredit ? "" : paid}
-                        onChange={(e) => setPaid(e.target.value)}
-                        className={`font-bold pe-12 ${
-                          isCredit
-                            ? "cursor-not-allowed opacity-60"
-                            : isOverpaid
-                              ? "border-rose-500 text-rose-600 bg-rose-500/5"
-                              : "text-emerald-600"
-                        }`}
-                      />
-                      <span className="pointer-events-none absolute end-2.5 top-2.5 text-[11px] text-muted-foreground">
-                        {currencySymbol}
-                      </span>
-                    </div>
-                    <span className="text-[11px] text-muted-foreground block">
-                      {isCredit ? "معطّل لأن الطريقة آجلة" : "المبلغ المستلم كاش أو شبكة"}
-                    </span>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-semibold text-muted-foreground">
-                      المتبقي كذمة آجلة
-                    </label>
-                    <div className="flex h-10 w-full items-center justify-between rounded-xl border border-border/80 bg-surface-2/70 px-3">
-                      <span className="text-xs text-muted-foreground">المتبقي:</span>
-                      <span
-                        className={`text-sm font-black tabular-nums ${
-                          remainingDue > 0
-                            ? "text-rose-600 dark:text-rose-400"
-                            : "text-emerald-600 dark:text-emerald-400"
-                        }`}
-                      >
-                        {fmtNum(remainingDue)} {currencySymbol}
-                      </span>
-                    </div>
-                    {remainingDue > 0 && (
-                      <p className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">
-                        {selectedCustomer ? (
-                          <>
-                            سيرحل كذمة رسمية على حساب العميل:{" "}
-                            <strong>{selectedCustomer.name}</strong>
-                          </>
-                        ) : (
-                          "يجب اختيار عميل مسجل لتقييد الذمة الآجلة."
-                        )}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {/* تنبيه الخطأ في حال كان المدفوع أكبر من إجمالي الفاتورة */}
-                {isOverpaid && (
-                  <div className="flex items-center gap-2 rounded-xl bg-rose-500/10 p-3 text-xs font-bold text-rose-600 dark:text-rose-400 border border-rose-500/20">
-                    <AlertCircle className="h-4 w-4 shrink-0" />
-                    <span>
-                      خطأ في الحساب: المبلغ المدفوع ({fmtNum(currentPaid)} {currencySymbol}) أكبر من
-                      صافي الفاتورة المطلوبة ({fmtNum(grandTotal)} {currencySymbol})! يرجى تصحيح
-                      المبلغ للمتابعة.
-                    </span>
-                  </div>
-                )}
+                {/* P1-4: ONE payment block — the same rules as POS and the
+                    sales invoice. The panel owns the method picker, the paid
+                    field, the remaining line and the debt/customer guards. */}
+                <PaymentPanel
+                  context="sales"
+                  total={grandTotal}
+                  method={paymentMethod}
+                  onMethodChange={setPaymentMethod}
+                  paid={paid}
+                  onPaidChange={setPaid}
+                  customerId={customerId}
+                  customers={customerList}
+                  currency={currencySymbol}
+                  autoMethod
+                />
               </div>
             </div>
 

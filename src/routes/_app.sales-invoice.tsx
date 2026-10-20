@@ -70,12 +70,9 @@ import {
   type ServiceLineInput,
 } from "@/lib/sales-invoice";
 import { MILLING_BAG_SIZES } from "@/components/milling/milling-terms-fields";
-import { PaymentMethodPicker } from "@/components/ui/payment-method";
-import {
-  getPaymentMethodDefinition,
-  paymentMethodLabel,
-  toLegacyPaymentValue,
-} from "@/lib/payments/payment-methods";
+import { PaymentPanel, usePaymentPanel } from "@/components/payments/payment-panel";
+import { useFormNavigationScope } from "@/hooks/use-form-navigation";
+import { paymentMethodLabel, toLegacyPaymentValue } from "@/lib/payments/payment-methods";
 
 export const Route = createFileRoute("/_app/sales-invoice")({
   head: () => ({ meta: [{ title: "فاتورة المبيعات — فورتيكس ERP" }] }),
@@ -157,6 +154,8 @@ interface Customer {
   phone?: string | null;
   balance?: number;
   credit_limit?: number;
+  /** P1-6: the seeded cash customer, which must never carry debt. */
+  is_system?: boolean | null;
 }
 
 interface PosCartLine {
@@ -234,6 +233,12 @@ function SalesInvoicePage() {
   //
   const [paymentMethod, setPaymentMethod] = useState<string>("cash");
   const [paid, setPaid] = useState("");
+  const [paymentReference, setPaymentReference] = useState("");
+
+  // Keyboard-only operation: arrows/Enter walk the payment block in order
+  // (customer → warehouse → method → reference → paid → discount → note),
+  // so a counter never needs a mouse. See src/lib/keyboard/form-navigation.ts.
+  const paymentScopeRef = useFormNavigationScope<HTMLDivElement>();
   const [discount, setDiscount] = useState("");
   const [note, setNote] = useState("");
 
@@ -265,7 +270,7 @@ function SalesInvoicePage() {
         supabase.from("warehouses").select("id,name,name_ar").eq("is_active", true).order("name"),
         supabase
           .from("customers")
-          .select("id,name,phone,balance,credit_limit")
+          .select("id,name,phone,balance,credit_limit,is_system")
           .eq("is_active", true)
           .order("name"),
       ]);
@@ -451,9 +456,15 @@ function SalesInvoicePage() {
   );
   const discountN = Math.max(0, Number(discount) || 0);
   const total = Math.max(0, Math.round((subtotal - discountN) * 100) / 100);
-  const effectivePaid =
-    paymentMethod === "credit" ? 0 : Math.max(0, Math.min(Number(paid) || 0, total));
-  const remaining = Math.max(0, Math.round((total - effectivePaid) * 100) / 100);
+
+  // P1-4: the payment arithmetic is the shared panel's, not this screen's.
+  const payment = usePaymentPanel({
+    total,
+    state: { method: paymentMethod, paidRaw: paid, customerId },
+    customers,
+  });
+  const effectivePaid = payment.paid;
+  const remaining = payment.remaining;
 
   /* ------------------------------------------------------------ submit */
 
@@ -487,6 +498,11 @@ function SalesInvoicePage() {
           : "Select a customer so the unpaid balance can be recorded as debt",
       );
     }
+    // The panel's rules (overpaid, debt on the cash customer, credit limit) are
+    // the same ones the server enforces — fail here with the same sentence.
+    if (!payment.isPayable) {
+      return toast.error(payment.blockingReason ?? (isRtl ? "بيانات دفع غير صالحة" : "Invalid payment"));
+    }
 
     setSubmitting(true);
     try {
@@ -499,7 +515,15 @@ function SalesInvoicePage() {
         // On a ticket the negotiated terms belong on the document, not only on
         // the line, so the receipt the customer keeps can be re-read later.
         note:
-          [mode === "ticket" ? ticketDetail : "", note].filter(Boolean).join(" — ") || undefined,
+          [
+            mode === "ticket" ? ticketDetail : "",
+            paymentReference.trim()
+              ? `${isRtl ? "مرجع الحوالة" : "Transfer ref"}: ${paymentReference.trim()}`
+              : "",
+            note,
+          ]
+            .filter(Boolean)
+            .join(" — ") || undefined,
         lines,
       });
 
@@ -578,6 +602,7 @@ function SalesInvoicePage() {
       setPaid("");
       setDiscount("");
       setNote("");
+      setPaymentReference("");
       setSearch("");
     } catch (err: any) {
       toast.error(
@@ -782,6 +807,7 @@ function SalesInvoicePage() {
                 <Field label={isRtl ? "العميل المسجّل" : "Registered customer"} required>
                   <select
                     value={ticket.customerId}
+                    data-form-nav
                     onChange={(e) => {
                       const c = customers.find((x) => x.id === e.target.value);
                       setT("customerId", e.target.value);
@@ -989,12 +1015,17 @@ function SalesInvoicePage() {
 
         {/* ----------------------------------------------------- right pane */}
         <div className="order-1 space-y-4 lg:order-2 lg:sticky lg:top-4">
-          <div className="panel-elevated space-y-3 rounded-2xl border border-border/80 bg-surface/90 p-4">
+          <div
+            ref={paymentScopeRef}
+            data-form-nav-scope
+            className="panel-elevated space-y-3 rounded-2xl border border-border/80 bg-surface/90 p-4"
+          >
             {hasMultiWarehouse && warehouses.length > 1 && (
               <Field label={t("common.warehouse")} icon={<WarehouseIcon className="h-3.5 w-3.5" />}>
                 <select
                   value={warehouseId}
                   onChange={(e) => setWarehouseId(e.target.value)}
+                  data-form-nav
                   className={inputClass}
                 >
                   {warehouses.map((w) => (
@@ -1216,25 +1247,23 @@ function SalesInvoicePage() {
             <div className="h-px bg-border" />
 
             <div className="space-y-2">
-              <Field label={isRtl ? "طريقة السداد" : "Payment method"}>
-                {/*
-                  The sales invoice form has its own context, so a business can
-                  offer a different set here than at the till. The picker returns
-                  a catalogue id; toLegacyPaymentValue converts it to the value
-                  the RPC expects.
-                */}
-                <PaymentMethodPicker
-                  context="sales"
-                  value={paymentMethod}
-                  onChange={(method) => {
-                    setPaymentMethod(method);
-                    const definition = getPaymentMethodDefinition(method);
-                    if (definition?.isCreditTerm) setPaid("0");
-                  }}
-                  ensureIds={[paymentMethod]}
-                  ariaLabel={isRtl ? "طريقة السداد" : "Payment method"}
-                />
-              </Field>
+              {/*
+                P1-4: ONE payment block for POS, sales and milling. The panel
+                owns the method picker, the paid field, the remaining line and
+                the debt/customer rules; this screen only places it.
+              */}
+              <PaymentPanel
+                context="sales"
+                total={total}
+                method={paymentMethod}
+                onMethodChange={setPaymentMethod}
+                paid={paid}
+                onPaidChange={setPaid}
+                customerId={customerId}
+                customers={customers}
+                reference={paymentReference}
+                onReferenceChange={setPaymentReference}
+              />
 
               <div className="grid grid-cols-2 gap-2">
                 <Field label={t("common.discount")}>
@@ -1244,32 +1273,21 @@ function SalesInvoicePage() {
                     step="0.01"
                     value={discount}
                     onChange={(e) => setDiscount(e.target.value)}
+                    data-form-nav
                     className={inputClass}
                     placeholder="0.00"
                   />
                 </Field>
-                <Field label={t("common.paid")}>
+                <Field label={t("common.note")}>
                   <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={paymentMethod === "credit" ? "0" : paid}
-                    disabled={paymentMethod === "credit"}
-                    onChange={(e) => setPaid(e.target.value)}
-                    className={`${inputClass} disabled:opacity-60`}
-                    placeholder="0.00"
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    data-form-nav
+                    className={inputClass}
+                    placeholder={isRtl ? "ملاحظة على الفاتورة" : "Invoice note"}
                   />
                 </Field>
               </div>
-
-              <Field label={t("common.note")}>
-                <input
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  className={inputClass}
-                  placeholder={isRtl ? "ملاحظة على الفاتورة" : "Invoice note"}
-                />
-              </Field>
             </div>
 
             <div className="h-px bg-border" />
