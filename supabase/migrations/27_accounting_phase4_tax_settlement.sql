@@ -66,6 +66,17 @@ BEGIN
     RAISE EXCEPTION 'Not authenticated';
   END IF;
 
+  -- ⚠️ الكتالوج يدعوها من الواجهة بوسيطَين، ونمررهما NULL أحيانًا عند الاستعلام
+  --    الحر. بلا هذا الفحص يرجع مجموعًا صفريًا صامتًا (مضلّل)، فيُرفض صراحةً.
+  IF p_start_date IS NULL OR p_end_date IS NULL THEN
+    RAISE EXCEPTION 'Tax declaration needs both start_date and end_date'
+      USING ERRCODE = '22023';
+  END IF;
+  IF p_end_date < p_start_date THEN
+    RAISE EXCEPTION 'Tax declaration end_date (%) is before start_date (%)', p_end_date, p_start_date
+      USING ERRCODE = '22023';
+  END IF;
+
   -- 1) ضريبة المخرجات من القيود المرحلة لحساب 2311 (رصيد دائن)
   SELECT coalesce(sum(jl.credit - jl.debit), 0)
     INTO v_output_tax
@@ -89,18 +100,28 @@ BEGIN
      AND je.entry_date BETWEEN p_start_date AND p_end_date;
 
   -- 3) إجمالي مبيعات الفترة الخاضعة للضريبة من الفواتير
+  --
+  -- ⚠️ الفاتورة لا تحمل عمود تاريخ مستقل: تاريخها التشغيلي هو created_at
+  --    (الترحيل يعتمد عليه، وقوائم التقارير كذلك — راجع 12_reporting_views).
+  --    أُصلح هنا بعد أن كان الاستعلام يقرأ invoice_date غير الموجود فيرمي
+  --    42703 «column invoice_date does not exist» عند كل استدعاء للإقرار
+  --    الضريبي وتسوية الفترة — أي أن الوحدة كانت معطّلة بالكامل.
+  --    النطاق الزمني [start, end] شامل: نقارن نصف مفتوح (<= نهاية اليوم) حتى
+  --    لا تسقط فواتير آخر يوم بعد منتصف الليل.
   SELECT coalesce(sum(subtotal), 0)
     INTO v_sales_taxable
     FROM public.sales_invoices
     WHERE status = 'confirmed'
-      AND invoice_date BETWEEN p_start_date AND p_end_date;
+      AND created_at >= p_start_date
+      AND created_at <  p_end_date + 1;
 
   -- 4) إجمالي مشتريات الفترة من الفواتير
   SELECT coalesce(sum(subtotal), 0)
     INTO v_purch_taxable
     FROM public.purchase_invoices
     WHERE status = 'confirmed'
-      AND invoice_date BETWEEN p_start_date AND p_end_date;
+      AND created_at >= p_start_date
+      AND created_at <  p_end_date + 1;
 
   v_net_tax := v_output_tax - v_input_tax;
 
@@ -145,6 +166,17 @@ DECLARE
 BEGIN
   IF v_user IS NULL THEN
     RAISE EXCEPTION 'Not authenticated';
+  END IF;
+
+  -- ⚠️ لا تسوية بلا نطاق وسياق: رفض صريح بدل قيد تسوية صفري كاذب.
+  IF p_start_date IS NULL OR p_end_date IS NULL
+     OR nullif(btrim(coalesce(p_period_number, '')), '') IS NULL THEN
+    RAISE EXCEPTION 'Tax settlement requires start_date, end_date and period_number'
+      USING ERRCODE = '22023';
+  END IF;
+  IF p_end_date < p_start_date THEN
+    RAISE EXCEPTION 'Tax settlement end_date (%) is before start_date (%)', p_end_date, p_start_date
+      USING ERRCODE = '22023';
   END IF;
 
   IF NOT (public.has_role(v_user, 'owner')

@@ -48,11 +48,7 @@ const store = new Map<string, string>();
 clearCompanyProfileCache();
 const empty = getCachedCompanyProfile();
 check("empty cache returns the default profile", empty.name === DEFAULT_COMPANY_PROFILE.name);
-check(
-  "default profile carries both support numbers",
-  empty.footerContact === "784795104 · 772217218",
-);
-check("default contacts include 784795104", empty.contacts.includes("784795104"));
+check("empty profile has no invented contact numbers", empty.contacts.length === 0);
 
 // كتابة صف كامل من قاعدة البيانات
 const row = {
@@ -65,7 +61,7 @@ const row = {
   email: "info@alnoor.ye",
   tax_number: "300123456700003",
   logo_url: "/logo.png",
-  footer_text: "شكرًا لتعاملكم معنا",
+  footer_text: "legacy footer text must not be loaded",
   footer_contact: "784795104 · 772217218",
   currency_symbol: "ر.ي",
 };
@@ -78,7 +74,8 @@ check("cacheCompanyProfile keeps email", cached.email === "info@alnoor.ye");
 check("cacheCompanyProfile keeps address", cached.address === "صنعاء - شارع تعز");
 check("cacheCompanyProfile keeps tax number", cached.taxNumber === "300123456700003");
 check("cacheCompanyProfile keeps logo", cached.logoUrl === "/logo.png");
-check("cacheCompanyProfile keeps footer contact", cached.footerContact === "784795104 · 772217218");
+check("legacy footer contact is not loaded into the profile", cached.footerContact === undefined);
+check("legacy footer text is not loaded into the profile", cached.footerText === undefined);
 check("cacheCompanyProfile keeps currency", cached.currency === "ر.ي");
 
 // القراءة اللاحقة ترى نفس البيانات (نفس المصدر)
@@ -96,12 +93,9 @@ check("patch is visible on the next read", getCachedCompanyProfile().currency ==
 /* ───────────────────────── 3. Fallbacks ───────────────────────────────── */
 
 // صف فارغ تمامًا
+clearCompanyProfileCache();
 const blank = cacheCompanyProfile({});
-check("blank row falls back to a usable name", Boolean(blank.name && blank.name.length > 0));
-check(
-  "blank row still exposes the support numbers",
-  blank.footerContact === "784795104 · 772217218",
-);
+check("blank profile does not invent contact numbers", blank.contacts.length === 0);
 check("blank row does not throw on contacts", Array.isArray(blank.contacts));
 
 // قيم null/undefined لا تُنتج "null" نصيًا
@@ -115,10 +109,7 @@ const nullish = cacheCompanyProfile({
 check("null name falls back instead of rendering 'null'", !String(nullish.name).includes("null"));
 check("null phone becomes undefined", nullish.phone === undefined);
 check("null email becomes undefined", nullish.email === undefined);
-check(
-  "null footer_contact falls back to support numbers",
-  nullish.footerContact === "784795104 · 772217218",
-);
+check("null footer_contact does not create a fallback", nullish.footerContact === undefined);
 
 // مسح الكاش
 clearCompanyProfileCache();
@@ -151,26 +142,20 @@ check(
   unifiedHtml.includes("شركة النور للتجارة"),
 );
 check("unified layout renders the company address", unifiedHtml.includes("صنعاء - شارع تعز"));
-check(
-  "unified layout renders the support numbers in the footer",
-  unifiedHtml.includes("784795104"),
-);
-check(
-  "unified layout has the universal footer element",
-  unifiedHtml.includes('class="universal-footer"'),
-);
+check("unified layout omits fixed support contacts", !unifiedHtml.includes("784795104"));
+check("unified layout omits the removed universal footer", !unifiedHtml.includes('class="universal-footer"'));
 
 // القالب الرسمي
 const formalHtml = renderFormalTemplate(baseDoc as never, getDefaultArabicLabels(), true);
 check("formal template uses Company Profile", formalHtml.includes("شركة النور للتجارة"));
-check("formal template has the universal footer", formalHtml.includes('class="universal-footer"'));
+check("formal template omits the removed universal footer", !formalHtml.includes('class="universal-footer"'));
 
 // المapper الحراري ESC/POS
 const escposDoc = renderThermalEscPos(request());
 const escposText = escposDoc.blocks.map((b) => b.text).join("\n");
 check("ESC/POS mapper uses Company Profile name", escposText.includes("شركة النور للتجارة"));
 check("ESC/POS mapper uses Company Profile address", escposText.includes("صنعاء - شارع تعز"));
-check("ESC/POS mapper uses Company Profile footer contact", escposText.includes("784795104"));
+check("ESC/POS mapper omits fixed support contacts", !escposText.includes("784795104"));
 check(
   "ESC/POS mapper prints the tax number from Company Profile",
   escposText.includes("300123456700003"),
@@ -191,7 +176,7 @@ const afterEscpos = renderThermalEscPos(request())
   .blocks.map((b) => b.text)
   .join("\n");
 check("changing the name propagates to ESC/POS", afterEscpos.includes("منشأة الأمانة"));
-check("changing the footer contact propagates to ESC/POS", afterEscpos.includes("711111111"));
+check("legacy footer contact is not printed by ESC/POS", !afterEscpos.includes("711111111"));
 
 /* ─────────────── 5. No direct cache reads outside the accessor ──────────── */
 

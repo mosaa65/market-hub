@@ -129,7 +129,8 @@ ON CONFLICT (id) DO NOTHING;
 WITH seed(user_id, email, phone) AS (VALUES
   ('a0000000-0000-4000-a000-000000000001'::uuid, 'mousa.mc13@gmail.com',     '+967772217218'),
   ('a0000000-0000-4000-a000-000000000002'::uuid, 'shoeabvv@gmail.com',       '+967772317950'),
-  ('a0000000-0000-4000-a000-000000000003'::uuid, 'emadfasill2001@gmail.com', '+967784795104')
+  ('a0000000-0000-4000-a000-000000000003'::uuid, 'emadfasill2001@gmail.com', '+967784795104'),
+  ('a0000000-0000-4000-a000-000000000004'::uuid, 'ahmedhetar15@gmail.com',   '+967779121636')
 )
 INSERT INTO auth.identities (
   id, user_id, provider_id, provider,
@@ -171,7 +172,8 @@ ON CONFLICT (provider, provider_id) DO NOTHING;
 WITH seed(user_id) AS (VALUES
   ('a0000000-0000-4000-a000-000000000001'::uuid),
   ('a0000000-0000-4000-a000-000000000002'::uuid),
-  ('a0000000-0000-4000-a000-000000000003'::uuid)
+  ('a0000000-0000-4000-a000-000000000003'::uuid),
+  ('a0000000-0000-4000-a000-000000000004'::uuid)
 )
 INSERT INTO auth.identities (
   id, user_id, provider_id, provider,
@@ -206,7 +208,8 @@ ON CONFLICT (provider, provider_id) DO NOTHING;
 WITH seed(user_id, full_name, phone) AS (VALUES
   ('a0000000-0000-4000-a000-000000000001'::uuid, 'موسى العواضي',  '+967772217218'),
   ('a0000000-0000-4000-a000-000000000002'::uuid, 'يونس العفيف',   '+967772317950'),
-  ('a0000000-0000-4000-a000-000000000003'::uuid, 'عماد الجماعي', '+967784795104')
+  ('a0000000-0000-4000-a000-000000000003'::uuid, 'عماد الجماعي', '+967784795104'),
+  ('a0000000-0000-4000-a000-000000000004'::uuid, 'أحمد الهتار',   '+967779121636')
 )
 INSERT INTO public.profiles (id, full_name, phone, language, theme, is_active)
 SELECT s.user_id, s.full_name, s.phone, 'ar', 'dark', true
@@ -223,7 +226,8 @@ ON CONFLICT (id) DO UPDATE
 WITH seed(user_id, role, mfa_required) AS (VALUES
   ('a0000000-0000-4000-a000-000000000001'::uuid, 'superadmin', false),
   ('a0000000-0000-4000-a000-000000000002'::uuid, 'superadmin', false),
-  ('a0000000-0000-4000-a000-000000000003'::uuid, 'support',    false)
+  ('a0000000-0000-4000-a000-000000000003'::uuid, 'support',    false),
+  ('a0000000-0000-4000-a000-000000000004'::uuid, 'superadmin', false)
 )
 INSERT INTO public.platform_admins (user_id, role, is_active, mfa_required)
 SELECT s.user_id, s.role, true, s.mfa_required
@@ -267,7 +271,8 @@ DECLARE
   v_expected uuid[] := ARRAY[
     'a0000000-0000-4000-a000-000000000001'::uuid,
     'a0000000-0000-4000-a000-000000000002'::uuid,
-    'a0000000-0000-4000-a000-000000000003'::uuid
+    'a0000000-0000-4000-a000-000000000003'::uuid,
+    'a0000000-0000-4000-a000-000000000004'::uuid
   ];
   v_id uuid;
 BEGIN
@@ -286,7 +291,7 @@ BEGIN
                    WHERE i.user_id = v_id AND i.provider = 'phone')
     THEN
       RAISE EXCEPTION
-        'حساب منصة لم يكتمل بناؤه (%) — ناقص في auth.users أو هوية البريد أو هوية الهاتف أو profiles أو platform_admins',
+        'حساب منصة لم يكتمل بناؤه (%) — ناقص في auth.users أو هوية البريد أو هوية الهاتف أو profiles أو platform_admins أو user_roles',
         v_id;
     END IF;
   END LOOP;

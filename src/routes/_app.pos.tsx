@@ -33,7 +33,6 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  posOfflineService,
   productsRepo,
   warehousesRepo,
   customersRepo,
@@ -68,6 +67,7 @@ import { printInvoice, type InvoiceTemplate } from "@/lib/invoice-print";
 import type { InvoiceDoc } from "@/lib/pdf";
 import { OperationSuccessModal } from "@/components/communication";
 import type { CustomerContext, InvoiceContext } from "@/lib/communication";
+import { translateRpcError } from "@/lib/errors/rpc-errors";
 
 export const Route = createFileRoute("/_app/pos")({
   head: () => ({ meta: [{ title: "نقطة البيع — فورتيكس ERP" }] }),
@@ -1250,97 +1250,58 @@ function POSPage() {
       let invoiceId: string;
       let invoiceNumber: string;
 
-      const isOfflineMode = typeof navigator !== "undefined" && !navigator.onLine;
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        throw new Error(
+          lang === "ar"
+            ? "نقطة البيع تحتاج اتصالاً لإصدار فاتورة رسمية. لم يُحفظ أي بيع محلياً."
+            : "POS requires a connection to issue an official invoice. No local sale was saved.",
+        );
+      }
 
-      if (isOfflineMode) {
-        const offlineResult = await posOfflineService.processOfflineSale({
-          warehouse_id: warehouseId,
-          customer_id: customerId || null,
-          items: cart.map((l) => ({
+      try {
+        const { data, error } = await supabase.rpc("create_sale", {
+          _warehouse_id: warehouseId,
+          _customer_id: (customerId || null) as any,
+          _payment_method: finalMethod as any,
+          _paid: Math.min(Math.max(effectivePaid, 0), total),
+          _discount: discountN,
+          _note: finalNote as any,
+          _sale_date: saleDate,
+          _payment_splits: paymentSplits as any,
+          _items: cart.map((l) => ({
             product_id: l.product_id,
-            product_name: l.name,
             quantity: l.quantity,
             unit_price: l.unit_price,
-            subtotal: l.quantity * l.unit_price,
+            tax_rate: l.tax_rate,
+            is_service: !!l.is_service,
+            name: l.name,
           })),
-          subtotal,
-          discount: discountN,
-          tax: taxTotal,
-          total,
-          paid: Math.min(Math.max(effectivePaid, 0), total),
-          payment_method: finalMethod as any,
-          notes: finalNote as any,
         });
-        invoiceId = offlineResult.invoice_id;
-        invoiceNumber = offlineResult.local_document_ref;
+        if (error) throw error;
+        invoiceId = data as string;
+        const { data: inv } = await supabase
+          .from("sales_invoices")
+          .select("invoice_number")
+          .eq("id", invoiceId)
+          .maybeSingle();
+        invoiceNumber = inv?.invoice_number ?? invoiceId.slice(0, 8);
         setLastInvoice({ id: invoiceId, number: invoiceNumber });
         toast.success(
           lang === "ar"
-            ? `تم حفظ الفاتورة محلياً (Offline) — مرجع #${invoiceNumber}`
-            : `Invoice saved offline — Ref #${invoiceNumber}`,
+            ? `تمت عملية البيع بنجاح — فاتورة #${invoiceNumber}`
+            : `${t("pos.sale_complete")} — #${invoiceNumber}`,
         );
-      } else {
-        try {
-          const { data, error } = await supabase.rpc("create_sale", {
-            _warehouse_id: warehouseId,
-            _customer_id: (customerId || null) as any,
-            _payment_method: finalMethod as any,
-            _paid: Math.min(Math.max(effectivePaid, 0), total),
-            _discount: discountN,
-            _note: finalNote as any,
-            _sale_date: saleDate,
-            _payment_splits: paymentSplits as any,
-            _items: cart.map((l) => ({
-              product_id: l.product_id,
-              quantity: l.quantity,
-              unit_price: l.unit_price,
-              tax_rate: l.tax_rate,
-              is_service: !!l.is_service,
-              name: l.name,
-            })),
-          });
-          if (error) throw error;
-          invoiceId = data as string;
-          const { data: inv } = await supabase
-            .from("sales_invoices")
-            .select("invoice_number")
-            .eq("id", invoiceId)
-            .maybeSingle();
-          invoiceNumber = inv?.invoice_number ?? invoiceId.slice(0, 8);
-          setLastInvoice({ id: invoiceId, number: invoiceNumber });
-          toast.success(
+      } catch (netErr: any) {
+        // P1-4: كل خطأ من RPC يمر بطبقة الترجمة الموحدة قبل أن يراه الكاشير.
+        throw new Error(
+          translateRpcError(
+            netErr,
+            lang === "ar" ? "ar" : "en",
             lang === "ar"
-              ? `تمت عملية البيع بنجاح — فاتورة #${invoiceNumber}`
-              : `${t("pos.sale_complete")} — #${invoiceNumber}`,
-          );
-        } catch (netErr: any) {
-          const offlineResult = await posOfflineService.processOfflineSale({
-            warehouse_id: warehouseId,
-            customer_id: customerId || null,
-            items: cart.map((l) => ({
-              product_id: l.product_id,
-              product_name: l.name,
-              quantity: l.quantity,
-              unit_price: l.unit_price,
-              subtotal: l.quantity * l.unit_price,
-            })),
-            subtotal,
-            discount: discountN,
-            tax: taxTotal,
-            total,
-            paid: Math.min(Math.max(effectivePaid, 0), total),
-            payment_method: finalMethod as any,
-            notes: finalNote as any,
-          });
-          invoiceId = offlineResult.invoice_id;
-          invoiceNumber = offlineResult.local_document_ref;
-          setLastInvoice({ id: invoiceId, number: invoiceNumber });
-          toast.success(
-            lang === "ar"
-              ? `تعذر الاتصال بالخادم، تم حفظ الفاتورة محلياً — مرجع #${invoiceNumber}`
-              : `Connection error, saved offline — Ref #${invoiceNumber}`,
-          );
-        }
+              ? "تعذر إصدار الفاتورة. لم يُحفظ أو يُخصم أي بيع محلياً."
+              : "Could not issue the invoice. No local sale was saved or deducted.",
+          ),
+        );
       }
 
       // Build invoice doc for printing

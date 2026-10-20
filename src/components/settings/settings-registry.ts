@@ -11,6 +11,7 @@ import {
   Scale,
   CreditCard,
   Boxes,
+  PanelLeft,
   LucideIcon,
 } from "lucide-react";
 import { CompanySection } from "./sections/company-section";
@@ -24,6 +25,7 @@ import { AppearanceSection } from "./sections/appearance-section";
 import { NumberFormatSection } from "./sections/number-format-section";
 import { PaymentMethodsSection } from "./sections/payment-methods-section";
 import { BackupSettingsCard } from "@/components/backup-settings-card";
+import { SidebarNavigationSection } from "./sections/sidebar-navigation-section";
 
 export type SettingsSectionId =
   | "company"
@@ -177,4 +179,14 @@ registerSettingsSection({
   descriptionEn: "Interface language and layout direction",
   icon: Languages,
   component: AppearanceSection,
+});
+
+registerSettingsSection({
+  id: "sidebar-navigation",
+  titleAr: "تخصيص القائمة الجانبية",
+  titleEn: "Sidebar Navigation",
+  descriptionAr: "طريقة التنقل وشكل الأيقونات وألوان مجموعات القائمة",
+  descriptionEn: "Navigation mode, icon shapes, and sidebar group colors",
+  icon: PanelLeft,
+  component: SidebarNavigationSection,
 });

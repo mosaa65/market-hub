@@ -18,6 +18,7 @@
     "test:report-pilot": "npx tsx src/lib/reports/__tests__/pilot-execution.test.ts",
     "test:report-export-engine": "npx tsx src/lib/reports/__tests__/export-engine.test.ts",
     "test:route-registry": "npx tsx src/lib/navigation/__tests__/route-registry.test.ts",
+    "test:sidebar-views": "npx tsx --tsconfig tsconfig.json src/lib/navigation/__tests__/sidebar-views.test.ts",
     "test:unified-printing": "npx tsx src/lib/printing/__tests__/unified-printing.test.ts",
     "test:transports": "npx tsx src/lib/printing/__tests__/transports.test.ts",
     "test:company-profile": "npx tsx src/lib/printing/__tests__/company-profile.test.ts",

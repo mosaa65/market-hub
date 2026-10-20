@@ -347,6 +347,17 @@ DECLARE
   v_existing RECORD;
   v_result JSONB;
 BEGIN
+  -- ⚠️ المدخلات إلزامية: بلا هذا الفحص كان NULL يمر إلى idempotency_key
+  --    (NOT NULL) فيظهر الخطأ كـ «null value in column ... violates not-null
+  --    constraint» ملفوفًا برسالة غير مفهومة بدل رفض واضح للمدخل.
+  IF nullif(btrim(coalesce(p_idempotency_key, '')), '') IS NULL
+     OR nullif(btrim(coalesce(p_entity_name, '')), '') IS NULL
+     OR nullif(btrim(coalesce(p_operation_type, '')), '') IS NULL
+     OR nullif(btrim(coalesce(p_origin_device_id, '')), '') IS NULL THEN
+    RAISE EXCEPTION 'Sync operation requires idempotency_key, entity_name, operation_type and origin_device_id'
+      USING ERRCODE = '22023';
+  END IF;
+
   -- 1. Check if idempotency key exists
   SELECT * INTO v_existing
   FROM public.sync_idempotency_keys

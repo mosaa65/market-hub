@@ -111,7 +111,10 @@ export function CustomerFormDialog({
 
   if (!open) return null;
 
-  const isLockedCashCustomer = Boolean(edit.id && isSystemCashCustomerName(initial?.name));
+  const isLockedCashCustomer = Boolean(
+    (edit.id && (edit as { is_system?: boolean }).is_system) ||
+      (edit.id && isSystemCashCustomerName(initial?.name)),
+  );
 
   async function save() {
     if (saving) return;

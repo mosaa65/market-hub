@@ -177,35 +177,26 @@ export function DirectStockInDialog({
 
     setSaving(true);
     try {
-      // 1. Update/Upsert the inventory table with the NEW Total Quantity (current + incoming)
-      const { error: invErr } = await supabase.from("inventory").upsert(
-        {
-          product_id: selectedProductId,
-          warehouse_id: selectedWarehouseId,
-          quantity: newTotalQty,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "product_id,warehouse_id" },
-      );
-
-      if (invErr) throw invErr;
-
-      // 2. Log the stock movement as 'purchase' (incoming stock receipt)
+      // P0-3: الكمية والقيمة تُكتبان من المحرّك وحده. الكتابة المباشرة على
+      // inventory/stock_movements كانت تحدّث الكمية دون أي تقييم فتغيب عن COGS.
       const noteText = note.trim()
         ? note.trim()
         : isAr
           ? "توريد مخزني مباشر (إدخال كمية)"
           : "Direct stock receipt";
 
-      const { error: mvErr } = await supabase.from("stock_movements").insert({
-        product_id: selectedProductId,
-        warehouse_id: selectedWarehouseId,
-        movement_type: "purchase",
-        quantity: incomingQty,
-        unit_cost: Number(unitCostStr) || 0,
-        reference: reference.trim() || null,
-        note: noteText,
-        created_by: user?.id ?? null,
+      const { error: mvErr } = await supabase.rpc("post_stock_delta", {
+        p_product_id: selectedProductId,
+        p_warehouse_id: selectedWarehouseId,
+        p_signed_qty: incomingQty,
+        p_unit_cost: Number(unitCostStr) || 0,
+        p_movement_kind: "RECEIPT",
+        p_source_type: "direct_stock_in",
+        p_source_id: crypto.randomUUID(),
+        p_note: noteText,
+        p_owner_type: "COMPANY",
+        p_owner_id: null,
+        p_movement_type_legacy: "adjustment",
       } as any);
 
       if (mvErr) throw mvErr;

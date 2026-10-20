@@ -16,7 +16,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { toast } from "sonner";
-import { InamaSoftFooter } from "@/components/inama-soft-footer";
 import { Button } from "@/components/ui/button";
 import { CountrySelector } from "@/components/country-selector";
 import { DEFAULT_COUNTRY, Country } from "@/lib/country-data";
@@ -529,9 +528,6 @@ function AuthPage() {
         </div>
       </main>
 
-      <footer className="relative z-10 w-full">
-        <InamaSoftFooter className="border-t border-border/70 bg-surface/80 text-muted-foreground backdrop-blur-md" />
-      </footer>
     </div>
   );
 }

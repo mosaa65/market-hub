@@ -53,6 +53,7 @@ import {
   Sparkles,
   Crown,
   HardDriveDownload,
+  PanelLeft,
   type LucideIcon,
 } from "lucide-react";
 
@@ -126,6 +127,7 @@ const ICONS: Record<string, LucideIcon> = {
   "appearance-settings": Palette,
   "catalog-settings": PackageSearch,
   "backup-settings": HardDriveDownload,
+  "sidebar-navigation-settings": PanelLeft,
 };
 
 export function routeIcon(id: string): LucideIcon {

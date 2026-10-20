@@ -57,6 +57,7 @@ import { toSystemDigits } from "@/lib/format-preferences";
 import { toast } from "sonner";
 import { printInvoice, type InvoiceTemplate } from "@/lib/invoice-print";
 import type { InvoiceDoc } from "@/lib/pdf";
+import { translateRpcError } from "@/lib/errors/rpc-errors";
 import { OperationSuccessModal } from "@/components/communication";
 import { LuxuryPrintPreviewModal } from "@/components/luxury-print-preview-modal";
 import {
@@ -579,7 +580,13 @@ function SalesInvoicePage() {
       setNote("");
       setSearch("");
     } catch (err: any) {
-      toast.error(err.message ?? (isRtl ? "تعذّر إصدار الفاتورة" : "Failed to post invoice"));
+      toast.error(
+        translateRpcError(
+          err,
+          isRtl ? "ar" : "en",
+          isRtl ? "تعذّر إصدار الفاتورة" : "Failed to post invoice",
+        ),
+      );
     } finally {
       setSubmitting(false);
     }

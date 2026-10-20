@@ -107,7 +107,7 @@ export function DocumentNumberingCard({ isAr, canEdit }: DocumentNumberingCardPr
         p_date_part: row.date_part,
         p_separator: row.separator,
         p_reset_policy: row.reset_policy,
-        p_next_value: nextValue ?? null,
+        p_next_value: nextValue ?? undefined,
       });
       setSavingType(null);
 

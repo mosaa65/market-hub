@@ -494,6 +494,9 @@ function CustomersPage() {
 
   const filtered = useMemo(() => {
     let list = rows.filter((r) => {
+      // P1-6: الكيان النظامي (العميل النقدي) ليس عميلاً تجارياً — لا يظهر
+      // في الدليل، ويُختار تلقائياً فقط في نقطة البيع.
+      if ((r as { is_system?: boolean }).is_system) return false;
       // Search match
       if (search.trim()) {
         const q = search.trim().toLowerCase();

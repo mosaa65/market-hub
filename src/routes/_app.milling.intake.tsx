@@ -72,6 +72,7 @@ import {
   fmtNum,
 } from "@/components/milling/milling-ui";
 import { getCompanyCurrencySymbol } from "@/lib/format";
+import { translateRpcError } from "@/lib/errors/rpc-errors";
 import type { UnifiedDocumentData } from "@/lib/templates/types";
 
 export const Route = createFileRoute("/_app/milling/intake")({
@@ -359,8 +360,23 @@ function MillingIntakePage() {
             setActiveDetails(details);
             const uDoc = buildMillingDocumentUnifiedDoc(details, "intake");
             setPrintDoc(uDoc);
-            // فتح نافذة المعاينة والطباعة الفاخرة تلقائياً للسرعة
-            setPrintModalOpen(true);
+            // P1-3: الطبع يتبع إعداد الطباعة الموحد (تلقائي / اسأل / إيقاف)
+            // لا قرار ثابت داخل الشاشة. «تلقائي» يطبع مباشرة، و«اسأل» يفتح
+            // المعاينة، و«إيقاف» لا يفتح شيئاً.
+            const { getPrintSettings, printDocument } = await import("@/lib/templates");
+            const settings = getPrintSettings();
+            if (settings.printMode === "auto") {
+              printDocument(
+                uDoc,
+                settings.defaultCustomerTemplate,
+                undefined,
+                true,
+                undefined,
+                settings.defaultCustomerPaperProfile,
+              );
+            } else if (settings.printMode === "ask") {
+              setPrintModalOpen(true);
+            }
           }
         } catch (e) {
           console.error("Failed to load details for printing:", e);
@@ -379,7 +395,7 @@ function MillingIntakePage() {
 
       void qc.invalidateQueries({ queryKey: ["milling"] });
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "خطأ غير متوقع"),
+    onError: (err) => toast.error(translateRpcError(err, "ar", "خطأ غير متوقع")),
   });
 
   // إعادة ضبط الكاونتر لاستلام جديد

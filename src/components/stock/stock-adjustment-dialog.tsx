@@ -185,29 +185,20 @@ export function StockAdjustmentDialog({
 
     setSaving(true);
     try {
-      // 1. Update/Upsert the inventory table with the EXACT actual physical count
-      const { error: invErr } = await supabase.from("inventory").upsert(
-        {
-          product_id: selectedProductId,
-          warehouse_id: selectedWarehouseId,
-          quantity: actualQty,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "product_id,warehouse_id" },
-      );
-
-      if (invErr) throw invErr;
-
-      // 2. Log the stock movement for the difference (positive for surplus, negative for shortage)
-      const { error: mvErr } = await supabase.from("stock_movements").insert({
-        product_id: selectedProductId,
-        warehouse_id: selectedWarehouseId,
-        movement_type: "adjustment",
-        quantity: difference,
-        unit_cost: Number(unitCostStr) || 0,
-        note: note.trim() || null,
-        adjustment_reason: reason,
-        created_by: user?.id ?? null,
+      // P0-3: الفرق فقط يُسجَّل من المحرّك (كمية + قيمة)، ولا تُكتب الكمية
+      // المطلقة على inventory مباشرة — ذلك يتجاوز التقييم ودفتر التكلفة.
+      const { error: mvErr } = await supabase.rpc("post_stock_delta", {
+        p_product_id: selectedProductId,
+        p_warehouse_id: selectedWarehouseId,
+        p_signed_qty: difference,
+        p_unit_cost: Number(unitCostStr) || null,
+        p_movement_kind: "ADJUSTMENT",
+        p_source_type: "stock_adjustment",
+        p_source_id: crypto.randomUUID(),
+        p_note: note.trim() || `${reason}`,
+        p_owner_type: "COMPANY",
+        p_owner_id: null,
+        p_movement_type_legacy: "adjustment",
       } as any);
 
       if (mvErr) throw mvErr;

@@ -544,12 +544,15 @@ BEGIN
       updated_at       = now()
   WHERE id = _item_id;
 
+  -- ⚠️ كان الوسيط الخامس هو نص السبب (btrim(_reason)) بينما توقيع الدالة
+  --    p_source text — أي أن "المصدر" يُكتب داخل payload.source_document
+  --    ويضيع السبب. أُصلح ليمرّر السبب في مكانه الصحيح، والمصدر ثابت.
   RETURN public.audit_item_policy_snapshot(
     _item_id,
     'item_policy.changed',
     v_before,
     v_after,
-    btrim(_reason)
+    'approval:' || btrim(_reason)
   );
 END $function$;
 
@@ -562,10 +565,13 @@ AS $function$
 DECLARE
   v_id uuid;
 BEGIN
+  -- ⚠️ audit_logs.action و entity_type هما NOT NULL: تمرير NULL كان يرمي
+  --    23502 بدل تسجيل الحدث. نضع قيمًا افتراضية صريحة حتى لو نادت الدالة
+  --    دالة جديدة بنفس العقد بلا وسيط.
   INSERT INTO public.audit_logs (actor_id, action, entity_type, entity_id, payload)
   VALUES (
     auth.uid(),
-    p_action,
+    coalesce(nullif(btrim(p_action), ''), 'item_policy.updated'),
     'product_policy',
     p_item_id,
     jsonb_build_object(
@@ -1725,8 +1731,18 @@ BEGIN
   IF NOT (public.has_role(v_user, 'owner') OR public.has_role(v_user, 'manager')) THEN
     RAISE EXCEPTION 'Only an owner or manager can change the company costing method';
   END IF;
+  -- ⚠️ _method قد تكون NULL (أو بأحرف صغيرة من الواجهة). التحقق القديم
+  --    `_method NOT IN (...)` يقبل NULL بصمت لأن NULL NOT IN (...) = NULL،
+  --    ثم يُدرج NULL في costing_policy_history.costing_method (NOT NULL)
+  --    فيرمي 23502 بدل رسالة واضحة. الآن يُرفض null/farغ صراحةً ويُطبَّع الحرف.
+  _method := upper(btrim(coalesce(_method, '')));
+  IF _method IS NULL OR _method = '' THEN
+    RAISE EXCEPTION 'Costing method is required (MOVING_AVERAGE or STANDARD)'
+      USING ERRCODE = '22023';
+  END IF;
   IF _method NOT IN ('MOVING_AVERAGE', 'STANDARD') THEN
-    RAISE EXCEPTION 'Costing method must be MOVING_AVERAGE or STANDARD (got %)', _method;
+    RAISE EXCEPTION 'Costing method must be MOVING_AVERAGE or STANDARD (got %)', _method
+      USING ERRCODE = '22023';
   END IF;
 
   SELECT costing_method INTO v_old FROM public.company_costing_settings WHERE id = 1 FOR UPDATE;

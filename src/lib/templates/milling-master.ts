@@ -473,7 +473,6 @@ export function renderMillingMasterTemplate(
         ? `
     <div class="inama-footer">
       <span>تاريخ الطباعة: ${new Date().toLocaleDateString("ar-YE")}</span>
-      <span class="inama-badge">عمل بواسطة شركة إنما سوفت - هاتف: 772217218</span>
     </div>`
         : ""
     }
@@ -680,7 +679,6 @@ export function renderMillingThermalTemplate(
     opts.showFooter
       ? `
   <div class="inama-footer">
-    عمل بواسطة شركة إنما سوفت - هاتف: 772217218
   </div>`
       : ""
   }
