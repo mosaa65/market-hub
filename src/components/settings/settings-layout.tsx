@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { Search as SearchIcon } from "lucide-react";
 import { getSettingsSection, SettingsSectionId } from "./settings-registry";
 
 interface SettingsLayoutProps {
   form: any;
-  setForm: (form: any) => void;
+  setForm: Dispatch<SetStateAction<any>>;
   enablePosServiceFee: boolean;
   setEnablePosServiceFee: (v: boolean) => void;
   printMode: "auto" | "ask" | "off";

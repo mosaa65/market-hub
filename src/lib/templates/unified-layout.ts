@@ -816,8 +816,10 @@ export function renderUnifiedLayout(
               : ""
           }
           <div>
-            <h1 class="corporate-brand-name">${esc(companyName || arabicName || (rtl ? "الشركة التجارية المعتمدة" : "Standard Corporation"))}</h1>
+            <h1 class="corporate-brand-name">${esc(arabicName || companyName)}</h1>
             <div class="corporate-brand-details">
+              ${englishName ? `<span dir="ltr">${esc(englishName)}</span>` : ""}
+              ${companyName && companyName !== arabicName ? `<span>${esc(companyName)}</span>` : ""}
               ${companyVat ? `<span>الضريبي: <b dir="ltr">${esc(companyVat)}</b></span>` : ""}
               ${companyPhone ? `<span>الهاتف: <b dir="ltr">${esc(companyPhone)}</b></span>` : ""}
               ${companyAddress ? `<span>${esc(companyAddress)}</span>` : ""}

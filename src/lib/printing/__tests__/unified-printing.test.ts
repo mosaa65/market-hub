@@ -147,8 +147,7 @@ check(
 
 const COMPANY: CompanyProfile = {
   name: "شركة الاختبار",
-  contacts: ["784795104", "772217218"],
-  footerContact: "784795104 · 772217218",
+  contacts: ["770000001"],
   address: "صنعاء",
   email: "test@example.com",
   logoUrl: "/inama-soft-logo.ico",
@@ -312,25 +311,11 @@ check("engine routes formal theme to the formal template", engineFormal.includes
 /* ─────────────────────────── Company Profile ─────────────────────────── */
 
 check("default company profile has no invented tenant name", DEFAULT_COMPANY_PROFILE.name === "");
-check(
-  "default company profile exposes both support numbers",
-  DEFAULT_COMPANY_PROFILE.footerContact === "784795104 · 772217218",
-);
+check("default company profile invents no contacts", DEFAULT_COMPANY_PROFILE.contacts.length === 0);
 
 const footer = renderUniversalFooter(COMPANY, true);
-check("universal footer renders the company name", footer.includes("شركة الاختبار"));
-check("universal footer renders contact numbers", footer.includes("784795104"));
-check("universal footer renders the address", footer.includes("صنعاء"));
-check("universal footer renders the email", footer.includes("test@example.com"));
-check("universal footer declares rtl", footer.includes('dir="rtl"'));
-check(
-  "universal footer declares ltr when asked",
-  renderUniversalFooter(COMPANY, false).includes('dir="ltr"'),
-);
-check(
-  "universal footer css avoids page breaks",
-  UNIVERSAL_FOOTER_CSS.includes("break-inside:avoid"),
-);
+check("removed universal footer renders no content", footer === "");
+check("removed universal footer has no injected styles", UNIVERSAL_FOOTER_CSS === "");
 
 const noOwnerName = renderUniversalFooter(COMPANY, true);
 check("footer never contains the former owner name", !noOwnerName.includes("موسى العواضي"));
@@ -348,7 +333,7 @@ check(
   !profileDrivenHtml.includes("طاحونتي"),
 );
 
-/* Footer presence across documents and formats */
+/* Legacy footer settings cannot reintroduce fixed footer output. */
 const FOOTER_MARKUP = '<footer class="universal-footer"';
 for (const paperId of ["a4", "a5", "thermal-58", "thermal-80"] as PrintPaperId[]) {
   const html = renderUnifiedDocument({
@@ -358,7 +343,7 @@ for (const paperId of ["a4", "a5", "thermal-58", "thermal-80"] as PrintPaperId[]
     paperId,
     settings: { ...DEFAULT_UNIFIED_PRINT_SETTINGS, footerEnabled: true, paperId },
   });
-  check(`footer present on ${paperId}`, html.includes(FOOTER_MARKUP));
+  check(`removed footer stays absent on ${paperId}`, !html.includes(FOOTER_MARKUP));
 }
 
 const footerOffHtml = renderUnifiedDocument({
@@ -367,13 +352,10 @@ const footerOffHtml = renderUnifiedDocument({
   rtl: true,
   settings: { ...DEFAULT_UNIFIED_PRINT_SETTINGS, footerEnabled: false },
 });
-check("footer can be disabled", !footerOffHtml.includes(FOOTER_MARKUP));
+check("legacy footer disabled remains absent", !footerOffHtml.includes(FOOTER_MARKUP));
 
-/* Multi-page documents must not let the footer cover content. */
-check(
-  "footer is pushed to the end of the document flow",
-  UNIVERSAL_FOOTER_CSS.includes("margin-top:auto"),
-);
+/* Multi-page layout is no longer constrained by a fixed footer. */
+check("removed footer adds no pagination styles", UNIVERSAL_FOOTER_CSS === "");
 
 /* ─────────────────────────── Color Customization Tests ─────────────────────────── */
 
@@ -471,10 +453,7 @@ check(
   !stdHtml.includes('<header class="luxury-header-wrap">') &&
     stdHtml.includes('<header class="corporate-header-wrap">'),
 );
-check(
-  "footer renders company phone when available",
-  stdHtml.includes("footer-contact") || stdHtml.includes("footer-company"),
-);
+check("document output omits legacy footer fields", !stdHtml.includes("footer-contact"));
 if (failures.length > 0) {
   throw new Error(`Unified printing tests failed:\n - ${failures.join("\n - ")}`);
 }

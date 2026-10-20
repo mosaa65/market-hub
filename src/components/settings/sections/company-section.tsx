@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import { Building2, ImagePlus, LoaderCircle, Trash2, Upload } from "lucide-react";
+import { useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { Building2, LoaderCircle, Trash2, Upload } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,11 +7,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 
 interface CompanySectionProps {
-  form: any;
-  setForm: (form: any) => void;
+  form: Record<string, unknown>;
+  setForm: Dispatch<SetStateAction<Record<string, unknown>>>;
   canEdit: boolean;
   lang: string;
 }
@@ -20,7 +19,8 @@ export function CompanySection({ form, setForm, canEdit, lang }: CompanySectionP
   const isAr = lang === "ar";
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
-  const logoUrl = form.logo_url || "/vortex-erp-wordmark.png";
+  const fieldValue = (key: string) => String(form[key] ?? "");
+  const logoUrl = fieldValue("logo_url") || "/vortex-erp-wordmark.png";
 
   const uploadLogo = async (file?: File) => {
     if (!file) return;
@@ -46,7 +46,7 @@ export function CompanySection({ form, setForm, canEdit, lang }: CompanySectionP
       });
       if (error) throw error;
       const { data } = supabase.storage.from("company-logos").getPublicUrl(path);
-      setForm({ ...form, logo_url: data.publicUrl });
+      setForm((current) => ({ ...current, logo_url: data.publicUrl }));
       toast.success(
         isAr
           ? "تم رفع الشعار. احفظ الملف لتطبيقه."
@@ -93,8 +93,8 @@ export function CompanySection({ form, setForm, canEdit, lang }: CompanySectionP
               <Input
                 id="company-name-ar"
                 dir="rtl"
-                value={form.name_ar ?? ""}
-                onChange={(e) => setForm({ ...form, name_ar: e.target.value })}
+                value={fieldValue("name_ar")}
+                onChange={(e) => setForm((current) => ({ ...current, name_ar: e.target.value }))}
                 disabled={!canEdit}
                 placeholder={isAr ? "الاسم العربي المعتمد" : "Official Arabic name"}
                 className="rounded-xl"
@@ -107,8 +107,8 @@ export function CompanySection({ form, setForm, canEdit, lang }: CompanySectionP
               <Input
                 id="company-name-en"
                 dir="ltr"
-                value={form.name_en ?? ""}
-                onChange={(e) => setForm({ ...form, name_en: e.target.value })}
+                value={fieldValue("name_en")}
+                onChange={(e) => setForm((current) => ({ ...current, name_en: e.target.value }))}
                 disabled={!canEdit}
                 placeholder="Official English name"
                 className="rounded-xl"
@@ -119,8 +119,8 @@ export function CompanySection({ form, setForm, canEdit, lang }: CompanySectionP
                 {isAr ? "الاسم التجاري للمتجر / المنشأة" : "Trade name"}
               </Label>
               <Input
-                value={form.name ?? ""}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                value={fieldValue("name")}
+                onChange={(e) => setForm((current) => ({ ...current, name: e.target.value }))}
                 disabled={!canEdit}
                 placeholder={isAr ? "اسم المتجر أو المؤسسة" : "Store or Trade Name"}
                 className="rounded-2xl"
@@ -135,8 +135,8 @@ export function CompanySection({ form, setForm, canEdit, lang }: CompanySectionP
                 {isAr ? "الاسم القانوني / السجل التجاري" : "Legal name"}
               </Label>
               <Input
-                value={form.legal_name ?? ""}
-                onChange={(e) => setForm({ ...form, legal_name: e.target.value })}
+                value={fieldValue("legal_name")}
+                onChange={(e) => setForm((current) => ({ ...current, legal_name: e.target.value }))}
                 disabled={!canEdit}
                 placeholder={isAr ? "الاسم الرسمي حسب السجل" : "Official Legal Entity Name"}
                 className="rounded-2xl"
@@ -185,7 +185,7 @@ export function CompanySection({ form, setForm, canEdit, lang }: CompanySectionP
                 )}
                 {isAr ? "رفع شعار" : "Upload logo"}
               </Button>
-              {form.logo_url && (
+              {Boolean(form.logo_url) && (
                 <Button
                   type="button"
                   size="icon"
@@ -193,7 +193,7 @@ export function CompanySection({ form, setForm, canEdit, lang }: CompanySectionP
                   aria-label={isAr ? "إزالة الشعار" : "Remove logo"}
                   className="size-10 rounded-lg text-muted-foreground hover:text-destructive"
                   disabled={!canEdit || isUploadingLogo}
-                  onClick={() => setForm({ ...form, logo_url: null })}
+                  onClick={() => setForm((current) => ({ ...current, logo_url: null }))}
                 >
                   <Trash2 className="size-4" />
                 </Button>
@@ -213,8 +213,8 @@ export function CompanySection({ form, setForm, canEdit, lang }: CompanySectionP
               {isAr ? "الرقم الضريبي / Tax ID" : "Tax registration number"}
             </Label>
             <Input
-              value={form.tax_number ?? ""}
-              onChange={(e) => setForm({ ...form, tax_number: e.target.value })}
+              value={fieldValue("tax_number")}
+              onChange={(e) => setForm((current) => ({ ...current, tax_number: e.target.value }))}
               disabled={!canEdit}
               placeholder="300000000000003"
               className="rounded-2xl font-mono"
@@ -226,8 +226,8 @@ export function CompanySection({ form, setForm, canEdit, lang }: CompanySectionP
               {isAr ? "هاتف المنشأة / للتواصل" : "Company phone number"}
             </Label>
             <Input
-              value={form.phone ?? ""}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              value={fieldValue("phone")}
+              onChange={(e) => setForm((current) => ({ ...current, phone: e.target.value }))}
               disabled={!canEdit}
               placeholder="+966 50 000 0000"
               className="rounded-2xl font-mono"
@@ -240,8 +240,8 @@ export function CompanySection({ form, setForm, canEdit, lang }: CompanySectionP
             </Label>
             <Input
               type="email"
-              value={form.email ?? ""}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              value={fieldValue("email")}
+              onChange={(e) => setForm((current) => ({ ...current, email: e.target.value }))}
               disabled={!canEdit}
               placeholder="info@company.com"
               className="rounded-2xl font-mono"
@@ -255,8 +255,8 @@ export function CompanySection({ form, setForm, canEdit, lang }: CompanySectionP
           </Label>
           <Textarea
             rows={3}
-            value={form.address ?? ""}
-            onChange={(e) => setForm({ ...form, address: e.target.value })}
+            value={fieldValue("address")}
+            onChange={(e) => setForm((current) => ({ ...current, address: e.target.value }))}
             disabled={!canEdit}
             placeholder={
               isAr

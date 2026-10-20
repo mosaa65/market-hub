@@ -7,10 +7,7 @@ import {
 } from "./types";
 import { generateBarcodeSvg, generateQrCodeSvg } from "@/lib/printing/barcode-qr";
 import { getCachedCompanyProfile } from "@/lib/printing/company-profile";
-import {
-  renderUniversalFooter,
-  UNIVERSAL_FOOTER_CSS,
-} from "@/lib/printing/footer";
+import { renderUniversalFooter, UNIVERSAL_FOOTER_CSS } from "@/lib/printing/footer";
 
 /**
  * قالب الإيصال الحراري مع باركود و QR (Thermal QR & Electronic Receipt).

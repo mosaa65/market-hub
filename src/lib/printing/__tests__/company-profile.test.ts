@@ -143,12 +143,18 @@ check(
 );
 check("unified layout renders the company address", unifiedHtml.includes("صنعاء - شارع تعز"));
 check("unified layout omits fixed support contacts", !unifiedHtml.includes("784795104"));
-check("unified layout omits the removed universal footer", !unifiedHtml.includes('class="universal-footer"'));
+check(
+  "unified layout omits the removed universal footer",
+  !unifiedHtml.includes('class="universal-footer"'),
+);
 
 // القالب الرسمي
 const formalHtml = renderFormalTemplate(baseDoc as never, getDefaultArabicLabels(), true);
 check("formal template uses Company Profile", formalHtml.includes("شركة النور للتجارة"));
-check("formal template omits the removed universal footer", !formalHtml.includes('class="universal-footer"'));
+check(
+  "formal template omits the removed universal footer",
+  !formalHtml.includes('class="universal-footer"'),
+);
 
 // المapper الحراري ESC/POS
 const escposDoc = renderThermalEscPos(request());
@@ -162,7 +168,13 @@ check(
 );
 
 // تغيير الهوية ينعكس على كل المستندات فورًا (نفس المصدر، بلا كاش منفصل)
-cacheCompanyProfile({ ...row, name: "منشأة الأمانة", address: "عدن", footer_contact: "711111111" });
+cacheCompanyProfile({
+  ...row,
+  name: "منشأة الأمانة",
+  name_ar: "منشأة الأمانة",
+  address: "عدن",
+  footer_contact: "711111111",
+});
 
 const afterHtml = renderUnifiedDocument(request({ paperId: "a4" }));
 check("changing the name propagates to the unified layout", afterHtml.includes("منشأة الأمانة"));

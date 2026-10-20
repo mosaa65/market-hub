@@ -46,6 +46,7 @@ export interface PrintRequest {
    */
   showBarcode?: boolean;
   showQrCode?: boolean;
+  showSignatures?: boolean;
   /**
    * لون مخصص صريح للقالب للمعاينة والطباعة المباشرة.
    */
@@ -116,7 +117,8 @@ export function renderUnifiedDocument(request: PrintRequest): string {
   // ← لقطة المستند ← الطلب الصريح. القالب يطبّق `...doc.options` أيضاً،
   // لذلك تمرّر قيم الطلب الأخيرة داخلها قبل الاستدعاء. L’ordre est volontaire.
   const customOptions = {
-    showFooter: settings.footerEnabled,
+    showFooter: false,
+    showSignatures: request.showSignatures ?? override?.showSignatures ?? settings.showSignatures,
     showBarcode: override?.showBarcode ?? settings.showBarcode ?? true,
     showQrCode: override?.showQrCode ?? settings.showQrCode ?? true,
     standardAccentColor: settings.standardAccentColor,

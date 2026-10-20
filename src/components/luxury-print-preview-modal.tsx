@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   Printer,
   X,
@@ -14,6 +14,7 @@ import {
   Scale,
   QrCode,
   Check,
+  PenLine,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { WhatsAppIcon } from "@/components/whatsapp-icon";
@@ -29,9 +30,10 @@ import {
   type PrintingDocumentType,
 } from "@/lib/printing";
 import type { UnifiedDocumentData, InvoiceTemplateId } from "@/lib/templates";
+import html2pdf from "html2pdf.js";
 
 export type LuxuryPaperFormat = PrintPaperId;
-import { generateInvoicePdfBlob, type InvoiceDoc } from "@/lib/pdf";
+import type { InvoiceDoc } from "@/lib/pdf";
 import { toast } from "sonner";
 
 export type PrintMethodType = "thermal" | "page";
@@ -188,8 +190,15 @@ export function LuxuryPrintPreviewModal({
   // والطباعة بنفس الحالة التي اختارها المستخدم في الإعدادات.
   const [showBarcode, setShowBarcode] = useState<boolean>(request?.showBarcode ?? true);
   const [showQrCode, setShowQrCode] = useState<boolean>(request?.showQrCode ?? true);
+  const [showSignatures, setShowSignatures] = useState<boolean>(
+    request?.showSignatures ??
+      request?.settings?.overrides[documentType]?.showSignatures ??
+      request?.settings?.showSignatures ??
+      false,
+  );
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [isPrinting, setIsPrinting] = useState(false);
+  const previewFrameRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
     if (open) {
@@ -198,6 +207,12 @@ export function LuxuryPrintPreviewModal({
       setActivePaper(initialPaperId);
       setShowBarcode(request?.showBarcode ?? true);
       setShowQrCode(request?.showQrCode ?? true);
+      setShowSignatures(
+        request?.showSignatures ??
+          request?.settings?.overrides[documentType]?.showSignatures ??
+          request?.settings?.showSignatures ??
+          false,
+      );
       setZoomLevel(100);
     }
   }, [
@@ -207,6 +222,9 @@ export function LuxuryPrintPreviewModal({
     initialPaperId,
     request?.showBarcode,
     request?.showQrCode,
+    request?.showSignatures,
+    request?.settings,
+    documentType,
   ]);
 
   // When switching method, adjust template and paper to match the method
@@ -268,6 +286,7 @@ export function LuxuryPrintPreviewModal({
           ...unifiedDoc.options,
           showBarcode,
           showQrCode,
+          showSignatures,
           ...(customColor ? { accentColor: customColor } : {}),
         },
       },
@@ -282,6 +301,7 @@ export function LuxuryPrintPreviewModal({
       // القيمتين داخل اللقطة لتفوز دائماً في المعاينة والطباعة.
       showBarcode,
       showQrCode,
+      showSignatures,
       labels: request?.labels,
     };
   }, [
@@ -293,6 +313,7 @@ export function LuxuryPrintPreviewModal({
     activeTheme,
     showBarcode,
     showQrCode,
+    showSignatures,
     request,
   ]);
 

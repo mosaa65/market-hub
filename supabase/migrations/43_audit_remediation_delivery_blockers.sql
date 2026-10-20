@@ -301,11 +301,11 @@ BEGIN
   v_mt := coalesce(
     p_movement_type_legacy,
     CASE p_movement_kind
-      WHEN 'RECEIPT'      THEN 'purchase'
-      WHEN 'ISSUE'        THEN 'sale'
-      WHEN 'TRANSFER_IN'  THEN 'transfer_in'
-      WHEN 'TRANSFER_OUT' THEN 'transfer_out'
-      ELSE 'adjustment'
+      WHEN 'RECEIPT'      THEN 'purchase'::public.movement_type
+      WHEN 'ISSUE'        THEN 'sale'::public.movement_type
+      WHEN 'TRANSFER_IN'  THEN 'transfer_in'::public.movement_type
+      WHEN 'TRANSFER_OUT' THEN 'transfer_out'::public.movement_type
+      ELSE 'adjustment'::public.movement_type
     END
   );
 
@@ -905,6 +905,7 @@ DECLARE
   v_system         boolean := false;
   v_supplier_balance numeric;
   v_paid           numeric;
+  v_credit_limit   numeric;
 BEGIN
   IF v_user IS NULL THEN
     RAISE EXCEPTION 'Not authenticated';

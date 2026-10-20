@@ -54,8 +54,7 @@ const RULES: Rule[] = [
   },
   {
     test: /Credit limit exceeded.*current balance ([\d.]+).*requested debt ([\d.]+).*limit ([\d.]+)/i,
-    ar: (m) =>
-      `تجاوز سقف الدين: الرصيد ${m[1]} + المطلوب ${m[2]} أكبر من الحد ${m[3]}.`,
+    ar: (m) => `تجاوز سقف الدين: الرصيد ${m[1]} + المطلوب ${m[2]} أكبر من الحد ${m[3]}.`,
     en: "Credit limit exceeded.",
   },
   {
@@ -75,7 +74,8 @@ const RULES: Rule[] = [
   },
   {
     test: /Return exceeds what was sold for item ([0-9a-f-]+).*sold ([\d.]+).*already returned ([\d.]+).*requested ([\d.]+)/i,
-    ar: (m) => `كمية المرتجع تتجاوز المبيع: المباع ${m[2]}، المرتجع سابقاً ${m[3]}، المطلوب ${m[4]}.`,
+    ar: (m) =>
+      `كمية المرتجع تتجاوز المبيع: المباع ${m[2]}، المرتجع سابقاً ${m[3]}، المطلوب ${m[4]}.`,
     en: "The return quantity exceeds what was sold.",
   },
   {
@@ -156,11 +156,7 @@ const RULES: Rule[] = [
 ];
 
 /** يحوّل نص خطأ (من RPC أو PostgREST أو fetch) إلى رسالة قابلة للعرض. */
-export function translateRpcError(
-  error: unknown,
-  lang: RpcLang = "ar",
-  fallback?: string,
-): string {
+export function translateRpcError(error: unknown, lang: RpcLang = "ar", fallback?: string): string {
   const raw =
     typeof error === "string"
       ? error
@@ -169,7 +165,10 @@ export function translateRpcError(
         : "";
 
   if (!raw.trim()) {
-    return fallback ?? (lang === "ar" ? "تعذر تنفيذ العملية. أعد المحاولة." : "The operation failed. Retry.");
+    return (
+      fallback ??
+      (lang === "ar" ? "تعذر تنفيذ العملية. أعد المحاولة." : "The operation failed. Retry.")
+    );
   }
 
   for (const rule of RULES) {

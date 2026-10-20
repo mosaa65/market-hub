@@ -615,11 +615,12 @@ export function buildMillingDocumentUnifiedDoc(
   // سطر فاتورة أجور الطحن الرسمية — P1-1: أساس التسعير من المستند نفسه،
   // لا من قسمة الإجمالي على عدد الأكياس (كان يعطي رقماً غير متعاقد عليه).
   const bagCount = details.intakeGrain?.bagsReceived || 0;
-  const basis = details.billing_basis === "PER_BAG" || details.billing_basis === "PER_KG"
-    ? details.billing_basis
-    : bagCount > 0
-      ? "PER_BAG"
-      : "PER_KG";
+  const basis =
+    details.billing_basis === "PER_BAG" || details.billing_basis === "PER_KG"
+      ? details.billing_basis
+      : bagCount > 0
+        ? "PER_BAG"
+        : "PER_KG";
   const feeQty =
     Number(details.fee_quantity) > 0
       ? Number(details.fee_quantity)

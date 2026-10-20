@@ -99,7 +99,7 @@ export function patchCompanyProfileCache(patch: Partial<CompanyProfile>): Compan
                 ? "name_en"
                 : key === "legalName"
                   ? "legal_name"
-                      : key;
+                  : key;
     rowPatch[column] = value;
   }
   return cacheCompanyProfile(rowPatch);
@@ -123,4 +123,3 @@ export async function loadCompanyProfile(): Promise<CompanyProfile> {
 }
 
 export const DEFAULT_COMPANY_PROFILE = DEFAULT_PROFILE;
-

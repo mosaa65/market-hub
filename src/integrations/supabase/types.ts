@@ -1439,21 +1439,15 @@ export type Database = {
         Returns: Json;
       };
       backup_schema_fingerprint: {
-        Args: {
-
-        };
+        Args: Record<PropertyKey, never>;
         Returns: string;
       };
       can_author_payment_methods: {
-        Args: {
-
-        };
+        Args: Record<PropertyKey, never>;
         Returns: boolean;
       };
       can_operate_milling: {
-        Args: {
-
-        };
+        Args: Record<PropertyKey, never>;
         Returns: boolean;
       };
       can_read_expense_entry: {
@@ -1470,9 +1464,7 @@ export type Database = {
         Returns: boolean;
       };
       can_view_milling: {
-        Args: {
-
-        };
+        Args: Record<PropertyKey, never>;
         Returns: boolean;
       };
       cancel_expense: {
@@ -1764,9 +1756,7 @@ export type Database = {
         Returns: Json;
       };
       get_chart_of_accounts_tree: {
-        Args: {
-
-        };
+        Args: Record<PropertyKey, never>;
         Returns: Json[];
       };
       get_supplier_statement: {

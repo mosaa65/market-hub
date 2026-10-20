@@ -10,7 +10,6 @@ import {
   type StatementCompanyInfo,
 } from "@/lib/statements/company";
 import { openStatementPrintWindow } from "@/lib/statements/print";
-import { companyCreditLine } from "@/lib/printing/identity";
 
 export interface LuxuryReportHeader {
   label: string;
@@ -252,19 +251,6 @@ export async function printLuxuryReport(options: LuxuryReportOptions): Promise<v
       </div>
     </div>
 
-    <!-- Footer -->
-    <div class="rpt-foot">
-      <div>
-        <div style="font-weight:600;margin-top:2px;">Market Hub · ${escapeHtml(company.brand.name)}</div>
-      </div>
-      <div class="brand">
-        <div class="brand-txt" style="text-align:${ar ? "right" : "left"};">
-          <b>${escapeHtml(company.brand.name)}</b>
-          <div dir="ltr">${escapeHtml(companyCreditLine())}</div>
-        </div>
-        <img src="/inama-soft-logo.ico" alt="${escapeHtml(company.brand.name)}" />
-      </div>
-    </div>
   </div>
 </body>
 </html>`;

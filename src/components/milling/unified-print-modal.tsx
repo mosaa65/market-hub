@@ -189,9 +189,7 @@ export function unifiedDocToTicketData(doc: UnifiedDocumentData): UnifiedTicketP
   );
 
   const bagCount = grainLine?.qty || serviceLine?.qty || 1;
-  const bagSizeKg = grainLine?.remainingKg
-    ? Math.round(grainLine.remainingKg / bagCount)
-    : 50;
+  const bagSizeKg = grainLine?.remainingKg ? Math.round(grainLine.remainingKg / bagCount) : 50;
   const totalWeightKg = grainLine?.currentKg || bagCount * bagSizeKg;
 
   const isDelivery = doc.docType === "delivery_note";
@@ -294,9 +292,7 @@ export function UnifiedPrintModal({
   const handleWhatsAppShare = () => {
     const bagSize =
       data.bagSizeKg ||
-      (data.bagCount && data.totalWeightKg
-        ? Math.round(data.totalWeightKg / data.bagCount)
-        : 50);
+      (data.bagCount && data.totalWeightKg ? Math.round(data.totalWeightKg / data.bagCount) : 50);
 
     const phone = (data.customerPhone || "").replace(/[^0-9]/g, "");
 
@@ -375,7 +371,9 @@ export function UnifiedPrintModal({
               </div>
               <div>
                 <h3 className="text-sm sm:text-base font-black text-foreground tracking-tight flex items-center gap-2">
-                  <span>{isDelivery ? "سند تسليم نواتج المطحنة" : "فاتورة وإيصال الطحن الموحد"}</span>
+                  <span>
+                    {isDelivery ? "سند تسليم نواتج المطحنة" : "فاتورة وإيصال الطحن الموحد"}
+                  </span>
                 </h3>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <span className="text-[11px] text-muted-foreground font-mono font-bold">
@@ -559,9 +557,7 @@ export function UnifiedPrintModal({
                 {data.customerPhone && (
                   <div className="flex justify-between items-center">
                     <span className="text-slate-500 font-medium">الهاتف:</span>
-                    <span className="font-mono font-bold text-slate-800">
-                      {data.customerPhone}
-                    </span>
+                    <span className="font-mono font-bold text-slate-800">{data.customerPhone}</span>
                   </div>
                 )}
               </div>
@@ -583,7 +579,9 @@ export function UnifiedPrintModal({
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-slate-600">درجة الطحن:</span>
-                      <span className="font-bold text-amber-700">{data.millingTypeLabel || "حسب الاتفاق"}</span>
+                      <span className="font-bold text-amber-700">
+                        {data.millingTypeLabel || "حسب الاتفاق"}
+                      </span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-slate-600">الكمية والأكياس:</span>
@@ -888,7 +886,9 @@ export function UnifiedPrintModal({
                     <tbody className="divide-y divide-slate-100">
                       <tr>
                         <td className="p-3 font-black text-slate-950">{data.grainType}</td>
-                        <td className="p-3 text-amber-700 font-bold">{data.millingTypeLabel || "—"}</td>
+                        <td className="p-3 text-amber-700 font-bold">
+                          {data.millingTypeLabel || "—"}
+                        </td>
                         <td className="p-3 text-center font-mono font-black">
                           {data.bagCount} كيس ({data.bagSizeKg || 50} كجم)
                         </td>
@@ -928,7 +928,9 @@ export function UnifiedPrintModal({
                     <div className="flex justify-between text-slate-600">
                       <span>المجموع الإجمالي:</span>
                       <span className="font-mono font-bold text-slate-900">
-                        {((data.millingFeeTotal || 0) + (data.packagingTotal || 0)).toLocaleString()}{" "}
+                        {(
+                          (data.millingFeeTotal || 0) + (data.packagingTotal || 0)
+                        ).toLocaleString()}{" "}
                         ر.ي
                       </span>
                     </div>
@@ -1051,8 +1053,7 @@ export function printUnifiedTicket(
   const doc = iframe.contentWindow?.document;
   if (!doc) return;
 
-  const html =
-    paper === "thermal" ? renderThermalHtml(data, thermalWidth) : renderA4Html(data);
+  const html = paper === "thermal" ? renderThermalHtml(data, thermalWidth) : renderA4Html(data);
 
   doc.open();
   doc.write(html);
@@ -1074,8 +1075,7 @@ function renderThermalHtml(d: UnifiedTicketPrintData, width: ThermalWidth = "80m
   const isMilled = d.stage === "milled";
   const isIntake = !isDelivery && !isMilled;
   const bagSize =
-    d.bagSizeKg ||
-    (d.bagCount && d.totalWeightKg ? Math.round(d.totalWeightKg / d.bagCount) : 50);
+    d.bagSizeKg || (d.bagCount && d.totalWeightKg ? Math.round(d.totalWeightKg / d.bagCount) : 50);
 
   const badgeTitle = isDelivery
     ? "سند تسليم نواتج أمانات"
@@ -1254,8 +1254,7 @@ function renderA4Html(d: UnifiedTicketPrintData): string {
   const isDelivery = d.stage === "delivery";
   const isMilled = d.stage === "milled";
   const bagSize =
-    d.bagSizeKg ||
-    (d.bagCount && d.totalWeightKg ? Math.round(d.totalWeightKg / d.bagCount) : 50);
+    d.bagSizeKg || (d.bagCount && d.totalWeightKg ? Math.round(d.totalWeightKg / d.bagCount) : 50);
 
   return `<!DOCTYPE html>
 <html dir="rtl" lang="ar">

@@ -505,7 +505,6 @@ export function SalesPage() {
             address: (cs as any).address || undefined,
             email: (cs as any).email || undefined,
             vat: (cs as any).tax_number || undefined,
-            footerContact: (cs as any).footer_contact || undefined,
           }
         : undefined,
       currency:

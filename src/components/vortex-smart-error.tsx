@@ -21,7 +21,6 @@ import {
   Activity,
 } from "lucide-react";
 import { reportLovableError } from "../lib/lovable-error-reporting";
-import { getCachedCompanyProfile, DEFAULT_COMPANY_PROFILE } from "@/lib/printing/company-profile";
 
 export type ErrorLayer =
   | "database"
@@ -262,15 +261,9 @@ export function VortexSmartError({ error, reset }: { error: any; reset: () => vo
     });
   };
 
-  /* رقم الدعم يبقى في الخلفية فقط (زر واتساب) — لا يُعرض على الشاشة أبداً.
-   * المصدر الرسمي: Company Profile (footerContact)، ثم متغير البيئة،
-   * ثم fallback ثابت حتى يعمل الزر حتى بدون أي إعداد.
-   * (حوكمة المحور 11.2: ممنوع عرض الأرقام نصاً في أي شاشة — هذا الزر يفتح واتساب فقط). */
-  const supportPhone =
-    (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_SUPPORT_WHATSAPP ??
-    (getCachedCompanyProfile().footerContact || DEFAULT_COMPANY_PROFILE.footerContact || "")
-      .split(" · ")[0]
-      .replace(/[^+\\d]/g, "");
+  const supportPhone = (
+    import.meta as { env?: Record<string, string | undefined> }
+  ).env?.VITE_SUPPORT_WHATSAPP?.replace(/[^+\\d]/g, "");
 
   const errorSummary =
     `*تقرير فحص فني ذكي - Vortex ERP*
@@ -301,11 +294,13 @@ ${error?.stack || "لا يوجد"}`;
     }
   };
 
-  const whatsappUrl = `https://wa.me/${supportPhone.replace(/\D/g, "")}?text=${encodeURIComponent(
-    `${errorSummary}
+  const whatsappUrl = supportPhone
+    ? `https://wa.me/${supportPhone.replace(/\D/g, "")}?text=${encodeURIComponent(
+        `${errorSummary}
 
 يرجى فحص المشكلة البرمجية أعلاه.`,
-  )}`;
+      )}`
+    : undefined;
 
   return (
     <div
@@ -420,15 +415,17 @@ ${error?.stack || "لا يوجد"}`;
               )}
             </button>
 
-            <a
-              href={whatsappUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex-1 min-w-[140px] inline-flex h-9 items-center justify-center gap-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white px-3 text-xs font-bold transition active:scale-95 shadow-sm"
-            >
-              <MessageSquare className="size-3.5" />
-              <span>إرسال للمطور عبر واتساب</span>
-            </a>
+            {whatsappUrl ? (
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 min-w-[140px] inline-flex h-9 items-center justify-center gap-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white px-3 text-xs font-bold transition active:scale-95 shadow-sm"
+              >
+                <MessageSquare className="size-3.5" />
+                <span>إرسال للمطور عبر واتساب</span>
+              </a>
+            ) : null}
           </div>
         </div>
 
