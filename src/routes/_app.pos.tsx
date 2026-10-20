@@ -2,7 +2,6 @@ import { ModuleGuard, useModules } from "@/lib/modules";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  Search,
   Plus,
   Trash2,
   ScanBarcode,
@@ -18,9 +17,6 @@ import {
   AlertCircle,
   RotateCcw,
   CheckCircle2,
-  LayoutGrid,
-  List,
-  Table2,
   Layers,
   Smartphone,
   CreditCard,
@@ -60,6 +56,8 @@ import { useIsDesktop } from "@/hooks/use-media-query";
 import { usePersistedViewMode } from "@/hooks/use-persisted-view-mode";
 import { CartLine as CartLineRow } from "@/components/commerce/cart-line";
 import { MobileProductPicker } from "@/components/commerce/mobile-product-picker";
+import { TableToolbar, type FilterValues } from "@/components/ui/table-toolbar";
+import { RecordsViewToggle } from "@/components/ui/records-view-toggle";
 import { CustomerFormDialog } from "@/components/contacts/customer-form-dialog";
 import { UniversalPrintPreview } from "@/components/universal-print-preview";
 import { printUnifiedDocument, type PrintRequest } from "@/lib/printing";
@@ -92,7 +90,6 @@ interface Product {
   unit_id?: string | null;
   origin_id?: string | null;
   quality_grade_id?: string | null;
-  /** تُستعلم في addToCart لتحديد مسار الخدمة؛ بدونها لا يمكن بيع أجرة الطحن. */
   is_service?: boolean | null;
   item_nature?: string | null;
   inventory_policy?: string | null;
@@ -107,7 +104,6 @@ interface CartLine {
   product_id: string;
   name: string;
   unit_price: number;
-  /** Default catalogue sale price, kept so we can flag an overridden price. */
   base_price?: number;
   tax_rate: number;
   quantity: number;
@@ -301,7 +297,8 @@ function POSPage() {
   const [warehouseId, setWarehouseId] = useState<string>("");
   const [customerId, setCustomerId] = useState<string>("");
   const [search, setSearch] = useState("");
-  const [filterOpen, setFilterOpen] = useState(false);
+  const [catalogSort, setCatalogSort] = useState("name_asc");
+  const [filterOpen] = useState(false);
   /* Unified records vocabulary: cards (was "grid"), list (was "compact"), table. */
   const [viewMode, setViewMode] = usePersistedViewMode("pos-catalog", "cards");
   const selectedCustomer = useMemo(
@@ -762,7 +759,7 @@ function POSPage() {
         )
       : null;
 
-    return products.filter((p) => {
+    const matchingProducts = products.filter((p) => {
       const q = search.trim().toLowerCase();
       const matchesSearch =
         !q ||
@@ -799,6 +796,23 @@ function POSPage() {
         matchesModel
       );
     });
+
+    return [...matchingProducts].sort((a, b) => {
+      switch (catalogSort) {
+        case "name_desc":
+          return (b.name_ar || b.name).localeCompare(a.name_ar || a.name, lang);
+        case "price_asc":
+          return Number(a.sale_price) - Number(b.sale_price);
+        case "price_desc":
+          return Number(b.sale_price) - Number(a.sale_price);
+        case "stock_asc":
+          return (stockMap[a.id] ?? 0) - (stockMap[b.id] ?? 0);
+        case "stock_desc":
+          return (stockMap[b.id] ?? 0) - (stockMap[a.id] ?? 0);
+        default:
+          return (a.name_ar || a.name).localeCompare(b.name_ar || b.name, lang);
+      }
+    });
   }, [
     products,
     search,
@@ -812,6 +826,9 @@ function POSPage() {
     compatibilities,
     models,
     catalogConfig,
+    catalogSort,
+    stockMap,
+    lang,
   ]);
 
   function addToCart(p: Product) {
@@ -1665,111 +1682,195 @@ function POSPage() {
           {/* ─── Products Panel (Desktop & Tablet) ─── */}
           {isDesktop && (
             <div className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-border/80 bg-surface/95 p-3 shadow-sm ring-1 ring-background/40 lg:col-start-1 lg:row-start-2">
-              {/* Catalog Toolbar: Search, View Mode Switcher, Filter, Barcode Scanner */}
-              <div className="mb-2.5 flex flex-wrap items-center gap-2">
-                {/* Search Input with F2 shortcut */}
-                <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-input/80 bg-surface px-3.5 h-10 shadow-2xs transition-all focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
-                  <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <input
-                    ref={searchRef}
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    onKeyDown={handleScan}
-                    placeholder={`${t("pos.search_or_scan")} (F2)`}
-                    className="w-full flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                    autoFocus
-                  />
-                  {search && (
+              <TableToolbar
+                className="mb-2.5"
+                lang={lang}
+                search={{
+                  value: search,
+                  onValueChange: setSearch,
+                  inputRef: searchRef,
+                  onKeyDown: handleScan,
+                  autoFocus: true,
+                  placeholder: `${t("pos.search_or_scan")} (F2)`,
+                  resultCount: filtered.length,
+                }}
+                filters={{
+                  definitions: [
+                    {
+                      key: "category",
+                      label: t("products.category"),
+                      type: "select",
+                      options: categories.map((item) => ({
+                        value: item.id,
+                        label:
+                          lang === "ar"
+                            ? item.name_ar || item.name
+                            : item.name || item.name_ar || "",
+                      })),
+                    },
+                    ...(catalogConfig.enableBrands
+                      ? [
+                          {
+                            key: "brand",
+                            label: t("products.brand"),
+                            type: "select" as const,
+                            options: brands.map((item) => ({
+                              value: item.id,
+                              label:
+                                lang === "ar"
+                                  ? item.name_ar || item.name
+                                  : item.name || item.name_ar || "",
+                            })),
+                          },
+                        ]
+                      : []),
+                    ...(catalogConfig.enableUnits
+                      ? [
+                          {
+                            key: "unit",
+                            label: t("products.unit"),
+                            type: "select" as const,
+                            options: units.map((item) => ({
+                              value: item.id,
+                              label:
+                                lang === "ar"
+                                  ? item.name_ar || item.name
+                                  : item.name || item.name_ar || "",
+                            })),
+                          },
+                        ]
+                      : []),
+                    ...(catalogConfig.enableOrigins
+                      ? [
+                          {
+                            key: "origin",
+                            label: t("products.origin"),
+                            type: "select" as const,
+                            options: origins.map((item) => ({
+                              value: item.id,
+                              label:
+                                lang === "ar"
+                                  ? item.name_ar || item.name
+                                  : item.name || item.name_ar || "",
+                            })),
+                          },
+                        ]
+                      : []),
+                    ...(catalogConfig.enableQualityGrades
+                      ? [
+                          {
+                            key: "quality",
+                            label: t("products.quality_grade"),
+                            type: "select" as const,
+                            options: qualities.map((item) => ({
+                              value: item.id,
+                              label:
+                                lang === "ar"
+                                  ? item.name_ar || item.name
+                                  : item.name || item.name_ar || "",
+                            })),
+                          },
+                        ]
+                      : []),
+                    ...(catalogConfig.enableMakesAndModels
+                      ? [
+                          {
+                            key: "make",
+                            label: t("products.vehicle_make"),
+                            type: "select" as const,
+                            options: makes.map((item) => ({
+                              value: item.id,
+                              label:
+                                lang === "ar"
+                                  ? item.name_ar || item.name
+                                  : item.name || item.name_ar || "",
+                            })),
+                          },
+                          {
+                            key: "model",
+                            label: t("products.vehicle_model"),
+                            type: "select" as const,
+                            options: availableModels.map((item) => ({
+                              value: item.id,
+                              label:
+                                lang === "ar"
+                                  ? item.name_ar || item.name
+                                  : item.name || item.name_ar || "",
+                            })),
+                          },
+                        ]
+                      : []),
+                  ],
+                  values: {
+                    category: selectedCategory,
+                    brand: selectedBrand,
+                    unit: selectedUnit,
+                    origin: selectedOrigin,
+                    quality: selectedQuality,
+                    make: selectedMake,
+                    model: selectedModel,
+                  },
+                  onValueChange: (values: FilterValues) => {
+                    setSelectedCategory(typeof values.category === "string" ? values.category : "");
+                    setSelectedBrand(typeof values.brand === "string" ? values.brand : "");
+                    setSelectedUnit(typeof values.unit === "string" ? values.unit : "");
+                    setSelectedOrigin(typeof values.origin === "string" ? values.origin : "");
+                    setSelectedQuality(typeof values.quality === "string" ? values.quality : "");
+                    const nextMake = typeof values.make === "string" ? values.make : "";
+                    const nextModel = typeof values.model === "string" ? values.model : "";
+                    setSelectedMake(nextMake);
+                    setSelectedModel(
+                      nextModel &&
+                        (!nextMake ||
+                          models.find((model) => model.id === nextModel)?.make_id === nextMake)
+                        ? nextModel
+                        : "",
+                    );
+                  },
+                }}
+                sort={{
+                  value: catalogSort,
+                  onValueChange: setCatalogSort,
+                  options: [
+                    { value: "name_asc", label: lang === "ar" ? "الاسم: أ إلى ي" : "Name: A to Z" },
+                    {
+                      value: "name_desc",
+                      label: lang === "ar" ? "الاسم: ي إلى أ" : "Name: Z to A",
+                    },
+                    {
+                      value: "price_asc",
+                      label: lang === "ar" ? "السعر: الأقل أولاً" : "Price: low to high",
+                    },
+                    {
+                      value: "price_desc",
+                      label: lang === "ar" ? "السعر: الأعلى أولاً" : "Price: high to low",
+                    },
+                    {
+                      value: "stock_asc",
+                      label: lang === "ar" ? "المخزون: الأقل أولاً" : "Stock: low to high",
+                    },
+                    {
+                      value: "stock_desc",
+                      label: lang === "ar" ? "المخزون: الأعلى أولاً" : "Stock: high to low",
+                    },
+                  ],
+                }}
+                viewToggle={<RecordsViewToggle value={viewMode} onChange={setViewMode} />}
+                end={
+                  isModuleEnabled("barcode") && catalogConfig.enableBarcode ? (
                     <button
                       type="button"
-                      onClick={() => setSearch("")}
-                      className="rounded-full p-1 text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+                      onClick={() => setScannerOpen(true)}
+                      className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-primary/30 bg-primary/10 text-primary transition hover:bg-primary/20"
+                      title={
+                        lang === "ar" ? "قراءة الباركود بالكاميرا (F4)" : "Scan with camera (F4)"
+                      }
                     >
-                      <X className="h-3 w-3" />
+                      <ScanBarcode className="h-4 w-4" />
                     </button>
-                  )}
-                  <kbd className="hidden sm:inline-block rounded-md border border-border bg-muted/60 px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
-                    F2
-                  </kbd>
-                </div>
-
-                {/* View Mode Switcher (Grid, Compact List, Table) */}
-                <div className="flex items-center rounded-xl border border-border/80 bg-muted/40 p-0.5 shadow-2xs">
-                  <button
-                    type="button"
-                    onClick={() => setViewMode("cards")}
-                    title={lang === "ar" ? "عرض بطاقات شبكية" : "Grid Cards view"}
-                    className={`flex h-8 items-center gap-1 rounded-lg px-2 text-xs font-semibold transition ${
-                      viewMode === "cards"
-                        ? "bg-background text-primary shadow-xs ring-1 ring-border/50"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <LayoutGrid className="h-3.5 w-3.5" />
-                    <span className="hidden xl:inline">{lang === "ar" ? "بطاقات" : "Grid"}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setViewMode("list")}
-                    title={lang === "ar" ? "عرض قائمة سريعة للكاشير" : "Compact Cashier List"}
-                    className={`flex h-8 items-center gap-1 rounded-lg px-2 text-xs font-semibold transition ${
-                      viewMode === "list"
-                        ? "bg-background text-primary shadow-xs ring-1 ring-border/50"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <List className="h-3.5 w-3.5" />
-                    <span className="hidden xl:inline">{lang === "ar" ? "قائمة" : "List"}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setViewMode("table")}
-                    title={lang === "ar" ? "عرض جدول كلاسيكي عالي الكثافة" : "Classic Table view"}
-                    className={`flex h-8 items-center gap-1 rounded-lg px-2 text-xs font-semibold transition ${
-                      viewMode === "table"
-                        ? "bg-background text-primary shadow-xs ring-1 ring-border/50"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <Table2 className="h-3.5 w-3.5" />
-                    <span className="hidden xl:inline">{lang === "ar" ? "جدول" : "Table"}</span>
-                  </button>
-                </div>
-
-                {/* Filter Toggle Button */}
-                <button
-                  type="button"
-                  onClick={() => setFilterOpen((v) => !v)}
-                  className={`inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl border px-3 text-xs font-medium transition-all ${
-                    filterOpen || activeFiltersCount > 0
-                      ? "border-primary bg-primary/10 text-primary shadow-xs ring-1 ring-primary/20"
-                      : "border-border/80 bg-surface text-muted-foreground hover:border-primary/40 hover:text-foreground"
-                  }`}
-                  title={lang === "ar" ? "تصفية الفهرس" : "Filter products"}
-                >
-                  <Filter className="h-3.5 w-3.5 shrink-0" />
-                  <span className="hidden sm:inline">{t("common.filter")}</span>
-                  {activeFiltersCount > 0 && (
-                    <span className="grid h-4 w-4 place-items-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground leading-none">
-                      {activeFiltersCount}
-                    </span>
-                  )}
-                </button>
-
-                {/* Barcode Camera Scanner */}
-                {isModuleEnabled("barcode") && catalogConfig.enableBarcode && (
-                  <button
-                    type="button"
-                    onClick={() => setScannerOpen(true)}
-                    className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-primary/30 bg-primary/10 text-primary transition hover:bg-primary/20 active:scale-95 shadow-2xs"
-                    title={
-                      lang === "ar" ? "قراءة الباركود بالكاميرا (F4)" : "Scan with camera (F4)"
-                    }
-                  >
-                    <ScanBarcode className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
+                  ) : undefined
+                }
+              />
 
               {/* Quick Category Chips Bar */}
               {categories.length > 0 && (

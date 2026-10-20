@@ -45,6 +45,7 @@ import { useAuth } from "@/lib/auth";
 import { money } from "@/lib/format";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { translateRpcError } from "@/lib/errors/rpc-errors";
 
 type ProductItem = {
   id: string;
@@ -368,7 +369,14 @@ export function SettlementWizardSheet({
       onOpenChange(false);
       onSaved();
     } catch (err: any) {
-      toast.error(err?.message ?? (isAr ? "فشل تنفيذ التسوية" : "Failed to post adjustment"));
+      // P1-4: ترجمة موحدة لأخطاء RPC قبل العرض.
+      toast.error(
+        translateRpcError(
+          err,
+          isAr ? "ar" : "en",
+          isAr ? "فشل تنفيذ التسوية" : "Failed to post adjustment",
+        ),
+      );
     } finally {
       setSaving(false);
     }

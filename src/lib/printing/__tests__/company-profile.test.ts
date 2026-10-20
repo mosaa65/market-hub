@@ -23,6 +23,7 @@ import {
 import { renderUnifiedDocument } from "../engine";
 import { renderThermalEscPos } from "../thermal-escpos";
 import { renderFormalTemplate } from "../formal";
+import { renderStandardTemplate } from "@/lib/templates/standard";
 import type { PrintRequest } from "../engine";
 import { getDefaultArabicLabels } from "@/lib/pdf";
 import { COMPANY_RIGHTS_TEXT } from "../footer";
@@ -137,6 +138,11 @@ const request = (over: Partial<PrintRequest> = {}): PrintRequest =>
 const unifiedHtml = renderUnifiedDocument(
   request({ paperId: "a4", templateId: "standard", theme: "standard" }),
 );
+const standardCompanyHtml = renderStandardTemplate(
+  { ...baseDoc, docType: "customer_invoice" } as never,
+  getDefaultArabicLabels(),
+  true,
+);
 check(
   "unified layout renders the company name from Company Profile",
   unifiedHtml.includes("شركة النور للتجارة"),
@@ -145,7 +151,8 @@ check("unified layout renders the company address", unifiedHtml.includes("صنع
 check("unified layout omits fixed support contacts", !unifiedHtml.includes("784795104"));
 check(
   "unified invoice includes the approved company rights line",
-  unifiedHtml.includes("تطوير وبرمجة إنما سوفت") && unifiedHtml.includes("772217218 - 784795101"),
+  standardCompanyHtml.includes("تطوير وبرمجة إنما سوفت") &&
+    standardCompanyHtml.includes("772217218 - 784795101"),
 );
 check(
   "unified invoice includes the approved company rights line",

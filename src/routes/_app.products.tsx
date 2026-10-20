@@ -87,7 +87,6 @@ import { ItemRoleBadge, resolveItemClass } from "@/components/item-role-badge";
 import { ProductFieldSettings } from "@/components/products/product-field-settings";
 import {
   ProductPreviewCard,
-  ProductFormTabs,
   FormIssuesBar,
   type ProductFormTab,
   type FormIssue,
@@ -2218,12 +2217,22 @@ function ProductDialog({
 }) {
   const { t, lang } = useI18n();
   const { config } = useCatalogModules();
+  const dialogQc = useQueryClient();
   const { isModuleEnabled } = useModules();
   // إعدادات إظهار الحقول موحّدة عبر الشاشة والفورم: نفس المصدر، نفس الزر.
   const { isVisible: isFieldVisible } = useProductFieldVisibility();
   const showForm = (key: ProductFieldKey) => isFieldVisible("form", key);
   const [scannerOpen, setScannerOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"general" | "pricing" | "specs" | "policy">("general");
+  const [categoryQuickAddOpen, setCategoryQuickAddOpen] = useState(false);
+  const [categoryNameAr, setCategoryNameAr] = useState("");
+  const [categoryNameEn, setCategoryNameEn] = useState("");
+  const [savingCategory, setSavingCategory] = useState(false);
+  const jumpToSection = (section: ProductFormTab) => {
+    document.getElementById(`product-section-${section}`)?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
   const policyFromProduct = (product: ProductRow): UserItemPolicyPreferences => ({
     item_nature: product.item_nature ?? "GOOD",
     inventory_policy: product.inventory_policy ?? "TRACKED",
@@ -2291,13 +2300,13 @@ function ProductDialog({
           ? "اسم المنتج بالعربية مطلوب لظهوره بشكل صحيح في بطاقات النظام."
           : "An Arabic product name is required for the Yemen catalogue.",
       );
-      setActiveTab("general");
+      jumpToSection("general");
       return;
     }
     const policyCheck = validateItemPolicy(policy);
     if (!policyCheck.valid) {
       toast.error(lang === "ar" ? policyCheck.errors[0] : "The selected item policy is not valid.");
-      setActiveTab("policy");
+      jumpToSection("policy");
       return;
     }
     setSaving(true);
@@ -2389,6 +2398,48 @@ function ProductDialog({
   const labelOf = (en: string, ar: string | null) => (lang === "ar" ? ar || en : en || ar || "");
   const currentCategory = meta.categories.find((c) => c.id === form.category_id);
 
+  async function addCategoryQuickly(event: React.FormEvent) {
+    event.preventDefault();
+    if (savingCategory) return;
+    if (!categoryNameAr.trim() && !categoryNameEn.trim()) {
+      toast.error(lang === "ar" ? "أدخل اسم التصنيف" : "Enter a category name");
+      return;
+    }
+    setSavingCategory(true);
+    try {
+      const payload = {
+        name: categoryNameEn.trim() || categoryNameAr.trim(),
+        name_ar: categoryNameAr.trim() || null,
+      };
+      const { data, error } = await supabase
+        .from("categories")
+        .insert(payload)
+        .select("id, name, name_ar")
+        .single();
+      if (error) throw error;
+      const category = data as { id: string; name: string; name_ar: string | null };
+      dialogQc.setQueryData(productKeys.meta(), (current: typeof meta) => ({
+        ...(current ?? meta),
+        categories: [...(current?.categories ?? meta.categories), category],
+      }));
+      setForm((current) => ({ ...current, category_id: category.id }));
+      setCategoryNameAr("");
+      setCategoryNameEn("");
+      setCategoryQuickAddOpen(false);
+      toast.success(lang === "ar" ? "تمت إضافة التصنيف واختياره" : "Category added and selected");
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : lang === "ar"
+            ? "تعذرت إضافة التصنيف"
+            : "Could not add category",
+      );
+    } finally {
+      setSavingCategory(false);
+    }
+  }
+
   /*
    * Live validation — the issues the operator sees BEFORE pressing Save.
    * Each entry points at the tab that owns it, so the strip (and the amber
@@ -2429,19 +2480,16 @@ function ProductDialog({
     return issues;
   }, [form.name_ar, form.sale_price, form.cost_price, policyCheckQuiet, canViewCost, lang]);
 
-  const tabIssueCounts = useMemo(() => {
-    const counts: Partial<Record<ProductFormTab, number>> = {};
-    for (const issue of formIssues) counts[issue.tab] = (counts[issue.tab] ?? 0) + 1;
-    return counts;
-  }, [formIssues]);
-
   return (
     <VortexDrawerDialog
       open={true}
       onOpenChange={(isOpen) => {
         if (!isOpen) onClose();
       }}
-      size="xl"
+      size="full"
+      className="sm:max-w-5xl sm:h-[min(92vh,900px)]"
+      bodyClassName="bg-muted/[0.12] px-4 py-4 sm:px-7 sm:py-6"
+      desktopSide="right"
       title={
         <div className="flex items-center gap-2">
           <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -2457,11 +2505,11 @@ function ProductDialog({
             : "Update product specs, margins, and policies"
           : lang === "ar"
             ? "تعريف صنف جديد بأسلوب بطاقة المكونات الأنيقة"
-            : "Define a new catalog item with luxury details"
+            : "Define a new catalog item with its details and policies"
       }
       footer={
-        <div className="flex w-full items-center justify-between gap-3 border-t border-border/40 pt-3">
-          <div className="flex items-center gap-2">
+        <div className="flex w-full flex-col gap-3 border-t border-border/40 pt-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2 sm:ms-auto">
             <label className="relative inline-flex cursor-pointer items-center gap-2">
               <input
                 type="checkbox"
@@ -2485,7 +2533,7 @@ function ProductDialog({
               type="button"
               variant="outline"
               onClick={onClose}
-              className="min-w-[90px] rounded-xl text-xs font-medium"
+              className="min-h-10 min-w-[90px] flex-1 rounded-xl text-xs font-medium sm:flex-none"
             >
               {t("common.cancel")}
             </Button>
@@ -2493,7 +2541,7 @@ function ProductDialog({
               type="submit"
               form="product-form"
               loading={saving}
-              className="min-w-[130px] rounded-xl bg-primary text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/95"
+              className="min-h-10 min-w-[130px] flex-1 rounded-xl bg-primary text-xs font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/95 hover:shadow-md active:scale-[0.98] sm:flex-none"
             >
               <Check className="me-1 size-3.5" />
               {t("common.save")}
@@ -2502,7 +2550,11 @@ function ProductDialog({
         </div>
       }
     >
-      <form id="product-form" onSubmit={submit} className="flex flex-col gap-5">
+      <form
+        id="product-form"
+        onSubmit={submit}
+        className="mx-auto flex w-full max-w-4xl flex-col gap-4 sm:gap-5"
+      >
         {/* Live Product Preview — shared shell (same card in every entry path). */}
         <ProductPreviewCard
           nameAr={form.name_ar}
@@ -2526,463 +2578,554 @@ function ProductDialog({
           newTitlePlaceholder={lang === "ar" ? "اسم المنتج الجديد..." : "New Product Name..."}
         />
 
-        {/* Live validation — issues jump to their owning tab. */}
-        <FormIssuesBar issues={formIssues} onJump={setActiveTab} />
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-border/50 bg-card/70 px-3.5 py-2.5 text-xs">
+          <span className="font-semibold text-foreground">
+            {lang === "ar" ? "اكتمال البيانات المطلوبة" : "Required details"}
+          </span>
+          <span
+            className={cn(
+              "rounded-full px-2.5 py-1 font-semibold tabular-nums",
+              formIssues.length === 0
+                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                : "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+            )}
+          >
+            {formIssues.length === 0
+              ? lang === "ar"
+                ? "جاهز للحفظ"
+                : "Ready to save"
+              : lang === "ar"
+                ? `${formIssues.length} ملاحظات`
+                : `${formIssues.length} items to review`}
+          </span>
+        </div>
 
-        {/* Sleek Segmented Tabs — shared control (SegmentedTabs). */}
-        <ProductFormTabs
-          value={activeTab}
-          onChange={setActiveTab}
-          issues={tabIssueCounts}
-          labels={{
-            general: {
-              label: lang === "ar" ? "البيانات الأساسية" : "Basic Info",
-              icon: <Package className="size-3.5" />,
-            },
-            pricing: {
-              label: lang === "ar" ? "التسعير والربحية" : "Pricing & Margins",
-              icon: <DollarSign className="size-3.5" />,
-            },
-            specs: {
-              label: lang === "ar" ? "المخزون والمواصفات" : "Stock & Specs",
-              icon: <Layers className="size-3.5" />,
-            },
-            policy: {
-              label: lang === "ar" ? "طبيعة وسياسة الصنف" : "Policies",
-              icon: <SlidersHorizontal className="size-3.5" />,
-            },
-          }}
-        />
+        {/* Live validation — issues jump to their owning tab. */}
+        <FormIssuesBar issues={formIssues} onJump={jumpToSection} />
 
         {/* Tab 1: General Info */}
-        {activeTab === "general" && (
-          <div className="space-y-4 pt-1">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <FormField label={t("products.name_ar")} required>
+        <section
+          id="product-section-general"
+          className="scroll-mt-4 animate-in fade-in-0 slide-in-from-bottom-1 duration-200 space-y-4 rounded-2xl border border-border/60 bg-card/80 p-4 shadow-xs sm:p-5"
+        >
+          <SectionHeading
+            icon={<Package className="size-4" />}
+            title={lang === "ar" ? "البيانات الأساسية" : "Basic information"}
+            description={
+              lang === "ar" ? "اسم الصنف ورموزه وتصنيفه" : "Product name, identifiers and category"
+            }
+          />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FormField label={t("products.name_ar")} required>
+              {(p) => (
+                <VortexTextInput
+                  id={p.id}
+                  aria-describedby={p["aria-describedby"]}
+                  dir="rtl"
+                  clearable
+                  value={form.name_ar}
+                  onChange={(e) => setForm({ ...form, name_ar: e.target.value })}
+                  placeholder={
+                    lang === "ar" ? "أدخل اسم الصنف بالعربية..." : "Arabic product name..."
+                  }
+                />
+              )}
+            </FormField>
+
+            {showForm("nameEn") && (
+              <FormField label={t("products.name_en")}>
                 {(p) => (
                   <VortexTextInput
                     id={p.id}
                     aria-describedby={p["aria-describedby"]}
-                    dir="rtl"
+                    dir="ltr"
                     clearable
-                    value={form.name_ar}
-                    onChange={(e) => setForm({ ...form, name_ar: e.target.value })}
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
                     placeholder={
-                      lang === "ar" ? "أدخل اسم الصنف بالعربية..." : "Arabic product name..."
+                      lang === "ar" ? "English product name..." : "English product name..."
                     }
                   />
-                )}
-              </FormField>
-
-              {showForm("nameEn") && (
-                <FormField label={t("products.name_en")}>
-                  {(p) => (
-                    <VortexTextInput
-                      id={p.id}
-                      aria-describedby={p["aria-describedby"]}
-                      dir="ltr"
-                      clearable
-                      value={form.name}
-                      onChange={(e) => setForm({ ...form, name: e.target.value })}
-                      placeholder={
-                        lang === "ar" ? "English product name..." : "English product name..."
-                      }
-                    />
-                  )}
-                </FormField>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {showForm("category") && (
-                <FormField label={t("products.category")}>
-                  {(p) => (
-                    <select
-                      id={p.id}
-                      aria-describedby={p["aria-describedby"]}
-                      value={form.category_id}
-                      onChange={(e) => setForm({ ...form, category_id: e.target.value })}
-                      className={cn(fieldSurfaceClass, "text-sm font-medium")}
-                    >
-                      <option value="">
-                        {lang === "ar" ? "اختر التصنيف..." : "Select category..."}
-                      </option>
-                      {meta.categories.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {labelOf(c.name, c.name_ar)}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </FormField>
-              )}
-
-              {showForm("sku") && (
-                <FormField
-                  label={t("products.sku")}
-                  hint={lang === "ar" ? "معرّف الصنف الفريد" : "Unique SKU code"}
-                >
-                  {(p) => (
-                    <VortexTextInput
-                      id={p.id}
-                      aria-describedby={p["aria-describedby"]}
-                      clearable
-                      value={form.sku}
-                      onChange={(e) => setForm({ ...form, sku: e.target.value })}
-                      placeholder="PRD-001"
-                    />
-                  )}
-                </FormField>
-              )}
-
-              {showForm("shelf") && (
-                <FormField label={lang === "ar" ? "موقع الرف / المستودع" : "Shelf location"}>
-                  {(p) => (
-                    <VortexTextInput
-                      id={p.id}
-                      aria-describedby={p["aria-describedby"]}
-                      clearable
-                      value={form.shelf_location}
-                      onChange={(e) => setForm({ ...form, shelf_location: e.target.value })}
-                      placeholder={lang === "ar" ? "رف A-12" : "Shelf A-12"}
-                    />
-                  )}
-                </FormField>
-              )}
-            </div>
-
-            {isModuleEnabled("barcode") && showForm("barcode") && (
-              <FormField
-                label={t("products.barcode")}
-                hint={lang === "ar" ? "رمز الباركود للمسح السريع" : "Fast scan barcode"}
-              >
-                {(p) => (
-                  <div className="flex items-center gap-2">
-                    <VortexTextInput
-                      id={p.id}
-                      aria-describedby={p["aria-describedby"]}
-                      dir="ltr"
-                      clearable
-                      value={form.barcode}
-                      onChange={(e) => setForm({ ...form, barcode: e.target.value })}
-                      placeholder="628100..."
-                      className="min-w-0 flex-1 font-mono"
-                    />
-                    <IconButton
-                      type="button"
-                      size="md"
-                      variant="outline"
-                      ariaLabel={lang === "ar" ? "مسح الباركود بالكاميرا" : "Scan barcode"}
-                      icon={<Camera className="size-4" />}
-                      onClick={() => setScannerOpen(true)}
-                    />
-                  </div>
                 )}
               </FormField>
             )}
           </div>
-        )}
 
-        {/* Tab 2: Pricing & Margins */}
-        {activeTab === "pricing" && (
-          <div className="space-y-4 pt-1">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {showForm("category") && (
+              <FormField label={t("products.category")}>
+                {(p) => (
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <select
+                        id={p.id}
+                        aria-describedby={p["aria-describedby"]}
+                        value={form.category_id}
+                        onChange={(e) => setForm({ ...form, category_id: e.target.value })}
+                        className={cn(fieldSurfaceClass, "min-w-0 flex-1 text-sm font-medium")}
+                      >
+                        <option value="">
+                          {lang === "ar" ? "اختر التصنيف..." : "Select category..."}
+                        </option>
+                        {meta.categories.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {labelOf(c.name, c.name_ar)}
+                          </option>
+                        ))}
+                      </select>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        aria-expanded={categoryQuickAddOpen}
+                        onClick={() => setCategoryQuickAddOpen((open) => !open)}
+                        className="h-10 shrink-0 gap-1.5 rounded-xl px-3 text-xs"
+                      >
+                        <Plus className="size-3.5" />
+                        <span className="hidden sm:inline">{lang === "ar" ? "جديد" : "New"}</span>
+                      </Button>
+                    </div>
+                    {categoryQuickAddOpen && (
+                      <form
+                        onSubmit={addCategoryQuickly}
+                        className="animate-in fade-in-0 slide-in-from-top-1 space-y-2 rounded-xl border border-primary/20 bg-primary/[0.035] p-3 duration-150"
+                      >
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <VortexTextInput
+                            value={categoryNameAr}
+                            onChange={(event) => setCategoryNameAr(event.target.value)}
+                            dir="rtl"
+                            placeholder={lang === "ar" ? "اسم التصنيف بالعربية" : "Arabic name"}
+                            aria-label={
+                              lang === "ar" ? "اسم التصنيف بالعربية" : "Arabic category name"
+                            }
+                          />
+                          <VortexTextInput
+                            value={categoryNameEn}
+                            onChange={(event) => setCategoryNameEn(event.target.value)}
+                            dir="ltr"
+                            placeholder={
+                              lang === "ar"
+                                ? "الاسم بالإنجليزية (اختياري)"
+                                : "English name (optional)"
+                            }
+                            aria-label={
+                              lang === "ar" ? "الاسم بالإنجليزية" : "English category name"
+                            }
+                          />
+                        </div>
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setCategoryQuickAddOpen(false)}
+                          >
+                            {t("common.cancel")}
+                          </Button>
+                          <Button type="submit" size="sm" loading={savingCategory}>
+                            {lang === "ar" ? "إضافة التصنيف" : "Add category"}
+                          </Button>
+                        </div>
+                      </form>
+                    )}
+                  </div>
+                )}
+              </FormField>
+            )}
+
+            {showForm("sku") && (
               <FormField
-                label={t("common.price")}
-                required
-                hint={lang === "ar" ? "سعر البيع النهائي للعميل" : "Retail sale price"}
+                label={t("products.sku")}
+                hint={lang === "ar" ? "معرّف الصنف الفريد" : "Unique SKU code"}
               >
                 {(p) => (
-                  <VortexCurrencyInput
+                  <VortexTextInput
                     id={p.id}
                     aria-describedby={p["aria-describedby"]}
-                    value={form.sale_price === "" ? null : Number(form.sale_price)}
-                    onValueChange={(num) =>
-                      setForm({ ...form, sale_price: num == null ? "" : String(num) })
-                    }
-                    min={0}
-                    currencySymbol={getCompanyCurrencySymbol()}
-                    placeholder="0.00"
+                    clearable
+                    value={form.sku}
+                    onChange={(e) => setForm({ ...form, sku: e.target.value })}
+                    placeholder="PRD-001"
                   />
                 )}
               </FormField>
+            )}
 
-              {canViewCost && showForm("cost") && (
-                <FormField
-                  label={t("common.cost")}
-                  hint={lang === "ar" ? "تكلفة الشراء الأساسية" : "Unit cost price"}
-                >
-                  <VortexCurrencyInput
-                    value={form.cost_price === "" ? null : Number(form.cost_price)}
-                    onValueChange={(num) =>
-                      setForm({ ...form, cost_price: num == null ? "" : String(num) })
+            {showForm("shelf") && (
+              <FormField label={lang === "ar" ? "موقع الرف / المستودع" : "Shelf location"}>
+                {(p) => (
+                  <VortexTextInput
+                    id={p.id}
+                    aria-describedby={p["aria-describedby"]}
+                    clearable
+                    value={form.shelf_location}
+                    onChange={(e) => setForm({ ...form, shelf_location: e.target.value })}
+                    placeholder={lang === "ar" ? "رف A-12" : "Shelf A-12"}
+                  />
+                )}
+              </FormField>
+            )}
+          </div>
+
+          {isModuleEnabled("barcode") && showForm("barcode") && (
+            <FormField
+              label={t("products.barcode")}
+              hint={lang === "ar" ? "رمز الباركود للمسح السريع" : "Fast scan barcode"}
+            >
+              {(p) => (
+                <div className="flex items-center gap-2">
+                  <VortexTextInput
+                    id={p.id}
+                    aria-describedby={p["aria-describedby"]}
+                    dir="ltr"
+                    clearable
+                    value={form.barcode}
+                    onChange={(e) => setForm({ ...form, barcode: e.target.value })}
+                    placeholder="628100..."
+                    className="min-w-0 flex-1 font-mono"
+                  />
+                  <IconButton
+                    type="button"
+                    size="md"
+                    variant="outline"
+                    ariaLabel={lang === "ar" ? "مسح الباركود بالكاميرا" : "Scan barcode"}
+                    icon={<Camera className="size-4" />}
+                    onClick={() => setScannerOpen(true)}
+                  />
+                </div>
+              )}
+            </FormField>
+          )}
+        </section>
+
+        {/* Tab 2: Pricing & Margins */}
+        <section
+          id="product-section-pricing"
+          className="scroll-mt-4 animate-in fade-in-0 slide-in-from-bottom-1 duration-200 space-y-4 rounded-2xl border border-border/60 bg-card/80 p-4 shadow-xs sm:p-5"
+        >
+          <SectionHeading
+            icon={<DollarSign className="size-4" />}
+            title={lang === "ar" ? "التسعير" : "Pricing"}
+            description={
+              lang === "ar" ? "أسعار البيع والتكلفة والضريبة" : "Sale price, cost and tax"
+            }
+          />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FormField
+              label={t("common.price")}
+              required
+              hint={lang === "ar" ? "سعر البيع النهائي للعميل" : "Retail sale price"}
+            >
+              {(p) => (
+                <VortexCurrencyInput
+                  id={p.id}
+                  aria-describedby={p["aria-describedby"]}
+                  value={form.sale_price === "" ? null : Number(form.sale_price)}
+                  onValueChange={(num) =>
+                    setForm({ ...form, sale_price: num == null ? "" : String(num) })
+                  }
+                  min={0}
+                  currencySymbol={getCompanyCurrencySymbol()}
+                  placeholder="0.00"
+                />
+              )}
+            </FormField>
+
+            {canViewCost && showForm("cost") && (
+              <FormField
+                label={t("common.cost")}
+                hint={lang === "ar" ? "تكلفة الشراء الأساسية" : "Unit cost price"}
+              >
+                <VortexCurrencyInput
+                  value={form.cost_price === "" ? null : Number(form.cost_price)}
+                  onValueChange={(num) =>
+                    setForm({ ...form, cost_price: num == null ? "" : String(num) })
+                  }
+                  min={0}
+                  currencySymbol={getCompanyCurrencySymbol()}
+                  placeholder="0.00"
+                />
+              </FormField>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {showForm("tax") && (
+              <FormField label={t("products.tax_rate")}>
+                {(p) => (
+                  <NumberInput
+                    {...p}
+                    value={form.tax_rate === "" ? null : Number(form.tax_rate)}
+                    onValueChange={(v) =>
+                      setForm({ ...form, tax_rate: v == null ? "" : String(v) })
                     }
                     min={0}
-                    currencySymbol={getCompanyCurrencySymbol()}
-                    placeholder="0.00"
+                    max={100}
+                    suffix="%"
+                    placeholder="0"
                   />
-                </FormField>
-              )}
-            </div>
+                )}
+              </FormField>
+            )}
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {showForm("tax") && (
-                <FormField label={t("products.tax_rate")}>
-                  {(p) => (
-                    <NumberInput
-                      {...p}
-                      value={form.tax_rate === "" ? null : Number(form.tax_rate)}
-                      onValueChange={(v) =>
-                        setForm({ ...form, tax_rate: v == null ? "" : String(v) })
-                      }
-                      min={0}
-                      max={100}
-                      suffix="%"
-                      placeholder="0"
-                    />
-                  )}
-                </FormField>
-              )}
-
-              {config.enableUnits && showForm("unit") && (
-                <FormField label={t("products.unit")}>
-                  {(p) => (
-                    <select
-                      id={p.id}
-                      aria-describedby={p["aria-describedby"]}
-                      value={form.unit_id}
-                      onChange={(e) => setForm({ ...form, unit_id: e.target.value })}
-                      className={cn(fieldSurfaceClass, "text-sm font-medium")}
-                    >
-                      <option value="">
-                        {lang === "ar" ? "اختر وحدة القياس..." : "Select unit..."}
+            {config.enableUnits && showForm("unit") && (
+              <FormField label={t("products.unit")}>
+                {(p) => (
+                  <select
+                    id={p.id}
+                    aria-describedby={p["aria-describedby"]}
+                    value={form.unit_id}
+                    onChange={(e) => setForm({ ...form, unit_id: e.target.value })}
+                    className={cn(fieldSurfaceClass, "text-sm font-medium")}
+                  >
+                    <option value="">
+                      {lang === "ar" ? "اختر وحدة القياس..." : "Select unit..."}
+                    </option>
+                    {meta.units.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {labelOf(u.name, u.name_ar)}
                       </option>
-                      {meta.units.map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {labelOf(u.name, u.name_ar)}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </FormField>
-              )}
-            </div>
+                    ))}
+                  </select>
+                )}
+              </FormField>
+            )}
           </div>
-        )}
+        </section>
 
         {/* Tab 3: Specs & Inventory */}
-        {activeTab === "specs" && (
-          <div className="space-y-4 pt-1">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {showForm("minStock") && (
-                <FormField
-                  label={t("products.min")}
-                  hint={
-                    lang === "ar"
-                      ? "حد التنبيه عند وصول المخزون لهذه الكمية"
-                      : "Low-stock alert threshold"
-                  }
-                >
-                  {(p) => (
-                    <NumberInput
-                      {...p}
-                      value={form.min_stock === "" ? null : Number(form.min_stock)}
-                      onValueChange={(v) =>
-                        setForm({ ...form, min_stock: v == null ? "" : String(v) })
-                      }
-                      min={0}
-                      decimal={false}
-                      placeholder="1"
-                    />
-                  )}
-                </FormField>
-              )}
+        <section
+          id="product-section-specs"
+          className="scroll-mt-4 animate-in fade-in-0 slide-in-from-bottom-1 duration-200 space-y-4 rounded-2xl border border-border/60 bg-card/80 p-4 shadow-xs sm:p-5"
+        >
+          <SectionHeading
+            icon={<Layers className="size-4" />}
+            title={lang === "ar" ? "المخزون والمواصفات" : "Inventory & specifications"}
+            description={
+              lang === "ar"
+                ? "حدود المخزون والعبوة والخصائص"
+                : "Stock thresholds, package and attributes"
+            }
+          />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {showForm("minStock") && (
+              <FormField
+                label={t("products.min")}
+                hint={
+                  lang === "ar"
+                    ? "حد التنبيه عند وصول المخزون لهذه الكمية"
+                    : "Low-stock alert threshold"
+                }
+              >
+                {(p) => (
+                  <NumberInput
+                    {...p}
+                    value={form.min_stock === "" ? null : Number(form.min_stock)}
+                    onValueChange={(v) =>
+                      setForm({ ...form, min_stock: v == null ? "" : String(v) })
+                    }
+                    min={0}
+                    decimal={false}
+                    placeholder="1"
+                  />
+                )}
+              </FormField>
+            )}
 
-              {showForm("packageWeight") && (
-                <FormField
-                  label={lang === "ar" ? "سعة العبوة (كجم)" : "Package size (kg)"}
-                  hint={
-                    lang === "ar"
-                      ? "الوزن الافتراضي للكيس (مثال 50 أو 25). يُستخدم لتعبئة الوزن في شاشات الطحن والتسليم فقط."
-                      : "Default bag weight (e.g. 50 or 25). Used to prefill the weight on milling and delivery screens only."
-                  }
-                >
-                  {(p) => (
-                    <NumberInput
-                      {...p}
-                      value={form.package_weight_kg === "" ? null : Number(form.package_weight_kg)}
-                      onValueChange={(v) =>
-                        setForm({ ...form, package_weight_kg: v == null ? "" : String(v) })
-                      }
-                      min={0}
-                      decimal
-                      placeholder={lang === "ar" ? "مثال: 50" : "e.g. 50"}
-                    />
-                  )}
-                </FormField>
-              )}
+            {showForm("packageWeight") && (
+              <FormField
+                label={lang === "ar" ? "سعة العبوة (كجم)" : "Package size (kg)"}
+                hint={
+                  lang === "ar"
+                    ? "الوزن الافتراضي للكيس (مثال 50 أو 25). يُستخدم لتعبئة الوزن في شاشات الطحن والتسليم فقط."
+                    : "Default bag weight (e.g. 50 or 25). Used to prefill the weight on milling and delivery screens only."
+                }
+              >
+                {(p) => (
+                  <NumberInput
+                    {...p}
+                    value={form.package_weight_kg === "" ? null : Number(form.package_weight_kg)}
+                    onValueChange={(v) =>
+                      setForm({ ...form, package_weight_kg: v == null ? "" : String(v) })
+                    }
+                    min={0}
+                    decimal
+                    placeholder={lang === "ar" ? "مثال: 50" : "e.g. 50"}
+                  />
+                )}
+              </FormField>
+            )}
 
-              {config.enableBrands && showForm("brand") && (
-                <FormField label={t("products.brand")}>
-                  {(p) => (
-                    <select
-                      id={p.id}
-                      aria-describedby={p["aria-describedby"]}
-                      value={form.brand_id}
-                      onChange={(e) => setForm({ ...form, brand_id: e.target.value })}
-                      className={cn(fieldSurfaceClass, "text-sm font-medium")}
-                    >
-                      <option value="">
-                        {lang === "ar" ? "اختر العلامة التجارية..." : "Select brand..."}
+            {config.enableBrands && showForm("brand") && (
+              <FormField label={t("products.brand")}>
+                {(p) => (
+                  <select
+                    id={p.id}
+                    aria-describedby={p["aria-describedby"]}
+                    value={form.brand_id}
+                    onChange={(e) => setForm({ ...form, brand_id: e.target.value })}
+                    className={cn(fieldSurfaceClass, "text-sm font-medium")}
+                  >
+                    <option value="">
+                      {lang === "ar" ? "اختر العلامة التجارية..." : "Select brand..."}
+                    </option>
+                    {meta.brands.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {labelOf(b.name, b.name_ar)}
                       </option>
-                      {meta.brands.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {labelOf(b.name, b.name_ar)}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </FormField>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {config.enableOrigins && (
-                <FormField label={lang === "ar" ? "بلد المنشأ" : "Country of origin"}>
-                  {(p) => (
-                    <select
-                      id={p.id}
-                      aria-describedby={p["aria-describedby"]}
-                      value={form.origin_id}
-                      onChange={(e) => setForm({ ...form, origin_id: e.target.value })}
-                      className={cn(fieldSurfaceClass, "text-sm font-medium")}
-                    >
-                      <option value="">
-                        {lang === "ar" ? "اختر بلد المنشأ..." : "Select origin..."}
-                      </option>
-                      {meta.origins.map((o) => (
-                        <option key={o.id} value={o.id}>
-                          {lang === "ar" ? o.name_ar : o.name}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </FormField>
-              )}
-
-              {config.enableQualityGrades && (
-                <FormField label={lang === "ar" ? "درجة الجودة" : "Quality grade"}>
-                  {(p) => (
-                    <select
-                      id={p.id}
-                      aria-describedby={p["aria-describedby"]}
-                      value={form.quality_grade_id}
-                      onChange={(e) => setForm({ ...form, quality_grade_id: e.target.value })}
-                      className={cn(fieldSurfaceClass, "text-sm font-medium")}
-                    >
-                      <option value="">
-                        {lang === "ar" ? "اختر درجة الجودة..." : "Select quality grade..."}
-                      </option>
-                      {meta.qualities.map((q) => (
-                        <option key={q.id} value={q.id}>
-                          {lang === "ar" ? q.name_ar : q.name}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </FormField>
-              )}
-            </div>
+                    ))}
+                  </select>
+                )}
+              </FormField>
+            )}
           </div>
-        )}
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {config.enableOrigins && (
+              <FormField label={lang === "ar" ? "بلد المنشأ" : "Country of origin"}>
+                {(p) => (
+                  <select
+                    id={p.id}
+                    aria-describedby={p["aria-describedby"]}
+                    value={form.origin_id}
+                    onChange={(e) => setForm({ ...form, origin_id: e.target.value })}
+                    className={cn(fieldSurfaceClass, "text-sm font-medium")}
+                  >
+                    <option value="">
+                      {lang === "ar" ? "اختر بلد المنشأ..." : "Select origin..."}
+                    </option>
+                    {meta.origins.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {lang === "ar" ? o.name_ar : o.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </FormField>
+            )}
+
+            {config.enableQualityGrades && (
+              <FormField label={lang === "ar" ? "درجة الجودة" : "Quality grade"}>
+                {(p) => (
+                  <select
+                    id={p.id}
+                    aria-describedby={p["aria-describedby"]}
+                    value={form.quality_grade_id}
+                    onChange={(e) => setForm({ ...form, quality_grade_id: e.target.value })}
+                    className={cn(fieldSurfaceClass, "text-sm font-medium")}
+                  >
+                    <option value="">
+                      {lang === "ar" ? "اختر درجة الجودة..." : "Select quality grade..."}
+                    </option>
+                    {meta.qualities.map((q) => (
+                      <option key={q.id} value={q.id}>
+                        {lang === "ar" ? q.name_ar : q.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </FormField>
+            )}
+          </div>
+        </section>
 
         {/* Tab 4: Item Nature & Policies */}
-        {activeTab === "policy" && (
-          <div className="space-y-4 rounded-xl border border-border/60 bg-muted/20 p-4 pt-3">
-            <div className="space-y-4">
+        <section
+          id="product-section-policy"
+          className="scroll-mt-4 animate-in fade-in-0 slide-in-from-bottom-1 duration-200 space-y-4 rounded-2xl border border-border/60 bg-card/80 p-4 shadow-xs sm:p-5"
+        >
+          <SectionHeading
+            icon={<SlidersHorizontal className="size-4" />}
+            title={lang === "ar" ? "طبيعة وسياسة الصنف" : "Item nature & policy"}
+            description={
+              lang === "ar"
+                ? "حدد أثر الصنف على البيع والشراء والمخزون"
+                : "Choose how the item participates in sales, purchasing and stock"
+            }
+          />
+          <div className="space-y-4">
+            <SettingsChoice
+              label={lang === "ar" ? "طبيعة الصنف" : "Item nature"}
+              value={policy.item_nature}
+              options={[
+                { value: "GOOD", label: ITEM_NATURE_LABELS.GOOD[lang === "ar" ? "ar" : "en"] },
+                {
+                  value: "SERVICE",
+                  label: ITEM_NATURE_LABELS.SERVICE[lang === "ar" ? "ar" : "en"],
+                },
+              ]}
+              onChange={(value) =>
+                setPolicy((current) => ({
+                  ...current,
+                  item_nature: value as ItemNature,
+                  inventory_policy: value === "SERVICE" ? "UNTRACKED" : current.inventory_policy,
+                  tracking: value === "SERVICE" ? "NONE" : current.tracking,
+                  costing_method: value === "SERVICE" ? "NONE" : current.costing_method,
+                }))
+              }
+            />
+
+            {policy.item_nature === "GOOD" && (
               <SettingsChoice
-                label={lang === "ar" ? "طبيعة الصنف" : "Item nature"}
-                value={policy.item_nature}
-                options={[
-                  { value: "GOOD", label: ITEM_NATURE_LABELS.GOOD[lang === "ar" ? "ar" : "en"] },
-                  {
-                    value: "SERVICE",
-                    label: ITEM_NATURE_LABELS.SERVICE[lang === "ar" ? "ar" : "en"],
-                  },
-                ]}
+                label={lang === "ar" ? "سياسة المخزون" : "Inventory policy"}
+                value={policy.inventory_policy}
+                options={(["TRACKED", "UNTRACKED", "CUSTOMER_OWNED"] as InventoryPolicy[]).map(
+                  (value) => ({
+                    value,
+                    label: INVENTORY_POLICY_LABELS[value][lang === "ar" ? "ar" : "en"],
+                  }),
+                )}
                 onChange={(value) =>
                   setPolicy((current) => ({
                     ...current,
-                    item_nature: value as ItemNature,
-                    inventory_policy: value === "SERVICE" ? "UNTRACKED" : current.inventory_policy,
-                    tracking: value === "SERVICE" ? "NONE" : current.tracking,
-                    costing_method: value === "SERVICE" ? "NONE" : current.costing_method,
+                    inventory_policy: value as InventoryPolicy,
+                    tracking: value === "TRACKED" ? current.tracking : "NONE",
                   }))
                 }
               />
+            )}
 
-              {policy.item_nature === "GOOD" && (
-                <SettingsChoice
-                  label={lang === "ar" ? "سياسة المخزون" : "Inventory policy"}
-                  value={policy.inventory_policy}
-                  options={(["TRACKED", "UNTRACKED", "CUSTOMER_OWNED"] as InventoryPolicy[]).map(
-                    (value) => ({
-                      value,
-                      label: INVENTORY_POLICY_LABELS[value][lang === "ar" ? "ar" : "en"],
-                    }),
-                  )}
-                  onChange={(value) =>
-                    setPolicy((current) => ({
-                      ...current,
-                      inventory_policy: value as InventoryPolicy,
-                      tracking: value === "TRACKED" ? current.tracking : "NONE",
-                    }))
-                  }
-                />
-              )}
+            {policy.item_nature === "GOOD" && policy.inventory_policy === "TRACKED" && (
+              <SettingsChoice
+                label={lang === "ar" ? "طريقة التتبع" : "Tracking method"}
+                value={policy.tracking}
+                options={(["NONE", "BATCH", "SERIAL"] as ItemTracking[]).map((value) => ({
+                  value,
+                  label: TRACKING_LABELS[value][lang === "ar" ? "ar" : "en"],
+                }))}
+                onChange={(value) =>
+                  setPolicy((current) => ({
+                    ...current,
+                    tracking: value as ItemTracking,
+                  }))
+                }
+              />
+            )}
 
-              {policy.item_nature === "GOOD" && policy.inventory_policy === "TRACKED" && (
-                <SettingsChoice
-                  label={lang === "ar" ? "طريقة التتبع" : "Tracking method"}
-                  value={policy.tracking}
-                  options={(["NONE", "BATCH", "SERIAL"] as ItemTracking[]).map((value) => ({
-                    value,
-                    label: TRACKING_LABELS[value][lang === "ar" ? "ar" : "en"],
-                  }))}
-                  onChange={(value) =>
-                    setPolicy((current) => ({
-                      ...current,
-                      tracking: value as ItemTracking,
-                    }))
-                  }
-                />
-              )}
-
-              <div className="grid grid-cols-1 gap-2 pt-2 sm:grid-cols-2">
-                <SettingsToggle
-                  label={lang === "ar" ? "متاح للبيع" : "Available for sales"}
-                  description={
-                    lang === "ar"
-                      ? "إظهار الصنف في نقطة البيع وفواتير المبيعات"
-                      : "Show in sales & POS"
-                  }
-                  checked={policy.is_sellable}
-                  onChange={(checked) => setPolicy((c) => ({ ...c, is_sellable: checked }))}
-                />
-                <SettingsToggle
-                  label={lang === "ar" ? "متاح للشراء" : "Available for purchase"}
-                  description={
-                    lang === "ar"
-                      ? "إظهار الصنف في فواتير المشتريات والتوريد"
-                      : "Show in purchases & supply"
-                  }
-                  checked={policy.is_purchasable}
-                  onChange={(checked) => setPolicy((c) => ({ ...c, is_purchasable: checked }))}
-                />
-              </div>
+            <div className="grid grid-cols-1 gap-2 pt-2 sm:grid-cols-2">
+              <SettingsToggle
+                label={lang === "ar" ? "متاح للبيع" : "Available for sales"}
+                description={
+                  lang === "ar"
+                    ? "إظهار الصنف في نقطة البيع وفواتير المبيعات"
+                    : "Show in sales & POS"
+                }
+                checked={policy.is_sellable}
+                onChange={(checked) => setPolicy((c) => ({ ...c, is_sellable: checked }))}
+              />
+              <SettingsToggle
+                label={lang === "ar" ? "متاح للشراء" : "Available for purchase"}
+                description={
+                  lang === "ar"
+                    ? "إظهار الصنف في فواتير المشتريات والتوريد"
+                    : "Show in purchases & supply"
+                }
+                checked={policy.is_purchasable}
+                onChange={(checked) => setPolicy((c) => ({ ...c, is_purchasable: checked }))}
+              />
             </div>
           </div>
-        )}
+        </section>
       </form>
 
       {scannerOpen && (
@@ -3000,6 +3143,30 @@ function ProductDialog({
   );
 }
 
+function SectionHeading({
+  icon,
+  title,
+  description,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+}) {
+  return (
+    <header className="flex items-start gap-3 border-b border-border/60 pb-3">
+      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+        {icon}
+      </span>
+      <span className="min-w-0 pt-0.5">
+        <span className="block text-sm font-bold text-foreground">{title}</span>
+        <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
+          {description}
+        </span>
+      </span>
+    </header>
+  );
+}
+
 function SettingsChoice({
   label,
   value,
@@ -3012,20 +3179,46 @@ function SettingsChoice({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="flex flex-col gap-2">
-      <span className="text-xs font-semibold text-foreground">{label}</span>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className={fieldSurfaceClass}
+    <fieldset className="space-y-2.5">
+      <legend className="text-xs font-semibold text-foreground">{label}</legend>
+      <div
+        role="radiogroup"
+        aria-label={label}
+        className={cn(
+          "grid gap-2",
+          options.length === 2 ? "grid-cols-2" : "grid-cols-1 sm:grid-cols-3",
+        )}
       >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
+        {options.map((option) => {
+          const selected = value === option.value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              onClick={() => onChange(option.value)}
+              className={cn(
+                "flex min-h-11 items-center justify-between gap-2 rounded-xl border px-3 py-2 text-start text-xs font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.99]",
+                selected
+                  ? "border-primary/50 bg-primary/10 text-primary shadow-xs"
+                  : "border-border/70 bg-background/70 text-muted-foreground hover:border-primary/30 hover:bg-muted/50 hover:text-foreground",
+              )}
+            >
+              <span>{option.label}</span>
+              <span
+                className={cn(
+                  "grid size-4 shrink-0 place-items-center rounded-full border",
+                  selected ? "border-primary bg-primary" : "border-border bg-background",
+                )}
+              >
+                {selected && <Check className="size-2.5 text-primary-foreground" />}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </fieldset>
   );
 }
 

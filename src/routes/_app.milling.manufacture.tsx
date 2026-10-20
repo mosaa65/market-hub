@@ -33,6 +33,7 @@ import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
 import { ModuleGuard } from "@/lib/modules";
 import { supabase } from "@/integrations/supabase/client";
+import { translateRpcError } from "@/lib/errors/rpc-errors";
 import {
   smartManufacture,
   fetchGrainItems,
@@ -333,7 +334,8 @@ export function SmartManufacturePage() {
       void qc.invalidateQueries({ queryKey: ["milling"] });
       void qc.invalidateQueries({ queryKey: ["inventory"] });
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "خطأ غير متوقع"),
+    // P1-4: كل خطأ RPC يمر بطبقة الترجمة الموحدة قبل العرض.
+    onError: (err) => toast.error(translateRpcError(err, "ar", "تعذر تنفيذ التصنيع.")),
   });
 
   // شروط تفعيل زر التنفيذ

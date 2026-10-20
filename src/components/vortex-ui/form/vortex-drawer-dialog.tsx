@@ -39,7 +39,7 @@ export interface VortexDrawerDialogProps {
    *   الكثيرة كشيت الفلترة/الترتيب لتوفير المساحة).
    * الجوال غير متأثر إطلاقاً — يبقى Bottom Sheet من الأسفل.
    */
-  desktopSide?: "center" | "left";
+  desktopSide?: "center" | "left" | "right";
 }
 
 /**
@@ -73,6 +73,7 @@ export function VortexDrawerDialog({
     // "left": لوحة جانبية أنيقة تنزلق من يسار الشاشة (المحور 10 — توفير المساحة
     // في الابتوب). الجوال يبقى Bottom Sheet كما هو دون أي تغيير.
     const isLeftPanel = desktopSide === "left";
+    const isSidePanel = desktopSide !== "center";
     return (
       <DialogPrimitive.Root open={open} onOpenChange={dismissible ? onOpenChange : undefined}>
         <DialogPrimitive.Portal>
@@ -84,10 +85,15 @@ export function VortexDrawerDialog({
                * - محتوى قليل => فورم منبثق صغير أنيق لا يمتد على طول الشاشة.
                * - محتوى كثير => تتمدد حتى قرب الحافة السفلية ثم يصبح الجسم قابلاً للتمرير.
                */
-              isLeftPanel
-                ? "fixed left-4 top-4 z-50 flex h-auto max-h-[calc(100vh-2rem)] w-[460px] max-w-[92vw] flex-col rounded-3xl rounded-s-2xl border border-border/70 bg-card/95 text-card-foreground shadow-2xl backdrop-blur-2xl transition-all duration-300 ease-out focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left"
+              isSidePanel
+                ? cn(
+                    "fixed top-4 z-50 flex h-auto max-h-[calc(100vh-2rem)] w-[min(760px,calc(100vw-2rem))] flex-col rounded-3xl border border-border/70 bg-card/95 text-card-foreground shadow-2xl backdrop-blur-2xl transition-all duration-300 ease-out focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+                    isLeftPanel
+                      ? "left-4 rounded-s-2xl data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left"
+                      : "right-4 rounded-e-2xl data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right",
+                  )
                 : "fixed left-1/2 top-1/2 z-50 flex max-h-[92vh] w-[95vw] -translate-x-1/2 -translate-y-1/2 flex-col rounded-3xl border border-border/70 bg-card/95 text-card-foreground shadow-2xl backdrop-blur-2xl transition-all duration-200 focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
-              !isLeftPanel && sizeClasses[size],
+              !isSidePanel && sizeClasses[size],
               className,
             )}
             onPointerDownOutside={(e) => {

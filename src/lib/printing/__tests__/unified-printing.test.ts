@@ -370,7 +370,10 @@ const noOwnerName = renderUniversalFooter(COMPANY, true);
 check("footer never contains the former owner name", !noOwnerName.includes("موسى العواضي"));
 
 function rightsOccurrences(html: string): number {
-  const text = html.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+  const text = html
+    .replace(/<[^>]*>/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
   return text.split(COMPANY_RIGHTS_TEXT).length - 1;
 }
 
@@ -527,8 +530,7 @@ check(
 check("document output omits legacy footer fields", !stdHtml.includes("footer-contact"));
 check(
   "unified invoice renders the approved rights line exactly once",
-  rightsOccurrences(stdHtml.replace(/\s*<\/span>\s*<bdi[^>]*>/g, " | ")) === 1 &&
-    stdHtml.includes("772217218 - 784795101"),
+  rightsOccurrences(stdHtml) === 1 && stdHtml.includes("772217218 - 784795101"),
 );
 
 const invoiceTemplateOutputs = [

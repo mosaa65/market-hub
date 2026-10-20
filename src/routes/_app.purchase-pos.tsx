@@ -44,6 +44,9 @@ import { useCatalogModules } from "@/lib/catalog-modules";
 import { useIsDesktop } from "@/hooks/use-media-query";
 import { CartLine as CartLineRow } from "@/components/commerce/cart-line";
 import { MobileProductPicker } from "@/components/commerce/mobile-product-picker";
+import { TableToolbar, type FilterValues } from "@/components/ui/table-toolbar";
+import { RecordsViewToggle } from "@/components/ui/records-view-toggle";
+import { usePersistedViewMode } from "@/hooks/use-persisted-view-mode";
 import { SupplierFormDialog } from "@/components/contacts/supplier-form-dialog";
 import { UniversalPrintPreview } from "@/components/universal-print-preview";
 import type { PrintRequest } from "@/lib/printing";
@@ -274,6 +277,8 @@ function PurchasePOSPage() {
   const [warehouseId, setWarehouseId] = useState<string>("");
   const [supplierId, setSupplierId] = useState<string>("");
   const [search, setSearch] = useState("");
+  const [catalogSort, setCatalogSort] = useState("name_asc");
+  const [viewMode, setViewMode] = usePersistedViewMode("purchase-pos-catalog", "cards");
   const [filterOpen, setFilterOpen] = useState(false);
 
   // Filter States
@@ -557,7 +562,7 @@ function PurchasePOSPage() {
 
   // Filter products
   const filtered = useMemo(() => {
-    return products.filter((p) => {
+    const matching = products.filter((p) => {
       if (search) {
         const s = search.toLowerCase();
         const matchesName = (p.name || "").toLowerCase().includes(s);
@@ -579,6 +584,22 @@ function PurchasePOSPage() {
         return false;
       return true;
     });
+    return [...matching].sort((a, b) => {
+      switch (catalogSort) {
+        case "name_desc":
+          return (b.name_ar || b.name).localeCompare(a.name_ar || a.name, lang);
+        case "cost_asc":
+          return Number(a.cost_price) - Number(b.cost_price);
+        case "cost_desc":
+          return Number(b.cost_price) - Number(a.cost_price);
+        case "stock_asc":
+          return (stockMap[a.id] ?? 0) - (stockMap[b.id] ?? 0);
+        case "stock_desc":
+          return (stockMap[b.id] ?? 0) - (stockMap[a.id] ?? 0);
+        default:
+          return (a.name_ar || a.name).localeCompare(b.name_ar || b.name, lang);
+      }
+    });
   }, [
     products,
     search,
@@ -588,6 +609,9 @@ function PurchasePOSPage() {
     selectedOrigin,
     selectedQuality,
     catalogConfig,
+    catalogSort,
+    stockMap,
+    lang,
   ]);
 
   // Create Supplier — the SAME form used by the Suppliers page.
@@ -855,146 +879,310 @@ function PurchasePOSPage() {
         {/* Left Column: Search, Filters & Product Grid — desktop only. */}
         {isDesktop && (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-border/80 bg-surface/95 shadow-sm ring-1 ring-background/40 lg:col-start-1 lg:row-start-2 lg:mx-2 lg:mb-2">
-            {/* Search & Filter Bar */}
-            <div className="p-3 border-b border-border/60 bg-surface/50 space-y-2">
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                  <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <input
-                    ref={searchRef}
-                    type="text"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleBarcode(search);
-                      }
-                    }}
-                    placeholder={
-                      lang === "ar"
-                        ? "ابحث باسم المنتج، الكود SKU، أو امسح الباركود (F2)..."
-                        : "Search by product name, SKU, or scan barcode (F2)..."
-                    }
-                    className="h-10 w-full rounded-2xl border border-border/80 bg-surface pe-9 ps-9 text-xs text-foreground placeholder:text-muted-foreground/70 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition"
-                  />
-                  {search && (
-                    <button
-                      onClick={() => setSearch("")}
-                      className="absolute end-3 top-1/2 -translate-y-1/2 rounded-full p-0.5 hover:bg-surface-2 text-muted-foreground"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  )}
-                </div>
-
-                {/* Toggle Filter Panel */}
+            <TableToolbar
+              className="border-b border-border/60 bg-surface/50 p-3"
+              lang={lang}
+              search={{
+                value: search,
+                onValueChange: setSearch,
+                inputRef: searchRef,
+                onKeyDown: (event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    handleBarcode(search);
+                  }
+                },
+                placeholder:
+                  lang === "ar"
+                    ? "ابحث باسم المنتج، SKU، أو امسح الباركود (F2)..."
+                    : "Search by product name, SKU, or scan barcode (F2)...",
+                resultCount: filtered.length,
+              }}
+              filters={{
+                definitions: [
+                  {
+                    key: "category",
+                    label: lang === "ar" ? "التصنيف" : "Category",
+                    type: "select",
+                    options: categories.map((item) => ({
+                      value: item.id,
+                      label:
+                        lang === "ar" ? item.name_ar || item.name : item.name || item.name_ar || "",
+                    })),
+                  },
+                  ...(catalogConfig.enableBrands
+                    ? [
+                        {
+                          key: "brand",
+                          label: lang === "ar" ? "الماركة" : "Brand",
+                          type: "select" as const,
+                          options: brands.map((item) => ({
+                            value: item.id,
+                            label:
+                              lang === "ar"
+                                ? item.name_ar || item.name
+                                : item.name || item.name_ar || "",
+                          })),
+                        },
+                      ]
+                    : []),
+                  ...(catalogConfig.enableUnits
+                    ? [
+                        {
+                          key: "unit",
+                          label: lang === "ar" ? "الوحدة" : "Unit",
+                          type: "select" as const,
+                          options: units.map((item) => ({
+                            value: item.id,
+                            label:
+                              lang === "ar"
+                                ? item.name_ar || item.name
+                                : item.name || item.name_ar || "",
+                          })),
+                        },
+                      ]
+                    : []),
+                  ...(catalogConfig.enableOrigins
+                    ? [
+                        {
+                          key: "origin",
+                          label: lang === "ar" ? "بلد المنشأ" : "Origin",
+                          type: "select" as const,
+                          options: origins.map((item) => ({
+                            value: item.id,
+                            label:
+                              lang === "ar"
+                                ? item.name_ar || item.name
+                                : item.name || item.name_ar || "",
+                          })),
+                        },
+                      ]
+                    : []),
+                  ...(catalogConfig.enableQualityGrades
+                    ? [
+                        {
+                          key: "quality",
+                          label: lang === "ar" ? "درجة الجودة" : "Quality grade",
+                          type: "select" as const,
+                          options: qualities.map((item) => ({
+                            value: item.id,
+                            label:
+                              lang === "ar"
+                                ? item.name_ar || item.name
+                                : item.name || item.name_ar || "",
+                          })),
+                        },
+                      ]
+                    : []),
+                ],
+                values: {
+                  category: selectedCategory,
+                  brand: selectedBrand,
+                  unit: selectedUnit,
+                  origin: selectedOrigin,
+                  quality: selectedQuality,
+                },
+                onValueChange: (values: FilterValues) => {
+                  setSelectedCategory(typeof values.category === "string" ? values.category : "");
+                  setSelectedBrand(typeof values.brand === "string" ? values.brand : "");
+                  setSelectedUnit(typeof values.unit === "string" ? values.unit : "");
+                  setSelectedOrigin(typeof values.origin === "string" ? values.origin : "");
+                  setSelectedQuality(typeof values.quality === "string" ? values.quality : "");
+                },
+              }}
+              sort={{
+                value: catalogSort,
+                onValueChange: setCatalogSort,
+                options: [
+                  { value: "name_asc", label: lang === "ar" ? "الاسم: أ إلى ي" : "Name: A to Z" },
+                  { value: "name_desc", label: lang === "ar" ? "الاسم: ي إلى أ" : "Name: Z to A" },
+                  {
+                    value: "cost_asc",
+                    label: lang === "ar" ? "التكلفة: الأقل أولاً" : "Cost: low to high",
+                  },
+                  {
+                    value: "cost_desc",
+                    label: lang === "ar" ? "التكلفة: الأعلى أولاً" : "Cost: high to low",
+                  },
+                  {
+                    value: "stock_asc",
+                    label: lang === "ar" ? "المخزون: الأقل أولاً" : "Stock: low to high",
+                  },
+                  {
+                    value: "stock_desc",
+                    label: lang === "ar" ? "المخزون: الأعلى أولاً" : "Stock: high to low",
+                  },
+                ],
+              }}
+              viewToggle={<RecordsViewToggle value={viewMode} onChange={setViewMode} />}
+            >
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
                 <button
                   type="button"
-                  onClick={() => setFilterOpen((o) => !o)}
-                  className={`relative flex h-10 items-center gap-1.5 rounded-2xl border px-3 text-xs font-semibold transition ${
-                    filterOpen || activeFiltersCount > 0
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border/80 bg-surface text-muted-foreground hover:bg-surface-2 hover:text-foreground"
-                  }`}
+                  onClick={() => setSelectedCategory("")}
+                  className={`h-7 shrink-0 rounded-lg px-2.5 text-xs font-medium ${selectedCategory === "" ? "bg-primary text-primary-foreground" : "border border-border/80 bg-surface text-muted-foreground hover:border-primary/40"}`}
                 >
-                  <Filter className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">{lang === "ar" ? "تصفية" : "Filter"}</span>
-                  {activeFiltersCount > 0 && (
-                    <span className="grid h-4 w-4 place-items-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
-                      {activeFiltersCount}
-                    </span>
-                  )}
+                  {lang === "ar" ? "الكل" : "All"} ({products.length})
                 </button>
+                {categories.map((category) => (
+                  <button
+                    key={category.id}
+                    type="button"
+                    onClick={() =>
+                      setSelectedCategory((current) => (current === category.id ? "" : category.id))
+                    }
+                    className={`h-7 shrink-0 rounded-lg px-2.5 text-xs font-medium ${selectedCategory === category.id ? "bg-primary text-primary-foreground" : "border border-border/80 bg-surface text-muted-foreground hover:border-primary/40"}`}
+                  >
+                    {lang === "ar"
+                      ? category.name_ar || category.name
+                      : category.name || category.name_ar}
+                  </button>
+                ))}
               </div>
+            </TableToolbar>
 
-              {/* Collapsible Filter Panel */}
-              {filterOpen && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 pt-2 border-t border-border/60">
-                  {/* Category */}
-                  <div>
-                    <label className="text-[10px] font-semibold text-muted-foreground mb-1 block">
-                      {lang === "ar" ? "التصنيف" : "Category"}
-                    </label>
-                    <select
-                      value={selectedCategory}
-                      onChange={(e) => setSelectedCategory(e.target.value)}
-                      className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2 text-xs text-foreground outline-none"
-                    >
-                      <option value="">{lang === "ar" ? "الكل" : "All"}</option>
-                      {categories.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {lang === "ar" ? c.name_ar || c.name : c.name || c.name_ar}
-                        </option>
-                      ))}
-                    </select>
+            {/* Legacy filter controls are retained temporarily for an isolated follow-up cleanup. */}
+            {filterOpen && (
+              <div className="p-3 border-b border-border/60 bg-surface/50 space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <input
+                      ref={searchRef}
+                      type="text"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleBarcode(search);
+                        }
+                      }}
+                      placeholder={
+                        lang === "ar"
+                          ? "ابحث باسم المنتج، الكود SKU، أو امسح الباركود (F2)..."
+                          : "Search by product name, SKU, or scan barcode (F2)..."
+                      }
+                      className="h-10 w-full rounded-2xl border border-border/80 bg-surface pe-9 ps-9 text-xs text-foreground placeholder:text-muted-foreground/70 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition"
+                    />
+                    {search && (
+                      <button
+                        onClick={() => setSearch("")}
+                        className="absolute end-3 top-1/2 -translate-y-1/2 rounded-full p-0.5 hover:bg-surface-2 text-muted-foreground"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </div>
 
-                  {/* Brand */}
-                  {catalogConfig.enableBrands && (
-                    <div>
-                      <label className="text-[10px] font-semibold text-muted-foreground mb-1 block">
-                        {lang === "ar" ? "الماركة" : "Brand"}
-                      </label>
-                      <select
-                        value={selectedBrand}
-                        onChange={(e) => setSelectedBrand(e.target.value)}
-                        className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2 text-xs text-foreground outline-none"
-                      >
-                        <option value="">{lang === "ar" ? "الكل" : "All"}</option>
-                        {brands.map((b) => (
-                          <option key={b.id} value={b.id}>
-                            {lang === "ar" ? b.name_ar || b.name : b.name || b.name_ar}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
-                  {/* Quality */}
-                  {catalogConfig.enableQualityGrades && (
-                    <div>
-                      <label className="text-[10px] font-semibold text-muted-foreground mb-1 block">
-                        {lang === "ar" ? "درجة الجودة" : "Quality Grade"}
-                      </label>
-                      <select
-                        value={selectedQuality}
-                        onChange={(e) => setSelectedQuality(e.target.value)}
-                        className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2 text-xs text-foreground outline-none"
-                      >
-                        <option value="">{lang === "ar" ? "الكل" : "All"}</option>
-                        {qualities.map((q) => (
-                          <option key={q.id} value={q.id}>
-                            {lang === "ar" ? q.name_ar || q.name : q.name || q.name_ar}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
-                  {/* Origin */}
-                  {catalogConfig.enableOrigins && (
-                    <div>
-                      <label className="text-[10px] font-semibold text-muted-foreground mb-1 block">
-                        {lang === "ar" ? "بلد المنشأ" : "Origin"}
-                      </label>
-                      <select
-                        value={selectedOrigin}
-                        onChange={(e) => setSelectedOrigin(e.target.value)}
-                        className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2 text-xs text-foreground outline-none"
-                      >
-                        <option value="">{lang === "ar" ? "الكل" : "All"}</option>
-                        {origins.map((o) => (
-                          <option key={o.id} value={o.id}>
-                            {lang === "ar" ? o.name_ar || o.name : o.name || o.name_ar}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
+                  {/* Toggle Filter Panel */}
+                  <button
+                    type="button"
+                    onClick={() => setFilterOpen((o) => !o)}
+                    className={`relative flex h-10 items-center gap-1.5 rounded-2xl border px-3 text-xs font-semibold transition ${
+                      filterOpen || activeFiltersCount > 0
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border/80 bg-surface text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+                    }`}
+                  >
+                    <Filter className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">{lang === "ar" ? "تصفية" : "Filter"}</span>
+                    {activeFiltersCount > 0 && (
+                      <span className="grid h-4 w-4 place-items-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                        {activeFiltersCount}
+                      </span>
+                    )}
+                  </button>
                 </div>
-              )}
-            </div>
+
+                {/* Collapsible Filter Panel */}
+                {filterOpen && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 pt-2 border-t border-border/60">
+                    {/* Category */}
+                    <div>
+                      <label className="text-[10px] font-semibold text-muted-foreground mb-1 block">
+                        {lang === "ar" ? "التصنيف" : "Category"}
+                      </label>
+                      <select
+                        value={selectedCategory}
+                        onChange={(e) => setSelectedCategory(e.target.value)}
+                        className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2 text-xs text-foreground outline-none"
+                      >
+                        <option value="">{lang === "ar" ? "الكل" : "All"}</option>
+                        {categories.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {lang === "ar" ? c.name_ar || c.name : c.name || c.name_ar}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Brand */}
+                    {catalogConfig.enableBrands && (
+                      <div>
+                        <label className="text-[10px] font-semibold text-muted-foreground mb-1 block">
+                          {lang === "ar" ? "الماركة" : "Brand"}
+                        </label>
+                        <select
+                          value={selectedBrand}
+                          onChange={(e) => setSelectedBrand(e.target.value)}
+                          className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2 text-xs text-foreground outline-none"
+                        >
+                          <option value="">{lang === "ar" ? "الكل" : "All"}</option>
+                          {brands.map((b) => (
+                            <option key={b.id} value={b.id}>
+                              {lang === "ar" ? b.name_ar || b.name : b.name || b.name_ar}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Quality */}
+                    {catalogConfig.enableQualityGrades && (
+                      <div>
+                        <label className="text-[10px] font-semibold text-muted-foreground mb-1 block">
+                          {lang === "ar" ? "درجة الجودة" : "Quality Grade"}
+                        </label>
+                        <select
+                          value={selectedQuality}
+                          onChange={(e) => setSelectedQuality(e.target.value)}
+                          className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2 text-xs text-foreground outline-none"
+                        >
+                          <option value="">{lang === "ar" ? "الكل" : "All"}</option>
+                          {qualities.map((q) => (
+                            <option key={q.id} value={q.id}>
+                              {lang === "ar" ? q.name_ar || q.name : q.name || q.name_ar}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Origin */}
+                    {catalogConfig.enableOrigins && (
+                      <div>
+                        <label className="text-[10px] font-semibold text-muted-foreground mb-1 block">
+                          {lang === "ar" ? "بلد المنشأ" : "Origin"}
+                        </label>
+                        <select
+                          value={selectedOrigin}
+                          onChange={(e) => setSelectedOrigin(e.target.value)}
+                          className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2 text-xs text-foreground outline-none"
+                        >
+                          <option value="">{lang === "ar" ? "الكل" : "All"}</option>
+                          {origins.map((o) => (
+                            <option key={o.id} value={o.id}>
+                              {lang === "ar" ? o.name_ar || o.name : o.name || o.name_ar}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Products Grid */}
             <div className="flex-1 min-h-0 overflow-y-auto p-3 custom-scrollbar">
@@ -1014,7 +1202,7 @@ function PurchasePOSPage() {
                     {lang === "ar" ? "إعادة ضبط الفلاتر" : "Reset filters"}
                   </button>
                 </div>
-              ) : (
+              ) : viewMode === "cards" ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">
                   {filtered.map((p) => {
                     const stock = stockMap[p.id] ?? 0;
@@ -1087,6 +1275,75 @@ function PurchasePOSPage() {
                       </button>
                     );
                   })}
+                </div>
+              ) : viewMode === "list" ? (
+                <div className="space-y-1.5">
+                  {filtered.map((product) => (
+                    <button
+                      key={product.id}
+                      type="button"
+                      onClick={() => addToCart(product)}
+                      className="flex w-full items-center justify-between gap-3 rounded-lg border border-border/70 bg-surface px-3 py-2 text-start transition hover:border-primary/40 hover:bg-surface-2"
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold">
+                          {lang === "ar"
+                            ? product.name_ar || product.name
+                            : product.name || product.name_ar}
+                        </span>
+                        <span className="block truncate text-[11px] text-muted-foreground">
+                          {product.category?.name_ar ||
+                            product.category?.name ||
+                            product.sku ||
+                            "—"}
+                          {product.barcode ? ` · ${product.barcode}` : ""}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-end">
+                        <span className="block text-xs font-semibold text-primary">
+                          {money(Number(product.cost_price || 0))}
+                        </span>
+                        <span className="block text-[10px] text-muted-foreground">
+                          {lang === "ar"
+                            ? `المخزون: ${stockMap[product.id] ?? 0}`
+                            : `Stock: ${stockMap[product.id] ?? 0}`}
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-lg border border-border">
+                  <table className="w-full text-start text-xs">
+                    <thead className="sticky top-0 bg-surface-2 text-muted-foreground">
+                      <tr>
+                        <th className="p-2 text-start">{lang === "ar" ? "الصنف" : "Product"}</th>
+                        <th className="p-2 text-start">{lang === "ar" ? "الرمز" : "Code"}</th>
+                        <th className="p-2 text-end">{lang === "ar" ? "التكلفة" : "Cost"}</th>
+                        <th className="p-2 text-end">{lang === "ar" ? "المخزون" : "Stock"}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/60">
+                      {filtered.map((product) => (
+                        <tr
+                          key={product.id}
+                          onClick={() => addToCart(product)}
+                          className="cursor-pointer hover:bg-primary/5"
+                        >
+                          <td className="p-2 font-medium">
+                            {lang === "ar"
+                              ? product.name_ar || product.name
+                              : product.name || product.name_ar}
+                          </td>
+                          <td className="p-2 font-mono text-muted-foreground">
+                            {product.sku || product.barcode || "—"}
+                          </td>
+                          <td className="p-2 text-end">{money(Number(product.cost_price || 0))}</td>
+                          <td className="p-2 text-end">{stockMap[product.id] ?? 0}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>

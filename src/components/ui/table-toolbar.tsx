@@ -138,6 +138,9 @@ export interface TableToolbarProps {
     resultCount?: number;
     debounceMs?: number;
     loading?: boolean;
+    inputRef?: React.Ref<HTMLInputElement>;
+    onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>;
+    autoFocus?: boolean;
   };
   /** Filter definitions + current values. */
   filters?: {
@@ -251,6 +254,7 @@ export function TableToolbar({
       <div className="flex items-center gap-1.5 sm:gap-2">
         {search ? (
           <SearchInput
+            ref={search.inputRef}
             value={search.value}
             onValueChange={search.onValueChange}
             placeholder={search.placeholder}
@@ -259,6 +263,8 @@ export function TableToolbar({
             debounceMs={search.debounceMs}
             loading={search.loading}
             enableSlashShortcut
+            onKeyDown={search.onKeyDown}
+            autoFocus={search.autoFocus}
             containerClassName="flex-1 min-w-0"
           />
         ) : (
