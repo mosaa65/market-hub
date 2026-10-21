@@ -123,7 +123,7 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
 
     return (
       <div
-        className={cn("group relative w-full min-w-0", containerClassName)}
+        className={cn("group isolate relative w-full min-w-0", containerClassName)}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >

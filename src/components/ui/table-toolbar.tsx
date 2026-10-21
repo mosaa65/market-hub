@@ -135,6 +135,7 @@ export interface TableToolbarProps {
     value: string;
     onValueChange: (value: string) => void;
     placeholder?: string;
+    dir?: "rtl" | "ltr";
     resultCount?: number;
     debounceMs?: number;
     loading?: boolean;
@@ -258,6 +259,7 @@ export function TableToolbar({
             value={search.value}
             onValueChange={search.onValueChange}
             placeholder={search.placeholder}
+            dir={search.dir}
             resultCountText={resultCountText}
             clearLabel={copy.clearSearch}
             debounceMs={search.debounceMs}

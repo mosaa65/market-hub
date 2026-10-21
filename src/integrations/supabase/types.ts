@@ -1919,6 +1919,15 @@ export type Database = {
         };
         Returns: string;
       };
+      post_stock_settlement: {
+        Args: {
+          p_warehouse_id: string;
+          p_reason: string;
+          p_note: string | null;
+          p_lines: Json;
+        };
+        Returns: string;
+      };
       product_reference_counts: {
         Args: {
           p_product_id: string;
@@ -2143,7 +2152,8 @@ export type Database = {
         | "opening"
         | "purchase_return"
         | "sale_return";
-      payment_method: "cash" | "card" | "bank_transfer" | "credit" | "mobile_money" | "split";
+      payment_method:
+        "cash" | "card" | "bank_transfer" | "credit" | "mobile_money" | "split" | "cheque";
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -2289,7 +2299,15 @@ export const Constants = {
         "purchase_return",
         "sale_return",
       ],
-      payment_method: ["cash", "card", "bank_transfer", "credit", "mobile_money", "split"],
+      payment_method: [
+        "cash",
+        "card",
+        "bank_transfer",
+        "credit",
+        "mobile_money",
+        "split",
+        "cheque",
+      ],
     },
   },
 } as const;

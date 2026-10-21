@@ -8,7 +8,6 @@ import {
   Sparkles,
   X,
   Loader2,
-  CheckCircle2,
   Check,
   Lock,
 } from "lucide-react";
@@ -138,46 +137,50 @@ export function CustomerFormDialog({
       }
     }
     setSaving(true);
+    try {
+      const finalPhone = phone.trim() ? formatPhoneE164(phone.trim(), country.dialCode) : null;
+      const payload = {
+        name: edit.name.trim(),
+        phone: finalPhone,
+        email: edit.email?.trim() || null,
+        address: edit.address?.trim() || null,
+        credit_limit: Number(edit.credit_limit ?? 0),
+        is_active: isLockedCashCustomer ? true : (edit.is_active ?? true),
+      };
 
-    let finalPhone: string | null = null;
-    if (phone.trim()) {
-      finalPhone = formatPhoneE164(phone.trim(), country.dialCode);
+      const { data, error } = edit.id
+        ? await supabase.from("customers").update(payload).eq("id", edit.id).select("*").single()
+        : await supabase.from("customers").insert(payload).select("*").single();
+
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      toast.success(
+        edit.id
+          ? t("common.updated")
+          : isAr
+            ? "تمت إضافة العميل بنجاح"
+            : "Customer created successfully",
+      );
+      if (data) onSaved?.(data as CustomerRecord);
+      onSavedComplete?.();
+      onClose();
+    } catch (error) {
+      console.error("[customers] save failed", error);
+      toast.error(isAr ? "تعذّر حفظ بيانات العميل. حاول مرة أخرى." : "Could not save customer details.");
+    } finally {
+      setSaving(false);
     }
-
-    const payload = {
-      name: edit.name.trim(),
-      phone: finalPhone,
-      email: edit.email?.trim() || null,
-      address: edit.address?.trim() || null,
-      credit_limit: Number(edit.credit_limit ?? 0),
-      is_active: isLockedCashCustomer ? true : (edit.is_active ?? true),
-    };
-
-    const { data, error } = edit.id
-      ? await supabase.from("customers").update(payload).eq("id", edit.id).select("*").single()
-      : await supabase.from("customers").insert(payload).select("*").single();
-
-    setSaving(false);
-    if (error) return toast.error(error.message);
-    toast.success(
-      edit.id
-        ? t("common.updated")
-        : isAr
-          ? "تمت إضافة العميل بنجاح"
-          : "Customer created successfully",
-    );
-    if (data) onSaved?.(data as CustomerRecord);
-    onSavedComplete?.();
-    onClose();
   }
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/60 p-0 backdrop-blur-sm animate-in fade-in duration-200 sm:items-center sm:p-4"
       onClick={() => !saving && onClose()}
     >
       <div
-        className="flex max-h-[90dvh] w-full max-w-lg flex-col rounded-3xl border border-border/80 bg-background/95 p-5 sm:p-7 shadow-2xl backdrop-blur-md animate-in zoom-in-95 duration-200 overflow-hidden"
+        className="flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl border border-border/80 bg-background/95 p-5 shadow-2xl backdrop-blur-md animate-in slide-in-from-bottom-3 duration-200 sm:max-h-[90dvh] sm:rounded-3xl sm:p-7 sm:zoom-in-95"
         onClick={(e) => e.stopPropagation()}
         dir={isAr ? "rtl" : "ltr"}
       >
@@ -206,7 +209,8 @@ export function CustomerFormDialog({
           <button
             type="button"
             onClick={onClose}
-            className="grid size-8 place-items-center rounded-full bg-surface-2 text-muted-foreground transition hover:text-foreground cursor-pointer"
+            disabled={saving}
+            className="grid size-8 place-items-center rounded-full bg-surface-2 text-muted-foreground transition hover:text-foreground disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
           >
             <X className="size-4" />
           </button>

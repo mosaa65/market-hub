@@ -10,8 +10,11 @@
  *   6. مراجعة واعتماد التسوية
  *
  * الفكرة: كل خطوة في Sheet/Drawer متجاوب، والفروقات تُعرض بوضوح قبل الاعتماد.
- * منطق الحفظ مطابق تمامًا لما كان في StockAdjustmentDialog:
- *   inventory upsert + stock_movements insert — بلا أي تغيير في الـ backend.
+ *
+ * الحفظ: نداء RPC واحد `post_stock_settlement` (46) يعتمد مستند التسوية ويحرّك
+ * المخزون **بكميته وقيمته** في معاملة واحدة عبر المحرّك. لا كتابة مباشرة على
+ * `inventory` أو `stock_movements` من المتصفح: تلك الكتابة لم تكن تُقيَّد
+ * (تنفصل الكمية عن التكلفة)، ولم تكن معاملة واحدة، ولم تكن مسموحة بعد 43.
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -275,6 +278,9 @@ export function SettlementWizardSheet({
   const summary = useMemo(() => {
     const netQty = resolved.reduce((s, d) => s + d.diff, 0);
     const cost = Number(unitCost ?? 0);
+    // القيمة التقديرية للمعاينة فقط: التقييد الفعلي يقرأ تكلفة الطبقة الفعلية
+    // داخل post_stock_settlement، لا هذا الحقل. الرقم هنا قد يختلف عن الدفاتر
+    // عمدًا إن تغيّرت التكلفة — والدفاتر هي الصحيح.
     return {
       shortages: resolved.filter((d) => d.state === "shortage").length,
       surpluses: resolved.filter((d) => d.state === "surplus").length,
@@ -334,36 +340,21 @@ export function SettlementWizardSheet({
 
     setSaving(true);
     try {
-      for (const line of resolved) {
-        const actual = line.actualQty as number;
-        const { error: invErr } = await supabase.from("inventory").upsert(
-          {
-            product_id: line.product_id,
-            warehouse_id: warehouseId,
-            quantity: actual,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "product_id,warehouse_id" },
-        );
-        if (invErr) throw invErr;
-
-        const { error: mvErr } = await supabase.from("stock_movements").insert({
+      const { data, error } = await supabase.rpc("post_stock_settlement", {
+        p_warehouse_id: warehouseId,
+        p_reason: reason,
+        p_note: note.trim() || null,
+        p_lines: resolved.map((line) => ({
           product_id: line.product_id,
-          warehouse_id: warehouseId,
-          movement_type: "adjustment",
-          quantity: line.diff,
-          unit_cost: Number(unitCost ?? 0),
-          note: note.trim() || null,
-          adjustment_reason: reason,
-          created_by: user?.id ?? null,
-        } as never);
-        if (mvErr) throw mvErr;
-      }
+          actual_qty: line.actualQty as number,
+        })),
+      });
+      if (error) throw error;
 
       toast.success(
         isAr
-          ? `تم اعتماد ${resolved.length} تسوية بنجاح`
-          : `${resolved.length} adjustment(s) posted successfully`,
+          ? `تم اعتماد تسوية ${resolved.length} صنف — مستند ${String(data ?? "").slice(0, 8)}`
+          : `Settlement posted for ${resolved.length} item(s)`,
       );
       reset();
       onOpenChange(false);
@@ -784,8 +775,12 @@ export function SettlementWizardSheet({
           </FormField>
 
           <FormField
-            label={isAr ? "تكلفة الوحدة للتسوية" : "Unit cost for adjustment"}
-            hint={isAr ? "تُستخدم في إثبات القيد المحاسبي." : "Used for the accounting entry."}
+            label={isAr ? "تكلفة الوحدة (تقديرية للمعاينة)" : "Unit cost (estimate for preview)"}
+            hint={
+              isAr
+                ? "للعرض فقط — القيد يُقيَّم بتكلفة المخزون الفعلية من طبقات التكلفة."
+                : "Preview only — the movement is valued from the actual cost layer."
+            }
           >
             {(p) => (
               <NumberInput

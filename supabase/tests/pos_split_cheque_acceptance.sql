@@ -1,4 +1,4 @@
--- Structural acceptance checks for migration 45 POS split-cheque support.
+-- Structural acceptance checks for migration 46 POS split-cheque support.
 -- Read-only; no invoice, payment, or stock rows are written.
 -- Run after migrations with psql "$DATABASE_URL" -f this file.
 
@@ -30,8 +30,14 @@ BEGIN
   IF position('Payment breakdown cannot exceed the invoice total' IN v_definition) = 0 THEN
     RAISE EXCEPTION 'FAIL: split create_sale does not guard tender total against invoice total';
   END IF;
+  IF position('Tender breakdown does not match the recorded paid amount' IN v_definition) = 0 THEN
+    RAISE EXCEPTION 'FAIL: split create_sale does not reconcile tender total with recorded paid';
+  END IF;
   IF position('A payment method may only be included once in a split' IN v_definition) = 0 THEN
     RAISE EXCEPTION 'FAIL: split create_sale does not reject duplicate enum methods';
+  END IF;
+  IF position('Multi-method payment requires split-aware ledger posting' IN v_definition) = 0 THEN
+    RAISE EXCEPTION 'FAIL: multi-method tender is not gated until ledger posting supports split accounts';
   END IF;
 
   RAISE NOTICE 'PASS: cheque is supported in split tenders and total/duplicate guards are present';

@@ -73,7 +73,13 @@ import { translateRpcError } from "@/lib/errors/rpc-errors";
 import { usePaymentPanel } from "@/components/payments/payment-panel";
 import { useFormNavigationScope } from "@/hooks/use-form-navigation";
 import { PaymentMethodPicker } from "@/components/ui/payment-method";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { usePaymentMethodsForContext } from "@/hooks/use-payment-methods";
 import { AmountInput } from "@/components/commerce/amount-input";
 
@@ -154,6 +160,10 @@ interface SplitPaymentLine {
   reference?: string;
 }
 
+// The current SSR ledger posts the invoice before tender split rows are saved.
+// Keep split UI gated until a reviewed backend change posts each tender account.
+const POS_SPLIT_LEDGER_POSTING_READY = false;
+
 const posGuideConfig: PageGuideConfig = {
   title: "دليل نقطة البيع والكاشير المتقدم (POS)",
   subtitle:
@@ -196,30 +206,72 @@ const posGuideConfig: PageGuideConfig = {
       { key: "controls", label: "الضوابط", className: "w-[25%]" },
     ],
     rows: [
-      { badge: { label: "نقدي", variant: "emerald" }, fields: { paymentType: "بيع نقدي", inventoryImpact: "خصم الكمية", accountingImpact: "إثبات التحصيل", controls: "مطابقة المقبوض" } },
-      { badge: { label: "إلكتروني", variant: "blue" }, fields: { paymentType: "شبكة/بطاقة", inventoryImpact: "خصم الكمية", accountingImpact: "إثبات تحصيل البنك", controls: "مطابقة إشعار الدفع" } },
-      { badge: { label: "آجل", variant: "purple" }, fields: { paymentType: "ذمم العميل", inventoryImpact: "خصم الكمية", accountingImpact: "إثبات الدين", controls: "التحقق من الحد الائتماني" } },
-      { badge: { label: "تحويل", variant: "amber" }, fields: { paymentType: "حوالة بنكية", inventoryImpact: "خصم الكمية", accountingImpact: "إثبات التحصيل البنكي", controls: "حفظ مرجع الحوالة" } },
+      {
+        badge: { label: "نقدي", variant: "emerald" },
+        fields: {
+          paymentType: "بيع نقدي",
+          inventoryImpact: "خصم الكمية",
+          accountingImpact: "إثبات التحصيل",
+          controls: "مطابقة المقبوض",
+        },
+      },
+      {
+        badge: { label: "إلكتروني", variant: "blue" },
+        fields: {
+          paymentType: "شبكة/بطاقة",
+          inventoryImpact: "خصم الكمية",
+          accountingImpact: "إثبات تحصيل البنك",
+          controls: "مطابقة إشعار الدفع",
+        },
+      },
+      {
+        badge: { label: "آجل", variant: "purple" },
+        fields: {
+          paymentType: "ذمم العميل",
+          inventoryImpact: "خصم الكمية",
+          accountingImpact: "إثبات الدين",
+          controls: "التحقق من الحد الائتماني",
+        },
+      },
+      {
+        badge: { label: "تحويل", variant: "amber" },
+        fields: {
+          paymentType: "حوالة بنكية",
+          inventoryImpact: "خصم الكمية",
+          accountingImpact: "إثبات التحصيل البنكي",
+          controls: "حفظ مرجع الحوالة",
+        },
+      },
     ],
   },
   stepsTitle: "خطوات البيع",
   steps: [
-    { number: "1", title: "إضافة الأصناف", description: "ابحث باسم الصنف أو امسح باركوده لإضافته." },
+    {
+      number: "1",
+      title: "إضافة الأصناف",
+      description: "ابحث باسم الصنف أو امسح باركوده لإضافته.",
+    },
     { number: "2", title: "مراجعة السلة", description: "راجع الكمية والسعر والخصم." },
-    { number: "3", title: "تحديد العميل والدفع", description: "اختر العميل وطريقة الدفع المناسبة." },
+    {
+      number: "3",
+      title: "تحديد العميل والدفع",
+      description: "اختر العميل وطريقة الدفع المناسبة.",
+    },
     { number: "4", title: "اعتماد الفاتورة", description: "اعتمد البيع واطبع الإيصال عند الحاجة." },
   ],
   rulesTitle: "إرشادات السلامة والرقابة التشغيلية",
   rules: [
-    { type: "danger", title: "توفر المخزون", description: "تحقق من الكميات المتاحة قبل اعتماد البيع." },
+    {
+      type: "danger",
+      title: "توفر المخزون",
+      description: "تحقق من الكميات المتاحة قبل اعتماد البيع.",
+    },
     { type: "warning", title: "الأسعار والخصومات", description: "تخضع لتفويض المستخدم." },
-    { type: "info", title: "حفظ الجلسة", description: "السلة محفوظة في ذاكرة الشاشة خلال الجلسة الحالية." },
-  ],
-  footerTip: "فورتيكس ERP — نظام الكاشير ونقاط البيع السريعة المعتمد",
-};
-
-function POSPage() {
-  // ...existing code...
+    {
+      type: "info",
+      title: "حفظ الجلسة",
+      description: "السلة محفوظة في ذاكرة الشاشة خلال الجلسة الحالية.",
+    },
   ],
   footerTip: "فورتيكس ERP — نظام الكاشير ونقاط البيع السريعة المعتمد",
 };
@@ -274,6 +326,7 @@ function POSPage() {
 
   const [cart, setCart] = useState<CartLine[]>([]);
   const [paid, setPaid] = useState<string>("");
+  const [paidManuallyEdited, setPaidManuallyEdited] = useState(false);
   const [discount, setDiscount] = useState<string>("");
   // Holds a catalogue id: the five quick tabs write 'cash'/'card'/... exactly as
   // before, and the "أخرى" tab writes any other id from the same catalogue —
@@ -807,11 +860,14 @@ function POSPage() {
       if (key === "stock") return stockMap[product.id] ?? 0;
       if (key === "price") return Number(product.sale_price) || 0;
       if (key === "category") {
-        const category = lang === "ar"
-          ? product.category?.name_ar || product.category?.name
-          : product.category?.name || product.category?.name_ar;
+        const category =
+          lang === "ar"
+            ? product.category?.name_ar || product.category?.name
+            : product.category?.name || product.category?.name_ar;
         const brand = product.brand
-          ? lang === "ar" ? product.brand.name_ar || product.brand.name : product.brand.name || product.brand.name_ar
+          ? lang === "ar"
+            ? product.brand.name_ar || product.brand.name
+            : product.brand.name || product.brand.name_ar
           : "";
         return `${category ?? ""} ${brand}`.trim();
       }
@@ -825,7 +881,8 @@ function POSPage() {
       const right = label(b, catalogTableSort.key);
       return typeof left === "number" && typeof right === "number"
         ? (left - right) * direction
-        : String(left).localeCompare(String(right), lang, { numeric: true, sensitivity: "base" }) * direction;
+        : String(left).localeCompare(String(right), lang, { numeric: true, sensitivity: "base" }) *
+            direction;
     });
   }, [filtered, catalogTableSort, stockMap, lang]);
 
@@ -1076,24 +1133,37 @@ function POSPage() {
         .filter((line) => line.method && line.amount > 0),
     [splitPayments, supportedSplitMethods],
   );
-  const splitPaidTotal = Math.round(splitRows.reduce((sum, line) => sum + line.amount, 0) * 100) / 100;
+  const splitPaidTotal =
+    Math.round(splitRows.reduce((sum, line) => sum + line.amount, 0) * 100) / 100;
   const splitMethodCount = splitRows.length;
-  const missingSplitReference = isSplitPayment && splitRows.some(
-    (line) => line.method?.requiresReference && !line.reference?.trim(),
-  );
+  const hasInvalidSplitLine =
+    isSplitPayment &&
+    splitPayments.some((line) => !Number.isFinite(Number(line.amount)) || Number(line.amount) <= 0);
+  const missingSplitReference =
+    isSplitPayment &&
+    splitRows.some((line) => line.method?.requiresReference && !line.reference?.trim());
   const paymentSplits = splitRows.map((line) => ({
     method: line.method!.legacyValue,
     amount: Math.round(line.amount * 100) / 100,
   }));
 
   function startSplitPayment() {
-    const defaultMethod = supportedSplitMethods.find((method) => method.legacyValue === "cash") ?? supportedSplitMethods[0];
+    const defaultMethod =
+      supportedSplitMethods.find((method) => method.legacyValue === "cash") ??
+      supportedSplitMethods[0];
     setIsSplitPayment(true);
     setSplitEditorOpen(true);
     setPaid("");
     setSplitPayments(
       defaultMethod
-        ? [{ key: crypto.randomUUID(), methodId: defaultMethod.id, amount: String(total), autoAmount: true }]
+        ? [
+            {
+              key: crypto.randomUUID(),
+              methodId: defaultMethod.id,
+              amount: String(total),
+              autoAmount: true,
+            },
+          ]
         : [],
     );
   }
@@ -1101,10 +1171,15 @@ function POSPage() {
   function addSplitPaymentLine() {
     const usedLegacyValues = new Set(
       splitPayments
-        .map((line) => supportedSplitMethods.find((method) => method.id === line.methodId)?.legacyValue)
+        .map(
+          (line) =>
+            supportedSplitMethods.find((method) => method.id === line.methodId)?.legacyValue,
+        )
         .filter(Boolean),
     );
-    const nextMethod = supportedSplitMethods.find((method) => !usedLegacyValues.has(method.legacyValue));
+    const nextMethod = supportedSplitMethods.find(
+      (method) => !usedLegacyValues.has(method.legacyValue),
+    );
     if (!nextMethod) return;
     setSplitPayments((current) => [
       ...current,
@@ -1113,11 +1188,15 @@ function POSPage() {
   }
 
   function updateSplitPayment(key: string, patch: Partial<SplitPaymentLine>) {
-    setSplitPayments((current) => current.map((line) => line.key === key ? { ...line, ...patch } : line));
+    setSplitPayments((current) =>
+      current.map((line) => (line.key === key ? { ...line, ...patch } : line)),
+    );
   }
 
   useEffect(() => {
-    setSplitPayments((current) => current.map((line) => line.autoAmount ? { ...line, amount: String(total) } : line));
+    setSplitPayments((current) =>
+      current.map((line) => (line.autoAmount ? { ...line, amount: String(total) } : line)),
+    );
   }, [total]);
 
   function removeSplitPayment(key: string) {
@@ -1128,11 +1207,13 @@ function POSPage() {
   // إذا كانت وسيلة الدفع "آجل" وترك حقل المدفوع فارغاً، فالافتراضي هو 0 (دين بالكامل)
   // أما في الوسائل الأخرى (نقدي/بطاقة/تحويل/محفظة)، فالفارغ يعني سداد كامل المبلغ تلقائياً
   const isPaidEmpty = paid.trim() === "";
-  const singlePaidNum = isPaidEmpty
-    ? paymentMethod === "credit"
+  const singlePaidNum = paidManuallyEdited
+    ? isPaidEmpty
       ? 0
-      : total
-    : Math.max(0, Number(paid));
+      : Math.max(0, Number(paid))
+    : paymentMethod === "credit"
+      ? 0
+      : total;
   const effectivePaid = isSplitPayment ? splitPaidTotal : singlePaidNum;
   const isOverpaid = effectivePaid > total;
   const remainingDebt = Math.max(0, Math.round((total - effectivePaid) * 100) / 100);
@@ -1146,35 +1227,30 @@ function POSPage() {
     state: { method: paymentMethod, paidRaw: paid, customerId },
     customers,
   });
+  const selectedSingleMethod = posPaymentMethods.find((method) => method.id === paymentMethod);
+  const splitDebtBlockReason =
+    isSplitPayment && remainingDebt > 0
+      ? !customerId
+        ? lang === "ar"
+          ? "اختر عميلاً لتسجيل المبلغ المتبقي كدين"
+          : "Select a customer for the remaining balance"
+        : selectedCustomer?.is_system
+          ? lang === "ar"
+            ? "لا يمكن تسجيل دين على العميل النقدي"
+            : "The cash customer cannot carry a balance"
+          : selectedCustomer?.credit_limit != null &&
+              Number(selectedCustomer.balance ?? 0) + remainingDebt >
+                Number(selectedCustomer.credit_limit)
+            ? lang === "ar"
+              ? "المبلغ المتبقي يتجاوز حد ائتمان العميل"
+              : "The remaining balance exceeds the customer's credit limit"
+            : null
+      : null;
 
-  // وسيلة الدفع يختارها الكاشير وتتبدل ذكياً حسب المبلغ:
-  function syncMethodWithPaid(num: number) {
-    setPaymentMethod((current) => {
-      if (current === "cash" && num < total) return "credit";
-      if (current === "credit" && num >= total && total > 0) return "cash";
-      return current;
-    });
-  }
-
-  // Handle smart payment method switching on paid input change
   function handlePaidChange(val: string) {
     setPaid(val);
-    if (val.trim() === "") {
-      // ترك الحقل فارغاً لا يغير وسيلة الدفع قسراً إذا كان الكاشير قد اختار "آجل"
-      return;
-    }
-    const num = Number(val);
-    if (!Number.isNaN(num)) syncMethodWithPaid(num);
+    setPaidManuallyEdited(true);
   }
-
-  // When total changes and user has entered an explicit amount in paid:
-  useEffect(() => {
-    if (paid.trim() === "") return;
-    const num = Number(paid);
-    if (Number.isNaN(num)) return;
-    syncMethodWithPaid(num);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- مقصود: يستجيب فقط لتغيّر total حتى لا يعاد ضبط وسيلة الدفع التي يختارها المستخدم
-  }, [total]);
 
   // Global Keyboard Shortcuts
   useEffect(() => {
@@ -1225,8 +1301,8 @@ function POSPage() {
     if (isOverpaid) {
       return toast.error(
         lang === "ar"
-          ? "المبلغ المدفوع أكبر من إجمالي الفاتورة المطلوب!"
-          : "Paid amount cannot exceed invoice total!",
+          ? "مجموع المدفوع أكبر من إجمالي الفاتورة"
+          : "Total paid cannot exceed invoice total",
       );
     }
     if (effectivePaid < 0) {
@@ -1249,6 +1325,13 @@ function POSPage() {
           (lang === "ar" ? "بيانات الدفع غير صالحة" : "Invalid payment details"),
       );
     }
+    if (!isSplitPayment && selectedSingleMethod?.requiresReference && !transferRef.trim()) {
+      return toast.error(
+        lang === "ar"
+          ? `مرجع الدفع مطلوب: ${selectedSingleMethod.nameAr}`
+          : `Payment reference required: ${selectedSingleMethod.nameEn || selectedSingleMethod.nameAr}`,
+      );
+    }
     if (isSplitPayment && splitMethodCount === 0) {
       return toast.error(
         lang === "ar"
@@ -1256,20 +1339,29 @@ function POSPage() {
           : "Please allocate the payment to at least one method",
       );
     }
-    if (missingSplitReference) {
+    if (hasInvalidSplitLine) {
       return toast.error(
-        lang === "ar" ? "أدخل مرجع كل طريقة دفع تتطلب رقماً مرجعياً" : "Enter a reference for each payment method that requires one",
+        lang === "ar"
+          ? "أدخل مبلغاً موجباً لكل طريقة دفع مضافة"
+          : "Enter a positive amount for each added payment method",
       );
     }
+    if (missingSplitReference) {
+      return toast.error(
+        lang === "ar"
+          ? "أدخل مرجع كل طريقة دفع تتطلب رقماً مرجعياً"
+          : "Enter a reference for each payment method that requires one",
+      );
+    }
+    if (splitDebtBlockReason) return toast.error(splitDebtBlockReason);
 
     setLoading(true);
     try {
       // Split allocations always go through the guarded split RPC overload.
       // The individual tender methods are stored in customer_payment_splits.
-      const selectedSingleMethod = posPaymentMethods.find((method) => method.id === paymentMethod);
       let finalMethod: string = isSplitPayment
         ? "split"
-        : selectedSingleMethod?.legacyValue ?? paymentMethod;
+        : (selectedSingleMethod?.legacyValue ?? paymentMethod);
 
       // تصحيح منطقي نهائي للوسيلة قبل الإرسال لمنع التناقض:
       if (!isSplitPayment) {
@@ -1313,9 +1405,9 @@ function POSPage() {
             paymentMethod === "mobile_money") &&
           transferRef.trim()
         ) {
-          const electronicLabel =
-            finalMethod === "mobile_money" || paymentMethod === "mobile_money"
-              || selectedSingleMethod?.legacyValue === "mobile_money"
+          const electronicLabel = selectedSingleMethod?.requiresReference
+            ? selectedSingleMethod.nameAr
+            : finalMethod === "mobile_money" || paymentMethod === "mobile_money"
               ? lang === "ar"
                 ? "مرجع المحفظة"
                 : "Wallet reference"
@@ -1530,6 +1622,7 @@ function POSPage() {
 
       setCart([]);
       setPaid("");
+      setPaidManuallyEdited(false);
       setDiscount("");
       setNote("");
       setTransferRef("");
@@ -1613,43 +1706,45 @@ function POSPage() {
   return (
     <>
       {/* ─── Compact Executive POS Workspace Shell ─── */}
-      <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-2 overflow-hidden bg-[radial-gradient(ellipse_at_top,_color-mix(in_oklab,var(--primary)_8%,transparent),transparent_48%)] p-1.5 sm:p-2.5 lg:grid-cols-[minmax(0,1fr)_minmax(390px,450px)] lg:grid-rows-[auto_minmax(0,1fr)]">
-        {/* ─── Top Executive Command Deck ─── */}
-        <header className="flex min-w-0 shrink-0 items-center justify-between gap-2 overflow-hidden rounded-2xl border border-border/80 bg-surface/95 px-2 py-2 shadow-xs backdrop-blur-md sm:px-3 lg:col-start-1 lg:row-start-1">
-          {/* Identity & Status */}
-          <div className="hidden min-w-0 max-w-[10rem] shrink-0 items-center gap-2.5 xl:flex xl:gap-3 xl:max-w-[18rem]">
-            <div className="relative grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-primary/25 bg-gradient-to-br from-primary via-primary to-primary/85 text-primary-foreground shadow-sm">
-              <ShoppingBag className="h-4 w-4" />
-              <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex h-3 w-3 rounded-full border-2 border-background bg-emerald-500" />
-              </span>
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h1 className="truncate text-sm font-black tracking-tight text-foreground">
-                  {t("pos.title")}
-                </h1>
-                <span className="hidden rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary sm:inline">
-                  {lang === "ar" ? "كاشير ذكي" : "Smart POS"}
-                </span>
-              </div>
-              <p className="hidden truncate text-[11px] text-muted-foreground sm:block">
-                {t("pos.subtitle")}
-              </p>
-            </div>
+      <div className="grid min-h-0 flex-1 grid-rows-[auto_auto_minmax(0,1fr)] gap-2 overflow-hidden bg-[radial-gradient(ellipse_at_top,_color-mix(in_oklab,var(--primary)_8%,transparent),transparent_48%)] p-1.5 sm:p-2.5 lg:grid-cols-[minmax(0,1fr)_minmax(390px,450px)] lg:grid-rows-[auto_auto_minmax(0,1fr)]">
+        <div className="flex min-w-0 items-center justify-between gap-2 px-1 py-0.5 lg:col-start-1 lg:row-start-1">
+          <div className="min-w-0">
+            <h1 className="truncate text-sm font-black text-foreground">{t("pos.title")}</h1>
+            <p className="truncate text-[11px] text-muted-foreground">{t("pos.subtitle")}</p>
           </div>
-
+          {selectedCustomer &&
+            (Number(selectedCustomer.balance) !== 0 || Number(selectedCustomer.credit_limit) > 0) && (
+              <div className="hidden min-w-0 shrink-0 items-center gap-2 rounded-lg border border-border/70 bg-surface/70 px-2 py-1 text-[10px] font-mono xl:flex">
+                {Number(selectedCustomer.balance) > 0 ? (
+                  <span className="font-bold text-amber-600">
+                    {lang === "ar" ? "عليه دين:" : "Debt:"} {money(Number(selectedCustomer.balance))}
+                  </span>
+                ) : Number(selectedCustomer.balance) < 0 ? (
+                  <span className="font-bold text-emerald-600">
+                    {lang === "ar" ? "له رصيد:" : "Credit:"} {money(Math.abs(Number(selectedCustomer.balance)))}
+                  </span>
+                ) : null}
+                {Number(selectedCustomer.credit_limit) > 0 && (
+                  <span className="border-s border-border/60 ps-2 text-muted-foreground">
+                    {lang === "ar" ? "الحد:" : "Limit:"} {money(Number(selectedCustomer.credit_limit))}
+                  </span>
+                )}
+              </div>
+            )}
+        </div>
+        {/* ─── Top Executive Command Deck ─── */}
+        <header className="flex min-w-0 shrink-0 items-center justify-between gap-2 overflow-visible rounded-xl border border-border/80 bg-surface/95 px-2 py-2 shadow-xs backdrop-blur-md sm:px-3 lg:col-start-1 lg:row-start-2">
           {/* Quick Command Controls: Customer, Balance, Date, Warehouse, Service */}
-          <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto_auto_auto_auto_auto] items-center justify-end gap-1 sm:flex sm:flex-nowrap sm:gap-1.5">
+          <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center justify-end gap-1 sm:gap-1.5 2xl:flex 2xl:flex-nowrap">
             {/* Customer Selector with VIP Badge */}
-            <div className="flex items-center gap-1 min-w-0">
-              <div className="relative min-w-0 sm:w-[clamp(8rem,15vw,13rem)] sm:shrink-0">
+            <div className="col-span-2 flex min-w-0 items-center gap-1 2xl:col-span-1 2xl:flex-1">
+              <div className="relative min-w-0 flex-1 2xl:w-[clamp(8rem,15vw,13rem)] 2xl:flex-none">
                 <select
+                  dir={lang === "ar" ? "rtl" : "ltr"}
                   aria-label={lang === "ar" ? "العميل" : "Customer"}
                   value={customerId}
                   onChange={(e) => setCustomerId(e.target.value)}
-                  className="h-9 w-full appearance-none rounded-xl border border-border/80 bg-surface pl-6 pr-2 text-[11px] font-semibold text-foreground outline-none transition hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/20 sm:pl-7 sm:pr-3 sm:text-xs rtl:pl-2 rtl:pr-6 sm:rtl:pl-3 sm:rtl:pr-7"
+                  className="h-9 w-full appearance-none rounded-xl border border-border/80 bg-surface pl-6 pr-2 text-[11px] font-semibold text-foreground outline-none transition hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/20 2xl:pl-7 2xl:pr-3 2xl:text-xs rtl:pl-2 rtl:pr-6 2xl:rtl:pl-3 2xl:rtl:pr-7"
                 >
                   <option value="">{t("pos.walkin")}</option>
                   {customers.map((c) => (
@@ -1671,39 +1766,15 @@ function POSPage() {
               </button>
             </div>
 
-            {/* Customer Balance Indicator (if customer has balance or limit) */}
-            {selectedCustomer &&
-              (Number(selectedCustomer.balance) !== 0 ||
-                Number(selectedCustomer.credit_limit) > 0) && (
-                <div className="hidden xl:flex items-center gap-1.5 rounded-xl border border-border/80 bg-muted/40 px-2.5 py-1 text-[11px] font-mono">
-                  {Number(selectedCustomer.balance) > 0 ? (
-                    <span className="text-amber-600 dark:text-amber-400 font-bold">
-                      {lang === "ar" ? "عليه دين:" : "Debt:"}{" "}
-                      {money(Number(selectedCustomer.balance || 0))}
-                    </span>
-                  ) : Number(selectedCustomer.balance) < 0 ? (
-                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">
-                      {lang === "ar" ? "له رصيد:" : "Credit:"}{" "}
-                      {money(Math.abs(Number(selectedCustomer.balance || 0)))}
-                    </span>
-                  ) : null}
-                  {Number(selectedCustomer.credit_limit) > 0 && (
-                    <span className="text-muted-foreground border-s border-border/60 ps-1.5">
-                      {lang === "ar" ? "الحد:" : "Limit:"}{" "}
-                      {money(Number(selectedCustomer.credit_limit || 0))}
-                    </span>
-                  )}
-                </div>
-              )}
-
             {/* Warehouse Selector (if multi_warehouse) */}
             {isModuleEnabled("multi_warehouse") && warehouses.length > 1 && (
               <div className="relative shrink-0">
                 <select
+                  dir={lang === "ar" ? "rtl" : "ltr"}
                   aria-label={lang === "ar" ? "المستودع" : "Warehouse"}
                   value={warehouseId}
                   onChange={(e) => setWarehouseId(e.target.value)}
-                  className="h-9 max-w-28 appearance-none rounded-full border border-amber-500/30 bg-amber-500/10 pl-6 pr-6 text-[11px] font-semibold text-amber-700 dark:text-amber-300 outline-none hover:bg-amber-500/20 rtl:pl-6 rtl:pr-6 cursor-pointer transition sm:max-w-36 sm:rounded-xl sm:text-xs"
+                  className="h-9 max-w-28 appearance-none rounded-full border border-amber-500/30 bg-amber-500/10 pl-6 pr-6 text-[11px] font-semibold text-amber-700 dark:text-amber-300 outline-none hover:bg-amber-500/20 rtl:pl-6 rtl:pr-6 cursor-pointer transition 2xl:max-w-36 2xl:rounded-xl 2xl:text-xs"
                 >
                   {warehouses.map((w) => (
                     <option key={w.id} value={w.id}>
@@ -1714,7 +1785,7 @@ function POSPage() {
                 <ChevronDown className="pointer-events-none absolute end-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-amber-700 dark:text-amber-300" />
               </div>
             )}
-
+            <div className="col-span-2 flex items-center justify-end gap-1 2xl:contents">
             {/* Invoice Date */}
             <label className="relative grid size-9 shrink-0 place-items-center rounded-full border border-border/80 bg-surface text-xs text-muted-foreground shadow-2xs hover:border-primary/40 transition sm:flex sm:w-auto sm:items-center sm:gap-1.5 sm:rounded-full sm:px-2.5">
               <CalendarDays className="h-3.5 w-3.5 text-primary shrink-0" />
@@ -1766,7 +1837,7 @@ function POSPage() {
               <button
                 type="button"
                 onClick={() => setServiceOpen(true)}
-                className="hidden size-9 shrink-0 items-center justify-center rounded-full border border-violet-500/30 bg-violet-500/10 text-violet-700 transition hover:bg-violet-500/20 dark:text-violet-300 md:inline-flex"
+                className="hidden size-9 shrink-0 items-center justify-center rounded-full border border-violet-500/30 bg-violet-500/10 text-violet-700 transition hover:bg-violet-500/20 dark:text-violet-300 xl:inline-flex"
                 title={lang === "ar" ? "إضافة خدمة أو أجرة تركيب" : "Add custom labor/service"}
               >
                 <Wrench className="h-3.5 w-3.5" />
@@ -1775,6 +1846,7 @@ function POSPage() {
 
             {/* Page Guide */}
             <PageGuideButton config={posGuideConfig} className="!h-9 !w-9 shrink-0" />
+            </div>
           </div>
         </header>
 
@@ -1782,26 +1854,21 @@ function POSPage() {
         <div className="grid min-h-0 grid-cols-1 items-stretch gap-2 lg:contents">
           {/* ─── Products Panel (Desktop & Tablet) ─── */}
           {isDesktop && (
-            <div className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-border/80 bg-surface/95 p-3 shadow-sm ring-1 ring-background/40 lg:col-start-1 lg:row-start-2">
-              <div className="mb-2 flex min-w-0 items-center gap-2 px-1">
-                <div className="grid size-7 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
-                  <ShoppingBag className="size-3.5" />
-                </div>
-                <div className="min-w-0">
-                  <h1 className="truncate text-xs font-bold text-foreground">{t("pos.title")}</h1>
-                  <p className="truncate text-[10px] text-muted-foreground">{lang === "ar" ? "امسح، أضف، وأصدر الفاتورة" : "Scan, add, and issue the invoice"}</p>
-                </div>
-              </div>
+              <div className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-border/80 bg-surface/95 p-3 shadow-sm ring-1 ring-background/40 lg:col-start-1 lg:row-start-3">
               <TableToolbar
                 className="mb-2.5"
                 lang={lang}
                 search={{
                   value: search,
                   onValueChange: setSearch,
+                  dir: lang === "ar" ? "rtl" : "ltr",
                   inputRef: searchRef,
                   onKeyDown: handleScan,
                   autoFocus: true,
-                  placeholder: `${t("pos.search_or_scan")} (F2)`,
+                  placeholder:
+                    lang === "ar"
+                      ? "ابحث باسم المنتج أو الرمز أو امسح الباركود (F2)"
+                      : "Search by product name or SKU, or scan barcode (F2)",
                   resultCount: filtered.length,
                 }}
                 filters={{
@@ -1938,33 +2005,40 @@ function POSPage() {
                     );
                   },
                 }}
-                sort={viewMode === "table" ? undefined : {
-                  value: catalogSort,
-                  onValueChange: setCatalogSort,
-                  options: [
-                    { value: "name_asc", label: lang === "ar" ? "الاسم: أ إلى ي" : "Name: A to Z" },
-                    {
-                      value: "name_desc",
-                      label: lang === "ar" ? "الاسم: ي إلى أ" : "Name: Z to A",
-                    },
-                    {
-                      value: "price_asc",
-                      label: lang === "ar" ? "السعر: الأقل أولاً" : "Price: low to high",
-                    },
-                    {
-                      value: "price_desc",
-                      label: lang === "ar" ? "السعر: الأعلى أولاً" : "Price: high to low",
-                    },
-                    {
-                      value: "stock_asc",
-                      label: lang === "ar" ? "المخزون: الأقل أولاً" : "Stock: low to high",
-                    },
-                    {
-                      value: "stock_desc",
-                      label: lang === "ar" ? "المخزون: الأعلى أولاً" : "Stock: high to low",
-                    },
-                  ],
-                }}
+                sort={
+                  viewMode === "table"
+                    ? undefined
+                    : {
+                        value: catalogSort,
+                        onValueChange: setCatalogSort,
+                        options: [
+                          {
+                            value: "name_asc",
+                            label: lang === "ar" ? "الاسم: أ إلى ي" : "Name: A to Z",
+                          },
+                          {
+                            value: "name_desc",
+                            label: lang === "ar" ? "الاسم: ي إلى أ" : "Name: Z to A",
+                          },
+                          {
+                            value: "price_asc",
+                            label: lang === "ar" ? "السعر: الأقل أولاً" : "Price: low to high",
+                          },
+                          {
+                            value: "price_desc",
+                            label: lang === "ar" ? "السعر: الأعلى أولاً" : "Price: high to low",
+                          },
+                          {
+                            value: "stock_asc",
+                            label: lang === "ar" ? "المخزون: الأقل أولاً" : "Stock: low to high",
+                          },
+                          {
+                            value: "stock_desc",
+                            label: lang === "ar" ? "المخزون: الأعلى أولاً" : "Stock: high to low",
+                          },
+                        ],
+                      }
+                }
                 viewToggle={<RecordsViewToggle value={viewMode} onChange={setViewMode} cycle />}
               />
 
@@ -2029,7 +2103,7 @@ function POSPage() {
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
                     {/* Category */}
                     <div>
-                      className="hidden size-9 shrink-0 items-center justify-center rounded-full border border-violet-500/30 bg-violet-500/10 text-violet-700 transition hover:bg-violet-500/20 dark:text-violet-300 md:inline-flex"
+                      <label className="text-[10px] font-medium text-muted-foreground block mb-1">
                         {t("products.category")}
                       </label>
                       <select
@@ -2409,38 +2483,83 @@ function POSPage() {
                     <table className="w-full text-start text-xs">
                       <thead>
                         <tr className="border-b border-border/80 bg-muted/50 text-[11px] font-bold text-muted-foreground">
-                          {([
-                            { key: "code", label: lang === "ar" ? "الباركود / الرمز" : "Barcode / SKU", align: "start" },
-                            { key: "name", label: lang === "ar" ? "اسم المنتج" : "Product Name", align: "start" },
-                            { key: "category", label: lang === "ar" ? "التصنيف والماركة" : "Category & Brand", align: "start" },
-                            { key: "stock", label: lang === "ar" ? "المتوفر" : "Stock", align: "center" },
-                            { key: "price", label: lang === "ar" ? "سعر البيع" : "Price", align: "end" },
-                          ] as const).map((column) => {
+                          {(
+                            [
+                              {
+                                key: "code",
+                                label: lang === "ar" ? "الباركود / الرمز" : "Barcode / SKU",
+                                align: "start",
+                              },
+                              {
+                                key: "name",
+                                label: lang === "ar" ? "اسم المنتج" : "Product Name",
+                                align: "start",
+                              },
+                              {
+                                key: "category",
+                                label: lang === "ar" ? "التصنيف والماركة" : "Category & Brand",
+                                align: "start",
+                              },
+                              {
+                                key: "stock",
+                                label: lang === "ar" ? "المتوفر" : "Stock",
+                                align: "center",
+                              },
+                              {
+                                key: "price",
+                                label: lang === "ar" ? "سعر البيع" : "Price",
+                                align: "end",
+                              },
+                            ] as const
+                          ).map((column) => {
                             const active = catalogTableSort.key === column.key;
                             const sortLabel = active
                               ? catalogTableSort.direction === "asc"
-                                ? lang === "ar" ? "تصاعدي" : "ascending"
-                                : lang === "ar" ? "تنازلي" : "descending"
-                              : lang === "ar" ? "غير مرتب" : "not sorted";
+                                ? lang === "ar"
+                                  ? "تصاعدي"
+                                  : "ascending"
+                                : lang === "ar"
+                                  ? "تنازلي"
+                                  : "descending"
+                              : lang === "ar"
+                                ? "غير مرتب"
+                                : "not sorted";
                             return (
                               <th
                                 key={column.key}
-                                aria-sort={active ? catalogTableSort.direction === "asc" ? "ascending" : "descending" : "none"}
+                                aria-sort={
+                                  active
+                                    ? catalogTableSort.direction === "asc"
+                                      ? "ascending"
+                                      : "descending"
+                                    : "none"
+                                }
                                 className={`py-2 px-3 ${column.align === "end" ? "text-end" : column.align === "center" ? "text-center" : "text-start"}`}
                               >
                                 <button
                                   type="button"
-                                  onClick={() => setCatalogTableSort((current) => ({
-                                    key: column.key,
-                                    direction: current.key === column.key && current.direction === "asc" ? "desc" : "asc",
-                                  }))}
+                                  onClick={() =>
+                                    setCatalogTableSort((current) => ({
+                                      key: column.key,
+                                      direction:
+                                        current.key === column.key && current.direction === "asc"
+                                          ? "desc"
+                                          : "asc",
+                                    }))
+                                  }
                                   className="inline-flex items-center gap-1 rounded-full px-1.5 py-1 transition hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                                   title={`${column.label} · ${sortLabel}`}
                                 >
                                   {column.label}
                                   {active ? (
-                                    catalogTableSort.direction === "asc" ? <ArrowUp className="size-3 text-primary" aria-hidden /> : <ArrowDown className="size-3 text-primary" aria-hidden />
-                                  ) : <ArrowDownUp className="size-3 opacity-40" aria-hidden />}
+                                    catalogTableSort.direction === "asc" ? (
+                                      <ArrowUp className="size-3 text-primary" aria-hidden />
+                                    ) : (
+                                      <ArrowDown className="size-3 text-primary" aria-hidden />
+                                    )
+                                  ) : (
+                                    <ArrowDownUp className="size-3 opacity-40" aria-hidden />
+                                  )}
                                 </button>
                               </th>
                             );
@@ -2519,7 +2638,7 @@ function POSPage() {
           )}
 
           {/* ─── Cart Panel (Primary Workspace on All Devices) ─── */}
-          <div className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-primary/20 bg-surface/95 p-2 sm:p-2.5 shadow-xl ring-1 ring-border/50 backdrop-blur-md lg:col-start-2 lg:row-span-2 lg:row-start-1">
+          <div className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-primary/20 bg-surface/95 p-2 sm:p-2.5 shadow-xl ring-1 ring-border/50 backdrop-blur-md lg:col-start-2 lg:row-span-2 lg:row-start-2">
             {/* Cart Header */}
             <div className="mb-1 flex shrink-0 items-center justify-between border-b border-border/60 px-1 pb-1.5">
               <div className="flex items-center gap-2">
@@ -2538,16 +2657,24 @@ function POSPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    if (isSplitPayment) {
-                      setIsSplitPayment(false);
-                      setSplitPayments([]);
-                      setSplitEditorOpen(false);
-                    } else startSplitPayment();
+                    toast.info(
+                      lang === "ar"
+                        ? "الدفع بأكثر من طريقة سيتاح بعد اكتمال ترحيله المحاسبي"
+                        : "Split payments will be enabled after ledger posting support is complete",
+                    );
                   }}
-                  disabled={cart.length === 0 || supportedSplitMethods.length === 0}
+                  disabled={
+                    !POS_SPLIT_LEDGER_POSTING_READY ||
+                    cart.length === 0 ||
+                    supportedSplitMethods.length === 0
+                  }
                   aria-pressed={isSplitPayment}
                   aria-label={lang === "ar" ? "الدفع بأكثر من طريقة" : "Split payment"}
-                  title={lang === "ar" ? "الدفع بأكثر من طريقة" : "Split payment"}
+                  title={
+                    lang === "ar"
+                      ? "يتطلب دعم الترحيل المحاسبي متعدد الطرق"
+                      : "Requires multi-tender ledger posting support"
+                  }
                   className={`grid size-8 place-items-center rounded-full border transition disabled:opacity-40 ${isSplitPayment ? "border-primary/40 bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-primary/10 hover:text-primary"}`}
                 >
                   <Layers className="size-4" />
@@ -2650,51 +2777,86 @@ function POSPage() {
             <div
               ref={posFormScopeRef}
               data-form-nav-scope
-              className="shrink-0 space-y-1.5 border-t border-border/70 bg-surface/95 pt-2 pr-0.5"
+              className="min-h-0 shrink overflow-y-auto space-y-1.5 border-t border-border/70 bg-surface/95 pt-2 pr-0.5"
             >
               {/* ─── Payment & Summary Section ─── */}
-              {/* Compact payment method selector */}
-              <div className="min-w-0">
-                {!isSplitPayment ? <PaymentMethodPicker
-                  context="pos"
-                  value={isSplitPayment ? "" : paymentMethod}
-                  onChange={(method) => {
-                    setIsSplitPayment(false);
-                    setSplitPayments([]);
-                    setPaymentMethod(method);
-                    setPaid(method === "credit" ? "0" : "");
-                  }}
-                  ensureIds={[paymentMethod]}
-                  ariaLabel={lang === "ar" ? "طريقة الدفع" : "Payment method"}
-                  data-form-nav
-                  className="h-8 min-w-0 rounded-full text-[11px]"
-                /> : <div className="flex h-8 items-center rounded-full border border-primary/20 bg-primary/[0.04] px-3 text-[11px] font-medium text-primary">{lang === "ar" ? "طرق دفع متعددة" : "Multiple methods"}</div>}
-              </div>
-              {!isSplitPayment && (
-                <div className="grid grid-cols-2 gap-2">
+              <div className="grid min-w-0 grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.8fr)] items-end gap-1.5">
+                <div className="flex min-w-0 flex-col gap-1">
+                  <span className="truncate text-[10px] font-semibold leading-none text-muted-foreground">
+                    {lang === "ar" ? "طريقة الدفع" : "Payment method"}
+                  </span>
+                {!isSplitPayment ? (
+                  <PaymentMethodPicker
+                    context="pos"
+                    value={isSplitPayment ? "" : paymentMethod}
+                    onChange={(method) => {
+                      setIsSplitPayment(false);
+                      setSplitPayments([]);
+                      setPaymentMethod(method);
+                      setPaid(method === "credit" ? "0" : "");
+                      setPaidManuallyEdited(false);
+                    }}
+                    ensureIds={[paymentMethod]}
+                    ariaLabel={lang === "ar" ? "طريقة الدفع" : "Payment method"}
+                    data-form-nav
+                    className="h-8 min-w-0 rounded-lg text-[10px] sm:text-[11px]"
+                  />
+                ) : (
+                  <div className="flex h-8 min-w-0 items-center truncate rounded-lg border border-primary/20 bg-primary/[0.04] px-2 text-[10px] font-medium text-primary sm:px-3 sm:text-[11px]">
+                    {lang === "ar" ? "طرق دفع متعددة" : "Multiple methods"}
+                  </div>
+                )}
+                </div>
+                {isSplitPayment ? (
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <span className="truncate text-[10px] font-semibold leading-none text-muted-foreground">
+                      {lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setSplitEditorOpen(true)}
+                      className="h-8 min-w-0 truncate rounded-lg border border-primary/20 bg-primary/[0.04] px-2.5 text-start text-[10px] font-medium text-primary"
+                      title={lang === "ar" ? "تعديل توزيع الدفعات" : "Edit payment allocation"}
+                    >
+                      {money(splitPaidTotal)}
+                    </button>
+                  </div>
+                ) : (
                   <AmountInput
                     label={lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}
-                    value={isPaidEmpty ? paymentMethod === "credit" ? "0" : String(total) : paid}
+                    showLabel
+                    dir={lang === "ar" ? "rtl" : "ltr"}
+                    value={
+                      paidManuallyEdited
+                        ? paid || "0"
+                        : paymentMethod === "credit"
+                          ? "0"
+                          : String(total)
+                    }
                     onValueChange={handlePaidChange}
                     invalid={isOverpaid}
                     data-form-nav
                     placeholder={lang === "ar" ? "المدفوع" : "Paid"}
-                    className="h-8 rounded-full border border-border bg-background px-2.5 text-[11px] font-semibold outline-none focus:border-primary"
+                    className="h-8 min-w-0 rounded-lg border border-border bg-background px-2 text-[10px] font-semibold outline-none focus:border-primary sm:px-2.5 sm:text-[11px]"
                   />
-                  <AmountInput
-                    label={t("pos.discount")}
-                    value={discount}
-                    onValueChange={setDiscount}
-                    data-form-nav
-                    placeholder={lang === "ar" ? "الخصم" : "Discount"}
-                    className="h-8 rounded-full border border-border bg-background px-2.5 text-[11px] font-semibold outline-none focus:border-primary"
-                  />
-                </div>
-              )}
+                )}
+                <AmountInput
+                  label={t("pos.discount")}
+                  showLabel
+                  dir={lang === "ar" ? "rtl" : "ltr"}
+                  value={discount}
+                  onValueChange={setDiscount}
+                  data-form-nav
+                  placeholder={lang === "ar" ? "الخصم" : "Discount"}
+                  className="h-8 min-w-0 rounded-lg border border-border bg-background px-2 text-[10px] font-semibold outline-none focus:border-primary sm:px-2.5 sm:text-[11px]"
+                />
+              </div>
 
               {/* Transfer reference input */}
               {!isSplitPayment &&
-                (paymentMethod === "bank_transfer" || paymentMethod === "mobile_money") && (
+                (selectedSingleMethod?.requiresReference ||
+                  paymentMethod === "bank_transfer" ||
+                  paymentMethod === "mobile_money") && (
                   <input
                     value={transferRef}
                     onChange={(e) => setTransferRef(e.target.value)}
@@ -2715,11 +2877,23 @@ function POSPage() {
               {isSplitPayment ? (
                 <div className="flex items-center justify-between gap-2 rounded-lg bg-primary/[0.04] px-2 py-1 text-[10px]">
                   <span className="text-muted-foreground">
-                    {lang === "ar" ? `دفع متعدد · ${splitRows.length} طرق` : `Split payment · ${splitRows.length} methods`}
+                    {lang === "ar"
+                      ? `دفع متعدد · ${splitRows.length} طرق`
+                      : `Split payment · ${splitRows.length} methods`}
                   </span>
                   <span className="font-mono font-semibold">{money(splitPaidTotal)}</span>
                 </div>
               ) : null}
+
+              {/* Notes stay beside the payment controls, not below the totals. */}
+              <input
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                data-form-nav
+                placeholder={t("pos.notes_placeholder")}
+                aria-label={t("pos.notes_placeholder")}
+                className="h-8 w-full rounded-xl border border-input/80 bg-background px-3 text-xs outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:ring-1 focus:ring-primary/20"
+              />
 
               {/* ─── Royal Totals Summary Card ─── */}
               <div className="space-y-1.5 rounded-xl border border-primary/25 bg-gradient-to-br from-card via-card to-primary/[0.04] p-2 sm:p-2.5 shadow-sm">
@@ -2751,21 +2925,34 @@ function POSPage() {
 
                 <div className="flex items-center justify-between text-[11px] text-muted-foreground">
                   <span>{lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}</span>
-                  <span className="font-mono font-semibold text-foreground">{money(effectivePaid)}</span>
+                  <span className="font-mono font-semibold text-foreground">
+                    {money(effectivePaid)}
+                  </span>
                 </div>
 
                 <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-muted-foreground">{lang === "ar" ? "المتبقي على العميل" : "Customer balance"}</span>
-                  <span className={`font-mono font-bold ${remainingDebt > 0 ? "text-amber-600" : "text-foreground"}`}>{money(remainingDebt)}</span>
+                  <span className="text-muted-foreground">
+                    {lang === "ar" ? "المتبقي على العميل" : "Customer balance"}
+                  </span>
+                  <span
+                    className={`font-mono font-bold ${remainingDebt > 0 ? "text-amber-600" : "text-foreground"}`}
+                  >
+                    {money(remainingDebt)}
+                  </span>
                 </div>
                 {isOverpaid && (
-                  <p role="alert" className="rounded-lg bg-destructive/10 px-2 py-1 text-[10px] font-semibold text-destructive">
-                    {lang === "ar" ? "مجموع المدفوع أكبر من إجمالي الفاتورة" : "Paid amount exceeds the invoice total"}
+                  <p
+                    role="alert"
+                    className="rounded-lg bg-destructive/10 px-2 py-1 text-[10px] font-semibold text-destructive"
+                  >
+                    {lang === "ar"
+                      ? "مجموع المدفوع أكبر من إجمالي الفاتورة"
+                      : "Paid amount exceeds the invoice total"}
                   </p>
                 )}
 
                 {/* Grand Total */}
-                  <div className="flex items-center justify-between border-t border-primary/20 pt-1.5">
+                <div className="flex items-center justify-between border-t border-primary/20 pt-1.5">
                   <div>
                     <span className="text-xs font-black text-foreground">{t("pos.total")}</span>
                     {cart.length > 0 && (
@@ -2775,7 +2962,7 @@ function POSPage() {
                       </span>
                     )}
                   </div>
-                    <span className="font-mono text-base font-black tracking-tight text-primary [unicode-bidi:isolate]">
+                  <span className="font-mono text-base font-black tracking-tight text-primary [unicode-bidi:isolate]">
                     {money(total)}
                   </span>
                 </div>
@@ -2793,15 +2980,6 @@ function POSPage() {
                   </div>
                 )}
 
-              {/* Notes Input */}
-              <input
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                data-form-nav
-                placeholder={t("pos.notes_placeholder")}
-                aria-label={t("pos.notes_placeholder")}
-                className="h-8 w-full rounded-xl border border-input/80 bg-background px-3 text-xs outline-none transition focus:border-primary focus:ring-1 focus:ring-primary/20"
-              />
             </div>
 
             {/* ─── Sticky Action Row ─── */}
@@ -2867,33 +3045,54 @@ function POSPage() {
               {lang === "ar" ? "توزيع الدفع على أكثر من طريقة" : "Split payment methods"}
             </DialogTitle>
             <p className="text-[11px] text-muted-foreground">
-              {lang === "ar" ? "أضف كل وسيلة والمبلغ المدفوع بها. المتبقي يسجل على العميل." : "Add each tender and its amount. The remaining amount is recorded against the customer."}
+              {lang === "ar"
+                ? "أضف كل وسيلة والمبلغ المدفوع بها. المتبقي يسجل على العميل."
+                : "Add each tender and its amount. The remaining amount is recorded against the customer."}
             </p>
           </DialogHeader>
 
           <div className="space-y-2">
             {splitPayments.map((line) => {
               const chosen = supportedSplitMethods.find((method) => method.id === line.methodId);
-              const choices = supportedSplitMethods.filter((method) =>
-                method.id === line.methodId || !splitPayments.some((other) =>
-                  other.key !== line.key &&
-                  supportedSplitMethods.find((candidate) => candidate.id === other.methodId)?.legacyValue === method.legacyValue,
-                ),
+              const choices = supportedSplitMethods.filter(
+                (method) =>
+                  method.id === line.methodId ||
+                  !splitPayments.some(
+                    (other) =>
+                      other.key !== line.key &&
+                      supportedSplitMethods.find((candidate) => candidate.id === other.methodId)
+                        ?.legacyValue === method.legacyValue,
+                  ),
               );
               return (
-                <div key={line.key} className="grid grid-cols-[minmax(0,1fr)_minmax(6rem,0.8fr)_2.25rem] items-center gap-1.5 rounded-lg border border-border/60 p-1.5 sm:gap-2 sm:p-2">
+                <div
+                  key={line.key}
+                  className="grid grid-cols-[minmax(0,1fr)_minmax(6rem,0.8fr)_2.25rem] items-center gap-1.5 rounded-lg border border-border/60 p-1.5 sm:gap-2 sm:p-2"
+                >
                   <select
                     value={line.methodId}
-                    onChange={(event) => updateSplitPayment(line.key, { methodId: event.target.value, reference: "" })}
+                    onChange={(event) =>
+                      updateSplitPayment(line.key, { methodId: event.target.value, reference: "" })
+                    }
                     aria-label={lang === "ar" ? "طريقة الدفع" : "Payment method"}
                     className="h-9 min-w-0 rounded-full border border-border bg-background px-2 text-[11px] font-medium outline-none focus:border-primary"
                   >
-                    {choices.map((method) => <option key={method.id} value={method.id}>{lang === "ar" ? method.nameAr : method.nameEn || method.nameAr}</option>)}
+                    {choices.map((method) => (
+                      <option key={method.id} value={method.id}>
+                        {lang === "ar" ? method.nameAr : method.nameEn || method.nameAr}
+                      </option>
+                    ))}
                   </select>
                   <AmountInput
-                    label={lang === "ar" ? `مبلغ ${chosen?.nameAr ?? "الدفع"}` : `${chosen?.nameEn ?? chosen?.nameAr ?? "Payment"} amount`}
+                    label={
+                      lang === "ar"
+                        ? `مبلغ ${chosen?.nameAr ?? "الدفع"}`
+                        : `${chosen?.nameEn ?? chosen?.nameAr ?? "Payment"} amount`
+                    }
                     value={line.amount}
-                    onValueChange={(amount) => updateSplitPayment(line.key, { amount, autoAmount: false })}
+                    onValueChange={(amount) =>
+                      updateSplitPayment(line.key, { amount, autoAmount: false })
+                    }
                     invalid={isOverpaid}
                     placeholder="0"
                     className="h-9 rounded-full border border-border bg-background px-2 text-xs font-semibold outline-none focus:border-primary"
@@ -2911,8 +3110,14 @@ function POSPage() {
                     <input
                       type="text"
                       value={line.reference ?? ""}
-                      onChange={(event) => updateSplitPayment(line.key, { reference: event.target.value })}
-                      aria-label={lang === "ar" ? `مرجع ${chosen.nameAr}` : `${chosen.nameEn || chosen.nameAr} reference`}
+                      onChange={(event) =>
+                        updateSplitPayment(line.key, { reference: event.target.value })
+                      }
+                      aria-label={
+                        lang === "ar"
+                          ? `مرجع ${chosen.nameAr}`
+                          : `${chosen.nameEn || chosen.nameAr} reference`
+                      }
                       placeholder={lang === "ar" ? "رقم المرجع" : "Reference"}
                       className="col-span-3 h-8 min-w-0 rounded-full border border-border bg-background px-3 text-[11px] outline-none focus:border-primary"
                     />
@@ -2933,7 +3138,9 @@ function POSPage() {
 
           <div className="space-y-1 rounded-xl border border-primary/20 bg-primary/[0.04] p-2.5 text-xs">
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">{lang === "ar" ? "إجمالي الفاتورة" : "Invoice total"}</span>
+              <span className="text-muted-foreground">
+                {lang === "ar" ? "إجمالي الفاتورة" : "Invoice total"}
+              </span>
               <span className="font-mono font-semibold">{money(total)}</span>
             </div>
             <div className="flex items-center justify-between">
@@ -2941,17 +3148,36 @@ function POSPage() {
               <span className="font-mono font-semibold">{money(splitPaidTotal)}</span>
             </div>
             <div className="flex items-center justify-between border-t border-border/50 pt-1">
-              <span className="text-muted-foreground">{lang === "ar" ? "المتبقي على العميل" : "Customer balance"}</span>
+              <span className="text-muted-foreground">
+                {lang === "ar" ? "المتبقي على العميل" : "Customer balance"}
+              </span>
               <span className="font-mono font-bold text-amber-600">{money(remainingDebt)}</span>
             </div>
-            {isOverpaid && <p role="alert" className="pt-1 text-[11px] font-semibold text-destructive">{lang === "ar" ? "مجموع الدفعات يتجاوز إجمالي الفاتورة" : "Payment total exceeds invoice total"}</p>}
+            {isOverpaid && (
+              <p role="alert" className="pt-1 text-[11px] font-semibold text-destructive">
+                {lang === "ar"
+                  ? "مجموع الدفعات يتجاوز إجمالي الفاتورة"
+                  : "Payment total exceeds invoice total"}
+              </p>
+            )}
+            {splitDebtBlockReason && (
+              <p role="alert" className="pt-1 text-[11px] font-semibold text-destructive">
+                {splitDebtBlockReason}
+              </p>
+            )}
           </div>
 
           <DialogFooter>
             <button
               type="button"
               onClick={() => setSplitEditorOpen(false)}
-              disabled={splitMethodCount === 0 || isOverpaid || missingSplitReference || (!customerId && remainingDebt > 0)}
+              disabled={
+                splitMethodCount === 0 ||
+                isOverpaid ||
+                hasInvalidSplitLine ||
+                missingSplitReference ||
+                Boolean(splitDebtBlockReason)
+              }
               className="h-9 rounded-full bg-primary px-5 text-xs font-semibold text-primary-foreground disabled:opacity-40"
             >
               {lang === "ar" ? "تم" : "Done"}

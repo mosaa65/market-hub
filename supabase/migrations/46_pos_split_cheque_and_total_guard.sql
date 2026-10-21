@@ -61,6 +61,15 @@ BEGIN
     INTO v_distinct_methods, v_single_method
   FROM jsonb_array_elements(_payment_splits) AS part;
 
+  -- The invoice's original journal is posted inside the legacy create_sale
+  -- overload before tender rows can be inserted. Until post_sales_invoice is
+  -- upgraded to debit every tender's own ledger account, a true multi-method
+  -- split would be reported correctly but posted to one account. Refuse it
+  -- transactionally rather than write a misleading journal.
+  IF v_distinct_methods > 1 THEN
+    RAISE EXCEPTION 'Multi-method payment requires split-aware ledger posting';
+  END IF;
+
   IF v_component_count <> v_distinct_methods THEN
     RAISE EXCEPTION 'A payment method may only be included once in a split';
   END IF;
@@ -76,12 +85,14 @@ BEGIN
     ELSE v_single_method
   END;
 
-  -- `cheque` is a valid ENUM and a bank tender, but the legacy single-method
-  -- sale function's allow-list predates it. Post through bank_transfer so the
-  -- ledger account remains BANK, then restore the document's cheque identity.
+  -- The legacy single-method function's allow-list predates cheque and split.
+  -- Use a ledger-safe single method to create the invoice, then restore its
+  -- tender identity after creation. For a cheque-only tender the canonical
+  -- ledger family is bank; for a multi-method invoice the posting is the
+  -- existing split/cash-settlement path and the tender rows remain authoritative.
   v_create_method := CASE
     WHEN v_recorded_method = 'cheque' THEN 'bank_transfer'
-    WHEN v_recorded_method = 'split' THEN 'split'
+    WHEN v_recorded_method = 'split' THEN 'cash'
     ELSE v_recorded_method
   END;
 
@@ -96,6 +107,10 @@ BEGIN
 
   IF round(v_split_total, 2) > round(v_total, 2) THEN
     RAISE EXCEPTION 'Payment breakdown cannot exceed the invoice total';
+  END IF;
+
+  IF round(v_split_total, 2) <> round(v_paid, 2) THEN
+    RAISE EXCEPTION 'Tender breakdown does not match the recorded paid amount';
   END IF;
 
   UPDATE public.sales_invoices
