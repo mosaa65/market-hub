@@ -6,7 +6,7 @@ import {
   CustomFieldOptions,
 } from "./types";
 import { getCachedCompanyProfile } from "@/lib/printing/company-profile";
-import { renderUniversalFooter, UNIVERSAL_FOOTER_CSS } from "@/lib/printing/footer";
+import { renderInvoiceRightsFooter, UNIVERSAL_FOOTER_CSS } from "@/lib/printing/footer";
 import { numberToArabicWords } from "./tafqeet";
 import { generateBarcodeSvg, generateQrCodeSvg } from "@/lib/printing/barcode-qr";
 
@@ -36,8 +36,8 @@ export function renderMillingCleanTemplate(
     showFinancialDetails: true,
     showPaymentInfo: true,
     showNotes: true,
-    showSignatures: true,
-    showFooter: true,
+    showSignatures: false,
+    showFooter: false,
     showBarcode: true,
     showQrCode: true,
     ...options,
@@ -45,13 +45,10 @@ export function renderMillingCleanTemplate(
   };
 
   const companyName =
-    doc.company?.legalName ||
-    doc.company?.name ||
-    company.legalName ||
-    company.name ||
-    "المركز التجاري المتقدم";
+    doc.company?.arabicName || doc.company?.name || company.arabicName || company.name || "";
+  const englishName = doc.company?.englishName || company.englishName || "";
   const companyAddress = doc.company?.address || company.address || "";
-  const companyPhone = doc.company?.phone || company.phone || company.contacts[0] || "";
+  const companyPhone = doc.company?.phone || company.phone || "";
   const companyVat = doc.company?.vat || company.taxNumber || "";
 
   const docTitle =
@@ -81,6 +78,11 @@ export function renderMillingCleanTemplate(
     </tr>`,
     )
     .join("");
+  const totalQuantity = doc.lines.reduce((sum, line) => sum + Number(line.qty || 0), 0);
+  const totalLines = doc.lines.reduce(
+    (sum, line) => sum + Number(line.total ?? Number(line.qty || 0) * Number(line.price || 0)),
+    0,
+  );
 
   return `<!doctype html>
 <html dir="${rtl ? "rtl" : "ltr"}" lang="${rtl ? "ar" : "en"}">
@@ -95,15 +97,16 @@ export function renderMillingCleanTemplate(
       font-size: 12px; line-height: 1.5;
       -webkit-print-color-adjust: exact; print-color-adjust: exact;
     }
+    @page { size: ${options?.paperProfileId === "a5" ? "A5" : "A4"} portrait; margin: ${options?.paperProfileId === "a5" ? "6mm" : "8mm"}; }
     .sheet-wrapper {
       width: 100%;
       max-width: 210mm;
       margin: 0 auto;
       padding: 12mm 15mm;
-      min-height: 100vh;
+      min-height: 0;
       display: flex;
       flex-direction: column;
-      justify-content: space-between;
+      justify-content: flex-start;
     }
     .header-box {
       display: flex;
@@ -149,6 +152,8 @@ export function renderMillingCleanTemplate(
     table.data-table tbody tr:nth-child(even) {
       background: #fafafa;
     }
+    table.data-table tfoot { display: table-row-group; font-weight: 800; }
+    table.data-table tfoot td { border-top: 2px solid #334155; background: #f1f5f9; }
     .totals-wrapper {
       display: flex;
       justify-content: flex-end;
@@ -224,9 +229,10 @@ export function renderMillingCleanTemplate(
           ${
             opts.showCompanyInfo
               ? `
-            <h1 style="margin: 0; font-size: 21px; font-weight: 900; color: #0f172a; letter-spacing: -0.3px;">
+            <h1 style="margin: 0; font-size: 21px; font-weight: 900; color: #0f172a;">
               ${esc(companyName)}
             </h1>
+            ${englishName ? `<p dir="ltr" style="margin: 2px 0 0; color: #475569; font-size: 11px;">${esc(englishName)}</p>` : ""}
             ${companyAddress ? `<p style="margin: 4px 0 0 0; color: #64748b; font-size: 11.5px;">${esc(companyAddress)}</p>` : ""}
             ${companyPhone ? `<p style="margin: 2px 0 0 0; color: #64748b; font-size: 11.5px; font-family: monospace;">هاتف: ${esc(companyPhone)}</p>` : ""}
             ${companyVat ? `<p style="margin: 2px 0 0 0; color: #64748b; font-size: 11px;">الرقم الضريبي: ${esc(companyVat)}</p>` : ""}
@@ -303,6 +309,14 @@ export function renderMillingCleanTemplate(
         <tbody>
           ${rowsHtml || `<tr><td colspan="5" style="text-align: center; color: #94a3b8; padding: 16px;">لا توجد أصناف</td></tr>`}
         </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="2" style="text-align: ${rtl ? "right" : "left"};">${rtl ? "الإجمالي" : "Totals"}</td>
+            <td style="text-align: center;">${totalQuantity}</td>
+            <td></td>
+            <td style="text-align: ${rtl ? "left" : "right"}; font-family: monospace;">${money(totalLines)}</td>
+          </tr>
+        </tfoot>
       </table>
 
       <!-- Bottom Layout: Tafqeet/Notes + Totals -->
@@ -413,11 +427,7 @@ export function renderMillingCleanTemplate(
           : ""
       }
     </div>
-
-    <!-- Footer -->
-    <div style="margin-top: 24px;">
-      ${opts.showFooter ? renderUniversalFooter(company, true, false) : ""}
-    </div>
+    ${renderInvoiceRightsFooter()}
   </div>
 </body>
 </html>`;

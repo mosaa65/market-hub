@@ -62,7 +62,10 @@ assert.ok(!TENANT_SELECTABLE_LEGACY_VALUES.includes("credit"));
 assert.deepEqual(Object.keys(PAYMENT_METHOD_ICON_ASSETS).sort(), ["floosak", "jaib", "one_cash"]);
 assert.equal(paymentMethodIconAsset("floosak")?.src, "/yemeni_wallet_icons_svg/floosak.svg");
 assert.equal(paymentMethodIconAsset("one_cash")?.src, "/yemeni_wallet_icons_svg/one-cash.svg");
-assert.equal(paymentMethodIconAsset("jaib")?.src, "/yemeni_wallet_icons_svg/jaib.svg");
+assert.equal(
+  paymentMethodIconAsset("jaib")?.src,
+  "/yemeni_wallet_icons_svg/%D8%B4%D8%B9%D8%A7%D8%B1-%D9%85%D8%AD%D9%81%D8%B7%D8%A9-%D8%AC%D9%8A%D8%A8.svg",
+);
 assert.equal(paymentMethodIconAsset("unknown"), undefined);
 assert.equal(paymentMethodIconAsset("purple-wallet"), undefined);
 

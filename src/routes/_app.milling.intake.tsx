@@ -52,8 +52,9 @@ import {
   type MillingServiceDocument,
   type MillingDocumentDetails,
 } from "@/lib/milling";
-import { PaymentMethodPicker } from "@/components/ui/payment-method";
+import { PaymentPanel, usePaymentPanel } from "@/components/payments/payment-panel";
 import { DynamicPaymentSelector } from "@/components/ui/payment-method/dynamic-payment-selector";
+import { useFormNavigationScope } from "@/hooks/use-form-navigation";
 import { AmountInput } from "@/components/ui/amount-input";
 import { QuantityInput } from "@/components/ui/quantity-input";
 import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
@@ -108,6 +109,7 @@ function MillingIntakePage() {
   const { docId: initialDocId } = useSearch({ from: "/_app/milling/intake" });
 
   const currencySymbol = useMemo(() => getCompanyCurrencySymbol(), []);
+  const formScopeRef = useFormNavigationScope<HTMLDivElement>();
 
   // الحقول الأساسية — تبدأ فارغة لتفادي إزعاج الـ 0
   const [customerId, setCustomerId] = useState("");
@@ -309,9 +311,14 @@ function MillingIntakePage() {
   const currentDiscount = Number(discount) || 0;
   const grandTotal = Math.max(0, currentSubtotal - currentDiscount);
 
-  const isCredit = paymentMethod === "credit";
-  const currentPaid = isCredit ? 0 : Number(paid) || 0;
-  const remainingDue = Math.max(0, grandTotal - currentPaid);
+  const payment = usePaymentPanel({
+    total: grandTotal,
+    state: { method: paymentMethod, paidRaw: paid, customerId },
+    customers: customers.data ?? [],
+  });
+  const isCredit = payment.isCredit;
+  const currentPaid = payment.paid;
+  const remainingDue = payment.remaining;
 
   // مساعدة سريعة لتسديد كامل المبلغ أو جعله آجلاً
   function handlePayFull() {
@@ -332,12 +339,13 @@ function MillingIntakePage() {
     itemId &&
     Boolean(serviceItem.data?.id) &&
     (bagCount > 0 || Number(kg) > 0) &&
-    !isOverpaid,
+    payment.isPayable,
   );
 
   const submit = useMutation({
-    mutationFn: async () =>
-      createMillingServiceDocument({
+    mutationFn: async () => {
+      if (!payment.isPayable) throw new Error(payment.blockingReason ?? "بيانات الدفع غير صالحة.");
+      return createMillingServiceDocument({
         customerId,
         warehouseId,
         grainItemId: itemId,
@@ -351,9 +359,10 @@ function MillingIntakePage() {
         bankAccountId: settlement.bankAccountId || null,
         paymentMethodId: settlement.paymentMethodId || paymentMethod || null,
         paymentReference: settlement.reference || null,
-        paid: isCredit ? 0 : Number(paid) || 0,
+        paid: currentPaid,
         notes: notes.trim() || undefined,
-      }),
+      });
+    },
     onSuccess: async (res) => {
       if (!res.ok) {
         toast.error(res.message || "تعذر تسجيل الاستلام.");

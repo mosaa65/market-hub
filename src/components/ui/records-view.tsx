@@ -167,7 +167,13 @@ export function RecordsView<T>({
           <RecordsSkeleton mode={viewMode} />
         ) : (
           <>
-            <div className={cn(refreshing || (loading && rows.length > 0) ? "opacity-70 transition-opacity pointer-events-none" : undefined)}>
+            <div
+              className={cn(
+                refreshing || (loading && rows.length > 0)
+                  ? "opacity-70 transition-opacity pointer-events-none"
+                  : undefined,
+              )}
+            >
               {viewMode === "cards" ? (
                 <div className={cardsGridClassName}>
                   {rows.map((row, index) => (

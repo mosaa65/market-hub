@@ -8,6 +8,7 @@ import {
 import { getCachedCompanyProfile } from "@/lib/printing/company-profile";
 import { generateBarcodeSvg, generateQrCodeSvg } from "@/lib/printing/barcode-qr";
 import { numberToArabicWords } from "./tafqeet";
+import { renderInvoiceRightsFooter } from "@/lib/printing/footer";
 
 /**
  * Milling Service Master Template (A4 / A5 Luxury Format)
@@ -34,8 +35,8 @@ export function renderMillingMasterTemplate(
     showFinancialDetails: true,
     showPaymentInfo: true,
     showNotes: true,
-    showSignatures: true,
-    showFooter: true,
+    showSignatures: false,
+    showFooter: false,
     showBarcode: true,
     showQrCode: true,
     ...options,
@@ -467,7 +468,7 @@ export function renderMillingMasterTemplate(
         : ""
     }
 
-    <!-- Inama Soft Footer -->
+    ${renderInvoiceRightsFooter()}
     ${
       opts.showFooter
         ? `
@@ -502,7 +503,7 @@ export function renderMillingThermalTemplate(
     showCustomerInfo: true,
     showDocNumberDate: true,
     showFinancialDetails: true,
-    showFooter: true,
+    showFooter: false,
     showBarcode: true,
     showQrCode: true,
     ...options,
@@ -673,6 +674,7 @@ export function renderMillingThermalTemplate(
       : ""
   }
 
+  ${renderInvoiceRightsFooter()}
   ${
     opts.showFooter && L.poweredBy
       ? `

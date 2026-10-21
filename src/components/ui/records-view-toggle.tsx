@@ -17,6 +17,8 @@ export interface RecordsViewToggleProps {
   onChange: (mode: RecordsViewMode) => void;
   /** Modes a screen does not support are not offered at all. */
   modes?: RecordsViewMode[];
+  /** Render one icon-only circular control that advances to the next mode. */
+  cycle?: boolean;
   className?: string;
 }
 
@@ -36,6 +38,7 @@ export function RecordsViewToggle({
   value,
   onChange,
   modes = ["cards", "list", "table"],
+  cycle = false,
   className,
 }: RecordsViewToggleProps) {
   const { t } = useI18n();
@@ -51,6 +54,24 @@ export function RecordsViewToggle({
   const currentLabel = t(LABEL_KEYS[value]) || value;
   const nextLabel = t(LABEL_KEYS[nextMode]) || nextMode;
 
+  // Explicit compact mode: one icon-only circular control on every viewport.
+  if (cycle) {
+    return (
+      <button
+        type="button"
+        onClick={() => onChange(nextMode)}
+        aria-label={`${t("records.view.switch_hint")}: ${nextLabel}`}
+        title={`${currentLabel} · ${nextLabel}`}
+        className={cn(
+          "grid size-9 shrink-0 place-items-center rounded-full border border-border/70 bg-surface/70 text-muted-foreground shadow-[var(--shadow-control)] transition hover:border-primary/40 hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 active:scale-95",
+          className,
+        )}
+      >
+        <CurrentIcon className="size-4" aria-hidden />
+      </button>
+    );
+  }
+
   return (
     <>
       {/* Mobile single cycling button (< sm) */}
@@ -64,7 +85,10 @@ export function RecordsViewToggle({
           className,
         )}
       >
-        <CurrentIcon className="size-4 text-primary shrink-0 transition-transform duration-200" aria-hidden />
+        <CurrentIcon
+          className="size-4 text-primary shrink-0 transition-transform duration-200"
+          aria-hidden
+        />
         <span className="text-[11px] font-bold text-foreground">{currentLabel}</span>
       </button>
 

@@ -27,7 +27,6 @@ import {
   Settings,
   ExternalLink,
   Power,
-  Camera,
   ScanBarcode,
   LayoutGrid,
   List,
@@ -39,16 +38,13 @@ import {
   Tag,
   Barcode,
   MapPin,
-  Sparkles,
   Loader2,
   Check,
   DollarSign,
-  TrendingUp,
   SlidersHorizontal,
-  ShieldCheck,
-  Percent,
   X,
   Copy,
+  ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
@@ -62,12 +58,17 @@ import {
 } from "@/lib/safety";
 import { fuzzySearch, buildSearchIndex } from "@/design/fuzzy";
 import { getCompanyCurrencySymbol, moneyCell, qtyCell } from "@/lib/format";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
-import { FieldInput, NumberInput, fieldSurfaceClass } from "@/components/ui/input";
+import { NumberInput, fieldSurfaceClass } from "@/components/ui/input";
 import { FormField } from "@/components/ui/form-field";
-import { FormActions, FormGrid, FormSection } from "@/components/ui/form-layout";
 import { Modal, ConfirmDialog } from "@/components/ui/modal";
 import { DataTable, type DataTableColumn, type DataTableSort } from "@/components/ui/data-table";
 import {
@@ -86,13 +87,6 @@ import { quietChipClass } from "@/components/ui/action-button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ItemRoleBadge, resolveItemClass } from "@/components/item-role-badge";
 import { ProductFieldSettings } from "@/components/products/product-field-settings";
-import {
-  ProductPreviewCard,
-  ProductFormTabs,
-  FormIssuesBar,
-  type ProductFormTab,
-  type FormIssue,
-} from "@/components/products/product-form-shell";
 import { useProductFieldVisibility } from "@/hooks/use-product-field-visibility";
 import { usePersistedViewMode } from "@/hooks/use-persisted-view-mode";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
@@ -1845,19 +1839,27 @@ function ProductsPage() {
                           <span
                             className={cn(
                               "size-1.5 rounded-full",
-                              selectedProductDetail.is_active ? "bg-emerald-500 animate-pulse" : "bg-muted-foreground",
+                              selectedProductDetail.is_active
+                                ? "bg-emerald-500 animate-pulse"
+                                : "bg-muted-foreground",
                             )}
                           />
-                          {selectedProductDetail.is_active ? t("common.active") : t("common.inactive")}
+                          {selectedProductDetail.is_active
+                            ? t("common.active")
+                            : t("common.inactive")}
                         </span>
                       </div>
 
                       <SheetDescription className="text-xs text-muted-foreground flex items-center gap-2 mt-1 flex-wrap">
-                        {(selectedProductDetail.name_ar && selectedProductDetail.name && selectedProductDetail.name_ar !== selectedProductDetail.name) && (
-                          <span className="font-medium text-muted-foreground">
-                            {lang === "ar" ? selectedProductDetail.name : selectedProductDetail.name_ar}
-                          </span>
-                        )}
+                        {selectedProductDetail.name_ar &&
+                          selectedProductDetail.name &&
+                          selectedProductDetail.name_ar !== selectedProductDetail.name && (
+                            <span className="font-medium text-muted-foreground">
+                              {lang === "ar"
+                                ? selectedProductDetail.name
+                                : selectedProductDetail.name_ar}
+                            </span>
+                          )}
                         {selectedProductDetail.sku && (
                           <>
                             <span>•</span>
@@ -1922,7 +1924,8 @@ function ProductsPage() {
                         {lang === "ar" ? "وزن العبوة (كجم)" : "Package Weight (kg)"}
                       </span>
                       <p className="font-mono text-lg sm:text-xl font-black text-foreground">
-                        {toSystemDigits(selectedProductDetail.package_weight_kg.toString())} {lang === "ar" ? "كجم" : "kg"}
+                        {toSystemDigits(selectedProductDetail.package_weight_kg.toString())}{" "}
+                        {lang === "ar" ? "كجم" : "kg"}
                       </p>
                     </div>
                   )}
@@ -1955,21 +1958,31 @@ function ProductsPage() {
                   <div className="space-y-2.5 text-xs">
                     {selectedProductDetail.name_ar && (
                       <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">{lang === "ar" ? "الاسم بالعربية" : "Arabic Name"}</span>
-                        <span className="font-semibold text-foreground">{selectedProductDetail.name_ar}</span>
+                        <span className="text-muted-foreground">
+                          {lang === "ar" ? "الاسم بالعربية" : "Arabic Name"}
+                        </span>
+                        <span className="font-semibold text-foreground">
+                          {selectedProductDetail.name_ar}
+                        </span>
                       </div>
                     )}
 
                     {selectedProductDetail.name && (
                       <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">{lang === "ar" ? "الاسم بالإنجليزية" : "English Name"}</span>
-                        <span className="font-semibold text-foreground" dir="ltr">{selectedProductDetail.name}</span>
+                        <span className="text-muted-foreground">
+                          {lang === "ar" ? "الاسم بالإنجليزية" : "English Name"}
+                        </span>
+                        <span className="font-semibold text-foreground" dir="ltr">
+                          {selectedProductDetail.name}
+                        </span>
                       </div>
                     )}
 
                     {selectedProductDetail.sku && (
                       <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">{lang === "ar" ? "رمز SKU" : "SKU Code"}</span>
+                        <span className="text-muted-foreground">
+                          {lang === "ar" ? "رمز SKU" : "SKU Code"}
+                        </span>
                         <div className="flex items-center gap-1.5 font-mono font-bold text-foreground">
                           <span>{selectedProductDetail.sku}</span>
                           <button
@@ -1989,7 +2002,9 @@ function ProductsPage() {
 
                     {selectedProductDetail.barcode && (
                       <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">{lang === "ar" ? "الباركود" : "Barcode"}</span>
+                        <span className="text-muted-foreground">
+                          {lang === "ar" ? "الباركود" : "Barcode"}
+                        </span>
                         <div className="flex items-center gap-1.5 font-mono font-bold text-foreground">
                           <span>{selectedProductDetail.barcode}</span>
                           <button
@@ -2009,7 +2024,9 @@ function ProductsPage() {
 
                     {selectedProductDetail.shelf_location && (
                       <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">{lang === "ar" ? "موقع الرف" : "Shelf Location"}</span>
+                        <span className="text-muted-foreground">
+                          {lang === "ar" ? "موقع الرف" : "Shelf Location"}
+                        </span>
                         <span className="font-mono text-foreground font-semibold">
                           {selectedProductDetail.shelf_location}
                         </span>
@@ -2029,44 +2046,62 @@ function ProductsPage() {
 
                   <div className="space-y-2.5 text-xs">
                     <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">{lang === "ar" ? "التصنيف" : "Category"}</span>
+                      <span className="text-muted-foreground">
+                        {lang === "ar" ? "التصنيف" : "Category"}
+                      </span>
                       <span className="font-semibold text-foreground">
-                        {categoryLabel(selectedProductDetail.category) ?? (lang === "ar" ? "بدون تصنيف" : "Uncategorized")}
+                        {categoryLabel(selectedProductDetail.category) ??
+                          (lang === "ar" ? "بدون تصنيف" : "Uncategorized")}
                       </span>
                     </div>
 
                     {selectedProductDetail.brand && (
                       <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">{lang === "ar" ? "العلامة التجارية" : "Brand"}</span>
+                        <span className="text-muted-foreground">
+                          {lang === "ar" ? "العلامة التجارية" : "Brand"}
+                        </span>
                         <span className="font-semibold text-foreground">
-                          {label(selectedProductDetail.brand.name, selectedProductDetail.brand.name_ar)}
+                          {label(
+                            selectedProductDetail.brand.name,
+                            selectedProductDetail.brand.name_ar,
+                          )}
                         </span>
                       </div>
                     )}
 
                     {selectedProductDetail.unit && (
                       <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">{lang === "ar" ? "وحدة القياس" : "Unit"}</span>
+                        <span className="text-muted-foreground">
+                          {lang === "ar" ? "وحدة القياس" : "Unit"}
+                        </span>
                         <span className="font-semibold text-foreground">
-                          {selectedProductDetail.unit.name_ar || selectedProductDetail.unit.name || selectedProductDetail.unit.short_name}
+                          {selectedProductDetail.unit.name_ar ||
+                            selectedProductDetail.unit.name ||
+                            selectedProductDetail.unit.short_name}
                         </span>
                       </div>
                     )}
 
                     {selectedProductDetail.origin && (
                       <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">{lang === "ar" ? "بلد المنشأ" : "Country of Origin"}</span>
+                        <span className="text-muted-foreground">
+                          {lang === "ar" ? "بلد المنشأ" : "Country of Origin"}
+                        </span>
                         <span className="font-semibold text-foreground">
-                          {selectedProductDetail.origin.name_ar || selectedProductDetail.origin.name}
+                          {selectedProductDetail.origin.name_ar ||
+                            selectedProductDetail.origin.name}
                         </span>
                       </div>
                     )}
 
                     {selectedProductDetail.quality && (
                       <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">{lang === "ar" ? "درجة الجودة" : "Quality Grade"}</span>
+                        <span className="text-muted-foreground">
+                          {lang === "ar" ? "درجة الجودة" : "Quality Grade"}
+                        </span>
                         <span className="font-semibold text-foreground">
-                          {selectedProductDetail.quality.name_ar || selectedProductDetail.quality.name}
+                          {selectedProductDetail.quality.name_ar ||
+                            selectedProductDetail.quality.name}
                         </span>
                       </div>
                     )}
@@ -2078,58 +2113,106 @@ function ProductsPage() {
                   <div className="flex items-center justify-between text-muted-foreground border-b border-border/40 pb-2">
                     <span className="flex items-center gap-1.5 text-xs font-bold text-foreground">
                       <ShieldCheck className="size-4 text-primary" />
-                      {lang === "ar" ? "سياسات الصنف والمخزون والعمليات" : "Item Policies & Operations"}
+                      {lang === "ar"
+                        ? "سياسات الصنف والمخزون والعمليات"
+                        : "Item Policies & Operations"}
                     </span>
                   </div>
 
                   <div className="space-y-2.5 text-xs">
                     {selectedProductDetail.item_nature && (
                       <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">{lang === "ar" ? "طبيعة الصنف" : "Item Nature"}</span>
+                        <span className="text-muted-foreground">
+                          {lang === "ar" ? "طبيعة الصنف" : "Item Nature"}
+                        </span>
                         <span className="font-semibold text-foreground">
-                          {ITEM_NATURE_LABELS[selectedProductDetail.item_nature]?.[lang === "ar" ? "ar" : "en"] || selectedProductDetail.item_nature}
+                          {ITEM_NATURE_LABELS[selectedProductDetail.item_nature]?.[
+                            lang === "ar" ? "ar" : "en"
+                          ] || selectedProductDetail.item_nature}
                         </span>
                       </div>
                     )}
 
                     {selectedProductDetail.inventory_policy && (
                       <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">{lang === "ar" ? "سياسة المخزون" : "Inventory Policy"}</span>
+                        <span className="text-muted-foreground">
+                          {lang === "ar" ? "سياسة المخزون" : "Inventory Policy"}
+                        </span>
                         <span className="font-semibold text-foreground">
-                          {INVENTORY_POLICY_LABELS[selectedProductDetail.inventory_policy]?.[lang === "ar" ? "ar" : "en"] || selectedProductDetail.inventory_policy}
+                          {INVENTORY_POLICY_LABELS[selectedProductDetail.inventory_policy]?.[
+                            lang === "ar" ? "ar" : "en"
+                          ] || selectedProductDetail.inventory_policy}
                         </span>
                       </div>
                     )}
 
                     {selectedProductDetail.tracking && (
                       <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">{lang === "ar" ? "طريقة التتبع" : "Tracking Method"}</span>
+                        <span className="text-muted-foreground">
+                          {lang === "ar" ? "طريقة التتبع" : "Tracking Method"}
+                        </span>
                         <span className="font-semibold text-foreground">
-                          {TRACKING_LABELS[selectedProductDetail.tracking]?.[lang === "ar" ? "ar" : "en"] || selectedProductDetail.tracking}
+                          {TRACKING_LABELS[selectedProductDetail.tracking]?.[
+                            lang === "ar" ? "ar" : "en"
+                          ] || selectedProductDetail.tracking}
                         </span>
                       </div>
                     )}
 
                     {selectedProductDetail.costing_method && (
                       <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">{lang === "ar" ? "طريقة حساب التكلفة" : "Costing Method"}</span>
+                        <span className="text-muted-foreground">
+                          {lang === "ar" ? "طريقة حساب التكلفة" : "Costing Method"}
+                        </span>
                         <span className="font-semibold text-foreground">
-                          {COSTING_METHOD_LABELS[selectedProductDetail.costing_method]?.[lang === "ar" ? "ar" : "en"] || selectedProductDetail.costing_method}
+                          {COSTING_METHOD_LABELS[selectedProductDetail.costing_method]?.[
+                            lang === "ar" ? "ar" : "en"
+                          ] || selectedProductDetail.costing_method}
                         </span>
                       </div>
                     )}
 
                     <div className="flex items-center justify-between pt-1 border-t border-border/40">
-                      <span className="text-muted-foreground">{lang === "ar" ? "قابل للبيع في المبيعات" : "Sellable"}</span>
-                      <span className={cn("font-bold text-xs", selectedProductDetail.is_sellable !== false ? "text-emerald-500" : "text-muted-foreground")}>
-                        {selectedProductDetail.is_sellable !== false ? (lang === "ar" ? "نعم" : "Yes") : (lang === "ar" ? "لا" : "No")}
+                      <span className="text-muted-foreground">
+                        {lang === "ar" ? "قابل للبيع في المبيعات" : "Sellable"}
+                      </span>
+                      <span
+                        className={cn(
+                          "font-bold text-xs",
+                          selectedProductDetail.is_sellable !== false
+                            ? "text-emerald-500"
+                            : "text-muted-foreground",
+                        )}
+                      >
+                        {selectedProductDetail.is_sellable !== false
+                          ? lang === "ar"
+                            ? "نعم"
+                            : "Yes"
+                          : lang === "ar"
+                            ? "لا"
+                            : "No"}
                       </span>
                     </div>
 
                     <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">{lang === "ar" ? "قابل للشراء في المشتريات" : "Purchasable"}</span>
-                      <span className={cn("font-bold text-xs", selectedProductDetail.is_purchasable !== false ? "text-emerald-500" : "text-muted-foreground")}>
-                        {selectedProductDetail.is_purchasable !== false ? (lang === "ar" ? "نعم" : "Yes") : (lang === "ar" ? "لا" : "No")}
+                      <span className="text-muted-foreground">
+                        {lang === "ar" ? "قابل للشراء في المشتريات" : "Purchasable"}
+                      </span>
+                      <span
+                        className={cn(
+                          "font-bold text-xs",
+                          selectedProductDetail.is_purchasable !== false
+                            ? "text-emerald-500"
+                            : "text-muted-foreground",
+                        )}
+                      >
+                        {selectedProductDetail.is_purchasable !== false
+                          ? lang === "ar"
+                            ? "نعم"
+                            : "Yes"
+                          : lang === "ar"
+                            ? "لا"
+                            : "No"}
                       </span>
                     </div>
                   </div>
@@ -2158,7 +2241,9 @@ function ProductsPage() {
                       <Power
                         className={cn(
                           "size-3.5",
-                          selectedProductDetail.is_active ? "text-emerald-500" : "text-muted-foreground",
+                          selectedProductDetail.is_active
+                            ? "text-emerald-500"
+                            : "text-muted-foreground",
                         )}
                       />
                       <span>
@@ -2379,12 +2464,16 @@ function ProductDialog({
 }) {
   const { t, lang } = useI18n();
   const { config } = useCatalogModules();
+  const dialogQc = useQueryClient();
   const { isModuleEnabled } = useModules();
   // إعدادات إظهار الحقول موحّدة عبر الشاشة والفورم: نفس المصدر، نفس الزر.
   const { isVisible: isFieldVisible } = useProductFieldVisibility();
   const showForm = (key: ProductFieldKey) => isFieldVisible("form", key);
   const [scannerOpen, setScannerOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"general" | "pricing" | "specs" | "policy">("general");
+  const [categoryQuickAddOpen, setCategoryQuickAddOpen] = useState(false);
+  const [categoryNameAr, setCategoryNameAr] = useState("");
+  const [categoryNameEn, setCategoryNameEn] = useState("");
+  const [savingCategory, setSavingCategory] = useState(false);
   const policyFromProduct = (product: ProductRow): UserItemPolicyPreferences => ({
     item_nature: product.item_nature ?? "GOOD",
     inventory_policy: product.inventory_policy ?? "TRACKED",
@@ -2438,11 +2527,6 @@ function ProductDialog({
     disabled: !isModuleEnabled("barcode") || scannerOpen,
   });
 
-  const costNum = Number(form.cost_price) || 0;
-  const saleNum = Number(form.sale_price) || 0;
-  const profitNum = saleNum - costNum;
-  const marginPercent = saleNum > 0 ? Math.round((profitNum / saleNum) * 100) : 0;
-
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (saving) return;
@@ -2452,13 +2536,11 @@ function ProductDialog({
           ? "اسم المنتج بالعربية مطلوب لظهوره بشكل صحيح في بطاقات النظام."
           : "An Arabic product name is required for the Yemen catalogue.",
       );
-      setActiveTab("general");
       return;
     }
     const policyCheck = validateItemPolicy(policy);
     if (!policyCheck.valid) {
       toast.error(lang === "ar" ? policyCheck.errors[0] : "The selected item policy is not valid.");
-      setActiveTab("policy");
       return;
     }
     setSaving(true);
@@ -2548,53 +2630,47 @@ function ProductDialog({
   }
 
   const labelOf = (en: string, ar: string | null) => (lang === "ar" ? ar || en : en || ar || "");
-  const currentCategory = meta.categories.find((c) => c.id === form.category_id);
 
-  /*
-   * Live validation — the issues the operator sees BEFORE pressing Save.
-   * Each entry points at the tab that owns it, so the strip (and the amber
-   * count badge on the tab itself) can jump straight to the field.
-   * The same rules the submit guard enforces, surfaced one step earlier.
-   */
-  const policyCheckQuiet = useMemo(() => validateItemPolicy(policy), [policy]);
-  const formIssues = useMemo<FormIssue[]>(() => {
-    const issues: FormIssue[] = [];
-    if (!form.name_ar.trim()) {
-      issues.push({
-        tab: "general",
-        message: lang === "ar" ? "الاسم بالعربية مطلوب" : "Arabic name is required",
-      });
+  async function addCategoryQuickly() {
+    if (savingCategory) return;
+    if (!categoryNameAr.trim() && !categoryNameEn.trim()) {
+      toast.error(lang === "ar" ? "أدخل اسم التصنيف" : "Enter a category name");
+      return;
     }
-    if (form.sale_price.trim() === "" || Number(form.sale_price) <= 0) {
-      issues.push({
-        tab: "pricing",
-        message: lang === "ar" ? "سعر البيع غير محدد" : "Sale price is not set",
-      });
+    setSavingCategory(true);
+    try {
+      const payload = {
+        name: categoryNameEn.trim() || categoryNameAr.trim(),
+        name_ar: categoryNameAr.trim() || null,
+      };
+      const { data, error } = await supabase
+        .from("categories")
+        .insert(payload)
+        .select("id, name, name_ar")
+        .single();
+      if (error) throw error;
+      const category = data as { id: string; name: string; name_ar: string | null };
+      dialogQc.setQueryData(productKeys.meta(), (current: typeof meta) => ({
+        ...(current ?? meta),
+        categories: [...(current?.categories ?? meta.categories), category],
+      }));
+      setForm((current) => ({ ...current, category_id: category.id }));
+      setCategoryNameAr("");
+      setCategoryNameEn("");
+      setCategoryQuickAddOpen(false);
+      toast.success(lang === "ar" ? "تمت إضافة التصنيف واختياره" : "Category added and selected");
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : lang === "ar"
+            ? "تعذرت إضافة التصنيف"
+            : "Could not add category",
+      );
+    } finally {
+      setSavingCategory(false);
     }
-    if (
-      canViewCost &&
-      form.cost_price.trim() !== "" &&
-      Number(form.cost_price) > Number(form.sale_price || 0)
-    ) {
-      issues.push({
-        tab: "pricing",
-        message: lang === "ar" ? "التكلفة أعلى من سعر البيع" : "Cost exceeds the sale price",
-      });
-    }
-    if (!policyCheckQuiet.valid) {
-      issues.push({
-        tab: "policy",
-        message: lang === "ar" ? policyCheckQuiet.errors[0] : "The item policy is invalid",
-      });
-    }
-    return issues;
-  }, [form.name_ar, form.sale_price, form.cost_price, policyCheckQuiet, canViewCost, lang]);
-
-  const tabIssueCounts = useMemo(() => {
-    const counts: Partial<Record<ProductFormTab, number>> = {};
-    for (const issue of formIssues) counts[issue.tab] = (counts[issue.tab] ?? 0) + 1;
-    return counts;
-  }, [formIssues]);
+  }
 
   return (
     <VortexDrawerDialog
@@ -2603,547 +2679,538 @@ function ProductDialog({
         if (!isOpen) onClose();
       }}
       size="xl"
-      title={
-        <div className="flex items-center gap-2">
-          <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <Package className="size-4" />
-          </span>
-          <span>{initial ? t("products.edit_product") : t("products.new_product")}</span>
-        </div>
-      }
+      className="sm:max-w-4xl sm:h-[min(90vh,820px)]"
+      bodyClassName="bg-muted/[0.16] px-4 py-4 sm:px-6 sm:py-5"
+      icon={<Package className="size-5" />}
+      title={initial ? t("products.edit_product") : t("products.new_product")}
       subtitle={
-        initial
-          ? lang === "ar"
-            ? "تعديل مواصفات الصنف وهوامش التسعير والسياسات"
-            : "Update product specs, margins, and policies"
-          : lang === "ar"
-            ? "تعريف صنف جديد بأسلوب بطاقة المكونات الأنيقة"
-            : "Define a new catalog item with luxury details"
+        lang === "ar" ? "بيانات الصنف والتسعير والمخزون" : "Item details, pricing and inventory"
       }
       footer={
-        <div className="flex w-full items-center justify-between gap-3 border-t border-border/40 pt-3">
-          <div className="flex items-center gap-2">
-            <label className="relative inline-flex cursor-pointer items-center gap-2">
-              <input
-                type="checkbox"
-                checked={form.is_active}
-                onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
-                className="size-4 rounded border-border accent-primary"
-              />
-              <span className="text-xs font-semibold text-foreground/80">
-                {form.is_active
-                  ? lang === "ar"
-                    ? "صنف نشط"
-                    : "Active"
-                  : lang === "ar"
-                    ? "صنف معطل"
-                    : "Inactive"}
-              </span>
-            </label>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              className="min-w-[90px] rounded-xl text-xs font-medium"
-            >
-              {t("common.cancel")}
-            </Button>
-            <Button
-              type="submit"
-              form="product-form"
-              loading={saving}
-              className="min-w-[130px] rounded-xl bg-primary text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/95"
-            >
-              <Check className="me-1 size-3.5" />
-              {t("common.save")}
-            </Button>
-          </div>
+        <div className="flex w-full items-center gap-2">
+          <button
+            type="submit"
+            form="product-form"
+            disabled={saving}
+            className="flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-foreground text-xs font-bold text-background shadow-lg shadow-foreground/15 transition hover:opacity-95 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 sm:text-sm"
+          >
+            <Check className="size-4 text-primary" />
+            <span>
+              {saving ? (lang === "ar" ? "جارٍ الحفظ..." : "Saving...") : t("common.save")}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-12 items-center gap-1.5 rounded-2xl bg-muted/80 px-4 text-xs font-bold text-muted-foreground transition hover:text-foreground active:scale-[0.98] sm:text-sm"
+            aria-label={t("common.cancel")}
+          >
+            <X className="size-3.5" />
+            <span>{t("common.cancel")}</span>
+          </button>
         </div>
       }
     >
-      <form id="product-form" onSubmit={submit} className="flex flex-col gap-5">
-        {/* Live Product Preview — shared shell (same card in every entry path). */}
-        <ProductPreviewCard
-          nameAr={form.name_ar}
-          nameEn={form.name}
-          categoryLabel={
-            currentCategory
-              ? labelOf(currentCategory.name, currentCategory.name_ar)
-              : lang === "ar"
-                ? "بدون تصنيف"
-                : "Uncategorized"
-          }
-          barcode={form.barcode || undefined}
-          isActive={form.is_active}
-          canViewCost={canViewCost}
-          profit={profitNum}
-          marginPercent={marginPercent}
-          currencySymbol={getCompanyCurrencySymbol()}
-          formatDigits={toSystemDigits}
-          activeLabel={lang === "ar" ? "نشط" : "Active"}
-          inactiveLabel={lang === "ar" ? "معطل" : "Inactive"}
-          newTitlePlaceholder={lang === "ar" ? "اسم المنتج الجديد..." : "New Product Name..."}
-        />
+      <form
+        id="product-form"
+        onSubmit={submit}
+        className="mx-auto flex w-full max-w-3xl flex-col gap-4 sm:gap-5"
+      >
+        {/* One form only. Each group is a visual fieldset, never a nested form. */}
+        <section
+          id="product-section-general"
+          className="scroll-mt-4 animate-in fade-in-0 slide-in-from-bottom-1 duration-200 space-y-4 rounded-2xl border border-border/60 bg-card/80 p-4 shadow-xs sm:p-5"
+        >
+          <SectionHeading
+            icon={<Package className="size-4" />}
+            title={lang === "ar" ? "البيانات الأساسية" : "Basic information"}
+            action={
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-muted/70 px-2.5 py-1 text-[11px] font-semibold text-muted-foreground transition hover:text-foreground">
+                <input
+                  type="checkbox"
+                  checked={form.is_active}
+                  onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
+                  className="size-3.5 rounded border-border accent-primary"
+                />
+                <span>{lang === "ar" ? "نشط" : "Active"}</span>
+              </label>
+            }
+          />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FormField label={t("products.name_ar")} required>
+              {(p) => (
+                <VortexTextInput
+                  id={p.id}
+                  aria-describedby={p["aria-describedby"]}
+                  dir="rtl"
+                  clearable
+                  value={form.name_ar}
+                  onChange={(e) => setForm({ ...form, name_ar: e.target.value })}
+                  placeholder={
+                    lang === "ar" ? "أدخل اسم الصنف بالعربية..." : "Arabic product name..."
+                  }
+                  className="rounded-full"
+                />
+              )}
+            </FormField>
 
-        {/* Live validation — issues jump to their owning tab. */}
-        <FormIssuesBar issues={formIssues} onJump={setActiveTab} />
-
-        {/* Sleek Segmented Tabs — shared control (SegmentedTabs). */}
-        <ProductFormTabs
-          value={activeTab}
-          onChange={setActiveTab}
-          issues={tabIssueCounts}
-          labels={{
-            general: {
-              label: lang === "ar" ? "البيانات الأساسية" : "Basic Info",
-              icon: <Package className="size-3.5" />,
-            },
-            pricing: {
-              label: lang === "ar" ? "التسعير والربحية" : "Pricing & Margins",
-              icon: <DollarSign className="size-3.5" />,
-            },
-            specs: {
-              label: lang === "ar" ? "المخزون والمواصفات" : "Stock & Specs",
-              icon: <Layers className="size-3.5" />,
-            },
-            policy: {
-              label: lang === "ar" ? "طبيعة وسياسة الصنف" : "Policies",
-              icon: <SlidersHorizontal className="size-3.5" />,
-            },
-          }}
-        />
-
-        {/* Tab 1: General Info */}
-        {activeTab === "general" && (
-          <div className="space-y-4 pt-1">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <FormField label={t("products.name_ar")} required>
+            {showForm("nameEn") && (
+              <FormField label={t("products.name_en")}>
                 {(p) => (
                   <VortexTextInput
                     id={p.id}
                     aria-describedby={p["aria-describedby"]}
-                    dir="rtl"
+                    dir="ltr"
                     clearable
-                    value={form.name_ar}
-                    onChange={(e) => setForm({ ...form, name_ar: e.target.value })}
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
                     placeholder={
-                      lang === "ar" ? "أدخل اسم الصنف بالعربية..." : "Arabic product name..."
+                      lang === "ar" ? "English product name..." : "English product name..."
                     }
+                    className="rounded-full"
                   />
-                )}
-              </FormField>
-
-              {showForm("nameEn") && (
-                <FormField label={t("products.name_en")}>
-                  {(p) => (
-                    <VortexTextInput
-                      id={p.id}
-                      aria-describedby={p["aria-describedby"]}
-                      dir="ltr"
-                      clearable
-                      value={form.name}
-                      onChange={(e) => setForm({ ...form, name: e.target.value })}
-                      placeholder={
-                        lang === "ar" ? "English product name..." : "English product name..."
-                      }
-                    />
-                  )}
-                </FormField>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {showForm("category") && (
-                <FormField label={t("products.category")}>
-                  {(p) => (
-                    <select
-                      id={p.id}
-                      aria-describedby={p["aria-describedby"]}
-                      value={form.category_id}
-                      onChange={(e) => setForm({ ...form, category_id: e.target.value })}
-                      className={cn(fieldSurfaceClass, "text-sm font-medium")}
-                    >
-                      <option value="">
-                        {lang === "ar" ? "اختر التصنيف..." : "Select category..."}
-                      </option>
-                      {meta.categories.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {labelOf(c.name, c.name_ar)}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </FormField>
-              )}
-
-              {showForm("sku") && (
-                <FormField
-                  label={t("products.sku")}
-                  hint={lang === "ar" ? "معرّف الصنف الفريد" : "Unique SKU code"}
-                >
-                  {(p) => (
-                    <VortexTextInput
-                      id={p.id}
-                      aria-describedby={p["aria-describedby"]}
-                      clearable
-                      value={form.sku}
-                      onChange={(e) => setForm({ ...form, sku: e.target.value })}
-                      placeholder="PRD-001"
-                    />
-                  )}
-                </FormField>
-              )}
-
-              {showForm("shelf") && (
-                <FormField label={lang === "ar" ? "موقع الرف / المستودع" : "Shelf location"}>
-                  {(p) => (
-                    <VortexTextInput
-                      id={p.id}
-                      aria-describedby={p["aria-describedby"]}
-                      clearable
-                      value={form.shelf_location}
-                      onChange={(e) => setForm({ ...form, shelf_location: e.target.value })}
-                      placeholder={lang === "ar" ? "رف A-12" : "Shelf A-12"}
-                    />
-                  )}
-                </FormField>
-              )}
-            </div>
-
-            {isModuleEnabled("barcode") && showForm("barcode") && (
-              <FormField
-                label={t("products.barcode")}
-                hint={lang === "ar" ? "رمز الباركود للمسح السريع" : "Fast scan barcode"}
-              >
-                {(p) => (
-                  <div className="flex items-center gap-2">
-                    <VortexTextInput
-                      id={p.id}
-                      aria-describedby={p["aria-describedby"]}
-                      dir="ltr"
-                      clearable
-                      value={form.barcode}
-                      onChange={(e) => setForm({ ...form, barcode: e.target.value })}
-                      placeholder="628100..."
-                      className="min-w-0 flex-1 font-mono"
-                    />
-                    <IconButton
-                      type="button"
-                      size="md"
-                      variant="outline"
-                      ariaLabel={lang === "ar" ? "مسح الباركود بالكاميرا" : "Scan barcode"}
-                      icon={<Camera className="size-4" />}
-                      onClick={() => setScannerOpen(true)}
-                    />
-                  </div>
                 )}
               </FormField>
             )}
           </div>
-        )}
 
-        {/* Tab 2: Pricing & Margins */}
-        {activeTab === "pricing" && (
-          <div className="space-y-4 pt-1">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <FormField
-                label={t("common.price")}
-                required
-                hint={lang === "ar" ? "سعر البيع النهائي للعميل" : "Retail sale price"}
-              >
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {showForm("category") && (
+              <FormField label={t("products.category")}>
                 {(p) => (
-                  <VortexCurrencyInput
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <select
+                        id={p.id}
+                        aria-describedby={p["aria-describedby"]}
+                        value={form.category_id}
+                        onChange={(e) => setForm({ ...form, category_id: e.target.value })}
+                        className={cn(
+                          fieldSurfaceClass,
+                          "h-10 min-w-0 flex-1 px-4 text-sm font-medium",
+                        )}
+                      >
+                        <option value="">
+                          {lang === "ar" ? "اختر التصنيف..." : "Select category..."}
+                        </option>
+                        {meta.categories.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {labelOf(c.name, c.name_ar)}
+                          </option>
+                        ))}
+                      </select>
+                      <IconButton
+                        type="button"
+                        size="lg"
+                        round
+                        variant="outline"
+                        tooltip
+                        ariaLabel={lang === "ar" ? "إضافة تصنيف جديد" : "Add category"}
+                        aria-expanded={categoryQuickAddOpen}
+                        onClick={() => setCategoryQuickAddOpen((open) => !open)}
+                        icon={<Plus />}
+                      />
+                    </div>
+                    {categoryQuickAddOpen && (
+                      <div className="animate-in fade-in-0 slide-in-from-top-1 space-y-2 rounded-2xl border border-primary/20 bg-primary/[0.035] p-3 duration-150">
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <VortexTextInput
+                            value={categoryNameAr}
+                            onChange={(event) => setCategoryNameAr(event.target.value)}
+                            dir="rtl"
+                            placeholder={lang === "ar" ? "اسم التصنيف بالعربية" : "Arabic name"}
+                            aria-label={
+                              lang === "ar" ? "اسم التصنيف بالعربية" : "Arabic category name"
+                            }
+                          />
+                          <VortexTextInput
+                            value={categoryNameEn}
+                            onChange={(event) => setCategoryNameEn(event.target.value)}
+                            dir="ltr"
+                            placeholder={
+                              lang === "ar"
+                                ? "الاسم بالإنجليزية (اختياري)"
+                                : "English name (optional)"
+                            }
+                            aria-label={
+                              lang === "ar" ? "الاسم بالإنجليزية" : "English category name"
+                            }
+                          />
+                        </div>
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setCategoryQuickAddOpen(false)}
+                          >
+                            {t("common.cancel")}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            loading={savingCategory}
+                            onClick={() => void addCategoryQuickly()}
+                          >
+                            {lang === "ar" ? "إضافة التصنيف" : "Add category"}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </FormField>
+            )}
+
+            {config.enableUnits && showForm("unit") && (
+              <FormField label={t("products.unit")}>
+                {(p) => (
+                  <select
                     id={p.id}
                     aria-describedby={p["aria-describedby"]}
-                    value={form.sale_price === "" ? null : Number(form.sale_price)}
-                    onValueChange={(num) =>
-                      setForm({ ...form, sale_price: num == null ? "" : String(num) })
-                    }
-                    min={0}
-                    currencySymbol={getCompanyCurrencySymbol()}
-                    placeholder="0.00"
+                    value={form.unit_id}
+                    onChange={(e) => setForm({ ...form, unit_id: e.target.value })}
+                    className={cn(fieldSurfaceClass, "h-10 px-4 text-sm font-medium")}
+                  >
+                    <option value="">
+                      {lang === "ar" ? "اختر وحدة القياس..." : "Select unit..."}
+                    </option>
+                    {meta.units.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {labelOf(u.name, u.name_ar)}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </FormField>
+            )}
+
+            {showForm("sku") && (
+              <FormField label={t("products.sku")}>
+                {(p) => (
+                  <VortexTextInput
+                    id={p.id}
+                    aria-describedby={p["aria-describedby"]}
+                    dir="ltr"
+                    clearable
+                    value={form.sku}
+                    onChange={(e) => setForm({ ...form, sku: e.target.value })}
+                    placeholder="PRD-001"
+                    className="rounded-full"
                   />
                 )}
               </FormField>
+            )}
 
-              {canViewCost && showForm("cost") && (
-                <FormField
-                  label={t("common.cost")}
-                  hint={lang === "ar" ? "تكلفة الشراء الأساسية" : "Unit cost price"}
-                >
-                  <VortexCurrencyInput
-                    value={form.cost_price === "" ? null : Number(form.cost_price)}
-                    onValueChange={(num) =>
-                      setForm({ ...form, cost_price: num == null ? "" : String(num) })
+            {showForm("shelf") && (
+              <FormField label={lang === "ar" ? "موقع الرف / المستودع" : "Shelf location"}>
+                {(p) => (
+                  <VortexTextInput
+                    id={p.id}
+                    aria-describedby={p["aria-describedby"]}
+                    value={form.shelf_location}
+                    onChange={(e) => setForm({ ...form, shelf_location: e.target.value })}
+                    placeholder={lang === "ar" ? "رف A-12" : "Shelf A-12"}
+                    className="rounded-full"
+                  />
+                )}
+              </FormField>
+            )}
+          </div>
+
+          {isModuleEnabled("barcode") && showForm("barcode") && (
+            <FormField label={t("products.barcode")}>
+              {(p) => (
+                <div className="flex items-center gap-2">
+                  <VortexTextInput
+                    id={p.id}
+                    aria-describedby={p["aria-describedby"]}
+                    dir="ltr"
+                    clearable
+                    value={form.barcode}
+                    onChange={(e) => setForm({ ...form, barcode: e.target.value })}
+                    placeholder="628100..."
+                    className="min-w-0 flex-1 rounded-full font-mono"
+                  />
+                  <IconButton
+                    type="button"
+                    size="lg"
+                    round
+                    variant="outline"
+                    tooltip
+                    ariaLabel={lang === "ar" ? "مسح الباركود بالكاميرا" : "Scan barcode"}
+                    icon={<ScanBarcode />}
+                    onClick={() => setScannerOpen(true)}
+                  />
+                </div>
+              )}
+            </FormField>
+          )}
+        </section>
+
+        {/* Tab 2: Pricing & Margins */}
+        <section
+          id="product-section-pricing"
+          className="scroll-mt-4 animate-in fade-in-0 slide-in-from-bottom-1 duration-200 space-y-4 rounded-2xl border border-border/60 bg-card/80 p-4 shadow-xs sm:p-5"
+        >
+          <SectionHeading
+            icon={<DollarSign className="size-4" />}
+            title={lang === "ar" ? "التسعير" : "Pricing"}
+          />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FormField label={t("common.price")} required>
+              {(p) => (
+                <VortexCurrencyInput
+                  id={p.id}
+                  aria-describedby={p["aria-describedby"]}
+                  value={form.sale_price === "" ? null : Number(form.sale_price)}
+                  onValueChange={(num) =>
+                    setForm({ ...form, sale_price: num == null ? "" : String(num) })
+                  }
+                  min={0}
+                  currencySymbol={getCompanyCurrencySymbol()}
+                  placeholder="0.00"
+                  className="rounded-full"
+                />
+              )}
+            </FormField>
+
+            {canViewCost && showForm("cost") && (
+              <FormField label={t("common.cost")}>
+                <VortexCurrencyInput
+                  value={form.cost_price === "" ? null : Number(form.cost_price)}
+                  onValueChange={(num) =>
+                    setForm({ ...form, cost_price: num == null ? "" : String(num) })
+                  }
+                  min={0}
+                  currencySymbol={getCompanyCurrencySymbol()}
+                  placeholder="0.00"
+                  className="rounded-full"
+                />
+              </FormField>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {showForm("tax") && (
+              <FormField label={t("products.tax_rate")}>
+                {(p) => (
+                  <NumberInput
+                    {...p}
+                    value={form.tax_rate === "" ? null : Number(form.tax_rate)}
+                    onValueChange={(v) =>
+                      setForm({ ...form, tax_rate: v == null ? "" : String(v) })
                     }
                     min={0}
-                    currencySymbol={getCompanyCurrencySymbol()}
-                    placeholder="0.00"
+                    max={100}
+                    suffix="%"
+                    placeholder="0"
                   />
-                </FormField>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {showForm("tax") && (
-                <FormField label={t("products.tax_rate")}>
-                  {(p) => (
-                    <NumberInput
-                      {...p}
-                      value={form.tax_rate === "" ? null : Number(form.tax_rate)}
-                      onValueChange={(v) =>
-                        setForm({ ...form, tax_rate: v == null ? "" : String(v) })
-                      }
-                      min={0}
-                      max={100}
-                      suffix="%"
-                      placeholder="0"
-                    />
-                  )}
-                </FormField>
-              )}
-
-              {config.enableUnits && showForm("unit") && (
-                <FormField label={t("products.unit")}>
-                  {(p) => (
-                    <select
-                      id={p.id}
-                      aria-describedby={p["aria-describedby"]}
-                      value={form.unit_id}
-                      onChange={(e) => setForm({ ...form, unit_id: e.target.value })}
-                      className={cn(fieldSurfaceClass, "text-sm font-medium")}
-                    >
-                      <option value="">
-                        {lang === "ar" ? "اختر وحدة القياس..." : "Select unit..."}
-                      </option>
-                      {meta.units.map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {labelOf(u.name, u.name_ar)}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </FormField>
-              )}
-            </div>
+                )}
+              </FormField>
+            )}
           </div>
-        )}
+        </section>
 
         {/* Tab 3: Specs & Inventory */}
-        {activeTab === "specs" && (
-          <div className="space-y-4 pt-1">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {showForm("minStock") && (
-                <FormField
-                  label={t("products.min")}
-                  hint={
-                    lang === "ar"
-                      ? "حد التنبيه عند وصول المخزون لهذه الكمية"
-                      : "Low-stock alert threshold"
-                  }
-                >
-                  {(p) => (
-                    <NumberInput
-                      {...p}
-                      value={form.min_stock === "" ? null : Number(form.min_stock)}
-                      onValueChange={(v) =>
-                        setForm({ ...form, min_stock: v == null ? "" : String(v) })
-                      }
-                      min={0}
-                      decimal={false}
-                      placeholder="1"
-                    />
-                  )}
-                </FormField>
-              )}
+        <section
+          id="product-section-specs"
+          className="scroll-mt-4 animate-in fade-in-0 slide-in-from-bottom-1 duration-200 space-y-4 rounded-2xl border border-border/60 bg-card/80 p-4 shadow-xs sm:p-5"
+        >
+          <SectionHeading
+            icon={<Layers className="size-4" />}
+            title={lang === "ar" ? "المخزون والمواصفات" : "Inventory & specifications"}
+          />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {showForm("minStock") && (
+              <FormField label={t("products.min")}>
+                {(p) => (
+                  <NumberInput
+                    {...p}
+                    value={form.min_stock === "" ? null : Number(form.min_stock)}
+                    onValueChange={(v) =>
+                      setForm({ ...form, min_stock: v == null ? "" : String(v) })
+                    }
+                    min={0}
+                    decimal={false}
+                    placeholder="1"
+                  />
+                )}
+              </FormField>
+            )}
 
-              {showForm("packageWeight") && (
-                <FormField
-                  label={lang === "ar" ? "سعة العبوة (كجم)" : "Package size (kg)"}
-                  hint={
-                    lang === "ar"
-                      ? "الوزن الافتراضي للكيس (مثال 50 أو 25). يُستخدم لتعبئة الوزن في شاشات الطحن والتسليم فقط."
-                      : "Default bag weight (e.g. 50 or 25). Used to prefill the weight on milling and delivery screens only."
-                  }
-                >
-                  {(p) => (
-                    <NumberInput
-                      {...p}
-                      value={form.package_weight_kg === "" ? null : Number(form.package_weight_kg)}
-                      onValueChange={(v) =>
-                        setForm({ ...form, package_weight_kg: v == null ? "" : String(v) })
-                      }
-                      min={0}
-                      decimal
-                      placeholder={lang === "ar" ? "مثال: 50" : "e.g. 50"}
-                    />
-                  )}
-                </FormField>
-              )}
+            {showForm("packageWeight") && (
+              <FormField label={lang === "ar" ? "سعة العبوة (كجم)" : "Package size (kg)"}>
+                {(p) => (
+                  <NumberInput
+                    {...p}
+                    value={form.package_weight_kg === "" ? null : Number(form.package_weight_kg)}
+                    onValueChange={(v) =>
+                      setForm({ ...form, package_weight_kg: v == null ? "" : String(v) })
+                    }
+                    min={0}
+                    decimal
+                    placeholder={lang === "ar" ? "مثال: 50" : "e.g. 50"}
+                  />
+                )}
+              </FormField>
+            )}
 
-              {config.enableBrands && showForm("brand") && (
-                <FormField label={t("products.brand")}>
-                  {(p) => (
-                    <select
-                      id={p.id}
-                      aria-describedby={p["aria-describedby"]}
-                      value={form.brand_id}
-                      onChange={(e) => setForm({ ...form, brand_id: e.target.value })}
-                      className={cn(fieldSurfaceClass, "text-sm font-medium")}
-                    >
-                      <option value="">
-                        {lang === "ar" ? "اختر العلامة التجارية..." : "Select brand..."}
+            {config.enableBrands && showForm("brand") && (
+              <FormField label={t("products.brand")}>
+                {(p) => (
+                  <select
+                    id={p.id}
+                    aria-describedby={p["aria-describedby"]}
+                    value={form.brand_id}
+                    onChange={(e) => setForm({ ...form, brand_id: e.target.value })}
+                    className={cn(fieldSurfaceClass, "h-10 px-4 text-sm font-medium")}
+                  >
+                    <option value="">
+                      {lang === "ar" ? "اختر العلامة التجارية..." : "Select brand..."}
+                    </option>
+                    {meta.brands.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {labelOf(b.name, b.name_ar)}
                       </option>
-                      {meta.brands.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {labelOf(b.name, b.name_ar)}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </FormField>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {config.enableOrigins && (
-                <FormField label={lang === "ar" ? "بلد المنشأ" : "Country of origin"}>
-                  {(p) => (
-                    <select
-                      id={p.id}
-                      aria-describedby={p["aria-describedby"]}
-                      value={form.origin_id}
-                      onChange={(e) => setForm({ ...form, origin_id: e.target.value })}
-                      className={cn(fieldSurfaceClass, "text-sm font-medium")}
-                    >
-                      <option value="">
-                        {lang === "ar" ? "اختر بلد المنشأ..." : "Select origin..."}
-                      </option>
-                      {meta.origins.map((o) => (
-                        <option key={o.id} value={o.id}>
-                          {lang === "ar" ? o.name_ar : o.name}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </FormField>
-              )}
-
-              {config.enableQualityGrades && (
-                <FormField label={lang === "ar" ? "درجة الجودة" : "Quality grade"}>
-                  {(p) => (
-                    <select
-                      id={p.id}
-                      aria-describedby={p["aria-describedby"]}
-                      value={form.quality_grade_id}
-                      onChange={(e) => setForm({ ...form, quality_grade_id: e.target.value })}
-                      className={cn(fieldSurfaceClass, "text-sm font-medium")}
-                    >
-                      <option value="">
-                        {lang === "ar" ? "اختر درجة الجودة..." : "Select quality grade..."}
-                      </option>
-                      {meta.qualities.map((q) => (
-                        <option key={q.id} value={q.id}>
-                          {lang === "ar" ? q.name_ar : q.name}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </FormField>
-              )}
-            </div>
+                    ))}
+                  </select>
+                )}
+              </FormField>
+            )}
           </div>
-        )}
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {config.enableOrigins && (
+              <FormField label={lang === "ar" ? "بلد المنشأ" : "Country of origin"}>
+                {(p) => (
+                  <select
+                    id={p.id}
+                    aria-describedby={p["aria-describedby"]}
+                    value={form.origin_id}
+                    onChange={(e) => setForm({ ...form, origin_id: e.target.value })}
+                    className={cn(fieldSurfaceClass, "h-10 px-4 text-sm font-medium")}
+                  >
+                    <option value="">
+                      {lang === "ar" ? "اختر بلد المنشأ..." : "Select origin..."}
+                    </option>
+                    {meta.origins.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {lang === "ar" ? o.name_ar : o.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </FormField>
+            )}
+
+            {config.enableQualityGrades && (
+              <FormField label={lang === "ar" ? "درجة الجودة" : "Quality grade"}>
+                {(p) => (
+                  <select
+                    id={p.id}
+                    aria-describedby={p["aria-describedby"]}
+                    value={form.quality_grade_id}
+                    onChange={(e) => setForm({ ...form, quality_grade_id: e.target.value })}
+                    className={cn(fieldSurfaceClass, "h-10 px-4 text-sm font-medium")}
+                  >
+                    <option value="">
+                      {lang === "ar" ? "اختر درجة الجودة..." : "Select quality grade..."}
+                    </option>
+                    {meta.qualities.map((q) => (
+                      <option key={q.id} value={q.id}>
+                        {lang === "ar" ? q.name_ar : q.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </FormField>
+            )}
+          </div>
+        </section>
 
         {/* Tab 4: Item Nature & Policies */}
-        {activeTab === "policy" && (
-          <div className="space-y-4 rounded-xl border border-border/60 bg-muted/20 p-4 pt-3">
-            <div className="space-y-4">
+        <section
+          id="product-section-policy"
+          className="scroll-mt-4 animate-in fade-in-0 slide-in-from-bottom-1 duration-200 space-y-4 rounded-2xl border border-border/60 bg-card/80 p-4 shadow-xs sm:p-5"
+        >
+          <SectionHeading
+            icon={<SlidersHorizontal className="size-4" />}
+            title={lang === "ar" ? "طبيعة وسياسة الصنف" : "Item nature & policy"}
+          />
+          <div className="space-y-4">
+            <SettingsChoice
+              label={lang === "ar" ? "طبيعة الصنف" : "Item nature"}
+              value={policy.item_nature}
+              options={[
+                { value: "GOOD", label: ITEM_NATURE_LABELS.GOOD[lang === "ar" ? "ar" : "en"] },
+                {
+                  value: "SERVICE",
+                  label: ITEM_NATURE_LABELS.SERVICE[lang === "ar" ? "ar" : "en"],
+                },
+              ]}
+              onChange={(value) =>
+                setPolicy((current) => ({
+                  ...current,
+                  item_nature: value as ItemNature,
+                  inventory_policy: value === "SERVICE" ? "UNTRACKED" : current.inventory_policy,
+                  tracking: value === "SERVICE" ? "NONE" : current.tracking,
+                  costing_method: value === "SERVICE" ? "NONE" : current.costing_method,
+                }))
+              }
+            />
+
+            {policy.item_nature === "GOOD" && (
               <SettingsChoice
-                label={lang === "ar" ? "طبيعة الصنف" : "Item nature"}
-                value={policy.item_nature}
-                options={[
-                  { value: "GOOD", label: ITEM_NATURE_LABELS.GOOD[lang === "ar" ? "ar" : "en"] },
-                  {
-                    value: "SERVICE",
-                    label: ITEM_NATURE_LABELS.SERVICE[lang === "ar" ? "ar" : "en"],
-                  },
-                ]}
+                label={lang === "ar" ? "سياسة المخزون" : "Inventory policy"}
+                value={policy.inventory_policy}
+                options={(["TRACKED", "UNTRACKED", "CUSTOMER_OWNED"] as InventoryPolicy[]).map(
+                  (value) => ({
+                    value,
+                    label: INVENTORY_POLICY_LABELS[value][lang === "ar" ? "ar" : "en"],
+                  }),
+                )}
                 onChange={(value) =>
                   setPolicy((current) => ({
                     ...current,
-                    item_nature: value as ItemNature,
-                    inventory_policy: value === "SERVICE" ? "UNTRACKED" : current.inventory_policy,
-                    tracking: value === "SERVICE" ? "NONE" : current.tracking,
-                    costing_method: value === "SERVICE" ? "NONE" : current.costing_method,
+                    inventory_policy: value as InventoryPolicy,
+                    tracking: value === "TRACKED" ? current.tracking : "NONE",
                   }))
                 }
               />
+            )}
 
-              {policy.item_nature === "GOOD" && (
-                <SettingsChoice
-                  label={lang === "ar" ? "سياسة المخزون" : "Inventory policy"}
-                  value={policy.inventory_policy}
-                  options={(["TRACKED", "UNTRACKED", "CUSTOMER_OWNED"] as InventoryPolicy[]).map(
-                    (value) => ({
-                      value,
-                      label: INVENTORY_POLICY_LABELS[value][lang === "ar" ? "ar" : "en"],
-                    }),
-                  )}
-                  onChange={(value) =>
-                    setPolicy((current) => ({
-                      ...current,
-                      inventory_policy: value as InventoryPolicy,
-                      tracking: value === "TRACKED" ? current.tracking : "NONE",
-                    }))
-                  }
-                />
-              )}
+            {policy.item_nature === "GOOD" && policy.inventory_policy === "TRACKED" && (
+              <SettingsChoice
+                label={lang === "ar" ? "طريقة التتبع" : "Tracking method"}
+                value={policy.tracking}
+                options={(["NONE", "BATCH", "SERIAL"] as ItemTracking[]).map((value) => ({
+                  value,
+                  label: TRACKING_LABELS[value][lang === "ar" ? "ar" : "en"],
+                }))}
+                onChange={(value) =>
+                  setPolicy((current) => ({
+                    ...current,
+                    tracking: value as ItemTracking,
+                  }))
+                }
+              />
+            )}
 
-              {policy.item_nature === "GOOD" && policy.inventory_policy === "TRACKED" && (
-                <SettingsChoice
-                  label={lang === "ar" ? "طريقة التتبع" : "Tracking method"}
-                  value={policy.tracking}
-                  options={(["NONE", "BATCH", "SERIAL"] as ItemTracking[]).map((value) => ({
-                    value,
-                    label: TRACKING_LABELS[value][lang === "ar" ? "ar" : "en"],
-                  }))}
-                  onChange={(value) =>
-                    setPolicy((current) => ({
-                      ...current,
-                      tracking: value as ItemTracking,
-                    }))
-                  }
-                />
-              )}
-
-              <div className="grid grid-cols-1 gap-2 pt-2 sm:grid-cols-2">
-                <SettingsToggle
-                  label={lang === "ar" ? "متاح للبيع" : "Available for sales"}
-                  description={
-                    lang === "ar"
-                      ? "إظهار الصنف في نقطة البيع وفواتير المبيعات"
-                      : "Show in sales & POS"
-                  }
-                  checked={policy.is_sellable}
-                  onChange={(checked) => setPolicy((c) => ({ ...c, is_sellable: checked }))}
-                />
-                <SettingsToggle
-                  label={lang === "ar" ? "متاح للشراء" : "Available for purchase"}
-                  description={
-                    lang === "ar"
-                      ? "إظهار الصنف في فواتير المشتريات والتوريد"
-                      : "Show in purchases & supply"
-                  }
-                  checked={policy.is_purchasable}
-                  onChange={(checked) => setPolicy((c) => ({ ...c, is_purchasable: checked }))}
-                />
-              </div>
+            <div className="grid grid-cols-2 gap-2 pt-2">
+              <SettingsToggle
+                label={lang === "ar" ? "متاح للبيع" : "Available for sales"}
+                checked={policy.is_sellable}
+                onChange={(checked) => setPolicy((c) => ({ ...c, is_sellable: checked }))}
+              />
+              <SettingsToggle
+                label={lang === "ar" ? "متاح للشراء" : "Available for purchase"}
+                checked={policy.is_purchasable}
+                onChange={(checked) => setPolicy((c) => ({ ...c, is_purchasable: checked }))}
+              />
             </div>
           </div>
-        )}
+        </section>
       </form>
 
       {scannerOpen && (
@@ -3161,6 +3228,28 @@ function ProductDialog({
   );
 }
 
+function SectionHeading({
+  icon,
+  title,
+  action,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <header className="flex items-center justify-between gap-3 border-b border-border/60 pb-3">
+      <span className="flex min-w-0 items-center gap-3">
+        <span className="grid size-9 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary">
+          {icon}
+        </span>
+        <span className="truncate text-sm font-bold text-foreground">{title}</span>
+      </span>
+      {action}
+    </header>
+  );
+}
+
 function SettingsChoice({
   label,
   value,
@@ -3173,20 +3262,43 @@ function SettingsChoice({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="flex flex-col gap-2">
-      <span className="text-xs font-semibold text-foreground">{label}</span>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className={fieldSurfaceClass}
+    <fieldset className="space-y-2.5">
+      <legend className="text-xs font-semibold text-foreground">{label}</legend>
+      <div
+        role="radiogroup"
+        aria-label={label}
+        className={cn("grid gap-2", options.length === 2 ? "grid-cols-2" : "grid-cols-3")}
       >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
+        {options.map((option) => {
+          const selected = value === option.value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              onClick={() => onChange(option.value)}
+              className={cn(
+                "flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-xl border px-2 py-2 text-center text-[11px] font-semibold leading-tight transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.99] sm:gap-2 sm:px-3 sm:text-xs",
+                selected
+                  ? "border-primary/50 bg-primary/10 text-primary shadow-xs"
+                  : "border-border/70 bg-background/70 text-muted-foreground hover:border-primary/30 hover:bg-muted/50 hover:text-foreground",
+              )}
+            >
+              <span className="min-w-0">{option.label}</span>
+              <span
+                className={cn(
+                  "grid size-4 shrink-0 place-items-center rounded-full border",
+                  selected ? "border-primary bg-primary" : "border-border bg-background",
+                )}
+              >
+                {selected && <Check className="size-2.5 text-primary-foreground" />}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </fieldset>
   );
 }
 
@@ -3203,14 +3315,14 @@ function SettingsToggle({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="flex cursor-pointer items-start gap-3 rounded-xl border-border bg-surface p-3 text-sm">
+    <label className="flex min-w-0 cursor-pointer items-center gap-2 rounded-xl border border-border/70 bg-surface p-2.5 text-xs sm:p-3 sm:text-sm">
       <input
         type="checkbox"
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
-        className="mt-0.5 size-4 accent-[var(--primary)]"
+        className="size-4 shrink-0 accent-[var(--primary)]"
       />
-      <span>
+      <span className="min-w-0 leading-tight">
         <span>{label}</span>
         {description && (
           <span className="mt-0.5 block text-[11px] text-muted-foreground">{description}</span>

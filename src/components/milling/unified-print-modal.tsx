@@ -147,12 +147,14 @@ export function documentDetailsToTicketData(
     customerPhone: details.customers?.phone || undefined,
     warehouseName: details.warehouses?.name_ar || details.warehouses?.name || "المستودع الرئيسي",
     createdAt: details.received_at || new Date().toISOString(),
-    grainType: grain?.nameAr || "قمح بلدي محلي",
-    millingTypeLabel: "طحن ناعم قياسي",
+    grainType: grain?.nameAr || "—",
+    // P1-5: لا نختلق «طحن ناعم قياسي» ولا «أكياس العميل» — تُعرض فقط إن سجّلها
+    // المستند. القيم الافتراضية القديمة كانت تظهر في إعادة الطباعة كأنها بيانات.
+    millingTypeLabel: (details as { milling_type?: string | null }).milling_type || undefined,
     bagCount,
     bagSizeKg,
     totalWeightKg,
-    bagsSourceLabel: "أكياس العميل",
+    bagsSourceLabel: undefined,
     items,
     millingFeeTotal: subtotal || grandTotal,
     packagingTotal: 0,
@@ -200,12 +202,12 @@ export function unifiedDocToTicketData(doc: UnifiedDocumentData): UnifiedTicketP
     customerPhone: doc.partyPhone || undefined,
     warehouseName: doc.warehouse || "المستودع الرئيسي",
     createdAt: doc.date || new Date().toISOString(),
-    grainType: grainLine?.product.replace(/حبوب مستلمة:?\s*/, "") || "قمح بلدي محلي",
-    millingTypeLabel: "طحن ناعم قياسي",
+    grainType: grainLine?.product.replace(/حبوب مستلمة:?\s*/, "") || "—",
+    millingTypeLabel: undefined,
     bagCount,
     bagSizeKg,
     totalWeightKg,
-    bagsSourceLabel: "أكياس العميل",
+    bagsSourceLabel: undefined,
     items: doc.lines.map((l) => ({
       name: l.product,
       bags: l.qty,
@@ -577,7 +579,9 @@ export function UnifiedPrintModal({
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-slate-600">درجة الطحن:</span>
-                      <span className="font-bold text-amber-700">{data.millingTypeLabel}</span>
+                      <span className="font-bold text-amber-700">
+                        {data.millingTypeLabel || "حسب الاتفاق"}
+                      </span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-slate-600">الكمية والأكياس:</span>
@@ -882,7 +886,9 @@ export function UnifiedPrintModal({
                     <tbody className="divide-y divide-slate-100">
                       <tr>
                         <td className="p-3 font-black text-slate-950">{data.grainType}</td>
-                        <td className="p-3 text-amber-700 font-bold">{data.millingTypeLabel}</td>
+                        <td className="p-3 text-amber-700 font-bold">
+                          {data.millingTypeLabel || "—"}
+                        </td>
                         <td className="p-3 text-center font-mono font-black">
                           {data.bagCount} كيس ({data.bagSizeKg || 50} كجم)
                         </td>

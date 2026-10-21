@@ -250,9 +250,11 @@ export type Database = {
           email: string | null;
           id: string;
           is_active: boolean;
+          is_system: boolean;
           loyalty_points: number;
           name: string;
           phone: string | null;
+          system_key: string | null;
           updated_at: string;
         };
         Insert: {
@@ -263,9 +265,11 @@ export type Database = {
           email?: string | null;
           id?: string;
           is_active?: boolean;
+          is_system?: boolean;
           loyalty_points?: number;
           name: string;
           phone?: string | null;
+          system_key?: string | null;
           updated_at?: string;
         };
         Update: {
@@ -276,9 +280,11 @@ export type Database = {
           email?: string | null;
           id?: string;
           is_active?: boolean;
+          is_system?: boolean;
           loyalty_points?: number;
           name?: string;
           phone?: string | null;
+          system_key?: string | null;
           updated_at?: string;
         };
         Relationships: [];
@@ -1225,8 +1231,10 @@ export type Database = {
           email: string | null;
           id: string;
           is_active: boolean;
+          is_system: boolean;
           name: string;
           phone: string | null;
+          system_key: string | null;
           updated_at: string;
         };
         Insert: {
@@ -1236,8 +1244,10 @@ export type Database = {
           email?: string | null;
           id?: string;
           is_active?: boolean;
+          is_system?: boolean;
           name: string;
           phone?: string | null;
+          system_key?: string | null;
           updated_at?: string;
         };
         Update: {
@@ -1247,8 +1257,10 @@ export type Database = {
           email?: string | null;
           id?: string;
           is_active?: boolean;
+          is_system?: boolean;
           name?: string;
           phone?: string | null;
+          system_key?: string | null;
           updated_at?: string;
         };
         Relationships: [];
@@ -1399,123 +1411,722 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      activate_fixed_asset: {
+        Args: {
+          p_asset_id: string;
+        };
+        Returns: boolean;
+      };
       adjust_loyalty: {
         Args: {
           _customer: string;
+          _points: number;
           _kind: string;
           _note: string;
-          _points: number;
         };
         Returns: string;
       };
+      backup_export_all: {
+        Args: {
+          p_max_log_rows?: number;
+        };
+        Returns: Json;
+      };
+      backup_restore_all: {
+        Args: {
+          p_payload: Json;
+        };
+        Returns: Json;
+      };
+      backup_schema_fingerprint: {
+        Args: Record<PropertyKey, never>;
+        Returns: string;
+      };
+      can_author_payment_methods: {
+        Args: Record<PropertyKey, never>;
+        Returns: boolean;
+      };
+      can_operate_milling: {
+        Args: Record<PropertyKey, never>;
+        Returns: boolean;
+      };
+      can_read_expense_entry: {
+        Args: {
+          p_entry_id: string;
+          p_user: string;
+        };
+        Returns: boolean;
+      };
+      can_read_finance: {
+        Args: {
+          p_user: string;
+        };
+        Returns: boolean;
+      };
+      can_view_milling: {
+        Args: Record<PropertyKey, never>;
+        Returns: boolean;
+      };
+      cancel_expense: {
+        Args: {
+          p_entry_id: string;
+          p_reason: string;
+          p_expected_version?: number;
+        };
+        Returns: string;
+      };
+      close_expense: {
+        Args: {
+          p_entry_id: string;
+        };
+        Returns: string;
+      };
+      close_fiscal_year: {
+        Args: {
+          p_year: number;
+        };
+        Returns: string;
+      };
+      consume_internal_supplies: {
+        Args: {
+          _warehouse_id: string;
+          _lines: Json;
+          _notes: string;
+        };
+        Returns: string;
+      };
+      create_expense: {
+        Args: {
+          p_lines: Json;
+          p_expense_date?: string;
+          p_due_date?: string;
+          p_entry_type?: string;
+          p_payee_type?: string;
+          p_payee_name?: string;
+          p_supplier_id?: string;
+          p_employee_id?: string;
+          p_warehouse_id?: string;
+          p_cost_center_id?: string;
+          p_project_id?: string;
+          p_description?: string;
+          p_note?: string;
+          p_tax_mode?: string;
+          p_reference?: string;
+          p_submit?: boolean;
+        };
+        Returns: string;
+      };
+      create_journal_entry: {
+        Args: {
+          p_memo: string;
+          p_entry_date: string;
+          p_source_type: string;
+          p_source_id: string;
+          p_is_system: boolean;
+          p_lines: Json;
+        };
+        Returns: string;
+      };
+      create_milling_service_document: {
+        Args: {
+          _customer_id: string;
+          _warehouse_id: string;
+          _grain_item_id: string;
+          _bags: number;
+          _kg: number;
+          _service_item_id: string;
+          _service_unit_price: number;
+          _discount: number;
+          _payment_method: string;
+          _paid: number;
+          _notes: string;
+        };
+        Returns: Json;
+      };
       create_purchase: {
         Args: {
-          _discount: number;
-          _items: Json;
-          _note: string;
-          _paid: number;
-          _payment_method: string;
-          _supplier_id: string;
           _warehouse_id: string;
+          _supplier_id: string;
+          _payment_method: string;
+          _paid: number;
+          _discount: number;
+          _note: string;
+          _items: Json;
         };
         Returns: string;
       };
       create_purchase_return: {
         Args: {
           _invoice_id: string;
-          _items: Json;
-          _note: string;
-          _refund_method: string;
-          _supplier_id: string;
           _warehouse_id: string;
+          _supplier_id: string;
+          _refund_method: string;
+          _note: string;
+          _items: Json;
         };
         Returns: string;
       };
       create_sale: {
         Args: {
-          _customer_id: string;
-          _discount: number;
-          _items: Json;
-          _note: string;
-          _paid: number;
-          _payment_method: string;
           _warehouse_id: string;
+          _customer_id: string;
+          _payment_method: string;
+          _paid: number;
+          _discount: number;
+          _note: string;
+          _items: Json;
         };
         Returns: string;
       };
       create_sales_return: {
         Args: {
-          _customer_id: string;
           _invoice_id: string;
-          _items: Json;
-          _note: string;
-          _refund_method: string;
           _warehouse_id: string;
+          _customer_id: string;
+          _refund_method: string;
+          _note: string;
+          _items: Json;
         };
         Returns: string;
       };
       create_stock_transfer: {
-        Args: { _from: string; _items: Json; _note: string; _to: string };
+        Args: {
+          _from: string;
+          _to: string;
+          _note: string;
+          _items: Json;
+        };
         Returns: string;
       };
-      has_role: {
+      create_tenant_payment_method: {
         Args: {
-          _role: Database["public"]["Enums"]["app_role"];
-          _user_id: string;
+          p_name_ar: string;
+          p_name_en: string;
+          p_icon_key: string;
+          p_legacy_id: string;
+          p_ledger_kind: string;
+          p_contexts?: string[];
+          p_requires_reference?: boolean;
+        };
+        Returns: string;
+      };
+      custody_intake: {
+        Args: {
+          _customer_id: string;
+          _warehouse_id: string;
+          _item_id: string;
+          _bags: number;
+          _kg: number;
+          _notes: string;
+        };
+        Returns: string;
+      };
+      custody_link_invoice: {
+        Args: {
+          _custody_entry_id: string;
+          _invoice_id: string;
+        };
+        Returns: string;
+      };
+      custody_milling: {
+        Args: {
+          _customer_id: string;
+          _warehouse_id: string;
+          _grain_item_id: string;
+          _bags_out: number;
+          _kg_out: number;
+          _outputs: Json;
+          _notes: string;
+        };
+        Returns: string;
+      };
+      customer_credit_limit_allows: {
+        Args: {
+          p_customer_id: string;
+          p_new_due: number;
         };
         Returns: boolean;
       };
-      is_staff: { Args: { _user_id: string }; Returns: boolean };
-      fn_document_numbering_sequence_name: {
-        Args: { p_document_type: string };
+      decide_expense: {
+        Args: {
+          p_entry_id: string;
+          p_approve: boolean;
+          p_reason?: string;
+          p_expected_version?: number;
+        };
         Returns: string;
+      };
+      delete_expense_category: {
+        Args: {
+          p_id: string;
+        };
+        Returns: string;
+      };
+      dispose_fixed_asset: {
+        Args: {
+          p_asset_id: string;
+          p_disposal_date: string;
+          p_proceeds?: number;
+          p_proceeds_account?: string;
+        };
+        Returns: string;
+      };
+      expense_detail: {
+        Args: {
+          p_entry_id: string;
+        };
+        Returns: Json;
+      };
+      expense_lookups: {
+        Args: {
+          p_include_archived?: boolean;
+        };
+        Returns: Json;
+      };
+      expense_report: {
+        Args: {
+          p_group_by?: string;
+          p_date_from?: string;
+          p_date_to?: string;
+          p_status?: string[];
+          p_warehouse_id?: string;
+          p_cost_center_id?: string;
+          p_project_id?: string;
+          p_limit?: number;
+        };
+        Returns: Json[];
+      };
+      expense_summary: {
+        Args: {
+          p_date_from?: string;
+          p_date_to?: string;
+          p_warehouse_id?: string;
+        };
+        Returns: Json;
       };
       fn_format_document_number: {
         Args: {
-          p_document_type: string;
           p_sequence: number;
+          p_prefix: string;
+          p_format: string;
+          p_padding: number;
+          p_separator: string;
+          p_date_part: string;
           p_at?: string;
+        };
+        Returns: string;
+      };
+      fn_next_document_number: {
+        Args: {
+          p_document_type: string;
+          p_company_id?: string;
+          p_branch_id?: string;
+          p_pos_id?: string;
+          p_at?: string;
+        };
+        Returns: string;
+      };
+      fn_resolve_document_numbering: {
+        Args: {
+          p_document_type: string;
+          p_company_id?: string;
+          p_branch_id?: string;
+          p_pos_id?: string;
         };
         Returns: string;
       };
       fn_set_document_numbering: {
         Args: {
           p_document_type: string;
-          p_prefix?: string | null;
-          p_format_tokens?: string | null;
-          p_padding?: number | null;
-          p_date_part?: string | null;
-          p_separator?: string | null;
-          p_reset_policy?: string | null;
-          p_next_value?: number | null;
+          p_prefix?: string;
+          p_format_tokens?: string;
+          p_padding?: number;
+          p_date_part?: string;
+          p_separator?: string;
+          p_reset_policy?: string;
+          p_next_value?: number;
         };
-        Returns: Database["public"]["Tables"]["document_numbering"]["Row"];
+        Returns: string;
       };
-      next_invoice_number: { Args: never; Returns: string };
-      next_purchase_number: { Args: never; Returns: string };
-      next_purchase_return_number: { Args: never; Returns: string };
-      next_sales_return_number: { Args: never; Returns: string };
-      next_transfer_number: { Args: never; Returns: string };
+      generate_tax_declaration: {
+        Args: {
+          p_start_date: string;
+          p_end_date: string;
+        };
+        Returns: Json;
+      };
+      get_chart_of_accounts_tree: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json[];
+      };
+      get_supplier_statement: {
+        Args: {
+          p_supplier_id: string;
+          p_start_date?: string;
+          p_end_date?: string;
+        };
+        Returns: Json[];
+      };
+      has_role: {
+        Args: {
+          _user_id: string;
+          _role: string;
+        };
+        Returns: boolean;
+      };
+      is_platform_admin: {
+        Args: {
+          p_user_id: string;
+        };
+        Returns: boolean;
+      };
+      is_platform_superadmin: {
+        Args: {
+          p_user_id: string;
+        };
+        Returns: boolean;
+      };
+      is_staff: {
+        Args: {
+          _user_id: string;
+        };
+        Returns: boolean;
+      };
+      is_system_customer: {
+        Args: {
+          p_customer_id: string;
+        };
+        Returns: boolean;
+      };
+      is_system_supplier: {
+        Args: {
+          p_supplier_id: string;
+        };
+        Returns: boolean;
+      };
+      item_effective_policy: {
+        Args: {
+          p_item_id: string;
+        };
+        Returns: string;
+      };
+      item_has_stock_history: {
+        Args: {
+          p_item_id: string;
+        };
+        Returns: boolean;
+      };
+      item_line_type: {
+        Args: {
+          p_item_id: string;
+          p_is_ad_hoc?: boolean;
+        };
+        Returns: string;
+      };
+      item_stock_effect: {
+        Args: {
+          p_item_id: string;
+          p_direction: string;
+        };
+        Returns: string;
+      };
+      ledger_account_code_for_payment_method: {
+        Args: {
+          p_payment_method: string;
+        };
+        Returns: string;
+      };
+      list_expenses: {
+        Args: {
+          p_search?: string;
+          p_status?: string[];
+          p_category_id?: string;
+          p_warehouse_id?: string;
+          p_cost_center_id?: string;
+          p_project_id?: string;
+          p_supplier_id?: string;
+          p_employee_id?: string;
+          p_payment_state?: string;
+          p_date_from?: string;
+          p_date_to?: string;
+          p_amount_min?: number;
+          p_amount_max?: number;
+          p_category_ids?: string[];
+          p_limit?: number;
+          p_cursor_date?: string;
+          p_cursor_id?: string;
+        };
+        Returns: Json[];
+      };
+      open_fiscal_year: {
+        Args: {
+          p_year: number;
+        };
+        Returns: number;
+      };
+      pay_tax_settlement: {
+        Args: {
+          p_settlement_id: string;
+          p_payment_date?: string;
+          p_payment_account?: string;
+        };
+        Returns: string;
+      };
+      payment_method_ledger_account: {
+        Args: {
+          p_stored: string;
+        };
+        Returns: string;
+      };
+      post_expense: {
+        Args: {
+          p_entry_id: string;
+          p_expected_version?: number;
+          p_pay_now?: boolean;
+          p_payment_method?: string;
+          p_account_label?: string;
+          p_payment_date?: string;
+          p_idempotency_key?: string;
+          p_account_id?: string;
+        };
+        Returns: string;
+      };
+      post_purchase_invoice: {
+        Args: {
+          p_invoice_id: string;
+        };
+        Returns: string;
+      };
+      post_sales_invoice: {
+        Args: {
+          p_invoice_id: string;
+        };
+        Returns: string;
+      };
+      post_stock_delta: {
+        Args: {
+          p_product_id: string;
+          p_warehouse_id: string;
+          p_signed_qty: number;
+          p_unit_cost?: number;
+          p_movement_kind?: string;
+          p_source_type?: string;
+          p_source_id?: string;
+          p_note?: string;
+          p_owner_type?: string;
+          p_owner_id?: string;
+          p_movement_type_legacy?: string;
+        };
+        Returns: string;
+      };
+      post_stock_settlement: {
+        Args: {
+          p_warehouse_id: string;
+          p_reason: string;
+          p_note: string | null;
+          p_lines: Json;
+        };
+        Returns: string;
+      };
+      product_reference_counts: {
+        Args: {
+          p_product_id: string;
+        };
+        Returns: Json;
+      };
       record_customer_payment: {
         Args: {
-          _amount: number;
           _customer_id: string;
           _invoice_id: string;
+          _amount: number;
           _method: string;
-          _note: string;
           _payment_date: string;
+          _note: string;
         };
         Returns: string;
       };
-      record_customer_advance_payment: {
+      record_expense_payment: {
         Args: {
-          _amount: number;
-          _customer_id: string;
-          _method: string;
-          _note: string;
-          _payment_date: string;
+          p_entry_id: string;
+          p_amount: number;
+          p_payment_date?: string;
+          p_payment_method?: string;
+          p_account_label?: string;
+          p_reference_no?: string;
+          p_note?: string;
+          p_idempotency_key?: string;
+          p_account_id?: string;
         };
         Returns: string;
+      };
+      record_supplier_payment: {
+        Args: {
+          p_supplier_id: string;
+          p_amount: number;
+          p_payment_method?: string;
+          p_account_code?: string;
+          p_payment_date?: string;
+          p_notes?: string;
+          p_due_date?: string;
+        };
+        Returns: Json;
+      };
+      remove_tenant_payment_method: {
+        Args: {
+          p_id: string;
+        };
+        Returns: string;
+      };
+      resolve_unit_cost: {
+        Args: {
+          p_product_id: string;
+          p_warehouse_id?: string;
+          p_as_of?: string;
+        };
+        Returns: number;
+      };
+      reverse_expense: {
+        Args: {
+          p_entry_id: string;
+          p_reason?: string;
+        };
+        Returns: string;
+      };
+      reverse_expense_payment: {
+        Args: {
+          p_payment_id: string;
+          p_reason?: string;
+        };
+        Returns: string;
+      };
+      reverse_journal_entry: {
+        Args: {
+          p_entry_id: string;
+          p_reason: string;
+        };
+        Returns: string;
+      };
+      run_batch_amortization: {
+        Args: {
+          p_date?: string;
+        };
+        Returns: Json;
+      };
+      run_batch_depreciation: {
+        Args: {
+          p_date?: string;
+        };
+        Returns: Json;
+      };
+      run_contract_amortization: {
+        Args: {
+          p_contract_id: string;
+          p_date?: string;
+        };
+        Returns: string;
+      };
+      run_depreciation: {
+        Args: {
+          p_asset_id: string;
+          p_date?: string;
+        };
+        Returns: string;
+      };
+      save_expense_category: {
+        Args: {
+          p_id?: string;
+          p_name?: string;
+          p_name_ar?: string;
+          p_sort_order?: number;
+          p_notes?: string;
+          p_is_active?: boolean;
+        };
+        Returns: string;
+      };
+      search_products: {
+        Args: {
+          p_query?: string;
+          p_category_id?: string;
+          p_brand_id?: string;
+          p_unit_id?: string;
+          p_origin_id?: string;
+          p_active?: boolean;
+          p_low_stock?: boolean;
+          p_sort_key?: string;
+          p_sort_dir?: string;
+          p_limit?: number;
+          p_offset?: number;
+        };
+        Returns: Json[];
+      };
+      set_period_status: {
+        Args: {
+          p_period_id: string;
+          p_status: string;
+        };
+        Returns: boolean;
+      };
+      settle_tax_period: {
+        Args: {
+          p_start_date: string;
+          p_end_date: string;
+          p_period_number: string;
+          p_settlement_date?: string;
+        };
+        Returns: string;
+      };
+      smart_manufacture: {
+        Args: {
+          _warehouse_id: string;
+          _grain_item_id: string;
+          _grain_qty: number;
+          _outputs: Json;
+          _notes: string;
+        };
+        Returns: string;
+      };
+      submit_expense: {
+        Args: {
+          p_entry_id: string;
+          p_expected_version?: number;
+        };
+        Returns: string;
+      };
+      update_expense: {
+        Args: {
+          p_entry_id: string;
+          p_expected_version: number;
+          p_lines: Json;
+          p_expense_date?: string;
+          p_due_date?: string;
+          p_entry_type?: string;
+          p_payee_type?: string;
+          p_payee_name?: string;
+          p_supplier_id?: string;
+          p_employee_id?: string;
+          p_warehouse_id?: string;
+          p_cost_center_id?: string;
+          p_project_id?: string;
+          p_description?: string;
+          p_note?: string;
+          p_tax_mode?: string;
+        };
+        Returns: string;
+      };
+      update_payment_method_identity: {
+        Args: {
+          p_id: string;
+          p_name_ar?: string;
+          p_name_en?: string;
+          p_icon_key?: string;
+        };
+        Returns: Json[];
+      };
+      warehouse_reference_counts: {
+        Args: {
+          p_warehouse_id: string;
+        };
+        Returns: Json;
       };
     };
     Enums: {
@@ -1541,7 +2152,8 @@ export type Database = {
         | "opening"
         | "purchase_return"
         | "sale_return";
-      payment_method: "cash" | "card" | "bank_transfer" | "credit" | "mobile_money" | "split";
+      payment_method:
+        "cash" | "card" | "bank_transfer" | "credit" | "mobile_money" | "split" | "cheque";
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -1687,7 +2299,15 @@ export const Constants = {
         "purchase_return",
         "sale_return",
       ],
-      payment_method: ["cash", "card", "bank_transfer", "credit", "mobile_money", "split"],
+      payment_method: [
+        "cash",
+        "card",
+        "bank_transfer",
+        "credit",
+        "mobile_money",
+        "split",
+        "cheque",
+      ],
     },
   },
 } as const;

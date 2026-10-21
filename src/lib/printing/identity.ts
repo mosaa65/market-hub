@@ -19,9 +19,4 @@
 
 // المصدر الوحيد لكل من الرقمين والعبارة، ثم إعادة تصديرها هنا ليبقى
 // `@/lib/printing` واجهة واحدة يقرأ منها بقية النظام.
-export {
-  SUPPORT_CONTACTS,
-  SUPPORT_CONTACT_LINE,
-  COMPANY_FOOTER_CREDIT,
-  companyCreditLine,
-} from "@/lib/company-credit";
+export {};

@@ -2,6 +2,9 @@ import { ModuleGuard, useModules } from "@/lib/modules";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
+  ArrowDown,
+  ArrowDownUp,
+  ArrowUp,
   Search,
   Plus,
   Minus,
@@ -34,21 +37,25 @@ import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { money } from "@/lib/format";
-import { PageHeader } from "@/components/page-header";
 import { PageGuideButton, type PageGuideConfig } from "@/components/page-guide";
 import { DollarSign, Archive, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { BarcodeScanner } from "@/components/barcode-scanner";
 import { useKeyboardWedge } from "@/hooks/use-keyboard-wedge";
 import { useCatalogModules } from "@/lib/catalog-modules";
-import { useIsDesktop } from "@/hooks/use-media-query";
+import { useIsDesktop, useMediaQuery } from "@/hooks/use-media-query";
 import { CartLine as CartLineRow } from "@/components/commerce/cart-line";
 import { MobileProductPicker } from "@/components/commerce/mobile-product-picker";
+import { TableToolbar, type FilterValues } from "@/components/ui/table-toolbar";
+import { RecordsViewToggle } from "@/components/ui/records-view-toggle";
+import { PaymentMethodPicker } from "@/components/ui/payment-method";
+import { AmountInput } from "@/components/commerce/amount-input";
+import { usePaymentMethodsForContext } from "@/hooks/use-payment-methods";
+import { usePersistedViewMode } from "@/hooks/use-persisted-view-mode";
 import { SupplierFormDialog } from "@/components/contacts/supplier-form-dialog";
 import { UniversalPrintPreview } from "@/components/universal-print-preview";
 import type { PrintRequest } from "@/lib/printing";
 import { DynamicPaymentSelector } from "@/components/ui/payment-method/dynamic-payment-selector";
-import { AmountInput } from "@/components/ui/amount-input";
 import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
 import { toLegacyPaymentValue, getPaymentMethodDefinition } from "@/lib/payments/payment-methods";
 
@@ -251,8 +258,9 @@ const purchasePosGuideConfig: PageGuideConfig = {
 
 function PurchasePOSPage() {
   const { isModuleEnabled } = useModules();
-  const { t, lang, dir } = useI18n();
+  const { t, lang } = useI18n();
   const { config: catalogConfig } = useCatalogModules();
+  const { methods: purchasePaymentMethods } = usePaymentMethodsForContext("purchases");
   const navigate = useNavigate();
   const { roles } = useAuth();
   // Suppliers are RLS-restricted to owner/manager/accountant; cashiers must not
@@ -278,6 +286,15 @@ function PurchasePOSPage() {
   const [warehouseId, setWarehouseId] = useState<string>("");
   const [supplierId, setSupplierId] = useState<string>("");
   const [search, setSearch] = useState("");
+  const [catalogSort, setCatalogSort] = useState("name_asc");
+  const [catalogTableSort, setCatalogTableSort] = useState<{
+    key: string;
+    direction: "asc" | "desc";
+  }>({
+    key: "name",
+    direction: "asc",
+  });
+  const [viewMode, setViewMode] = usePersistedViewMode("purchase-pos-catalog", "cards");
   const [filterOpen, setFilterOpen] = useState(false);
 
   // Filter States
@@ -291,8 +308,12 @@ function PurchasePOSPage() {
 
   const [cart, setCart] = useState<CartLine[]>([]);
   const [paid, setPaid] = useState<string>("");
+  const [paidManuallyEdited, setPaidManuallyEdited] = useState(false);
   const [discount, setDiscount] = useState<string>("");
   const [paymentMethod, setPaymentMethod] = useState<string>("cash");
+  const selectedPurchasePaymentMethod = purchasePaymentMethods.find(
+    (method) => method.id === paymentMethod,
+  );
   const [paymentSelection, setPaymentSelection] = useState<PaymentSettlementSelection>({
     method: "cash",
   });
@@ -302,6 +323,7 @@ function PurchasePOSPage() {
 
   // Mobile workspace: cart-first, catalogue opened on demand.
   const isDesktop = useIsDesktop();
+  const isTouchDevice = useMediaQuery("(pointer: coarse)");
   const [mobilePickerOpen, setMobilePickerOpen] = useState(false);
 
   // Modals
@@ -309,6 +331,10 @@ function PurchasePOSPage() {
 
   const [loading, setLoading] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [barcodeReaderEnabled, setBarcodeReaderEnabled] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem("purchase_pos_barcode_reader_enabled") !== "false";
+  });
   const [successInvoice, setSuccessInvoice] = useState<{
     id: string;
     number?: string;
@@ -535,6 +561,7 @@ function PurchasePOSPage() {
     onScan: (scanned) => {
       scanHandlerRef.current(scanned);
     },
+    disabled: scannerOpen || !catalogConfig.enableBarcode || !barcodeReaderEnabled,
   });
 
   // Hotkeys: F2 search, F4 submit, Esc clear
@@ -557,12 +584,12 @@ function PurchasePOSPage() {
   const taxTotal = cart.reduce((s, l) => s + l.unit_cost * l.quantity * (l.tax_rate / 100), 0);
   const discountN = Number(discount || 0);
   const total = Math.max(0, subtotal + taxTotal - discountN);
-  const paidN = paymentMethod === "credit" ? 0 : paid !== "" ? Number(paid) : total;
+  const paidN = paymentMethod === "credit" ? 0 : paidManuallyEdited ? Number(paid || 0) : total;
   const isOverpaid = Number.isFinite(paidN) && paidN > total;
 
   // Filter products
   const filtered = useMemo(() => {
-    return products.filter((p) => {
+    const matching = products.filter((p) => {
       if (search) {
         const s = search.toLowerCase();
         const matchesName = (p.name || "").toLowerCase().includes(s);
@@ -584,6 +611,22 @@ function PurchasePOSPage() {
         return false;
       return true;
     });
+    return [...matching].sort((a, b) => {
+      switch (catalogSort) {
+        case "name_desc":
+          return (b.name_ar || b.name).localeCompare(a.name_ar || a.name, lang);
+        case "cost_asc":
+          return Number(a.cost_price) - Number(b.cost_price);
+        case "cost_desc":
+          return Number(b.cost_price) - Number(a.cost_price);
+        case "stock_asc":
+          return (stockMap[a.id] ?? 0) - (stockMap[b.id] ?? 0);
+        case "stock_desc":
+          return (stockMap[b.id] ?? 0) - (stockMap[a.id] ?? 0);
+        default:
+          return (a.name_ar || a.name).localeCompare(b.name_ar || b.name, lang);
+      }
+    });
   }, [
     products,
     search,
@@ -593,7 +636,35 @@ function PurchasePOSPage() {
     selectedOrigin,
     selectedQuality,
     catalogConfig,
+    catalogSort,
+    stockMap,
+    lang,
   ]);
+
+  const tableRows = useMemo(() => {
+    const valueFor = (product: Product): string | number => {
+      switch (catalogTableSort.key) {
+        case "code":
+          return product.sku || product.barcode || "";
+        case "cost":
+          return Number(product.cost_price) || 0;
+        case "stock":
+          return Number(stockMap[product.id] ?? 0);
+        default:
+          return lang === "ar"
+            ? product.name_ar || product.name
+            : product.name || product.name_ar || "";
+      }
+    };
+    const factor = catalogTableSort.direction === "asc" ? 1 : -1;
+    return [...filtered].sort((left, right) => {
+      const a = valueFor(left);
+      const b = valueFor(right);
+      return typeof a === "number" && typeof b === "number"
+        ? (a - b) * factor
+        : String(a).localeCompare(String(b), lang, { numeric: true, sensitivity: "base" }) * factor;
+    });
+  }, [filtered, catalogTableSort, stockMap, lang]);
 
   // Create Supplier — the SAME form used by the Suppliers page.
   function handleSupplierSaved(record: { id: string; name: string; phone?: string | null }) {
@@ -643,11 +714,13 @@ function PurchasePOSPage() {
         const parts: string[] = [];
         if (note.trim()) parts.push(note.trim());
         if (
-          (paymentMethod === "bank_transfer" || paymentMethod === "mobile_money") &&
+          (selectedPurchasePaymentMethod?.requiresReference ||
+            paymentMethod === "bank_transfer" ||
+            paymentMethod === "mobile_money") &&
           transferRef.trim()
         ) {
           parts.push(
-            `${paymentMethod === "mobile_money" ? (lang === "ar" ? "مرجع المحفظة" : "Wallet reference") : lang === "ar" ? "رقم الحوالة" : "Transfer no."}: ${transferRef.trim()}`,
+            `${selectedPurchasePaymentMethod?.nameAr ?? (paymentMethod === "mobile_money" ? (lang === "ar" ? "مرجع المحفظة" : "Wallet reference") : lang === "ar" ? "رقم الحوالة" : "Transfer no.")}: ${transferRef.trim()}`,
           );
         }
         return parts.length ? parts.join(" — ") : null;
@@ -660,7 +733,8 @@ function PurchasePOSPage() {
         const res = await (supabase.rpc as any)("create_purchase", {
           _warehouse_id: warehouseId,
           _supplier_id: supplierId,
-          _payment_method: toLegacyPaymentValue(paymentMethod),
+          _payment_method:
+            selectedPurchasePaymentMethod?.legacyValue ?? toLegacyPaymentValue(paymentMethod),
           _paid: paidN,
           _discount: discountN,
           _note: composedNote as any,
@@ -685,7 +759,8 @@ function PurchasePOSPage() {
         const res = await supabase.rpc("create_purchase", {
           _warehouse_id: warehouseId,
           _supplier_id: supplierId,
-          _payment_method: toLegacyPaymentValue(paymentMethod),
+          _payment_method: (selectedPurchasePaymentMethod?.legacyValue ??
+            toLegacyPaymentValue(paymentMethod)) as any,
           _paid: paidN,
           _discount: discountN,
           _note: composedNote as any,
@@ -748,6 +823,7 @@ function PurchasePOSPage() {
       // Reset cart and payment
       setCart([]);
       setPaid("");
+      setPaidManuallyEdited(false);
       setDiscount("");
       setNote("");
       setTransferRef("");
@@ -800,51 +876,37 @@ function PurchasePOSPage() {
   }
 
   return (
-    <div className="grid h-full min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-2 overflow-hidden bg-[radial-gradient(ellipse_at_top,_color-mix(in_oklab,var(--primary)_10%,transparent),transparent_48%)] lg:grid-cols-[minmax(0,1fr)_minmax(400px,460px)] lg:grid-rows-[auto_minmax(0,1fr)]">
-      {/* Top Bar / Header */}
-      <div className="m-1.5 flex shrink-0 flex-col items-stretch gap-2 rounded-2xl border border-border/80 bg-surface/95 px-3 py-2 shadow-sm backdrop-blur-md sm:m-2 sm:px-4 lg:col-start-1 lg:row-start-1">
-        <div className="flex items-center gap-3">
-          <Link
-            to="/purchases"
-            className="grid h-9 w-9 place-items-center rounded-xl border border-border/80 bg-surface-2/60 text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
-            title={lang === "ar" ? "العودة إلى سجل المشتريات" : "Back to purchases list"}
-          >
-            <ArrowRight className={`h-4 w-4 ${dir === "rtl" ? "" : "rotate-180"}`} />
-          </Link>
-          <div className="flex items-center gap-2">
-            <div className="grid h-10 w-10 place-items-center rounded-2xl border border-primary/25 bg-primary text-primary-foreground shadow-sm">
-              <PackagePlus className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-sm font-extrabold tracking-tight text-foreground">
-                  {lang === "ar" ? "نقطة المشتريات السريعة" : "Point of Purchase (POP)"}
-                </h1>
-                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
-                  {lang === "ar" ? "مساحة المشتريات" : "Purchase workspace"}
-                </span>
-              </div>
-              <p className="text-[11px] text-muted-foreground">
-                {lang === "ar"
-                  ? "تسجيل مشتريات وتحديث فوري للمخزون مع إسناد المورد النقدي"
-                  : "Rapid purchase receiving & stock increment"}
-              </p>
-            </div>
-          </div>
+    <div className="grid h-full min-h-0 flex-1 grid-rows-[auto_auto_minmax(0,1fr)] gap-2 overflow-hidden bg-[radial-gradient(ellipse_at_top,_color-mix(in_oklab,var(--primary)_10%,transparent),transparent_48%)] lg:grid-cols-[minmax(0,1fr)_minmax(400px,460px)] lg:grid-rows-[auto_auto_minmax(0,1fr)]">
+      <div className="flex min-w-0 items-center gap-2 px-1 py-0.5 lg:col-start-1 lg:row-start-1">
+        <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+          <PackagePlus className="size-4" />
         </div>
-
+        <div className="min-w-0">
+          <h1 className="truncate text-sm font-extrabold text-foreground">
+            {lang === "ar" ? "نقطة المشتريات السريعة" : "Point of Purchase"}
+          </h1>
+          <p className="truncate text-[11px] text-muted-foreground">
+            {lang === "ar"
+              ? "تسجيل المشتريات وتحديث المخزون"
+              : "Purchase entry and stock receiving"}
+          </p>
+        </div>
+      </div>
+      {/* Top Bar / Header */}
+      <div className="m-0 flex min-w-0 shrink-0 items-center gap-2 overflow-visible rounded-xl border border-border/80 bg-surface/95 px-2 py-2 shadow-sm backdrop-blur-md sm:px-3 lg:col-start-1 lg:row-start-2">
         {/* Global Toolbar Selectors */}
-        <div className="flex w-full flex-wrap items-center gap-1.5 border-t border-border/60 pt-2">
+        <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center justify-end gap-1 sm:gap-1.5 2xl:flex 2xl:flex-nowrap">
           {/* Warehouse Selector */}
-          <div className="order-2 flex h-9 min-w-0 items-center gap-1.5 rounded-xl border border-border/80 bg-surface px-2.5 text-xs shadow-2xs">
+          <div className="flex h-9 min-w-0 items-center gap-1 rounded-xl border border-border/80 bg-surface px-1.5 text-xs shadow-2xs sm:gap-1.5 sm:px-2.5">
             <Building2 className="h-3.5 w-3.5 text-primary shrink-0" />
-            <span className="text-muted-foreground font-medium hidden sm:inline">
+            <span className="sr-only sm:not-sr-only sm:inline text-muted-foreground font-medium">
               {lang === "ar" ? "المستودع:" : "Warehouse:"}
             </span>
             <select
+              dir={lang === "ar" ? "rtl" : "ltr"}
               value={warehouseId}
               onChange={(e) => setWarehouseId(e.target.value)}
-              className="bg-transparent font-medium text-foreground outline-none text-xs cursor-pointer"
+              className="min-w-0 max-w-full bg-transparent font-medium text-foreground outline-none text-[10px] cursor-pointer sm:text-xs"
             >
               {warehouses.map((w) => (
                 <option key={w.id} value={w.id}>
@@ -855,15 +917,16 @@ function PurchasePOSPage() {
           </div>
 
           {/* Supplier Selector with Cash Supplier Default */}
-          <div className="order-1 flex h-9 min-w-0 items-center gap-1.5 rounded-xl border border-border/80 bg-surface px-2.5 text-xs shadow-2xs">
+          <div className="flex h-9 min-w-0 items-center gap-1 rounded-xl border border-border/80 bg-surface px-1.5 text-xs shadow-2xs sm:gap-1.5 sm:px-2.5">
             <Truck className="h-3.5 w-3.5 text-primary shrink-0" />
-            <span className="text-muted-foreground font-medium hidden sm:inline">
+            <span className="sr-only sm:not-sr-only sm:inline text-muted-foreground font-medium">
               {lang === "ar" ? "المورد:" : "Supplier:"}
             </span>
             <select
+              dir={lang === "ar" ? "rtl" : "ltr"}
               value={supplierId}
               onChange={(e) => setSupplierId(e.target.value)}
-              className="h-8 w-72 max-w-[48vw] bg-transparent px-1 text-sm font-medium text-foreground outline-none cursor-pointer"
+              className="h-8 min-w-0 w-full bg-transparent px-0.5 text-[10px] font-medium text-foreground outline-none cursor-pointer sm:px-1 sm:text-xs 2xl:w-56 2xl:text-sm"
             >
               {suppliers.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -875,36 +938,74 @@ function PurchasePOSPage() {
               type="button"
               onClick={() => setNewSupplierOpen(true)}
               title={lang === "ar" ? "إضافة مورد جديد" : "Add new supplier"}
-              className="grid h-8 w-8 place-items-center rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition disabled:opacity-40"
+              className="grid size-8 shrink-0 place-items-center rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition disabled:opacity-40"
               disabled={!canManageSuppliers}
             >
               <UserPlus className="h-3 w-3" />
             </button>
           </div>
 
-          {/* Purchase Date */}
-          <div className="order-3 flex h-9 items-center gap-1.5 rounded-xl border border-border/80 bg-surface px-2.5 text-xs shadow-2xs">
-            <CalendarDays className="h-3.5 w-3.5 text-primary shrink-0" />
-            <input
-              type="date"
-              value={purchaseDate}
-              onChange={(e) => setPurchaseDate(e.target.value)}
-              className="bg-transparent text-xs text-foreground outline-none cursor-pointer font-mono"
+          <div className="col-span-2 flex items-center justify-end gap-1 2xl:contents">
+            <Link
+              to="/purchases"
+              aria-label={lang === "ar" ? "العودة إلى سجل المشتريات" : "Back to purchases list"}
+              title={lang === "ar" ? "العودة إلى سجل المشتريات" : "Back to purchases list"}
+              className="grid size-9 shrink-0 place-items-center rounded-full border border-border/80 bg-surface text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
+            >
+              <ArrowRight className={`size-4 ${lang === "ar" ? "" : "rotate-180"}`} />
+            </Link>
+            {/* Purchase Date */}
+            <label className="relative grid size-9 shrink-0 place-items-center rounded-full border border-border/80 bg-surface text-xs shadow-2xs sm:flex sm:w-auto sm:items-center sm:gap-1.5 sm:rounded-full sm:px-2.5">
+              <CalendarDays className="h-3.5 w-3.5 text-primary shrink-0" />
+              <input
+                type="date"
+                value={purchaseDate}
+                onChange={(e) => setPurchaseDate(e.target.value)}
+                aria-label={lang === "ar" ? "تاريخ الفاتورة" : "Purchase date"}
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0 sm:static sm:h-auto sm:w-28 sm:opacity-100 sm:bg-transparent sm:text-xs sm:text-foreground sm:outline-none sm:font-mono"
+              />
+            </label>
+
+            {/* Page Guide Button */}
+            <PageGuideButton
+              config={purchasePosGuideConfig}
+              className="!size-9 !rounded-full shrink-0"
             />
+
+            {/* Barcode Camera Modal Trigger */}
+            {isDesktop && !isTouchDevice && catalogConfig.enableBarcode ? (
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !barcodeReaderEnabled;
+                  setBarcodeReaderEnabled(next);
+                  localStorage.setItem("purchase_pos_barcode_reader_enabled", String(next));
+                }}
+                aria-pressed={barcodeReaderEnabled}
+                title={
+                  lang === "ar"
+                    ? barcodeReaderEnabled
+                      ? "إيقاف قارئ الباركود"
+                      : "تفعيل قارئ الباركود"
+                    : barcodeReaderEnabled
+                      ? "Disable barcode reader"
+                      : "Enable barcode reader"
+                }
+                className={`grid size-9 shrink-0 place-items-center rounded-full border transition ${barcodeReaderEnabled ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600" : "border-border bg-surface text-muted-foreground"}`}
+              >
+                <ScanBarcode className="h-4 w-4" />
+              </button>
+            ) : (!isDesktop || isTouchDevice) && catalogConfig.enableBarcode ? (
+              <button
+                type="button"
+                onClick={() => setScannerOpen(true)}
+                className="grid size-9 shrink-0 place-items-center rounded-full border border-border/80 bg-surface text-muted-foreground hover:text-foreground hover:bg-surface-2 transition shadow-2xs"
+                title={lang === "ar" ? "مسح الباركود بالكاميرا" : "Scan barcode with camera"}
+              >
+                <ScanBarcode className="h-4 w-4" />
+              </button>
+            ) : null}
           </div>
-
-          {/* Page Guide Button */}
-          <PageGuideButton config={purchasePosGuideConfig} className="order-4 !h-9 !w-9" />
-
-          {/* Barcode Camera Modal Trigger */}
-          <button
-            type="button"
-            onClick={() => setScannerOpen(true)}
-            className="order-5 grid h-9 w-9 place-items-center rounded-xl border border-border/80 bg-surface text-muted-foreground hover:text-foreground hover:bg-surface-2 transition shadow-2xs"
-            title={lang === "ar" ? "مسح الباركود بالكاميرا" : "Scan barcode with camera"}
-          >
-            <ScanBarcode className="h-4 w-4" />
-          </button>
         </div>
       </div>
 
@@ -912,147 +1013,322 @@ function PurchasePOSPage() {
       <div className="flex min-h-0 flex-col gap-2 overflow-hidden px-1.5 pb-1.5 sm:px-2 sm:pb-2 lg:contents">
         {/* Left Column: Search, Filters & Product Grid — desktop only. */}
         {isDesktop && (
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-border/80 bg-surface/95 shadow-sm ring-1 ring-background/40 lg:col-start-1 lg:row-start-2 lg:mx-2 lg:mb-2">
-            {/* Search & Filter Bar */}
-            <div className="p-3 border-b border-border/60 bg-surface/50 space-y-2">
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                  <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <input
-                    ref={searchRef}
-                    type="text"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleBarcode(search);
-                      }
-                    }}
-                    placeholder={
-                      lang === "ar"
-                        ? "ابحث باسم المنتج، الكود SKU، أو امسح الباركود (F2)..."
-                        : "Search by product name, SKU, or scan barcode (F2)..."
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-border/80 bg-surface/95 shadow-sm ring-1 ring-background/40 lg:col-start-1 lg:row-start-3 lg:mx-2 lg:mb-2">
+            <TableToolbar
+              className="border-b border-border/60 bg-surface/50 p-3"
+              lang={lang}
+              search={{
+                value: search,
+                onValueChange: setSearch,
+                dir: lang === "ar" ? "rtl" : "ltr",
+                inputRef: searchRef,
+                onKeyDown: (event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    handleBarcode(search);
+                  }
+                },
+                placeholder:
+                  lang === "ar"
+                    ? "ابحث باسم المنتج، SKU، أو امسح الباركود (F2)..."
+                    : "Search by product name, SKU, or scan barcode (F2)...",
+                resultCount: filtered.length,
+              }}
+              filters={{
+                definitions: [
+                  {
+                    key: "category",
+                    label: lang === "ar" ? "التصنيف" : "Category",
+                    type: "select",
+                    options: categories.map((item) => ({
+                      value: item.id,
+                      label:
+                        lang === "ar" ? item.name_ar || item.name : item.name || item.name_ar || "",
+                    })),
+                  },
+                  ...(catalogConfig.enableBrands
+                    ? [
+                        {
+                          key: "brand",
+                          label: lang === "ar" ? "الماركة" : "Brand",
+                          type: "select" as const,
+                          options: brands.map((item) => ({
+                            value: item.id,
+                            label:
+                              lang === "ar"
+                                ? item.name_ar || item.name
+                                : item.name || item.name_ar || "",
+                          })),
+                        },
+                      ]
+                    : []),
+                  ...(catalogConfig.enableUnits
+                    ? [
+                        {
+                          key: "unit",
+                          label: lang === "ar" ? "الوحدة" : "Unit",
+                          type: "select" as const,
+                          options: units.map((item) => ({
+                            value: item.id,
+                            label:
+                              lang === "ar"
+                                ? item.name_ar || item.name
+                                : item.name || item.name_ar || "",
+                          })),
+                        },
+                      ]
+                    : []),
+                  ...(catalogConfig.enableOrigins
+                    ? [
+                        {
+                          key: "origin",
+                          label: lang === "ar" ? "بلد المنشأ" : "Origin",
+                          type: "select" as const,
+                          options: origins.map((item) => ({
+                            value: item.id,
+                            label:
+                              lang === "ar"
+                                ? item.name_ar || item.name
+                                : item.name || item.name_ar || "",
+                          })),
+                        },
+                      ]
+                    : []),
+                  ...(catalogConfig.enableQualityGrades
+                    ? [
+                        {
+                          key: "quality",
+                          label: lang === "ar" ? "درجة الجودة" : "Quality grade",
+                          type: "select" as const,
+                          options: qualities.map((item) => ({
+                            value: item.id,
+                            label:
+                              lang === "ar"
+                                ? item.name_ar || item.name
+                                : item.name || item.name_ar || "",
+                          })),
+                        },
+                      ]
+                    : []),
+                ],
+                values: {
+                  category: selectedCategory,
+                  brand: selectedBrand,
+                  unit: selectedUnit,
+                  origin: selectedOrigin,
+                  quality: selectedQuality,
+                },
+                onValueChange: (values: FilterValues) => {
+                  setSelectedCategory(typeof values.category === "string" ? values.category : "");
+                  setSelectedBrand(typeof values.brand === "string" ? values.brand : "");
+                  setSelectedUnit(typeof values.unit === "string" ? values.unit : "");
+                  setSelectedOrigin(typeof values.origin === "string" ? values.origin : "");
+                  setSelectedQuality(typeof values.quality === "string" ? values.quality : "");
+                },
+              }}
+              sort={
+                viewMode === "table"
+                  ? undefined
+                  : {
+                      value: catalogSort,
+                      onValueChange: setCatalogSort,
+                      options: [
+                        {
+                          value: "name_asc",
+                          label: lang === "ar" ? "الاسم: أ إلى ي" : "Name: A to Z",
+                        },
+                        {
+                          value: "name_desc",
+                          label: lang === "ar" ? "الاسم: ي إلى أ" : "Name: Z to A",
+                        },
+                        {
+                          value: "cost_asc",
+                          label: lang === "ar" ? "التكلفة: الأقل أولاً" : "Cost: low to high",
+                        },
+                        {
+                          value: "cost_desc",
+                          label: lang === "ar" ? "التكلفة: الأعلى أولاً" : "Cost: high to low",
+                        },
+                        {
+                          value: "stock_asc",
+                          label: lang === "ar" ? "المخزون: الأقل أولاً" : "Stock: low to high",
+                        },
+                        {
+                          value: "stock_desc",
+                          label: lang === "ar" ? "المخزون: الأعلى أولاً" : "Stock: high to low",
+                        },
+                      ],
                     }
-                    className="h-10 w-full rounded-2xl border border-border/80 bg-surface pe-9 ps-9 text-xs text-foreground placeholder:text-muted-foreground/70 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition"
-                  />
-                  {search && (
-                    <button
-                      onClick={() => setSearch("")}
-                      className="absolute end-3 top-1/2 -translate-y-1/2 rounded-full p-0.5 hover:bg-surface-2 text-muted-foreground"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  )}
-                </div>
-
-                {/* Toggle Filter Panel */}
+              }
+              viewToggle={<RecordsViewToggle value={viewMode} onChange={setViewMode} cycle />}
+            >
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
                 <button
                   type="button"
-                  onClick={() => setFilterOpen((o) => !o)}
-                  className={`relative flex h-10 items-center gap-1.5 rounded-2xl border px-3 text-xs font-semibold transition ${
-                    filterOpen || activeFiltersCount > 0
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border/80 bg-surface text-muted-foreground hover:bg-surface-2 hover:text-foreground"
-                  }`}
+                  onClick={() => setSelectedCategory("")}
+                  className={`h-7 shrink-0 rounded-lg px-2.5 text-xs font-medium ${selectedCategory === "" ? "bg-primary text-primary-foreground" : "border border-border/80 bg-surface text-muted-foreground hover:border-primary/40"}`}
                 >
-                  <Filter className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">{lang === "ar" ? "تصفية" : "Filter"}</span>
-                  {activeFiltersCount > 0 && (
-                    <span className="grid h-4 w-4 place-items-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
-                      {activeFiltersCount}
-                    </span>
-                  )}
+                  {lang === "ar" ? "الكل" : "All"} ({products.length})
                 </button>
+                {categories.map((category) => (
+                  <button
+                    key={category.id}
+                    type="button"
+                    onClick={() =>
+                      setSelectedCategory((current) => (current === category.id ? "" : category.id))
+                    }
+                    className={`h-7 shrink-0 rounded-lg px-2.5 text-xs font-medium ${selectedCategory === category.id ? "bg-primary text-primary-foreground" : "border border-border/80 bg-surface text-muted-foreground hover:border-primary/40"}`}
+                  >
+                    {lang === "ar"
+                      ? category.name_ar || category.name
+                      : category.name || category.name_ar}
+                  </button>
+                ))}
               </div>
+            </TableToolbar>
 
-              {/* Collapsible Filter Panel */}
-              {filterOpen && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 pt-2 border-t border-border/60">
-                  {/* Category */}
-                  <div>
-                    <label className="text-[10px] font-semibold text-muted-foreground mb-1 block">
-                      {lang === "ar" ? "التصنيف" : "Category"}
-                    </label>
-                    <select
-                      value={selectedCategory}
-                      onChange={(e) => setSelectedCategory(e.target.value)}
-                      className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2 text-xs text-foreground outline-none"
-                    >
-                      <option value="">{lang === "ar" ? "الكل" : "All"}</option>
-                      {categories.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {lang === "ar" ? c.name_ar || c.name : c.name || c.name_ar}
-                        </option>
-                      ))}
-                    </select>
+            {/* Legacy filter controls are retained temporarily for an isolated follow-up cleanup. */}
+            {filterOpen && (
+              <div className="p-3 border-b border-border/60 bg-surface/50 space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <input
+                      ref={searchRef}
+                      type="text"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleBarcode(search);
+                        }
+                      }}
+                      placeholder={
+                        lang === "ar"
+                          ? "ابحث باسم المنتج، الكود SKU، أو امسح الباركود (F2)..."
+                          : "Search by product name, SKU, or scan barcode (F2)..."
+                      }
+                      className="h-10 w-full rounded-2xl border border-border/80 bg-surface pe-9 ps-9 text-xs text-foreground placeholder:text-muted-foreground/70 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition"
+                    />
+                    {search && (
+                      <button
+                        onClick={() => setSearch("")}
+                        className="absolute end-3 top-1/2 -translate-y-1/2 rounded-full p-0.5 hover:bg-surface-2 text-muted-foreground"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </div>
 
-                  {/* Brand */}
-                  {catalogConfig.enableBrands && (
-                    <div>
-                      <label className="text-[10px] font-semibold text-muted-foreground mb-1 block">
-                        {lang === "ar" ? "الماركة" : "Brand"}
-                      </label>
-                      <select
-                        value={selectedBrand}
-                        onChange={(e) => setSelectedBrand(e.target.value)}
-                        className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2 text-xs text-foreground outline-none"
-                      >
-                        <option value="">{lang === "ar" ? "الكل" : "All"}</option>
-                        {brands.map((b) => (
-                          <option key={b.id} value={b.id}>
-                            {lang === "ar" ? b.name_ar || b.name : b.name || b.name_ar}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
-                  {/* Quality */}
-                  {catalogConfig.enableQualityGrades && (
-                    <div>
-                      <label className="text-[10px] font-semibold text-muted-foreground mb-1 block">
-                        {lang === "ar" ? "درجة الجودة" : "Quality Grade"}
-                      </label>
-                      <select
-                        value={selectedQuality}
-                        onChange={(e) => setSelectedQuality(e.target.value)}
-                        className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2 text-xs text-foreground outline-none"
-                      >
-                        <option value="">{lang === "ar" ? "الكل" : "All"}</option>
-                        {qualities.map((q) => (
-                          <option key={q.id} value={q.id}>
-                            {lang === "ar" ? q.name_ar || q.name : q.name || q.name_ar}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
-                  {/* Origin */}
-                  {catalogConfig.enableOrigins && (
-                    <div>
-                      <label className="text-[10px] font-semibold text-muted-foreground mb-1 block">
-                        {lang === "ar" ? "بلد المنشأ" : "Origin"}
-                      </label>
-                      <select
-                        value={selectedOrigin}
-                        onChange={(e) => setSelectedOrigin(e.target.value)}
-                        className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2 text-xs text-foreground outline-none"
-                      >
-                        <option value="">{lang === "ar" ? "الكل" : "All"}</option>
-                        {origins.map((o) => (
-                          <option key={o.id} value={o.id}>
-                            {lang === "ar" ? o.name_ar || o.name : o.name || o.name_ar}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
+                  {/* Toggle Filter Panel */}
+                  <button
+                    type="button"
+                    onClick={() => setFilterOpen((o) => !o)}
+                    className={`relative flex h-10 items-center gap-1.5 rounded-2xl border px-3 text-xs font-semibold transition ${
+                      filterOpen || activeFiltersCount > 0
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border/80 bg-surface text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+                    }`}
+                  >
+                    <Filter className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">{lang === "ar" ? "تصفية" : "Filter"}</span>
+                    {activeFiltersCount > 0 && (
+                      <span className="grid h-4 w-4 place-items-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                        {activeFiltersCount}
+                      </span>
+                    )}
+                  </button>
                 </div>
-              )}
-            </div>
+
+                {/* Collapsible Filter Panel */}
+                {filterOpen && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 pt-2 border-t border-border/60">
+                    {/* Category */}
+                    <div>
+                      <label className="text-[10px] font-semibold text-muted-foreground mb-1 block">
+                        {lang === "ar" ? "التصنيف" : "Category"}
+                      </label>
+                      <select
+                        value={selectedCategory}
+                        onChange={(e) => setSelectedCategory(e.target.value)}
+                        className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2 text-xs text-foreground outline-none"
+                      >
+                        <option value="">{lang === "ar" ? "الكل" : "All"}</option>
+                        {categories.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {lang === "ar" ? c.name_ar || c.name : c.name || c.name_ar}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Brand */}
+                    {catalogConfig.enableBrands && (
+                      <div>
+                        <label className="text-[10px] font-semibold text-muted-foreground mb-1 block">
+                          {lang === "ar" ? "الماركة" : "Brand"}
+                        </label>
+                        <select
+                          value={selectedBrand}
+                          onChange={(e) => setSelectedBrand(e.target.value)}
+                          className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2 text-xs text-foreground outline-none"
+                        >
+                          <option value="">{lang === "ar" ? "الكل" : "All"}</option>
+                          {brands.map((b) => (
+                            <option key={b.id} value={b.id}>
+                              {lang === "ar" ? b.name_ar || b.name : b.name || b.name_ar}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Quality */}
+                    {catalogConfig.enableQualityGrades && (
+                      <div>
+                        <label className="text-[10px] font-semibold text-muted-foreground mb-1 block">
+                          {lang === "ar" ? "درجة الجودة" : "Quality Grade"}
+                        </label>
+                        <select
+                          value={selectedQuality}
+                          onChange={(e) => setSelectedQuality(e.target.value)}
+                          className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2 text-xs text-foreground outline-none"
+                        >
+                          <option value="">{lang === "ar" ? "الكل" : "All"}</option>
+                          {qualities.map((q) => (
+                            <option key={q.id} value={q.id}>
+                              {lang === "ar" ? q.name_ar || q.name : q.name || q.name_ar}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Origin */}
+                    {catalogConfig.enableOrigins && (
+                      <div>
+                        <label className="text-[10px] font-semibold text-muted-foreground mb-1 block">
+                          {lang === "ar" ? "بلد المنشأ" : "Origin"}
+                        </label>
+                        <select
+                          value={selectedOrigin}
+                          onChange={(e) => setSelectedOrigin(e.target.value)}
+                          className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2 text-xs text-foreground outline-none"
+                        >
+                          <option value="">{lang === "ar" ? "الكل" : "All"}</option>
+                          {origins.map((o) => (
+                            <option key={o.id} value={o.id}>
+                              {lang === "ar" ? o.name_ar || o.name : o.name || o.name_ar}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Products Grid */}
             <div className="flex-1 min-h-0 overflow-y-auto p-3 custom-scrollbar">
@@ -1072,7 +1348,7 @@ function PurchasePOSPage() {
                     {lang === "ar" ? "إعادة ضبط الفلاتر" : "Reset filters"}
                   </button>
                 </div>
-              ) : (
+              ) : viewMode === "cards" ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">
                   {filtered.map((p) => {
                     const stock = stockMap[p.id] ?? 0;
@@ -1146,13 +1422,143 @@ function PurchasePOSPage() {
                     );
                   })}
                 </div>
+              ) : viewMode === "list" ? (
+                <div className="space-y-1.5">
+                  {filtered.map((product) => (
+                    <button
+                      key={product.id}
+                      type="button"
+                      onClick={() => addToCart(product)}
+                      className="flex w-full items-center justify-between gap-3 rounded-lg border border-border/70 bg-surface px-3 py-2 text-start transition hover:border-primary/40 hover:bg-surface-2"
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold">
+                          {lang === "ar"
+                            ? product.name_ar || product.name
+                            : product.name || product.name_ar}
+                        </span>
+                        <span className="block truncate text-[11px] text-muted-foreground">
+                          {product.category?.name_ar ||
+                            product.category?.name ||
+                            product.sku ||
+                            "—"}
+                          {product.barcode ? ` · ${product.barcode}` : ""}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-end">
+                        <span className="block text-xs font-semibold text-primary">
+                          {money(Number(product.cost_price || 0))}
+                        </span>
+                        <span className="block text-[10px] text-muted-foreground">
+                          {lang === "ar"
+                            ? `المخزون: ${stockMap[product.id] ?? 0}`
+                            : `Stock: ${stockMap[product.id] ?? 0}`}
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-lg border border-border">
+                  <table className="w-full text-start text-xs">
+                    <thead className="sticky top-0 bg-surface-2 text-muted-foreground">
+                      <tr>
+                        {(
+                          [
+                            {
+                              key: "name",
+                              label: lang === "ar" ? "الصنف" : "Product",
+                              align: "start",
+                            },
+                            {
+                              key: "code",
+                              label: lang === "ar" ? "الرمز" : "Code",
+                              align: "start",
+                            },
+                            {
+                              key: "cost",
+                              label: lang === "ar" ? "التكلفة" : "Cost",
+                              align: "end",
+                            },
+                            {
+                              key: "stock",
+                              label: lang === "ar" ? "المخزون" : "Stock",
+                              align: "end",
+                            },
+                          ] as const
+                        ).map((column) => {
+                          const active = catalogTableSort.key === column.key;
+                          const DirectionIcon = active
+                            ? catalogTableSort.direction === "asc"
+                              ? ArrowUp
+                              : ArrowDown
+                            : ArrowDownUp;
+                          return (
+                            <th
+                              key={column.key}
+                              aria-sort={
+                                active
+                                  ? catalogTableSort.direction === "asc"
+                                    ? "ascending"
+                                    : "descending"
+                                  : "none"
+                              }
+                              className={`p-1.5 sm:p-2 ${column.align === "end" ? "text-end" : "text-start"}`}
+                            >
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setCatalogTableSort((current) => ({
+                                    key: column.key,
+                                    direction:
+                                      current.key === column.key && current.direction === "asc"
+                                        ? "desc"
+                                        : "asc",
+                                  }))
+                                }
+                                title={column.label}
+                                className="inline-flex items-center gap-1 rounded-full px-1.5 py-1 transition hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                              >
+                                {column.label}
+                                <DirectionIcon
+                                  className={`size-3 ${active ? "text-primary" : "opacity-40"}`}
+                                  aria-hidden
+                                />
+                              </button>
+                            </th>
+                          );
+                        })}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/60">
+                      {tableRows.map((product) => (
+                        <tr
+                          key={product.id}
+                          onClick={() => addToCart(product)}
+                          className="cursor-pointer hover:bg-primary/5"
+                        >
+                          <td className="p-2 font-medium">
+                            {lang === "ar"
+                              ? product.name_ar || product.name
+                              : product.name || product.name_ar}
+                          </td>
+                          <td className="p-2 font-mono text-muted-foreground">
+                            {product.sku || product.barcode || "—"}
+                          </td>
+                          <td className="p-2 text-end">{money(Number(product.cost_price || 0))}</td>
+                          <td className="p-2 text-end">{stockMap[product.id] ?? 0}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           </div>
         )}
 
         {/* Right Column: Purchase Cart & Invoicing — the primary workspace. */}
-        <div className="flex min-h-0 w-full shrink-0 flex-col overflow-hidden rounded-3xl border border-primary/15 bg-surface/95 p-2.5 shadow-xl ring-1 ring-border/50 backdrop-blur-md sm:p-3 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:mx-2 lg:mb-2">
+        <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-3xl border border-primary/15 bg-surface/95 p-2 shadow-xl ring-1 ring-border/50 backdrop-blur-md sm:p-2.5 lg:col-start-2 lg:row-span-2 lg:row-start-2 lg:mx-2 lg:mb-2">
           {/* Cart Header */}
           <div className="mb-2 flex shrink-0 items-center justify-between border-b border-border/60 px-1 pb-2">
             <div className="flex items-center gap-2">
@@ -1169,26 +1575,26 @@ function PurchasePOSPage() {
                 <button
                   type="button"
                   onClick={() => setCart([])}
-                  className="flex items-center gap-1 text-[11px] text-destructive hover:underline"
+                  className="grid size-8 shrink-0 place-items-center rounded-full border border-destructive/20 text-destructive transition hover:bg-destructive/10"
+                  title={lang === "ar" ? "إفراغ السلة" : "Clear cart"}
                 >
-                  <Trash2 className="h-3 w-3" />
-                  {lang === "ar" ? "إفراغ السلة" : "Clear cart"}
+                  <Trash2 className="h-3.5 w-3.5" />
                 </button>
               )
             ) : (
               <button
                 type="button"
                 onClick={() => setMobilePickerOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm active:scale-95"
+                className="grid size-9 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm active:scale-95"
+                title={t("pos.add_product")}
               >
                 <Plus className="h-3.5 w-3.5" />
-                <span>{t("pos.add_product")}</span>
               </button>
             )}
           </div>
 
           {/* Cart Lines Scrollable Area */}
-          <div className="my-1 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 custom-scrollbar">
+          <div className="my-1 min-h-0 flex-1 space-y-1 overflow-y-auto pr-1 custom-scrollbar">
             {cart.length === 0 ? (
               <div className="grid place-items-center py-14 text-center text-sm text-muted-foreground">
                 <div className="grid h-12 w-12 place-items-center rounded-2xl border border-dashed border-border bg-surface-2/50 mb-2">
@@ -1214,6 +1620,7 @@ function PurchasePOSPage() {
                     unitPrice: line.unit_cost,
                     taxRate: line.tax_rate,
                     stock: stockMap[line.product_id],
+                    unboundedQuantity: true,
                   }}
                   labels={{
                     price: lang === "ar" ? "سعر الشراء" : "Cost",
@@ -1227,121 +1634,157 @@ function PurchasePOSPage() {
                 />
               ))
             )}
+          </div>
 
-            {/* Payment and totals share this same cart scroll area. */}
-            <div className="mt-3 space-y-2 border-t border-border/70 bg-surface/95 pt-2.5 pr-1">
-              {/* Dynamic Unified Treasury & Payment Selector (POP Context) */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2 rounded-xl border border-border/80 bg-surface px-2.5 py-1">
-                  <span className="text-[11px] font-medium text-muted-foreground">
-                    {lang === "ar" ? "الخصم الإضافي" : "Discount"}
-                  </span>
-                  <AmountInput
-                    min={0}
-                    hideClear
-                    value={toNumberOrNull(discount)}
-                    onValueChange={(v) => setDiscount(v == null ? "" : String(v))}
-                    placeholder="0"
-                    aria-label={lang === "ar" ? "الخصم" : "Discount"}
-                    wordsClassName="text-[10px] leading-3"
-                    containerClassName="w-24 shrink-0 [&_input]:h-7 [&_input]:rounded-lg [&_input]:bg-surface [&_input]:text-xs"
-                  />
-                </div>
-
-                <DynamicPaymentSelector
+          {/* Fixed payment and totals footer */}
+          <div className="min-h-0 shrink overflow-y-auto space-y-1.5 border-t border-border/70 bg-surface/95 pt-2 pr-1">
+            <div className="grid min-w-0 grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.8fr)] items-end gap-1.5">
+              <div className="flex min-w-0 flex-col gap-1">
+                <span className="truncate text-[10px] font-semibold leading-none text-muted-foreground">
+                  {lang === "ar" ? "طريقة الدفع" : "Payment method"}
+                </span>
+                <PaymentMethodPicker
                   context="purchases"
-                  compact={true}
                   value={paymentMethod}
                   onChange={(method) => {
                     setPaymentMethod(method);
-                    const def = getPaymentMethodDefinition(method);
-                    if (def?.isCreditTerm) {
-                      setPaid("0");
-                    }
+                    setPaid(method === "credit" ? "0" : "");
+                    setPaidManuallyEdited(false);
+                    setPaymentSelection((s) => ({
+                      ...s,
+                      method,
+                      paymentMethodId: method === "cash" ? "cash" : s.paymentMethodId || method,
+                    }));
                   }}
-                  settlement={paymentSelection}
-                  onSettlementChange={(s) => {
-                    setPaymentSelection(s);
-                    const ref = s.reference || s.paymentReference;
-                    if (ref) setTransferRef(ref);
-                  }}
-                  includeCredit={true}
+                  ensureIds={[paymentMethod]}
+                  allowedLegacyValues={[
+                    "cash",
+                    "card",
+                    "bank_transfer",
+                    "credit",
+                    "mobile_money",
+                    "split",
+                  ]}
+                  ariaLabel={lang === "ar" ? "طريقة الدفع" : "Payment method"}
+                  className="h-8 min-w-0 rounded-lg text-[10px] sm:text-xs"
                 />
               </div>
+              <AmountInput
+                label={lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}
+                showLabel
+                dir={lang === "ar" ? "rtl" : "ltr"}
+                value={paymentMethod === "credit" ? "0" : paidManuallyEdited ? paid : String(total)}
+                onValueChange={(value) => {
+                  setPaid(value);
+                  setPaidManuallyEdited(true);
+                }}
+                invalid={isOverpaid}
+                placeholder={lang === "ar" ? "المدفوع" : "Paid"}
+                className="h-8 rounded-lg border border-border/80 bg-surface px-2 text-[10px] outline-none focus:border-primary sm:text-[11px]"
+              />
+              <AmountInput
+                label={lang === "ar" ? "الخصم" : "Discount"}
+                showLabel
+                dir={lang === "ar" ? "rtl" : "ltr"}
+                value={discount}
+                onValueChange={setDiscount}
+                placeholder={lang === "ar" ? "الخصم" : "Discount"}
+                className="h-8 rounded-lg border border-border/80 bg-surface px-2 text-[10px] outline-none focus:border-primary sm:text-[11px]"
+              />
+            </div>
 
-              {/* Paid Amount */}
-              {paymentMethod !== "cash" && (
-                <div className="rounded-2xl border border-border/70 bg-surface-2/30 p-2.5">
-                  <div className="mb-1.5 flex items-center justify-between text-xs">
-                    <span className="font-semibold text-muted-foreground">
-                      {lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}
-                    </span>
-                    <span className="font-mono font-bold text-primary">{money(total)}</span>
-                  </div>
-                  <AmountInput
-                    min={0}
-                    value={toNumberOrNull(paid)}
-                    onValueChange={(v) => setPaid(v == null ? "" : String(v))}
-                    placeholder={total.toFixed(2)}
-                    aria-label={lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}
-                    containerClassName={`[&_input]:h-10 [&_input]:rounded-xl [&_input]:px-3 [&_input]:text-sm ${isOverpaid ? "[&_input]:border-destructive [&_input]:text-destructive" : "[&_input]:border-border"}`}
-                  />
-                </div>
-              )}
-
-              {isOverpaid && (
-                <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-2.5 py-1.5 text-[11px] font-medium text-destructive">
-                  {lang === "ar"
-                    ? "المبلغ المدفوع أكبر من إجمالي الفاتورة"
-                    : "Paid amount exceeds the invoice total"}
-                </p>
-              )}
-
-              {/* Note Input */}
+            {/* Transfer reference input */}
+            {(selectedPurchasePaymentMethod?.requiresReference ||
+              paymentMethod === "bank_transfer" ||
+              paymentMethod === "mobile_money") && (
               <input
                 type="text"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
+                value={transferRef}
+                onChange={(e) => {
+                  setTransferRef(e.target.value);
+                  setPaymentSelection((s) => ({ ...s, reference: e.target.value }));
+                }}
                 placeholder={
-                  lang === "ar" ? "ملاحظة على فاتورة الشراء (اختياري)..." : "Note (optional)..."
+                  paymentMethod === "mobile_money"
+                    ? lang === "ar"
+                      ? "رقم عملية المحفظة / المرجع"
+                      : "Wallet transaction / reference number"
+                    : t("pos.pm.transfer_ref")
                 }
-                className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2.5 text-xs text-foreground placeholder:text-muted-foreground/70 outline-none focus:border-primary"
+                aria-label={
+                  paymentMethod === "mobile_money"
+                    ? lang === "ar"
+                      ? "مرجع المحفظة"
+                      : "Wallet reference"
+                    : t("pos.pm.transfer_ref")
+                }
+                className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2.5 text-xs text-foreground outline-none transition focus:border-primary"
               />
+            )}
 
-              <div className="space-y-1.5 rounded-2xl border border-primary/20 bg-primary/5 p-3">
+            {isOverpaid && (
+              <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-2.5 py-1.5 text-[11px] font-medium text-destructive">
+                {lang === "ar"
+                  ? "المبلغ المدفوع أكبر من إجمالي الفاتورة"
+                  : "Paid amount exceeds the invoice total"}
+              </p>
+            )}
+
+            {/* Note Input */}
+            <input
+              type="text"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder={
+                lang === "ar" ? "ملاحظة على فاتورة الشراء (اختياري)..." : "Note (optional)..."
+              }
+              className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2.5 text-xs text-foreground placeholder:text-muted-foreground/70 outline-none focus:border-primary"
+            />
+
+            <div className="space-y-1 rounded-xl border border-primary/20 bg-primary/5 p-2">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>{lang === "ar" ? "المجموع الفرعي" : "Subtotal"}</span>
+                <span className="font-mono font-semibold text-foreground">{money(subtotal)}</span>
+              </div>
+
+              {discountN > 0 && (
+                <div className="flex items-center justify-between text-xs text-emerald-600 dark:text-emerald-400">
+                  <span className="font-medium">{lang === "ar" ? "الخصم" : "Discount"}</span>
+                  <span className="font-mono font-bold [unicode-bidi:isolate]">
+                    −{money(discountN)}
+                  </span>
+                </div>
+              )}
+
+              {taxTotal > 0 && (
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>{lang === "ar" ? "المجموع الفرعي" : "Subtotal"}</span>
-                  <span className="font-mono font-semibold text-foreground">{money(subtotal)}</span>
+                  <span>{lang === "ar" ? "الضريبة" : "Tax"}</span>
+                  <span className="font-mono font-semibold text-foreground">{money(taxTotal)}</span>
                 </div>
+              )}
 
-                {discountN > 0 && (
-                  <div className="flex items-center justify-between text-xs text-emerald-600 dark:text-emerald-400">
-                    <span className="font-medium">{lang === "ar" ? "الخصم" : "Discount"}</span>
-                    <span className="font-mono font-bold [unicode-bidi:isolate]">
-                      −{money(discountN)}
-                    </span>
-                  </div>
-                )}
+              <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                <span>{lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}</span>
+                <span className="font-mono font-semibold text-foreground">{money(paidN)}</span>
+              </div>
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-muted-foreground">
+                  {lang === "ar" ? "المتبقي للمورد" : "Supplier balance"}
+                </span>
+                <span className="font-mono font-bold text-amber-600">
+                  {money(Math.max(0, total - paidN))}
+                </span>
+              </div>
 
-                {taxTotal > 0 && (
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{lang === "ar" ? "الضريبة" : "Tax"}</span>
-                    <span className="font-mono font-semibold text-foreground">
-                      {money(taxTotal)}
-                    </span>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between border-t border-primary/20 pt-2">
-                  <span className="text-xs font-bold text-foreground">
-                    {lang === "ar" ? "الإجمالي" : "Total"}
+              <div className="flex items-center justify-between border-t border-primary/20 pt-2">
+                <span className="text-xs font-bold text-foreground">
+                  {lang === "ar" ? "الإجمالي" : "Total"}
+                </span>
+                <span className="font-mono text-base font-extrabold tracking-tight text-primary">
+                  <span dir="ltr" className="[unicode-bidi:isolate]">
+                    {money(total)}
                   </span>
-                  <span className="font-mono text-base font-extrabold tracking-tight text-primary">
-                    <span dir="ltr" className="[unicode-bidi:isolate]">
-                      {money(total)}
-                    </span>
-                  </span>
-                </div>
+                </span>
               </div>
             </div>
           </div>

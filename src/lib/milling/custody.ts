@@ -120,6 +120,12 @@ export interface MillingServiceDocument {
   received_at: string;
   processed_at: string | null;
   delivered_at: string | null;
+  /** P1-1: أساس التسعير المسجَّل (PER_BAG أو PER_KG). */
+  billing_basis?: string | null;
+  /** P1-1: سعر الوحدة المتعاقد عليه (للكيس أو للكيلو). */
+  fee_per_unit?: number | null;
+  /** P1-1: الكمية المسعّرة (عدد الأكياس أو الكيلوجرامات). */
+  fee_quantity?: number | null;
   customers?: { name: string; phone: string | null } | null;
   warehouses?: { name: string; name_ar: string | null } | null;
   sales_invoices?: {
@@ -138,6 +144,9 @@ export interface MillingServiceDocumentCreated {
   document_number: string;
   invoice_id: string;
   invoice_number: string;
+  billing_basis?: "PER_BAG" | "PER_KG" | null;
+  fee_per_unit?: number | null;
+  fee_quantity?: number | null;
 }
 
 export interface MillingDocumentLine {
@@ -392,7 +401,7 @@ export async function fetchMillingServiceDocument(
     .from("milling_service_documents")
     .select(
       `id, document_number, customer_id, warehouse_id, sales_invoice_id, status,
-       received_at, processed_at, delivered_at,
+       received_at, processed_at, delivered_at, billing_basis, fee_per_unit, fee_quantity,
        customers(name, phone), warehouses(name, name_ar),
        sales_invoices(invoice_number, subtotal, discount, total, paid, payment_method, payment_status)`,
     )
@@ -411,7 +420,7 @@ export async function fetchMillingDocuments(options?: {
     .from("milling_service_documents")
     .select(
       `id, document_number, customer_id, warehouse_id, sales_invoice_id, status,
-       received_at, processed_at, delivered_at, created_at,
+       received_at, processed_at, delivered_at, created_at, billing_basis, fee_per_unit, fee_quantity,
        customers(name, phone), warehouses(name, name_ar),
        sales_invoices(invoice_number, subtotal, discount, total, paid, payment_method, payment_status)`,
     )
@@ -628,13 +637,30 @@ export function buildMillingDocumentUnifiedDoc(
     }
   }
 
-  // سطر فاتورة أجور الطحن الرسمية
+  // سطر فاتورة أجور الطحن الرسمية — P1-1: أساس التسعير من المستند نفسه،
+  // لا من قسمة الإجمالي على عدد الأكياس (كان يعطي رقماً غير متعاقد عليه).
   const bagCount = details.intakeGrain?.bagsReceived || 0;
+  const basis =
+    details.billing_basis === "PER_BAG" || details.billing_basis === "PER_KG"
+      ? details.billing_basis
+      : bagCount > 0
+        ? "PER_BAG"
+        : "PER_KG";
+  const feeQty =
+    Number(details.fee_quantity) > 0
+      ? Number(details.fee_quantity)
+      : basis === "PER_BAG"
+        ? bagCount || 1
+        : Number(details.intakeGrain?.kgReceived) || 1;
+  const feePerUnit =
+    Number(details.fee_per_unit) > 0
+      ? Number(details.fee_per_unit)
+      : Number((subtotal / feeQty).toFixed(2));
   lines.push({
     product: `أجور طحن وتجهيز (${details.intakeGrain?.nameAr || "حبوب"})`,
-    qty: bagCount > 0 ? bagCount : 1,
-    unit: bagCount > 0 ? "كيس" : "خدمة",
-    price: bagCount > 0 ? Number((subtotal / bagCount).toFixed(2)) : subtotal,
+    qty: feeQty,
+    unit: basis === "PER_BAG" ? "كيس" : "كجم",
+    price: feePerUnit,
     total: subtotal,
     note: inv?.invoice_number ? `فاتورة مبيعات رسمية #${inv.invoice_number}` : undefined,
   });

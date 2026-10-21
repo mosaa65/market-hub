@@ -145,6 +145,8 @@ function SuppliersPage() {
 
   const filtered = useMemo(() => {
     let list = rows.filter((r) => {
+      // P1-6: المورد النقدي كيان نظامي — لا يظهر في دليل الموردين.
+      if ((r as { is_system?: boolean }).is_system) return false;
       if (search.trim()) {
         const q = search.trim().toLowerCase();
         const matches =

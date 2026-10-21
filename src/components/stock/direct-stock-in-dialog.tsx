@@ -179,7 +179,6 @@ export function DirectStockInDialog({
 
     setSaving(true);
     try {
-      // 1. Post the incoming stock delta using the atomic security-definer RPC
       const noteText = note.trim()
         ? note.trim()
         : isAr
@@ -194,7 +193,10 @@ export function DirectStockInDialog({
         p_movement_kind: "RECEIPT",
         p_movement_type_legacy: "purchase",
         p_source_type: "direct_stock_in",
+        p_source_id: crypto.randomUUID(),
         p_note: noteText,
+        p_owner_type: "COMPANY",
+        p_owner_id: null,
       });
 
       if (deltaErr) throw deltaErr;

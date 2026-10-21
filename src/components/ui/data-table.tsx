@@ -525,86 +525,92 @@ export function DataTable<T>({
               />
 
               <tbody className="divide-y divide-border/60">
-                {showSkeleton ? (
-                  Array.from({ length: 7 }).map((_, rowIndex) => (
-                    <tr
-                      key={`skeleton-row-${rowIndex}`}
-                      className="border-b border-border/50 transition-colors"
-                    >
-                      {visibleColumns.map((col, colIdx) => {
-                        const stickyCol = col.sticky ?? (pinFirst && col === visibleColumns[0]);
-                        const w = columnWidths[colIdx];
-                        return (
-                          <td
-                            key={col.key}
-                            style={w ? { width: `${w}px`, minWidth: `${w}px`, maxWidth: `${w}px` } : undefined}
-                            className={cn(
-                              "px-3 py-3 align-middle first:ps-4 last:pe-5",
-                              col.align === "end"
-                                ? "text-end"
-                                : col.align === "center"
-                                  ? "text-center"
-                                  : "text-start",
-                              col.className,
-                              col.hideBelow && HIDE_BELOW[col.hideBelow],
-                              stickyCol && "sticky start-0 z-10 bg-surface",
-                            )}
-                          >
-                            <div
+                {showSkeleton
+                  ? Array.from({ length: 7 }).map((_, rowIndex) => (
+                      <tr
+                        key={`skeleton-row-${rowIndex}`}
+                        className="border-b border-border/50 transition-colors"
+                      >
+                        {visibleColumns.map((col, colIdx) => {
+                          const stickyCol = col.sticky ?? (pinFirst && col === visibleColumns[0]);
+                          const w = columnWidths[colIdx];
+                          return (
+                            <td
+                              key={col.key}
+                              style={
+                                w
+                                  ? { width: `${w}px`, minWidth: `${w}px`, maxWidth: `${w}px` }
+                                  : undefined
+                              }
                               className={cn(
-                                "shimmer h-3.5 rounded-md bg-surface-3/70",
+                                "px-3 py-3 align-middle first:ps-4 last:pe-5",
                                 col.align === "end"
-                                  ? "ms-auto w-16"
+                                  ? "text-end"
                                   : col.align === "center"
-                                    ? "mx-auto w-12"
-                                    : colIdx === 0
-                                      ? "w-36 max-w-[85%]"
-                                      : "w-20 max-w-[70%]",
+                                    ? "text-center"
+                                    : "text-start",
+                                col.className,
+                                col.hideBelow && HIDE_BELOW[col.hideBelow],
+                                stickyCol && "sticky start-0 z-10 bg-surface",
                               )}
-                            />
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))
-                ) : (
-                  displayRows.map((row, index) => (
-                    <tr
-                      key={rowKey(row)}
-                      className={cn(
-                        "border-b border-border/60 transition-colors duration-150 hover:bg-accent/40",
-                        onRowClick && "cursor-pointer",
-                      )}
-                      onClick={onRowClick ? () => onRowClick(row) : undefined}
-                      {...(rowProps ? rowProps(row) : {})}
-                    >
-                      {visibleColumns.map((col, colIdx) => {
-                        const stickyCol = col.sticky ?? (pinFirst && col === visibleColumns[0]);
-                        const w = columnWidths[colIdx];
-                        return (
-                          <td
-                            key={col.key}
-                            style={w ? { width: `${w}px`, minWidth: `${w}px`, maxWidth: `${w}px` } : undefined}
-                            className={cn(
-                              "px-3 py-2.5 align-middle first:ps-4 last:pe-5",
-                              !col.wrap ? "whitespace-nowrap" : "break-words",
-                              col.align === "end"
-                                ? "text-end tabular-nums"
-                                : col.align === "center"
-                                  ? "text-center"
-                                  : "text-start",
-                              col.className,
-                              col.hideBelow && HIDE_BELOW[col.hideBelow],
-                              stickyCol && "sticky start-0 z-10 bg-surface",
-                            )}
-                          >
-                            {col.cell(row, index)}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))
-                )}
+                            >
+                              <div
+                                className={cn(
+                                  "shimmer h-3.5 rounded-md bg-surface-3/70",
+                                  col.align === "end"
+                                    ? "ms-auto w-16"
+                                    : col.align === "center"
+                                      ? "mx-auto w-12"
+                                      : colIdx === 0
+                                        ? "w-36 max-w-[85%]"
+                                        : "w-20 max-w-[70%]",
+                                )}
+                              />
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))
+                  : displayRows.map((row, index) => (
+                      <tr
+                        key={rowKey(row)}
+                        className={cn(
+                          "border-b border-border/60 transition-colors duration-150 hover:bg-accent/40",
+                          onRowClick && "cursor-pointer",
+                        )}
+                        onClick={onRowClick ? () => onRowClick(row) : undefined}
+                        {...(rowProps ? rowProps(row) : {})}
+                      >
+                        {visibleColumns.map((col, colIdx) => {
+                          const stickyCol = col.sticky ?? (pinFirst && col === visibleColumns[0]);
+                          const w = columnWidths[colIdx];
+                          return (
+                            <td
+                              key={col.key}
+                              style={
+                                w
+                                  ? { width: `${w}px`, minWidth: `${w}px`, maxWidth: `${w}px` }
+                                  : undefined
+                              }
+                              className={cn(
+                                "px-3 py-2.5 align-middle first:ps-4 last:pe-5",
+                                !col.wrap ? "whitespace-nowrap" : "break-words",
+                                col.align === "end"
+                                  ? "text-end tabular-nums"
+                                  : col.align === "center"
+                                    ? "text-center"
+                                    : "text-start",
+                                col.className,
+                                col.hideBelow && HIDE_BELOW[col.hideBelow],
+                                stickyCol && "sticky start-0 z-10 bg-surface",
+                              )}
+                            >
+                              {col.cell(row, index)}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
               </tbody>
             </table>
 
@@ -694,9 +700,8 @@ function TableHead<T>({
       className={cn(
         visuallyHidden
           ? "invisible h-0 border-none select-none pointer-events-none [&_th]:h-0 [&_th]:py-0 [&_th]:border-none [&_th]:leading-[0px] [&_th_*]:hidden"
-          :
-        sticky &&
-          "sticky z-20 bg-surface-2/70 backdrop-blur-md [top:calc(var(--ds-sticky-top,0px)+var(--ds-toolbar-h,0px))]",
+          : sticky &&
+              "sticky z-20 bg-surface-2/70 backdrop-blur-md [top:calc(var(--ds-sticky-top,0px)+var(--ds-toolbar-h,0px))]",
         !sticky && !visuallyHidden && "bg-surface-2/50",
       )}
     >

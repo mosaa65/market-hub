@@ -32,6 +32,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { money } from "@/lib/format";
+import { translateRpcError } from "@/lib/errors/rpc-errors";
 import { toSystemDigits } from "@/lib/format-preferences";
 import { Ltr } from "@/components/ltr-value";
 import { LuxuryPrintPreviewModal } from "@/components/luxury-print-preview-modal";
@@ -107,10 +108,11 @@ interface Product {
   name_ar: string | null;
   sku: string | null;
   barcode: string | null;
+  category_id?: string | null;
   cost_price: number;
   tax_rate: number;
   unit?: { short_name?: string | null; name?: string | null; name_ar?: string | null } | null;
-  category?: { name?: string | null; name_ar?: string | null } | null;
+  category?: { id?: string; name?: string | null; name_ar?: string | null } | null;
   inventory?: { warehouse_id: string; quantity: number }[] | null;
 }
 
@@ -1749,6 +1751,9 @@ function CreateDialog({
   const [warehouseId, setWarehouseId] = useState("");
   const [supplierId, setSupplierId] = useState("");
   const [search, setSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [productSort, setProductSort] = useState("name_asc");
+  const [productView, setProductView] = usePersistedViewMode("purchase-product-picker", "list");
   const [stockMap, setStockMap] = useState<Record<string, number>>({});
   const [cart, setCart] = useState<CartLine[]>([]);
   const [paid, setPaid] = useState("");
@@ -1772,7 +1777,7 @@ function CreateDialog({
         supabase
           .from("products")
           .select(
-            "id,name,name_ar,sku,barcode,cost_price,tax_rate,unit:units!products_unit_id_fkey(short_name,name,name_ar),category:categories(name,name_ar),inventory!inventory_product_id_fkey(warehouse_id,quantity)",
+            "id,name,name_ar,sku,barcode,cost_price,tax_rate,category_id,unit:units!products_unit_id_fkey(short_name,name,name_ar),category:categories(id,name,name_ar),inventory!inventory_product_id_fkey(warehouse_id,quantity)",
           )
           .eq("is_active", true)
           .order("name")
@@ -1807,18 +1812,52 @@ function CreateDialog({
     })();
   }, [warehouseId]);
 
+  const productCategories = useMemo(() => {
+    const categories = new Map<string, { id: string; name: string; name_ar: string | null }>();
+    for (const product of products) {
+      if (product.category_id && product.category) {
+        categories.set(product.category_id, {
+          id: product.category_id,
+          name: product.category.name ?? "",
+          name_ar: product.category.name_ar ?? null,
+        });
+      }
+    }
+    return [...categories.values()].sort((a, b) =>
+      (lang === "ar" ? a.name_ar || a.name : a.name || a.name_ar || "").localeCompare(
+        lang === "ar" ? b.name_ar || b.name : b.name || b.name_ar || "",
+        lang,
+      ),
+    );
+  }, [products, lang]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return (
-      q
-        ? products.filter((p) =>
-            [p.name, p.name_ar, p.sku, p.barcode].some((value) =>
-              (value ?? "").toLowerCase().includes(q),
-            ),
-          )
-        : products
-    ).slice(0, 30);
-  }, [products, search]);
+    const matching = products.filter((p) => {
+      const matchesSearch =
+        !q ||
+        [p.name, p.name_ar, p.sku, p.barcode].some((value) =>
+          (value ?? "").toLowerCase().includes(q),
+        );
+      return matchesSearch && (!selectedCategory || p.category_id === selectedCategory);
+    });
+    return [...matching].sort((a, b) => {
+      switch (productSort) {
+        case "name_desc":
+          return (b.name_ar || b.name).localeCompare(a.name_ar || a.name, lang);
+        case "cost_asc":
+          return Number(a.cost_price) - Number(b.cost_price);
+        case "cost_desc":
+          return Number(b.cost_price) - Number(a.cost_price);
+        case "stock_asc":
+          return (stockMap[a.id] ?? 0) - (stockMap[b.id] ?? 0);
+        case "stock_desc":
+          return (stockMap[b.id] ?? 0) - (stockMap[a.id] ?? 0);
+        default:
+          return (a.name_ar || a.name).localeCompare(b.name_ar || b.name, lang);
+      }
+    });
+  }, [products, search, selectedCategory, productSort, stockMap, lang]);
 
   function addToCart(p: Product) {
     const available = Number(stockMap[p.id] ?? 0);
@@ -1960,7 +1999,8 @@ function CreateDialog({
       toast.success(t("purchases.recorded"));
       onDone();
     } catch (e: any) {
-      toast.error(e.message ?? t("common.failed"));
+      // P1-4: ترجمة موحدة لأخطاء RPC قبل العرض.
+      toast.error(translateRpcError(e, "ar", t("common.failed")));
     } finally {
       setLoading(false);
     }
@@ -2032,13 +2072,85 @@ function CreateDialog({
         </div>
 
         <div className="grid flex-1 grid-cols-1 gap-4 overflow-hidden md:grid-cols-2">
-          <div className="flex flex-col overflow-hidden">
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={t("purchases.search_products")}
-              className="mb-2 h-9 rounded-md border border-input bg-surface px-3 text-sm"
-            />
+          <div className="flex min-h-0 flex-col overflow-hidden">
+            <TableToolbar
+              className="mb-2"
+              lang={lang}
+              search={{
+                value: search,
+                onValueChange: setSearch,
+                placeholder: t("purchases.search_products"),
+                resultCount: filtered.length,
+              }}
+              filters={{
+                definitions: [
+                  {
+                    key: "category",
+                    label: lang === "ar" ? "التصنيف" : "Category",
+                    type: "select",
+                    options: productCategories.map((category) => ({
+                      value: category.id,
+                      label:
+                        lang === "ar"
+                          ? category.name_ar || category.name
+                          : category.name || category.name_ar || "",
+                    })),
+                  },
+                ],
+                values: { category: selectedCategory },
+                onValueChange: (values) =>
+                  setSelectedCategory(typeof values.category === "string" ? values.category : ""),
+              }}
+              sort={{
+                value: productSort,
+                onValueChange: setProductSort,
+                options: [
+                  { value: "name_asc", label: lang === "ar" ? "الاسم: أ إلى ي" : "Name: A to Z" },
+                  { value: "name_desc", label: lang === "ar" ? "الاسم: ي إلى أ" : "Name: Z to A" },
+                  {
+                    value: "cost_asc",
+                    label: lang === "ar" ? "التكلفة: الأقل أولاً" : "Cost: low to high",
+                  },
+                  {
+                    value: "cost_desc",
+                    label: lang === "ar" ? "التكلفة: الأعلى أولاً" : "Cost: high to low",
+                  },
+                  {
+                    value: "stock_asc",
+                    label: lang === "ar" ? "المخزون: الأقل أولاً" : "Stock: low to high",
+                  },
+                  {
+                    value: "stock_desc",
+                    label: lang === "ar" ? "المخزون: الأعلى أولاً" : "Stock: high to low",
+                  },
+                ],
+              }}
+              viewToggle={<RecordsViewToggle value={productView} onChange={setProductView} />}
+            >
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategory("")}
+                  className={`h-7 shrink-0 rounded-lg px-2.5 text-xs font-medium ${selectedCategory === "" ? "bg-primary text-primary-foreground" : "border border-border/80 bg-surface text-muted-foreground hover:border-primary/40"}`}
+                >
+                  {lang === "ar" ? "الكل" : "All"} ({products.length})
+                </button>
+                {productCategories.map((category) => (
+                  <button
+                    key={category.id}
+                    type="button"
+                    onClick={() =>
+                      setSelectedCategory((current) => (current === category.id ? "" : category.id))
+                    }
+                    className={`h-7 shrink-0 rounded-lg px-2.5 text-xs font-medium ${selectedCategory === category.id ? "bg-primary text-primary-foreground" : "border border-border/80 bg-surface text-muted-foreground hover:border-primary/40"}`}
+                  >
+                    {lang === "ar"
+                      ? category.name_ar || category.name
+                      : category.name || category.name_ar}
+                  </button>
+                ))}
+              </div>
+            </TableToolbar>
             {!search && lowStockSuggestions.length > 0 && (
               <div className="mb-2 flex flex-wrap gap-1.5">
                 {lowStockSuggestions.map((p) => (
@@ -2054,33 +2166,100 @@ function CreateDialog({
                 ))}
               </div>
             )}
-            <div className="flex-1 overflow-y-auto space-y-1 pr-1">
-              {filtered.map((p) => {
-                const available = Number(stockMap[p.id] ?? 0);
-                return (
-                  <button
-                    key={p.id}
-                    onClick={() => addToCart(p)}
-                    className="flex w-full items-center justify-between gap-3 rounded border border-border bg-surface px-3 py-2 text-sm hover:border-ring hover:bg-surface-2"
-                  >
-                    <div className="min-w-0 flex-1 text-start">
-                      <div className="truncate font-medium">{productLabel(p)}</div>
-                      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                        <span>{p.sku ?? "—"}</span>
-                        {p.barcode && <span className="font-mono">{p.barcode}</span>}
-                      </div>
-                    </div>
-                    <div className="text-end">
-                      <div className="text-xs text-muted-foreground">
-                        {money(Number(p.cost_price))}
-                      </div>
-                      <div className="text-[10px] text-muted-foreground">
-                        {lang === "ar" ? `المخزون: ${available}` : `Stock: ${available}`}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
+            <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+              {filtered.length === 0 ? (
+                <div className="grid place-items-center py-10 text-sm text-muted-foreground">
+                  {lang === "ar" ? "لا توجد أصناف مطابقة" : "No matching products"}
+                </div>
+              ) : productView === "cards" ? (
+                <div className="grid grid-cols-1 gap-2 xl:grid-cols-2">
+                  {filtered.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => addToCart(p)}
+                      className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-border bg-surface p-3 text-start transition hover:border-primary/40 hover:bg-surface-2"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold">
+                          {productLabel(p)}
+                        </span>
+                        <span className="block truncate text-[11px] text-muted-foreground">
+                          {p.category?.name_ar || p.category?.name || p.sku || "—"}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-end">
+                        <span className="block text-sm font-semibold text-primary">
+                          {money(Number(p.cost_price))}
+                        </span>
+                        <span className="block text-[10px] text-muted-foreground">
+                          {lang === "ar"
+                            ? `المخزون: ${Number(stockMap[p.id] ?? 0)}`
+                            : `Stock: ${Number(stockMap[p.id] ?? 0)}`}
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : productView === "table" ? (
+                <div className="overflow-x-auto rounded-lg border border-border">
+                  <table className="w-full text-start text-xs">
+                    <thead className="sticky top-0 bg-surface-2 text-muted-foreground">
+                      <tr>
+                        <th className="p-2 text-start">{lang === "ar" ? "الصنف" : "Product"}</th>
+                        <th className="p-2 text-start">{lang === "ar" ? "الرمز" : "Code"}</th>
+                        <th className="p-2 text-end">{lang === "ar" ? "التكلفة" : "Cost"}</th>
+                        <th className="p-2 text-end">{lang === "ar" ? "المخزون" : "Stock"}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/60">
+                      {filtered.map((p) => (
+                        <tr
+                          key={p.id}
+                          onClick={() => addToCart(p)}
+                          className="cursor-pointer hover:bg-primary/5"
+                        >
+                          <td className="p-2 font-medium">{productLabel(p)}</td>
+                          <td className="p-2 font-mono text-muted-foreground">
+                            {p.sku || p.barcode || "—"}
+                          </td>
+                          <td className="p-2 text-end">{money(Number(p.cost_price))}</td>
+                          <td className="p-2 text-end">{Number(stockMap[p.id] ?? 0)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {filtered.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => addToCart(p)}
+                      className="flex w-full items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-2 text-sm text-start transition hover:border-primary/40 hover:bg-surface-2"
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-medium">{productLabel(p)}</span>
+                        <span className="block truncate text-[11px] text-muted-foreground">
+                          {p.category?.name_ar || p.category?.name || p.sku || "—"}
+                          {p.barcode ? ` · ${p.barcode}` : ""}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-end">
+                        <span className="block text-xs font-semibold text-primary">
+                          {money(Number(p.cost_price))}
+                        </span>
+                        <span className="block text-[10px] text-muted-foreground">
+                          {lang === "ar"
+                            ? `المخزون: ${Number(stockMap[p.id] ?? 0)}`
+                            : `Stock: ${Number(stockMap[p.id] ?? 0)}`}
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

@@ -4,22 +4,19 @@
  * ════════════════════════════════════════════════════════════════════════════
  * DESIGN: THIS IS THE POS CONTROL, COPIED EXACTLY
  * ════════════════════════════════════════════════════════════════════════════
- * This is a native `<select>` with the identical class recipe used by the POS
- * payment switcher on main — not a re-interpretation of it:
+ * This uses the shared Radix Select used by the filter controls, with a compact
+ * trigger recipe aligned to the POS payment switcher:
  *
  *   height        h-10
  *   radius        rounded-xl
  *   border        border-border/80
  *   surface       bg-surface
  *   typography    text-xs font-semibold text-foreground
- *   chevron       ChevronDown, absolute end-3, h-4 w-4, text-muted-foreground
+ *   chevron       shared SelectTrigger chevron
  *   focus         focus:border-primary focus:ring-2 focus:ring-primary/20
  *
- * Why a native select and not custom cards: it is what the till already uses, it
- * is keyboard- and touch-correct for free, it opens the OS picker on a phone,
- * and it stays one compact row no matter how many Yemeni methods a business
- * enables. A grid of cards would grow the checkout panel with every method
- * added — the opposite of what a cashier wants under time pressure.
+ * A single dropdown stays compact as a business enables more methods. The same
+ * catalogue-backed logo and label appear in the trigger and each option.
  *
  * The icon is rendered as a static adornment at the START of the field, so a
  * method is recognisable by shape as well as by name. It is decorative: the
@@ -42,7 +39,6 @@
  */
 
 import { useMemo } from "react";
-import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import {
@@ -59,6 +55,13 @@ import {
   type ResolvedPaymentMethod,
 } from "@/hooks/use-payment-methods";
 import { PaymentMethodIcon } from "./payment-method-icon";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 /**
  * Resolve one `ensureIds` entry to a method, accepting EITHER a catalogue id or
@@ -100,11 +103,20 @@ export interface PaymentMethodPickerProps {
    * id, so a historic document stays editable instead of losing its method.
    */
   ensureIds?: (string | null | undefined)[];
+  /** Restrict options to values accepted by the current screen's write contract. */
+  allowedLegacyValues?: readonly string[];
   className?: string;
   /** Accessible name for the select. */
   ariaLabel?: string;
   /** Placeholder shown when `value` is empty. */
   placeholder?: string;
+  /**
+   * Include the select in the screen's keyboard field order
+   * (`data-form-nav`, see `src/lib/keyboard/form-navigation.ts`). On by
+   * default: a payment method is a field like any other, and a counter that
+   * works without a mouse must be able to land on it.
+   */
+  "data-form-nav"?: boolean;
 }
 
 export function PaymentMethodPicker({
@@ -114,9 +126,11 @@ export function PaymentMethodPicker({
   includeCredit = true,
   disabled = false,
   ensureIds,
+  allowedLegacyValues,
   className,
   ariaLabel,
   placeholder,
+  "data-form-nav": formNav = true,
 }: PaymentMethodPickerProps) {
   const { t, lang } = useI18n();
   const isRtl = lang === "ar";
@@ -150,6 +164,13 @@ export function PaymentMethodPicker({
     return extra.length === 0 ? methods : [...methods, ...extra];
   }, [methods, ensureIds]);
 
+  const selectableOptions = useMemo(() => {
+    if (!allowedLegacyValues) return options;
+    return options.filter(
+      (method) => method.id === value || allowedLegacyValues.includes(method.legacyValue),
+    );
+  }, [options, allowedLegacyValues, value]);
+
   /**
    * The label for a method, read from the ONE authority: the catalogue row.
    *
@@ -178,50 +199,56 @@ export function PaymentMethodPicker({
   const selectedDefinition =
     (value ? options.find((method) => method.id === value) : undefined) ??
     (value ? getPaymentMethodDefinition(value) : undefined);
+  const selectedMethod = value ? options.find((method) => method.id === value) : undefined;
+  const selectedLabel = selectedMethod
+    ? labelFor(selectedMethod)
+    : value
+      ? paymentMethodLabel(value, isRtl ? "ar" : "en")
+      : undefined;
 
   return (
-    <div className={cn("relative min-w-0", className)}>
-      {/* Adornment: the shape of the chosen method, so it reads at a glance. */}
+    <div className="relative min-w-0">
+      <Select value={value ?? ""} onValueChange={onChange} dir={isRtl ? "rtl" : "ltr"}>
+        <SelectTrigger
+          aria-label={ariaLabel ?? (isRtl ? "طريقة الدفع" : "Payment method")}
+          data-form-nav={formNav ? "" : undefined}
+          disabled={disabled || isLoading}
+          className={cn(
+            "h-10 w-full rounded-xl border-border/80 bg-surface ps-9 text-xs font-semibold text-foreground",
+            "focus:border-primary focus:ring-2 focus:ring-primary/20",
+            className,
+          )}
+        >
+          <SelectValue placeholder={placeholder ?? (isRtl ? "طريقة الدفع" : "Payment method")}>
+            {selectedLabel}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent align="start" className="min-w-[var(--radix-select-trigger-width)]">
+          {selectableOptions.map((method) => (
+            <SelectItem key={method.id} value={method.id} className="gap-2 py-2 ps-2 pe-8">
+              <span className="flex min-w-0 items-center gap-2">
+                <PaymentMethodIcon
+                  iconKey={method.iconKey}
+                  methodId={method.id}
+                  ledgerKind={method.ledgerKind}
+                  className="size-5"
+                />
+                <span className="truncate">{labelFor(method)}</span>
+              </span>
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
       {selectedDefinition && (
         <span className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2">
           <PaymentMethodIcon
             iconKey={selectedDefinition.iconKey}
-            methodId={value}
+            methodId={selectedDefinition.id}
             ledgerKind={selectedDefinition.ledgerKind}
-            className="h-4 w-4"
+            className="size-4"
           />
         </span>
       )}
-
-      <select
-        dir={isRtl ? "rtl" : "ltr"}
-        aria-label={ariaLabel ?? (isRtl ? "طريقة الدفع" : "Payment method")}
-        disabled={disabled || isLoading}
-        value={value ?? ""}
-        onChange={(event) => onChange(event.target.value)}
-        className={cn(
-          // The POS select recipe, unchanged — including the appearance-none
-          // reset and the absolute chevron that replace the native arrow.
-          "h-10 w-full appearance-none rounded-xl border border-border/80 bg-surface",
-          "ps-9 pe-9 text-xs font-semibold text-foreground",
-          "outline-none transition",
-          "focus:border-primary focus:ring-2 focus:ring-primary/20",
-          "disabled:cursor-not-allowed disabled:opacity-50",
-        )}
-      >
-        {!value && (
-          <option value="" disabled>
-            {placeholder ?? (isRtl ? "طريقة الدفع" : "Payment method")}
-          </option>
-        )}
-        {options.map((method) => (
-          <option key={method.id} value={method.id}>
-            {labelFor(method)}
-          </option>
-        ))}
-      </select>
-
-      <ChevronDown className="pointer-events-none absolute end-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
     </div>
   );
 }

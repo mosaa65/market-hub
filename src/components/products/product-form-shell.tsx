@@ -78,11 +78,11 @@ export function ProductPreviewCard({
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-br from-card via-card/90 to-primary/5 p-4 shadow-xs sm:p-5",
+        "group relative overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-br from-card via-card/95 to-primary/[0.035] p-4 shadow-sm transition-shadow duration-200 hover:shadow-md sm:p-5",
         className,
       )}
     >
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0 flex-1 space-y-1.5">
           <div className="flex flex-wrap items-center gap-2">
             {categoryLabel ? (

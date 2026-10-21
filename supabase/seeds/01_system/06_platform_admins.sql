@@ -129,7 +129,8 @@ ON CONFLICT (id) DO NOTHING;
 WITH seed(user_id, email, phone) AS (VALUES
   ('a0000000-0000-4000-a000-000000000001'::uuid, 'mousa.mc13@gmail.com',     '+967772217218'),
   ('a0000000-0000-4000-a000-000000000002'::uuid, 'shoeabvv@gmail.com',       '+967772317950'),
-  ('a0000000-0000-4000-a000-000000000003'::uuid, 'emadfasill2001@gmail.com', '+967784795104')
+  ('a0000000-0000-4000-a000-000000000003'::uuid, 'emadfasill2001@gmail.com', '+967784795104'),
+  ('a0000000-0000-4000-a000-000000000004'::uuid, 'ahmedhetar15@gmail.com',   '+967779121636')
 )
 INSERT INTO auth.identities (
   id, user_id, provider_id, provider,
@@ -168,10 +169,22 @@ ON CONFLICT (provider, provider_id) DO NOTHING;
 -- المحاولة الأولى وضعت provider_id = رقم الهاتف، ففشل الدخول رغم صحة كل شيء
 -- آخر. GoTrue لا يستدلّ على المستخدم بـ provider_id هنا، بل بجدول users.phone،
 -- والتفرد على (provider, provider_id) هو ما يمنع صفين لنفس المستخدم.
-WITH seed(user_id) AS (VALUES
-  ('a0000000-0000-4000-a000-000000000001'::uuid),
-  ('a0000000-0000-4000-a000-000000000002'::uuid),
-  ('a0000000-0000-4000-a000-000000000003'::uuid)
+--
+-- ⚠️ إصلاح 2026-10-21 — سبب فشل تسجيل الدخول بالهاتف على الإنتاج:
+--   كانت البذرة تزرع هوية الهاتف بـ identity_data **بلا حقل `phone`**. هذا
+--   الصف يُقبل، لكنه لا يطابق أي رقم فيبحث GoTrue بلا نتيجة ويعيد
+--   invalid_credentials رغم صحة الرقم وكلمة المرور (auth.users.phone كان
+--   صحيحًا!). البيانات الحقيقية على المشروع أظهرت الهوية هكذا:
+--     {"email_verified": false, "phone_verified": true, "sub": "<uuid>"}
+--   أي معرف بلا رقم. Supabase نفسه يكتب الرقم في identity_data.phone،
+--   فصار الـseed يطابقه. لكن ON CONFLICT DO NOTHING لا يصلح الصف المعطوب
+--   القائم، فتحوّل إلى DO UPDATE يكتب identity_data الصحيحة.
+--   إن كانت البيئة تعتمد على الدخول بالهاتف شغّل هذا الملف مرة بعد النشر.
+WITH seed(user_id, phone) AS (VALUES
+  ('a0000000-0000-4000-a000-000000000001'::uuid, '+967772217218'),
+  ('a0000000-0000-4000-a000-000000000002'::uuid, '+967772317950'),
+  ('a0000000-0000-4000-a000-000000000003'::uuid, '+967784795104'),
+  ('a0000000-0000-4000-a000-000000000004'::uuid, '+967779121636')
 )
 INSERT INTO auth.identities (
   id, user_id, provider_id, provider,
@@ -187,13 +200,18 @@ SELECT
   jsonb_build_object(
     'sub', s.user_id::text,
     'email_verified', false,
-    'phone_verified', true
+    'phone_verified', true,
+    -- الرقم إلزامي هنا: بلا هذا الحقل لا تجد قراءة الهوية شيئًا ليطابقه
+    -- GoTrue فيعيد invalid_credentials رغم صحة الرقم في auth.users.phone.
+    'phone', s.phone
   ),
   now(),
   now(),
   NULL
 FROM seed s
-ON CONFLICT (provider, provider_id) DO NOTHING;
+ON CONFLICT (provider, provider_id) DO UPDATE
+  SET identity_data = EXCLUDED.identity_data,
+      updated_at    = now();
 
 -- ── 3) public.profiles ──────────────────────────────────────────────────────
 -- الاسم الظاهر واللغة. العربية 'ar' و«الوضع الداكن» ليكونا الافتراضي عند أول
@@ -206,7 +224,8 @@ ON CONFLICT (provider, provider_id) DO NOTHING;
 WITH seed(user_id, full_name, phone) AS (VALUES
   ('a0000000-0000-4000-a000-000000000001'::uuid, 'موسى العواضي',  '+967772217218'),
   ('a0000000-0000-4000-a000-000000000002'::uuid, 'يونس العفيف',   '+967772317950'),
-  ('a0000000-0000-4000-a000-000000000003'::uuid, 'عماد الجماعي', '+967784795104')
+  ('a0000000-0000-4000-a000-000000000003'::uuid, 'عماد الجماعي', '+967784795104'),
+  ('a0000000-0000-4000-a000-000000000004'::uuid, 'أحمد الهتار',   '+967779121636')
 )
 INSERT INTO public.profiles (id, full_name, phone, language, theme, is_active)
 SELECT s.user_id, s.full_name, s.phone, 'ar', 'dark', true
@@ -223,7 +242,8 @@ ON CONFLICT (id) DO UPDATE
 WITH seed(user_id, role, mfa_required) AS (VALUES
   ('a0000000-0000-4000-a000-000000000001'::uuid, 'superadmin', false),
   ('a0000000-0000-4000-a000-000000000002'::uuid, 'superadmin', false),
-  ('a0000000-0000-4000-a000-000000000003'::uuid, 'support',    false)
+  ('a0000000-0000-4000-a000-000000000003'::uuid, 'support',    false),
+  ('a0000000-0000-4000-a000-000000000004'::uuid, 'superadmin', false)
 )
 INSERT INTO public.platform_admins (user_id, role, is_active, mfa_required)
 SELECT s.user_id, s.role, true, s.mfa_required
@@ -267,7 +287,8 @@ DECLARE
   v_expected uuid[] := ARRAY[
     'a0000000-0000-4000-a000-000000000001'::uuid,
     'a0000000-0000-4000-a000-000000000002'::uuid,
-    'a0000000-0000-4000-a000-000000000003'::uuid
+    'a0000000-0000-4000-a000-000000000003'::uuid,
+    'a0000000-0000-4000-a000-000000000004'::uuid
   ];
   v_id uuid;
 BEGIN
@@ -286,7 +307,7 @@ BEGIN
                    WHERE i.user_id = v_id AND i.provider = 'phone')
     THEN
       RAISE EXCEPTION
-        'حساب منصة لم يكتمل بناؤه (%) — ناقص في auth.users أو هوية البريد أو هوية الهاتف أو profiles أو platform_admins',
+        'حساب منصة لم يكتمل بناؤه (%) — ناقص في auth.users أو هوية البريد أو هوية الهاتف أو profiles أو platform_admins أو user_roles',
         v_id;
     END IF;
   END LOOP;

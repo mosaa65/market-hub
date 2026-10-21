@@ -76,9 +76,15 @@ DECLARE
   v_q text;
   v_rows jsonb;
 BEGIN
+  -- ⚠️ superadmin المنصة (المستخدمون في platform_admins) يملكون دور متجر 'owner'
+  --    من البذرة، لكن لو أُنشئ حساب سوبر أدمن جديد بلا دور المتجر لُحجب عنه
+  --    التصدير رغم أن كل صلاحيات المنصة له. القاعدة: إما دور مالك/مدير،
+  --    أو سوبر أدمن منصة. (backup_restore_all يشترط owner فقط — بقصد الاستعادة.)
   IF v_caller IS NULL
-     OR NOT (public.has_role(v_caller, 'owner') OR public.has_role(v_caller, 'manager')) THEN
-    RAISE EXCEPTION 'BACKUP_AUTH: backup export requires owner or manager role'
+     OR NOT (public.has_role(v_caller, 'owner')
+             OR public.has_role(v_caller, 'manager')
+             OR public.is_platform_superadmin(v_caller)) THEN
+    RAISE EXCEPTION 'BACKUP_AUTH: backup export requires owner, manager or platform superadmin'
       USING HINT = 'لا يملك المستدعي صلاحية تصدير النسخ الاحتياطية';
   END IF;
 

@@ -5,7 +5,7 @@
 -- ما هذا الملف؟
 --   صف لكل نوع مستند في النظام: بادئته، وصيغته، وحشوه. محرّك الترقيم في
 --   `supabase/migrations/14_document_numbering_engine.sql` يقرأ من هنا ليُنتج
---   الرقم المعروض: `{PREFIX}-{YYYY}{MM}-{SEQ}` ← `INV-202610-0001`.
+--   الرقم الافتراضي المعروض: `{PREFIX}-{YYYY}-{MM}-{SEQ}` ← `INV-2026-10-0001`.
 --
 -- لماذا هو ملف نظام (يُشغَّل تلقائيًا)؟
 --   لأن بلا هذه الصفوف يرفض المحرّك توليد أي رقم:
@@ -46,30 +46,30 @@ INSERT INTO public.document_numbering
   (document_type, section, label_ar, label_en, prefix, separator, format_tokens, padding, date_part)
 VALUES
   -- ── المبيعات ──────────────────────────────────────────────────────────────
-  ('sales_invoice',    'sales',      'فاتورة مبيعات',   'Sales Invoice',     'INV',  '-', '{PREFIX}-{YYYY}{MM}-{SEQ}',  4, 'none'),
-  ('sales_return',     'sales',      'مرتجع مبيعات',    'Sales Return',      'SR',   '-', '{PREFIX}-{YYYY}{MM}-{SEQ}',  4, 'none'),
-  ('quotation',        'sales',      'عرض سعر',         'Quotation',         'QUO',  '-', '{PREFIX}-{YYYY}{MM}-{SEQ}',  4, 'none'),
-  ('sales_order',      'sales',      'أمر بيع',         'Sales Order',       'SO',   '-', '{PREFIX}-{YYYY}{MM}-{SEQ}',  4, 'none'),
+  ('sales_invoice',    'sales',      'فاتورة مبيعات',   'Sales Invoice',     'INV',  '-', '{PREFIX}-{YYYY}-{MM}-{SEQ}',  4, 'none'),
+  ('sales_return',     'sales',      'مرتجع مبيعات',    'Sales Return',      'SR',   '-', '{PREFIX}-{YYYY}-{MM}-{SEQ}',  4, 'none'),
+  ('quotation',        'sales',      'عرض سعر',         'Quotation',         'QUO',  '-', '{PREFIX}-{YYYY}-{MM}-{SEQ}',  4, 'none'),
+  ('sales_order',      'sales',      'أمر بيع',         'Sales Order',       'SO',   '-', '{PREFIX}-{YYYY}-{MM}-{SEQ}',  4, 'none'),
 
   -- ── المشتريات ─────────────────────────────────────────────────────────────
-  ('purchase_invoice', 'purchase',   'فاتورة مشتريات',  'Purchase Invoice',  'PO',   '-', '{PREFIX}-{YYYY}{MM}-{SEQ}',  4, 'none'),
-  ('purchase_return',  'purchase',   'مرتجع مشتريات',   'Purchase Return',   'PR',   '-', '{PREFIX}-{YYYY}{MM}-{SEQ}',  4, 'none'),
-  ('purchase_order',   'purchase',   'أمر شراء',        'Purchase Order',    'PO',   '-', '{PREFIX}-{YYYY}{MM}-{SEQ}',  4, 'none'),
+  ('purchase_invoice', 'purchase',   'فاتورة مشتريات',  'Purchase Invoice',  'PO',   '-', '{PREFIX}-{YYYY}-{MM}-{SEQ}',  4, 'none'),
+  ('purchase_return',  'purchase',   'مرتجع مشتريات',   'Purchase Return',   'PR',   '-', '{PREFIX}-{YYYY}-{MM}-{SEQ}',  4, 'none'),
+  ('purchase_order',   'purchase',   'أمر شراء',         'Purchase Order',    'PO',   '-', '{PREFIX}-{YYYY}-{MM}-{SEQ}',  4, 'none'),
 
   -- ── المخزون ───────────────────────────────────────────────────────────────
-  ('goods_receipt',    'inventory',  'سند استلام',      'Goods Receipt',     'GRN',  '-', '{PREFIX}-{YYYY}{MM}-{SEQ}',  4, 'none'),
-  ('stock_transfer',   'inventory',  'تحويل مخزني',     'Stock Transfer',    'TR',   '-', '{PREFIX}-{YYYY}{MM}-{SEQ}',  4, 'none'),
-  ('stock_adjustment', 'inventory',  'تسوية مخزنية',    'Stock Adjustment',  'ADJ',  '-', '{PREFIX}-{YYYY}{MM}-{SEQ}',  4, 'none'),
+  ('goods_receipt',    'inventory',  'سند استلام',      'Goods Receipt',     'GRN',  '-', '{PREFIX}-{YYYY}-{MM}-{SEQ}',  4, 'none'),
+  ('stock_transfer',   'inventory',  'تحويل مخزني',     'Stock Transfer',    'TR',   '-', '{PREFIX}-{YYYY}-{MM}-{SEQ}',  4, 'none'),
+  ('stock_adjustment', 'inventory',  'تسوية مخزنية',    'Stock Adjustment',  'ADJ',  '-', '{PREFIX}-{YYYY}-{MM}-{SEQ}',  4, 'none'),
 
   -- ── المطحنة ──────────────────────────────────────────────────────
-  ('milling_intake',   'milling',    'سند استلام أمانات', 'Milling Intake',    'MI',   '-', '{PREFIX}-{YYYY}{MM}-{SEQ}',  4, 'none'),
-  ('milling_service',  'milling',    'سند خدمة طحن',    'Milling Service',   'MS',   '-', '{PREFIX}-{YYYY}{MM}-{SEQ}',  4, 'none'),
+  ('milling_intake',   'milling',    'سند استلام أمانات', 'Milling Intake',    'MI',   '-', '{PREFIX}-{YYYY}-{MM}-{SEQ}',  4, 'none'),
+  ('milling_service',  'milling',    'سند خدمة طحن',    'Milling Service',   'MS',   '-', '{PREFIX}-{YYYY}-{MM}-{SEQ}',  4, 'none'),
 
   -- ── السندات والمالية ──────────────────────────────────────────────────────
-  ('customer_payment', 'receipts',   'سند قبض عميل',    'Customer Receipt',  'RV',   '-', '{PREFIX}-{YYYY}{MM}-{SEQ}',  5, 'none'),
-  ('supplier_payment', 'payments',   'سند صرف مورد',    'Supplier Payment',  'PV',   '-', '{PREFIX}-{YYYY}{MM}-{SEQ}',  5, 'none'),
-  ('expense',          'payments',   'سند مصروف',       'Expense Voucher',   'EXP',  '-', '{PREFIX}-{YYYY}{MM}-{SEQ}',  5, 'none'),
-  ('journal_entry',    'finance',    'قيد يومية',       'Journal Entry',     'JV',   '-', '{PREFIX}-{YYYY}{MM}-{SEQ}',  5, 'none')
+  ('customer_payment', 'receipts',   'سند قبض عميل',    'Customer Receipt',  'RV',   '-', '{PREFIX}-{YYYY}-{MM}-{SEQ}',  4, 'none'),
+  ('supplier_payment', 'payments',   'سند صرف مورد',    'Supplier Payment',  'PV',   '-', '{PREFIX}-{YYYY}-{MM}-{SEQ}',  4, 'none'),
+  ('expense',          'payments',   'سند مصروف',       'Expense Voucher',   'EXP',  '-', '{PREFIX}-{YYYY}-{MM}-{SEQ}',  4, 'none'),
+  ('journal_entry',    'finance',    'قيد يومية',       'Journal Entry',      'JV',   '-', '{PREFIX}-{YYYY}-{MM}-{SEQ}',  4, 'none')
 -- ⚠️ صيغة ON CONFLICT تطابق فهرس التعبير في الترحيل 14 حرفيًا.
 -- لا نكتب (document_type, scope, scope_id) مجرّدة: scope_id = NULL لا يتعارض
 -- مع NULL في SQL، فيمرّ الصف مكررًا كل تشغيل. راجع الشرح في الترحيل 14.

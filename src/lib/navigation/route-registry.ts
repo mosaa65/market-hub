@@ -1156,6 +1156,18 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
     i18nKey: "nav.settings_activity",
   },
   {
+    id: "sidebar-navigation-settings",
+    path: "/settings?section=sidebar-navigation",
+    titleAr: "تخصيص القائمة الجانبية",
+    titleEn: "Sidebar Navigation",
+    descriptionAr: "طريقة عرض التنقل وشكل الأيقونات وألوانها",
+    descriptionEn: "Navigation views, icon shapes, and sidebar group colors",
+    keywords: ["قائمة جانبية", "تنقل", "أيقونات", "ألوان", "sidebar", "navigation", "icons"],
+    category: "settings",
+    requiredRoles: ["owner", "manager", "accountant", "cashier", "warehouse"],
+    i18nKey: "nav.settings_sidebar",
+  },
+  {
     id: "backup-settings",
     path: "/settings?section=backup",
     titleAr: "النسخ الاحتياطي والأمان",

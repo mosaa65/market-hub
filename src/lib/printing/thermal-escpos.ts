@@ -213,16 +213,5 @@ export function renderThermalEscPos(
   // خط توقيع ممتد — ليس فاصل بنود، فلا يخضع لـ showDividers.
   blocks.push({ text: "_".repeat(columns), align: "center" });
 
-  // ── الفوتر الموحد: من Company Profile ───────────────────────────────
-  if (opts.showFooter) {
-    const footerNote = company.footerText;
-    const footerContact = company.footerContact || company.contacts.join(" · ");
-    if (footerNote || footerContact) {
-      if (divider) blocks.push({ text: divider, align: "center" });
-      if (footerNote) blocks.push({ text: footerNote, align: "center" });
-      if (footerContact) blocks.push({ text: footerContact, align: "center" });
-    }
-  }
-
   return { columns, blocks, cut: true, feedBeforeCut: 3 };
 }

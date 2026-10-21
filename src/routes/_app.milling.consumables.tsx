@@ -13,6 +13,7 @@ import { PageHeader } from "@/components/page-header";
 import { ModuleGuard } from "@/lib/modules";
 import { supabase } from "@/integrations/supabase/client";
 import { consumeInternalSupplies, fetchConsumableItems, type ProductOption } from "@/lib/milling";
+import { translateRpcError } from "@/lib/errors/rpc-errors";
 import {
   MillingPanel,
   MillingSectionTitle,
@@ -89,7 +90,8 @@ function ConsumablesPage() {
       setNotes("");
       void qc.invalidateQueries({ queryKey: ["milling"] });
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "خطأ غير متوقع"),
+    // P1-4: كل خطأ RPC يمر بطبقة الترجمة الموحدة قبل العرض.
+    onError: (err) => toast.error(translateRpcError(err, "ar", "تعذر تنفيذ الصرف.")),
   });
 
   const canSubmit = Boolean(warehouseId && lines.some((l) => l.itemId && Number(l.qty) > 0));

@@ -312,23 +312,15 @@ export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
       paperId,
       templateId,
       theme,
+      settings: unified,
       rtl: true,
       accentColor,
       // حتى ينعكس تفعيل/إلغاء الباركود و QR لهذا القسم فعلياً على المعاينة.
       showBarcode: override?.showBarcode ?? unified.showBarcode ?? true,
       showQrCode: override?.showQrCode ?? unified.showQrCode ?? true,
+      showSignatures: override?.showSignatures ?? unified.showSignatures ?? false,
     };
-  }, [
-    sampleDoc,
-    previewDocType,
-    previewTemplateOverride,
-    previewPaperOverride,
-    unified.overrides,
-    unified.showBarcode,
-    unified.showQrCode,
-    unified.standardAccentColor,
-    unified.luxuryAccentColor,
-  ]);
+  }, [sampleDoc, previewDocType, previewTemplateOverride, previewPaperOverride, unified]);
 
   return (
     <>
@@ -1449,6 +1441,21 @@ export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
                 </div>
               </div>
 
+              <div className="flex items-center justify-between gap-4 rounded-xl border border-border/70 bg-surface/60 p-3.5">
+                <div>
+                  <div className="text-xs font-semibold text-foreground">خانات التوقيع والختم</div>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    مخفية افتراضياً. عند تفعيلها تظهر في المعاينة والطباعة وملف PDF.
+                  </p>
+                </div>
+                <Switch
+                  checked={unified.showSignatures}
+                  onCheckedChange={(checked) => updateUnified({ showSignatures: checked })}
+                  disabled={!canEdit}
+                  aria-label="إظهار خانات التوقيع والختم"
+                />
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {(
                   [
@@ -1460,7 +1467,6 @@ export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
                     ["showFinancialDetails", "تفاصيل الضريبة والخصومات"],
                     ["showPaymentInfo", "طريقة السداد والمدفوع والمتبقي"],
                     ["showNotes", "الملاحظات والشروط وسياسة الإرجاع"],
-                    ["showSignatures", "خانات التوقيع والاعتماد والختم"],
                     ["showFooter", "الهامش السفلي وتذييل الفاتورة"],
                     ["showBarcode", "رمز الباركود للمستند (Barcode)"],
                     ["showQrCode", "رمز الاستجابة السريعة (QR Code)"],

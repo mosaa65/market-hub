@@ -17,8 +17,22 @@ import { PRINT_ADAPTER_META, getRegisteredPrintAdapters } from "../adapters";
 import { renderUnifiedDocument } from "../engine";
 import { renderStandardTemplate } from "@/lib/templates/standard";
 import { renderElegantTemplate } from "@/lib/templates/elegant";
+import {
+  renderThermalTemplate,
+  renderThermalQrTemplate,
+  renderThermalMillingTemplate,
+  renderMillingCleanTemplate,
+  renderMillingMasterTemplate,
+  renderMillingThermalTemplate,
+} from "@/lib/templates";
+import { formatPrintedDateTime } from "@/lib/templates/unified-layout";
 import { renderFormalTemplate } from "../formal";
-import { renderUniversalFooter, UNIVERSAL_FOOTER_CSS } from "../footer";
+import {
+  COMPANY_RIGHTS_TEXT,
+  renderInvoiceRightsFooter,
+  renderUniversalFooter,
+  UNIVERSAL_FOOTER_CSS,
+} from "../footer";
 import { DEFAULT_COMPANY_PROFILE, type CompanyProfile } from "../company-profile";
 import type { UnifiedDocumentData, InvoiceLabels } from "@/lib/templates";
 
@@ -147,8 +161,7 @@ check(
 
 const COMPANY: CompanyProfile = {
   name: "شركة الاختبار",
-  contacts: ["784795104", "772217218"],
-  footerContact: "784795104 · 772217218",
+  contacts: ["770000001"],
   address: "صنعاء",
   email: "test@example.com",
   logoUrl: "/inama-soft-logo.ico",
@@ -225,7 +238,42 @@ longDoc.lines = Array.from({ length: 40 }, (_, i) => ({
 }));
 const manyLinesHtml = renderStandardTemplate(longDoc, LABELS, true, { company: COMPANY });
 check("many lines render without truncation", (manyLinesHtml.match(/<tr>/g) ?? []).length >= 40);
-
+check(
+  "long invoice includes a line items summary row",
+  manyLinesHtml.includes('class="items-summary-row"'),
+);
+const fiftyLinesDoc = docFor("customer_invoice");
+fiftyLinesDoc.lines = Array.from({ length: 50 }, (_, index) => ({
+  product: `Product ${index + 1}`,
+  qty: 1,
+  unit: "each",
+  price: 10,
+  total: 10,
+}));
+const fiftyLinesHtml = renderStandardTemplate(fiftyLinesDoc, LABELS, true, { company: COMPANY });
+check("50 lines and one summary row render", (fiftyLinesHtml.match(/<tr>/g) ?? []).length === 51);
+check(
+  "50 line summary quantity and amount are aggregated",
+  fiftyLinesHtml.includes("50 each") && fiftyLinesHtml.includes("500.00"),
+);
+const fiftyOneLinesDoc = {
+  ...fiftyLinesDoc,
+  lines: [
+    ...fiftyLinesDoc.lines,
+    { product: "Product 51", qty: 1, unit: "each", price: 10, total: 10 },
+  ],
+};
+const fiftyOneLinesHtml = renderStandardTemplate(fiftyOneLinesDoc, LABELS, true, {
+  company: COMPANY,
+});
+check(
+  "51 line document keeps all rows and summary",
+  (fiftyOneLinesHtml.match(/<tr>/g) ?? []).length === 52,
+);
+check(
+  "printed date uses Latin digits and 24-hour Aden time",
+  formatPrintedDateTime("2026-10-20T13:05:00.000Z") === "20/10/2026 16:05",
+);
 /* Standard and luxury must share one layout — only colours differ. */
 const stdHtml = renderStandardTemplate(docFor("customer_invoice"), LABELS, true, {
   company: COMPANY,
@@ -312,28 +360,27 @@ check("engine routes formal theme to the formal template", engineFormal.includes
 /* ─────────────────────────── Company Profile ─────────────────────────── */
 
 check("default company profile has no invented tenant name", DEFAULT_COMPANY_PROFILE.name === "");
-check(
-  "default company profile exposes both support numbers",
-  DEFAULT_COMPANY_PROFILE.footerContact === "784795104 · 772217218",
-);
+check("default company profile invents no contacts", DEFAULT_COMPANY_PROFILE.contacts.length === 0);
 
 const footer = renderUniversalFooter(COMPANY, true);
-check("universal footer renders the company name", footer.includes("شركة الاختبار"));
-check("universal footer renders contact numbers", footer.includes("784795104"));
-check("universal footer renders the address", footer.includes("صنعاء"));
-check("universal footer renders the email", footer.includes("test@example.com"));
-check("universal footer declares rtl", footer.includes('dir="rtl"'));
-check(
-  "universal footer declares ltr when asked",
-  renderUniversalFooter(COMPANY, false).includes('dir="ltr"'),
-);
-check(
-  "universal footer css avoids page breaks",
-  UNIVERSAL_FOOTER_CSS.includes("break-inside:avoid"),
-);
+check("removed universal footer renders no content", footer === "");
+check("removed universal footer has no injected styles", UNIVERSAL_FOOTER_CSS === "");
 
 const noOwnerName = renderUniversalFooter(COMPANY, true);
 check("footer never contains the former owner name", !noOwnerName.includes("موسى العواضي"));
+
+function rightsOccurrences(html: string): number {
+  const text = html
+    .replace(/<[^>]*>/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text.split(COMPANY_RIGHTS_TEXT).length - 1;
+}
+
+check(
+  "rights helper contains the approved exact line",
+  rightsOccurrences(renderInvoiceRightsFooter()) === 1,
+);
 
 /* Company data must come from Company Profile, not a template constant. */
 const profileDrivenHtml = renderStandardTemplate(docFor("customer_invoice"), LABELS, true, {
@@ -348,7 +395,7 @@ check(
   !profileDrivenHtml.includes("طاحونتي"),
 );
 
-/* Footer presence across documents and formats */
+/* Legacy footer settings cannot reintroduce fixed footer output. */
 const FOOTER_MARKUP = '<footer class="universal-footer"';
 for (const paperId of ["a4", "a5", "thermal-58", "thermal-80"] as PrintPaperId[]) {
   const html = renderUnifiedDocument({
@@ -358,7 +405,7 @@ for (const paperId of ["a4", "a5", "thermal-58", "thermal-80"] as PrintPaperId[]
     paperId,
     settings: { ...DEFAULT_UNIFIED_PRINT_SETTINGS, footerEnabled: true, paperId },
   });
-  check(`footer present on ${paperId}`, html.includes(FOOTER_MARKUP));
+  check(`removed footer stays absent on ${paperId}`, !html.includes(FOOTER_MARKUP));
 }
 
 const footerOffHtml = renderUnifiedDocument({
@@ -367,13 +414,10 @@ const footerOffHtml = renderUnifiedDocument({
   rtl: true,
   settings: { ...DEFAULT_UNIFIED_PRINT_SETTINGS, footerEnabled: false },
 });
-check("footer can be disabled", !footerOffHtml.includes(FOOTER_MARKUP));
+check("legacy footer disabled remains absent", !footerOffHtml.includes(FOOTER_MARKUP));
 
-/* Multi-page documents must not let the footer cover content. */
-check(
-  "footer is pushed to the end of the document flow",
-  UNIVERSAL_FOOTER_CSS.includes("margin-top:auto"),
-);
+/* Multi-page layout is no longer constrained by a fixed footer. */
+check("removed footer adds no pagination styles", UNIVERSAL_FOOTER_CSS === "");
 
 /* ─────────────────────────── Color Customization Tests ─────────────────────────── */
 
@@ -461,7 +505,19 @@ check(
   "luxury template does not have fake simulated signature svgs",
   !luxHtml.includes("M10 32 C 30 10"),
 );
-check("luxury template has official stamp area", luxHtml.includes('class="stamp-box-area"'));
+check("luxury template hides signatures by default", !luxHtml.includes('class="stamp-box-area"'));
+const signaturesEnabledHtml = renderUnifiedDocument({
+  doc: { ...docFor("customer_invoice"), options: { showSignatures: true } },
+  documentType: "customer_invoice",
+  rtl: true,
+  paperId: "a4",
+  templateId: "elegant",
+  theme: "luxury",
+});
+check(
+  "luxury template shows signatures when explicitly enabled",
+  signaturesEnabledHtml.includes('class="stamp-box-area"'),
+);
 check(
   "standard template has compact high-density party ribbon",
   stdHtml.includes('class="party-info-compact-bar"'),
@@ -471,9 +527,25 @@ check(
   !stdHtml.includes('<header class="luxury-header-wrap">') &&
     stdHtml.includes('<header class="corporate-header-wrap">'),
 );
+check("document output omits legacy footer fields", !stdHtml.includes("footer-contact"));
 check(
-  "footer renders company phone when available",
-  stdHtml.includes("footer-contact") || stdHtml.includes("footer-company"),
+  "unified invoice renders the approved rights line exactly once",
+  rightsOccurrences(stdHtml) === 1 && stdHtml.includes("772217218 - 784795101"),
+);
+
+const invoiceTemplateOutputs = [
+  renderUnifiedDocument({ doc: docFor("customer_invoice"), templateId: "standard", paperId: "a4" }),
+  renderFormalTemplate(docFor("customer_invoice"), LABELS, true),
+  renderThermalTemplate(docFor("customer_invoice"), LABELS, true),
+  renderThermalQrTemplate(docFor("customer_invoice"), LABELS, true),
+  renderThermalMillingTemplate(docFor("customer_invoice"), LABELS, true),
+  renderMillingCleanTemplate(docFor("customer_invoice"), LABELS, true),
+  renderMillingMasterTemplate(docFor("customer_invoice"), LABELS, true),
+  renderMillingThermalTemplate(docFor("customer_invoice"), LABELS, true),
+];
+check(
+  "approved rights line appears exactly once in every invoice template",
+  invoiceTemplateOutputs.every((html) => rightsOccurrences(html) === 1),
 );
 if (failures.length > 0) {
   throw new Error(`Unified printing tests failed:\n - ${failures.join("\n - ")}`);

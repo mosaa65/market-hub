@@ -90,16 +90,31 @@ export function MillingField({
  * فلا حاجة بعد الآن لمعالج `onWheel → blur` الذي كان يقاطع التركيز.
  */
 export function MillingInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={cn(fieldBase, props.className)} />;
+  return (
+    <input
+      // Every milling field is part of the keyboard order unless a screen opts
+      // out — the counter works without a mouse (see form-navigation.ts).
+      data-form-nav=""
+      {...props}
+      className={cn(fieldBase, props.className)}
+    />
+  );
 }
 
 export function MillingSelect(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select {...props} className={cn(fieldBase, "appearance-none", props.className)} />;
+  return (
+    <select
+      data-form-nav=""
+      {...props}
+      className={cn(fieldBase, "appearance-none", props.className)}
+    />
+  );
 }
 
 export function MillingTextarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return (
     <textarea
+      data-form-nav=""
       {...props}
       className={cn(fieldBase, "h-auto min-h-20 py-2 leading-relaxed", props.className)}
     />

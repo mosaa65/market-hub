@@ -38,6 +38,7 @@ import { money } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import { PaymentMethodPicker } from "@/components/ui/payment-method";
 import { toLegacyPaymentValue } from "@/lib/payments/payment-methods";
+import { translateRpcError } from "@/lib/errors/rpc-errors";
 import { toast } from "sonner";
 
 /* ------------------------------------------------------------------ */
@@ -339,7 +340,7 @@ export function PurchaseFormSheet({
       onOpenChange(false);
       await onSaved();
     } catch (e: any) {
-      toast.error(e?.message ?? t("common.failed"));
+      toast.error(translateRpcError(e, isAr ? "ar" : "en", t("common.failed")));
     } finally {
       setSaving(false);
     }

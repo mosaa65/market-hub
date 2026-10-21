@@ -20,6 +20,7 @@ export async function connect() {
 }
 
 const isMain = process.argv[1] && import.meta.url.endsWith(process.argv[1].split(/[\\/]/).pop());
+// connect() قابل للاستيراد من سكربتات أخرى بلا تشغيل الكتلة أدناه.
 if (isMain) {
   const client = await connect();
   await client.connect();

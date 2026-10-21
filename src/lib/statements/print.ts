@@ -144,7 +144,6 @@ function renderFooter(
     email: profile.email || company.email || undefined,
     taxNumber: profile.taxNumber || company.taxNumber || undefined,
     logoUrl: profile.logoUrl || company.logoUrl || undefined,
-    footerContact: profile.footerContact || company.brand.phone,
   };
 
   const brandBlock = layout.showBrandFooter

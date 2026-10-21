@@ -10,8 +10,11 @@
  *   6. مراجعة واعتماد التسوية
  *
  * الفكرة: كل خطوة في Sheet/Drawer متجاوب، والفروقات تُعرض بوضوح قبل الاعتماد.
- * منطق الحفظ مطابق تمامًا لما كان في StockAdjustmentDialog:
- *   inventory upsert + stock_movements insert — بلا أي تغيير في الـ backend.
+ *
+ * الحفظ: نداء RPC واحد `post_stock_settlement` (46) يعتمد مستند التسوية ويحرّك
+ * المخزون **بكميته وقيمته** في معاملة واحدة عبر المحرّك. لا كتابة مباشرة على
+ * `inventory` أو `stock_movements` من المتصفح: تلك الكتابة لم تكن تُقيَّد
+ * (تنفصل الكمية عن التكلفة)، ولم تكن معاملة واحدة، ولم تكن مسموحة بعد 43.
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -46,6 +49,7 @@ import { useAuth } from "@/lib/auth";
 import { money } from "@/lib/format";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { translateRpcError } from "@/lib/errors/rpc-errors";
 
 type ProductItem = {
   id: string;
@@ -275,6 +279,9 @@ export function SettlementWizardSheet({
   const summary = useMemo(() => {
     const netQty = resolved.reduce((s, d) => s + d.diff, 0);
     const cost = Number(unitCost ?? 0);
+    // القيمة التقديرية للمعاينة فقط: التقييد الفعلي يقرأ تكلفة الطبقة الفعلية
+    // داخل post_stock_settlement، لا هذا الحقل. الرقم هنا قد يختلف عن الدفاتر
+    // عمدًا إن تغيّرت التكلفة — والدفاتر هي الصحيح.
     return {
       shortages: resolved.filter((d) => d.state === "shortage").length,
       surpluses: resolved.filter((d) => d.state === "surplus").length,
@@ -355,14 +362,21 @@ export function SettlementWizardSheet({
 
       toast.success(
         isAr
-          ? `تم اعتماد ${resolved.length} تسوية بنجاح`
-          : `${resolved.length} adjustment(s) posted successfully`,
+          ? `تم اعتماد تسوية ${resolved.length} صنف بنجاح`
+          : `Settlement posted for ${resolved.length} item(s)`,
       );
       reset();
       onOpenChange(false);
       onSaved();
     } catch (err: any) {
-      toast.error(err?.message ?? (isAr ? "فشل تنفيذ التسوية" : "Failed to post adjustment"));
+      // P1-4: ترجمة موحدة لأخطاء RPC قبل العرض.
+      toast.error(
+        translateRpcError(
+          err,
+          isAr ? "ar" : "en",
+          isAr ? "فشل تنفيذ التسوية" : "Failed to post adjustment",
+        ),
+      );
     } finally {
       setSaving(false);
     }
@@ -770,8 +784,12 @@ export function SettlementWizardSheet({
           </FormField>
 
           <FormField
-            label={isAr ? "تكلفة الوحدة للتسوية" : "Unit cost for adjustment"}
-            hint={isAr ? "تُستخدم في إثبات القيد المحاسبي." : "Used for the accounting entry."}
+            label={isAr ? "تكلفة الوحدة (تقديرية للمعاينة)" : "Unit cost (estimate for preview)"}
+            hint={
+              isAr
+                ? "للعرض فقط — القيد يُقيَّم بتكلفة المخزون الفعلية من طبقات التكلفة."
+                : "Preview only — the movement is valued from the actual cost layer."
+            }
           >
             {(p) => (
               <NumberInput

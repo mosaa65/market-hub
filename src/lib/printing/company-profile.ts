@@ -1,5 +1,4 @@
 import { supabase } from "@/integrations/supabase/client";
-import { SUPPORT_CONTACTS, SUPPORT_CONTACT_LINE } from "@/lib/company-credit";
 
 export interface CompanyProfile {
   name: string;
@@ -12,23 +11,18 @@ export interface CompanyProfile {
   email?: string;
   taxNumber?: string;
   logoUrl?: string;
-  footerText?: string;
-  footerContact?: string;
   currency?: string;
 }
 
 const CACHE_KEY = "company_settings_cache";
 /**
  * Fallback used only when `company_settings` has never been cached.
- * The app must never render a tenant name of its own, so `name` stays empty
- * and the required support contacts are the documented fallback numbers.
+ * The app must never render a tenant name or contact number of its own.
  */
 const DEFAULT_PROFILE: CompanyProfile = {
   name: "",
-  contacts: [...SUPPORT_CONTACTS],
-  footerText: "",
-  footerContact: SUPPORT_CONTACT_LINE,
-  logoUrl: "/vortex-erp-mark.png",
+  contacts: [],
+  logoUrl: "/vortex-erp-wordmark.png",
 };
 
 function fromRow(row: Record<string, unknown> | null | undefined): CompanyProfile {
@@ -37,10 +31,7 @@ function fromRow(row: Record<string, unknown> | null | undefined): CompanyProfil
     .split(/[,،\n]/)
     .map((v) => v.trim())
     .filter(Boolean);
-  // الرقمان المعتمدان للدعم — fallback موثق عند غياب أرقام المنشأة.
-  const contacts = Array.from(
-    new Set([phone, ...extra, ...DEFAULT_PROFILE.contacts].filter(Boolean)),
-  );
+  const contacts = Array.from(new Set([phone, ...extra].filter(Boolean)));
   return {
     name: String(row?.name ?? "").trim() || DEFAULT_PROFILE.name,
     arabicName: String(row?.name_ar ?? "").trim() || undefined,
@@ -52,12 +43,6 @@ function fromRow(row: Record<string, unknown> | null | undefined): CompanyProfil
     email: String(row?.email ?? "").trim() || undefined,
     taxNumber: String(row?.tax_number ?? "").trim() || undefined,
     logoUrl: String(row?.logo_url ?? "").trim() || DEFAULT_PROFILE.logoUrl,
-    footerText: String(row?.footer_text ?? "").trim() || undefined,
-    // إن غاب `footer_contact` نستخدم الرقمين المعتمدين — لا نتركه بلا فوتر.
-    footerContact:
-      String(row?.footer_contact ?? "").trim() ||
-      DEFAULT_PROFILE.footerContact ||
-      contacts.join(" · "),
     currency: String(row?.currency_symbol ?? row?.currency ?? "").trim() || undefined,
   };
 }
@@ -112,11 +97,7 @@ export function patchCompanyProfileCache(patch: Partial<CompanyProfile>): Compan
                 ? "name_en"
                 : key === "legalName"
                   ? "legal_name"
-                  : key === "footerText"
-                    ? "footer_text"
-                    : key === "footerContact"
-                      ? "footer_contact"
-                      : key;
+                  : key;
     rowPatch[column] = value;
   }
   return cacheCompanyProfile(rowPatch);
@@ -140,10 +121,3 @@ export async function loadCompanyProfile(): Promise<CompanyProfile> {
 }
 
 export const DEFAULT_COMPANY_PROFILE = DEFAULT_PROFILE;
-
-/**
- * الأرقام المعتمدة للمؤسسة — ثابتة ومحمية.
- * أي عرض لهذه الأرقام في الواجهات يجب أن يقرأها من هنا، لا أن يكرّر النص.
- */
-export const COMPANY_SUPPORT_CONTACTS: readonly string[] = SUPPORT_CONTACTS;
-export const COMPANY_SUPPORT_CONTACT_LINE = SUPPORT_CONTACT_LINE;

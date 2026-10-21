@@ -26,6 +26,7 @@ export const VortexTextInput = React.forwardRef<HTMLInputElement, VortexTextInpu
       clearable = false,
       onClear,
       hasError = false,
+      dir,
       value,
       onChange,
       disabled,
@@ -54,7 +55,7 @@ export const VortexTextInput = React.forwardRef<HTMLInputElement, VortexTextInpu
     };
 
     return (
-      <div className="relative flex w-full items-center">
+      <div dir={dir} className="relative flex w-full items-center">
         {startIcon && (
           <div className="pointer-events-none absolute start-3 flex items-center justify-center text-muted-foreground/70 transition-colors">
             {startIcon}
@@ -64,6 +65,7 @@ export const VortexTextInput = React.forwardRef<HTMLInputElement, VortexTextInpu
         <input
           ref={ref}
           type={effectiveType}
+          dir={dir}
           value={value}
           onChange={onChange}
           disabled={disabled}

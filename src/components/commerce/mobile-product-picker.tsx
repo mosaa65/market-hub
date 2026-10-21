@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
-import { Search, X, Plus } from "lucide-react";
+import { X, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SearchInput } from "@/components/ui/search-input";
+import { useI18n } from "@/lib/i18n";
 
 /**
  * MobileProductPicker — the on-demand product browser for phones.
@@ -51,6 +53,7 @@ export function MobileProductPicker({
   emptyLabel,
   inputRef,
 }: MobileProductPickerProps) {
+  const { lang } = useI18n();
   const fallbackRef = useRef<HTMLInputElement>(null);
   const ref = inputRef ?? fallbackRef;
 
@@ -91,34 +94,23 @@ export function MobileProductPicker({
 
       {/* Search */}
       <div className="shrink-0 px-4 py-3">
-        <div className="flex h-11 items-center gap-2 rounded-full border border-input/80 bg-surface px-4 shadow-2xs focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
-          <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <input
-            ref={ref}
-            value={search}
-            onChange={(e) => onSearchChange(e.target.value)}
-            onKeyDown={(e) => {
-              // A barcode scanner usually finishes with Enter. When search has
-              // narrowed to one result, Enter is the fastest safe add action.
-              if (e.key === "Enter" && products.length === 1 && !products[0].disabled) {
-                e.preventDefault();
-                onSelect(products[0].id);
-              }
-            }}
-            placeholder={searchPlaceholder}
-            className="w-full flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-          />
-          {search ? (
-            <button
-              type="button"
-              onClick={() => onSearchChange("")}
-              aria-label="clear"
-              className="rounded-full p-1 text-muted-foreground hover:bg-surface-2"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          ) : null}
-        </div>
+        <SearchInput
+          ref={ref}
+          value={search}
+          onValueChange={onSearchChange}
+          placeholder={searchPlaceholder}
+          clearLabel={lang === "ar" ? "مسح البحث" : "Clear search"}
+          searchLabel={searchPlaceholder}
+          size="lg"
+          onKeyDown={(event) => {
+            // A barcode scanner usually finishes with Enter. When search has
+            // narrowed to one result, Enter is the fastest safe add action.
+            if (event.key === "Enter" && products.length === 1 && !products[0].disabled) {
+              event.preventDefault();
+              onSelect(products[0].id);
+            }
+          }}
+        />
       </div>
 
       {/* Results */}

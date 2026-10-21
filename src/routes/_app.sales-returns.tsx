@@ -43,6 +43,7 @@ import { usePaymentMethodOverrides } from "@/hooks/use-payment-methods";
 import { Plus, Trash2, RotateCcw, Search, Loader2, Printer } from "lucide-react";
 import { LuxuryPrintPreviewModal } from "@/components/luxury-print-preview-modal";
 import type { UnifiedDocumentData } from "@/lib/templates";
+import { translateRpcError } from "@/lib/errors/rpc-errors";
 
 export const Route = createFileRoute("/_app/sales-returns")({
   head: () => ({ meta: [{ title: "مرتجعات المبيعات — Vortex ERP" }] }),
@@ -448,7 +449,8 @@ function NewSalesReturn({
       _items: lines as any,
     });
     if (error) {
-      toast.error(error.message);
+      // P1-4: رسالة واحدة مترجمة بدل نص PostgreSQL الإنجليزي.
+      toast.error(translateRpcError(error, lang === "ar" ? "ar" : "en"));
       return;
     }
     const returnId = typeof retData === "string" ? retData : (retData as any)?.id;

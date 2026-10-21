@@ -584,7 +584,10 @@ const ICON_REGISTRY: Record<string, LucideIcon> = {
 export const PAYMENT_METHOD_ICON_ASSETS = {
   floosak: { src: "/yemeni_wallet_icons_svg/floosak.svg", alt: "Floosak" },
   one_cash: { src: "/yemeni_wallet_icons_svg/one-cash.svg", alt: "One Cash" },
-  jaib: { src: "/yemeni_wallet_icons_svg/jaib.svg", alt: "Jaib" },
+  jaib: {
+    src: "/yemeni_wallet_icons_svg/%D8%B4%D8%B9%D8%A7%D8%B1-%D9%85%D8%AD%D9%81%D8%B7%D8%A9-%D8%AC%D9%8A%D8%A8.svg",
+    alt: "Jaib",
+  },
 } as const;
 
 export function paymentMethodIconAsset(methodId?: string | null) {

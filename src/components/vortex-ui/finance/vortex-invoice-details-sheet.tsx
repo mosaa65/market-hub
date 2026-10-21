@@ -306,9 +306,7 @@ export function VortexInvoiceDetailsSheet({
               </div>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
-              {renderStatusBadge()}
-            </div>
+            <div className="flex items-center gap-2 shrink-0">{renderStatusBadge()}</div>
           </div>
         </div>
 
@@ -363,8 +361,14 @@ export function VortexInvoiceDetailsSheet({
               <span className="text-[10px] text-muted-foreground block font-medium">
                 {isRtl ? "الخصم" : "Discount"}
               </span>
-              <span className={cn("font-mono font-bold", discount > 0 ? "text-emerald-500" : "text-muted-foreground")}>
-                {discount > 0 ? `-${toSystemDigits(formatSystemNumber(discount))}` : "٠"} {currencySymbol}
+              <span
+                className={cn(
+                  "font-mono font-bold",
+                  discount > 0 ? "text-emerald-500" : "text-muted-foreground",
+                )}
+              >
+                {discount > 0 ? `-${toSystemDigits(formatSystemNumber(discount))}` : "٠"}{" "}
+                {currencySymbol}
               </span>
             </div>
             <div>
@@ -383,7 +387,11 @@ export function VortexInvoiceDetailsSheet({
             <div className="rounded-2xl border border-border/70 bg-card p-4 space-y-2">
               <div className="flex items-center justify-between text-muted-foreground">
                 <span className="flex items-center gap-1.5 text-xs font-bold text-foreground">
-                  {isSale ? <User className="size-4 text-primary" /> : <Building2 className="size-4 text-primary" />}
+                  {isSale ? (
+                    <User className="size-4 text-primary" />
+                  ) : (
+                    <Building2 className="size-4 text-primary" />
+                  )}
                   {partyRole}
                 </span>
                 {partyPhone && (
@@ -409,7 +417,11 @@ export function VortexInvoiceDetailsSheet({
                       title={isRtl ? "نسخ الهاتف" : "Copy phone"}
                       className="p-1 rounded text-muted-foreground hover:text-foreground"
                     >
-                      {copiedPhone ? <Check className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
+                      {copiedPhone ? (
+                        <Check className="size-3.5 text-emerald-500" />
+                      ) : (
+                        <Copy className="size-3.5" />
+                      )}
                     </button>
                     {onWhatsApp && (
                       <button
@@ -472,7 +484,8 @@ export function VortexInvoiceDetailsSheet({
                 {isRtl ? "أصناف الفاتورة" : "Invoice Items"}
               </span>
               <span className="text-[11px] font-mono font-bold text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-md border border-border/50">
-                {toSystemDigits(items.length)} {isRtl ? "أصناف" : "items"} • {toSystemDigits(totalQuantity)} {isRtl ? "قطعة" : "units"}
+                {toSystemDigits(items.length)} {isRtl ? "أصناف" : "items"} •{" "}
+                {toSystemDigits(totalQuantity)} {isRtl ? "قطعة" : "units"}
               </span>
             </div>
 
@@ -482,10 +495,18 @@ export function VortexInvoiceDetailsSheet({
                   <thead className="bg-muted/40 border-b border-border/60 text-muted-foreground">
                     <tr>
                       <th className="px-3.5 py-2.5 text-start font-semibold w-8">#</th>
-                      <th className="px-3.5 py-2.5 text-start font-semibold">{isRtl ? "الصنف" : "Item"}</th>
-                      <th className="px-3.5 py-2.5 text-center font-semibold w-16">{isRtl ? "الكمية" : "Qty"}</th>
-                      <th className="px-3.5 py-2.5 text-end font-semibold w-24">{isRtl ? "السعر" : "Price"}</th>
-                      <th className="px-3.5 py-2.5 text-end font-semibold w-28">{isRtl ? "الإجمالي" : "Total"}</th>
+                      <th className="px-3.5 py-2.5 text-start font-semibold">
+                        {isRtl ? "الصنف" : "Item"}
+                      </th>
+                      <th className="px-3.5 py-2.5 text-center font-semibold w-16">
+                        {isRtl ? "الكمية" : "Qty"}
+                      </th>
+                      <th className="px-3.5 py-2.5 text-end font-semibold w-24">
+                        {isRtl ? "السعر" : "Price"}
+                      </th>
+                      <th className="px-3.5 py-2.5 text-end font-semibold w-28">
+                        {isRtl ? "الإجمالي" : "Total"}
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/40">
