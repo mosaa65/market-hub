@@ -12,7 +12,7 @@ import {
   ShieldCheck,
   TableProperties,
   Trash2,
-  X,
+  Settings2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
@@ -35,9 +35,13 @@ import { PrimaryAction } from "@/components/ui/primary-action";
 import { type DataTableColumn, type DataTableSort } from "@/components/ui/data-table";
 import { useBreakpoint } from "@/design/breakpoints";
 import { useRealtimeTable } from "@/lib/realtime";
+import { useBatchSettings } from "@/hooks/use-batch-settings";
+import { BatchSettingsDialog } from "@/components/batches/batch-settings-dialog";
+import { AddBatchDialog } from "@/components/batches/add-batch-dialog";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/_app/batches")({
-  head: () => ({ meta: [{ title: "Batches & Expiry — Vortex ERP" }] }),
+  head: () => ({ meta: [{ title: "الدفعات وتواريخ الصلاحية — Vortex ERP" }] }),
   component: () => (
     <ModuleGuard moduleId="batches">
       <BatchesPage />
@@ -61,6 +65,27 @@ type ViewMode = RecordsViewMode;
 type ExpiryState = "expired" | "soon" | "valid" | "none";
 type QuickFilter = "all" | ExpiryState;
 
+function formatQty(val: number | string | null | undefined): string {
+  if (val === null || val === undefined || val === "") return "0";
+  const num = typeof val === "number" ? val : parseFloat(String(val));
+  if (isNaN(num)) return "0";
+  return num % 1 === 0 ? num.toString() : num.toFixed(3).replace(/\.?0+$/, "");
+}
+
+function getLocalDateString(date: Date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function addDaysToDateString(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  date.setDate(date.getDate() + days);
+  return getLocalDateString(date);
+}
+
 function BatchesPage() {
   const { isModuleEnabled } = useModules();
   const hasMultiWarehouse = isModuleEnabled("multi_warehouse");
@@ -71,20 +96,20 @@ function BatchesPage() {
   const tableUsesHorizontalScroll =
     breakpoint === "xs" || breakpoint === "sm" || breakpoint === "md";
 
+  const { settings } = useBatchSettings();
+
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<FilterValues>({});
   const [sortKey, setSortKey] = useState<string>("expiry_asc");
   const [sort, setSort] = useState<DataTableSort | null>(null);
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
   const [viewMode, setViewMode] = usePersistedViewMode("batches", "cards");
-  const [open, setOpen] = useState(false);
+  const [openAddDialog, setOpenAddDialog] = useState(false);
+  const [openSettingsDialog, setOpenSettingsDialog] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
 
   /*
-   * Batches now flow through the shared QueryClient. The read is unchanged —
-   * same table, same joins, same 500-row cap and expiry ordering — but sign-out
-   * now drops it, Realtime can invalidate it, and a save/delete re-reads exactly
-   * this key instead of calling a local `load()`.
+   * Fetch batches without artificial 500 cap
    */
   const {
     data: rows = [],
@@ -98,8 +123,7 @@ function BatchesPage() {
       const { data, error } = await supabase
         .from("product_batches")
         .select("*, products(name,name_ar,sku), warehouses(name,name_ar)")
-        .order("expiry_date", { ascending: true, nullsFirst: false })
-        .limit(500);
+        .order("expiry_date", { ascending: true, nullsFirst: false });
       if (error) throw error;
       return (data ?? []) as Batch[];
     },
@@ -111,16 +135,14 @@ function BatchesPage() {
     qc,
   );
 
-  const today = useMemo(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d;
-  }, []);
-  const soon = useMemo(() => {
-    const d = new Date(today);
-    d.setDate(today.getDate() + 30);
-    return d;
-  }, [today]);
+  /*
+   * Pure Calendar Date comparison: Timezone-safe & handles current day as expired
+   */
+  const todayStr = useMemo(() => getLocalDateString(), []);
+  const soonLimitStr = useMemo(
+    () => addDaysToDateString(todayStr, settings.warning_days || 30),
+    [todayStr, settings.warning_days],
+  );
 
   const productLabel = useCallback(
     (r: Batch) =>
@@ -138,12 +160,12 @@ function BatchesPage() {
   const expiryState = useCallback(
     (exp: string | null): ExpiryState => {
       if (!exp) return "none";
-      const d = new Date(exp);
-      if (d < today) return "expired";
-      if (d < soon) return "soon";
+      const expStr = exp.slice(0, 10);
+      if (expStr <= todayStr) return "expired";
+      if (expStr <= soonLimitStr) return "soon";
       return "valid";
     },
-    [today, soon],
+    [todayStr, soonLimitStr],
   );
 
   const statusMeta = useCallback(
@@ -151,27 +173,27 @@ function BatchesPage() {
       switch (state) {
         case "expired":
           return {
-            label: t("batches.status.expired"),
+            label: isRtl ? "منتهي الصلاحية" : t("batches.status.expired"),
             cls: "bg-red-500/10 text-red-400 border-red-500/20",
           };
         case "soon":
           return {
-            label: t("batches.status.soon"),
+            label: isRtl ? "قريب الانتهاء" : t("batches.status.soon"),
             cls: "bg-amber-500/10 text-amber-400 border-amber-500/20",
           };
         case "valid":
           return {
-            label: t("batches.status.valid"),
+            label: isRtl ? "صالح للاستخدام" : t("batches.status.valid"),
             cls: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
           };
         default:
           return {
-            label: t("batches.status.none"),
+            label: isRtl ? "غير محدد" : t("batches.status.none"),
             cls: "bg-muted text-muted-foreground border-border",
           };
       }
     },
-    [t],
+    [t, isRtl],
   );
 
   /* ---------------- search + filter + quick chips ---------------- */
@@ -194,10 +216,10 @@ function BatchesPage() {
         label: isRtl ? "حالة الصلاحية" : "Expiry status",
         type: "select",
         options: [
-          { value: "valid", label: t("batches.status.valid") },
-          { value: "soon", label: t("batches.status.soon") },
-          { value: "expired", label: t("batches.status.expired") },
-          { value: "none", label: t("batches.status.none") },
+          { value: "valid", label: isRtl ? "صالح للاستخدام" : t("batches.status.valid") },
+          { value: "soon", label: isRtl ? "قريب الانتهاء" : t("batches.status.soon") },
+          { value: "expired", label: isRtl ? "منتهي الصلاحية" : t("batches.status.expired") },
+          { value: "none", label: isRtl ? "بدون تاريخ" : t("batches.status.none") },
         ],
       },
     ];
@@ -236,22 +258,53 @@ function BatchesPage() {
       if (filters.warehouse_id && r.warehouse_id !== filters.warehouse_id) return false;
       if (filters.expiry_date && typeof filters.expiry_date === "object") {
         if (!r.expiry_date) return false;
-        const t0 = new Date(r.expiry_date).getTime();
-        if (filters.expiry_date.from && t0 < new Date(filters.expiry_date.from).getTime())
+        const expStr = r.expiry_date.slice(0, 10);
+        if (filters.expiry_date.from && expStr < filters.expiry_date.from.slice(0, 10))
           return false;
-        if (filters.expiry_date.to) {
-          const to = new Date(filters.expiry_date.to);
-          to.setHours(23, 59, 59, 999);
-          if (t0 > to.getTime()) return false;
-        }
+        if (filters.expiry_date.to && expStr > filters.expiry_date.to.slice(0, 10)) return false;
       }
       if (quickFilter !== "all" && state !== quickFilter) return false;
       return true;
     });
   }, [searched, filters, quickFilter, expiryState]);
 
-  /* ---------------- KPI counts ---------------- */
+  /* ---------------- Precise DB KPIs or local aggregation ---------------- */
+  const { data: dbKpis } = useQuery({
+    queryKey: ["batch-kpis", settings.warning_days],
+    queryFn: async () => {
+      try {
+        const { data, error } = await supabase.rpc("get_batch_kpis" as any, {
+          p_warning_days: settings.warning_days || 30,
+        });
+        if (!error && data) {
+          return data as {
+            total: number;
+            expired: number;
+            soon: number;
+            valid: number;
+            none: number;
+            at_risk: number;
+          };
+        }
+      } catch {
+        // fallback
+      }
+      return null;
+    },
+    staleTime: 60_000,
+  });
+
   const counts = useMemo(() => {
+    if (dbKpis) {
+      return {
+        total: Number(dbKpis.total),
+        expired: Number(dbKpis.expired),
+        soon: Number(dbKpis.soon),
+        valid: Number(dbKpis.valid),
+        none: Number(dbKpis.none),
+        atRisk: Number(dbKpis.at_risk),
+      };
+    }
     let expired = 0;
     let soonCount = 0;
     let valid = 0;
@@ -271,8 +324,15 @@ function BatchesPage() {
           none++;
       }
     }
-    return { expired, soon: soonCount, valid, none, atRisk: expired + soonCount };
-  }, [rows, expiryState]);
+    return {
+      total: rows.length,
+      expired,
+      soon: soonCount,
+      valid,
+      none,
+      atRisk: expired + soonCount,
+    };
+  }, [dbKpis, rows, expiryState]);
 
   /* ---------------- sort ---------------- */
   const sortOptions: SortOption[] = useMemo(
@@ -300,7 +360,7 @@ function BatchesPage() {
         case "quantity":
           return list.sort((a, b) => (Number(a.quantity) - Number(b.quantity)) * dir);
         case "expiry":
-          return list.sort((a, b) => expiryTime(a) - expiryTime(b));
+          return list.sort((a, b) => (expiryTime(a) - expiryTime(b)) * dir);
         default:
           break;
       }
@@ -321,15 +381,25 @@ function BatchesPage() {
     }
   }, [filtered, sort, sortKey, productLabel, isRtl]);
 
-  /* ---------------- delete ---------------- */
+  /* ---------------- delete with inventory sync ---------------- */
   const remove = useMutation({
     mutationFn: async (id: string) => {
+      try {
+        const { error } = await supabase.rpc("delete_product_batch" as any, {
+          p_batch_id: id,
+          p_sync_inventory: settings.auto_sync_inventory,
+        });
+        if (!error) return;
+      } catch {
+        // Fallback
+      }
       const { error } = await supabase.from("product_batches").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success(t("common.deleted"));
+      toast.success(isRtl ? "تم حذف الدفعة بنجاح وتعديل المخزون" : t("common.deleted"));
       qc.invalidateQueries({ queryKey: ["batches"] });
+      qc.invalidateQueries({ queryKey: ["batch-kpis"] });
       qc.invalidateQueries({ queryKey: ["inventory"] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -338,11 +408,16 @@ function BatchesPage() {
   const removeRow = useCallback(
     (id: string) => {
       if (deleting) return;
-      if (!confirm(t("common.confirm_delete"))) return;
+      if (
+        !confirm(
+          isRtl ? "هل أنت متأكد من حذف هذه الدفعة وتحديث المخزون؟" : t("common.confirm_delete"),
+        )
+      )
+        return;
       setDeleting(id);
       remove.mutate(id, { onSettled: () => setDeleting(null) });
     },
-    [deleting, remove, t],
+    [deleting, remove, t, isRtl],
   );
 
   /* ---------------- classic table columns ---------------- */
@@ -354,7 +429,9 @@ function BatchesPage() {
         sortable: true,
         width: "w-[150px]",
         sortValue: (r) => r.batch_number,
-        cell: (r) => <span className="font-mono text-xs">{r.batch_number}</span>,
+        cell: (r) => (
+          <span className="font-mono text-xs font-bold text-foreground">{r.batch_number}</span>
+        ),
       },
       {
         key: "product",
@@ -364,7 +441,7 @@ function BatchesPage() {
         sortValue: (r) => productLabel(r) ?? "",
         cell: (r) => (
           <div className="py-0.5">
-            <div className="truncate text-foreground">{productLabel(r) ?? "—"}</div>
+            <div className="truncate font-medium text-foreground">{productLabel(r) ?? "—"}</div>
             {r.products?.sku && (
               <div className="font-mono text-[11px] text-muted-foreground">{r.products.sku}</div>
             )}
@@ -388,7 +465,11 @@ function BatchesPage() {
         align: "end",
         width: "w-[110px]",
         sortValue: (r) => Number(r.quantity),
-        cell: (r) => <span className="font-mono text-xs tabular-nums">{r.quantity}</span>,
+        cell: (r) => (
+          <span className="font-mono text-xs font-semibold tabular-nums">
+            {formatQty(r.quantity)}
+          </span>
+        ),
       },
       {
         key: "expiry",
@@ -408,7 +489,7 @@ function BatchesPage() {
           const meta = statusMeta(expiryState(r.expiry_date));
           return (
             <span
-              className={`inline-flex whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] ${meta.cls}`}
+              className={`inline-flex whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-semibold ${meta.cls}`}
             >
               {meta.label}
             </span>
@@ -464,14 +545,21 @@ function BatchesPage() {
 
   return (
     <div className="space-y-4 pb-12">
-      <PageHeader title={t("batches.title")} subtitle={t("batches.subtitle")} />
+      <PageHeader
+        title={isRtl ? "الدفعات وتواريخ الصلاحية" : t("batches.title")}
+        subtitle={
+          isRtl
+            ? "إدارة وتتبع تشغيلات المنتجات، وتواريخ الانتهاء، وسياسات الصرف"
+            : t("batches.subtitle")
+        }
+      />
 
       {counts.atRisk > 0 && (
         <div className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/5 px-3.5 py-2.5 text-sm text-amber-500">
           <AlertTriangle className="h-4 w-4 shrink-0" />
           {isRtl
-            ? `${counts.atRisk} دفعة قريبة الانتهاء أو منتهية`
-            : `${counts.atRisk} batch(es) expired or expiring within 30 days`}
+            ? `${counts.atRisk} دفعة منتهية أو قريبة الانتهاء خلال ${settings.warning_days || 30} يوماً`
+            : `${counts.atRisk} batch(es) expired or expiring within ${settings.warning_days || 30} days`}
         </div>
       )}
 
@@ -479,33 +567,37 @@ function BatchesPage() {
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <VortexMetricCard
           title={isRtl ? "إجمالي الدفعات" : "Total batches"}
-          value={rows.length}
-          subtitle={isRtl ? "المحمّلة حالياً" : "Currently loaded"}
+          value={counts.total}
+          subtitle={isRtl ? "إجمالي السجلات المسجلة" : "Total in system"}
           icon={<CalendarClock className="size-5" />}
           tone="info"
         />
         <VortexMetricCard
-          title={t("batches.status.valid")}
+          title={isRtl ? "صالح للاستخدام" : t("batches.status.valid")}
           value={counts.valid}
-          subtitle={isRtl ? "صالح للاستخدام" : "Safe to use"}
+          subtitle={isRtl ? "آمن للصرف والبيع" : "Safe to use"}
           icon={<ShieldCheck className="size-5" />}
           tone="success"
           highlight={quickFilter === "valid"}
           onClick={() => setQuickFilter("valid")}
         />
         <VortexMetricCard
-          title={t("batches.status.soon")}
+          title={isRtl ? "قريب الانتهاء" : t("batches.status.soon")}
           value={counts.soon}
-          subtitle={isRtl ? "خلال 30 يوماً" : "Within 30 days"}
+          subtitle={
+            isRtl
+              ? `خلال ${settings.warning_days || 30} يوماً`
+              : `Within ${settings.warning_days || 30} days`
+          }
           icon={<AlertTriangle className="size-5" />}
           tone="warning"
           highlight={quickFilter === "soon"}
           onClick={() => setQuickFilter("soon")}
         />
         <VortexMetricCard
-          title={t("batches.status.expired")}
+          title={isRtl ? "منتهي الصلاحية" : t("batches.status.expired")}
           value={counts.expired}
-          subtitle={isRtl ? "تجاوزت الصلاحية" : "Past expiry"}
+          subtitle={isRtl ? "محظور من البيع" : "Past expiry"}
           icon={<PackageX className="size-5" />}
           tone="danger"
           highlight={quickFilter === "expired"}
@@ -536,24 +628,46 @@ function BatchesPage() {
         }}
         viewToggle={<RecordsViewToggle value={viewMode} onChange={setViewMode} />}
         action={
-          <PrimaryAction
-            label={t("batches.new")}
-            icon={<Plus />}
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setOpenSettingsDialog(true)}
+              className="h-9 gap-1.5 text-xs font-semibold"
+            >
+              <Settings2 className="size-4 text-muted-foreground" />
+              <span>{isRtl ? "إعدادات الدفعات" : "Batch Settings"}</span>
+            </Button>
 
-            onClick={() => setOpen(true)}
-          />
+            <PrimaryAction
+              label={t("batches.new")}
+              icon={<Plus />}
+              onClick={() => setOpenAddDialog(true)}
+            />
+          </div>
         }
       >
         <QuickFilterBar
           value={quickFilter}
           onChange={(id) => setQuickFilter(id as QuickFilter)}
           items={[
-            { id: "all", label: isRtl ? "الكل" : "All", count: rows.length, tone: "primary" },
-            { id: "valid", label: t("batches.status.valid"), count: counts.valid, tone: "success" },
-            { id: "soon", label: t("batches.status.soon"), count: counts.soon, tone: "warning" },
+            { id: "all", label: isRtl ? "الكل" : "All", count: counts.total, tone: "primary" },
+            {
+              id: "valid",
+              label: isRtl ? "صالح" : t("batches.status.valid"),
+              count: counts.valid,
+              tone: "success",
+            },
+            {
+              id: "soon",
+              label: isRtl ? "قريب الانتهاء" : t("batches.status.soon"),
+              count: counts.soon,
+              tone: "warning",
+            },
             {
               id: "expired",
-              label: t("batches.status.expired"),
+              label: isRtl ? "منتهي" : t("batches.status.expired"),
               count: counts.expired,
               tone: "danger",
             },
@@ -561,7 +675,7 @@ function BatchesPage() {
         />
       </TableToolbar>
 
-      {/* ─── Records: cards / list / classic table — shared scaffold ─── */}
+      {/* ─── Records: cards / list / classic table ─── */}
       <RecordsView<Batch>
         rows={sortedRows}
         getRowId={(r) => r.id}
@@ -594,7 +708,7 @@ function BatchesPage() {
           action: (
             <button
               type="button"
-              onClick={() => setOpen(true)}
+              onClick={() => setOpenAddDialog(true)}
               className="mt-2 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-xs font-bold text-primary-foreground shadow-sm transition hover:bg-primary/90 active:scale-95"
             >
               <Plus className="size-4" />
@@ -604,16 +718,20 @@ function BatchesPage() {
         }}
       />
 
-      {open && (
-        <NewBatchModal
-          onClose={() => setOpen(false)}
-          onSaved={() => {
-            setOpen(false);
-            qc.invalidateQueries({ queryKey: ["batches"] });
-          }}
-          hasMultiWarehouse={hasMultiWarehouse}
-        />
-      )}
+      {/* Upgraded Add Batch Dialog */}
+      <AddBatchDialog
+        open={openAddDialog}
+        onOpenChange={setOpenAddDialog}
+        onSaved={() => {
+          qc.invalidateQueries({ queryKey: ["batches"] });
+          qc.invalidateQueries({ queryKey: ["batch-kpis"] });
+          qc.invalidateQueries({ queryKey: ["inventory"] });
+        }}
+        hasMultiWarehouse={hasMultiWarehouse}
+      />
+
+      {/* Batch Settings Dialog */}
+      <BatchSettingsDialog open={openSettingsDialog} onOpenChange={setOpenSettingsDialog} />
     </div>
   );
 }
@@ -698,37 +816,41 @@ function BatchCard({
             {r.batch_number}
           </span>
           <div className="truncate text-[11px] text-muted-foreground">{productLabel(r) ?? "—"}</div>
-          <span
-            className={`mt-1 inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-[9px] font-bold ${meta.cls}`}
-          >
-            <span className={`size-1.5 rounded-full ${barClass}`} />
-            {meta.label}
-          </span>
+          {r.products?.sku && (
+            <span className="font-mono text-[10px] text-muted-foreground/75">{r.products.sku}</span>
+          )}
         </div>
+        <span
+          className={`shrink-0 whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-semibold ${meta.cls}`}
+        >
+          {meta.label}
+        </span>
       </div>
 
-      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
-        <span className="inline-flex items-center gap-1 font-mono">
-          {isRtl ? "الكمية:" : "Qty:"} {r.quantity}
-        </span>
-        <span className="inline-flex items-center gap-1 font-mono">
-          {isRtl ? "الانتهاء:" : "Expiry:"} {r.expiry_date ?? "—"}
-        </span>
-        {hasMultiWarehouse && (
-          <span className="col-span-2 truncate">
-            {isRtl ? "المستودع: " : "Warehouse: "}
-            {warehouseLabel(r) ?? "—"}
-          </span>
-        )}
-      </div>
+      <div className="mt-4 flex items-center justify-between border-t border-border/60 pt-3 text-xs">
+        <div className="min-w-0 flex-1 space-y-0.5">
+          <div className="flex items-center gap-1.5 text-muted-foreground">
+            <span>{isRtl ? "الكمية:" : "Qty:"}</span>
+            <span className="font-mono font-bold text-foreground">{formatQty(r.quantity)}</span>
+          </div>
+          {hasMultiWarehouse && r.warehouses && (
+            <div className="truncate text-[10px] text-muted-foreground">{warehouseLabel(r)}</div>
+          )}
+        </div>
 
-      <div className="mt-3 flex items-center justify-end border-t border-border/60 pt-2.5">
-        <BatchRowActions
-          row={r}
-          onDelete={onDelete}
-          deleting={deleting}
-          deleteLabel={deleteLabel}
-        />
+        <div className="flex items-center gap-2">
+          <div className="text-end">
+            <div className="font-mono text-[11px] text-muted-foreground">
+              {r.expiry_date ?? "—"}
+            </div>
+          </div>
+          <BatchRowActions
+            row={r}
+            onDelete={onDelete}
+            deleting={deleting}
+            deleteLabel={deleteLabel}
+          />
+        </div>
       </div>
     </div>
   );
@@ -747,50 +869,36 @@ function BatchListRow({
   deleteLabel,
 }: BatchRendererProps) {
   const meta = statusMeta(state);
-  const barClass =
-    state === "expired"
-      ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.45)]"
-      : state === "soon"
-        ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]"
-        : state === "valid"
-          ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]"
-          : "bg-muted-foreground/30";
 
   return (
-    <div className="card-mullak group relative flex flex-col justify-between gap-3 rounded-2xl border p-3.5 transition-all duration-200 hover:border-primary/50 hover:shadow-md sm:p-4 md:flex-row md:items-center">
+    <div className="card-mullak group flex items-center justify-between gap-3 rounded-xl p-3 transition hover:shadow-sm">
       <div className="flex min-w-0 flex-1 items-center gap-3">
-        <span aria-hidden className={`h-11 w-1.5 shrink-0 rounded-full sm:h-12 ${barClass}`} />
-        <div className="grid size-11 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-primary transition-all group-hover:scale-105 group-hover:bg-primary group-hover:text-primary-foreground">
-          <CalendarClock className="size-5" />
+        <div className="grid size-9 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
+          <CalendarClock className="size-4" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h4 className="truncate font-mono text-sm font-bold leading-snug text-foreground">
-              {r.batch_number}
-            </h4>
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-xs font-bold text-foreground">{r.batch_number}</span>
             <span
-              className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-[9px] font-bold ${meta.cls}`}
+              className={`rounded-full border px-1.5 py-0.2 text-[9px] font-semibold ${meta.cls}`}
             >
               {meta.label}
             </span>
           </div>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+          <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
             <span className="truncate">{productLabel(r) ?? "—"}</span>
-            {hasMultiWarehouse && <span className="truncate">— {warehouseLabel(r) ?? "—"}</span>}
+            {r.products?.sku && <span className="font-mono text-[10px]">({r.products.sku})</span>}
+            {hasMultiWarehouse && r.warehouses && (
+              <span className="truncate text-[10px]">· {warehouseLabel(r)}</span>
+            )}
           </div>
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-4 border-t border-border/50 pt-2 ps-4 text-xs md:border-t-0 md:pt-0">
+      <div className="flex shrink-0 items-center gap-4">
         <div className="text-end">
-          <p className="font-mono text-base font-bold tracking-tight text-foreground">
-            {r.quantity}
-          </p>
-          <p className="text-[10px] text-muted-foreground">{isRtl ? "الكمية" : "Qty"}</p>
-        </div>
-        <div className="text-end">
-          <p className="font-mono text-[11px] text-muted-foreground">{r.expiry_date ?? "—"}</p>
-          <p className="text-[10px] text-muted-foreground">{isRtl ? "الانتهاء" : "Expiry"}</p>
+          <div className="font-mono text-xs font-bold text-foreground">{formatQty(r.quantity)}</div>
+          <div className="font-mono text-[10px] text-muted-foreground">{r.expiry_date ?? "—"}</div>
         </div>
         <BatchRowActions
           row={r}
@@ -799,156 +907,6 @@ function BatchListRow({
           deleteLabel={deleteLabel}
         />
       </div>
-    </div>
-  );
-}
-
-function NewBatchModal({
-  onClose,
-  onSaved,
-  hasMultiWarehouse,
-}: {
-  onClose: () => void;
-  onSaved: () => void;
-  hasMultiWarehouse?: boolean;
-}) {
-  const { lang, t } = useI18n();
-  const [products, setProducts] = useState<any[]>([]);
-  const [warehouses, setWarehouses] = useState<any[]>([]);
-  const [form, setForm] = useState({
-    product_id: "",
-    warehouse_id: "",
-    batch_number: "",
-    expiry_date: "",
-    quantity: 0,
-    unit_cost: 0,
-  });
-
-  useEffect(() => {
-    Promise.all([
-      supabase
-        .from("products")
-        .select("id,name,name_ar,sku")
-        .eq("is_active", true)
-        .order("name")
-        .limit(500),
-      supabase.from("warehouses").select("id,name,name_ar").eq("is_active", true).order("name"),
-    ]).then(([p, w]) => {
-      setProducts(p.data ?? []);
-      setWarehouses(w.data ?? []);
-      if (w.data?.[0]) setForm((f) => ({ ...f, warehouse_id: f.warehouse_id || w.data[0].id }));
-    });
-  }, []);
-
-  async function save() {
-    if (!form.product_id || !form.warehouse_id || !form.batch_number) {
-      toast.error(t("common.fill_form"));
-      return;
-    }
-    const { error } = await supabase
-      .from("product_batches")
-      .insert({ ...form, expiry_date: form.expiry_date || null });
-    if (error) return toast.error(error.message);
-    toast.success(t("common.saved") || t("common.success"));
-    onSaved();
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur-sm p-4">
-      <div className="panel-elevated w-full max-w-md p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-semibold">{lang === "ar" ? "دفعة جديدة" : "New batch"}</h3>
-          <button onClick={onClose} className="rounded p-1 hover:bg-surface-2">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="space-y-3">
-          <Field label={lang === "ar" ? "المنتج" : "Product"}>
-            <select
-              value={form.product_id}
-              onChange={(e) => setForm({ ...form, product_id: e.target.value })}
-              className="h-9 w-full rounded-md border border-input bg-surface px-3 text-sm"
-            >
-              <option value="">{lang === "ar" ? "اختر..." : "Select..."}</option>
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {lang === "ar" ? p.name_ar || p.name : p.name || p.name_ar}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label={lang === "ar" ? "المستودع" : "Warehouse"}>
-            <select
-              value={form.warehouse_id}
-              onChange={(e) => setForm({ ...form, warehouse_id: e.target.value })}
-              className="h-9 w-full rounded-md border border-input bg-surface px-3 text-sm"
-            >
-              <option value="">{lang === "ar" ? "اختر..." : "Select..."}</option>
-              {warehouses.map((w) => (
-                <option key={w.id} value={w.id}>
-                  {lang === "ar" ? w.name_ar || w.name : w.name || w.name_ar}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label={lang === "ar" ? "رقم الدفعة" : "Batch #"}>
-              <input
-                value={form.batch_number}
-                onChange={(e) => setForm({ ...form, batch_number: e.target.value })}
-                className="h-9 w-full rounded-md border border-input bg-surface px-3 text-sm"
-              />
-            </Field>
-            <Field label={lang === "ar" ? "تاريخ الانتهاء" : "Expiry"}>
-              <input
-                type="date"
-                value={form.expiry_date}
-                onChange={(e) => setForm({ ...form, expiry_date: e.target.value })}
-                className="h-9 w-full rounded-md border border-input bg-surface px-3 text-sm"
-              />
-            </Field>
-            <Field label={lang === "ar" ? "الكمية" : "Quantity"}>
-              <input
-                type="number"
-                value={form.quantity}
-                onChange={(e) => setForm({ ...form, quantity: Number(e.target.value) })}
-                className="h-9 w-full rounded-md border border-input bg-surface px-3 text-sm"
-              />
-            </Field>
-            <Field label={lang === "ar" ? "تكلفة الوحدة" : "Unit cost"}>
-              <input
-                type="number"
-                value={form.unit_cost}
-                onChange={(e) => setForm({ ...form, unit_cost: Number(e.target.value) })}
-                className="h-9 w-full rounded-md border border-input bg-surface px-3 text-sm"
-              />
-            </Field>
-          </div>
-        </div>
-        <div className="mt-5 flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            className="h-9 rounded-md border border-border px-4 text-sm hover:bg-surface-2"
-          >
-            {t("common.cancel")}
-          </button>
-          <button
-            onClick={save}
-            className="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90"
-          >
-            {t("common.save")}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="mb-1.5 block text-xs font-medium text-muted-foreground">{label}</label>
-      {children}
     </div>
   );
 }

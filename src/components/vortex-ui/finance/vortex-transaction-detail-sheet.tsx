@@ -11,6 +11,7 @@ import {
   Send,
   Copy,
   Check,
+  Landmark,
 } from "lucide-react";
 import { VortexDrawerDialog } from "../form/vortex-drawer-dialog";
 import { VortexDateBadge } from "../display/vortex-date-badge";
@@ -29,6 +30,8 @@ export interface VortexTransaction {
   method?: string;
   notes?: string;
   remainingBalance?: number;
+  cashboxName?: string | null;
+  bankAccountName?: string | null;
 }
 
 export interface VortexTransactionDetailSheetProps {
@@ -54,7 +57,7 @@ export function VortexTransactionDetailContent({
 المبلغ: ${formatSystemNumber(transaction.amount, { currency: currencySymbol })}
 رقم المرجع: #${transaction.referenceNumber || transaction.id.slice(-6)}
 التاريخ: ${transaction.date}
-${transaction.remainingBalance !== undefined ? `المتبقي في الحساب: ${formatSystemNumber(transaction.remainingBalance, { currency: currencySymbol })}` : ""}
+${transaction.cashboxName || transaction.bankAccountName ? `الجهة/الوعاء: ${transaction.cashboxName || transaction.bankAccountName}\n` : ""}${transaction.remainingBalance !== undefined ? `المتبقي في الحساب: ${formatSystemNumber(transaction.remainingBalance, { currency: currencySymbol })}` : ""}
 شاكرين لكم ومقدرين حسن تعاونكم.`;
   };
 
@@ -104,6 +107,17 @@ ${transaction.remainingBalance !== undefined ? `المتبقي في الحساب
           </span>
           <span className="font-bold text-foreground">{transaction.method || "نقداً (كاش)"}</span>
         </div>
+
+        {(transaction.cashboxName || transaction.bankAccountName) && (
+          <div className="flex items-center justify-between text-xs pb-2 border-b border-border/50">
+            <span className="text-muted-foreground flex items-center gap-1.5 font-bold">
+              <Landmark className="size-3.5 text-primary" /> الحساب المالي / الخزينة:
+            </span>
+            <span className="font-bold text-foreground">
+              {transaction.cashboxName || transaction.bankAccountName}
+            </span>
+          </div>
+        )}
 
         {transaction.remainingBalance !== undefined && (
           <div className="flex items-center justify-between text-xs pb-2 border-b border-border/50">

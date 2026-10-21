@@ -60,7 +60,10 @@ export function QuantityStepper({
 
   const hClass = size === "md" ? "h-8" : "h-7";
   const btnClass = size === "md" ? "h-8 w-7" : "h-7 w-6";
-  const inputClass = size === "md" ? "w-10 text-xs sm:text-sm" : "w-8 text-xs";
+  // عرض الحقل يتمدد مع عدد أرقام الكمية (يبدأ من مقاس الكتلة المدمجة) فلا يُقصّ
+  // الرقم في المنتصف ولا يتضخم الحقل لكمية من خانة واحدة.
+  const digitCount = text.replace(/[^0-9]/g, "").length;
+  const widthCh = Math.min(Math.max(digitCount + 1, 2), 7);
 
   return (
     <div
@@ -106,9 +109,10 @@ export function QuantityStepper({
           }
         }}
         className={cn(
-          inputClass,
-          "h-full bg-transparent text-center font-mono font-bold tabular-nums text-foreground outline-none [unicode-bidi:plaintext] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
+          "h-full min-w-0 shrink-0 bg-transparent text-center font-mono font-bold tabular-nums text-foreground outline-none [unicode-bidi:plaintext] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
+          size === "md" ? "text-xs sm:text-sm" : "text-xs",
         )}
+        style={{ width: `${widthCh + 0.5}ch` }}
       />
 
       <button

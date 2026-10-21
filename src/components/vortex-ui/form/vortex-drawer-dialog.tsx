@@ -184,7 +184,7 @@ export function VortexDrawerDialog({
             <div className="flex shrink-0 items-center justify-between border-b border-border/40 px-5 pb-3">
               <div className="flex items-center gap-2.5">
                 {icon && (
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-full border border-border bg-primary/10 text-primary">
+                  <div className="flex size-9 shrink-0 aspect-square items-center justify-center rounded-full border border-border/80 bg-primary/10 text-primary">
                     {icon}
                   </div>
                 )}

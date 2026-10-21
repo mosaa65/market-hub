@@ -8,6 +8,7 @@ import { money } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { QuantityInput } from "@/components/ui/quantity-input";
 import { Label } from "@/components/ui/label";
 import {
   Table,
@@ -347,11 +348,13 @@ function FiscalPeriodsPage() {
           </DialogHeader>
           <div className="space-y-2">
             <Label htmlFor="fiscal-year-input">السنة</Label>
-            <Input
+            <QuantityInput
               id="fiscal-year-input"
-              type="number"
-              value={openYearValue}
-              onChange={(e) => setOpenYearValue(e.target.value)}
+              decimals={0}
+              min={2000}
+              max={2100}
+              value={openYearValue === "" ? null : Number(openYearValue)}
+              onValueChange={(v) => setOpenYearValue(v == null ? "" : String(v))}
               placeholder="مثال: 2027"
             />
           </div>

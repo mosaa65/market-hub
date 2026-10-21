@@ -1,6 +1,6 @@
 import { PrimaryAction } from "@/components/ui/primary-action";
 import { ModuleGuard } from "@/lib/modules";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -16,6 +16,7 @@ import {
   PackageCheck,
   TrendingDown,
   Lock,
+  Receipt,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
@@ -783,8 +784,26 @@ function SupplierRowActions({
   SupplierRendererProps,
   "supplier" | "onEdit" | "onDelete" | "deleting" | "whatsAppMessage" | "editLabel" | "deleteLabel"
 >) {
+  const navigate = useNavigate();
+  const { lang } = useI18n();
+  const isAr = lang === "ar";
+
   return (
     <div className="flex shrink-0 items-center gap-1" onClick={(event) => event.stopPropagation()}>
+      <IconButton
+        size="sm"
+        variant="outline"
+        tooltip
+        ariaLabel={isAr ? "دفتر أستاذ المورد وسندات الصرف" : "Supplier Ledger & Vouchers"}
+        icon={<Receipt className="size-3.5 text-primary" />}
+        round
+        onClick={() => {
+          void (navigate as any)({
+            to: "/_app/supplier-ledger",
+            search: { supplierId: supplier.id },
+          });
+        }}
+      />
       <span className="shrink-0">
         <WhatsAppButton phone={supplier.phone} message={whatsAppMessage} />
       </span>

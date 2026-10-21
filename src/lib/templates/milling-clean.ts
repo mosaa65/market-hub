@@ -44,7 +44,8 @@ export function renderMillingCleanTemplate(
     ...doc.options,
   };
 
-  const companyName = doc.company?.arabicName || doc.company?.name || company.arabicName || company.name || "";
+  const companyName =
+    doc.company?.arabicName || doc.company?.name || company.arabicName || company.name || "";
   const englishName = doc.company?.englishName || company.englishName || "";
   const companyAddress = doc.company?.address || company.address || "";
   const companyPhone = doc.company?.phone || company.phone || "";

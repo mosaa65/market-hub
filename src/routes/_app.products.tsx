@@ -44,6 +44,7 @@ import {
   SlidersHorizontal,
   X,
   Copy,
+  ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
@@ -57,6 +58,13 @@ import {
 } from "@/lib/safety";
 import { fuzzySearch, buildSearchIndex } from "@/design/fuzzy";
 import { getCompanyCurrencySymbol, moneyCell, qtyCell } from "@/lib/format";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { NumberInput, fieldSurfaceClass } from "@/components/ui/input";
@@ -1788,58 +1796,145 @@ function ProductsPage() {
         </div>
       )}
 
-      {/* ─── Luxury Product Detail Sheet (Drawer) ─── */}
-      {selectedProductDetail && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-end bg-black/65 backdrop-blur-xs animate-in fade-in duration-200"
-          onClick={() => setSelectedProductDetail(null)}
+      {/* ─── Luxury Product Detail Sheet (Matching Audit & Users Sheet Style) ─── */}
+      <Sheet
+        open={Boolean(selectedProductDetail)}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setSelectedProductDetail(null);
+        }}
+      >
+        <SheetContent
+          side="left"
+          className="w-full sm:max-w-xl md:max-w-2xl p-0 flex flex-col h-full bg-background/95 backdrop-blur-xl border-s border-border/80 shadow-2xl overflow-hidden"
+          dir={lang === "ar" ? "rtl" : "ltr"}
         >
-          <div
-            className="h-full w-full max-w-lg border-s border-border/80 bg-background/95 backdrop-blur-md p-6 shadow-2xl overflow-y-auto animate-in slide-in-from-left duration-200"
-            onClick={(e) => e.stopPropagation()}
-            dir={lang === "ar" ? "rtl" : "ltr"}
-          >
-            {/* Ambient decorative blur */}
-            <div className="absolute -top-10 -right-10 size-40 rounded-full bg-primary/20 blur-3xl pointer-events-none" />
+          {selectedProductDetail && (
+            <>
+              {/* Ambient top glow */}
+              <div className="absolute -top-12 -right-12 size-48 rounded-full bg-primary/15 blur-3xl pointer-events-none" />
 
-            {/* Header */}
-            <div className="flex items-start justify-between pb-4 border-b border-border/60">
-              <div className="flex items-center gap-3.5">
-                <div className="grid size-14 place-items-center rounded-2xl bg-primary/10 text-primary font-bold text-xl border border-primary/20 shadow-sm">
-                  <Package className="size-6 text-primary" />
+              {/* ─── Header: Matching Audit, Users & Customer Details ─── */}
+              <div className="shrink-0 p-5 sm:p-6 border-b border-border/60 bg-muted/20">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3.5 min-w-0">
+                    <div className="grid size-13 shrink-0 place-items-center rounded-2xl border border-primary/25 bg-primary/10 text-primary shadow-xs">
+                      <Package className="size-6 stroke-[2.2]" />
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <SheetTitle className="text-lg sm:text-xl font-black text-foreground tracking-tight">
+                          {lang === "ar"
+                            ? selectedProductDetail.name_ar || selectedProductDetail.name
+                            : selectedProductDetail.name || selectedProductDetail.name_ar}
+                        </SheetTitle>
+                        <span
+                          className={cn(
+                            "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold",
+                            selectedProductDetail.is_active
+                              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                              : "border-border bg-muted/60 text-muted-foreground",
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "size-1.5 rounded-full",
+                              selectedProductDetail.is_active
+                                ? "bg-emerald-500 animate-pulse"
+                                : "bg-muted-foreground",
+                            )}
+                          />
+                          {selectedProductDetail.is_active
+                            ? t("common.active")
+                            : t("common.inactive")}
+                        </span>
+                      </div>
+
+                      <SheetDescription className="text-xs text-muted-foreground flex items-center gap-2 mt-1 flex-wrap">
+                        {selectedProductDetail.name_ar &&
+                          selectedProductDetail.name &&
+                          selectedProductDetail.name_ar !== selectedProductDetail.name && (
+                            <span className="font-medium text-muted-foreground">
+                              {lang === "ar"
+                                ? selectedProductDetail.name
+                                : selectedProductDetail.name_ar}
+                            </span>
+                          )}
+                        {selectedProductDetail.sku && (
+                          <>
+                            <span>•</span>
+                            <span className="font-mono text-foreground font-semibold">
+                              SKU: {selectedProductDetail.sku}
+                            </span>
+                          </>
+                        )}
+                      </SheetDescription>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-lg font-bold text-foreground">
-                    {lang === "ar"
-                      ? selectedProductDetail.name_ar || selectedProductDetail.name
-                      : selectedProductDetail.name || selectedProductDetail.name_ar}
-                  </h3>
-                  {showDetail("nameEn") &&
-                    (lang === "ar"
-                      ? selectedProductDetail.name
-                      : selectedProductDetail.name_ar) && (
-                      <p
-                        className="text-xs text-muted-foreground"
-                        dir={lang === "ar" ? "ltr" : "rtl"}
-                      >
-                        {lang === "ar" ? selectedProductDetail.name : selectedProductDetail.name_ar}
-                      </p>
-                    )}
-                  <div className="mt-0.5 flex items-center gap-2">
-                    {showDetail("status") && (
-                      <span
-                        className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${
-                          selectedProductDetail.is_active
-                            ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
-                            : "border-border bg-muted text-muted-foreground"
-                        }`}
-                      >
-                        {selectedProductDetail.is_active
-                          ? t("common.active")
-                          : t("common.inactive")}
+              </div>
+
+              {/* ─── Scrollable Body ─── */}
+              <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5 custom-scrollbar">
+                {/* 1. Financial & Stock Overview Cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  <div className="rounded-2xl border border-border/70 bg-card p-3.5 space-y-0.5">
+                    <span className="text-[11px] font-bold text-muted-foreground block">
+                      {lang === "ar" ? "سعر البيع" : "Sale Price"}
+                    </span>
+                    <p className="font-mono text-lg sm:text-xl font-black text-foreground">
+                      {moneyCell(selectedProductDetail.sale_price)}
+                    </p>
+                  </div>
+
+                  {canViewCost && (
+                    <div className="rounded-2xl border border-border/70 bg-card p-3.5 space-y-0.5">
+                      <span className="text-[11px] font-bold text-muted-foreground block">
+                        {lang === "ar" ? "سعر التكلفة" : "Cost Price"}
                       </span>
-                    )}
-                    {showDetail("role") && (
+                      <p className="font-mono text-lg sm:text-xl font-black text-muted-foreground">
+                        {selectedProductDetail.cost_price != null
+                          ? moneyCell(selectedProductDetail.cost_price)
+                          : "—"}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="rounded-2xl border border-border/70 bg-card p-3.5 space-y-0.5">
+                    <span className="text-[11px] font-bold text-muted-foreground block">
+                      {lang === "ar" ? "حد أدنى المخزون" : "Min Stock Alert"}
+                    </span>
+                    <p className="font-mono text-lg sm:text-xl font-black text-amber-500">
+                      {qtyCell(selectedProductDetail.min_stock)}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-border/70 bg-card p-3.5 space-y-0.5">
+                    <span className="text-[11px] font-bold text-muted-foreground block">
+                      {lang === "ar" ? "نسبة الضريبة" : "Tax Rate"}
+                    </span>
+                    <p className="font-mono text-lg sm:text-xl font-black text-foreground">
+                      {selectedProductDetail.tax_rate ? `${selectedProductDetail.tax_rate}%` : "0%"}
+                    </p>
+                  </div>
+
+                  {selectedProductDetail.package_weight_kg != null && (
+                    <div className="rounded-2xl border border-border/70 bg-card p-3.5 space-y-0.5">
+                      <span className="text-[11px] font-bold text-muted-foreground block">
+                        {lang === "ar" ? "وزن العبوة (كجم)" : "Package Weight (kg)"}
+                      </span>
+                      <p className="font-mono text-lg sm:text-xl font-black text-foreground">
+                        {toSystemDigits(selectedProductDetail.package_weight_kg.toString())}{" "}
+                        {lang === "ar" ? "كجم" : "kg"}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="rounded-2xl border border-border/70 bg-card p-3.5 space-y-0.5">
+                    <span className="text-[11px] font-bold text-muted-foreground block">
+                      {lang === "ar" ? "دور الصنف" : "Item Role"}
+                    </span>
+                    <div className="pt-0.5">
                       <ItemRoleBadge
                         itemClass={selectedProductDetail.item_class}
                         itemNature={selectedProductDetail.item_nature}
@@ -1847,187 +1942,351 @@ function ProductsPage() {
                         isRtl={lang === "ar"}
                         compact
                       />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Identity & Barcode Card */}
+                <div className="rounded-2xl border border-border/70 bg-card p-4 space-y-3">
+                  <div className="flex items-center justify-between text-muted-foreground border-b border-border/40 pb-2">
+                    <span className="flex items-center gap-1.5 text-xs font-bold text-foreground">
+                      <Tag className="size-4 text-primary" />
+                      {lang === "ar" ? "البيانات التعريفية والرموز" : "Identity & Codes"}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2.5 text-xs">
+                    {selectedProductDetail.name_ar && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">
+                          {lang === "ar" ? "الاسم بالعربية" : "Arabic Name"}
+                        </span>
+                        <span className="font-semibold text-foreground">
+                          {selectedProductDetail.name_ar}
+                        </span>
+                      </div>
                     )}
-                    {showDetail("sku") && selectedProductDetail.sku && (
-                      <span className="font-mono text-xs text-muted-foreground">
-                        SKU: {selectedProductDetail.sku}
+
+                    {selectedProductDetail.name && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">
+                          {lang === "ar" ? "الاسم بالإنجليزية" : "English Name"}
+                        </span>
+                        <span className="font-semibold text-foreground" dir="ltr">
+                          {selectedProductDetail.name}
+                        </span>
+                      </div>
+                    )}
+
+                    {selectedProductDetail.sku && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">
+                          {lang === "ar" ? "رمز SKU" : "SKU Code"}
+                        </span>
+                        <div className="flex items-center gap-1.5 font-mono font-bold text-foreground">
+                          <span>{selectedProductDetail.sku}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(selectedProductDetail.sku!);
+                              toast.success(lang === "ar" ? "تم نسخ رمز SKU" : "SKU copied");
+                            }}
+                            className="p-1 rounded text-muted-foreground hover:text-foreground"
+                            title={lang === "ar" ? "نسخ رمز SKU" : "Copy SKU"}
+                          >
+                            <Copy className="size-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedProductDetail.barcode && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">
+                          {lang === "ar" ? "الباركود" : "Barcode"}
+                        </span>
+                        <div className="flex items-center gap-1.5 font-mono font-bold text-foreground">
+                          <span>{selectedProductDetail.barcode}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(selectedProductDetail.barcode!);
+                              toast.success(lang === "ar" ? "تم نسخ الباركود" : "Barcode copied");
+                            }}
+                            className="p-1 rounded text-muted-foreground hover:text-foreground"
+                            title={lang === "ar" ? "نسخ الباركود" : "Copy barcode"}
+                          >
+                            <Copy className="size-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedProductDetail.shelf_location && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">
+                          {lang === "ar" ? "موقع الرف" : "Shelf Location"}
+                        </span>
+                        <span className="font-mono text-foreground font-semibold">
+                          {selectedProductDetail.shelf_location}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 3. Category & Classification Card */}
+                <div className="rounded-2xl border border-border/70 bg-card p-4 space-y-3">
+                  <div className="flex items-center justify-between text-muted-foreground border-b border-border/40 pb-2">
+                    <span className="flex items-center gap-1.5 text-xs font-bold text-foreground">
+                      <Layers className="size-4 text-primary" />
+                      {lang === "ar" ? "التصنيف والمواصفات" : "Classification & Specs"}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2.5 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">
+                        {lang === "ar" ? "التصنيف" : "Category"}
                       </span>
+                      <span className="font-semibold text-foreground">
+                        {categoryLabel(selectedProductDetail.category) ??
+                          (lang === "ar" ? "بدون تصنيف" : "Uncategorized")}
+                      </span>
+                    </div>
+
+                    {selectedProductDetail.brand && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">
+                          {lang === "ar" ? "العلامة التجارية" : "Brand"}
+                        </span>
+                        <span className="font-semibold text-foreground">
+                          {label(
+                            selectedProductDetail.brand.name,
+                            selectedProductDetail.brand.name_ar,
+                          )}
+                        </span>
+                      </div>
+                    )}
+
+                    {selectedProductDetail.unit && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">
+                          {lang === "ar" ? "وحدة القياس" : "Unit"}
+                        </span>
+                        <span className="font-semibold text-foreground">
+                          {selectedProductDetail.unit.name_ar ||
+                            selectedProductDetail.unit.name ||
+                            selectedProductDetail.unit.short_name}
+                        </span>
+                      </div>
+                    )}
+
+                    {selectedProductDetail.origin && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">
+                          {lang === "ar" ? "بلد المنشأ" : "Country of Origin"}
+                        </span>
+                        <span className="font-semibold text-foreground">
+                          {selectedProductDetail.origin.name_ar ||
+                            selectedProductDetail.origin.name}
+                        </span>
+                      </div>
+                    )}
+
+                    {selectedProductDetail.quality && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">
+                          {lang === "ar" ? "درجة الجودة" : "Quality Grade"}
+                        </span>
+                        <span className="font-semibold text-foreground">
+                          {selectedProductDetail.quality.name_ar ||
+                            selectedProductDetail.quality.name}
+                        </span>
+                      </div>
                     )}
                   </div>
                 </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedProductDetail(null)}
-                className="grid size-9 place-items-center rounded-full bg-surface-2 text-muted-foreground hover:text-foreground transition"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
 
-            {/* Financial Overview Cards */}
-            <div className="mt-5 grid grid-cols-2 gap-3">
-              <div className="rounded-2xl border border-border/70 bg-card p-4">
-                <span className="text-[11px] font-bold text-muted-foreground block mb-1">
-                  {lang === "ar" ? "سعر البيع" : "Sale Price"}
-                </span>
-                <span className="text-xl font-black font-mono text-foreground">
-                  {moneyCell(selectedProductDetail.sale_price)}
-                </span>
-              </div>
+                {/* 4. Policies & Operations Card */}
+                <div className="rounded-2xl border border-border/70 bg-card p-4 space-y-3">
+                  <div className="flex items-center justify-between text-muted-foreground border-b border-border/40 pb-2">
+                    <span className="flex items-center gap-1.5 text-xs font-bold text-foreground">
+                      <ShieldCheck className="size-4 text-primary" />
+                      {lang === "ar"
+                        ? "سياسات الصنف والمخزون والعمليات"
+                        : "Item Policies & Operations"}
+                    </span>
+                  </div>
 
-              {canViewCost && showDetail("cost") && (
-                <div className="rounded-2xl border border-border/70 bg-card p-4">
-                  <span className="text-[11px] font-bold text-muted-foreground block mb-1">
-                    {lang === "ar" ? "سعر التكلفة" : "Cost Price"}
-                  </span>
-                  <span className="text-xl font-black font-mono text-muted-foreground">
-                    {selectedProductDetail.cost_price != null
-                      ? moneyCell(selectedProductDetail.cost_price)
-                      : "—"}
-                  </span>
-                </div>
-              )}
+                  <div className="space-y-2.5 text-xs">
+                    {selectedProductDetail.item_nature && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">
+                          {lang === "ar" ? "طبيعة الصنف" : "Item Nature"}
+                        </span>
+                        <span className="font-semibold text-foreground">
+                          {ITEM_NATURE_LABELS[selectedProductDetail.item_nature]?.[
+                            lang === "ar" ? "ar" : "en"
+                          ] || selectedProductDetail.item_nature}
+                        </span>
+                      </div>
+                    )}
 
-              {showDetail("minStock") && (
-                <div className="rounded-2xl border border-border/70 bg-card p-4">
-                  <span className="text-[11px] font-bold text-muted-foreground block mb-1">
-                    {lang === "ar" ? "حد أدنى المخزون" : "Min Stock Alert"}
-                  </span>
-                  <span className="text-lg font-black font-mono text-amber-500">
-                    {qtyCell(selectedProductDetail.min_stock)}
-                  </span>
-                </div>
-              )}
+                    {selectedProductDetail.inventory_policy && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">
+                          {lang === "ar" ? "سياسة المخزون" : "Inventory Policy"}
+                        </span>
+                        <span className="font-semibold text-foreground">
+                          {INVENTORY_POLICY_LABELS[selectedProductDetail.inventory_policy]?.[
+                            lang === "ar" ? "ar" : "en"
+                          ] || selectedProductDetail.inventory_policy}
+                        </span>
+                      </div>
+                    )}
 
-              {showDetail("tax") && (
-                <div className="rounded-2xl border border-border/70 bg-card p-4">
-                  <span className="text-[11px] font-bold text-muted-foreground block mb-1">
-                    {lang === "ar" ? "الضريبة" : "Tax Rate"}
-                  </span>
-                  <span className="text-lg font-black font-mono text-foreground">
-                    {selectedProductDetail.tax_rate ? `${selectedProductDetail.tax_rate}%` : "0%"}
-                  </span>
-                </div>
-              )}
-            </div>
+                    {selectedProductDetail.tracking && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">
+                          {lang === "ar" ? "طريقة التتبع" : "Tracking Method"}
+                        </span>
+                        <span className="font-semibold text-foreground">
+                          {TRACKING_LABELS[selectedProductDetail.tracking]?.[
+                            lang === "ar" ? "ar" : "en"
+                          ] || selectedProductDetail.tracking}
+                        </span>
+                      </div>
+                    )}
 
-            {/* Attribute & Specifications Grid */}
-            <div className="mt-5 rounded-2xl border border-border/70 bg-card p-4 space-y-3 text-xs">
-              {showDetail("category") && (
-                <div className="flex items-center justify-between border-b border-border/40 pb-2">
-                  <span className="text-muted-foreground">
-                    {lang === "ar" ? "التصنيف" : "Category"}
-                  </span>
-                  <span className="font-semibold text-foreground">
-                    {categoryLabel(selectedProductDetail.category) ??
-                      (lang === "ar" ? "بدون تصنيف" : "Uncategorized")}
-                  </span>
-                </div>
-              )}
+                    {selectedProductDetail.costing_method && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">
+                          {lang === "ar" ? "طريقة حساب التكلفة" : "Costing Method"}
+                        </span>
+                        <span className="font-semibold text-foreground">
+                          {COSTING_METHOD_LABELS[selectedProductDetail.costing_method]?.[
+                            lang === "ar" ? "ar" : "en"
+                          ] || selectedProductDetail.costing_method}
+                        </span>
+                      </div>
+                    )}
 
-              {showDetail("brand") && selectedProductDetail.brand && (
-                <div className="flex items-center justify-between border-b border-border/40 pb-2">
-                  <span className="text-muted-foreground">
-                    {lang === "ar" ? "العلامة التجارية" : "Brand"}
-                  </span>
-                  <span className="font-semibold text-foreground">
-                    {label(selectedProductDetail.brand.name, selectedProductDetail.brand.name_ar)}
-                  </span>
-                </div>
-              )}
+                    <div className="flex items-center justify-between pt-1 border-t border-border/40">
+                      <span className="text-muted-foreground">
+                        {lang === "ar" ? "قابل للبيع في المبيعات" : "Sellable"}
+                      </span>
+                      <span
+                        className={cn(
+                          "font-bold text-xs",
+                          selectedProductDetail.is_sellable !== false
+                            ? "text-emerald-500"
+                            : "text-muted-foreground",
+                        )}
+                      >
+                        {selectedProductDetail.is_sellable !== false
+                          ? lang === "ar"
+                            ? "نعم"
+                            : "Yes"
+                          : lang === "ar"
+                            ? "لا"
+                            : "No"}
+                      </span>
+                    </div>
 
-              {showDetail("unit") && selectedProductDetail.unit && (
-                <div className="flex items-center justify-between border-b border-border/40 pb-2">
-                  <span className="text-muted-foreground">
-                    {lang === "ar" ? "وحدة القياس" : "Unit"}
-                  </span>
-                  <span className="font-semibold text-foreground">
-                    {selectedProductDetail.unit.name_ar || selectedProductDetail.unit.name}
-                  </span>
-                </div>
-              )}
-
-              {showDetail("barcode") && selectedProductDetail.barcode && (
-                <div className="flex items-center justify-between border-b border-border/40 pb-2">
-                  <span className="text-muted-foreground">
-                    {lang === "ar" ? "الباركود" : "Barcode"}
-                  </span>
-                  <div className="flex items-center gap-1.5 font-mono font-bold text-foreground">
-                    <span>{selectedProductDetail.barcode}</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(selectedProductDetail.barcode!);
-                        toast.success(lang === "ar" ? "تم نسخ الباركود" : "Barcode copied");
-                      }}
-                      className="text-muted-foreground hover:text-foreground"
-                    >
-                      <Copy className="size-3.5" />
-                    </button>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">
+                        {lang === "ar" ? "قابل للشراء في المشتريات" : "Purchasable"}
+                      </span>
+                      <span
+                        className={cn(
+                          "font-bold text-xs",
+                          selectedProductDetail.is_purchasable !== false
+                            ? "text-emerald-500"
+                            : "text-muted-foreground",
+                        )}
+                      >
+                        {selectedProductDetail.is_purchasable !== false
+                          ? lang === "ar"
+                            ? "نعم"
+                            : "Yes"
+                          : lang === "ar"
+                            ? "لا"
+                            : "No"}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              )}
+              </div>
 
-              {showDetail("shelf") && selectedProductDetail.shelf_location && (
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">
-                    {lang === "ar" ? "موقع الرف" : "Shelf Location"}
-                  </span>
-                  <span className="font-mono text-foreground font-semibold">
-                    {selectedProductDetail.shelf_location}
-                  </span>
+              {/* ─── Adaptive Action Footer ─── */}
+              <div className="shrink-0 p-4 border-t border-border/60 bg-muted/20">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="rounded-xl h-9 gap-1.5 text-xs font-bold flex-1 sm:flex-initial"
+                      onClick={() => {
+                        toggleProductActiveMutation.mutate({
+                          id: selectedProductDetail.id,
+                          isActive: !selectedProductDetail.is_active,
+                        });
+                        setSelectedProductDetail({
+                          ...selectedProductDetail,
+                          is_active: !selectedProductDetail.is_active,
+                        });
+                      }}
+                    >
+                      <Power
+                        className={cn(
+                          "size-3.5",
+                          selectedProductDetail.is_active
+                            ? "text-emerald-500"
+                            : "text-muted-foreground",
+                        )}
+                      />
+                      <span>
+                        {selectedProductDetail.is_active
+                          ? lang === "ar"
+                            ? "تعطيل المنتج"
+                            : "Deactivate"
+                          : lang === "ar"
+                            ? "تفعيل المنتج"
+                            : "Activate"}
+                      </span>
+                    </Button>
+                  </div>
+
+                  <div className="flex items-center gap-2 justify-end">
+                    <Button
+                      size="sm"
+                      className="rounded-xl h-9 gap-1.5 text-xs font-bold flex-1 sm:flex-initial"
+                      onClick={() => {
+                        setEditing(selectedProductDetail);
+                        setSelectedProductDetail(null);
+                        setOpen(true);
+                      }}
+                    >
+                      <Pencil className="size-3.5" />
+                      <span>{lang === "ar" ? "تعديل المنتج" : "Edit Product"}</span>
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedProductDetail(null)}
+                      className="rounded-xl h-9 text-xs"
+                    >
+                      {t("common.close") || (lang === "ar" ? "إغلاق" : "Close")}
+                    </Button>
+                  </div>
                 </div>
-              )}
-            </div>
-
-            {/* Quick Actions Footer */}
-            <div className="mt-6 flex items-center gap-2 pt-4 border-t border-border/60">
-              <Button
-                variant="outline"
-                className="flex-1 rounded-xl gap-2 font-bold"
-                onClick={() => {
-                  setEditing(selectedProductDetail);
-                  setSelectedProductDetail(null);
-                  setOpen(true);
-                }}
-              >
-                <Pencil className="size-4" />
-                <span>{t("common.edit")}</span>
-              </Button>
-              <Button
-                variant="outline"
-                className="rounded-xl gap-2 font-bold"
-                onClick={() => {
-                  toggleProductActiveMutation.mutate({
-                    id: selectedProductDetail.id,
-                    isActive: !selectedProductDetail.is_active,
-                  });
-                  setSelectedProductDetail({
-                    ...selectedProductDetail,
-                    is_active: !selectedProductDetail.is_active,
-                  });
-                }}
-              >
-                <Power
-                  className={`size-4 ${
-                    selectedProductDetail.is_active ? "text-emerald-500" : "text-muted-foreground"
-                  }`}
-                />
-                <span>
-                  {selectedProductDetail.is_active
-                    ? lang === "ar"
-                      ? "تعطيل"
-                      : "Deactivate"
-                    : lang === "ar"
-                      ? "تفعيل"
-                      : "Activate"}
-                </span>
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
 
       {open && (
         <ProductDialog

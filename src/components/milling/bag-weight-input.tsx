@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { Package, Scale, ArrowRightLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Mono, fmtNum } from "@/components/milling/milling-ui";
+import { QuantityInput } from "@/components/ui/quantity-input";
+import { AmountInput } from "@/components/ui/amount-input";
 
 export interface BagWeightValue {
   bags: number;
@@ -198,16 +200,14 @@ export function BagWeightInput({
               <label className="mb-1 block text-[11px] font-semibold text-muted-foreground">
                 عدد الأكياس *
               </label>
-              <input
-                type="number"
+              <QuantityInput
                 min={0}
-                step="any"
-                inputMode="decimal"
+                decimals={0}
                 disabled={disabled}
                 placeholder="0"
-                value={internalBags}
-                onChange={(e) => handleBagsChange(e.target.value)}
-                className="h-10 w-full rounded-xl border border-border/80 bg-surface px-3 text-sm font-semibold text-foreground outline-none transition focus:border-amber-500 focus:ring-1 focus:ring-amber-500 disabled:opacity-50"
+                aria-label="عدد الأكياس"
+                value={toNumOrNull(internalBags)}
+                onValueChange={(v) => handleBagsChange(v == null ? "" : String(v))}
               />
             </div>
 
@@ -239,16 +239,18 @@ export function BagWeightInput({
                 </select>
 
                 {isCustomCapacity && (
-                  <input
-                    type="number"
-                    min={0.1}
-                    step="0.1"
-                    disabled={disabled}
-                    placeholder="كجم"
-                    value={customCapacity}
-                    onChange={(e) => handleCapacityChange(-1, e.target.value)}
-                    className="h-10 w-24 rounded-xl border border-border/80 bg-surface px-2.5 text-xs font-semibold text-foreground outline-none transition focus:border-amber-500 disabled:opacity-50"
-                  />
+                  <div className="w-24">
+                    <QuantityInput
+                      min={0}
+                      decimals={1}
+                      unit="kg"
+                      disabled={disabled}
+                      placeholder="كجم"
+                      aria-label="سعة الكيس المخصصة (كجم)"
+                      value={toNumOrNull(customCapacity)}
+                      onValueChange={(v) => handleCapacityChange(-1, v == null ? "" : String(v))}
+                    />
+                  </div>
                 )}
               </div>
             </div>
@@ -272,16 +274,15 @@ export function BagWeightInput({
               <label className="mb-1 block text-[11px] font-semibold text-muted-foreground">
                 الوزن الإجمالي (كجم) *
               </label>
-              <input
-                type="number"
+              <QuantityInput
                 min={0}
-                step="any"
-                inputMode="decimal"
+                decimals={3}
+                unit="kg"
                 disabled={disabled}
                 placeholder="0.00"
-                value={internalTotalKg}
-                onChange={(e) => handleTotalKgChange(e.target.value)}
-                className="h-10 w-full rounded-xl border border-border/80 bg-surface px-3 text-sm font-semibold text-foreground outline-none transition focus:border-sky-500 focus:ring-1 focus:ring-sky-500 disabled:opacity-50"
+                aria-label="الوزن الإجمالي (كجم)"
+                value={toNumOrNull(internalTotalKg)}
+                onValueChange={(v) => handleTotalKgChange(v == null ? "" : String(v))}
               />
             </div>
 
@@ -330,19 +331,19 @@ export function BagWeightInput({
             <label className="mb-1 block text-[11px] font-semibold text-muted-foreground">
               سعر الكيس ({currencySymbol})
             </label>
-            <input
-              type="number"
+            <AmountInput
               min={0}
-              step="any"
               disabled={disabled}
               placeholder="0.00"
-              value={unitPriceBag !== undefined ? unitPriceBag : ""}
-              onChange={(e) => {
-                const bagP = Number(e.target.value) || 0;
+              aria-label={`سعر الكيس (${currencySymbol})`}
+              value={unitPriceBag ?? null}
+              onValueChange={(v) => {
+                const bagP = v ?? 0;
                 const kgP = activeCapacity > 0 ? bagP / activeCapacity : 0;
                 onPriceChange?.({ unitPriceBag: bagP, unitPriceKg: kgP });
               }}
-              className="h-9 w-full rounded-lg border border-border/80 bg-surface px-2.5 text-xs font-mono font-semibold text-foreground outline-none focus:border-primary"
+              wordsClassName="text-[10px] leading-3"
+              containerClassName="[&_input]:h-9 [&_input]:rounded-lg [&_input]:text-xs"
             />
           </div>
 
@@ -350,23 +351,36 @@ export function BagWeightInput({
             <label className="mb-1 block text-[11px] font-semibold text-muted-foreground">
               سعر الكيلو ({currencySymbol}/كجم)
             </label>
-            <input
-              type="number"
+            <AmountInput
               min={0}
-              step="any"
               disabled={disabled}
               placeholder="0.00"
-              value={unitPriceKg !== undefined ? unitPriceKg : ""}
-              onChange={(e) => {
-                const kgP = Number(e.target.value) || 0;
+              aria-label={`سعر الكيلو (${currencySymbol}/كجم)`}
+              value={unitPriceKg ?? null}
+              onValueChange={(v) => {
+                const kgP = v ?? 0;
                 const bagP = activeCapacity > 0 ? kgP * activeCapacity : 0;
                 onPriceChange?.({ unitPriceBag: bagP, unitPriceKg: kgP });
               }}
-              className="h-9 w-full rounded-lg border border-border/80 bg-surface px-2.5 text-xs font-mono font-semibold text-foreground outline-none focus:border-primary"
+              wordsClassName="text-[10px] leading-3"
+              containerClassName="[&_input]:h-9 [&_input]:rounded-lg [&_input]:text-xs"
             />
           </div>
         </div>
       )}
     </div>
   );
+}
+
+/**
+ * القيم هنا محفوظة كنصوص (لأنها تصل من النموذج الأب)، والمكوّنان الموحّدان
+ * يعملان بـ `number | null` — النص الفارغ أو غير الرقمي يصبح null بدل NaN.
+ */
+function toNumOrNull(value: string | number | null | undefined): number | null {
+  if (value == null) return null;
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = Number(trimmed.replace(/,/g, ""));
+  return Number.isFinite(parsed) ? parsed : null;
 }

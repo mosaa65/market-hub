@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
+import { postStockAdjustment } from "@/lib/items/stock-operations";
 import { VortexDrawerDialog } from "@/components/vortex-ui";
 import { FormField } from "@/components/ui/form-field";
 import { FieldInput, NumberInput } from "@/components/ui/input";
@@ -340,20 +341,28 @@ export function SettlementWizardSheet({
 
     setSaving(true);
     try {
-      const { data, error } = await supabase.rpc("post_stock_settlement", {
-        p_warehouse_id: warehouseId,
-        p_reason: reason,
-        p_note: note.trim() || null,
-        p_lines: resolved.map((line) => ({
-          product_id: line.product_id,
-          actual_qty: line.actualQty as number,
+      const result = await postStockAdjustment({
+        warehouseId,
+        reason,
+        note: note.trim() || undefined,
+        effectiveDate: new Date().toISOString().slice(0, 10),
+        lines: resolved.map((line) => ({
+          productId: line.product_id,
+          quantity: line.diff,
+          unitCost: Number(unitCost ?? 0),
+          note: note.trim() || undefined,
         })),
       });
-      if (error) throw error;
+
+      if (!result.ok) {
+        throw new Error(
+          result.message || (isAr ? "فشل تنفيذ التسوية" : "Failed to post adjustment"),
+        );
+      }
 
       toast.success(
         isAr
-          ? `تم اعتماد تسوية ${resolved.length} صنف — مستند ${String(data ?? "").slice(0, 8)}`
+          ? `تم اعتماد تسوية ${resolved.length} صنف بنجاح`
           : `Settlement posted for ${resolved.length} item(s)`,
       );
       reset();

@@ -52,6 +52,7 @@ import {
   Mono,
   fmtNum,
 } from "@/components/milling/milling-ui";
+import { QuantityInput } from "@/components/ui/quantity-input";
 
 export const Route = createFileRoute("/_app/milling/milling")({
   head: () => ({ meta: [{ title: "عمليات الطحن ونواتج الأمانات — فورتكس ERP" }] }),
@@ -441,12 +442,13 @@ function MillingMillPage() {
                         : undefined
                     }
                   >
-                    <MillingInput
-                      type="number"
+                    <QuantityInput
+                      decimals={0}
                       min={0}
                       placeholder="0 كيس"
-                      value={bagsOut}
-                      onChange={(e) => changeBagsOut(e.target.value)}
+                      aria-label="الأكياس المطحونة بهذه الدفعة"
+                      value={bagsOut === "" ? null : Number(bagsOut)}
+                      onValueChange={(v) => changeBagsOut(v == null ? "" : String(v))}
                       className="font-bold text-amber-600 dark:text-amber-400"
                     />
                   </MillingField>
@@ -459,13 +461,14 @@ function MillingMillPage() {
                         : "أدخل الوزن الفعلي"
                     }
                   >
-                    <MillingInput
-                      type="number"
+                    <QuantityInput
+                      decimals={2}
                       min={0}
-                      step="0.01"
+                      unit="kg"
                       placeholder="0.00 كجم"
-                      value={kgOut}
-                      onChange={(e) => changeKgOut(e.target.value)}
+                      aria-label="الوزن المطحون (كجم)"
+                      value={kgOut === "" ? null : Number(kgOut)}
+                      onValueChange={(v) => changeKgOut(v == null ? "" : String(v))}
                       className="font-bold"
                     />
                   </MillingField>
@@ -522,22 +525,25 @@ function MillingMillPage() {
                       ))}
                     </MillingSelect>
 
-                    <MillingInput
-                      type="number"
+                    <QuantityInput
+                      decimals={0}
                       min={0}
+                      emptyAsZero
                       placeholder="أكياس"
-                      value={line.bags || ""}
-                      onChange={(e) => changeLineBags(idx, Number(e.target.value) || 0)}
+                      aria-label="أكياس الناتج"
+                      value={line.bags || null}
+                      onValueChange={(v) => changeLineBags(idx, v ?? 0)}
                       className="font-bold text-emerald-600 dark:text-emerald-400"
                     />
 
-                    <MillingInput
-                      type="number"
+                    <QuantityInput
+                      decimals={2}
                       min={0}
-                      step="0.01"
+                      emptyAsZero
                       placeholder="كجم"
-                      value={line.kg || ""}
-                      onChange={(e) => changeLineKg(idx, Number(e.target.value) || 0)}
+                      aria-label="وزن الناتج كجم"
+                      value={line.kg || null}
+                      onValueChange={(v) => changeLineKg(idx, v ?? 0)}
                       className="font-bold"
                     />
 
@@ -585,23 +591,25 @@ function MillingMillPage() {
                   </MillingField>
 
                   <MillingField label="أكياس الفاقد">
-                    <MillingInput
-                      type="number"
+                    <QuantityInput
+                      decimals={0}
                       min={0}
                       placeholder="0"
-                      value={lossBags}
-                      onChange={(e) => handleLossBagsChange(e.target.value)}
+                      aria-label="أكياس الفاقد"
+                      value={lossBags === "" ? null : Number(lossBags)}
+                      onValueChange={(v) => handleLossBagsChange(v == null ? "" : String(v))}
                     />
                   </MillingField>
 
                   <MillingField label="وزن الفاقد (كجم)">
-                    <MillingInput
-                      type="number"
+                    <QuantityInput
+                      decimals={2}
                       min={0}
-                      step="0.01"
+                      unit="kg"
                       placeholder="0.00"
-                      value={lossKg}
-                      onChange={(e) => setLossKg(e.target.value)}
+                      aria-label="وزن الفاقد (كجم)"
+                      value={lossKg === "" ? null : Number(lossKg)}
+                      onValueChange={(v) => setLossKg(v == null ? "" : String(v))}
                       className="font-bold text-amber-700 dark:text-amber-300"
                     />
                   </MillingField>

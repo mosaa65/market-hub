@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import type { BankAccountKind, ChequeStatus, PaymentSettlementSelection } from "../treasury-types";
 import {
   LEGACY_PAYMENT_VALUES,
   PAYMENT_METHOD_CATALOG,
@@ -61,7 +62,10 @@ assert.ok(!TENANT_SELECTABLE_LEGACY_VALUES.includes("credit"));
 assert.deepEqual(Object.keys(PAYMENT_METHOD_ICON_ASSETS).sort(), ["floosak", "jaib", "one_cash"]);
 assert.equal(paymentMethodIconAsset("floosak")?.src, "/yemeni_wallet_icons_svg/floosak.svg");
 assert.equal(paymentMethodIconAsset("one_cash")?.src, "/yemeni_wallet_icons_svg/one-cash.svg");
-assert.equal(paymentMethodIconAsset("jaib")?.src, "/yemeni_wallet_icons_svg/jaib.svg");
+assert.equal(
+  paymentMethodIconAsset("jaib")?.src,
+  "/yemeni_wallet_icons_svg/%D8%B4%D8%B9%D8%A7%D8%B1-%D9%85%D8%AD%D9%81%D8%B7%D8%A9-%D8%AC%D9%8A%D8%A8.svg",
+);
 assert.equal(paymentMethodIconAsset("unknown"), undefined);
 assert.equal(paymentMethodIconAsset("purple-wallet"), undefined);
 
@@ -245,5 +249,20 @@ assert.notEqual(
 );
 assert.equal(getShippedPaymentMethod("kuraimi_bank")?.nameAr, "بنك الكريمي");
 assert.equal(getShippedPaymentMethod("nonexistent_method"), undefined);
+
+// ── 10. Treasury Hierarchy & Cheque Types Integrity ──────────────────────
+const validKinds: BankAccountKind[] = ["BANK", "WALLET", "POS_TERMINAL"];
+assert.equal(validKinds.length, 3);
+const validStatuses: ChequeStatus[] = ["UNDER_COLLECTION", "CLEARED", "BOUNCED", "RETURNED"];
+assert.equal(validStatuses.length, 4);
+
+const sampleSettlement: PaymentSettlementSelection = {
+  method: "cash",
+  paymentMethodId: "cash",
+  cashboxId: "cb-123",
+  cashboxName: "الصندوق الرئيسي",
+};
+assert.equal(sampleSettlement.method, "cash");
+assert.equal(sampleSettlement.cashboxName, "الصندوق الرئيسي");
 
 console.log("payment-methods: all checks passed");

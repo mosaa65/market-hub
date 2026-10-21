@@ -18,11 +18,11 @@ import {
   MillingPanel,
   MillingSectionTitle,
   MillingField,
-  MillingInput,
   MillingSelect,
   MillingTextarea,
   fmtNum,
 } from "@/components/milling/milling-ui";
+import { QuantityInput } from "@/components/ui/quantity-input";
 
 export const Route = createFileRoute("/_app/milling/consumables")({
   head: () => ({ meta: [{ title: "صرف مستهلكات داخلي — فورتكس ERP" }] }),
@@ -160,15 +160,18 @@ function ConsumablesPage() {
                       </option>
                     ))}
                   </MillingSelect>
-                  <MillingInput
-                    type="number"
+                  <QuantityInput
+                    decimals={3}
                     min={0}
-                    inputMode="numeric"
+                    emptyAsZero
                     placeholder="الكمية"
-                    value={line.qty}
-                    onChange={(e) =>
+                    aria-label="الكمية"
+                    value={line.qty ? Number(line.qty) : null}
+                    onValueChange={(v) =>
                       setLines((l) =>
-                        l.map((x, i) => (i === idx ? { ...x, qty: e.target.value } : x)),
+                        l.map((x, i) =>
+                          i === idx ? { ...x, qty: v == null ? "" : String(v) } : x,
+                        ),
                       )
                     }
                   />

@@ -55,6 +55,10 @@ import { IconButton } from "@/components/ui/icon-button";
 import { useBreakpoint } from "@/design/breakpoints";
 import { toast } from "sonner";
 import { PaymentMethodPicker } from "@/components/ui/payment-method";
+import { DynamicPaymentSelector } from "@/components/ui/payment-method/dynamic-payment-selector";
+import { AmountInput } from "@/components/ui/amount-input";
+import { QuantityInput } from "@/components/ui/quantity-input";
+import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
 import {
   getPaymentMethodDefinition,
   paymentMethodLabel,
@@ -1755,6 +1759,9 @@ function CreateDialog({
   const [paid, setPaid] = useState("");
   const [discount, setDiscount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<string>("bank_transfer");
+  const [paymentSelection, setPaymentSelection] = useState<PaymentSettlementSelection>({
+    method: "bank_transfer",
+  });
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
   const productLabel = (p?: Pick<Product, "name" | "name_ar"> | null) =>
@@ -1922,24 +1929,73 @@ function CreateDialog({
 
     setLoading(true);
     try {
-      const { error } = await supabase.rpc("create_purchase", {
-        _warehouse_id: warehouseId,
-        _supplier_id: supplierId,
-        // The picker holds a catalogue id. Convert at the boundary, exactly as
-        // the POS screen does, so `create_purchase` receives the stored value it
-        // casts into the ENUM.
-        _payment_method: toLegacyPaymentValue(paymentMethod),
-        _paid: paymentMethod === "credit" ? 0 : paidN || total,
-        _discount: discountN,
-        _note: (note || null) as any,
-        _items: cart.map((l) => ({
-          product_id: l.product_id,
-          quantity: Number(l.quantity),
-          unit_cost: Number(l.unit_cost),
-          tax_rate: Number(l.tax_rate),
-        })),
-      });
+      let invId: string | null = null;
+      let error: any = null;
+
+      try {
+        const res = await (supabase.rpc as any)("create_purchase", {
+          _warehouse_id: warehouseId,
+          _supplier_id: supplierId,
+          // The picker holds a catalogue id. Convert at the boundary, exactly as
+          // the POS screen does, so `create_purchase` receives the stored value it
+          // casts into the ENUM.
+          _payment_method: toLegacyPaymentValue(paymentMethod),
+          _paid: paymentMethod === "credit" ? 0 : paidN || total,
+          _discount: discountN,
+          _note: (note || null) as any,
+          _items: cart.map((l) => ({
+            product_id: l.product_id,
+            quantity: Number(l.quantity),
+            unit_cost: Number(l.unit_cost),
+            tax_rate: Number(l.tax_rate),
+          })),
+          _cashbox_id: paymentSelection.cashboxId || null,
+          _bank_account_id: paymentSelection.bankAccountId || null,
+          _payment_reference:
+            paymentSelection.reference || paymentSelection.paymentReference || null,
+          _payment_method_id: paymentSelection.paymentMethodId || paymentMethod,
+        });
+        invId = res.data;
+        error = res.error;
+      } catch {
+        const res = await supabase.rpc("create_purchase", {
+          _warehouse_id: warehouseId,
+          _supplier_id: supplierId,
+          _payment_method: toLegacyPaymentValue(paymentMethod),
+          _paid: paymentMethod === "credit" ? 0 : paidN || total,
+          _discount: discountN,
+          _note: (note || null) as any,
+          _items: cart.map((l) => ({
+            product_id: l.product_id,
+            quantity: Number(l.quantity),
+            unit_cost: Number(l.unit_cost),
+            tax_rate: Number(l.tax_rate),
+          })),
+        });
+        invId = res.data;
+        error = res.error;
+      }
+
       if (error) throw error;
+
+      // Attach treasury settlement details if provided
+      if (invId) {
+        try {
+          await (supabase as any)
+            .from("purchase_invoices")
+            .update({
+              cashbox_id: paymentSelection.cashboxId || null,
+              bank_account_id: paymentSelection.bankAccountId || null,
+              payment_method_id: paymentSelection.paymentMethodId || paymentMethod,
+              payment_reference:
+                paymentSelection.reference || paymentSelection.paymentReference || null,
+            })
+            .eq("id", invId);
+        } catch (updateErr) {
+          console.warn("Could not attach treasury metadata to purchase_invoice:", updateErr);
+        }
+      }
+
       toast.success(t("purchases.recorded"));
       onDone();
     } catch (e: any) {
@@ -2265,7 +2321,7 @@ function CreateDialog({
               business enabled for purchases, and آجل appears only because the
               catalogue allows it here.
             */}
-            <PaymentMethodPicker
+            <DynamicPaymentSelector
               context="purchases"
               value={paymentMethod}
               onChange={(method) => {
@@ -2273,16 +2329,17 @@ function CreateDialog({
                 const definition = getPaymentMethodDefinition(method);
                 if (definition?.isCreditTerm) setPaid("0");
               }}
-              ensureIds={[paymentMethod]}
-              ariaLabel={t("common.method")}
+              settlement={paymentSelection}
+              onSettlementChange={setPaymentSelection}
+              includeCredit={true}
             />
             {!(getPaymentMethodDefinition(paymentMethod)?.isCreditTerm ?? false) && (
-              <input
-                type="number"
-                value={paid}
-                onChange={(e) => setPaid(e.target.value)}
+              <AmountInput
+                min={0}
+                value={toNumberOrNull(paid)}
+                onValueChange={(v) => setPaid(v == null ? "" : String(v))}
                 placeholder={t("purchases.paid_default", total.toFixed(2))}
-                className="h-9 w-full rounded-md border border-input bg-surface px-2 text-sm"
+                aria-label={t("common.paid")}
               />
             )}
             <input
@@ -2297,12 +2354,15 @@ function CreateDialog({
             <Row label={t("common.tax")} value={money(taxTotal)} />
             <div className="flex items-center justify-between gap-2">
               <span className="text-muted-foreground">{t("common.discount")}</span>
-              <input
-                type="number"
-                value={discount}
-                onChange={(e) => setDiscount(e.target.value)}
+              <AmountInput
+                min={0}
+                value={toNumberOrNull(discount)}
+                onValueChange={(v) => setDiscount(v == null ? "" : String(v))}
                 placeholder="0"
-                className="h-7 w-24 rounded border border-border bg-surface px-2 text-end text-xs"
+                aria-label={t("common.discount")}
+                hideClear
+                wordsClassName="text-[10px] leading-3"
+                containerClassName="w-24 shrink-0 [&_input]:h-7 [&_input]:rounded [&_input]:text-xs"
               />
             </div>
             <Row label={t("common.total")} value={money(total)} bold />
@@ -2335,12 +2395,14 @@ function NumberInput({
   return (
     <div>
       <label className="block text-[10px] uppercase text-muted-foreground">{label}</label>
-      <input
-        type="number"
-        step={step}
+      <QuantityInput
+        decimals={2}
+        min={0}
         value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="h-7 w-full rounded border border-border bg-surface px-1.5 text-xs"
+        onValueChange={(v) => onChange(v ?? 0)}
+        aria-label={label}
+        className="h-7 text-xs"
+        groupThousands={step >= 1}
       />
     </div>
   );
@@ -2362,4 +2424,17 @@ function Row({ label, value, bold }: { label: string; value: string; bold?: bool
       <span className={bold ? "text-foreground" : ""}>{value}</span>
     </div>
   );
+}
+
+/**
+ * حالة النموذج تحتفظ بالمبالغ كسلاسل، بينما المكونان الموحّدان يعملان بقيمة
+ * `number | null`. النص الفارغ أو غير الرقمي يصبح null بدل NaN.
+ */
+function toNumberOrNull(value: string | number | null | undefined): number | null {
+  if (value == null) return null;
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = Number(trimmed.replace(/,/g, ""));
+  return Number.isFinite(parsed) ? parsed : null;
 }

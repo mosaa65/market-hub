@@ -338,6 +338,10 @@ export async function createMillingServiceDocument(input: {
   serviceUnitPrice: number;
   discount?: number;
   paymentMethod: string;
+  cashboxId?: string | null;
+  bankAccountId?: string | null;
+  paymentMethodId?: string | null;
+  paymentReference?: string | null;
   paid: number;
   notes?: string;
 }): Promise<OpResult<MillingServiceDocumentCreated>> {
@@ -365,7 +369,28 @@ export async function createMillingServiceDocument(input: {
     _notes: input.notes ?? null,
   });
   if (error) return { ok: false, message: translateCustodyError(error.message) };
-  return { ok: true, data: data as MillingServiceDocumentCreated };
+
+  const created = data as MillingServiceDocumentCreated;
+  if (
+    created?.invoice_id &&
+    (input.cashboxId || input.bankAccountId || input.paymentMethodId || input.paymentReference)
+  ) {
+    try {
+      await db
+        .from("sales_invoices")
+        .update({
+          cashbox_id: input.cashboxId || null,
+          bank_account_id: input.bankAccountId || null,
+          payment_method_id: input.paymentMethodId || null,
+          payment_reference: input.paymentReference || null,
+        })
+        .eq("id", created.invoice_id);
+    } catch (e) {
+      console.warn("Could not set treasury keys on milling sales_invoice:", e);
+    }
+  }
+
+  return { ok: true, data: created };
 }
 
 export async function fetchMillingServiceDocument(

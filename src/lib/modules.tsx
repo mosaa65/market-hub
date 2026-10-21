@@ -384,6 +384,18 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
   // Load from Supabase (with graceful offline / fallback behavior)
   const refreshFromRemote = async () => {
     try {
+      // لا نطلب subscription قبل جهوزية الجلسة: الطلب بلا توكن يعيد 401 في
+      // الكونسول في كل صفحة (خصوصاً POS) ويُنشئ ضجيجاً لا فائدة منه.
+      // مهلة أمان: getSession قد يتأخر عند تجديد التوكن، ولا يجوز تعليق الواجهة.
+      const session = await Promise.race([
+        supabase.auth.getSession().then((r) => r.data.session),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000)),
+      ]);
+      if (!session) {
+        // لا جلسة (أو تأخرت): نستمر بالخطة المحلية ولا نطلب شيئًا.
+        return;
+      }
+
       const { data, error } = await (supabase as any)
         .from("tenant_subscriptions")
         .select("plan_id, extra_modules, disabled_modules, status")

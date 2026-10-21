@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/page-header";
 import { useI18n } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { QuantityInput } from "@/components/ui/quantity-input";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
@@ -305,10 +306,11 @@ function AdjustDialog({ customers, onSaved }: { customers: Customer[]; onSaved: 
             </div>
             <div className="grid gap-1.5">
               <Label>{lang === "ar" ? "النقاط" : "Points"}</Label>
-              <Input
-                type="number"
+              <QuantityInput
+                decimals={0}
                 value={form.points}
-                onChange={(e) => setForm({ ...form, points: Number(e.target.value) })}
+                onValueChange={(v) => setForm({ ...form, points: v ?? 0 })}
+                aria-label={lang === "ar" ? "النقاط" : "Points"}
               />
             </div>
           </div>

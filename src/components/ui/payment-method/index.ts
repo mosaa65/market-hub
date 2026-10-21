@@ -3,6 +3,10 @@ export {
   PaymentMethodChip,
   type PaymentMethodPickerProps,
 } from "./payment-method-picker";
+export {
+  DynamicPaymentSelector,
+  type DynamicPaymentSelectorProps,
+} from "./dynamic-payment-selector";
 export { PaymentMethodIcon, type PaymentMethodIconProps } from "./payment-method-icon";
 export {
   PaymentMethodIdentityEditor,

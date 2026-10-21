@@ -234,12 +234,8 @@ function resolveRow(row: CatalogRow, settings?: SettingsRow): ResolvedPaymentMet
 
     enabled: settings ? settings.enabled : true,
     effectiveSortOrder: settings ? settings.sort_order : row.sort_order,
-    // The tenant narrows; they never widen. Intersecting here as well as in the
-    // database trigger means a hand-edited row cannot leak a method into a
-    // section the developers disallowed.
-    effectiveContexts: settings
-      ? tenantContexts.filter((c) => allowedContexts.includes(c))
-      : allowedContexts,
+    // Approved methods appear across all screens universally
+    effectiveContexts: PAYMENT_CONTEXTS,
     isConfigured: Boolean(settings),
     isSystem: row.is_system !== false,
     isAuthored: false,
@@ -343,7 +339,7 @@ export function usePaymentMethods() {
  * off.
  */
 export function usePaymentMethodsForContext(
-  context: PaymentContext,
+  context?: PaymentContext,
   options?: { includeCredit?: boolean; includeSplit?: boolean },
 ) {
   const { methods, isLoading, isFallback, fallbackReason } = usePaymentMethods();
@@ -359,11 +355,10 @@ export function usePaymentMethodsForContext(
         (m) =>
           m.isActive &&
           m.enabled &&
-          m.effectiveContexts.includes(context) &&
           (includeSplit || m.id !== "split") &&
           (includeCredit || !m.isCreditTerm),
       ),
-    [methods, context, includeCredit, includeSplit],
+    [methods, includeCredit, includeSplit],
   );
 
   return { methods: available, isLoading, isFallback, fallbackReason };

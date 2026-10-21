@@ -5,16 +5,12 @@ import type { RecordsViewMode } from "@/components/ui/records-view";
 import { useI18n } from "@/lib/i18n";
 
 /**
- * View-mode switcher — cards / list / table, in one control (plan §2).
+ * View-mode switcher — cards / list / table (plan §2).
  *
- * Why a segmented control and not one cycling button: the previous control
- * showed the *current* mode and rotated on click, so reaching "table" from
- * "cards" took two presses and the user could never see that a third option
- * existed. A three-segment switch makes all presentations visible at once and
- * switches in a single press — which is the plan's "the choice is clear in the
- * page bar".
- *
- * Labels come from i18n so the control is identical on every screen.
+ * On mobile viewports (< sm), it renders a single, elegant cycling button that
+ * rotates between the modes on each tap, preserving screen width for search and
+ * action buttons. On tablet/desktop (>= sm), it expands into a full segmented
+ * control displaying all available modes.
  */
 export interface RecordsViewToggleProps {
   value: RecordsViewMode;
@@ -47,12 +43,19 @@ export function RecordsViewToggle({
 }: RecordsViewToggleProps) {
   const { t } = useI18n();
 
+  if (modes.length <= 1) return null;
+
+  const currentIndex = modes.indexOf(value);
+  const safeIndex = currentIndex >= 0 ? currentIndex : 0;
+  const nextIndex = (safeIndex + 1) % modes.length;
+  const nextMode = modes[nextIndex];
+
+  const CurrentIcon = ICONS[value] || LayoutGrid;
+  const currentLabel = t(LABEL_KEYS[value]) || value;
+  const nextLabel = t(LABEL_KEYS[nextMode]) || nextMode;
+
+  // Explicit compact mode: one icon-only circular control on every viewport.
   if (cycle) {
-    const currentIndex = Math.max(0, modes.indexOf(value));
-    const nextMode = modes[(currentIndex + 1) % modes.length] ?? value;
-    const Icon = ICONS[value];
-    const nextLabel = t(LABEL_KEYS[nextMode]);
-    const currentLabel = t(LABEL_KEYS[value]);
     return (
       <button
         type="button"
@@ -64,46 +67,67 @@ export function RecordsViewToggle({
           className,
         )}
       >
-        <Icon className="size-4" aria-hidden />
+        <CurrentIcon className="size-4" aria-hidden />
       </button>
     );
   }
 
   return (
-    <div
-      role="group"
-      aria-label={t("records.view.group")}
-      title={t("records.view.switch_hint")}
-      className={cn(
-        "inline-flex shrink-0 items-center gap-0.5 rounded-full border border-border/70 bg-surface/55 p-0.5 shadow-[var(--shadow-control)] backdrop-blur-xl",
-        className,
-      )}
-    >
-      {modes.map((mode) => {
-        const Icon = ICONS[mode];
-        const selected = value === mode;
-        const label = t(LABEL_KEYS[mode]);
-        return (
-          <button
-            key={mode}
-            type="button"
-            onClick={() => onChange(mode)}
-            aria-pressed={selected}
-            aria-label={label}
-            title={label}
-            className={cn(
-              "inline-flex h-9 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium transition-colors sm:h-10 sm:px-3.5",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-              selected
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:bg-surface-2 hover:text-foreground",
-            )}
-          >
-            <Icon className="size-4" aria-hidden />
-            <span className="hidden lg:inline">{label}</span>
-          </button>
-        );
-      })}
-    </div>
+    <>
+      {/* Mobile single cycling button (< sm) */}
+      <button
+        type="button"
+        onClick={() => onChange(nextMode)}
+        aria-label={`${currentLabel} — ${t("records.view.switch_hint")}`}
+        title={`${currentLabel} (انقر للتبديل إلى ${nextLabel})`}
+        className={cn(
+          "inline-flex sm:hidden shrink-0 h-9 items-center justify-center gap-1.5 rounded-full border border-border/80 bg-surface/80 px-2.5 text-xs font-semibold text-foreground shadow-[var(--shadow-control)] backdrop-blur-xl transition-all active:scale-95 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+          className,
+        )}
+      >
+        <CurrentIcon
+          className="size-4 text-primary shrink-0 transition-transform duration-200"
+          aria-hidden
+        />
+        <span className="text-[11px] font-bold text-foreground">{currentLabel}</span>
+      </button>
+
+      {/* Desktop/tablet segmented multi-button control (>= sm) */}
+      <div
+        role="group"
+        aria-label={t("records.view.group")}
+        title={t("records.view.switch_hint")}
+        className={cn(
+          "hidden sm:inline-flex shrink-0 items-center gap-0.5 rounded-full border border-border/70 bg-surface/55 p-0.5 shadow-[var(--shadow-control)] backdrop-blur-xl",
+          className,
+        )}
+      >
+        {modes.map((mode) => {
+          const Icon = ICONS[mode];
+          const selected = value === mode;
+          const label = t(LABEL_KEYS[mode]);
+          return (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => onChange(mode)}
+              aria-pressed={selected}
+              aria-label={label}
+              title={label}
+              className={cn(
+                "inline-flex h-9 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium transition-colors sm:h-10 sm:px-3.5",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                selected
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-surface-2 hover:text-foreground",
+              )}
+            >
+              <Icon className="size-4" aria-hidden />
+              <span className="hidden lg:inline">{label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </>
   );
 }

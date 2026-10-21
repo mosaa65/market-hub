@@ -444,20 +444,18 @@ export function useExpenseMutations() {
       version: number;
       payNow: boolean;
       paymentMethod?: string;
+      cashboxId?: string | null;
+      bankAccountId?: string | null;
+      paymentMethodId?: string | null;
       accountId?: string | null;
       accountLabel?: string | null;
       paymentDate?: string | null;
+      referenceNo?: string | null;
     }): Promise<ExpenseEntry> => {
       const { data, error } = await (supabase as any).rpc("post_expense", {
         p_entry_id: input.id,
         p_expected_version: input.version,
         p_pay_now: input.payNow,
-        // `post_expense` and `record_expense_payment` take a
-        // `public.payment_method`, not a catalogue id, and are NOT among the
-        // functions the unified migration redefined — so unlike create_sale
-        // they cannot resolve 'kuraimi_bank' themselves and would fail on the
-        // cast. Converting here is what makes a new Yemeni method usable in
-        // the expense screens at all.
         p_payment_method: toLegacyPaymentValue(input.paymentMethod ?? "cash"),
         p_account_label: input.accountLabel || null,
         p_payment_date: input.paymentDate || null,
@@ -465,6 +463,23 @@ export function useExpenseMutations() {
         p_account_id: input.accountId || null,
       });
       if (error) throw error;
+
+      // Persist treasury cashbox/bank settlement link if settled now
+      if (input.payNow && (input.cashboxId || input.bankAccountId || input.paymentMethodId)) {
+        try {
+          await (supabase as any)
+            .from("expense_payments")
+            .update({
+              cashbox_id: input.cashboxId || null,
+              bank_account_id: input.bankAccountId || null,
+              payment_method_id: input.paymentMethodId || input.paymentMethod || null,
+            })
+            .eq("entry_id", input.id);
+        } catch (e) {
+          console.warn("Could not link expense payment to treasury hierarchy:", e);
+        }
+      }
+
       return data as ExpenseEntry;
     },
     onSuccess: (entry, variables) => {
@@ -488,6 +503,9 @@ export function useExpenseMutations() {
       amount: number;
       paymentDate?: string;
       paymentMethod?: string;
+      cashboxId?: string | null;
+      bankAccountId?: string | null;
+      paymentMethodId?: string | null;
       accountId?: string | null;
       accountLabel?: string | null;
       referenceNo?: string | null;
@@ -497,7 +515,6 @@ export function useExpenseMutations() {
         p_entry_id: input.id,
         p_amount: input.amount,
         p_payment_date: input.paymentDate || null,
-        // Same conversion, same reason as `post_expense` above.
         p_payment_method: toLegacyPaymentValue(input.paymentMethod ?? "cash"),
         p_account_label: input.accountLabel || null,
         p_reference_no: input.referenceNo || null,
@@ -506,6 +523,23 @@ export function useExpenseMutations() {
         p_account_id: input.accountId || null,
       });
       if (error) throw error;
+
+      // Persist treasury cashbox/bank settlement link
+      if (input.cashboxId || input.bankAccountId || input.paymentMethodId) {
+        try {
+          await (supabase as any)
+            .from("expense_payments")
+            .update({
+              cashbox_id: input.cashboxId || null,
+              bank_account_id: input.bankAccountId || null,
+              payment_method_id: input.paymentMethodId || input.paymentMethod || null,
+            })
+            .eq("entry_id", input.id);
+        } catch (e) {
+          console.warn("Could not link expense payment to treasury hierarchy:", e);
+        }
+      }
+
       return data as ExpenseEntry;
     },
     onSuccess: (entry) => {

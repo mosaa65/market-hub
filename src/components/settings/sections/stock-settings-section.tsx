@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { QuantityInput } from "@/components/ui/quantity-input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -265,15 +266,14 @@ export function StockSettingsSection({ canEdit = true, lang = "ar" }: StockSetti
                     ? "حد التنبيه الافتراضي لأدنى مخزون (Default Min Stock)"
                     : "Default Minimum Stock Level"}
                 </Label>
-                <Input
-                  type="number"
+                <QuantityInput
+                  decimals={3}
                   min={0}
                   value={settings.defaultMinStock}
                   disabled={!canEdit}
-                  onChange={(e) =>
-                    setSettings({ ...settings, defaultMinStock: Number(e.target.value) })
-                  }
-                  className="h-10 rounded-xl font-mono text-xs font-bold"
+                  onValueChange={(v) => setSettings({ ...settings, defaultMinStock: v ?? 0 })}
+                  aria-label={isAr ? "حد التنبيه الافتراضي لأدنى مخزون" : "Default min stock"}
+                  className="h-10 text-xs font-bold"
                 />
                 <p className="text-[11px] text-muted-foreground">
                   {isAr

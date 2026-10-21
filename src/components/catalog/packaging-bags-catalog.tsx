@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { VortexDrawerDialog } from "@/components/vortex-ui";
+import { AmountInput } from "@/components/ui/amount-input";
+import { QuantityInput } from "@/components/ui/quantity-input";
 
 const db = supabase as any;
 
@@ -451,14 +453,13 @@ export function PackagingBagsCatalogView() {
 
           <div className="space-y-1.5">
             <label className="font-bold text-foreground">سعة العبوة (كجم)</label>
-            <input
-              type="number"
+            <QuantityInput
+              value={formWeightKg === "" ? null : Number(formWeightKg)}
+              onValueChange={(v) => setFormWeightKg(v == null ? "" : String(v))}
+              decimals={3}
               min={0}
-              step="0.001"
-              value={formWeightKg}
-              onChange={(e) => setFormWeightKg(e.target.value)}
+              unit="kg"
               placeholder="مثال: 50 أو 25"
-              className="w-full rounded-xl border border-border bg-background px-3 py-2 font-mono"
             />
             <p className="text-[10px] text-muted-foreground">
               تُستخدم في شاشات الطحن لاحتساب الوزن الإجمالي تلقائياً (عدد الأكياس × السعة). اتركها
@@ -469,23 +470,21 @@ export function PackagingBagsCatalogView() {
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <label className="font-bold text-foreground">سعر البيع للزبون (ر.ي) *</label>
-              <input
-                type="number"
-                min={0}
+              <AmountInput
                 value={formSalePrice}
-                onChange={(e) => setFormSalePrice(Number(e.target.value))}
-                className="w-full rounded-xl border border-border bg-background px-3 py-2 font-mono"
+                onValueChange={(v) => setFormSalePrice(v ?? 0)}
+                min={0}
+                showInWords={false}
               />
             </div>
 
             <div className="space-y-1.5">
               <label className="font-bold text-foreground">سعر التكلفة للمطحنة (ر.ي)</label>
-              <input
-                type="number"
-                min={0}
+              <AmountInput
                 value={formCostPrice}
-                onChange={(e) => setFormCostPrice(Number(e.target.value))}
-                className="w-full rounded-xl border border-border bg-background px-3 py-2 font-mono"
+                onValueChange={(v) => setFormCostPrice(v ?? 0)}
+                min={0}
+                showInWords={false}
               />
             </div>
           </div>

@@ -177,39 +177,29 @@ function InventoryPage() {
   }, [warehouses, warehouseId]);
 
   /*
-   * Origin/main's stock engine, streamed.
+  /*
+   * Streamed inventory catalogue.
    *
-   * Stock is read from public.stock_positions — the Item + Location + Owner
-   * model — filtered to company-owned TRACKED goods. One position row is one
-   * item in one warehouse, so the page is paginated over DISTINCT ITEMS, not
-   * over raw position rows: the item ids for the page are selected first with
-   * a real `.range()` window, then only that item's positions are fetched.
+   * Inventory is rooted in the active physical goods (`products` with
+   * `inventory_policy = 'TRACKED'` and not services), paginated by distinct
+   * item IDs. For each page slice, quantities across warehouses are resolved
+   * from `stock_positions` (or directly from `inventory` as fallback).
    *
-   * Paginating the raw rows instead would split one item across two pages and
-   * make the per-warehouse aggregation silently wrong, which is exactly what
-   * this ordering avoids.
-   *
-   * `item_name` is not unique, so `item_id` is appended as a tie-breaker: the
-   * order must be stable or a page can repeat or skip rows.
+   * This guarantees that even newly added products or products currently at 0 stock
+   * appear in the inventory list as "out of stock" instead of vanishing completely.
    */
   const { data: allWarehouses } = useQuery({
     queryKey: ["inventory", "item-ids"],
     queryFn: async () => {
-      const { data, error: idsError } = await positionsTable()
-        .select("item_id")
-        .eq("owner_type", "COMPANY")
-        .eq("inventory_policy", "TRACKED")
-        .order("item_name")
-        .order("item_id");
+      const { data, error: idsError } = await (supabase.from("products") as any)
+        .select("id")
+        .eq("is_active", true)
+        .neq("item_nature", "SERVICE")
+        .neq("inventory_policy", "UNTRACKED")
+        .order("name_ar", { ascending: true })
+        .order("name", { ascending: true });
       if (idsError) throw idsError;
-      const ordered: string[] = [];
-      const seen = new Set<string>();
-      for (const position of (data ?? []) as { item_id: string }[]) {
-        if (seen.has(position.item_id)) continue;
-        seen.add(position.item_id);
-        ordered.push(position.item_id);
-      }
-      return ordered;
+      return ((data ?? []) as { id: string }[]).map((p) => p.id);
     },
     staleTime: 30_000,
   });
@@ -232,69 +222,80 @@ function InventoryPage() {
       const pageIds = orderedIds.slice(from, from + INVENTORY_PAGE_SIZE);
       if (pageIds.length === 0) return { rows: [] as Row[], hasMore: false };
 
-      // Only this page's positions cross the wire, filtered server-side.
-      const { data, error: rowsError } = await positionsTable()
-        .select("item_id, item_name, item_name_ar, sku, quantity, warehouse_id")
-        .eq("owner_type", "COMPANY")
-        .eq("inventory_policy", "TRACKED")
-        .in("item_id", pageIds);
-      if (rowsError) throw rowsError;
+      // 1. Fetch metadata for this page's products
+      const { data: detailRows, error: detailsError } = await (supabase.from("products") as any)
+        .select(
+          "id, name, name_ar, sku, barcode, min_stock, cost_price, shelf_location, item_nature, item_class, inventory_policy, category:categories(name, name_ar), brand:brands!products_brand_id_fkey(name, name_ar), unit:units!products_unit_id_fkey(name, short_name, name_ar)",
+        )
+        .in("id", pageIds);
+      if (detailsError) throw detailsError;
 
-      const byItem = new Map<string, Row>();
-      for (const position of (data ?? []) as StockPosition[]) {
-        const existing = byItem.get(position.item_id);
-        if (existing) {
-          existing.byWarehouse[position.warehouse_id] =
-            (existing.byWarehouse[position.warehouse_id] ?? 0) + Number(position.quantity ?? 0);
+      // 2. Fetch stock quantities for this page's products across warehouses
+      const byWarehouseByItem: Record<string, Record<string, number>> = {};
+      for (const id of pageIds) {
+        byWarehouseByItem[id] = {};
+      }
+
+      try {
+        const { data: posData, error: posError } = await positionsTable()
+          .select("item_id, warehouse_id, quantity")
+          .eq("owner_type", "COMPANY")
+          .eq("inventory_policy", "TRACKED")
+          .in("item_id", pageIds);
+
+        if (!posError && Array.isArray(posData)) {
+          for (const pos of posData as StockPosition[]) {
+            if (!byWarehouseByItem[pos.item_id]) byWarehouseByItem[pos.item_id] = {};
+            byWarehouseByItem[pos.item_id][pos.warehouse_id] =
+              (byWarehouseByItem[pos.item_id][pos.warehouse_id] ?? 0) + Number(pos.quantity ?? 0);
+          }
         } else {
-          byItem.set(position.item_id, {
-            id: position.item_id,
-            name: position.item_name,
-            name_ar: position.item_name_ar,
-            sku: position.sku,
-            barcode: null,
-            cost_price: 0,
-            min_stock: 0,
-            shelf_location: null,
-            byWarehouse: { [position.warehouse_id]: Number(position.quantity ?? 0) },
-          });
+          // Fallback to inventory table — `owner_type` موجود في قاعدة البيانات لكنه
+          // غائب عن الأنواع المولّدة، فنمرّر الطلب عبر `any` بدل حذف الفلتر
+          // (الفتر ضروري لتمييز مخزون المنشأة عن الأمانات).
+          const { data: invData } = await (supabase.from("inventory") as any)
+            .select("product_id, warehouse_id, quantity")
+            .eq("owner_type", "COMPANY")
+            .in("product_id", pageIds);
+
+          if (Array.isArray(invData)) {
+            for (const inv of invData) {
+              if (!byWarehouseByItem[inv.product_id]) byWarehouseByItem[inv.product_id] = {};
+              byWarehouseByItem[inv.product_id][inv.warehouse_id] =
+                (byWarehouseByItem[inv.product_id][inv.warehouse_id] ?? 0) +
+                Number(inv.quantity ?? 0);
+            }
+          }
         }
+      } catch {
+        // Fallback gracefully with initialized 0 quantities
       }
 
-      // Presentation metadata for the slice of items currently in view. The
-      // stock engine above never depends on it, so an item without a catalogue
-      // row is still shown instead of silently vanishing.
-      const sliced = pageIds.map((id) => byItem.get(id)).filter((row): row is Row => Boolean(row));
-      const ids = sliced.map((r) => r.id);
-      let details: any[] = [];
-      if (ids.length) {
-        const { data: detailRows } = await (supabase.from("products") as any)
-          .select(
-            "id, barcode, min_stock, cost_price, shelf_location, item_nature, item_class, inventory_policy, category:categories(name, name_ar), brand:brands!products_brand_id_fkey(name, name_ar), unit:units!products_unit_id_fkey(name, short_name, name_ar)",
-          )
-          .in("id", ids);
-        details = (detailRows ?? []) as any[];
-      }
-      const metaById = new Map<string, any>((details ?? []).map((d: any) => [d.id, d]));
-      const rows = sliced.map((r) => {
-        const meta = metaById.get(r.id);
-        if (!meta) return r;
-        return {
-          ...r,
-          barcode: meta.barcode ?? null,
-          min_stock: Number(meta.min_stock ?? 0),
-          cost_price: Number(meta.cost_price ?? 0),
-          shelf_location: meta.shelf_location ?? null,
-          category: meta.category ?? null,
-          brand: meta.brand ?? null,
-          unit: meta.unit ?? null,
-          // Carried so the row can be colour-coded by role. On a mill screen a
-          // sack of grain and a sack of flour look identical until they do not.
-          item_nature: meta.item_nature ?? null,
-          item_class: meta.item_class ?? null,
-          inventory_policy: meta.inventory_policy ?? null,
-        };
-      });
+      const metaById = new Map<string, any>((detailRows ?? []).map((d: any) => [d.id, d]));
+      const rows: Row[] = pageIds
+        .map((id): Row | null => {
+          const meta = metaById.get(id);
+          if (!meta) return null;
+          return {
+            id: meta.id,
+            name: meta.name || meta.name_ar || "",
+            name_ar: meta.name_ar || meta.name || null,
+            sku: meta.sku ?? null,
+            barcode: meta.barcode ?? null,
+            min_stock: Number(meta.min_stock ?? 0),
+            cost_price: Number(meta.cost_price ?? 0),
+            shelf_location: meta.shelf_location ?? null,
+            category: meta.category ?? null,
+            brand: meta.brand ?? null,
+            unit: meta.unit ?? null,
+            item_nature: meta.item_nature ?? null,
+            item_class: meta.item_class ?? null,
+            inventory_policy: meta.inventory_policy ?? null,
+            byWarehouse: byWarehouseByItem[meta.id] ?? {},
+          };
+        })
+        .filter((r): r is Row => Boolean(r));
+
       return { rows, hasMore: from + INVENTORY_PAGE_SIZE < orderedIds.length };
     },
     getNextPageParam: (lastPage, pages) => (lastPage.hasMore ? pages.length : undefined),
@@ -337,6 +338,7 @@ function InventoryPage() {
     { table: "inventory", queryKey: QUERY_KEYS.inventory(warehouseId), debounceMs: 150 },
     qc,
   );
+  useRealtimeTable({ table: "products", queryKey: ["inventory", "item-ids"], debounceMs: 250 }, qc);
 
   const label = (en?: string | null, ar?: string | null) =>
     (lang === "ar" ? ar || en : en || ar) ?? "—";

@@ -158,6 +158,17 @@ const HIDE_BELOW: Record<"sm" | "md" | "lg", string> = {
  *  - **Full bleed.** No horizontal padding around the table, so rows fill the
  *    panel edge to edge.
  */
+function parseColumnWidth(width?: string): number | null {
+  if (!width) return null;
+  const pxMatch = width.match(/w-\[(\d+(?:\.\d+)?)px\]/);
+  if (pxMatch) return parseFloat(pxMatch[1]);
+  const remMatch = width.match(/w-\[(\d+(?:\.\d+)?)rem\]/);
+  if (remMatch) return parseFloat(remMatch[1]) * 16;
+  const numMatch = width.match(/w-(\d+)/);
+  if (numMatch) return parseFloat(numMatch[1]) * 4;
+  return null;
+}
+
 export function DataTable<T>({
   columns,
   rows,
@@ -340,16 +351,6 @@ export function DataTable<T>({
     return () => observer.disconnect();
   }, [infinite, hasMore]);
 
-  /* ---- error ---- */
-  if (error) {
-    return (
-      <div className={cn("flex min-w-0 flex-col", className)}>
-        {toolbar ? <div className="border-b border-border/60 px-3 py-2.5">{toolbar}</div> : null}
-        <QueryErrorState error={error} onRetry={onRetry} />
-      </div>
-    );
-  }
-
   const loadedCount = displayRows.length;
 
   /*
@@ -362,31 +363,60 @@ export function DataTable<T>({
    * with the other hooks at the top of the component.
    */
   const stickyOffset = stickyTop ?? "0px";
-  const tableClassName = cn(
-    "w-full border-collapse text-sm",
-    minWidth || horizontalScroll ? "table-auto" : "table-fixed",
-  );
-  const tableStyle = minWidth ? { minWidth } : undefined;
-  const detachedHeader = Boolean(horizontalScroll || minWidth) && stickyHeader;
+  const isScrollable = Boolean(horizontalScroll || minWidth);
+  const detachedHeader = isScrollable && stickyHeader;
 
-  /*
-   * توزيع الأعمدة متطابق بين جدول الرأس المفصول وجدول البيانات: نُصدر
-   * <colgroup> واحدًا بنفس كلاسات العرض لكلا الجدولين. بدونه، يُحسب تخطيط
-   * الجدول التلقائي (table-auto) من محتوى كل جدول على حدة — فتتباين أعمدة
-   * الرأس عن أعمدة البيانات.
-   */
+  // Hooks must run before any early return, so the width geometry lives above
+  // the error branch (react-hooks/rules-of-hooks).
+  const columnWidths = React.useMemo(() => {
+    return visibleColumns.map((c) => parseColumnWidth(c.width) ?? 130);
+  }, [visibleColumns]);
+
+  const totalExplicitWidth = React.useMemo(() => {
+    return columnWidths.reduce((sum, w) => sum + w, 0);
+  }, [columnWidths]);
+
+  /* ---- error ---- */
+  if (error) {
+    return (
+      <div className={cn("flex min-w-0 flex-col", className)}>
+        {toolbar ? <div className="border-b border-border/60 px-3 py-2.5">{toolbar}</div> : null}
+        <QueryErrorState error={error} onRetry={onRetry} />
+      </div>
+    );
+  }
+
+  const effectiveTableWidth = isScrollable
+    ? Math.max(minWidth ?? 0, totalExplicitWidth)
+    : undefined;
+
+  const tableStyle: React.CSSProperties = effectiveTableWidth
+    ? {
+        minWidth: `${effectiveTableWidth}px`,
+        width: `${effectiveTableWidth}px`,
+        tableLayout: "fixed",
+      }
+    : {
+        width: "100%",
+        tableLayout: "fixed",
+      };
+
+  const alignedTableClassName = "w-full border-collapse text-sm table-fixed";
+
   const colGroup = visibleColumns.length ? (
     <colgroup>
-      {visibleColumns.map((c) => (
-        <col key={c.key} className={c.width} />
-      ))}
+      {visibleColumns.map((c, i) => {
+        const w = columnWidths[i];
+        return (
+          <col
+            key={c.key}
+            className={c.width}
+            style={w ? { width: `${w}px`, minWidth: `${w}px`, maxWidth: `${w}px` } : undefined}
+          />
+        );
+      })}
     </colgroup>
   ) : null;
-
-  /* مع min-width يبقى التخطيط تلقائيًا ليتسع المحتوى؛ مع ثبات الأعمدة
-   * نستخدم table-fixed ليكون الجدولان متطابقين تمامًا وعمودًا بعمود. */
-  // السماح للجدول بالتوسع تلقائياً حسب أطول نص في كل عمود (table-auto) دون إجبار العرض الثابت
-  const alignedTableClassName = cn(tableClassName, "table-auto");
 
   // مزامنة أفقية موحدة وفورية تمنع حلقة الصدى (echo loop) والتقطع،
   // وتسمح للمتصفح بالاحتفاظ بعزم الحركة الطبيعي (120Hz momentum) والمطاطية (rubber-band)
@@ -421,9 +451,7 @@ export function DataTable<T>({
         </div>
       ) : null}
 
-      {showSkeleton ? (
-        <TableSkeleton columns={Math.min(visibleColumns.length, 7)} />
-      ) : showEmpty ? (
+      {showEmpty ? (
         <EmptyState
           icon={empty?.icon ?? <Inbox />}
           title={empty?.title ?? "No records"}
@@ -450,6 +478,7 @@ export function DataTable<T>({
                   {colGroup}
                   <TableHead
                     columns={visibleColumns}
+                    columnWidths={columnWidths}
                     sort={sort}
                     onSortChange={onSortChange}
                     pinFirst={pinFirst}
@@ -487,6 +516,7 @@ export function DataTable<T>({
               {colGroup}
               <TableHead
                 columns={visibleColumns}
+                columnWidths={columnWidths}
                 sort={sort}
                 onSortChange={onSortChange}
                 pinFirst={pinFirst}
@@ -494,50 +524,98 @@ export function DataTable<T>({
                 visuallyHidden={detachedHeader}
               />
 
-              <tbody>
-                {displayRows.map((row, index) => (
-                  <tr
-                    key={rowKey(row)}
-                    className={cn(
-                      "border-b border-border/60 transition-colors duration-150 hover:bg-accent/40",
-                      onRowClick && "cursor-pointer",
-                    )}
-                    onClick={onRowClick ? () => onRowClick(row) : undefined}
-                    {...(rowProps ? rowProps(row) : {})}
-                  >
-                    {visibleColumns.map((col) => {
-                      const stickyCol = col.sticky ?? (pinFirst && col === visibleColumns[0]);
-                      return (
-                        <td
-                          key={col.key}
-                          className={cn(
-                            "px-3 py-2.5 align-middle first:ps-4 last:pe-5",
-                            /* On a phone, forced single-line cells are what push a
-                             * wide table past the viewport. Let text wrap under
-                             * `sm` and keep the single-line ERP look from `sm`
-                             * up, where there is room for it. */
-                            !col.wrap ? "whitespace-nowrap" : "break-words",
-                            col.align === "end"
-                              ? "text-end tabular-nums"
-                              : col.align === "center"
-                                ? "text-center"
-                                : "text-start",
-                            col.className,
-                            col.hideBelow && HIDE_BELOW[col.hideBelow],
-                            stickyCol && "sticky start-0 z-10 bg-surface",
-                          )}
-                        >
-                          {col.cell(row, index)}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
+              <tbody className="divide-y divide-border/60">
+                {showSkeleton
+                  ? Array.from({ length: 7 }).map((_, rowIndex) => (
+                      <tr
+                        key={`skeleton-row-${rowIndex}`}
+                        className="border-b border-border/50 transition-colors"
+                      >
+                        {visibleColumns.map((col, colIdx) => {
+                          const stickyCol = col.sticky ?? (pinFirst && col === visibleColumns[0]);
+                          const w = columnWidths[colIdx];
+                          return (
+                            <td
+                              key={col.key}
+                              style={
+                                w
+                                  ? { width: `${w}px`, minWidth: `${w}px`, maxWidth: `${w}px` }
+                                  : undefined
+                              }
+                              className={cn(
+                                "px-3 py-3 align-middle first:ps-4 last:pe-5",
+                                col.align === "end"
+                                  ? "text-end"
+                                  : col.align === "center"
+                                    ? "text-center"
+                                    : "text-start",
+                                col.className,
+                                col.hideBelow && HIDE_BELOW[col.hideBelow],
+                                stickyCol && "sticky start-0 z-10 bg-surface",
+                              )}
+                            >
+                              <div
+                                className={cn(
+                                  "shimmer h-3.5 rounded-md bg-surface-3/70",
+                                  col.align === "end"
+                                    ? "ms-auto w-16"
+                                    : col.align === "center"
+                                      ? "mx-auto w-12"
+                                      : colIdx === 0
+                                        ? "w-36 max-w-[85%]"
+                                        : "w-20 max-w-[70%]",
+                                )}
+                              />
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))
+                  : displayRows.map((row, index) => (
+                      <tr
+                        key={rowKey(row)}
+                        className={cn(
+                          "border-b border-border/60 transition-colors duration-150 hover:bg-accent/40",
+                          onRowClick && "cursor-pointer",
+                        )}
+                        onClick={onRowClick ? () => onRowClick(row) : undefined}
+                        {...(rowProps ? rowProps(row) : {})}
+                      >
+                        {visibleColumns.map((col, colIdx) => {
+                          const stickyCol = col.sticky ?? (pinFirst && col === visibleColumns[0]);
+                          const w = columnWidths[colIdx];
+                          return (
+                            <td
+                              key={col.key}
+                              style={
+                                w
+                                  ? { width: `${w}px`, minWidth: `${w}px`, maxWidth: `${w}px` }
+                                  : undefined
+                              }
+                              className={cn(
+                                "px-3 py-2.5 align-middle first:ps-4 last:pe-5",
+                                !col.wrap ? "whitespace-nowrap" : "break-words",
+                                col.align === "end"
+                                  ? "text-end tabular-nums"
+                                  : col.align === "center"
+                                    ? "text-center"
+                                    : "text-start",
+                                col.className,
+                                col.hideBelow && HIDE_BELOW[col.hideBelow],
+                                stickyCol && "sticky start-0 z-10 bg-surface",
+                              )}
+                            >
+                              {col.cell(row, index)}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
               </tbody>
             </table>
 
             {/* ---------- Infinite-scroll footer ---------- */}
-            {infinite ? (
+            {!showSkeleton && infinite ? (
               <div ref={sentinelRef} className="flex items-center justify-center gap-2 py-4">
                 {loadingMore ? (
                   <>
@@ -560,7 +638,7 @@ export function DataTable<T>({
             ) : null}
 
             {/* ---------- "Load more" for legacy paged tables ---------- */}
-            {paginate && legacyPageRows.length < sortedRows.length ? (
+            {!showSkeleton && paginate && legacyPageRows.length < sortedRows.length ? (
               <div className="flex justify-center py-3">
                 <button
                   type="button"
@@ -594,6 +672,7 @@ export function DataTable<T>({
 
 function TableHead<T>({
   columns,
+  columnWidths,
   sort,
   onSortChange,
   pinFirst,
@@ -601,6 +680,7 @@ function TableHead<T>({
   visuallyHidden = false,
 }: {
   columns: DataTableColumn<T>[];
+  columnWidths?: number[];
   sort: DataTableSort | null;
   onSortChange?: (sort: DataTableSort | null) => void;
   pinFirst: boolean;
@@ -616,10 +696,12 @@ function TableHead<T>({
 
   return (
     <thead
+      aria-hidden={visuallyHidden ? "true" : undefined}
       className={cn(
-        visuallyHidden && "sr-only",
-        sticky &&
-          "sticky z-20 bg-surface-2/70 backdrop-blur-md [top:calc(var(--ds-sticky-top,0px)+var(--ds-toolbar-h,0px))]",
+        visuallyHidden
+          ? "invisible h-0 border-none select-none pointer-events-none [&_th]:h-0 [&_th]:py-0 [&_th]:border-none [&_th]:leading-[0px] [&_th_*]:hidden"
+          : sticky &&
+              "sticky z-20 bg-surface-2/70 backdrop-blur-md [top:calc(var(--ds-sticky-top,0px)+var(--ds-toolbar-h,0px))]",
         !sticky && !visuallyHidden && "bg-surface-2/50",
       )}
     >
@@ -627,9 +709,11 @@ function TableHead<T>({
         {columns.map((column, index) => {
           const active = sort?.key === column.key;
           const stickyColumn = column.sticky ?? (pinFirst && index === 0);
+          const w = columnWidths?.[index];
           return (
             <th
               key={column.key}
+              style={w ? { width: `${w}px`, minWidth: `${w}px`, maxWidth: `${w}px` } : undefined}
               scope="col"
               aria-sort={
                 active

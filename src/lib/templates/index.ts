@@ -247,18 +247,10 @@ registerTemplate(
     nameEn: "Milling Service & Delivery Master",
     category: "standard",
     paperSize: "A4",
-    supportedPaperProfiles: ["a4", "a5", "thermal-80", "thermal-58"],
+    supportedPaperProfiles: ["a4", "a5"],
     supportedDocTypes: ALL_SUPPORTED_DOC_TYPES,
   },
-  (doc, labels, rtl, options) => {
-    if (
-      options?.paperProfileId?.startsWith("thermal") ||
-      doc.options?.paperSize?.startsWith("thermal")
-    ) {
-      return renderMillingThermalTemplate(doc, labels, rtl, options);
-    }
-    return renderMillingMasterTemplate(doc, labels, rtl, options);
-  },
+  renderMillingMasterTemplate,
 );
 
 registerTemplate(

@@ -240,15 +240,15 @@ export function BackupSettingsCard() {
       toast.success(
         isAr
           ? `تم التفريغ الخادمي (${serverPayload.table_count} جدول / ${serverPayload.total_rows} صف)` +
-            (cloudPath
-              ? ` ورفع السحابي إلى ${cloudPath}`
-              : destination === "cloud" || destination === "both"
-                ? ` — فشل الرفع السحابي: ${cloudFailed}`
+              (cloudPath
+                ? ` ورفع السحابي إلى ${cloudPath}`
+                : destination === "cloud" || destination === "both"
+                  ? ` — فشل الرفع السحابي: ${cloudFailed}`
+                  : "") +
+              (customDirsResult && customDirsResult.ok > 0
+                ? ` وكُتب في ${customDirsResult.ok} مسار مخصص على الجهاز`
                 : "") +
-            (customDirsResult && customDirsResult.ok > 0
-              ? ` وكُتب في ${customDirsResult.ok} مسار مخصص على الجهاز`
-              : "") +
-            ` — النسخة المشفّرة: ${pkg.fileName}`
+              ` — النسخة المشفّرة: ${pkg.fileName}`
           : `Server-side export (${serverPayload.table_count} tables / ${serverPayload.total_rows} rows) saved as ${pkg.fileName}`,
       );
     } catch (err: any) {
@@ -504,7 +504,7 @@ export function BackupSettingsCard() {
               ) : (
                 <div className="text-xs text-muted-foreground bg-surface-2/40 p-3 rounded-xl border border-dashed border-border/60">
                   {isAr
-                    ? "لم تُضف أي مسار بعد — انقر \"إضافة مسار\" واختر مجلداً على أي قرص."
+                    ? 'لم تُضف أي مسار بعد — انقر "إضافة مسار" واختر مجلداً على أي قرص.'
                     : "No custom paths yet — click 'Add Path' and pick a folder."}
                 </div>
               )}

@@ -68,6 +68,11 @@ import { printUnifiedDocument, type PrintRequest } from "@/lib/printing";
 import { printInvoice, type InvoiceTemplate } from "@/lib/invoice-print";
 import type { InvoiceDoc } from "@/lib/pdf";
 import { OperationSuccessModal } from "@/components/communication";
+import { PosBatchSelectorModal } from "@/components/batches/pos-batch-selector-modal";
+import { useBatchSettings } from "@/hooks/use-batch-settings";
+import { useCashboxes } from "@/hooks/use-cashboxes";
+import { useCompanyBankAccounts } from "@/hooks/use-company-bank-accounts";
+import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
 import type { CustomerContext, InvoiceContext } from "@/lib/communication";
 import { translateRpcError } from "@/lib/errors/rpc-errors";
 import { usePaymentPanel } from "@/components/payments/payment-panel";
@@ -109,6 +114,7 @@ interface Product {
   is_service?: boolean | null;
   item_nature?: string | null;
   inventory_policy?: string | null;
+  tracking?: string | null;
   unit?: { short_name: string; name_ar: string | null; name: string } | null;
   category?: { name: string; name_ar: string | null } | null;
   brand?: { name: string; name_ar: string | null } | null;
@@ -125,6 +131,9 @@ interface CartLine {
   is_service?: boolean;
   item_nature?: string;
   inventory_policy?: string;
+  batch_id?: string | null;
+  batch_number?: string | null;
+  expiry_date?: string | null;
 }
 interface Warehouse {
   id: string;
@@ -283,6 +292,20 @@ function POSPage() {
   const { methods: posPaymentMethods } = usePaymentMethodsForContext("pos", {
     includeCredit: true,
   });
+  const { settings: batchSettings } = useBatchSettings();
+  const { activeCashboxes, defaultCashbox } = useCashboxes();
+  const {
+    banks: companyBanks,
+    wallets: companyWallets,
+    defaultBank,
+    defaultWallet,
+  } = useCompanyBankAccounts();
+  const [settlement, setSettlement] = useState<PaymentSettlementSelection>({
+    method: "cash",
+    paymentMethodId: "cash",
+  });
+  const [batchPendingProduct, setBatchPendingProduct] = useState<Product | null>(null);
+  const [batchModalOpen, setBatchModalOpen] = useState(false);
   const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
   const [stockMap, setStockMap] = useState<Record<string, number>>({});
@@ -886,22 +909,48 @@ function POSPage() {
     });
   }, [filtered, catalogTableSort, stockMap, lang]);
 
-  function addToCart(p: Product) {
+  function addToCart(
+    p: Product,
+    selectedBatch?: { id: string; batch_number: string; expiry_date: string | null } | null,
+  ) {
     const prodName = lang === "ar" && p.name_ar ? p.name_ar : p.name;
-    // الخدمات (SERVICE) لا مخزون لها إطلاقاً — item_nature = SERVICE يعني
-    // inventory_policy = UNTRACKED. فحص "نفد المخزون" كان يرفضها لأن
-    // stockMap لا يحملها، فيستحيل بيع أجرة الطحن من نقطة البيع.
     const isService = p.is_service === true;
 
     if (!isService) {
+      // التحقق من سياسة المخزون وتتبع الدفعات (BATCH):
+      const isBatchTracked =
+        p.tracking === "BATCH" ||
+        p.inventory_policy === "BATCH" ||
+        (batchSettings?.enforce_batch_selection_on_pos &&
+          (p.tracking === "BATCH" || p.inventory_policy === "BATCH"));
+
+      if (isBatchTracked && selectedBatch === undefined) {
+        if (!warehouseId) {
+          toast.error(
+            lang === "ar"
+              ? "يرجى اختيار المستودع أولاً لاختيار الدفعة"
+              : "Please select a warehouse first to choose a batch",
+          );
+          return;
+        }
+        setBatchPendingProduct(p);
+        setBatchModalOpen(true);
+        return;
+      }
+
       const stock = stockMap[p.id] ?? 0;
       if (stock <= 0) {
         return toast.error(
           lang === "ar" ? `نفد المخزون من: ${prodName}` : `${p.name} ${t("pos.out_of_stock")}`,
         );
       }
+
+      const batchId = selectedBatch?.id ?? null;
+      const batchNumber = selectedBatch?.batch_number ?? null;
+      const expiryDate = selectedBatch?.expiry_date ?? null;
+
       setCart((c) => {
-        const existing = c.find((l) => l.product_id === p.id);
+        const existing = c.find((l) => l.product_id === p.id && (l.batch_id || null) === batchId);
         if (existing) {
           if (existing.quantity >= stock) {
             toast.error(
@@ -911,7 +960,7 @@ function POSPage() {
             );
             return c;
           }
-          return c.map((l) => (l.product_id === p.id ? { ...l, quantity: l.quantity + 1 } : l));
+          return c.map((l) => (l === existing ? { ...l, quantity: l.quantity + 1 } : l));
         }
         return [
           ...c,
@@ -923,6 +972,9 @@ function POSPage() {
             tax_rate: Number(p.tax_rate ?? 0),
             quantity: 1,
             is_service: false,
+            batch_id: batchId,
+            batch_number: batchNumber,
+            expiry_date: expiryDate,
           },
         ];
       });
@@ -1713,20 +1765,24 @@ function POSPage() {
             <p className="truncate text-[11px] text-muted-foreground">{t("pos.subtitle")}</p>
           </div>
           {selectedCustomer &&
-            (Number(selectedCustomer.balance) !== 0 || Number(selectedCustomer.credit_limit) > 0) && (
+            (Number(selectedCustomer.balance) !== 0 ||
+              Number(selectedCustomer.credit_limit) > 0) && (
               <div className="hidden min-w-0 shrink-0 items-center gap-2 rounded-lg border border-border/70 bg-surface/70 px-2 py-1 text-[10px] font-mono xl:flex">
                 {Number(selectedCustomer.balance) > 0 ? (
                   <span className="font-bold text-amber-600">
-                    {lang === "ar" ? "عليه دين:" : "Debt:"} {money(Number(selectedCustomer.balance))}
+                    {lang === "ar" ? "عليه دين:" : "Debt:"}{" "}
+                    {money(Number(selectedCustomer.balance))}
                   </span>
                 ) : Number(selectedCustomer.balance) < 0 ? (
                   <span className="font-bold text-emerald-600">
-                    {lang === "ar" ? "له رصيد:" : "Credit:"} {money(Math.abs(Number(selectedCustomer.balance)))}
+                    {lang === "ar" ? "له رصيد:" : "Credit:"}{" "}
+                    {money(Math.abs(Number(selectedCustomer.balance)))}
                   </span>
                 ) : null}
                 {Number(selectedCustomer.credit_limit) > 0 && (
                   <span className="border-s border-border/60 ps-2 text-muted-foreground">
-                    {lang === "ar" ? "الحد:" : "Limit:"} {money(Number(selectedCustomer.credit_limit))}
+                    {lang === "ar" ? "الحد:" : "Limit:"}{" "}
+                    {money(Number(selectedCustomer.credit_limit))}
                   </span>
                 )}
               </div>
@@ -1786,66 +1842,66 @@ function POSPage() {
               </div>
             )}
             <div className="col-span-2 flex items-center justify-end gap-1 2xl:contents">
-            {/* Invoice Date */}
-            <label className="relative grid size-9 shrink-0 place-items-center rounded-full border border-border/80 bg-surface text-xs text-muted-foreground shadow-2xs hover:border-primary/40 transition sm:flex sm:w-auto sm:items-center sm:gap-1.5 sm:rounded-full sm:px-2.5">
-              <CalendarDays className="h-3.5 w-3.5 text-primary shrink-0" />
-              <input
-                type="date"
-                value={saleDate}
-                onChange={(e) => setSaleDate(e.target.value)}
-                aria-label={lang === "ar" ? "تاريخ الفاتورة" : "Invoice date"}
-                className="absolute inset-0 h-full w-full cursor-pointer opacity-0 sm:static sm:h-auto sm:w-24 sm:opacity-100 sm:bg-transparent sm:text-[11px] sm:font-mono sm:text-foreground sm:outline-none"
-              />
-            </label>
+              {/* Invoice Date */}
+              <label className="relative grid size-9 shrink-0 place-items-center rounded-full border border-border/80 bg-surface text-xs text-muted-foreground shadow-2xs hover:border-primary/40 transition sm:flex sm:w-auto sm:items-center sm:gap-1.5 sm:rounded-full sm:px-2.5">
+                <CalendarDays className="h-3.5 w-3.5 text-primary shrink-0" />
+                <input
+                  type="date"
+                  value={saleDate}
+                  onChange={(e) => setSaleDate(e.target.value)}
+                  aria-label={lang === "ar" ? "تاريخ الفاتورة" : "Invoice date"}
+                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0 sm:static sm:h-auto sm:w-24 sm:opacity-100 sm:bg-transparent sm:text-[11px] sm:font-mono sm:text-foreground sm:outline-none"
+                />
+              </label>
 
-            {catalogConfig.enableBarcode &&
-              (isDesktop && !isTouchDevice ? (
+              {catalogConfig.enableBarcode &&
+                (isDesktop && !isTouchDevice ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = !barcodeReaderEnabled;
+                      setBarcodeReaderEnabled(next);
+                      localStorage.setItem("pos_barcode_reader_enabled", String(next));
+                    }}
+                    aria-pressed={barcodeReaderEnabled}
+                    title={
+                      lang === "ar"
+                        ? barcodeReaderEnabled
+                          ? "إيقاف قارئ الباركود"
+                          : "تفعيل قارئ الباركود"
+                        : barcodeReaderEnabled
+                          ? "Disable barcode reader"
+                          : "Enable barcode reader"
+                    }
+                    className={`grid size-9 shrink-0 place-items-center rounded-full border transition ${barcodeReaderEnabled ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600" : "border-border bg-surface text-muted-foreground"}`}
+                  >
+                    <Barcode className="h-4 w-4" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setScannerOpen(true)}
+                    title={lang === "ar" ? "مسح بالكاميرا" : "Scan with camera"}
+                    className="grid size-9 shrink-0 place-items-center rounded-full border border-primary/30 bg-primary/10 text-primary transition hover:bg-primary/20"
+                  >
+                    <ScanBarcode className="h-4 w-4" />
+                  </button>
+                ))}
+
+              {/* Custom Service Fee button */}
+              {enableServiceFeeSetting && (
                 <button
                   type="button"
-                  onClick={() => {
-                    const next = !barcodeReaderEnabled;
-                    setBarcodeReaderEnabled(next);
-                    localStorage.setItem("pos_barcode_reader_enabled", String(next));
-                  }}
-                  aria-pressed={barcodeReaderEnabled}
-                  title={
-                    lang === "ar"
-                      ? barcodeReaderEnabled
-                        ? "إيقاف قارئ الباركود"
-                        : "تفعيل قارئ الباركود"
-                      : barcodeReaderEnabled
-                        ? "Disable barcode reader"
-                        : "Enable barcode reader"
-                  }
-                  className={`grid size-9 shrink-0 place-items-center rounded-full border transition ${barcodeReaderEnabled ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600" : "border-border bg-surface text-muted-foreground"}`}
+                  onClick={() => setServiceOpen(true)}
+                  className="hidden size-9 shrink-0 items-center justify-center rounded-full border border-violet-500/30 bg-violet-500/10 text-violet-700 transition hover:bg-violet-500/20 dark:text-violet-300 xl:inline-flex"
+                  title={lang === "ar" ? "إضافة خدمة أو أجرة تركيب" : "Add custom labor/service"}
                 >
-                  <Barcode className="h-4 w-4" />
+                  <Wrench className="h-3.5 w-3.5" />
                 </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setScannerOpen(true)}
-                  title={lang === "ar" ? "مسح بالكاميرا" : "Scan with camera"}
-                  className="grid size-9 shrink-0 place-items-center rounded-full border border-primary/30 bg-primary/10 text-primary transition hover:bg-primary/20"
-                >
-                  <ScanBarcode className="h-4 w-4" />
-                </button>
-              ))}
+              )}
 
-            {/* Custom Service Fee button */}
-            {enableServiceFeeSetting && (
-              <button
-                type="button"
-                onClick={() => setServiceOpen(true)}
-                className="hidden size-9 shrink-0 items-center justify-center rounded-full border border-violet-500/30 bg-violet-500/10 text-violet-700 transition hover:bg-violet-500/20 dark:text-violet-300 xl:inline-flex"
-                title={lang === "ar" ? "إضافة خدمة أو أجرة تركيب" : "Add custom labor/service"}
-              >
-                <Wrench className="h-3.5 w-3.5" />
-              </button>
-            )}
-
-            {/* Page Guide */}
-            <PageGuideButton config={posGuideConfig} className="!h-9 !w-9 shrink-0" />
+              {/* Page Guide */}
+              <PageGuideButton config={posGuideConfig} className="!h-9 !w-9 shrink-0" />
             </div>
           </div>
         </header>
@@ -1854,7 +1910,7 @@ function POSPage() {
         <div className="grid min-h-0 grid-cols-1 items-stretch gap-2 lg:contents">
           {/* ─── Products Panel (Desktop & Tablet) ─── */}
           {isDesktop && (
-              <div className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-border/80 bg-surface/95 p-3 shadow-sm ring-1 ring-background/40 lg:col-start-1 lg:row-start-3">
+            <div className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-border/80 bg-surface/95 p-3 shadow-sm ring-1 ring-background/40 lg:col-start-1 lg:row-start-3">
               <TableToolbar
                 className="mb-2.5"
                 lang={lang}
@@ -2785,27 +2841,27 @@ function POSPage() {
                   <span className="truncate text-[10px] font-semibold leading-none text-muted-foreground">
                     {lang === "ar" ? "طريقة الدفع" : "Payment method"}
                   </span>
-                {!isSplitPayment ? (
-                  <PaymentMethodPicker
-                    context="pos"
-                    value={isSplitPayment ? "" : paymentMethod}
-                    onChange={(method) => {
-                      setIsSplitPayment(false);
-                      setSplitPayments([]);
-                      setPaymentMethod(method);
-                      setPaid(method === "credit" ? "0" : "");
-                      setPaidManuallyEdited(false);
-                    }}
-                    ensureIds={[paymentMethod]}
-                    ariaLabel={lang === "ar" ? "طريقة الدفع" : "Payment method"}
-                    data-form-nav
-                    className="h-8 min-w-0 rounded-lg text-[10px] sm:text-[11px]"
-                  />
-                ) : (
-                  <div className="flex h-8 min-w-0 items-center truncate rounded-lg border border-primary/20 bg-primary/[0.04] px-2 text-[10px] font-medium text-primary sm:px-3 sm:text-[11px]">
-                    {lang === "ar" ? "طرق دفع متعددة" : "Multiple methods"}
-                  </div>
-                )}
+                  {!isSplitPayment ? (
+                    <PaymentMethodPicker
+                      context="pos"
+                      value={isSplitPayment ? "" : paymentMethod}
+                      onChange={(method) => {
+                        setIsSplitPayment(false);
+                        setSplitPayments([]);
+                        setPaymentMethod(method);
+                        setPaid(method === "credit" ? "0" : "");
+                        setPaidManuallyEdited(false);
+                      }}
+                      ensureIds={[paymentMethod]}
+                      ariaLabel={lang === "ar" ? "طريقة الدفع" : "Payment method"}
+                      data-form-nav
+                      className="h-8 min-w-0 rounded-lg text-[10px] sm:text-[11px]"
+                    />
+                  ) : (
+                    <div className="flex h-8 min-w-0 items-center truncate rounded-lg border border-primary/20 bg-primary/[0.04] px-2 text-[10px] font-medium text-primary sm:px-3 sm:text-[11px]">
+                      {lang === "ar" ? "طرق دفع متعددة" : "Multiple methods"}
+                    </div>
+                  )}
                 </div>
                 {isSplitPayment ? (
                   <div className="flex min-w-0 flex-col gap-1">
@@ -2979,7 +3035,6 @@ function POSPage() {
                     <span>{singlePayment.blockingReason}</span>
                   </div>
                 )}
-
             </div>
 
             {/* ─── Sticky Action Row ─── */}
@@ -3416,11 +3471,11 @@ function POSPage() {
                 }
                 className="h-10 w-full rounded-2xl border border-input bg-surface px-3.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
               />
-              <input
-                type="number"
-                min="0"
+              <AmountInput
+                label={lang === "ar" ? "السعر المتفق عليه" : "Agreed price"}
+                min={0}
                 value={servicePrice}
-                onChange={(e) => setServicePrice(e.target.value)}
+                onValueChange={(v) => setServicePrice(v)}
                 placeholder={lang === "ar" ? "السعر المتفق عليه" : "Agreed price"}
                 className="h-10 w-full rounded-2xl border border-input bg-surface px-3.5 text-sm font-mono outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
               />
@@ -3485,6 +3540,28 @@ function POSPage() {
           request={quoteRequest}
           title={t("pos.quote_preview_title")}
           rtl={lang === "ar"}
+        />
+      ) : null}
+
+      {batchPendingProduct ? (
+        <PosBatchSelectorModal
+          open={batchModalOpen}
+          onOpenChange={(open) => {
+            setBatchModalOpen(open);
+            if (!open) setBatchPendingProduct(null);
+          }}
+          productId={batchPendingProduct.id}
+          productName={
+            lang === "ar" && batchPendingProduct.name_ar
+              ? batchPendingProduct.name_ar
+              : batchPendingProduct.name
+          }
+          warehouseId={warehouseId}
+          onSelectBatch={(batch) => {
+            addToCart(batchPendingProduct, batch);
+            setBatchModalOpen(false);
+            setBatchPendingProduct(null);
+          }}
         />
       ) : null}
     </>

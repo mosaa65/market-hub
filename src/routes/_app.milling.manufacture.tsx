@@ -50,6 +50,7 @@ import {
   Mono,
   fmtNum,
 } from "@/components/milling/milling-ui";
+import { QuantityInput } from "@/components/ui/quantity-input";
 import { BagWeightInput } from "@/components/milling/bag-weight-input";
 
 export const Route = createFileRoute("/_app/milling/manufacture")({
@@ -626,37 +627,47 @@ export function SmartManufacturePage() {
                       </div>
 
                       {line.packageType === "bulk" ? (
-                        <MillingInput
-                          type="number"
+                        <QuantityInput
+                          decimals={3}
                           min={0}
-                          step="0.01"
-                          inputMode="decimal"
+                          emptyAsZero
+                          unit="kg"
                           placeholder="كجم"
-                          value={line.qty}
-                          onChange={(e) =>
+                          aria-label="الكمية كجم"
+                          value={line.qty ? Number(line.qty) : null}
+                          onValueChange={(v) =>
                             setOutputs((o) =>
-                              o.map((l, i) => (i === idx ? { ...l, qty: e.target.value } : l)),
+                              o.map((l, i) =>
+                                i === idx ? { ...l, qty: v == null ? "" : String(v) } : l,
+                              ),
                             )
                           }
                         />
                       ) : (
                         <div className="space-y-1.5">
-                          <MillingInput
-                            type="number"
+                          <QuantityInput
+                            decimals={0}
                             min={0}
-                            step="any"
+                            emptyAsZero
                             placeholder="عدد الأكياس"
-                            value={line.bagsCount ?? ""}
-                            onChange={(e) => handleBagsCountChange(idx, e.target.value)}
+                            aria-label="عدد الأكياس"
+                            value={line.bagsCount ? Number(line.bagsCount) : null}
+                            onValueChange={(v) =>
+                              handleBagsCountChange(idx, v == null ? "" : String(v))
+                            }
                           />
                           {line.packageType === "custom" && (
-                            <MillingInput
-                              type="number"
-                              min={0.1}
-                              step="0.1"
-                              placeholder="سعة الكيس كجم"
-                              value={line.customPackageKg ?? ""}
-                              onChange={(e) => handlePackageChange(idx, "custom", e.target.value)}
+                            <QuantityInput
+                              decimals={3}
+                              min={0}
+                              emptyAsZero
+                              unit="kg"
+                              placeholder="وزن الكيس كجم"
+                              aria-label="وزن الكيس كجم"
+                              value={line.customPackageKg ? Number(line.customPackageKg) : null}
+                              onValueChange={(v) =>
+                                handlePackageChange(idx, "custom", v == null ? "" : String(v))
+                              }
                             />
                           )}
                         </div>
@@ -699,7 +710,6 @@ export function SmartManufacturePage() {
                           </span>
                         )}
                       </div>
-
                       {bagCapacity > 0 && estimatedBagCost > 0 && (
                         <div className="flex items-center gap-2">
                           <span className="text-foreground font-semibold">
@@ -742,13 +752,14 @@ export function SmartManufacturePage() {
                 label="الفاقد التشغيلي اليدوي (كجم)"
                 hint="اختياري — اتركه فارغاً ليقوم النظام بحساب الفاقد آلياً"
               >
-                <MillingInput
-                  type="number"
+                <QuantityInput
                   min={0}
-                  step="0.01"
+                  decimals={2}
+                  unit="kg"
                   placeholder={`تلقائي (${fmtNum(autoWasteKg)} كجم)`}
-                  value={manualWasteKg}
-                  onChange={(e) => setManualWasteKg(e.target.value)}
+                  aria-label="الفاقد التشغيلي اليدوي (كلجم)"
+                  value={manualWasteKg === "" ? null : Number(manualWasteKg)}
+                  onValueChange={(v) => setManualWasteKg(v == null ? "" : String(v))}
                 />
               </MillingField>
 

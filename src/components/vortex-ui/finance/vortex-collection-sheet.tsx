@@ -24,6 +24,9 @@ import { cn } from "@/lib/utils";
 import { useFinancialPosting } from "@/hooks/use-financial-posting";
 import { usePaymentMethodsForContext } from "@/hooks/use-payment-methods";
 import { PaymentMethodPicker } from "@/components/ui/payment-method";
+import { DynamicPaymentSelector } from "@/components/ui/payment-method/dynamic-payment-selector";
+import { AmountInput } from "@/components/ui/amount-input";
+import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
 import { paymentMethodLabel, requiresPaymentReference } from "@/lib/payments/payment-methods";
 
 /** Catalogue id from the business's configured payment-method list. */
@@ -48,6 +51,8 @@ export interface CollectionReceipt {
   date: string;
   paymentDate: string;
   notes?: string;
+  cashboxName?: string | null;
+  bankAccountName?: string | null;
 }
 
 export interface VortexCollectionSheetProps {
@@ -63,6 +68,8 @@ export interface VortexCollectionSheetProps {
     collectionMode?: CollectionMode;
     paymentDate?: string;
     reference?: string;
+    cashboxId?: string | null;
+    bankAccountId?: string | null;
     notes?: string;
   }) => Promise<{ receiptNumber: string }>;
   /** A preselected invoice may be supplied by the sales screen without changing the old sheet UI. */
@@ -83,6 +90,10 @@ export function VortexCollectionSheet({
   const { postPayment, isPosting } = useFinancialPosting();
   const [amount, setAmount] = useState<string>("");
   const [method, setMethod] = useState<PaymentMethod>("cash");
+  const [settlement, setSettlement] = useState<PaymentSettlementSelection>({
+    method: "cash",
+    paymentMethodId: "cash",
+  });
   const [collectionMode, setCollectionMode] = useState<CollectionMode>("receivable");
   const [paymentDate, setPaymentDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [reference, setReference] = useState<string>("");
@@ -149,7 +160,12 @@ export function VortexCollectionSheet({
   const buildTemplateMessage = (r: CollectionReceipt, tpl: MessageTemplateType) => {
     const formattedAmount = money(r.amount);
     const formattedRemaining = money(r.remainingBalance);
-    const mLabel = labelForMethod(r.method);
+    const destination = r.bankAccountName
+      ? ` (${r.bankAccountName})`
+      : r.cashboxName
+        ? ` (${r.cashboxName})`
+        : "";
+    const mLabel = labelForMethod(r.method) + destination;
     const balanceLine =
       r.collectionMode === "advance"
         ? "💳 تم تسجيل دفعة مقدمة مستقلة على حساب العميل."
@@ -212,10 +228,11 @@ export function VortexCollectionSheet({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!customer || payAmount <= 0 || isOverpayment || (needsReference && !reference.trim()))
+    const effectiveReference = (settlement.reference || reference).trim();
+    if (!customer || payAmount <= 0 || isOverpayment || (needsReference && !effectiveReference))
       return;
 
-    const trimmedReference = reference.trim();
+    const trimmedReference = effectiveReference;
     const trimmedNotes = notes.trim();
     const receiptNotes = [
       trimmedReference ? `مرجع: ${trimmedReference}` : null,
@@ -230,10 +247,12 @@ export function VortexCollectionSheet({
         ? await onSavePayment({
             customerId: customer.id,
             amount: payAmount,
-            method,
+            method: settlement.paymentMethodId || method,
             collectionMode,
             paymentDate,
             reference: trimmedReference || undefined,
+            cashboxId: settlement.cashboxId || null,
+            bankAccountId: settlement.bankAccountId || null,
             notes: receiptNotes || undefined,
           })
         : await postPayment({
@@ -241,7 +260,14 @@ export function VortexCollectionSheet({
             partyType: "customer",
             type: "customer_collection",
             amount: payAmount,
-            method,
+            method: settlement.paymentMethodId || method,
+            paymentMethodId: settlement.paymentMethodId || method,
+            cashboxId: settlement.cashboxId || null,
+            bankAccountId: settlement.bankAccountId || null,
+            chequeNumber: settlement.chequeNumber || settlement.cheque?.chequeNumber || null,
+            chequeBank: settlement.chequeBank || settlement.cheque?.bankName || null,
+            chequeDueDate: settlement.chequeDueDate || settlement.cheque?.dueDate || null,
+            chequeDrawer: settlement.chequeDrawer || settlement.cheque?.drawerName || null,
             invoiceId: collectionMode === "advance" ? null : (initialInvoiceId ?? null),
             paymentDate,
             reference: trimmedReference || null,
@@ -266,6 +292,8 @@ export function VortexCollectionSheet({
         date: toSystemDigits(displayDate),
         paymentDate,
         notes: receiptNotes || undefined,
+        cashboxName: settlement.cashboxName || null,
+        bankAccountName: settlement.bankAccountName || null,
       };
 
       setReceipt(newReceipt);
@@ -585,15 +613,14 @@ export function VortexCollectionSheet({
               )}
             </div>
             <div className="relative">
-              <input
-                type="number"
-                step="any"
-                min="0.01"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+              <AmountInput
+                min={0.01}
+                value={toNumberOrNull(amount)}
+                onValueChange={(v) => setAmount(v == null ? "" : String(v))}
                 placeholder="0.00"
-                required
-                className="w-full h-12 rounded-2xl border border-border bg-card px-4 text-base font-black font-mono text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition"
+                aria-label={collectionMode === "advance" ? "قيمة الدفعة المقدمة" : "المبلغ المحصل"}
+                wordsClassName="text-xs"
+                containerClassName="[&_input]:h-12 [&_input]:rounded-2xl [&_input]:bg-card [&_input]:text-base [&_input]:font-black"
               />
             </div>
             {payAmount > 0 && collectionMode === "receivable" && (
@@ -612,13 +639,14 @@ export function VortexCollectionSheet({
 
           {/* Payment Method Selector */}
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-foreground">طريقة الدفع</label>
-            <PaymentMethodPicker
+            <label className="text-xs font-bold text-foreground">طريقة الدفع ومصدر التحصيل</label>
+            <DynamicPaymentSelector
               context="customer_collection"
               value={method}
               onChange={setMethod}
+              settlement={settlement}
+              onSettlementChange={setSettlement}
               includeCredit={false}
-              ariaLabel="طريقة دفع سند القبض"
               className="w-full"
             />
           </div>
@@ -678,4 +706,17 @@ export function VortexCollectionSheet({
       )}
     </VortexDrawerDialog>
   );
+}
+
+/**
+ * حالة النموذج تحتفظ بالمبلغ كسلسلة، بينما `AmountInput` يعمل بقيمة
+ * `number | null`. النص الفارغ أو غير الرقمي يصبح null بدل NaN.
+ */
+function toNumberOrNull(value: string | number | null | undefined): number | null {
+  if (value == null) return null;
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = Number(trimmed.replace(/,/g, ""));
+  return Number.isFinite(parsed) ? parsed : null;
 }

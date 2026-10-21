@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { PackagingBagsCatalogView } from "@/components/catalog/packaging-bags-catalog";
+import { QuantityInput } from "@/components/ui/quantity-input";
 
 export const Route = createFileRoute("/_app/catalog")({
   head: () => ({ meta: [{ title: "الفهرس والتصنيفات — فورتيكس ERP" }] }),
@@ -950,12 +951,12 @@ function CatalogSheetDialog({
             <label className="mb-1.5 block text-xs font-bold text-foreground">
               {lang === "ar" ? "ترتيب الأهمية" : "Sort Order"}
             </label>
-            <input
-              type="number"
-              min="0"
-              value={form.sort_order}
-              onChange={(e) => setForm({ ...form, sort_order: e.target.value })}
-              className="h-11 w-full rounded-xl border border-border/80 bg-background px-3.5 font-mono text-sm text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+            <QuantityInput
+              value={form.sort_order === "" ? null : Number(form.sort_order)}
+              onValueChange={(v) => setForm({ ...form, sort_order: v == null ? "" : String(v) })}
+              decimals={0}
+              min={0}
+              containerClassName="[&_input]:h-11 [&_input]:rounded-xl"
             />
           </div>
         )}

@@ -8,6 +8,8 @@ import { money } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { AmountInput } from "@/components/ui/amount-input";
+import { QuantityInput } from "@/components/ui/quantity-input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -80,7 +82,7 @@ function PrepaymentsPage() {
   const [num, setNum] = useState("");
   const [type, setType] = useState<PrepaymentContract["contract_type"]>("PREPAID_EXPENSE");
   const [title, setTitle] = useState("");
-  const [amount, setAmount] = useState("");
+  const [amountNum, setAmountNum] = useState<number | null>(null);
   const [periods, setPeriods] = useState("12");
   const [targetAccount, setTargetAccount] = useState("5313");
 
@@ -127,10 +129,10 @@ function PrepaymentsPage() {
   }, [contracts]);
 
   const handleCreate = async () => {
-    if (!num || !title || !amount || !periods) return;
+    if (!num || !title || amountNum == null || amountNum <= 0 || !periods) return;
     setActing(true);
     setError(null);
-    const total = Number(amount);
+    const total = amountNum;
     const count = Number(periods);
     const balAccount =
       type === "PREPAID_EXPENSE" ? "1511" : type === "DEFERRED_EXPENSE" ? "1512" : "2231";
@@ -160,7 +162,7 @@ function PrepaymentsPage() {
     setNewOpen(false);
     setNum("");
     setTitle("");
-    setAmount("");
+    setAmountNum(null);
     setNotice("تمت إضافة العقد كمسودة بنجاح");
     await loadContracts();
   };
@@ -436,20 +438,18 @@ function PrepaymentsPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label>المبلغ الإجمالي</Label>
-                <Input
-                  type="number"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="120000"
-                />
+                <AmountInput value={amountNum} onValueChange={setAmountNum} decimals={2} />
               </div>
               <div className="space-y-1">
                 <Label>عدد الفترات (شهور)</Label>
-                <Input
-                  type="number"
-                  value={periods}
-                  onChange={(e) => setPeriods(e.target.value)}
+                <QuantityInput
+                  decimals={0}
+                  min={1}
+                  max={120}
+                  value={periods === "" ? null : Number(periods)}
+                  onValueChange={(v) => setPeriods(v == null ? "" : String(v))}
                   placeholder="12"
+                  aria-label="عدد الفترات (شهور)"
                 />
               </div>
             </div>

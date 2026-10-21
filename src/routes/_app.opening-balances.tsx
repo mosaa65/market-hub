@@ -51,6 +51,8 @@ import {
   type OpeningSummary,
 } from "@/lib/opening-balances";
 import { PageHeader } from "@/components/page-header";
+import { AmountInput } from "@/components/ui/amount-input";
+import { QuantityInput } from "@/components/ui/quantity-input";
 import {
   Cell,
   MillingEmpty,
@@ -468,14 +470,13 @@ export function OpeningBalancesPage() {
                       <label className="mb-1 block text-xs font-bold text-foreground">
                         عدد الأكياس *
                       </label>
-                      <input
-                        type="number"
-                        min="1"
-                        step="1"
+                      <QuantityInput
+                        min={0}
+                        decimals={0}
                         placeholder="مثال: 100"
-                        value={bagsCount}
-                        onChange={(e) => setBagsCount(e.target.value)}
-                        className="h-10 w-full rounded-xl border border-border bg-surface px-3 text-xs font-bold font-mono text-foreground outline-none transition focus:border-primary/60"
+                        aria-label="عدد الأكياس"
+                        value={toNumberOrNull(bagsCount)}
+                        onValueChange={(v) => setBagsCount(v == null ? "" : String(v))}
                       />
                     </div>
 
@@ -483,14 +484,14 @@ export function OpeningBalancesPage() {
                       <label className="mb-1 block text-xs font-bold text-foreground">
                         سعة الكيس (كجم) *
                       </label>
-                      <input
-                        type="number"
-                        min="0.1"
-                        step="any"
+                      <QuantityInput
+                        min={0}
+                        decimals={3}
+                        unit="kg"
                         placeholder="50"
-                        value={bagCapacityKg}
-                        onChange={(e) => setBagCapacityKg(e.target.value)}
-                        className="h-10 w-full rounded-xl border border-border bg-surface px-3 text-xs font-bold font-mono text-foreground outline-none transition focus:border-primary/60"
+                        aria-label="سعة الكيس (كجم)"
+                        value={toNumberOrNull(bagCapacityKg)}
+                        onValueChange={(v) => setBagCapacityKg(v == null ? "" : String(v))}
                       />
                     </div>
 
@@ -498,14 +499,13 @@ export function OpeningBalancesPage() {
                       <label className="mb-1 block text-xs font-bold text-foreground">
                         تكلفة الكيس الواحد *
                       </label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="any"
+                      <AmountInput
+                        min={0}
                         placeholder="مثال: 22000"
-                        value={bagCost}
-                        onChange={(e) => setBagCost(e.target.value)}
-                        className="h-10 w-full rounded-xl border border-border bg-surface px-3 text-xs font-bold font-mono text-foreground outline-none transition focus:border-primary/60"
+                        aria-label="تكلفة الكيس الواحد"
+                        value={toNumberOrNull(bagCost)}
+                        onValueChange={(v) => setBagCost(v == null ? "" : String(v))}
+                        wordsClassName="text-[10px] leading-3"
                       />
                     </div>
                   </div>
@@ -515,14 +515,15 @@ export function OpeningBalancesPage() {
                       <label className="mb-1 block text-xs font-bold text-foreground">
                         الوزن الإجمالي (كجم) *
                       </label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="any"
+                      <QuantityInput
+                        min={0}
+                        decimals={3}
                         placeholder="مثال: 5000"
-                        value={qty}
-                        onChange={(e) => handleQtyOrCostChange(e.target.value, unitCost)}
-                        className="h-10 w-full rounded-xl border border-border bg-surface px-3 text-xs font-bold font-mono text-foreground outline-none transition focus:border-primary/60"
+                        aria-label="الوزن الإجمالي (كجم)"
+                        value={toNumberOrNull(qty)}
+                        onValueChange={(v) =>
+                          handleQtyOrCostChange(v == null ? "" : String(v), unitCost)
+                        }
                       />
                     </div>
 
@@ -530,14 +531,15 @@ export function OpeningBalancesPage() {
                       <label className="mb-1 block text-xs font-bold text-foreground">
                         تكلفة الكيلوجرام الواحد *
                       </label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="any"
+                      <AmountInput
+                        min={0}
                         placeholder="مثال: 440"
-                        value={unitCost}
-                        onChange={(e) => handleQtyOrCostChange(qty, e.target.value)}
-                        className="h-10 w-full rounded-xl border border-border bg-surface px-3 text-xs font-bold font-mono text-foreground outline-none transition focus:border-primary/60"
+                        aria-label="تكلفة الكيلوجرام الواحد"
+                        value={toNumberOrNull(unitCost)}
+                        onValueChange={(v) =>
+                          handleQtyOrCostChange(qty, v == null ? "" : String(v))
+                        }
+                        wordsClassName="text-[10px] leading-3"
                       />
                     </div>
                   </div>
@@ -644,20 +646,16 @@ export function OpeningBalancesPage() {
                 <label className="mb-1 block text-xs font-bold text-foreground">
                   المبلغ المالي للبند (ر.ي) *
                 </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    min="0"
-                    step="any"
-                    placeholder="0.00"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    className="h-12 w-full rounded-xl border border-border bg-surface px-4 text-lg font-black font-mono text-foreground outline-none transition focus:border-primary/60"
-                  />
-                  <span className="absolute end-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">
-                    ر.ي
-                  </span>
-                </div>
+                {/* المبلغ المُوحّد: فاصلة آلاف + تفقيط + رمز العملة من الإعدادات. */}
+                <AmountInput
+                  min={0}
+                  aria-label="المبلغ المالي للبند"
+                  value={toNumberOrNull(amount)}
+                  onValueChange={(v) => setAmount(v == null ? "" : String(v))}
+                  placeholder="0.00"
+                  wordsClassName="text-xs"
+                  containerClassName="[&_input]:h-12 [&_input]:rounded-xl [&_input]:px-4 [&_input]:text-lg [&_input]:font-black"
+                />
               </div>
 
               <button
@@ -1012,4 +1010,17 @@ export function OpeningBalancesPage() {
 
 function roundNum(n: number) {
   return Math.round(n * 100) / 100;
+}
+
+/**
+ * حالة النموذج تحتفظ بالمبلغ كسلسلة (تُرسل للدالة كما هي)، بينما `AmountInput`
+ * يعمل بقيمة `number | null`. النص الفارغ أو غير الرقمي يصبح null بدل NaN.
+ */
+function toNumberOrNull(value: string | number | null | undefined): number | null {
+  if (value == null) return null;
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = Number(trimmed.replace(/,/g, ""));
+  return Number.isFinite(parsed) ? parsed : null;
 }

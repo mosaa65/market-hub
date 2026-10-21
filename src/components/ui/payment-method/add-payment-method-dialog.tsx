@@ -126,12 +126,6 @@ export function AddPaymentMethodDialog({
     }
   }
 
-  function toggleContext(context: PaymentContext) {
-    setContexts((current) =>
-      current.includes(context) ? current.filter((c) => c !== context) : [...current, context],
-    );
-  }
-
   const inputClass =
     "h-10 w-full rounded-xl border border-border/80 bg-surface px-3 text-xs font-semibold text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20";
 
@@ -259,42 +253,10 @@ export function AddPaymentMethodDialog({
           </div>
         </div>
 
-        <div>
-          <span className="text-[11px] font-medium text-muted-foreground">
-            {ar ? "الأقسام التي تظهر فيها" : "Sections where it appears"}
-          </span>
-          {/* `credit` has no context of its own: it is not a way of collecting. */}
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {PAYMENT_CONTEXTS.filter((c) => c !== "sales_returns" && c !== "purchase_returns").map(
-              (context) => {
-                const selected = contexts.includes(context);
-                const label = ar
-                  ? PAYMENT_CONTEXT_LABELS[context].ar
-                  : PAYMENT_CONTEXT_LABELS[context].en;
-                return (
-                  <button
-                    key={context}
-                    type="button"
-                    onClick={() => toggleContext(context)}
-                    aria-pressed={selected}
-                    className={cn(
-                      "rounded-full border px-2.5 py-1 text-[10px] font-medium transition",
-                      selected
-                        ? "border-primary/60 bg-primary/10 text-primary"
-                        : "border-border/70 bg-surface text-muted-foreground hover:bg-surface-2",
-                    )}
-                  >
-                    {label}
-                  </button>
-                );
-              },
-            )}
-          </div>
-          <p className="mt-1.5 text-[10px] text-muted-foreground">
-            {ar
-              ? "مرتجعات المبيعات والمشتريات لا تعرض إلا النقدي والآجل — لا محافظ ولا بنوك."
-              : "Sales and purchase returns only offer cash and credit — never a wallet or a bank."}
-          </p>
+        <div className="rounded-xl border border-primary/20 bg-primary/5 p-2.5 text-[11px] text-muted-foreground">
+          {ar
+            ? "ستُعتمد طريقة الدفع وتظهر تلقائياً في كافة الشاشات والمعاملات (نقطة البيع، المبيعات، المشتريات، المصروفات، السندات والتقارير)."
+            : "The payment method will be approved and appear automatically in all screens (POS, sales, purchases, expenses, vouchers, and reports)."}
         </div>
 
         {error ? (

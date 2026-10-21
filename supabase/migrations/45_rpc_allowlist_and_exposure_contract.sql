@@ -49,10 +49,20 @@ AS $$
     'post_sales_invoice', 'post_purchase_invoice',
     'post_stock_delta',                    -- شاشتا التوريد والتسوية
     'post_stock_settlement',               -- معالج التسوية الجردية (46)
+    'post_stock_adjustment',               -- تسويات المخزون مع قيود الأستاذ
+    'post_opening_stock',                  -- رصيد افتتاحي للمخزون
+    'receive_customer_owned_stock', 'release_customer_owned_stock',
+    'create_opening_balance', 'post_opening_balance', 'reverse_opening_balance',
     'search_products',
     'item_line_type', 'item_stock_effect', 'item_effective_policy',
     'item_has_stock_history', 'resolve_unit_cost',
     'product_reference_counts', 'warehouse_reference_counts',
+    'save_item_policy', 'approve_item_policy_change',
+    -- ── الدفعات والشيكات والتشغيل المالي (فريق العمل) ──
+    'clear_cheque', 'bounce_cheque',
+    -- ── إدارة الدفعات / التشغيلات (فريق العمل - 31) ──
+    'reconcile_batches_with_inventory', 'save_product_batch',
+    'get_batch_kpis', 'delete_product_batch', 'save_batch_settings',
     -- ── الذمم والمدفوعات ──
     'record_customer_payment', 'record_supplier_payment', 'get_supplier_statement',
     'adjust_loyalty', 'customer_credit_limit_allows',

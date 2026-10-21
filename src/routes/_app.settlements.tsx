@@ -1,12 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PrimaryAction } from "@/components/ui/primary-action";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { supabase } from "@/integrations/supabase/client";
 import { StockAdjustmentDialog } from "@/components/stock/stock-adjustment-dialog";
+import { money } from "@/lib/format";
 import {
   Boxes,
   ClipboardList,
@@ -21,6 +22,16 @@ import {
   TrendingUp,
   Warehouse,
   Plus,
+  Eye,
+  X,
+  FileText,
+  User,
+  Calendar,
+  Layers,
+  Coins,
+  Hash,
+  ArrowRightLeft,
+  CheckCircle2,
 } from "lucide-react";
 import { type PageGuideConfig } from "@/components/page-guide";
 import { VortexMetricCard } from "@/components/vortex-ui";
@@ -37,9 +48,10 @@ import { usePersistedViewMode } from "@/hooks/use-persisted-view-mode";
 import { type DataTableColumn, type DataTableSort } from "@/components/ui/data-table";
 import { useBreakpoint } from "@/design/breakpoints";
 import { QUERY_KEYS } from "@/lib/query-keys";
+import { useRealtimeTable } from "@/lib/realtime";
 
 export const Route = createFileRoute("/_app/settlements")({
-  head: () => ({ meta: [{ title: "التسويات — فورتيكس ERP" }] }),
+  head: () => ({ meta: [{ title: "حركة المخزون — فورتيكس ERP" }] }),
   component: SettlementsPage,
 });
 
@@ -63,13 +75,13 @@ type SettlementRow = {
 type ViewMode = RecordsViewMode;
 
 const settlementGuideConfig: PageGuideConfig = {
-  title: "دليل التسويات والمطابقة المخزنية",
+  title: "دليل حركة المخزون والرقابة",
   subtitle:
-    "شرح شامل لكيفية معالجة الفروقات الجردية وتأثير كل حركة على الأرصدة والقيود المحاسبية وسجل التدقيق الداخلي.",
+    "شرح شامل لكيفية معالجة الفروقات الجردية وتتبع كافة حركات التوريد والصرف والتحويل وسجل التدقيق الداخلي.",
   badge: "إدارة المخزون والرقابة",
   icon: <Scale className="h-5 w-5 text-sky-500" />,
   summaryText:
-    "شاشة التسويات هي صمام الأمان للرقابة المخزنية؛ تسجل بدقة وبصمة رقمية غير قابلة للتلاعب كل حركة تؤثر على رصيد المستودعات، سواء كانت تسوية يدوية لمعالجة عجز/فائض جردي، أو حركات آلية ناتجة عن فواتير بيع وشراء وترجيع.",
+    "شاشة حركة المخزون هي السجل الرقمي الموحد لكل حركة تؤثر على رصيد المستودعات، سواء كانت تسوية يدوية لمعالجة عجز/فائض جردي، أو توريداً أو حركات آلية ناتجة عن فواتير بيع وشراء وترجيع.",
   overviewCards: [
     {
       title: "التسوية الجردية (Stock Adjustment)",
@@ -206,16 +218,83 @@ const settlementGuideConfig: PageGuideConfig = {
   footerTip: "فورتيكس ERP — التدقيق الرقمي الموحد والمطابقة المحاسبية اللحظية",
 };
 
+function formatQty(val: number | string | null | undefined): string {
+  if (val === null || val === undefined || val === "") return "0";
+  const n = typeof val === "string" ? Number(val) : val;
+  if (isNaN(n)) return "0";
+  const rounded = Math.round(n * 1000) / 1000;
+  return Number.isInteger(rounded) ? String(rounded) : String(rounded);
+}
+
+function getArabicMovementLabel(type: string): string {
+  const map: Record<string, string> = {
+    adjustment: "تسوية جردية",
+    opening: "رصيد أول المدة",
+    purchase: "توريد مشتريات",
+    sale: "صرف مبيعات",
+    transfer_in: "تحويل وارد للمستودع",
+    transfer_out: "تحويل صادر من المستودع",
+    return_in: "مرتجع مبيعات وارد",
+    return_out: "مرتجع مشتريات صادر",
+    purchase_return: "مرتجع مشتريات",
+    sale_return: "مرتجع مبيعات",
+    production_in: "ناتج تشغيل وإنتاج",
+    production_out: "صرف مواد خام للإنتاج",
+    damage: "إتلاف وفاقد مخزني",
+    waste: "عجز وتلف جردي",
+  };
+  return map[type] || "حركة مخزنية";
+}
+
+function getArabicSourceLabel(type: string | null): string {
+  if (!type) return "بدون مستند مصدري";
+  const map: Record<string, string> = {
+    purchase: "فاتورة مشتريات",
+    stock_opening: "مستند رصيد أول المدة",
+    stock_adjustment: "سند تسوية مخزنية",
+    sales_invoice: "فاتورة مبيعات",
+    stock_transfer: "سند تحويل بين المستودعات",
+    direct_stock_in: "سند توريد مخزني مباشر",
+    production: "أمر تشغيل وإنتاج",
+  };
+  return map[type] || "مستند نظام";
+}
+
+function formatArabicDateTime(dateStr: string): string {
+  try {
+    const d = new Date(dateStr);
+    const datePart = d.toLocaleDateString("ar-EG", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+    const timePart = d.toLocaleTimeString("ar-EG", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true,
+    });
+    return `${datePart} — ${timePart}`;
+  } catch {
+    return dateStr;
+  }
+}
+
 function SettlementsPage() {
   const { lang } = useI18n();
   const isRtl = lang === "ar";
-  const { hasRole, user } = useAuth();
+  const { hasRole, user, isPlatformAdmin, isPlatformSuperadmin } = useAuth();
   const queryClient = useQueryClient();
   const breakpoint = useBreakpoint();
   const tableUsesHorizontalScroll =
     breakpoint === "xs" || breakpoint === "sm" || breakpoint === "md";
   const canManageSettlement =
-    hasRole("owner") || hasRole("manager") || hasRole("warehouse") || hasRole("accountant");
+    hasRole("owner") ||
+    hasRole("manager") ||
+    hasRole("warehouse") ||
+    hasRole("accountant") ||
+    isPlatformAdmin ||
+    isPlatformSuperadmin;
 
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState<FilterValues>({});
@@ -223,29 +302,35 @@ function SettlementsPage() {
   const [sort, setSort] = useState<DataTableSort | null>(null);
   const [viewMode, setViewMode] = usePersistedViewMode("settlements", "cards");
   const [isAdjustmentOpen, setIsAdjustmentOpen] = useState(false);
+  const [selectedMovement, setSelectedMovement] = useState<SettlementRow | null>(null);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape" && selectedMovement) {
+        setSelectedMovement(null);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedMovement]);
+
+  // اشتراك لحظي في أي حركة مخزون جديدة أو معدلة
+  useRealtimeTable<SettlementRow>(
+    { table: "stock_movements", queryKey: QUERY_KEYS.settlements, debounceMs: 150 },
+    queryClient,
+  );
 
   const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: QUERY_KEYS.settlements,
     queryFn: async (): Promise<SettlementRow[]> => {
+      // جلب كافة حركات المخزون بلا استثناء (تسويات، مشتريات، مبيعات، تحويلات، رصيد أول مدة، إنتاج)
       const { data, error } = await supabase
         .from("stock_movements")
         .select(
           "id, movement_type, quantity, note, created_at, product_id, warehouse_id, created_by, unit_cost, reference, reference_type, products(id,name,name_ar,sku), warehouses(id,name,name_ar,code)",
         )
-        .in("movement_type", [
-          "adjustment",
-          "purchase",
-          "sale",
-          "transfer_in",
-          "transfer_out",
-          "return_in",
-          "return_out",
-          "opening",
-          "purchase_return",
-          "sale_return",
-        ])
         .order("created_at", { ascending: false })
-        .limit(200);
+        .limit(300);
       if (error) throw error;
 
       const rows = data ?? [];
@@ -294,16 +379,18 @@ function SettlementsPage() {
   const movementLabel = useCallback(
     (type: string) => {
       const map: Record<string, { ar: string; en: string }> = {
-        adjustment: { ar: "تسوية", en: "Adjustment" },
+        adjustment: { ar: "تسوية جردية", en: "Stock adjustment" },
         opening: { ar: "رصيد أول المدة", en: "Opening stock" },
-        purchase: { ar: "شراء", en: "Purchase" },
-        sale: { ar: "بيع", en: "Sale" },
+        purchase: { ar: "شراء / توريد", en: "Purchase / Stock in" },
+        sale: { ar: "بيع / صرف", en: "Sale / Stock out" },
         transfer_in: { ar: "تحويل وارد", en: "Transfer in" },
         transfer_out: { ar: "تحويل صادر", en: "Transfer out" },
         return_in: { ar: "مرتجع وارد", en: "Return in" },
         return_out: { ar: "مرتجع صادر", en: "Return out" },
         purchase_return: { ar: "مرتجع مشتريات", en: "Purchase return" },
         sale_return: { ar: "مرتجع مبيعات", en: "Sales return" },
+        production_in: { ar: "ناتج إنتاج", en: "Production output" },
+        production_out: { ar: "صرف إنتاج", en: "Production issue" },
       };
       const entry = map[type];
       return entry ? (isRtl ? entry.ar : entry.en) : type;
@@ -319,6 +406,8 @@ function SettlementsPage() {
         stock_adjustment: { ar: "مستند تسوية مخزون", en: "Stock-adjustment document" },
         sales_invoice: { ar: "فاتورة بيع", en: "Sales invoice" },
         stock_transfer: { ar: "تحويل مخزون", en: "Stock transfer" },
+        direct_stock_in: { ar: "توريد مخزني مباشر", en: "Direct stock-in" },
+        production: { ar: "أمر تشغيل إنتاج", en: "Production order" },
       };
       if (!type) return "—";
       const entry = map[type];
@@ -537,9 +626,7 @@ function SettlementsPage() {
         align: "end",
         width: "w-[120px]",
         sortValue: (row) => Number(row.quantity),
-        cell: (row) => (
-          <span className="font-mono text-foreground">{Number(row.quantity).toFixed(2)}</span>
-        ),
+        cell: (row) => <span className="font-mono text-foreground">{formatQty(row.quantity)}</span>,
       },
       {
         key: "reason",
@@ -571,6 +658,25 @@ function SettlementsPage() {
           <span className="text-muted-foreground">{new Date(row.created_at).toLocaleString()}</span>
         ),
       },
+      {
+        key: "actions",
+        header: isRtl ? "معاينة" : "View",
+        width: "w-[70px]",
+        align: "center",
+        cell: (row) => (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedMovement(row);
+            }}
+            className="grid size-7 place-items-center rounded-lg border border-border/70 bg-surface hover:bg-primary hover:border-primary hover:text-primary-foreground text-muted-foreground transition shadow-2xs mx-auto"
+            title="عرض تفاصيل الحركة"
+          >
+            <Eye className="size-3.5" />
+          </button>
+        ),
+      },
     ];
     return cols;
   }, [isRtl, productLabel, warehouseLabel, movementLabel, sourceLabel, user?.email]);
@@ -583,6 +689,7 @@ function SettlementsPage() {
     movementName: movementLabel(row.movement_type),
     sourceName: sourceLabel(row.reference_type),
     userName: row.profiles?.full_name ?? user?.email ?? (isRtl ? "غير معروف" : "Unknown"),
+    onViewDetails: () => setSelectedMovement(row),
   });
 
   const hasActiveCriteria = Boolean(query.trim()) || Object.keys(filters).length > 0;
@@ -592,12 +699,12 @@ function SettlementsPage() {
       <div className="panel-elevated rounded-3xl border border-border/80 bg-surface/90 p-8 text-center">
         <ShieldCheck className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
         <h3 className="text-lg font-semibold text-foreground">
-          {isRtl ? "لا يوجد صلاحية للتسويات" : "Settlement access denied"}
+          {isRtl ? "لا توجد صلاحية لعرض حركات المخزون" : "Stock movements access denied"}
         </h3>
         <p className="mt-2 text-sm text-muted-foreground">
           {isRtl
-            ? "يحتاج المستخدم إلى صلاحية المخزون أو الإدارة لمشاهدة سجل التسويات."
-            : "Inventory or admin access is required to view settlement records."}
+            ? "يحتاج المستخدم إلى صلاحية المخزون أو الإدارة لمشاهدة سجل حركات المخزون."
+            : "Inventory or admin access is required to view stock movement records."}
         </p>
       </div>
     );
@@ -606,11 +713,11 @@ function SettlementsPage() {
   return (
     <div className="space-y-4 pb-12">
       <PageHeader
-        title={isRtl ? "التسويات والمراجعة" : "Stock Settlements"}
+        title={isRtl ? "حركة المخزون" : "Stock Movements"}
         subtitle={
           isRtl
-            ? "سجل واضح لكل حركة مخزون وتعديل مع مطابقة المستخدم والتاريخ والسبب"
-            : "Clear audit trail for stock changes and review steps"
+            ? "سجل كامل لكافة حركات وتوريدات وصرف وتسويات المخزون"
+            : "Complete log of all stock movements, receipts, issues, and adjustments"
         }
         guide={settlementGuideConfig}
       />
@@ -625,14 +732,14 @@ function SettlementsPage() {
           tone="info"
         />
         <VortexMetricCard
-          title={isRtl ? "إضافات (فائض)" : "Additions (surplus)"}
+          title={isRtl ? "إضافات (فائض/توريد)" : "Additions (receipts)"}
           value={kpi.additions}
           subtitle={isRtl ? "حركات موجبة" : "Positive movements"}
           icon={<TrendingUp className="size-5" />}
           tone="success"
         />
         <VortexMetricCard
-          title={isRtl ? "إخصومات (عجز)" : "Deductions (shortage)"}
+          title={isRtl ? "خصومات (صرف/عجز)" : "Deductions (issues)"}
           value={kpi.deductions}
           subtitle={isRtl ? "حركات سالبة" : "Negative movements"}
           icon={<TrendingDown className="size-5" />}
@@ -673,9 +780,8 @@ function SettlementsPage() {
         viewToggle={<RecordsViewToggle value={viewMode} onChange={setViewMode} />}
         action={
           <PrimaryAction
-            label={isRtl ? "تسوية جديدة" : "New adjustment"}
+            label={isRtl ? "تسوية مخزون" : "Stock adjustment"}
             icon={<Plus />}
-
             onClick={() => setIsAdjustmentOpen(true)}
           />
         }
@@ -704,15 +810,15 @@ function SettlementsPage() {
               ? "لا توجد حركات مطابقة"
               : "No matching movements"
             : isRtl
-              ? "لا توجد حركات تسوية بعد"
-              : "No settlement movements yet",
+              ? "لا توجد حركات مخزون بعد"
+              : "No stock movements yet",
           description: hasActiveCriteria
             ? isRtl
               ? "جرّب تعديل البحث أو الفلاتر."
               : "Try adjusting your search or filters."
             : isRtl
-              ? "ابدأ بإجراء تسوية جردية جديدة."
-              : "Start by recording a new stock adjustment.",
+              ? "سجل أول حركة أو تسوية مخزنية لتظهر هنا."
+              : "Record a stock movement or adjustment to see it here.",
         }}
       />
 
@@ -725,6 +831,213 @@ function SettlementsPage() {
             queryClient.invalidateQueries({ queryKey: ["inventory"] });
           }}
         />
+      )}
+
+      {/* ─── نافذة تفاصيل حركة المخزون من اليمين (مستوحاة من شاشة العملاء) ─── */}
+      {selectedMovement && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-end bg-black/65 backdrop-blur-xs animate-in fade-in duration-200"
+          onClick={() => setSelectedMovement(null)}
+        >
+          <div
+            className="relative h-full w-full max-w-lg border-s border-border/80 bg-background/95 backdrop-blur-md p-6 shadow-2xl overflow-y-auto animate-in slide-in-from-right duration-200"
+            onClick={(e) => e.stopPropagation()}
+            dir="rtl"
+          >
+            {/* إضاءة جمالية في خلفية النافذة */}
+            <div className="absolute -top-10 -right-10 size-40 rounded-full bg-primary/20 blur-3xl pointer-events-none" />
+
+            {/* ترويسة النافذة مع زر الإغلاق */}
+            <div className="flex items-start justify-between pb-4 border-b border-border/60">
+              <div className="flex items-center gap-3.5">
+                <div
+                  className={`grid size-14 place-items-center rounded-2xl border text-xl font-bold shadow-sm ${
+                    Number(selectedMovement.quantity) >= 0
+                      ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500"
+                      : "bg-rose-500/10 border-rose-500/30 text-rose-500"
+                  }`}
+                >
+                  {Number(selectedMovement.quantity) >= 0 ? (
+                    <TrendingUp className="size-6" />
+                  ) : (
+                    <TrendingDown className="size-6" />
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-foreground">
+                    {selectedMovement.products?.name_ar ||
+                      selectedMovement.products?.name ||
+                      "صنف مخزني"}
+                  </h3>
+                  <div className="mt-1 flex items-center gap-2">
+                    <span
+                      className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${
+                        Number(selectedMovement.quantity) >= 0
+                          ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                          : "border-rose-500/25 bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                      }`}
+                    >
+                      {getArabicMovementLabel(selectedMovement.movement_type)}
+                    </span>
+                    {selectedMovement.products?.sku && (
+                      <span className="font-mono text-xs text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-md">
+                        {selectedMovement.products.sku}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedMovement(null)}
+                className="grid size-9 place-items-center rounded-full bg-surface-2 text-muted-foreground hover:text-foreground transition"
+                title="إغلاق النافذة"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            {/* بطاقات المؤشرات السريعة */}
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <div className="rounded-xl border border-border/70 bg-surface/60 p-3.5">
+                <div className="text-xs text-muted-foreground font-medium">كمية الحركة</div>
+                <div
+                  className={`mt-1 font-mono text-xl font-bold ${
+                    Number(selectedMovement.quantity) >= 0 ? "text-emerald-500" : "text-rose-500"
+                  }`}
+                >
+                  {Number(selectedMovement.quantity) >= 0
+                    ? `+${formatQty(selectedMovement.quantity)}`
+                    : formatQty(selectedMovement.quantity)}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-border/70 bg-surface/60 p-3.5">
+                <div className="text-xs text-muted-foreground font-medium">الأثر المخزني</div>
+                <div className="mt-1.5 text-xs font-bold text-foreground flex items-center gap-1.5">
+                  <span
+                    className={`size-2 rounded-full ${
+                      Number(selectedMovement.quantity) >= 0 ? "bg-emerald-500" : "bg-rose-500"
+                    }`}
+                  />
+                  <span>
+                    {Number(selectedMovement.quantity) >= 0
+                      ? "إضافة إلى رصيد المستودع"
+                      : "خصم من رصيد المستودع"}
+                  </span>
+                </div>
+              </div>
+
+              {selectedMovement.unit_cost != null && (
+                <>
+                  <div className="rounded-xl border border-border/70 bg-surface/60 p-3.5">
+                    <div className="text-xs text-muted-foreground font-medium">
+                      سعر تكلفة الوحدة
+                    </div>
+                    <div className="mt-1 font-mono text-base font-bold text-foreground">
+                      {money(Number(selectedMovement.unit_cost))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-border/70 bg-surface/60 p-3.5">
+                    <div className="text-xs text-muted-foreground font-medium">
+                      إجمالي قيمة الحركة
+                    </div>
+                    <div className="mt-1 font-mono text-base font-bold text-primary">
+                      {money(
+                        Math.abs(
+                          Number(selectedMovement.quantity) * Number(selectedMovement.unit_cost),
+                        ),
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* تفاصيل السجل المخزني الكاملة باللغة العربية حصراً */}
+            <div className="mt-6 space-y-3">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                البيانات التفصيلية للحركة
+              </h4>
+
+              <div className="divide-y divide-border/60 rounded-2xl border border-border/70 bg-surface/50 text-xs overflow-hidden">
+                <div className="flex items-center justify-between p-3">
+                  <span className="text-muted-foreground">المستودع</span>
+                  <span className="font-semibold text-foreground">
+                    {selectedMovement.warehouses?.name_ar ||
+                      selectedMovement.warehouses?.name ||
+                      "غير محدد"}
+                    {selectedMovement.warehouses?.code && (
+                      <span className="ms-1.5 text-muted-foreground text-[11px] font-mono">
+                        ({selectedMovement.warehouses.code})
+                      </span>
+                    )}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between p-3">
+                  <span className="text-muted-foreground">نوع الحركة المخزنية</span>
+                  <span className="font-semibold text-foreground">
+                    {getArabicMovementLabel(selectedMovement.movement_type)}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between p-3">
+                  <span className="text-muted-foreground">المستند المصدر</span>
+                  <span className="font-semibold text-foreground">
+                    {getArabicSourceLabel(selectedMovement.reference_type)}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between p-3">
+                  <span className="text-muted-foreground">الرقم المرجعي / الفاتورة</span>
+                  <span className="font-mono text-foreground font-medium">
+                    {selectedMovement.reference || "بدون رقم مرجعي"}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between p-3">
+                  <span className="text-muted-foreground">الموظف المنفّذ</span>
+                  <span className="font-semibold text-foreground">
+                    {selectedMovement.profiles?.full_name || "النظام / مسؤول تلقائي"}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between p-3">
+                  <span className="text-muted-foreground">تاريخ وتوقيت التسجيل</span>
+                  <span className="font-medium text-foreground">
+                    {formatArabicDateTime(selectedMovement.created_at)}
+                  </span>
+                </div>
+
+                {selectedMovement.note && (
+                  <div className="p-3 bg-muted/20">
+                    <div className="text-muted-foreground text-[11px] mb-1">
+                      البيان والسبب المسجل:
+                    </div>
+                    <div className="text-foreground font-medium leading-relaxed bg-surface/80 p-2.5 rounded-xl border border-border/50">
+                      {selectedMovement.note}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* تذييل النافذة */}
+            <div className="mt-6 pt-4 border-t border-border/60 flex items-center justify-between">
+              <span className="text-[11px] text-muted-foreground font-mono">
+                رقم المعاملة: {selectedMovement.id.slice(0, 8)}...
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedMovement(null)}
+                className="px-4 py-2 rounded-xl bg-surface border border-border text-foreground hover:bg-muted text-xs font-semibold transition"
+              >
+                إغلاق
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -742,6 +1055,7 @@ interface SettlementRendererProps {
   movementName: string;
   sourceName: string;
   userName: string;
+  onViewDetails?: () => void;
 }
 
 function SettlementCard({
@@ -752,33 +1066,58 @@ function SettlementCard({
   movementName,
   sourceName,
   userName,
+  onViewDetails,
 }: SettlementRendererProps) {
   const isPositive = Number(row.quantity) >= 0;
   return (
-    <div className="card-mullak group relative flex h-full flex-col justify-between rounded-2xl p-3 transition-all duration-200 hover:shadow-md sm:p-4.5">
+    <div
+      onClick={onViewDetails}
+      className="card-mullak group relative flex h-full flex-col justify-between rounded-2xl p-3 transition-all duration-200 hover:shadow-md hover:border-primary/40 cursor-pointer sm:p-4.5"
+    >
       <div className="flex items-start gap-2.5">
         <span
           aria-hidden
-          className={`h-12 w-1.5 shrink-0 rounded-full ${isPositive ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]" : "bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.3)]"}`}
+          className={`h-12 w-1.5 shrink-0 rounded-full ${
+            isPositive
+              ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]"
+              : "bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.3)]"
+          }`}
         />
         <div className="grid size-11 shrink-0 place-items-center rounded-2xl border border-primary/20 bg-primary/10 text-primary transition-transform group-hover:scale-105">
           {isPositive ? <TrendingUp className="size-5" /> : <TrendingDown className="size-5" />}
         </div>
         <div className="min-w-0 flex-1">
-          <span className="block truncate text-xs font-bold text-foreground sm:text-sm">
-            {productName}
-          </span>
+          <div className="flex items-start justify-between gap-1.5">
+            <span className="block truncate text-xs font-bold text-foreground sm:text-sm">
+              {productName}
+            </span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onViewDetails?.();
+              }}
+              className="grid size-7 shrink-0 place-items-center rounded-lg border border-border/70 bg-surface hover:bg-primary hover:border-primary hover:text-primary-foreground text-muted-foreground transition shadow-2xs"
+              title="عرض تفاصيل الحركة"
+              aria-label="عرض تفاصيل الحركة"
+            >
+              <Eye className="size-3.5" />
+            </button>
+          </div>
           <div className="truncate font-mono text-[11px] text-muted-foreground">
             {row.products?.sku ?? "—"}
           </div>
           <span
-            className={`mt-1 inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-[9px] font-bold ${isPositive ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300" : "border-rose-500/25 bg-rose-500/10 text-rose-600 dark:text-rose-300"}`}
+            className={`mt-1 inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-[9px] font-bold ${
+              isPositive
+                ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300"
+                : "border-rose-500/25 bg-rose-500/10 text-rose-600 dark:text-rose-300"
+            }`}
           >
             {movementName}
           </span>
         </div>
       </div>
-
       <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
         <span className="inline-flex items-center gap-1 truncate">
           <Warehouse className="size-2.5" />
@@ -789,12 +1128,13 @@ function SettlementCard({
           {row.note || row.reference || (isRtl ? "بدون سبب" : "No note")}
         </span>
       </div>
-
       <div className="mt-3 flex items-end justify-between border-t border-border/60 pt-2.5">
         <span className="truncate text-[10px] text-muted-foreground">{userName}</span>
-        <span className="font-mono text-base font-bold text-foreground">
-          {Number(row.quantity).toFixed(2)}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-base font-bold text-foreground">
+            {formatQty(row.quantity)}
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -808,14 +1148,22 @@ function SettlementListRow({
   movementName,
   sourceName,
   userName,
+  onViewDetails,
 }: SettlementRendererProps) {
   const isPositive = Number(row.quantity) >= 0;
   return (
-    <div className="card-mullak group relative flex flex-col justify-between gap-3 rounded-2xl border p-3.5 transition-all duration-200 hover:border-primary/50 hover:shadow-md sm:p-4 md:flex-row md:items-center">
+    <div
+      onClick={onViewDetails}
+      className="card-mullak group relative flex flex-col justify-between gap-3 rounded-2xl border p-3.5 transition-all duration-200 hover:border-primary/50 hover:shadow-md cursor-pointer sm:p-4 md:flex-row md:items-center"
+    >
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <span
           aria-hidden
-          className={`h-11 w-1.5 shrink-0 rounded-full sm:h-12 ${isPositive ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" : "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.45)]"}`}
+          className={`h-11 w-1.5 shrink-0 rounded-full sm:h-12 ${
+            isPositive
+              ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]"
+              : "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.45)]"
+          }`}
         />
         <div className="grid size-11 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-primary transition-all group-hover:scale-105 group-hover:bg-primary group-hover:text-primary-foreground">
           {isPositive ? <TrendingUp className="size-5" /> : <TrendingDown className="size-5" />}
@@ -826,7 +1174,11 @@ function SettlementListRow({
               {productName}
             </h4>
             <span
-              className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-[9px] font-bold ${isPositive ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300" : "border-rose-500/25 bg-rose-500/10 text-rose-600 dark:text-rose-300"}`}
+              className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-[9px] font-bold ${
+                isPositive
+                  ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300"
+                  : "border-rose-500/25 bg-rose-500/10 text-rose-600 dark:text-rose-300"
+              }`}
             >
               {movementName}
             </span>
@@ -840,8 +1192,7 @@ function SettlementListRow({
           </div>
         </div>
       </div>
-
-      <div className="flex shrink-0 items-center gap-4 border-t border-border/50 pt-2 ps-4 text-xs md:border-t-0 md:pt-0">
+      <div className="flex shrink-0 items-center gap-3 border-t border-border/50 pt-2 ps-4 text-xs md:border-t-0 md:pt-0">
         <span className="hidden max-w-[120px] truncate text-[11px] text-muted-foreground sm:inline">
           {userName}
         </span>
@@ -850,10 +1201,22 @@ function SettlementListRow({
         </span>
         <div className="text-end">
           <p className="font-mono text-base font-bold tracking-tight text-foreground">
-            {Number(row.quantity).toFixed(2)}
+            {formatQty(row.quantity)}
           </p>
           <p className="text-[10px] text-muted-foreground">{isRtl ? "الكمية" : "Qty"}</p>
         </div>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onViewDetails?.();
+          }}
+          className="grid size-8 shrink-0 place-items-center rounded-lg border border-border/70 bg-surface hover:bg-primary hover:border-primary hover:text-primary-foreground text-muted-foreground transition shadow-2xs ms-1"
+          title="عرض تفاصيل الحركة"
+          aria-label="عرض تفاصيل الحركة"
+        >
+          <Eye className="size-4" />
+        </button>
       </div>
     </div>
   );

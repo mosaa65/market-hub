@@ -34,8 +34,11 @@ import {
   AlertTriangle,
   ArrowDown,
   ArrowUp,
+  Banknote,
   Check,
   CreditCard,
+  FileCheck2,
+  Landmark,
   LayoutGrid,
   List,
   LoaderCircle,
@@ -43,6 +46,9 @@ import {
   Save,
   TableProperties,
 } from "lucide-react";
+import { CashboxesManagement } from "./cashboxes-management";
+import { BankAccountsManagement } from "./bank-accounts-management";
+import { ChequesManagement } from "./cheques-management";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import {
@@ -116,6 +122,7 @@ export function PaymentMethodsSection() {
   const { methods, isLoading, isFallback, refetch } = usePaymentMethods();
   const { save, isSaving } = useUpdatePaymentMethodSettings();
 
+  const [mainTab, setMainTab] = useState<"catalog" | "cashboxes" | "banks" | "cheques">("catalog");
   const [draft, setDraft] = useState<DraftState>({ rows: {}, order: [] });
   const [savedSnapshot, setSavedSnapshot] = useState<DraftState>({ rows: {}, order: [] });
   const [query, setQuery] = useState("");
@@ -354,299 +361,370 @@ export function PaymentMethodsSection() {
 
   return (
     <div className="space-y-4">
-      {/*
-        The catalogue is the developers'; the NAMING is the business's. Say both,
-        because an operator who is told "nothing to create here" will not look for
-        the button that now exists — and one who is told "anything goes" will
-        expect to upload a logo.
-      */}
-      <div className="rounded-2xl border border-border/70 bg-surface/60 p-3.5 text-[11px] leading-relaxed text-muted-foreground">
-        {isAr
-          ? "هذه هي طرق الدفع المعتمدة في النظام. يمكنك تعديل اسم أي طريقة وأيقونتها كما تناسب منشأتك، وتفعيلها أو تعطيلها، واختيار الأقسام التي تظهر فيها. نوع الحساب المحاسبي لا يتغيّر بالتعديل، فيبقى الترحيل كما هو."
-          : "These are the system's approved payment methods. You can rename or re-icon any of them to suit your business, enable or disable them, and choose the sections they appear in. The accounting family is not affected by a rename, so posting stays exactly as it was."}
+      {/* ── Treasury & Payment Navigation Tabs ── */}
+      <div className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-border/80 bg-surface/80 p-1.5 shadow-2xs">
+        <button
+          type="button"
+          onClick={() => setMainTab("catalog")}
+          className={cn(
+            "flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition",
+            mainTab === "catalog"
+              ? "bg-primary text-primary-foreground shadow-xs font-bold"
+              : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+          )}
+        >
+          <CreditCard className="h-4 w-4" />
+          <span>{isAr ? "طرق الدفع والكتالوج" : "Payment Methods"}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMainTab("cashboxes")}
+          className={cn(
+            "flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition",
+            mainTab === "cashboxes"
+              ? "bg-primary text-primary-foreground shadow-xs font-bold"
+              : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+          )}
+        >
+          <Banknote className="h-4 w-4" />
+          <span>{isAr ? "الصناديق والخزائن" : "Cashboxes & Tills"}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMainTab("banks")}
+          className={cn(
+            "flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition",
+            mainTab === "banks"
+              ? "bg-primary text-primary-foreground shadow-xs font-bold"
+              : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+          )}
+        >
+          <Landmark className="h-4 w-4" />
+          <span>{isAr ? "الحسابات والمحافظ" : "Bank & Wallets"}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMainTab("cheques")}
+          className={cn(
+            "flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition",
+            mainTab === "cheques"
+              ? "bg-primary text-primary-foreground shadow-xs font-bold"
+              : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+          )}
+        >
+          <FileCheck2 className="h-4 w-4" />
+          <span>{isAr ? "سجل أوراق القبض والشيكات" : "Cheques Register"}</span>
+        </button>
       </div>
 
-      {/* A configuration that could not be read must never look like a choice. */}
-      {isFallback && (
-        <div className="flex items-start gap-2 rounded-2xl border border-amber-500/40 bg-amber-500/10 p-3 text-[11px] text-amber-700 dark:text-amber-300">
-          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span className="flex-1">
+      {mainTab === "cashboxes" && <CashboxesManagement />}
+      {mainTab === "banks" && <BankAccountsManagement />}
+      {mainTab === "cheques" && <ChequesManagement />}
+
+      {mainTab === "catalog" && (
+        <>
+          {/*
+            The catalogue is the developers'; the NAMING is the business's. Say both,
+            because an operator who is told "nothing to create here" will not look for
+            the button that now exists — and one who is told "anything goes" will
+            expect to upload a logo.
+          */}
+          <div className="rounded-2xl border border-border/70 bg-surface/60 p-3.5 text-[11px] leading-relaxed text-muted-foreground">
             {isAr
-              ? "تعذّر قراءة إعداداتك من الخادم، والمعروض هو الكتالوج الافتراضي. الحفظ قد لا يعمل قبل استعادة الاتصال."
-              : "Your configuration could not be read; this is the default catalogue. Saving may fail until the connection is restored."}
-          </span>
-          <button
-            type="button"
-            onClick={() => refetch()}
-            className="shrink-0 underline decoration-dotted"
-          >
-            {isAr ? "إعادة المحاولة" : "Retry"}
-          </button>
-        </div>
-      )}
+              ? "هذه هي طرق الدفع المعتمدة في النظام. يمكنك تعديل اسم أي طريقة وأيقونتها كما تناسب منشأتك، وتفعيلها أو تعطيلها، واختيار الأقسام التي تظهر فيها. نوع الحساب المحاسبي لا يتغيّر بالتعديل، فيبقى الترحيل كما هو."
+              : "These are the system's approved payment methods. You can rename or re-icon any of them to suit your business, enable or disable them, and choose the sections they appear in. The accounting family is not affected by a rename, so posting stays exactly as it was."}
+          </div>
 
-      <Card className="rounded-3xl border-border/80 shadow-xs">
-        <CardHeader className="border-b border-border/50 pb-4">
-          <CardTitle className="flex items-center gap-2 text-base font-bold">
-            <span className="rounded-xl bg-primary/10 p-2 text-primary">
-              <CreditCard className="h-5 w-5" />
-            </span>
-            {isAr ? "طرق الدفع" : "Payment methods"}
-          </CardTitle>
-          <CardDescription className="mt-1.5 text-xs">
-            {isAr
-              ? "الطريقة غير المفعّلة لا تظهر في أي شاشة. وتخصيص الأقسام مستقل لكل طريقة."
-              : "A disabled method appears nowhere. Section scoping is independent per method."}
-          </CardDescription>
-        </CardHeader>
-
-        <CardContent className="space-y-3 pt-5">
-          <TableToolbar
-            sticky
-            lang={lang}
-            search={{
-              value: query,
-              onValueChange: setQuery,
-              placeholder: isAr
-                ? "ابحث بالاسم أو المعرّف أو العائلة أو السياق"
-                : "Search name, ID, family or context",
-              resultCount: visibleMethods.length,
-            }}
-            filters={{ definitions: filterDefinitions, values: filters, onValueChange: setFilters }}
-            sort={{ options: sortOptions, value: sortKey, onValueChange: setSortKey }}
-            viewToggle={<RecordsViewToggle value={viewMode} onChange={setViewMode} />}
-          >
-            <p className="px-1 text-[11px] text-muted-foreground" aria-live="polite">
-              {isAr
-                ? `عرض ${visibleMethods.length} من ${ordered.length} طريقة`
-                : `Showing ${visibleMethods.length} of ${ordered.length} methods`}
-            </p>
-          </TableToolbar>
-
-          {visibleMethods.length === 0 ? (
-            <div className="card-mullak flex-col items-center justify-center gap-2 p-10 text-center">
-              <CreditCard className="h-8 w-8 text-muted-foreground" aria-hidden="true" />
-              <p className="text-sm font-semibold">
-                {isAr ? "لا توجد طرق مطابقة" : "No matching payment methods"}
-              </p>
-              <p className="text-xs text-muted-foreground">
+          {/* A configuration that could not be read must never look like a choice. */}
+          {isFallback && (
+            <div className="flex items-start gap-2 rounded-2xl border border-amber-500/40 bg-amber-500/10 p-3 text-[11px] text-amber-700 dark:text-amber-300">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span className="flex-1">
                 {isAr
-                  ? "جرّب تغيير البحث أو مسح عوامل التصفية."
-                  : "Try changing the search or clearing filters."}
-              </p>
+                  ? "تعذّر قراءة إعداداتك من الخادم، والمعروض هو الكتالوج الافتراضي. الحفظ قد لا يعمل قبل استعادة الاتصال."
+                  : "Your configuration could not be read; this is the default catalogue. Saving may fail until the connection is restored."}
+              </span>
+              <button
+                type="button"
+                onClick={() => refetch()}
+                className="shrink-0 underline decoration-dotted"
+              >
+                {isAr ? "إعادة المحاولة" : "Retry"}
+              </button>
             </div>
-          ) : (
-            <div
-              className={cn(
-                viewMode === "cards"
-                  ? "grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
-                  : viewMode === "list"
-                    ? "grid grid-cols-1 gap-2.5"
-                    : "overflow-x-auto rounded-xl border-border/60",
-              )}
-            >
-              {visibleMethods.map((method) => {
-                const index = ordered.findIndex((item) => item.id === method.id);
-                const row = draft.rows[method.id];
-                if (!row) return null;
-                const isCredit = Boolean(method.isCreditTerm);
+          )}
 
-                return (
-                  <div
-                    key={method.id}
-                    className={cn(
-                      "card-mullak group rounded-2xl border p-3 transition-colors hover:border-primary/35 focus-within:ring-2 focus-within:ring-primary/25",
-                      row.enabled
-                        ? "border-border/70 bg-surface/70"
-                        : "border-border/50 bg-muted/20 opacity-70",
-                      viewMode === "table" &&
-                        "min-w-[44rem] rounded-none border-x-0 border-t-0 shadow-none",
-                    )}
-                  >
-                    {/* ── Row 1: identity, order, master switch ── */}
-                    <div className="flex min-w-0 items-start gap-3">
-                      <PaymentMethodIcon
-                        iconKey={method.iconKey}
-                        methodId={method.id}
-                        ledgerKind={method.ledgerKind}
-                        className="h-5 w-5"
-                      />
+          <Card className="rounded-3xl border-border/80 shadow-xs">
+            <CardHeader className="border-b border-border/50 pb-4">
+              <CardTitle className="flex items-center gap-2 text-base font-bold">
+                <span className="rounded-xl bg-primary/10 p-2 text-primary">
+                  <CreditCard className="h-5 w-5" />
+                </span>
+                {isAr ? "طرق الدفع" : "Payment methods"}
+              </CardTitle>
+              <CardDescription className="mt-1.5 text-xs">
+                {isAr
+                  ? "الطريقة غير المفعّلة لا تظهر في أي شاشة. وتخصيص الأقسام مستقل لكل طريقة."
+                  : "A disabled method appears nowhere. Section scoping is independent per method."}
+              </CardDescription>
+            </CardHeader>
 
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="truncate text-sm font-bold">
-                            {isAr ? method.nameAr : (method.nameEn ?? method.nameAr)}
-                          </span>
-                          {isCredit && (
-                            <Badge
-                              variant="outline"
-                              className="h-5 border-amber-500/40 px-1.5 text-[10px] text-amber-600 dark:text-amber-400"
-                            >
-                              {isAr ? "لا يُحصَّل الآن" : "No collection"}
-                            </Badge>
-                          )}
-                          {method.requiresReference && (
-                            <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
-                              {isAr ? "يتطلب مرجعاً" : "Ref. required"}
-                            </Badge>
-                          )}
-                          <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
-                            {method.ledgerKind}
-                          </Badge>
-                          {/*
+            <CardContent className="space-y-3 pt-5">
+              <TableToolbar
+                sticky
+                lang={lang}
+                search={{
+                  value: query,
+                  onValueChange: setQuery,
+                  placeholder: isAr
+                    ? "ابحث بالاسم أو المعرّف أو العائلة أو السياق"
+                    : "Search name, ID, family or context",
+                  resultCount: visibleMethods.length,
+                }}
+                filters={{
+                  definitions: filterDefinitions,
+                  values: filters,
+                  onValueChange: setFilters,
+                }}
+                sort={{ options: sortOptions, value: sortKey, onValueChange: setSortKey }}
+                viewToggle={<RecordsViewToggle value={viewMode} onChange={setViewMode} />}
+              >
+                <p className="px-1 text-[11px] text-muted-foreground" aria-live="polite">
+                  {isAr
+                    ? `عرض ${visibleMethods.length} من ${ordered.length} طريقة`
+                    : `Showing ${visibleMethods.length} of ${ordered.length} methods`}
+                </p>
+              </TableToolbar>
+
+              {visibleMethods.length === 0 ? (
+                <div className="card-mullak flex-col items-center justify-center gap-2 p-10 text-center">
+                  <CreditCard className="h-8 w-8 text-muted-foreground" aria-hidden="true" />
+                  <p className="text-sm font-semibold">
+                    {isAr ? "لا توجد طرق مطابقة" : "No matching payment methods"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {isAr
+                      ? "جرّب تغيير البحث أو مسح عوامل التصفية."
+                      : "Try changing the search or clearing filters."}
+                  </p>
+                </div>
+              ) : (
+                <div
+                  className={cn(
+                    viewMode === "cards"
+                      ? "grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
+                      : viewMode === "list"
+                        ? "grid grid-cols-1 gap-2.5"
+                        : "overflow-x-auto rounded-xl border-border/60",
+                  )}
+                >
+                  {visibleMethods.map((method) => {
+                    const index = ordered.findIndex((item) => item.id === method.id);
+                    const row = draft.rows[method.id];
+                    if (!row) return null;
+                    const isCredit = Boolean(method.isCreditTerm);
+
+                    return (
+                      <div
+                        key={method.id}
+                        className={cn(
+                          "card-mullak group rounded-2xl border p-3 transition-colors hover:border-primary/35 focus-within:ring-2 focus-within:ring-primary/25",
+                          row.enabled
+                            ? "border-border/70 bg-surface/70"
+                            : "border-border/50 bg-muted/20 opacity-70",
+                          viewMode === "table" &&
+                            "min-w-[44rem] rounded-none border-x-0 border-t-0 shadow-none",
+                        )}
+                      >
+                        {/* ── Row 1: identity, order, master switch ── */}
+                        <div className="flex min-w-0 items-start gap-3">
+                          <PaymentMethodIcon
+                            iconKey={method.iconKey}
+                            methodId={method.id}
+                            ledgerKind={method.ledgerKind}
+                            className="h-5 w-5"
+                          />
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="truncate text-sm font-bold">
+                                {isAr ? method.nameAr : (method.nameEn ?? method.nameAr)}
+                              </span>
+                              {isCredit && (
+                                <Badge
+                                  variant="outline"
+                                  className="h-5 border-amber-500/40 px-1.5 text-[10px] text-amber-600 dark:text-amber-400"
+                                >
+                                  {isAr ? "لا يُحصَّل الآن" : "No collection"}
+                                </Badge>
+                              )}
+                              {method.requiresReference && (
+                                <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
+                                  {isAr ? "يتطلب مرجعاً" : "Ref. required"}
+                                </Badge>
+                              )}
+                              <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
+                                {method.ledgerKind}
+                              </Badge>
+                              {/*
                         Two different things, deliberately two badges:
                           • غير نظامية — the business created this method itself,
                             so it may be renamed, re-iconed AND deleted.
                           • معدّلة    — a shipped method whose name or icon the
                             business changed. It may be restored, never deleted.
                       */}
-                          {!method.isSystem ? (
-                            <Badge
-                              variant="outline"
-                              className="h-5 border-primary/40 px-1.5 text-[10px] text-primary"
-                            >
-                              {isAr ? "من إنشائك" : "Yours"}
-                            </Badge>
-                          ) : method.isAuthored ? (
-                            <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
-                              {isAr ? "اسم/أيقونة معدّلة" : "Renamed"}
-                            </Badge>
-                          ) : null}
-                        </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground">
-                          <span>
-                            {row.enabled
-                              ? isAr
-                                ? "مفعّلة"
-                                : "Enabled"
-                              : isAr
-                                ? "متوقفة"
-                                : "Disabled"}
-                          </span>
-                          {row.enabled ? (
-                            <span>
-                              {row.contexts.length} {isAr ? "أماكن ظهور" : "places"}
-                            </span>
-                          ) : null}
-                          {method.defaultAccountCode ? (
-                            <span>{isAr ? "حساب مرتبط" : "Linked account"}</span>
-                          ) : null}
-                        </div>
-                      </div>
-
-                      {/* Order — the picker's sequence is this list, top to bottom. */}
-                      <div className="flex shrink-0 items-center gap-0.5">
-                        <button
-                          type="button"
-                          onClick={() => move(method.id, -1)}
-                          disabled={index === 0 || sortKey !== ""}
-                          aria-label={isAr ? "تحريك لأعلى" : "Move up"}
-                          className="rounded-lg p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-30"
-                        >
-                          <ArrowUp className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => move(method.id, 1)}
-                          disabled={index === ordered.length - 1 || sortKey !== ""}
-                          aria-label={isAr ? "تحريك لأسفل" : "Move down"}
-                          className="rounded-lg p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-30"
-                        >
-                          <ArrowDown className="h-3.5 w-3.5" />
-                        </button>
-                        <span className="w-6 text-center font-mono text-[10px] text-muted-foreground">
-                          {index + 1}
-                        </span>
-                      </div>
-
-                      <Switch
-                        checked={row.enabled}
-                        onCheckedChange={(checked) => toggleEnabled(method.id, checked)}
-                        aria-label={
-                          isAr
-                            ? `تفعيل ${method.nameAr}`
-                            : `Enable ${method.nameEn ?? method.nameAr}`
-                        }
-                      />
-                    </div>
-
-                    {/* ── Row 2: identity authoring. Name + icon, never the account. ── */}
-                    <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-border/40 pt-2.5">
-                      <PaymentMethodIdentityEditor
-                        method={method}
-                        onSaved={() => void refetch()}
-                        className="flex-1"
-                      />
-                    </div>
-
-                    {/* ── Row 3: contexts. Only those the developers allow. ── */}
-                    {row.enabled && (
-                      <div className="mt-2.5 border-t border-border/40 pt-2.5">
-                        <p className="mb-1.5 text-[10px] font-semibold text-muted-foreground">
-                          {isAr ? "يظهر في:" : "Appears in:"}
-                        </p>
-                        <div className="flex flex-wrap gap-1">
-                          {PAYMENT_CONTEXTS.filter((c) => method.allowedContexts.includes(c)).map(
-                            (context) => {
-                              const on = row.contexts.includes(context);
-                              const label = PAYMENT_CONTEXT_LABELS[context];
-                              return (
-                                <button
-                                  key={context}
-                                  type="button"
-                                  aria-pressed={on}
-                                  onClick={() => toggleContext(method.id, context, !on)}
-                                  className={cn(
-                                    "inline-flex h-7 items-center gap-1 rounded-lg border px-2 text-[10px] font-medium transition-all",
-                                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-                                    on
-                                      ? "border-primary/60 bg-primary/10 text-foreground"
-                                      : "border-border/60 bg-background/60 text-muted-foreground hover:border-primary/30 hover:text-foreground",
-                                  )}
+                              {!method.isSystem ? (
+                                <Badge
+                                  variant="outline"
+                                  className="h-5 border-primary/40 px-1.5 text-[10px] text-primary"
                                 >
-                                  {on && <Check className="h-3 w-3" />}
-                                  {isAr ? label.ar : label.en}
-                                </button>
-                              );
-                            },
-                          )}
+                                  {isAr ? "من إنشائك" : "Yours"}
+                                </Badge>
+                              ) : method.isAuthored ? (
+                                <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
+                                  {isAr ? "اسم/أيقونة معدّلة" : "Renamed"}
+                                </Badge>
+                              ) : null}
+                            </div>
+                            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground">
+                              <span>
+                                {row.enabled
+                                  ? isAr
+                                    ? "مفعّلة"
+                                    : "Enabled"
+                                  : isAr
+                                    ? "متوقفة"
+                                    : "Disabled"}
+                              </span>
+                              {row.enabled ? (
+                                <span>
+                                  {row.contexts.length} {isAr ? "أماكن ظهور" : "places"}
+                                </span>
+                              ) : null}
+                              {method.defaultAccountCode ? (
+                                <span>{isAr ? "حساب مرتبط" : "Linked account"}</span>
+                              ) : null}
+                            </div>
+                          </div>
+
+                          {/* Order — the picker's sequence is this list, top to bottom. */}
+                          <div className="flex shrink-0 items-center gap-0.5">
+                            <button
+                              type="button"
+                              onClick={() => move(method.id, -1)}
+                              disabled={index === 0 || sortKey !== ""}
+                              aria-label={isAr ? "تحريك لأعلى" : "Move up"}
+                              className="rounded-lg p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-30"
+                            >
+                              <ArrowUp className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => move(method.id, 1)}
+                              disabled={index === ordered.length - 1 || sortKey !== ""}
+                              aria-label={isAr ? "تحريك لأسفل" : "Move down"}
+                              className="rounded-lg p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-30"
+                            >
+                              <ArrowDown className="h-3.5 w-3.5" />
+                            </button>
+                            <span className="w-6 text-center font-mono text-[10px] text-muted-foreground">
+                              {index + 1}
+                            </span>
+                          </div>
+
+                          <Switch
+                            checked={row.enabled}
+                            onCheckedChange={(checked) => toggleEnabled(method.id, checked)}
+                            aria-label={
+                              isAr
+                                ? `تفعيل ${method.nameAr}`
+                                : `Enable ${method.nameEn ?? method.nameAr}`
+                            }
+                          />
                         </div>
-                        {method.allowedContexts.length < PAYMENT_CONTEXTS.length && (
-                          <p className="mt-1.5 text-[10px] text-muted-foreground/80">
-                            {isAr
-                              ? `غير متاح في ${PAYMENT_CONTEXTS.length - method.allowedContexts.length} أقسام بحسب تعريف النظام.`
-                              : `Not available in ${PAYMENT_CONTEXTS.length - method.allowedContexts.length} sections by system definition.`}
-                          </p>
+
+                        {/* ── Row 2: identity authoring. Name + icon, never the account. ── */}
+                        <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-border/40 pt-2.5">
+                          <PaymentMethodIdentityEditor
+                            method={method}
+                            onSaved={() => void refetch()}
+                            className="flex-1"
+                          />
+                        </div>
+
+                        {/* ── Row 3: contexts. Only those the developers allow. ── */}
+                        {row.enabled && (
+                          <div className="mt-2.5 border-t border-border/40 pt-2.5">
+                            <p className="mb-1.5 text-[10px] font-semibold text-muted-foreground">
+                              {isAr ? "يظهر في:" : "Appears in:"}
+                            </p>
+                            <div className="flex flex-wrap gap-1">
+                              {PAYMENT_CONTEXTS.filter((c) =>
+                                method.allowedContexts.includes(c),
+                              ).map((context) => {
+                                const on = row.contexts.includes(context);
+                                const label = PAYMENT_CONTEXT_LABELS[context];
+                                return (
+                                  <button
+                                    key={context}
+                                    type="button"
+                                    aria-pressed={on}
+                                    onClick={() => toggleContext(method.id, context, !on)}
+                                    className={cn(
+                                      "inline-flex h-7 items-center gap-1 rounded-lg border px-2 text-[10px] font-medium transition-all",
+                                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+                                      on
+                                        ? "border-primary/60 bg-primary/10 text-foreground"
+                                        : "border-border/60 bg-background/60 text-muted-foreground hover:border-primary/30 hover:text-foreground",
+                                    )}
+                                  >
+                                    {on && <Check className="h-3 w-3" />}
+                                    {isAr ? label.ar : label.en}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                            {method.allowedContexts.length < PAYMENT_CONTEXTS.length && (
+                              <p className="mt-1.5 text-[10px] text-muted-foreground/80">
+                                {isAr
+                                  ? `غير متاح في ${PAYMENT_CONTEXTS.length - method.allowedContexts.length} أقسام بحسب تعريف النظام.`
+                                  : `Not available in ${PAYMENT_CONTEXTS.length - method.allowedContexts.length} sections by system definition.`}
+                              </p>
+                            )}
+                          </div>
                         )}
                       </div>
-                    )}
-                  </div>
-                );
-              })}
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* ── Sticky action bar, matching the rest of Settings ── */}
+          {mainTab === "catalog" && (isDirty || isSaving) && (
+            <div className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 z-40 flex max-w-[calc(100vw-2rem)] flex-wrap items-center justify-end gap-2 rounded-2xl border border-border/70 bg-card/95 p-2 shadow-xl backdrop-blur-md">
+              <span className="px-1 text-[11px] font-medium text-muted-foreground">
+                {isAr ? "لديك تغييرات غير محفوظة" : "You have unsaved changes"}
+              </span>
+              <ActionButton
+                tone="ghost"
+                size="sm"
+                icon={<RotateCcw />}
+                onClick={reset}
+                disabled={isSaving}
+              >
+                {isAr ? "تراجع" : "Revert"}
+              </ActionButton>
+              <ActionButton size="sm" icon={<Save />} onClick={handleSave} loading={isSaving}>
+                {isAr ? "حفظ التغييرات" : "Save changes"}
+              </ActionButton>
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      {/* ── Sticky action bar, matching the rest of Settings ── */}
-      {(isDirty || isSaving) && (
-        <div className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 z-40 flex max-w-[calc(100vw-2rem)] flex-wrap items-center justify-end gap-2 rounded-2xl border border-border/70 bg-card/95 p-2 shadow-xl backdrop-blur-md">
-          <span className="px-1 text-[11px] font-medium text-muted-foreground">
-            {isAr ? "لديك تغييرات غير محفوظة" : "You have unsaved changes"}
-          </span>
-          <ActionButton
-            tone="ghost"
-            size="sm"
-            icon={<RotateCcw />}
-            onClick={reset}
-            disabled={isSaving}
-          >
-            {isAr ? "تراجع" : "Revert"}
-          </ActionButton>
-          <ActionButton size="sm" icon={<Save />} onClick={handleSave} loading={isSaving}>
-            {isAr ? "حفظ التغييرات" : "Save changes"}
-          </ActionButton>
-        </div>
+        </>
       )}
     </div>
   );

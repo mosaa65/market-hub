@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AmountInput } from "@/components/ui/amount-input";
+import { QuantityInput } from "@/components/ui/quantity-input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -491,28 +493,30 @@ function FixedAssetsPage() {
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1">
                 <Label>تكلفة الشراء</Label>
-                <Input
-                  type="number"
-                  value={newCost}
-                  onChange={(e) => setNewCost(e.target.value)}
-                  placeholder="100000"
+                <AmountInput
+                  value={newCost === "" ? null : Number(newCost)}
+                  onValueChange={(v) => setNewCost(v == null ? "" : String(v))}
+                  min={0}
+                  showInWords={false}
                 />
               </div>
               <div className="space-y-1">
                 <Label>قيمة الخردة</Label>
-                <Input
-                  type="number"
-                  value={newSalvage}
-                  onChange={(e) => setNewSalvage(e.target.value)}
+                <AmountInput
+                  value={newSalvage === "" ? null : Number(newSalvage)}
+                  onValueChange={(v) => setNewSalvage(v == null ? "" : String(v))}
+                  min={0}
+                  showInWords={false}
                   placeholder="0"
                 />
               </div>
               <div className="space-y-1">
                 <Label>العمر (شهور)</Label>
-                <Input
-                  type="number"
-                  value={newMonths}
-                  onChange={(e) => setNewMonths(e.target.value)}
+                <QuantityInput
+                  value={newMonths === "" ? null : Number(newMonths)}
+                  onValueChange={(v) => setNewMonths(v == null ? "" : String(v))}
+                  decimals={0}
+                  min={0}
                   placeholder="60"
                 />
               </div>
@@ -604,10 +608,11 @@ function FixedAssetsPage() {
               </div>
               <div className="space-y-1">
                 <Label>حصيلة البيع إن وجدت</Label>
-                <Input
-                  type="number"
-                  value={disposeProceeds}
-                  onChange={(e) => setDisposeProceeds(e.target.value)}
+                <AmountInput
+                  value={disposeProceeds === "" ? null : Number(disposeProceeds)}
+                  onValueChange={(v) => setDisposeProceeds(v == null ? "" : String(v))}
+                  min={0}
+                  showInWords={false}
                   placeholder="0"
                 />
               </div>

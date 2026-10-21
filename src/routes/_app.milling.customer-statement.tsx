@@ -78,6 +78,7 @@ import {
   MillingEmpty,
   fmtNum,
 } from "@/components/milling/milling-ui";
+import { QuantityInput } from "@/components/ui/quantity-input";
 import { getCompanyCurrencySymbol } from "@/lib/format";
 import { usePersistedViewMode } from "@/hooks/use-persisted-view-mode";
 import type { RecordsViewMode } from "@/components/ui/records-view";
@@ -1256,26 +1257,28 @@ function QuickMillingModal({
 
             <div className="grid gap-3 sm:grid-cols-2">
               <MillingField label="عدد الأكياس المطحونة *">
-                <MillingInput
-                  type="number"
+                <QuantityInput
+                  decimals={0}
                   min={1}
                   max={maxAvailableBags}
                   placeholder="0"
-                  value={bagsOut}
-                  onChange={(e) => handleBagsOutChange(e.target.value)}
+                  aria-label="عدد الأكياس المطحونة"
+                  value={bagsOut === "" ? null : Number(bagsOut)}
+                  onValueChange={(v) => handleBagsOutChange(v == null ? "" : String(v))}
                   className="font-bold text-amber-600 dark:text-amber-400"
                 />
               </MillingField>
 
               <MillingField label="الوزن الإجمالي بالكجم *">
-                <MillingInput
-                  type="number"
+                <QuantityInput
+                  decimals={2}
                   min={0.1}
-                  step="0.01"
+                  unit="kg"
                   placeholder="0.00"
-                  value={kgOut}
-                  onChange={(e) => {
-                    setKgOut(e.target.value);
+                  aria-label="الوزن الإجمالي بالكجم"
+                  value={kgOut === "" ? null : Number(kgOut)}
+                  onValueChange={(v) => {
+                    setKgOut(v == null ? "" : String(v));
                     setKgAuto(false);
                   }}
                   className="font-bold"
@@ -1338,25 +1341,28 @@ function QuickMillingModal({
 
                   {/* عدد الأكياس */}
                   <div className="col-span-2">
-                    <MillingInput
-                      type="number"
+                    <QuantityInput
+                      decimals={0}
                       min={0}
                       placeholder="أكياس"
-                      value={line.bags}
-                      onChange={(e) => updateOutputLine(idx, "bags", e.target.value)}
+                      aria-label="عدد الأكياس"
+                      value={line.bags === "" ? null : Number(line.bags)}
+                      onValueChange={(v) =>
+                        updateOutputLine(idx, "bags", v == null ? "" : String(v))
+                      }
                       className="font-bold text-center text-xs"
                     />
                   </div>
 
                   {/* الوزن كجم */}
                   <div className="col-span-2">
-                    <MillingInput
-                      type="number"
+                    <QuantityInput
+                      decimals={2}
                       min={0}
-                      step="0.01"
                       placeholder="كجم"
-                      value={line.kg}
-                      onChange={(e) => updateOutputLine(idx, "kg", e.target.value)}
+                      aria-label="الوزن كجم"
+                      value={line.kg === "" ? null : Number(line.kg)}
+                      onValueChange={(v) => updateOutputLine(idx, "kg", v == null ? "" : String(v))}
                       className="font-bold text-center text-xs"
                     />
                   </div>
@@ -1645,25 +1651,27 @@ function QuickDeliveryModal({
 
             <div className="grid gap-3 sm:grid-cols-2">
               <MillingField label="عدد الأكياس المسلمة">
-                <MillingInput
-                  type="number"
+                <QuantityInput
+                  decimals={0}
                   min={1}
                   max={maxBags}
                   placeholder="0"
-                  value={bags}
-                  onChange={(e) => setBags(e.target.value)}
+                  aria-label="عدد الأكياس المسلمة"
+                  value={bags === "" ? null : Number(bags)}
+                  onValueChange={(v) => setBags(v == null ? "" : String(v))}
                   className="font-bold text-emerald-600 dark:text-emerald-400"
                 />
               </MillingField>
 
               <MillingField label="الوزن الإجمالي بالكجم">
-                <MillingInput
-                  type="number"
+                <QuantityInput
+                  decimals={2}
                   min={0.1}
-                  step="0.01"
+                  unit="kg"
                   placeholder="0.00"
-                  value={kg}
-                  onChange={(e) => setKg(e.target.value)}
+                  aria-label="الوزن الإجمالي بالكجم"
+                  value={kg === "" ? null : Number(kg)}
+                  onValueChange={(v) => setKg(v == null ? "" : String(v))}
                   className="font-bold"
                 />
               </MillingField>

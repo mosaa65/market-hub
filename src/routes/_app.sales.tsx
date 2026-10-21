@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
+import { AmountInput } from "@/components/ui/amount-input";
 import { useI18n } from "@/lib/i18n";
 import { useModules } from "@/lib/modules";
 import { money } from "@/lib/format";
@@ -1715,24 +1716,28 @@ export function SalesPage() {
               <label className="text-[10px] text-muted-foreground">
                 {isRtl ? "من (الحد الأدنى)" : "Min"}
               </label>
-              <input
-                type="number"
-                value={minAmount}
-                onChange={(e) => setMinAmount(e.target.value)}
+              <AmountInput
+                min={0}
+                showInWords={false}
+                value={minAmount === "" ? null : Number(minAmount)}
+                onValueChange={(v) => setMinAmount(v == null ? "" : String(v))}
                 placeholder="0"
-                className="h-9 w-full rounded-lg border border-input bg-surface px-3 text-xs"
+                aria-label={isRtl ? "الحد الأدنى" : "Min"}
+                containerClassName="[&_input]:h-9 [&_input]:rounded-lg [&_input]:bg-surface [&_input]:text-xs"
               />
             </div>
             <div>
               <label className="text-[10px] text-muted-foreground">
                 {isRtl ? "إلى (الحد الأقصى)" : "Max"}
               </label>
-              <input
-                type="number"
-                value={maxAmount}
-                onChange={(e) => setMaxAmount(e.target.value)}
+              <AmountInput
+                min={0}
+                showInWords={false}
+                value={maxAmount === "" ? null : Number(maxAmount)}
+                onValueChange={(v) => setMaxAmount(v == null ? "" : String(v))}
                 placeholder="0"
-                className="h-9 w-full rounded-lg border border-input bg-surface px-3 text-xs"
+                aria-label={isRtl ? "الحد الأقصى" : "Max"}
+                containerClassName="[&_input]:h-9 [&_input]:rounded-lg [&_input]:bg-surface [&_input]:text-xs"
               />
             </div>
           </div>

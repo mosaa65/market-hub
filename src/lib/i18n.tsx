@@ -28,7 +28,7 @@ const en: Dict = {
   "nav.barcodes": "Barcode Labels",
   "nav.loyalty": "Loyalty",
   "nav.audit": "Audit Logs",
-  "nav.settlements": "Settlements",
+  "nav.settlements": "Stock Movements",
   "nav.customers": "Customers",
   "nav.suppliers": "Suppliers",
   "nav.finance": "Finance",
@@ -221,8 +221,7 @@ const en: Dict = {
   "common.overpaid": "Paid amount cannot exceed the total",
   "common.customer_required_for_credit":
     "Select a customer so the unpaid balance can be recorded as debt",
-  "common.credit_customer_locked":
-    "The cash customer cannot carry debt — choose a real customer",
+  "common.credit_customer_locked": "The cash customer cannot carry debt — choose a real customer",
   "common.customer_credit_limit": "Credit limit",
   "common.payment_reference": "Transfer / wallet reference",
   "common.active": "Active",
@@ -1206,7 +1205,7 @@ const ar: Dict = {
   "nav.barcodes": "ملصقات الباركود",
   "nav.loyalty": "نقاط الولاء",
   "nav.audit": "سجل الأحداث",
-  "nav.settlements": "التسويات",
+  "nav.settlements": "حركة المخزون",
   "nav.customers": "العملاء",
   "nav.suppliers": "الموردون",
   "nav.finance": "المالية",

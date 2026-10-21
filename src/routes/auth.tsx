@@ -527,7 +527,6 @@ function AuthPage() {
           </div>
         </div>
       </main>
-
     </div>
   );
 }

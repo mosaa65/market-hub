@@ -55,7 +55,13 @@ import {
   type ResolvedPaymentMethod,
 } from "@/hooks/use-payment-methods";
 import { PaymentMethodIcon } from "./payment-method-icon";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 /**
  * Resolve one `ensureIds` entry to a method, accepting EITHER a catalogue id or

@@ -42,6 +42,18 @@ interface PurchasePaidRow {
   suppliers: { name: string } | null;
 }
 
+interface SupplierPaymentRow {
+  id: string;
+  voucher_number?: string | null;
+  supplier_id: string | null;
+  amount: number | null;
+  payment_method: string | null;
+  payment_date: string;
+  notes: string | null;
+  created_at?: string | null;
+  suppliers?: { name: string } | null;
+}
+
 interface ExpenseRow {
   id: string;
   amount: number | null;
@@ -126,6 +138,37 @@ export function supplierPaymentToCashEntry(
       paymentMethod: row.payment_method,
       counterparty: who,
       bundledWithInvoice: true,
+      entityId: CASH_ENTITY_ID,
+    },
+  };
+}
+
+/** تحويل سند صرف مورد إلى صادر صندوق */
+export function supplierVoucherToCashEntry(
+  row: SupplierPaymentRow,
+  lang: "ar" | "en" = "ar",
+): LedgerEntry | null {
+  const amt = Number(row.amount ?? 0);
+  if (amt <= 0) return null;
+  const who = row.suppliers?.name ?? (lang === "ar" ? "مورد" : "Supplier");
+  const ref = row.voucher_number || row.id.slice(0, 8);
+  return {
+    id: `sp-cash:${row.id}`,
+    occurredAt: row.created_at || `${row.payment_date}T00:00:00Z`,
+    kind: "payment",
+    debit: 0,
+    credit: amt,
+    reference: ref,
+    description:
+      row.notes ||
+      (lang === "ar" ? `سند صرف للمورد ${who} (${ref})` : `Payment voucher to ${who} (${ref})`),
+    referenceId: row.id,
+    referenceType: "supplier_payment",
+    meta: {
+      entitySource: "supplier_payments",
+      paymentMethod: row.payment_method,
+      counterparty: who,
+      voucherNumber: row.voucher_number,
       entityId: CASH_ENTITY_ID,
     },
   };
@@ -221,48 +264,43 @@ export interface CashStatementData {
  * ملاحظة: تُدرج فقط حركات لها تاريخ صالح.
  */
 export async function loadCashStatement(lang: "ar" | "en" = "ar"): Promise<CashStatementData> {
-  const [paymentsRes, purchasesRes, expensesRes, expensePaymentsRes] = await Promise.all([
-    supabase
-      .from("customer_payments")
-      .select(
-        "id, customer_id, amount, payment_method, payment_date, note, created_at, customers(name)",
-      )
-      .order("created_at", { ascending: true }),
-    supabase
-      .from("purchase_invoices")
-      .select(
-        "id, invoice_number, supplier_id, total, paid, payment_method, created_at, suppliers(name)",
-      )
-      .gt("paid", 0)
-      .order("created_at", { ascending: true }),
-    // Legacy rows only. An expense migrated into the new module gets a mirrored
-    // row whose `legacy_expense_id` points back here, and counting both would
-    // charge the cash drawer twice for the same money.
-    supabase
-      .from("expenses")
-      .select(
-        "id, amount, payment_method, expense_date, note, created_at, expense_categories(name,name_ar)",
-      )
-      .order("expense_date", { ascending: true }),
-    /**
-     * Payments recorded by the new module.
-     *
-     * Failure is tolerated rather than fatal: on an installation where the
-     * expense-module migration has not been applied yet, `expense_payments`
-     * does not exist and the cash statement must keep working unchanged rather
-     * than showing an error page.
-     *
-     * `as any` is confined to this one call because `database.ts` is generated
-     * from the deployed schema; it is regenerated once the migration ships and
-     * this cast can be removed.
-     */
-    (supabase as any)
-      .from("expense_payments")
-      .select(
-        "id, entry_id, amount, payment_method, payment_date, account_label, note, created_at, reversal_of, reversed_by, expense_entries(reference,status,expense_date)",
-      )
-      .order("created_at", { ascending: true }),
-  ]);
+  const [paymentsRes, purchasesRes, expensesRes, expensePaymentsRes, supplierPaymentsRes] =
+    await Promise.all([
+      supabase
+        .from("customer_payments")
+        .select(
+          "id, customer_id, amount, payment_method, payment_date, note, created_at, customers(name)",
+        )
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("purchase_invoices")
+        .select(
+          "id, invoice_number, supplier_id, total, paid, payment_method, created_at, suppliers(name)",
+        )
+        .gt("paid", 0)
+        .order("created_at", { ascending: true }),
+      // Legacy rows only. An expense migrated into the new module gets a mirrored
+      // row whose `legacy_expense_id` points back here, and counting both would
+      // charge the cash drawer twice for the same money.
+      supabase
+        .from("expenses")
+        .select(
+          "id, amount, payment_method, expense_date, note, created_at, expense_categories(name,name_ar)",
+        )
+        .order("expense_date", { ascending: true }),
+      (supabase as any)
+        .from("expense_payments")
+        .select(
+          "id, entry_id, amount, payment_method, payment_date, account_label, note, created_at, reversal_of, reversed_by, expense_entries(reference,status,expense_date)",
+        )
+        .order("created_at", { ascending: true }),
+      (supabase as any)
+        .from("supplier_payments")
+        .select(
+          "id, voucher_number, supplier_id, amount, payment_method, payment_date, notes, created_at, suppliers(name)",
+        )
+        .order("created_at", { ascending: true }),
+    ]);
 
   /*
    * Rows that have been bridged into the new module are excluded from the
@@ -303,6 +341,12 @@ export async function loadCashStatement(lang: "ar" | "en" = "ar"): Promise<CashS
   }
   for (const row of (purchasesRes.data ?? []) as unknown as PurchasePaidRow[]) {
     const entry = supplierPaymentToCashEntry(row, lang);
+    if (!entry) continue;
+    supplierPayments += entry.credit;
+    entries.push(entry);
+  }
+  for (const row of (supplierPaymentsRes?.data ?? []) as unknown as SupplierPaymentRow[]) {
+    const entry = supplierVoucherToCashEntry(row, lang);
     if (!entry) continue;
     supplierPayments += entry.credit;
     entries.push(entry);

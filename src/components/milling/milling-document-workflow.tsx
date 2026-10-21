@@ -33,7 +33,6 @@ import {
 } from "@/lib/milling";
 import {
   MillingField,
-  MillingInput,
   MillingPanel,
   MillingSectionTitle,
   MillingSelect,
@@ -42,8 +41,12 @@ import {
   Mono,
   fmtNum,
 } from "@/components/milling/milling-ui";
+import { QuantityInput } from "@/components/ui/quantity-input";
 import { UniversalPrintPreview } from "@/components/universal-print-preview";
-import { UnifiedPrintModal, type MillingTicketStage } from "@/components/milling/unified-print-modal";
+import {
+  UnifiedPrintModal,
+  type MillingTicketStage,
+} from "@/components/milling/unified-print-modal";
 import { DocumentShareDialog } from "@/components/communication/document-share-dialog";
 import type { PrintRequest } from "@/lib/printing";
 
@@ -332,20 +335,22 @@ export function MillingDocumentWorkflow({
 
                 <div className="grid grid-cols-2 gap-3">
                   <MillingField label="الأكياس المطحونة">
-                    <MillingInput
-                      type="number"
+                    <QuantityInput
+                      value={bagsOut === "" ? null : Number(bagsOut)}
+                      onValueChange={(v) => setBagsOut(v == null ? "" : String(v))}
+                      decimals={0}
                       min={0}
-                      value={bagsOut}
-                      onChange={(e) => setBagsOut(e.target.value)}
+                      placeholder="0"
                     />
                   </MillingField>
                   <MillingField label="الوزن المطحون (كجم)">
-                    <MillingInput
-                      type="number"
+                    <QuantityInput
+                      value={kgOut === "" ? null : Number(kgOut)}
+                      onValueChange={(v) => setKgOut(v == null ? "" : String(v))}
+                      decimals={3}
                       min={0}
-                      step="0.001"
-                      value={kgOut}
-                      onChange={(e) => setKgOut(e.target.value)}
+                      unit="kg"
+                      placeholder="0"
                     />
                   </MillingField>
                 </div>
@@ -571,20 +576,24 @@ function LinesEditor({
               </option>
             ))}
           </MillingSelect>
-          <MillingInput
-            type="number"
+          <QuantityInput
+            decimals={0}
             min={0}
+            emptyAsZero
             placeholder="أكياس"
-            value={line.bags || ""}
-            onChange={(e) => update(index, { bags: Number(e.target.value) || 0 })}
+            aria-label="أكياس"
+            value={line.bags || null}
+            onValueChange={(v) => update(index, { bags: v ?? 0 })}
           />
-          <MillingInput
-            type="number"
+          <QuantityInput
+            decimals={3}
             min={0}
-            step="0.001"
+            emptyAsZero
             placeholder="كجم"
-            value={line.kg || ""}
-            onChange={(e) => update(index, { kg: Number(e.target.value) || 0 })}
+            aria-label="كجم"
+            unit="kg"
+            value={line.kg || null}
+            onValueChange={(v) => update(index, { kg: v ?? 0 })}
           />
           <button
             type="button"

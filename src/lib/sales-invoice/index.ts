@@ -82,6 +82,14 @@ export interface CreateSalesInvoiceInput {
   discount?: number;
   note?: string;
   lines: InvoiceLine[];
+  cashboxId?: string | null;
+  bankAccountId?: string | null;
+  paymentMethodId?: string | null;
+  paymentReference?: string | null;
+  chequeNumber?: string | null;
+  chequeBank?: string | null;
+  chequeDueDate?: string | null;
+  chequeDrawer?: string | null;
 }
 
 export interface SalesInvoiceResult {
@@ -229,6 +237,47 @@ export async function createSalesInvoice(
     if (error) throw new Error(error.message);
 
     const invoiceId = data as string;
+
+    // Update invoice with specific treasury & settlement routing metadata
+    if (input.cashboxId || input.bankAccountId || input.paymentMethodId || input.paymentReference) {
+      try {
+        await db
+          .from("sales_invoices")
+          .update({
+            cashbox_id: input.cashboxId || null,
+            bank_account_id: input.bankAccountId || null,
+            payment_method_id: input.paymentMethodId || null,
+            payment_reference: input.paymentReference || null,
+          })
+          .eq("id", invoiceId);
+      } catch (metaErr) {
+        console.warn("Settlement metadata update skipped or column not ready:", metaErr);
+      }
+    }
+
+    // Register cheque if payment is cheque and cheque number was provided
+    if (
+      (input.paymentMethod === ("cheque" as any) || input.chequeNumber) &&
+      input.chequeNumber &&
+      paid > 0
+    ) {
+      try {
+        await db.from("cheques_register").insert({
+          cheque_number: input.chequeNumber,
+          bank_name: input.chequeBank || "شيك مصرفي",
+          drawer_name: input.chequeDrawer || null,
+          due_date: input.chequeDueDate || new Date().toISOString().slice(0, 10),
+          amount: paid,
+          status: "UNDER_COLLECTION",
+          customer_id: input.customerId || null,
+          invoice_id: invoiceId,
+          notes: input.note || null,
+        });
+      } catch (chequeErr) {
+        console.warn("Cheque registration skipped or table not ready:", chequeErr);
+      }
+    }
+
     const { data: inv } = await db
       .from("sales_invoices")
       .select("invoice_number, total")

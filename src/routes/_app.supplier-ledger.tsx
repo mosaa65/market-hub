@@ -8,6 +8,7 @@ import { money } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { AmountInput } from "@/components/ui/amount-input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -45,6 +46,11 @@ import {
   Building,
   RefreshCw,
 } from "lucide-react";
+import { useCashboxes } from "@/hooks/use-cashboxes";
+import { useCompanyBankAccounts } from "@/hooks/use-company-bank-accounts";
+import { DynamicPaymentSelector } from "@/components/ui/payment-method";
+import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
+import { toLegacyPaymentValue } from "@/lib/payments/payment-methods";
 
 export const Route = createFileRoute("/_app/supplier-ledger")({
   head: () => ({
@@ -107,6 +113,30 @@ function SupplierLedgerPage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
+  // Treasury hooks & Dynamic Settlement State
+  const { activeCashboxes, defaultCashbox } = useCashboxes();
+  const { banks, wallets, defaultBank, defaultWallet } = useCompanyBankAccounts();
+  const [selectedCashboxId, setSelectedCashboxId] = useState<string>("");
+  const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>("");
+  const [settlement, setSettlement] = useState<PaymentSettlementSelection>({
+    method: "cash",
+    paymentMethodId: "cash",
+  });
+
+  // Read URL query params on initial mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const sp = new URLSearchParams(window.location.search);
+      const urlSupplierId = sp.get("supplierId");
+      if (urlSupplierId) {
+        setSelectedSupplierId(urlSupplierId);
+        if (sp.get("action") === "payment") {
+          setPaymentDialogOpen(true);
+        }
+      }
+    }
+  }, []);
+
   // Payment Dialog State
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [payAmount, setPayAmount] = useState("");
@@ -134,7 +164,11 @@ function SupplierLedgerPage() {
       }));
       setSuppliers(list);
       if (list.length > 0 && !selectedSupplierId) {
-        setSelectedSupplierId(list[0].id);
+        const urlSupplierId =
+          typeof window !== "undefined"
+            ? new URLSearchParams(window.location.search).get("supplierId")
+            : null;
+        setSelectedSupplierId(urlSupplierId || list[0].id);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -248,6 +282,35 @@ function SupplierLedgerPage() {
   const totalDebits = useMemo(() => movements.reduce((acc, m) => acc + m.debit, 0), [movements]);
   const totalCredits = useMemo(() => movements.reduce((acc, m) => acc + m.credit, 0), [movements]);
 
+  const handleMethodChange = (m: string) => {
+    setPayMethod(m);
+    if (m === "CASH") {
+      const box =
+        (selectedCashboxId ? activeCashboxes.find((c) => c.id === selectedCashboxId) : null) ||
+        defaultCashbox ||
+        activeCashboxes[0];
+      setSelectedCashboxId(box?.id || "");
+      setSelectedBankAccountId("");
+      setPayAccount(box?.account?.code || "1101");
+    } else if (m === "WALLET") {
+      const w =
+        (selectedBankAccountId ? wallets.find((b) => b.id === selectedBankAccountId) : null) ||
+        defaultWallet ||
+        wallets[0];
+      setSelectedBankAccountId(w?.id || "");
+      setSelectedCashboxId("");
+      setPayAccount(w?.account?.code || "1131");
+    } else {
+      const b =
+        (selectedBankAccountId ? banks.find((bk) => bk.id === selectedBankAccountId) : null) ||
+        defaultBank ||
+        banks[0];
+      setSelectedBankAccountId(b?.id || "");
+      setSelectedCashboxId("");
+      setPayAccount(b?.account?.code || "1111");
+    }
+  };
+
   // 4. Submit Payment
   const handleRecordPayment = async () => {
     const amt = parseFloat(payAmount);
@@ -262,21 +325,63 @@ function SupplierLedgerPage() {
     setSubmittingPayment(true);
     setActionMessage(null);
     try {
-      const { data, error } = await (supabase as any).rpc("record_supplier_payment", {
-        p_supplier_id: selectedSupplierId,
-        p_amount: amt,
-        p_payment_method: payMethod,
-        p_account_code: payAccount,
-        p_payment_date: payDate || new Date().toISOString().slice(0, 10),
-        p_notes: payNotes || null,
-      });
+      let data: any = null;
+      let error: any = null;
+
+      const resolvedCashbox =
+        settlement.cashboxId || selectedCashboxId || defaultCashbox?.id || null;
+      const resolvedBank =
+        settlement.bankAccountId || selectedBankAccountId || defaultBank?.id || null;
+      const resolvedMethod = toLegacyPaymentValue(settlement.method || payMethod).toUpperCase();
+      const resolvedAccount = settlement.chartAccountId || payAccount || "1101";
+
+      try {
+        const res = await (supabase as any).rpc("record_supplier_payment", {
+          p_supplier_id: selectedSupplierId,
+          p_amount: amt,
+          p_payment_method: resolvedMethod,
+          p_account_code: resolvedAccount,
+          p_payment_date: payDate || new Date().toISOString().slice(0, 10),
+          p_notes: payNotes || null,
+          p_cashbox_id: resolvedMethod === "CASH" ? resolvedCashbox : null,
+          p_bank_account_id: resolvedMethod !== "CASH" ? resolvedBank : null,
+        });
+        data = res.data;
+        error = res.error;
+      } catch {
+        const res = await (supabase as any).rpc("record_supplier_payment", {
+          p_supplier_id: selectedSupplierId,
+          p_amount: amt,
+          p_payment_method: resolvedMethod,
+          p_account_code: resolvedAccount,
+          p_payment_date: payDate || new Date().toISOString().slice(0, 10),
+          p_notes: payNotes || null,
+        });
+        data = res.data;
+        error = res.error;
+      }
 
       if (error) throw error;
+
+      if (data?.payment_id) {
+        try {
+          await (supabase as any)
+            .from("supplier_payments")
+            .update({
+              cashbox_id: resolvedMethod === "CASH" ? resolvedCashbox : null,
+              bank_account_id: resolvedMethod !== "CASH" ? resolvedBank : null,
+              payment_method_id: settlement.paymentMethodId || settlement.method || null,
+            })
+            .eq("id", data.payment_id);
+        } catch {
+          // ignore if columns not in remote schema yet
+        }
+      }
 
       const voucherNo = data?.voucher_number || "";
       setActionMessage({
         type: "success",
-        text: `تم تسجيل وترحيل سند الصرف بنجاح (رقم السند: ${voucherNo})، وقيد المحاسبة Dr 2111 / Cr ${payAccount}.`,
+        text: `تم تسجيل وترحيل سند الصرف بنجاح (رقم السند: ${voucherNo})، وقيد المحاسبة Dr 2111 / Cr ${resolvedAccount}.`,
       });
 
       setPaymentDialogOpen(false);
@@ -675,13 +780,13 @@ function SupplierLedgerPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs">المبلغ المسدد *</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
+                {/* المبلغ المُوحّد: فاصلة آلاف + تفقيط تحت الرقم. */}
+                <AmountInput
+                  min={0.01}
                   placeholder="0.00"
-                  value={payAmount}
-                  onChange={(e) => setPayAmount(e.target.value)}
+                  aria-label="المبلغ المسدد"
+                  value={toNumberOrNull(payAmount)}
+                  onValueChange={(v) => setPayAmount(v == null ? "" : String(v))}
                 />
               </div>
               <div className="space-y-1.5">
@@ -690,34 +795,29 @@ function SupplierLedgerPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs">طريقة الدفع</Label>
-                <Select value={payMethod} onValueChange={setPayMethod}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="CASH">نقداً (Cash)</SelectItem>
-                    <SelectItem value="BANK">تحويل بنكي (Bank Transfer)</SelectItem>
-                    <SelectItem value="CHEQUE">شيك (Cheque)</SelectItem>
-                    <SelectItem value="CARD">بطاقة / مدى (Card)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs">حساب الصرف المالي</Label>
-                <Select value={payAccount} onValueChange={setPayAccount}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1101">1101 — الصندوق الرئيسي</SelectItem>
-                    <SelectItem value="1111">1111 — الحساب البنكي</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold">
+                طريقة الصرف وتحديد الوعاء المالي (خزينة / بنك / محفظة)
+              </Label>
+              <DynamicPaymentSelector
+                context="purchases"
+                value={settlement.paymentMethodId || settlement.method || "cash"}
+                onChange={(m) => {
+                  setSettlement((prev) => ({ ...prev, method: m }));
+                  setPayMethod(toLegacyPaymentValue(m).toUpperCase());
+                }}
+                settlement={settlement}
+                onSettlementChange={(next) => {
+                  setSettlement(next);
+                  setPayMethod(toLegacyPaymentValue(next.method).toUpperCase());
+                  setSelectedCashboxId(next.cashboxId || "");
+                  setSelectedBankAccountId(next.bankAccountId || "");
+                  if (next.chartAccountId) {
+                    setPayAccount(next.chartAccountId);
+                  }
+                }}
+                includeCredit={false}
+              />
             </div>
 
             <div className="space-y-1.5">
@@ -753,4 +853,17 @@ function SupplierLedgerPage() {
       </Dialog>
     </div>
   );
+}
+
+/**
+ * حالة النموذج تحتفظ بالمبلغ كسلسلة، بينما `AmountInput` يعمل بقيمة
+ * `number | null`. النص الفارغ أو غير الرقمي يصبح null بدل NaN.
+ */
+function toNumberOrNull(value: string | number | null | undefined): number | null {
+  if (value == null) return null;
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = Number(trimmed.replace(/,/g, ""));
+  return Number.isFinite(parsed) ? parsed : null;
 }

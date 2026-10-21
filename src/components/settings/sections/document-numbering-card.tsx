@@ -14,6 +14,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { QuantityInput } from "@/components/ui/quantity-input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
@@ -409,17 +410,17 @@ function DocumentEditor({
           <Label className="text-[10px] font-semibold text-muted-foreground">
             {isAr ? "أول رقم قادم (اختياري)" : "Next number (optional)"}
           </Label>
-          <Input
-            type="number"
+          <QuantityInput
+            decimals={0}
             min={1}
-            value={nextValue}
-            onChange={(e) => setNextValue(e.target.value)}
+            value={nextValue === "" ? null : Number(nextValue)}
+            onValueChange={(v) => setNextValue(v == null ? "" : String(v))}
             disabled={!canEdit}
             placeholder={
               isAr ? "اتركه فارغاً للإبقاء على التسلسل" : "Leave empty to keep the sequence"
             }
-            className="h-8 rounded-lg font-mono text-xs px-2"
-            dir="ltr"
+            aria-label={isAr ? "أول رقم قادم" : "Next number"}
+            className="h-8 text-xs"
           />
         </div>
         <div className="text-[10px] text-muted-foreground flex items-center gap-1 pb-1.5">

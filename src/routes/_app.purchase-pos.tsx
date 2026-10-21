@@ -55,6 +55,9 @@ import { usePersistedViewMode } from "@/hooks/use-persisted-view-mode";
 import { SupplierFormDialog } from "@/components/contacts/supplier-form-dialog";
 import { UniversalPrintPreview } from "@/components/universal-print-preview";
 import type { PrintRequest } from "@/lib/printing";
+import { DynamicPaymentSelector } from "@/components/ui/payment-method/dynamic-payment-selector";
+import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
+import { toLegacyPaymentValue, getPaymentMethodDefinition } from "@/lib/payments/payment-methods";
 
 export const Route = createFileRoute("/_app/purchase-pos")({
   head: () => ({ meta: [{ title: "نقطة المشتريات — فورتيكس ERP" }] }),
@@ -311,6 +314,9 @@ function PurchasePOSPage() {
   const selectedPurchasePaymentMethod = purchasePaymentMethods.find(
     (method) => method.id === paymentMethod,
   );
+  const [paymentSelection, setPaymentSelection] = useState<PaymentSettlementSelection>({
+    method: "cash",
+  });
   const [note, setNote] = useState("");
   const [purchaseDate, setPurchaseDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [transferRef, setTransferRef] = useState("");
@@ -720,22 +726,77 @@ function PurchasePOSPage() {
         return parts.length ? parts.join(" — ") : null;
       })();
 
-      const { data: invoiceId, error } = await supabase.rpc("create_purchase", {
-        _warehouse_id: warehouseId,
-        _supplier_id: supplierId,
-        _payment_method: selectedPurchasePaymentMethod?.legacyValue ?? paymentMethod,
-        _paid: paidN,
-        _discount: discountN,
-        _note: composedNote as any,
-        _items: cart.map((l) => ({
-          product_id: l.product_id,
-          quantity: Number(l.quantity),
-          unit_cost: Number(l.unit_cost),
-          tax_rate: Number(l.tax_rate),
-        })),
-      });
+      let invoiceId: string | null = null;
+      let error: any = null;
+
+      try {
+        const res = await (supabase.rpc as any)("create_purchase", {
+          _warehouse_id: warehouseId,
+          _supplier_id: supplierId,
+          _payment_method:
+            selectedPurchasePaymentMethod?.legacyValue ?? toLegacyPaymentValue(paymentMethod),
+          _paid: paidN,
+          _discount: discountN,
+          _note: composedNote as any,
+          _items: cart.map((l) => ({
+            product_id: l.product_id,
+            quantity: Number(l.quantity),
+            unit_cost: Number(l.unit_cost),
+            tax_rate: Number(l.tax_rate),
+          })),
+          _cashbox_id: paymentSelection.cashboxId || null,
+          _bank_account_id: paymentSelection.bankAccountId || null,
+          _payment_reference:
+            paymentSelection.reference ||
+            paymentSelection.paymentReference ||
+            transferRef.trim() ||
+            null,
+          _payment_method_id: paymentSelection.paymentMethodId || paymentMethod,
+        });
+        invoiceId = res.data;
+        error = res.error;
+      } catch {
+        const res = await supabase.rpc("create_purchase", {
+          _warehouse_id: warehouseId,
+          _supplier_id: supplierId,
+          _payment_method: (selectedPurchasePaymentMethod?.legacyValue ??
+            toLegacyPaymentValue(paymentMethod)) as any,
+          _paid: paidN,
+          _discount: discountN,
+          _note: composedNote as any,
+          _items: cart.map((l) => ({
+            product_id: l.product_id,
+            quantity: Number(l.quantity),
+            unit_cost: Number(l.unit_cost),
+            tax_rate: Number(l.tax_rate),
+          })),
+        });
+        invoiceId = res.data;
+        error = res.error;
+      }
 
       if (error) throw error;
+
+      // Attach treasury settlement details if provided
+      if (invoiceId) {
+        try {
+          await (supabase as any)
+            .from("purchase_invoices")
+            .update({
+              cashbox_id: paymentSelection.cashboxId || null,
+              bank_account_id: paymentSelection.bankAccountId || null,
+              payment_method_id: paymentSelection.paymentMethodId || paymentMethod,
+              payment_reference:
+                paymentSelection.reference ||
+                paymentSelection.paymentReference ||
+                transferRef.trim() ||
+                null,
+            })
+            .eq("id", invoiceId);
+        } catch (updateErr) {
+          console.warn("Could not attach treasury metadata to purchase_invoice:", updateErr);
+        }
+      }
 
       // Update local stock map with added quantities
       setStockMap((prev) => {
@@ -825,7 +886,9 @@ function PurchasePOSPage() {
             {lang === "ar" ? "نقطة المشتريات السريعة" : "Point of Purchase"}
           </h1>
           <p className="truncate text-[11px] text-muted-foreground">
-            {lang === "ar" ? "تسجيل المشتريات وتحديث المخزون" : "Purchase entry and stock receiving"}
+            {lang === "ar"
+              ? "تسجيل المشتريات وتحديث المخزون"
+              : "Purchase entry and stock receiving"}
           </p>
         </div>
       </div>
@@ -883,65 +946,65 @@ function PurchasePOSPage() {
           </div>
 
           <div className="col-span-2 flex items-center justify-end gap-1 2xl:contents">
-          <Link
-            to="/purchases"
-            aria-label={lang === "ar" ? "العودة إلى سجل المشتريات" : "Back to purchases list"}
-            title={lang === "ar" ? "العودة إلى سجل المشتريات" : "Back to purchases list"}
-            className="grid size-9 shrink-0 place-items-center rounded-full border border-border/80 bg-surface text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
-          >
-            <ArrowRight className={`size-4 ${lang === "ar" ? "" : "rotate-180"}`} />
-          </Link>
-          {/* Purchase Date */}
-          <label className="relative grid size-9 shrink-0 place-items-center rounded-full border border-border/80 bg-surface text-xs shadow-2xs sm:flex sm:w-auto sm:items-center sm:gap-1.5 sm:rounded-full sm:px-2.5">
-            <CalendarDays className="h-3.5 w-3.5 text-primary shrink-0" />
-            <input
-              type="date"
-              value={purchaseDate}
-              onChange={(e) => setPurchaseDate(e.target.value)}
-              aria-label={lang === "ar" ? "تاريخ الفاتورة" : "Purchase date"}
-              className="absolute inset-0 h-full w-full cursor-pointer opacity-0 sm:static sm:h-auto sm:w-28 sm:opacity-100 sm:bg-transparent sm:text-xs sm:text-foreground sm:outline-none sm:font-mono"
+            <Link
+              to="/purchases"
+              aria-label={lang === "ar" ? "العودة إلى سجل المشتريات" : "Back to purchases list"}
+              title={lang === "ar" ? "العودة إلى سجل المشتريات" : "Back to purchases list"}
+              className="grid size-9 shrink-0 place-items-center rounded-full border border-border/80 bg-surface text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
+            >
+              <ArrowRight className={`size-4 ${lang === "ar" ? "" : "rotate-180"}`} />
+            </Link>
+            {/* Purchase Date */}
+            <label className="relative grid size-9 shrink-0 place-items-center rounded-full border border-border/80 bg-surface text-xs shadow-2xs sm:flex sm:w-auto sm:items-center sm:gap-1.5 sm:rounded-full sm:px-2.5">
+              <CalendarDays className="h-3.5 w-3.5 text-primary shrink-0" />
+              <input
+                type="date"
+                value={purchaseDate}
+                onChange={(e) => setPurchaseDate(e.target.value)}
+                aria-label={lang === "ar" ? "تاريخ الفاتورة" : "Purchase date"}
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0 sm:static sm:h-auto sm:w-28 sm:opacity-100 sm:bg-transparent sm:text-xs sm:text-foreground sm:outline-none sm:font-mono"
+              />
+            </label>
+
+            {/* Page Guide Button */}
+            <PageGuideButton
+              config={purchasePosGuideConfig}
+              className="!size-9 !rounded-full shrink-0"
             />
-          </label>
 
-          {/* Page Guide Button */}
-          <PageGuideButton
-            config={purchasePosGuideConfig}
-            className="!size-9 !rounded-full shrink-0"
-          />
-
-          {/* Barcode Camera Modal Trigger */}
-          {isDesktop && !isTouchDevice && catalogConfig.enableBarcode ? (
-            <button
-              type="button"
-              onClick={() => {
-                const next = !barcodeReaderEnabled;
-                setBarcodeReaderEnabled(next);
-                localStorage.setItem("purchase_pos_barcode_reader_enabled", String(next));
-              }}
-              aria-pressed={barcodeReaderEnabled}
-              title={
-                lang === "ar"
-                  ? barcodeReaderEnabled
-                    ? "إيقاف قارئ الباركود"
-                    : "تفعيل قارئ الباركود"
-                  : barcodeReaderEnabled
-                    ? "Disable barcode reader"
-                    : "Enable barcode reader"
-              }
-              className={`grid size-9 shrink-0 place-items-center rounded-full border transition ${barcodeReaderEnabled ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600" : "border-border bg-surface text-muted-foreground"}`}
-            >
-              <ScanBarcode className="h-4 w-4" />
-            </button>
-          ) : (!isDesktop || isTouchDevice) && catalogConfig.enableBarcode ? (
-            <button
-              type="button"
-              onClick={() => setScannerOpen(true)}
-              className="grid size-9 shrink-0 place-items-center rounded-full border border-border/80 bg-surface text-muted-foreground hover:text-foreground hover:bg-surface-2 transition shadow-2xs"
-              title={lang === "ar" ? "مسح الباركود بالكاميرا" : "Scan barcode with camera"}
-            >
-              <ScanBarcode className="h-4 w-4" />
-            </button>
-          ) : null}
+            {/* Barcode Camera Modal Trigger */}
+            {isDesktop && !isTouchDevice && catalogConfig.enableBarcode ? (
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !barcodeReaderEnabled;
+                  setBarcodeReaderEnabled(next);
+                  localStorage.setItem("purchase_pos_barcode_reader_enabled", String(next));
+                }}
+                aria-pressed={barcodeReaderEnabled}
+                title={
+                  lang === "ar"
+                    ? barcodeReaderEnabled
+                      ? "إيقاف قارئ الباركود"
+                      : "تفعيل قارئ الباركود"
+                    : barcodeReaderEnabled
+                      ? "Disable barcode reader"
+                      : "Enable barcode reader"
+                }
+                className={`grid size-9 shrink-0 place-items-center rounded-full border transition ${barcodeReaderEnabled ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600" : "border-border bg-surface text-muted-foreground"}`}
+              >
+                <ScanBarcode className="h-4 w-4" />
+              </button>
+            ) : (!isDesktop || isTouchDevice) && catalogConfig.enableBarcode ? (
+              <button
+                type="button"
+                onClick={() => setScannerOpen(true)}
+                className="grid size-9 shrink-0 place-items-center rounded-full border border-border/80 bg-surface text-muted-foreground hover:text-foreground hover:bg-surface-2 transition shadow-2xs"
+                title={lang === "ar" ? "مسح الباركود بالكاميرا" : "Scan barcode with camera"}
+              >
+                <ScanBarcode className="h-4 w-4" />
+              </button>
+            ) : null}
           </div>
         </div>
       </div>
@@ -1575,32 +1638,36 @@ function PurchasePOSPage() {
 
           {/* Fixed payment and totals footer */}
           <div className="min-h-0 shrink overflow-y-auto space-y-1.5 border-t border-border/70 bg-surface/95 pt-2 pr-1">
-            {/* Payment Method Selector — 4 clear options incl. wallet & transfer. */}
             <div className="grid min-w-0 grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.8fr)] items-end gap-1.5">
               <div className="flex min-w-0 flex-col gap-1">
                 <span className="truncate text-[10px] font-semibold leading-none text-muted-foreground">
                   {lang === "ar" ? "طريقة الدفع" : "Payment method"}
                 </span>
                 <PaymentMethodPicker
-                context="purchases"
-                value={paymentMethod}
-                onChange={(method) => {
-                  setPaymentMethod(method);
-                  setPaid(method === "credit" ? "0" : "");
-                  setPaidManuallyEdited(false);
-                }}
-                ensureIds={[paymentMethod]}
-                allowedLegacyValues={[
-                  "cash",
-                  "card",
-                  "bank_transfer",
-                  "credit",
-                  "mobile_money",
-                  "split",
-                ]}
-                ariaLabel={lang === "ar" ? "طريقة الدفع" : "Payment method"}
-                className="h-8 min-w-0 rounded-lg text-[10px] sm:text-xs"
-              />
+                  context="purchases"
+                  value={paymentMethod}
+                  onChange={(method) => {
+                    setPaymentMethod(method);
+                    setPaid(method === "credit" ? "0" : "");
+                    setPaidManuallyEdited(false);
+                    setPaymentSelection((s) => ({
+                      ...s,
+                      method,
+                      paymentMethodId: method === "cash" ? "cash" : s.paymentMethodId || method,
+                    }));
+                  }}
+                  ensureIds={[paymentMethod]}
+                  allowedLegacyValues={[
+                    "cash",
+                    "card",
+                    "bank_transfer",
+                    "credit",
+                    "mobile_money",
+                    "split",
+                  ]}
+                  ariaLabel={lang === "ar" ? "طريقة الدفع" : "Payment method"}
+                  className="h-8 min-w-0 rounded-lg text-[10px] sm:text-xs"
+                />
               </div>
               <AmountInput
                 label={lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}
@@ -1626,14 +1693,17 @@ function PurchasePOSPage() {
               />
             </div>
 
-            {/* Transfer reference — shown only for bank transfers. */}
+            {/* Transfer reference input */}
             {(selectedPurchasePaymentMethod?.requiresReference ||
               paymentMethod === "bank_transfer" ||
               paymentMethod === "mobile_money") && (
               <input
                 type="text"
                 value={transferRef}
-                onChange={(e) => setTransferRef(e.target.value)}
+                onChange={(e) => {
+                  setTransferRef(e.target.value);
+                  setPaymentSelection((s) => ({ ...s, reference: e.target.value }));
+                }}
                 placeholder={
                   paymentMethod === "mobile_money"
                     ? lang === "ar"
@@ -1869,4 +1939,14 @@ function PurchasePOSPage() {
       ) : null}
     </div>
   );
+}
+
+/** جسر التحويل بين سلسلة النموذج وقيمة `AmountInput` (`number | null`). */
+function toNumberOrNull(value: string | number | null | undefined): number | null {
+  if (value == null) return null;
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = Number(trimmed.replace(/,/g, ""));
+  return Number.isFinite(parsed) ? parsed : null;
 }

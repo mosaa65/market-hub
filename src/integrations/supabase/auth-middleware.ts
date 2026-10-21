@@ -51,7 +51,7 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" }).server
         context: {
           supabase: publicSupabase,
           userId: "anonymous",
-          claims: {},
+          claims: {} as any,
         },
       });
     }
@@ -76,7 +76,7 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" }).server
           context: {
             supabase,
             userId: "anonymous",
-            claims: {},
+            claims: {} as any,
           },
         });
       }
@@ -85,7 +85,7 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" }).server
         context: {
           supabase,
           userId: data.claims.sub,
-          claims: data.claims,
+          claims: data.claims as any,
         },
       });
     } catch {

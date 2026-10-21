@@ -18,6 +18,7 @@ import {
 import { CircleDollarSign, Hash, Receipt, ScanBarcode, Wrench } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { QuantityInput } from "@/components/ui/quantity-input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -234,19 +235,21 @@ export function InvoicingSection({
                   <Label htmlFor="tax-rate" className="text-xs font-semibold">
                     {isAr ? "نسبة الضريبة %" : "Tax rate %"}
                   </Label>
-                  <Input
+                  <QuantityInput
                     id="tax-rate"
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    value={String(form.tax_rate ?? 0)}
-                    onChange={(event) =>
-                      setForm((current: any) => ({ ...current, tax_rate: event.target.value }))
+                    decimals={2}
+                    min={0}
+                    max={100}
+                    unit="%"
+                    value={form.tax_rate === "" ? null : Number(form.tax_rate ?? 0)}
+                    onValueChange={(v) =>
+                      setForm((current: any) => ({
+                        ...current,
+                        tax_rate: v == null ? "" : String(v),
+                      }))
                     }
                     disabled={!canEdit}
                     placeholder="0"
-                    className="rounded-2xl font-mono"
                   />
                 </div>
               </div>

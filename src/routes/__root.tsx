@@ -66,7 +66,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      {
+        name: "viewport",
+        content:
+          "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover",
+      },
       { title: "فورتيكس ERP - منصة البيع بالجملة والتجزئة" },
       {
         name: "description",
@@ -127,6 +131,28 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   errorComponent: ErrorComponent,
 });
 
+const IOS_ZOOM_GUARD_SCRIPT = `
+(function() {
+  if (typeof window === "undefined") return;
+  var tags = ["INPUT", "TEXTAREA", "SELECT"];
+  var meta = document.querySelector('meta[name="viewport"]');
+  var fixedContent = "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover";
+
+  function enforceScale(e) {
+    var t = e.target;
+    if (t && (tags.indexOf(t.tagName) !== -1 || t.isContentEditable)) {
+      if (!meta) meta = document.querySelector('meta[name="viewport"]');
+      if (meta && meta.getAttribute("content") !== fixedContent) {
+        meta.setAttribute("content", fixedContent);
+      }
+    }
+  }
+
+  document.addEventListener("touchstart", enforceScale, { passive: true, capture: true });
+  document.addEventListener("focusin", enforceScale, { passive: true, capture: true });
+})();
+`;
+
 function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="ar" dir="rtl" className="light" suppressHydrationWarning>
@@ -137,6 +163,7 @@ function RootShell({ children }: { children: ReactNode }) {
          * قبل أول رسم، فلا يومض التطبيق بالوضع الفاتح ثم ينقلب ليلاً.
          */}
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: IOS_ZOOM_GUARD_SCRIPT }} />
       </head>
       <body>
         {children}

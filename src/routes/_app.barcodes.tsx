@@ -8,6 +8,7 @@ import { useI18n } from "@/lib/i18n";
 import { toast } from "sonner";
 import { money } from "@/lib/format";
 import { BarcodeScanner } from "@/components/barcode-scanner";
+import { QuantityInput } from "@/components/ui/quantity-input";
 
 export const Route = createFileRoute("/_app/barcodes")({
   head: () => ({ meta: [{ title: "Barcode Labels — Vortex ERP" }] }),
@@ -369,13 +370,13 @@ function BarcodesPage() {
                   <label className="text-xs font-medium mb-1.5 block">
                     {lang === "ar" ? "النسخ" : "Copies"}
                   </label>
-                  <input
-                    type="number"
+                  <QuantityInput
+                    value={copies}
+                    onValueChange={(v) => setCopies(Math.min(400, Math.max(1, v ?? 1)))}
+                    decimals={0}
                     min={1}
                     max={400}
-                    value={copies}
-                    onChange={(e) => setCopies(Math.min(400, Math.max(1, Number(e.target.value))))}
-                    className="h-9 w-full rounded-full border border-input bg-surface px-3 text-xs"
+                    containerClassName="[&_input]:h-9 [&_input]:rounded-full [&_input]:bg-surface [&_input]:text-xs"
                   />
                 </div>
               </div>

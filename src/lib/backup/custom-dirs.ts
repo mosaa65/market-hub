@@ -89,7 +89,9 @@ export async function listCustomBackupDirectories(): Promise<CustomDirMeta[]> {
 /** يطلب من المستخدم اختيار مجلد ويسجله كموجه نسخ */
 export async function addCustomBackupDirectory(): Promise<string> {
   if (!customDirSupported()) {
-    throw new Error("المتصفح لا يدعم اختيار مجلدات النظام (File System Access API) — استخدم Chrome أو Edge.");
+    throw new Error(
+      "المتصفح لا يدعم اختيار مجلدات النظام (File System Access API) — استخدم Chrome أو Edge.",
+    );
   }
   // @ts-expect-error — showDirectoryPicker غير معرّف في TypeScript DOM lib بعد
   const handle = await window.showDirectoryPicker({ mode: "readwrite" });

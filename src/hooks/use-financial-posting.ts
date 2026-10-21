@@ -25,8 +25,15 @@ export interface PostFinancialPaymentParams {
   invoiceId?: string | null;
   paymentDate?: string;
   reference?: string | null;
+  cashboxId?: string | null;
+  bankAccountId?: string | null;
+  paymentMethodId?: string | null;
   accountId?: string | null;
   note?: string | null;
+  chequeNumber?: string | null;
+  chequeBank?: string | null;
+  chequeDueDate?: string | null;
+  chequeDrawer?: string | null;
   /** An advance is explicit; ordinary collections are never allowed to exceed debt. */
   collectionMode?: "receivable" | "advance";
 }
@@ -91,30 +98,87 @@ export function useFinancialPosting() {
           .join(" | ");
 
         let paymentId: string | undefined;
+        let voucherNumber: string | undefined;
 
         if (type === "customer_collection" || params.partyType === "customer") {
           const rpcName =
             collectionMode === "advance"
               ? "record_customer_advance_payment"
               : "record_customer_payment";
-          const { data, error } = await (supabase as any).rpc(rpcName, {
-            _customer_id: partyId,
-            _amount: amount,
-            // Customer collection RPCs resolve the catalogue id themselves.
-            // Passing the chosen id preserves its enabled/context validation;
-            // the database converts it to its legacy ENUM value only when it
-            // writes the payment row.
-            _method: method,
-            _payment_date: paymentDate,
-            _note: fullNote || null,
-            ...(collectionMode === "advance" ? {} : { _invoice_id: invoiceId || null }),
-          });
+
+          let data: any = null;
+          let error: any = null;
+
+          if (collectionMode === "advance") {
+            const res = await (supabase as any).rpc(rpcName, {
+              _customer_id: partyId,
+              _amount: amount,
+              _method: method,
+              _payment_date: paymentDate,
+              _note: fullNote || null,
+            });
+            data = res.data;
+            error = res.error;
+          } else {
+            // Try enhanced 13-parameter signature first to ensure atomic treasury routing & cheque registration
+            try {
+              const res = await (supabase as any).rpc("record_customer_payment", {
+                _customer_id: partyId,
+                _invoice_id: invoiceId || null,
+                _amount: amount,
+                _method: params.paymentMethodId || method,
+                _payment_date: paymentDate,
+                _note: fullNote || null,
+                _cashbox_id: params.cashboxId || null,
+                _bank_account_id: params.bankAccountId || null,
+                _payment_method_id: params.paymentMethodId || method || null,
+                _cheque_number: params.chequeNumber || null,
+                _cheque_bank: params.chequeBank || null,
+                _cheque_due_date: params.chequeDueDate || null,
+                _cheque_drawer: params.chequeDrawer || null,
+              });
+              data = res.data;
+              error = res.error;
+            } catch {
+              // Backward-compatible fallback to 6-parameter signature
+              const res = await (supabase as any).rpc("record_customer_payment", {
+                _customer_id: partyId,
+                _amount: amount,
+                _method: method,
+                _payment_date: paymentDate,
+                _note: fullNote || null,
+                _invoice_id: invoiceId || null,
+              });
+              data = res.data;
+              error = res.error;
+            }
+          }
 
           if (error) {
             console.error("RPC record_customer_payment failed:", error);
             throw error;
           }
           paymentId = typeof data === "string" ? data : data?.id || undefined;
+
+          // Persist treasury link into customer_payments row
+          if (
+            paymentId &&
+            (params.cashboxId || params.bankAccountId || params.paymentMethodId || params.reference)
+          ) {
+            try {
+              await (supabase as any)
+                .from("customer_payments")
+                .update({
+                  cashbox_id: params.cashboxId || null,
+                  bank_account_id: params.bankAccountId || null,
+                  payment_method_id: params.paymentMethodId || params.method || null,
+                  payment_reference: params.reference || null,
+                })
+                .eq("id", paymentId);
+            } catch (e) {
+              console.warn("Could not set treasury keys on customer_payments:", e);
+            }
+          }
         } else {
           if (type !== "supplier_payment") {
             throw new Error(
@@ -124,28 +188,50 @@ export function useFinancialPosting() {
             );
           }
 
-          // Supplier payments are inserted directly into a legacy ENUM column,
-          // so this path (unlike the collection RPC) still needs conversion.
-          const dbMethod = toLegacyPaymentValue(method);
-          const { data, error } = await (supabase as any)
-            .from("supplier_payments")
-            .insert({
-              supplier_id: partyId,
-              amount: amount,
-              payment_method: dbMethod,
-              payment_date: paymentDate,
-              notes: fullNote || null,
-            })
-            .select("id")
-            .single();
+          // Use atomic record_supplier_payment RPC first (Dr 2111 / Cr cashbox/bank)
+          try {
+            const res = await (supabase as any).rpc("record_supplier_payment", {
+              p_supplier_id: partyId,
+              p_amount: amount,
+              p_payment_method: toLegacyPaymentValue(method).toUpperCase(),
+              p_account_code: params.accountId || null,
+              p_payment_date: paymentDate,
+              p_notes: fullNote || null,
+              p_cashbox_id: params.cashboxId || null,
+              p_bank_account_id: params.bankAccountId || null,
+            });
+            if (res.error) throw res.error;
+            paymentId = res.data?.payment_id || res.data?.id;
+            voucherNumber = res.data?.voucher_number;
+          } catch (rpcErr) {
+            console.warn("RPC record_supplier_payment fallback to direct insert:", rpcErr);
+            const dbMethod = toLegacyPaymentValue(method);
+            const { data, error } = await (supabase as any)
+              .from("supplier_payments")
+              .insert({
+                supplier_id: partyId,
+                amount: amount,
+                payment_method: dbMethod,
+                payment_date: paymentDate,
+                notes: fullNote || null,
+                cashbox_id: params.cashboxId || null,
+                bank_account_id: params.bankAccountId || null,
+                payment_method_id: params.paymentMethodId || params.method || null,
+              })
+              .select("id, voucher_number")
+              .single();
 
-          if (error) throw error;
-          paymentId = data?.id;
+            if (error) throw error;
+            paymentId = data?.id;
+            voucherNumber = data?.voucher_number;
+          }
         }
 
-        const receiptNumber = paymentId
-          ? paymentId.slice(0, 8).toUpperCase()
-          : String(Date.now()).slice(-6);
+        const receiptNumber = voucherNumber
+          ? voucherNumber
+          : paymentId
+            ? paymentId.slice(0, 8).toUpperCase()
+            : String(Date.now()).slice(-6);
 
         await Promise.allSettled([
           queryClient.invalidateQueries({ queryKey: ["customers"] }),

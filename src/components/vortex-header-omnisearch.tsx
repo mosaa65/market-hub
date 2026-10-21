@@ -111,7 +111,7 @@ export const VortexHeaderOmnisearch = memo(function VortexHeaderOmnisearch({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // اختصار البحث الرئيسي المخصص للهيدر
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "k") {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
@@ -446,7 +446,20 @@ export const VortexHeaderOmnisearch = memo(function VortexHeaderOmnisearch({
             <X className="h-3.5 w-3.5" />
           </button>
         ) : (
-          <div className="flex items-center gap-1.5" />
+          <div className="flex items-center gap-1.5 shrink-0">
+            <kbd
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsOpen(true);
+                setTimeout(() => inputRef.current?.focus(), 50);
+              }}
+              title={isAr ? "اختصار البحث: Ctrl + K" : "Search shortcut: Ctrl + K"}
+              className="hidden md:inline-flex select-none cursor-pointer items-center gap-1 rounded-md border border-border/80 bg-surface-2/90 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-muted-foreground transition-all hover:border-primary/50 hover:bg-surface-2 hover:text-foreground shadow-2xs"
+            >
+              <span className="text-[10px] opacity-80">Ctrl</span>
+              <span className="text-[10px] font-bold">K</span>
+            </kbd>
+          </div>
         )}
       </div>
 

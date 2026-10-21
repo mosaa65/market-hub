@@ -18,6 +18,8 @@
 
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { AmountInput } from "@/components/ui/amount-input";
+import { QuantityInput } from "@/components/ui/quantity-input";
 import { useI18n } from "@/lib/i18n";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -398,14 +400,11 @@ export function GuidedItemDialog({ onClose, onCreated, units, categories }: Guid
                   </select>
                 </Field>
                 <Field label={ar ? "سعر البيع" : "Sale price"}>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={salePrice}
-                    onChange={(event) => setSalePrice(event.target.value)}
-                    className={inputClass}
-                    placeholder="0.00"
+                  <AmountInput
+                    value={salePrice === "" ? null : Number(salePrice)}
+                    onValueChange={(v) => setSalePrice(v == null ? "" : String(v))}
+                    min={0}
+                    showInWords={false}
                   />
                 </Field>
                 <Field
@@ -416,26 +415,21 @@ export function GuidedItemDialog({ onClose, onCreated, units, categories }: Guid
                       : "An estimate for margin only. Not a purchase record."
                   }
                 >
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={referenceCost}
-                    onChange={(event) => setReferenceCost(event.target.value)}
-                    className={inputClass}
-                    placeholder="0.00"
+                  <AmountInput
+                    value={referenceCost === "" ? null : Number(referenceCost)}
+                    onValueChange={(v) => setReferenceCost(v == null ? "" : String(v))}
+                    min={0}
+                    showInWords={false}
                   />
                 </Field>
                 <Field label={ar ? "الضريبة %" : "Tax %"}>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    max="100"
-                    value={taxRate}
-                    onChange={(event) => setTaxRate(event.target.value)}
-                    className={inputClass}
-                    placeholder="0"
+                  <QuantityInput
+                    value={taxRate === "" ? null : Number(taxRate)}
+                    onValueChange={(v) => setTaxRate(v == null ? "" : String(v))}
+                    decimals={2}
+                    min={0}
+                    max={100}
+                    unit="%"
                   />
                 </Field>
                 <Field label={ar ? "وحدة القياس الأساسية" : "Base UOM"}>
@@ -498,13 +492,12 @@ export function GuidedItemDialog({ onClose, onCreated, units, categories }: Guid
                         : "Optional — e.g. 50 for a 50 kg bag. Used to compute milling total weight."
                     }
                   >
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.001"
-                      value={packageWeightKg}
-                      onChange={(event) => setPackageWeightKg(event.target.value)}
-                      className={inputClass}
+                    <QuantityInput
+                      value={packageWeightKg === "" ? null : Number(packageWeightKg)}
+                      onValueChange={(v) => setPackageWeightKg(v == null ? "" : String(v))}
+                      decimals={3}
+                      min={0}
+                      unit="kg"
                       placeholder={ar ? "مثال: 50" : "e.g. 50"}
                     />
                   </Field>

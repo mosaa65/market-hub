@@ -312,10 +312,8 @@ export function PaymentPanel(props: PaymentPanelProps) {
           </label>
           <div className="relative">
             <input
-              type="number"
+              type="text"
               inputMode="decimal"
-              min={0}
-              step="0.01"
               dir="ltr"
               disabled={disabled || result.isCredit}
               value={result.isCredit ? "" : paid}

@@ -59,6 +59,8 @@ import { printInvoice, type InvoiceTemplate } from "@/lib/invoice-print";
 import type { InvoiceDoc } from "@/lib/pdf";
 import { translateRpcError } from "@/lib/errors/rpc-errors";
 import { OperationSuccessModal } from "@/components/communication";
+import { AmountInput } from "@/components/ui/amount-input";
+import { QuantityInput } from "@/components/ui/quantity-input";
 import { LuxuryPrintPreviewModal } from "@/components/luxury-print-preview-modal";
 import {
   createSalesInvoice,
@@ -72,7 +74,13 @@ import {
 import { MILLING_BAG_SIZES } from "@/components/milling/milling-terms-fields";
 import { PaymentPanel, usePaymentPanel } from "@/components/payments/payment-panel";
 import { useFormNavigationScope } from "@/hooks/use-form-navigation";
-import { paymentMethodLabel, toLegacyPaymentValue } from "@/lib/payments/payment-methods";
+import { DynamicPaymentSelector } from "@/components/ui/payment-method/dynamic-payment-selector";
+import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
+import {
+  getPaymentMethodDefinition,
+  paymentMethodLabel,
+  toLegacyPaymentValue,
+} from "@/lib/payments/payment-methods";
 
 export const Route = createFileRoute("/_app/sales-invoice")({
   head: () => ({ meta: [{ title: "فاتورة المبيعات — فورتيكس ERP" }] }),
@@ -230,8 +238,11 @@ function SalesInvoicePage() {
   // Holds a CATALOGUE id (e.g. 'kuraimi_bank'), because that is what the picker
   // produces. It is converted to the stored ENUM value with toLegacyPaymentValue
   // at the point of submission, so the RPC contract never changes.
-  //
   const [paymentMethod, setPaymentMethod] = useState<string>("cash");
+  const [settlement, setSettlement] = useState<PaymentSettlementSelection>({
+    method: "cash",
+    paymentMethodId: "cash",
+  });
   const [paid, setPaid] = useState("");
   const [paymentReference, setPaymentReference] = useState("");
 
@@ -527,6 +538,14 @@ function SalesInvoicePage() {
             .filter(Boolean)
             .join(" — ") || undefined,
         lines,
+        cashboxId: settlement.cashboxId || null,
+        bankAccountId: settlement.bankAccountId || null,
+        paymentMethodId: settlement.paymentMethodId || null,
+        paymentReference: settlement.reference || null,
+        chequeNumber: settlement.chequeNumber || null,
+        chequeBank: settlement.chequeBank || null,
+        chequeDueDate: settlement.chequeDueDate || null,
+        chequeDrawer: settlement.chequeDrawer || null,
       });
 
       if (!result.ok) {
@@ -539,6 +558,12 @@ function SalesInvoicePage() {
         ticket.customerName.trim() ||
         (isRtl ? "عميل نقدي" : "Walk-in");
       const warehouse = warehouses.find((w) => w.id === warehouseId);
+
+      const resolvedPaymentLabel = settlement.bankAccountName
+        ? `${pmLabel(paymentMethod, isRtl)} (${settlement.bankAccountName})`
+        : settlement.cashboxName
+          ? `${pmLabel(paymentMethod, isRtl)} (${settlement.cashboxName})`
+          : pmLabel(paymentMethod, isRtl);
 
       const doc: InvoiceDoc = {
         title:
@@ -558,7 +583,7 @@ function SalesInvoicePage() {
             ? warehouse?.name_ar || warehouse?.name
             : warehouse?.name
           : undefined,
-        payment: pmLabel(paymentMethod, isRtl),
+        payment: resolvedPaymentLabel,
         status:
           remaining > 0
             ? effectivePaid > 0
@@ -870,14 +895,13 @@ function SalesInvoicePage() {
                 </Field>
 
                 <Field label={isRtl ? "عدد الأكياس" : "Sack count"}>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={ticket.bagCount}
-                    onChange={(e) => setT("bagCount", e.target.value)}
-                    className={inputClass}
+                  <QuantityInput
+                    decimals={0}
+                    min={0}
+                    value={ticket.bagCount === "" ? null : Number(ticket.bagCount)}
+                    onValueChange={(v) => setT("bagCount", v == null ? "" : String(v))}
                     placeholder="0"
+                    containerClassName="[&_input]:h-10 [&_input]:rounded-xl"
                   />
                 </Field>
 
@@ -940,67 +964,58 @@ function SalesInvoicePage() {
 
                 {ticket.feeBasis === "PER_BAG" && (
                   <Field label={isRtl ? "الأجرة لكل شوال" : "Fee per sack"}>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={ticket.feePerBag}
-                      onChange={(e) => setT("feePerBag", e.target.value)}
-                      className={inputClass}
-                      placeholder="0.00"
+                    <AmountInput
+                      value={ticket.feePerBag === "" ? null : Number(ticket.feePerBag)}
+                      onValueChange={(v) => setT("feePerBag", v == null ? "" : String(v))}
+                      min={0}
+                      containerClassName="[&_input]:h-10 [&_input]:rounded-xl"
                     />
                   </Field>
                 )}
                 {ticket.feeBasis === "PER_TON" && (
                   <Field label={isRtl ? "الأجرة لكل طن" : "Fee per ton"}>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={ticket.feePerTon}
-                      onChange={(e) => setT("feePerTon", e.target.value)}
-                      className={inputClass}
-                      placeholder="0.00"
+                    <AmountInput
+                      value={ticket.feePerTon === "" ? null : Number(ticket.feePerTon)}
+                      onValueChange={(v) => setT("feePerTon", v == null ? "" : String(v))}
+                      min={0}
+                      containerClassName="[&_input]:h-10 [&_input]:rounded-xl"
                     />
                   </Field>
                 )}
                 {ticket.feeBasis === "LUMP_SUM" && (
                   <Field label={isRtl ? "مبلغ مقطوع" : "Lump sum"}>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={ticket.lumpSum}
-                      onChange={(e) => setT("lumpSum", e.target.value)}
-                      className={inputClass}
-                      placeholder="0.00"
+                    <AmountInput
+                      value={ticket.lumpSum === "" ? null : Number(ticket.lumpSum)}
+                      onValueChange={(v) => setT("lumpSum", v == null ? "" : String(v))}
+                      min={0}
+                      containerClassName="[&_input]:h-10 [&_input]:rounded-xl"
                     />
                   </Field>
                 )}
 
                 <Field label={isRtl ? "الاستخلاص المتوقع %" : "Expected extraction %"}>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    value={ticket.expectedExtraction}
-                    onChange={(e) => setT("expectedExtraction", e.target.value)}
-                    className={inputClass}
-                    placeholder="—"
+                  <QuantityInput
+                    value={
+                      ticket.expectedExtraction === "" ? null : Number(ticket.expectedExtraction)
+                    }
+                    onValueChange={(v) => setT("expectedExtraction", v == null ? "" : String(v))}
+                    decimals={2}
+                    min={0}
+                    max={100}
+                    unit="%"
+                    containerClassName="[&_input]:h-10 [&_input]:rounded-xl"
                   />
                 </Field>
 
                 <Field label={isRtl ? "الفاقد المسموح %" : "Allowed loss %"}>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    value={ticket.allowedLoss}
-                    onChange={(e) => setT("allowedLoss", e.target.value)}
-                    className={inputClass}
-                    placeholder="—"
+                  <QuantityInput
+                    value={ticket.allowedLoss === "" ? null : Number(ticket.allowedLoss)}
+                    onValueChange={(v) => setT("allowedLoss", v == null ? "" : String(v))}
+                    decimals={2}
+                    min={0}
+                    max={100}
+                    unit="%"
+                    containerClassName="[&_input]:h-10 [&_input]:rounded-xl"
                   />
                 </Field>
               </div>
@@ -1168,40 +1183,41 @@ function SalesInvoicePage() {
                           <span className="block text-[10px] text-muted-foreground">
                             {t("common.qty")}
                           </span>
-                          <input
-                            type="number"
-                            min="0"
-                            step="1"
-                            value={l.quantity}
-                            onChange={(e) =>
+                          <QuantityInput
+                            decimals={0}
+                            min={0}
+                            emptyAsZero
+                            aria-label={t("common.qty")}
+                            value={l.quantity === "" ? null : Number(l.quantity)}
+                            onValueChange={(v) =>
                               setCart((current) =>
                                 current.map((x, i) =>
-                                  i === index ? { ...x, quantity: e.target.value } : x,
+                                  i === index ? { ...x, quantity: v == null ? "" : String(v) } : x,
                                 ),
                               )
                             }
-                            className="h-8 w-full rounded-lg border border-border bg-surface px-2 text-xs outline-none focus:border-primary"
+                            className="h-8 text-xs"
                           />
                         </label>
-                        <label className="space-y-0.5">
+                        <div className="space-y-0.5">
                           <span className="block text-[10px] text-muted-foreground">
                             {t("common.price")}
                           </span>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={l.unitPrice}
-                            onChange={(e) =>
+                          <AmountInput
+                            min={0}
+                            showInWords={false}
+                            aria-label={t("common.price")}
+                            value={l.unitPrice === "" ? null : Number(l.unitPrice)}
+                            onValueChange={(v) =>
                               setCart((current) =>
                                 current.map((x, i) =>
-                                  i === index ? { ...x, unitPrice: e.target.value } : x,
+                                  i === index ? { ...x, unitPrice: v == null ? "" : String(v) } : x,
                                 ),
                               )
                             }
-                            className="h-8 w-full rounded-lg border border-border bg-surface px-2 text-xs outline-none focus:border-primary"
+                            className="h-8 text-xs"
                           />
-                        </label>
+                        </div>
                         <div className="space-y-0.5">
                           <span className="block text-[10px] text-muted-foreground">
                             {t("common.total")}
@@ -1248,12 +1264,23 @@ function SalesInvoicePage() {
 
             <div className="h-px bg-border" />
 
-            <div className="space-y-2">
-              {/*
-                P1-4: ONE payment block for POS, sales and milling. The panel
-                owns the method picker, the paid field, the remaining line and
-                the debt/customer rules; this screen only places it.
-              */}
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-muted-foreground">
+                  {isRtl ? "طريقة السداد والتوجيه المالي" : "Payment method & settlement"}
+                </label>
+                <DynamicPaymentSelector
+                  context="sales"
+                  value={paymentMethod}
+                  onChange={(method) => {
+                    setPaymentMethod(method);
+                    if (getPaymentMethodDefinition(method)?.isCreditTerm) setPaid("0");
+                  }}
+                  settlement={settlement}
+                  onSettlementChange={setSettlement}
+                  includeCredit
+                />
+              </div>
               <PaymentPanel
                 context="sales"
                 total={total}
@@ -1265,19 +1292,16 @@ function SalesInvoicePage() {
                 customers={customers}
                 reference={paymentReference}
                 onReferenceChange={setPaymentReference}
+                showShortcuts={false}
               />
-
               <div className="grid grid-cols-2 gap-2">
                 <Field label={t("common.discount")}>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={discount}
-                    onChange={(e) => setDiscount(e.target.value)}
+                  <AmountInput
+                    value={discount === "" ? null : Number(discount)}
+                    onValueChange={(v) => setDiscount(v == null ? "" : String(v))}
+                    min={0}
                     data-form-nav
-                    className={inputClass}
-                    placeholder="0.00"
+                    containerClassName="[&_input]:h-10 [&_input]:rounded-xl"
                   />
                 </Field>
                 <Field label={t("common.note")}>

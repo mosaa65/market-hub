@@ -59,6 +59,19 @@ export default tseslint.config(
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-unused-vars": "off",
       "@typescript-eslint/no-explicit-any": "off",
+      /*
+       * حقول الأرقام: المتصفح يغيّر قيمة `type="number"` عند تمرير عجلة الماوس
+       * فوقه، ويرفض الأرقام العربية والفاصلة. لذلك المال → AmountInput والكمية
+       * → QuantityInput، وكلاهما يُعرض `type="text"` + `inputMode="decimal"`.
+       */
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: 'JSXAttribute[name.name="type"][value.value="number"]',
+          message:
+            'لا تستخدم type="number": استعمل <AmountInput> للمبالغ أو <QuantityInput> للكميات — عجلة الماوس تغيّر رقم type="number" بلا إذن.',
+        },
+      ],
     },
   },
   eslintPluginPrettier,

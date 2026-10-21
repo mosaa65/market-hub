@@ -15,6 +15,8 @@ import {
   DollarSign,
   ArrowUpRight,
 } from "lucide-react";
+import { AmountInput } from "@/components/ui/amount-input";
+import { QuantityInput } from "@/components/ui/quantity-input";
 
 type ProductItem = {
   id: string;
@@ -177,29 +179,27 @@ export function DirectStockInDialog({
 
     setSaving(true);
     try {
-      // P0-3: الكمية والقيمة تُكتبان من المحرّك وحده. الكتابة المباشرة على
-      // inventory/stock_movements كانت تحدّث الكمية دون أي تقييم فتغيب عن COGS.
       const noteText = note.trim()
         ? note.trim()
         : isAr
           ? "توريد مخزني مباشر (إدخال كمية)"
           : "Direct stock receipt";
 
-      const { error: mvErr } = await supabase.rpc("post_stock_delta", {
+      const { error: deltaErr } = await (supabase.rpc as any)("post_stock_delta", {
         p_product_id: selectedProductId,
         p_warehouse_id: selectedWarehouseId,
         p_signed_qty: incomingQty,
-        p_unit_cost: Number(unitCostStr) || 0,
+        p_unit_cost: Number(unitCostStr) || null,
         p_movement_kind: "RECEIPT",
+        p_movement_type_legacy: "purchase",
         p_source_type: "direct_stock_in",
         p_source_id: crypto.randomUUID(),
         p_note: noteText,
         p_owner_type: "COMPANY",
         p_owner_id: null,
-        p_movement_type_legacy: "adjustment",
-      } as any);
+      });
 
-      if (mvErr) throw mvErr;
+      if (deltaErr) throw deltaErr;
 
       toast.success(
         isAr
@@ -348,16 +348,15 @@ export function DirectStockInDialog({
                   <label className="text-[11px] font-bold text-emerald-600 dark:text-emerald-300 block">
                     {isAr ? "الكمية الواردة *" : "Incoming Qty *"}
                   </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    value={incomingQtyStr}
-                    onChange={(e) => setIncomingQtyStr(e.target.value)}
-                    className="h-8 w-full rounded-lg border border-emerald-500/50 bg-surface px-2 font-mono text-base font-extrabold outline-none focus:ring-2 focus:ring-emerald-500/20"
+                  <QuantityInput
+                    value={incomingQtyStr === "" ? null : Number(incomingQtyStr)}
+                    onValueChange={(v) => setIncomingQtyStr(v == null ? "" : String(v))}
+                    decimals={3}
+                    min={0.01}
                     placeholder="+0.00"
+                    aria-label={isAr ? "الكمية الواردة" : "Incoming qty"}
                     autoFocus
-                    required
+                    containerClassName="[&_input]:h-8 [&_input]:rounded-lg [&_input]:border-emerald-500/50 [&_input]:bg-surface [&_input]:text-base [&_input]:font-extrabold"
                   />
                 </div>
 
@@ -379,13 +378,12 @@ export function DirectStockInDialog({
                     <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
                     {isAr ? "تكلفة شراء الوارد للقطعة" : "Unit Purchase Cost"}
                   </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={unitCostStr}
-                    onChange={(e) => setUnitCostStr(e.target.value)}
-                    className="h-10 w-full rounded-xl border border-border bg-surface px-3 font-mono text-xs outline-none focus:border-emerald-500"
+                  <AmountInput
+                    value={unitCostStr === "" ? null : Number(unitCostStr)}
+                    onValueChange={(v) => setUnitCostStr(v == null ? "" : String(v))}
+                    min={0}
+                    showInWords={false}
+                    containerClassName="[&_input]:h-10 [&_input]:rounded-xl [&_input]:bg-surface [&_input]:text-xs"
                   />
                 </div>
 

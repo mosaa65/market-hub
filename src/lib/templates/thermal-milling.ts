@@ -62,10 +62,10 @@ export function renderThermalMillingTemplate(
         : "فاتورة مبيعات سريعة");
 
   const linesHtml = doc.lines
-    .map(
-      (l, idx) => {
-        const isCustody = (l.price === 0 || l.price === undefined) && (l.total === 0 || l.total === undefined);
-        return `
+    .map((l, idx) => {
+      const isCustody =
+        (l.price === 0 || l.price === undefined) && (l.total === 0 || l.total === undefined);
+      return `
     <div style="padding: 4px 0; border-bottom: ${idx < doc.lines.length - 1 ? "1px dashed #e2e8f0" : "none"};">
       <div style="font-weight: 700; font-size: 11.5px; color: #0f172a; line-height: 1.3;">${esc(l.product)}</div>
       <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; margin-top: 2px;">
@@ -85,8 +85,7 @@ export function renderThermalMillingTemplate(
       ${l.note ? `<div style="font-size: 10px; color: #475569; margin-top: 1.5px;">${esc(l.note)}</div>` : ""}
       ${l.code ? `<div style="font-size: 9px; color: #94a3b8; font-family: monospace;">SKU: ${esc(l.code)}</div>` : ""}
     </div>`;
-      },
-    )
+    })
     .join("");
 
   const qrPayload = [

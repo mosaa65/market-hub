@@ -22,6 +22,8 @@
  * agreed once) and the agreed total is shown before anything is saved.
  */
 import { useMemo } from "react";
+import { AmountInput } from "@/components/ui/amount-input";
+import { QuantityInput } from "@/components/ui/quantity-input";
 
 export type MillingFeeBasis = "BAG" | "TON" | "LUMP_SUM";
 export type BagSource = "CUSTOMER" | "MILL";
@@ -206,10 +208,7 @@ export function MillingTermsFields({
                   ? "مبلغ مقطوع (ر.ي)"
                   : "Lump sum"}
           </label>
-          <input
-            type="number"
-            min={0}
-            step="0.01"
+          <AmountInput
             value={
               value.feeBasis === "BAG"
                 ? value.feePerBag
@@ -217,13 +216,14 @@ export function MillingTermsFields({
                   ? value.feePerTon
                   : value.lumpSum
             }
-            onChange={(e) => {
-              const n = Math.max(0, Number(e.target.value) || 0);
-              if (value.feeBasis === "BAG") set("feePerBag", n);
-              else if (value.feeBasis === "TON") set("feePerTon", n);
-              else set("lumpSum", n);
+            onValueChange={(n) => {
+              const amount = n ?? 0;
+              if (value.feeBasis === "BAG") set("feePerBag", amount);
+              else if (value.feeBasis === "TON") set("feePerTon", amount);
+              else set("lumpSum", amount);
             }}
-            className={`${FIELD} text-center font-mono`}
+            min={0}
+            className="h-[38px] text-xs"
           />
         </div>
       </div>
@@ -271,28 +271,28 @@ export function MillingTermsFields({
           <label className={LABEL}>
             {isRtl ? "الاستخلاص المتوقع (%)" : "Expected extraction (%)"}
           </label>
-          <input
-            type="number"
+          <QuantityInput
+            value={value.extractionRate === "" ? null : Number(value.extractionRate)}
+            onValueChange={(v) => set("extractionRate", v == null ? "" : String(v))}
+            decimals={2}
             min={0}
             max={100}
-            step="0.01"
-            value={value.extractionRate}
-            onChange={(e) => set("extractionRate", e.target.value)}
+            unit="%"
             placeholder={isRtl ? "اختياري" : "optional"}
-            className={`${FIELD} text-center font-mono`}
+            className="h-[38px] text-xs"
           />
         </div>
         <div className="space-y-1.5">
           <label className={LABEL}>{isRtl ? "الفاقد المسموح (%)" : "Allowed loss (%)"}</label>
-          <input
-            type="number"
+          <QuantityInput
+            value={value.allowedLoss === "" ? null : Number(value.allowedLoss)}
+            onValueChange={(v) => set("allowedLoss", v == null ? "" : String(v))}
+            decimals={2}
             min={0}
             max={100}
-            step="0.01"
-            value={value.allowedLoss}
-            onChange={(e) => set("allowedLoss", e.target.value)}
+            unit="%"
             placeholder={isRtl ? "اختياري" : "optional"}
-            className={`${FIELD} text-center font-mono`}
+            className="h-[38px] text-xs"
           />
         </div>
       </div>
@@ -320,13 +320,11 @@ export function MillingTermsFields({
           </div>
           <div className="space-y-1.5">
             <label className={LABEL}>{isRtl ? "سعر الكيس الواحد" : "Price per bag"}</label>
-            <input
-              type="number"
-              min={0}
-              step="0.01"
+            <AmountInput
               value={millBagPrice}
-              onChange={(e) => onMillBagChange(millBagId, Math.max(0, Number(e.target.value) || 0))}
-              className={`${FIELD} text-center font-mono`}
+              onValueChange={(n) => onMillBagChange(millBagId, n ?? 0)}
+              min={0}
+              className="h-[38px] text-xs"
             />
           </div>
         </div>

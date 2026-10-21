@@ -365,6 +365,18 @@
     color: color-mix(in oklab, var(--muted-foreground) 60%, transparent);
   }
 
+  /* Prevent unwanted double-tap zoom and gesture distortions on iOS mobile */
+  html,
+  body {
+    touch-action: manipulation;
+  }
+  input,
+  textarea,
+  select,
+  button {
+    touch-action: manipulation;
+  }
+
   /* Minimalist overlay scrollbar — the track remains invisible.
    * اللون يعتمد على السمة: كان أبيضَ شبه شفاف في الاثنتين، فيختفي تماماً على
    * خلفية الوضع الفاتح ويصبح شريط التمرير غير مرئي. */

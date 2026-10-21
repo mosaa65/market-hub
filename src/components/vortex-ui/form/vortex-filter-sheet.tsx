@@ -19,7 +19,7 @@ export function VortexFilterSection({ title, icon, description, children }: Filt
       <div className="flex items-center justify-between">
         <label className="flex items-center gap-2.5 text-xs font-bold text-foreground">
           {icon && (
-            <span className="flex size-8 shrink-0 place-items-center rounded-full border border-border bg-primary/10 text-primary">
+            <span className="flex size-8 shrink-0 aspect-square items-center justify-center rounded-full border border-border/80 bg-primary/10 text-primary [&_svg]:size-4">
               {icon}
             </span>
           )}
@@ -86,10 +86,10 @@ export function VortexFilterSheet({
        * الجوال يبقى Bottom Sheet كما هو دون أي تغيير. */
       desktopSide="left"
       icon={
-        <div className="relative grid size-10 place-items-center rounded-full border border-border bg-foreground text-background shadow-md shadow-foreground/10">
-          <Filter className="size-5" />
+        <div className="relative flex size-full items-center justify-center">
+          <Filter className="size-4.5" />
           {effectiveCount > 0 && (
-            <span className="absolute -top-1 -left-1 flex size-5 items-center justify-center rounded-full bg-primary text-[10px] font-black text-primary-foreground ring-2 ring-background">
+            <span className="absolute -top-1.5 -end-1.5 flex size-4.5 items-center justify-center rounded-full bg-primary text-[9px] font-black text-primary-foreground ring-2 ring-background">
               {effectiveCount}
             </span>
           )}

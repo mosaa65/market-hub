@@ -5,6 +5,8 @@ import { useI18n } from "@/lib/i18n";
 import { postOpeningStock } from "@/lib/items/stock-operations";
 import { toast } from "sonner";
 import { X, PackagePlus, Plus, Loader2 } from "lucide-react";
+import { AmountInput } from "@/components/ui/amount-input";
+import { QuantityInput } from "@/components/ui/quantity-input";
 
 type OpeningItem = {
   id: string;
@@ -170,24 +172,31 @@ export function OpeningStockDialog({ warehouseId, onClose, onSaved }: OpeningSto
                     </option>
                   ))}
                 </select>
-                <input
-                  type="number"
-                  step="0.001"
-                  min="0"
-                  value={line.quantity}
-                  onChange={(event) => updateLine(index, { quantity: event.target.value })}
-                  placeholder={ar ? "الكمية" : "Qty"}
-                  className={`${fieldClass} col-span-3`}
-                />
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={line.unitCost}
-                  onChange={(event) => updateLine(index, { unitCost: event.target.value })}
-                  placeholder={ar ? "تكلفة الوحدة" : "Unit cost"}
-                  className={`${fieldClass} col-span-3`}
-                />
+                <div className="col-span-3">
+                  <QuantityInput
+                    value={line.quantity === "" ? null : Number(line.quantity)}
+                    onValueChange={(v) =>
+                      updateLine(index, { quantity: v == null ? "" : String(v) })
+                    }
+                    decimals={3}
+                    min={0}
+                    placeholder={ar ? "الكمية" : "Qty"}
+                    aria-label={ar ? "الكمية" : "Qty"}
+                    className="h-9 text-xs"
+                  />
+                </div>
+                <div className="col-span-3">
+                  <AmountInput
+                    value={line.unitCost === "" ? null : Number(line.unitCost)}
+                    onValueChange={(v) =>
+                      updateLine(index, { unitCost: v == null ? "" : String(v) })
+                    }
+                    min={0}
+                    showInWords={false}
+                    placeholder={ar ? "تكلفة الوحدة" : "Unit cost"}
+                    className="h-9 text-xs"
+                  />
+                </div>
               </div>
             ))}
           </div>

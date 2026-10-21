@@ -163,11 +163,17 @@ export function RecordsView<T>({
   if (viewMode === "cards" || viewMode === "list") {
     return (
       <div className={cn("min-w-0", className)}>
-        {loading ? (
+        {loading && rows.length === 0 ? (
           <RecordsSkeleton mode={viewMode} />
         ) : (
           <>
-            <div className={refreshing ? "opacity-70 transition-opacity" : undefined}>
+            <div
+              className={cn(
+                refreshing || (loading && rows.length > 0)
+                  ? "opacity-70 transition-opacity pointer-events-none"
+                  : undefined,
+              )}
+            >
               {viewMode === "cards" ? (
                 <div className={cardsGridClassName}>
                   {rows.map((row, index) => (

@@ -52,6 +52,7 @@ import {
   Mono,
   fmtNum,
 } from "@/components/milling/milling-ui";
+import { QuantityInput } from "@/components/ui/quantity-input";
 
 export const Route = createFileRoute("/_app/milling/delivery")({
   head: () => ({ meta: [{ title: "تسليم نواتج الأمانات — فورتكس ERP" }] }),
@@ -488,12 +489,14 @@ function MillingDeliveryPage() {
                           <span className="block text-[11px] font-semibold text-muted-foreground mb-1">
                             الأكياس المسلمة:
                           </span>
-                          <MillingInput
-                            type="number"
+                          <QuantityInput
+                            decimals={0}
                             min={0}
+                            emptyAsZero
                             placeholder="0 كيس"
-                            value={line.bags || ""}
-                            onChange={(e) => changeLineBags(idx, Number(e.target.value) || 0)}
+                            aria-label="الأكياس المسلمة"
+                            value={line.bags || null}
+                            onValueChange={(v) => changeLineBags(idx, v ?? 0)}
                             className="font-bold text-emerald-600 dark:text-emerald-400"
                           />
                         </div>
@@ -502,13 +505,15 @@ function MillingDeliveryPage() {
                           <span className="block text-[11px] font-semibold text-muted-foreground mb-1">
                             الوزن المسلّم (كجم):
                           </span>
-                          <MillingInput
-                            type="number"
+                          <QuantityInput
+                            decimals={2}
                             min={0}
-                            step="0.01"
+                            emptyAsZero
+                            unit="kg"
                             placeholder="0.00 كجم"
-                            value={line.kg || ""}
-                            onChange={(e) => changeLineKg(idx, Number(e.target.value) || 0)}
+                            aria-label="الوزن المسلّم (كجم)"
+                            value={line.kg || null}
+                            onValueChange={(v) => changeLineKg(idx, v ?? 0)}
                             className="font-bold"
                           />
                         </div>

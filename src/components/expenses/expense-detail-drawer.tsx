@@ -26,7 +26,8 @@ import { Button } from "@/components/ui/button";
 import { FieldInput } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { VortexDrawerDialog } from "@/components/vortex-ui";
-import { PaymentMethodPicker } from "@/components/ui/payment-method";
+import { DynamicPaymentSelector } from "@/components/ui/payment-method/dynamic-payment-selector";
+import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
 import { ExpenseStatusBadge, ExpensePaymentBadge } from "./expense-status-badge";
 import { useExpenseDetail, useExpenseLookups, useExpenseMutations } from "@/hooks/use-expenses";
 import { isOverdue, paymentProgress, parseAmount, today } from "@/lib/expenses/query-keys";
@@ -453,9 +454,13 @@ export function ExpenseDetailDrawer({
                   id: entry.id,
                   amount: values.amount,
                   paymentDate: values.date,
-                  paymentMethod: values.method,
-                  accountId: values.accountId,
+                  paymentMethod: values.settlement?.paymentMethodId || values.method,
+                  paymentMethodId: values.settlement?.paymentMethodId || values.method,
+                  cashboxId: values.settlement?.cashboxId || null,
+                  bankAccountId: values.settlement?.bankAccountId || null,
+                  accountId: values.settlement?.chartAccountId || values.accountId,
                   accountLabel: values.label,
+                  referenceNo: values.settlement?.reference || null,
                   note: values.note,
                 }),
               );
@@ -758,6 +763,7 @@ function PaymentModal({
     amount: number;
     date: string;
     method: string;
+    settlement?: PaymentSettlementSelection;
     accountId?: string | null;
     label: string;
     note: string;
@@ -768,6 +774,10 @@ function PaymentModal({
   const [amount, setAmount] = useState(String(remaining));
   const [date, setDate] = useState(defaultDate);
   const [method, setMethod] = useState("cash");
+  const [settlement, setSettlement] = useState<PaymentSettlementSelection>({
+    method: "cash",
+    paymentMethodId: "cash",
+  });
   const [accountId, setAccountId] = useState("");
   const [label, setLabel] = useState("");
   const [note, setNote] = useState("");
@@ -804,8 +814,9 @@ function PaymentModal({
     await onSubmit({
       amount: parsed.value,
       date,
-      method,
-      accountId: accountId || null,
+      method: settlement.paymentMethodId || method || "cash",
+      settlement,
+      accountId: settlement.chartAccountId || accountId || null,
       label,
       note,
     });
@@ -860,59 +871,17 @@ function PaymentModal({
           {t("expenses.pay_full")} — {money(remaining)}
         </button>
 
-        <div className="grid grid-cols-2 gap-2">
-          <label className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-medium text-muted-foreground">
-              {t("common.method")}
-            </span>
-            {/* Same catalogue, expenses context. */}
-            <PaymentMethodPicker
-              context="expenses"
-              value={method}
-              onChange={setMethod}
-              includeCredit={false}
-              ensureIds={[method]}
-              ariaLabel={t("common.method")}
-              className="h-9"
-            />
-          </label>
-
-          {(financialAccounts ?? []).length > 0 ? (
-            <label className="flex flex-col gap-1.5">
-              <span className="text-[11px] font-medium text-muted-foreground">
-                {ar ? "الحساب المالي" : "Financial Account"}
-              </span>
-              <select
-                value={accountId}
-                onChange={(event) => {
-                  const val = event.target.value;
-                  setAccountId(val);
-                  const matched = financialAccounts?.find((a) => a.id === val);
-                  if (matched) setLabel(matched.name_ar);
-                }}
-                className="h-9 rounded-[12px] border border-input bg-surface/70 px-3 text-sm text-foreground focus:border-primary/60 focus:outline-none focus:ring-4 focus:ring-primary/10"
-              >
-                <option value="">{ar ? "— اختياري (تلقائي) —" : "— Optional —"}</option>
-                {(financialAccounts ?? []).map((acct) => (
-                  <option key={acct.id} value={acct.id}>
-                    {acct.code} — {acct.name_ar}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : (
-            <label className="flex flex-col gap-1.5">
-              <span className="text-[11px] font-medium text-muted-foreground">
-                {ar ? "المصدر" : "Source"}
-              </span>
-              <FieldInput
-                value={label}
-                onValueChange={setLabel}
-                placeholder={t("common.optional")}
-              />
-            </label>
-          )}
-        </div>
+        <DynamicPaymentSelector
+          context="expenses"
+          value={method}
+          onChange={setMethod}
+          settlement={settlement}
+          onSettlementChange={(s) => {
+            setSettlement(s);
+            if (s.chartAccountId) setAccountId(s.chartAccountId);
+          }}
+          includeCredit={false}
+        />
 
         <label className="flex flex-col gap-1.5">
           <span className="text-[11px] font-medium text-muted-foreground">{t("common.note")}</span>

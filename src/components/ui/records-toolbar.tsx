@@ -40,6 +40,10 @@ export interface RecordsToolbarProps {
   searchLoading?: boolean;
   /** Slot rendered inside the search row, before the controls (e.g. a hint). */
   searchAdornment?: React.ReactNode;
+  /** Optional ref to the search input — screens with a keyboard shortcut (F2) need it. */
+  searchRef?: React.Ref<HTMLInputElement>;
+  /** Fired on every keydown in the search box (barcode scanners press Enter). */
+  onSearchKeyDown?: React.KeyboardEventHandler<HTMLInputElement>;
 
   /* ---- filters ---- */
   activeFilterCount?: number;
@@ -84,6 +88,8 @@ export function RecordsToolbar({
   resultCount,
   searchLoading,
   searchAdornment,
+  searchRef,
+  onSearchKeyDown,
   activeFilterCount = 0,
   onFilterOpen,
   filterChips,
@@ -152,6 +158,8 @@ export function RecordsToolbar({
          *  last so it always sits on the trailing edge in both directions. */}
         <div className="flex items-center gap-1.5 sm:gap-2">
           <SearchInput
+            ref={searchRef}
+            onKeyDown={onSearchKeyDown}
             value={searchValue}
             onValueChange={onSearchChange}
             placeholder={searchPlaceholder}

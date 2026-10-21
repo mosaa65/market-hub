@@ -8,6 +8,7 @@ import {
   sanitizeIntegerString,
   sanitizeNumericString,
   sanitizePhone,
+  toAsciiDigits,
 } from "@/design/number";
 import type { FieldSize } from "@/design/styles";
 import { useFieldContext } from "@/components/ui/form-field";
@@ -158,7 +159,16 @@ export const FieldInput = React.forwardRef<HTMLInputElement, FieldInputProps>(
       let next: string;
       if (type === "integer") next = sanitizeIntegerString(raw, true);
       else if (type === "phone" || type === "tel") next = sanitizePhone(raw);
-      else next = sanitizeNumericString(raw);
+      // `sanitizeNumericString` strips grouping commas, so a field that deliberately
+      // groups digits (e.g. AmountInput renders "1,234,567") keeps them here.
+      else
+        next =
+          NUMERIC_TYPES.has(type) && /^[\d,.\s-]*$/.test(raw)
+            ? toAsciiDigits(raw)
+                .replace(/\u066B/g, ".")
+                .replace(/\u066C/g, "")
+                .trim()
+            : sanitizeNumericString(raw);
 
       // Only rewrite the DOM when sanitisation actually changed something, so the
       // caret stays put during normal typing.

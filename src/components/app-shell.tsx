@@ -1159,7 +1159,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           )}
         >
           {isPosRoute ? (
-            <div className="flex-1 min-h-0 flex flex-col overflow-hidden p-2 sm:p-3">{children}</div>
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden p-2 sm:p-3">
+              {children}
+            </div>
           ) : (
             <div className="flex min-h-full w-full flex-col">
               <div className="mx-auto w-full max-w-[1400px] flex-1 px-2 py-3 sm:px-1 sm:py-4 lg:px-1 lg:py-6">
