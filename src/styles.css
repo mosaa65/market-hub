@@ -473,12 +473,27 @@
     font-feature-settings: "tnum";
   }
 
-  /* ---- Safe-area aware padding for mobile sheets/action bars ---- */
+  /* ---- Safe-area aware padding for mobile sheets/action bars/headers ---- */
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
   .pb-safe {
-    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+  }
+  .ps-safe {
+    padding-inline-start: env(safe-area-inset-left, 0px);
+  }
+  .pe-safe {
+    padding-inline-end: env(safe-area-inset-right, 0px);
+  }
+  .p-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
   }
   .mb-safe {
-    margin-bottom: env(safe-area-inset-bottom);
+    margin-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   /* ---- Overlay entry/exit (shared by Modal, Drawer, Popover, Toast) ---- */

@@ -4,6 +4,7 @@ import { RecordsViewToggle } from "@/components/ui/records-view-toggle";
 import { RecordsSkeleton } from "@/components/ui/records-states";
 import { QuickFilterBar } from "@/components/ui/quick-filter-bar";
 import { PrimaryAction } from "@/components/ui/primary-action";
+import { InvoiceSectionTabs } from "@/components/invoices/invoice-section-tabs";
 import type { RecordsViewMode } from "@/components/ui/records-view";
 import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -1008,6 +1009,7 @@ export function SalesPage() {
 
   return (
     <div className="space-y-6 pb-12">
+      <InvoiceSectionTabs kind="sales" active="list" />
       {/* ─── Unified Top Header & Quick Action Bar — Full width & responsive ─── */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
         <div>
@@ -1046,14 +1048,14 @@ export function SalesPage() {
               </Link>
             )}
             <Link
-              to="/pos"
+              to="/sales-invoice/new"
               className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-primary px-3 sm:px-3.5 text-xs font-semibold text-primary-foreground shadow-xs transition hover:opacity-95"
-              title={isRtl ? "فاتورة جديدة (نقطة البيع)" : "New Invoice (POS)"}
+              title={isRtl ? "إنشاء فاتورة مبيعات" : "Create sales invoice"}
             >
               <Plus className="h-4 w-4 shrink-0" />
               <span>
                 {t("sales.new_invoice") ||
-                  (isRtl ? "فاتورة جديدة (نقطة البيع)" : "New Invoice (POS)")}
+                  (isRtl ? "فاتورة مبيعات جديدة" : "New sales invoice")}
               </span>
             </Link>
           </div>
@@ -1203,11 +1205,11 @@ export function SalesPage() {
               </button>
             )}
             <Link
-              to="/pos"
+              to="/sales-invoice/new"
               className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground"
             >
               <Plus className="h-3 w-3" />
-              {isRtl ? "إنشاء فاتورة الآن" : "Create Invoice"}
+              {isRtl ? "إنشاء فاتورة مبيعات" : "Create sales invoice"}
             </Link>
           </div>
         </div>
