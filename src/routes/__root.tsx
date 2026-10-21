@@ -80,7 +80,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "author", content: "Inama Soft" },
       { name: "theme-color", content: "#0A0A0B" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
-      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "default" },
       { name: "apple-mobile-web-app-title", content: "Vortex ERP" },
       { name: "mobile-web-app-capable", content: "yes" },
       { name: "application-name", content: "Vortex ERP" },

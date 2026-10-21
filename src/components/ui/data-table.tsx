@@ -390,16 +390,11 @@ export function DataTable<T>({
     ? Math.max(minWidth ?? 0, totalExplicitWidth)
     : undefined;
 
-  const tableStyle: React.CSSProperties = effectiveTableWidth
-    ? {
-        minWidth: `${effectiveTableWidth}px`,
-        width: `${effectiveTableWidth}px`,
-        tableLayout: "fixed",
-      }
-    : {
-        width: "100%",
-        tableLayout: "fixed",
-      };
+  const tableStyle: React.CSSProperties = {
+    width: "100%",
+    minWidth: effectiveTableWidth ? `${effectiveTableWidth}px` : "100%",
+    tableLayout: "fixed",
+  };
 
   const alignedTableClassName = "w-full border-collapse text-sm table-fixed";
 
@@ -411,7 +406,7 @@ export function DataTable<T>({
           <col
             key={c.key}
             className={c.width}
-            style={w ? { width: `${w}px`, minWidth: `${w}px`, maxWidth: `${w}px` } : undefined}
+            style={w ? { width: `${w}px`, minWidth: `${w}px` } : undefined}
           />
         );
       })}
@@ -537,11 +532,7 @@ export function DataTable<T>({
                           return (
                             <td
                               key={col.key}
-                              style={
-                                w
-                                  ? { width: `${w}px`, minWidth: `${w}px`, maxWidth: `${w}px` }
-                                  : undefined
-                              }
+                              style={w ? { minWidth: `${w}px` } : undefined}
                               className={cn(
                                 "px-3 py-3 align-middle first:ps-4 last:pe-5",
                                 col.align === "end"
@@ -587,11 +578,7 @@ export function DataTable<T>({
                           return (
                             <td
                               key={col.key}
-                              style={
-                                w
-                                  ? { width: `${w}px`, minWidth: `${w}px`, maxWidth: `${w}px` }
-                                  : undefined
-                              }
+                              style={w ? { minWidth: `${w}px` } : undefined}
                               className={cn(
                                 "px-3 py-2.5 align-middle first:ps-4 last:pe-5",
                                 !col.wrap ? "whitespace-nowrap" : "break-words",
@@ -713,7 +700,7 @@ function TableHead<T>({
           return (
             <th
               key={column.key}
-              style={w ? { width: `${w}px`, minWidth: `${w}px`, maxWidth: `${w}px` } : undefined}
+              style={w ? { width: `${w}px`, minWidth: `${w}px` } : undefined}
               scope="col"
               aria-sort={
                 active
