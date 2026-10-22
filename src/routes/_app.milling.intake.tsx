@@ -1,7 +1,7 @@
 /**
  * /milling/intake — استلام وفواتير (كاونتر المطحنة ونقطة الخدمة الموحدة).
  *
- * العميل + الحبوب + الأكياس + السعة + الوزن التلقائي
+ * العميل + الحبوب + الأكياس + السعة اليدوية + الوزن (يدوي/مقترح)
  * + أجرة الطحن (أكياس × سعر الكيس) + الخصم + طريقة الدفع + المدفوع/الآجل
  * = مستند أمانة واحد + فاتورة مبيعات رسمية في نفس المعاملة الفورية.
  */
@@ -46,7 +46,6 @@ import {
   fetchMillingServiceDocument,
   fetchMillingDocumentDetails,
   buildMillingDocumentUnifiedDoc,
-  capacityKgOf,
   type MillingServiceDocumentCreated,
   type ProductOption,
   type MillingServiceDocument,
@@ -238,18 +237,9 @@ function MillingIntakePage() {
     [grainItems.data, itemId],
   );
 
-  // عند تغيير صنف الحبوب: ملء سعة الكيس تلقائياً إن وجدت
+  // عند تغيير صنف الحبوب: V2 — لا قراءة للسعة من المنتج؛ السعة اختيار يدوي بالأزرار أو حقل مخصص.
   function handleGrainItemChange(newId: string) {
     setItemId(newId);
-    const item = (grainItems.data ?? []).find((g) => g.id === newId);
-    if (item && item.package_weight_kg && item.package_weight_kg > 0) {
-      const capStr = String(item.package_weight_kg);
-      setCapacityKg(capStr);
-      const bagCount = Number(bags) || 0;
-      if (bagCount > 0 && kgAuto) {
-        setKg(String(bagCount * item.package_weight_kg));
-      }
-    }
   }
 
   // اختيار سعة الكيس من الأزرار السريعة
@@ -601,7 +591,7 @@ function MillingIntakePage() {
               {/* نوع الحبوب المستلمة */}
               <MillingField
                 label="نوع الحبوب المستلمة *"
-                hint="قائمة الحبوب الخام المعرفة في النظام — تُملأ سعة العبوة تلقائياً إن وجدت."
+                hint="قائمة الحبوب الخام المعرفة في النظام."
               >
                 <MillingSelect
                   value={itemId}
@@ -612,7 +602,6 @@ function MillingIntakePage() {
                   {(grainItems.data ?? []).map((g: ProductOption) => (
                     <option key={g.id} value={g.id}>
                       {g.name_ar || g.name}
-                      {g.package_weight_kg ? ` — سعة كيس ${g.package_weight_kg} كجم` : ""}
                     </option>
                   ))}
                 </MillingSelect>
@@ -1055,7 +1044,7 @@ function MillingIntakePage() {
               ? {
                   id: createdDocument.invoice_id,
                   invoiceNumber: createdDocument.invoice_number,
-                  date: new Date().toLocaleDateString("ar-YE"),
+                  date: new Date().toISOString(),
                   subtotal:
                     currentSubtotal ||
                     Number(activeDetails?.sales_invoices?.subtotal ?? grandTotal),

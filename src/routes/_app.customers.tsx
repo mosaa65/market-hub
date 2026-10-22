@@ -961,29 +961,21 @@ function CustomersPage() {
       >
         <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-x-none">
           {[
-            { id: "all", label: lang === "ar" ? "الكل" : "All", count: rows.length },
-            { id: "debt", label: lang === "ar" ? "عليهم مبالغ" : "With Debt", count: debtCount },
-            { id: "credit", label: lang === "ar" ? "لهم رصيد" : "With Credit" },
-            { id: "active", label: lang === "ar" ? "النشطين" : "Active", count: activeCount },
+            { id: "all", label: lang === "ar" ? "الكل" : "All", count: rows.length, active: "border-primary bg-primary text-primary-foreground", idle: "border-border/70 bg-surface/70 text-muted-foreground hover:bg-primary/10 hover:text-primary", badge: "bg-primary/10 text-primary" },
+            { id: "debt", label: lang === "ar" ? "عليهم مبالغ" : "With Debt", count: debtCount, active: "border-rose-600 bg-rose-600 text-white", idle: "border-rose-500/25 bg-rose-500/5 text-rose-700 hover:bg-rose-500/10 dark:text-rose-300", badge: "bg-rose-500/15 text-rose-700 dark:text-rose-300" },
+            { id: "credit", label: lang === "ar" ? "لهم رصيد" : "With Credit", active: "border-emerald-600 bg-emerald-600 text-white", idle: "border-emerald-500/25 bg-emerald-500/5 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-300", badge: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" },
+            { id: "active", label: lang === "ar" ? "النشطين" : "Active", count: activeCount, active: "border-sky-600 bg-sky-600 text-white", idle: "border-sky-500/25 bg-sky-500/5 text-sky-700 hover:bg-sky-500/10 dark:text-sky-300", badge: "bg-sky-500/15 text-sky-700 dark:text-sky-300" },
           ].map((f) => (
             <button
               key={f.id}
               type="button"
               onClick={() => setFilterType(f.id as FilterType)}
-              className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold transition ${
-                filterType === f.id
-                  ? "border-primary bg-primary text-primary-foreground shadow-xs shadow-primary/20"
-                  : "border-border/70 bg-surface/70 text-muted-foreground hover:bg-surface-2 hover:text-foreground"
-              }`}
+              className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold transition ${filterType === f.id ? `${f.active} shadow-xs` : f.idle}`}
             >
               <span>{f.label}</span>
               {f.count !== undefined && (
                 <span
-                  className={`rounded-full px-1.5 py-0.2 text-[10px] font-mono ${
-                    filterType === f.id
-                      ? "bg-white/20 text-white"
-                      : "bg-muted text-muted-foreground"
-                  }`}
+                  className={`rounded-full px-1.5 py-0.2 text-[10px] font-mono ${filterType === f.id ? "bg-white/20 text-white" : f.badge}`}
                 >
                   {f.count}
                 </span>

@@ -18,7 +18,6 @@
 
 import { useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n";
-import { money } from "@/lib/format";
 import { VortexFilterSheet, VortexFilterSection } from "@/components/vortex-ui";
 import { FieldInput } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -33,7 +32,7 @@ import {
   type ExpenseListFilters,
 } from "@/lib/expenses/query-keys";
 import type { ExpenseLookups, ExpensePaymentState, ExpenseStatus } from "@/lib/expenses/types";
-import { Building2, CalendarRange, CircleDollarSign, Layers, Tag, Users } from "lucide-react";
+import { CalendarRange, CircleDollarSign, Layers, Tag } from "lucide-react";
 
 export function ExpenseFilterSheet({
   open,
@@ -159,6 +158,7 @@ export function ExpenseFilterSheet({
       </VortexFilterSection>
 
       <VortexFilterSection title={t("common.date")} icon={<CalendarRange className="size-3.5" />}>
+        {" "}
         <div className="mb-2 flex flex-wrap gap-1.5">
           {(["today", "month", "quarter", "year", "all_time"] as const).map((preset) => (
             <button
@@ -220,125 +220,10 @@ export function ExpenseFilterSheet({
           ))}
         </div>
       </VortexFilterSection>
-
-      <VortexFilterSection
-        title={ar ? "الجهة والأبعاد" : "Payee & dimensions"}
-        icon={<Building2 className="size-3.5" />}
-      >
-        <div className="grid gap-2">
-          <SelectField
-            value={draft.warehouseId}
-            onChange={(value) => set("warehouseId", value)}
-            placeholder={t("expenses.field.warehouse")}
-            options={(lookups?.warehouses ?? []).map((w) => ({
-              value: w.id,
-              label: ar ? w.name_ar || w.name : w.name,
-            }))}
-          />
-          <SelectField
-            value={draft.costCenterId}
-            onChange={(value) => set("costCenterId", value)}
-            placeholder={t("expenses.field.cost_center")}
-            options={(lookups?.cost_centers ?? []).map((c) => ({
-              value: c.id,
-              label: ar ? c.name_ar || c.name : c.name,
-            }))}
-          />
-          <SelectField
-            value={draft.projectId}
-            onChange={(value) => set("projectId", value)}
-            placeholder={t("expenses.field.project")}
-            options={(lookups?.projects ?? []).map((p) => ({
-              value: p.id,
-              label: ar ? p.name_ar || p.name : p.name,
-            }))}
-          />
-          <SelectField
-            value={draft.supplierId}
-            onChange={(value) => set("supplierId", value)}
-            placeholder={t("common.supplier")}
-            options={(lookups?.suppliers ?? []).map((s) => ({ value: s.id, label: s.name }))}
-          />
-          <SelectField
-            value={draft.employeeId}
-            onChange={(value) => set("employeeId", value)}
-            icon={<Users className="size-3.5" />}
-            placeholder={ar ? "الموظف" : "Staff member"}
-            options={(lookups?.employees ?? []).map((e) => ({
-              value: e.id,
-              label: e.name ?? "—",
-            }))}
-          />
-        </div>
-      </VortexFilterSection>
-
-      <VortexFilterSection
-        title={t("common.amount")}
-        icon={<CircleDollarSign className="size-3.5" />}
-      >
-        <div className="grid grid-cols-2 gap-2">
-          <FieldInput
-            type="decimal"
-            size="sm"
-            value={draft.amountMin == null ? "" : String(draft.amountMin)}
-            onValueChange={(value) => set("amountMin", value ? Number(value) : null)}
-            placeholder={t("common.from")}
-            aria-label={ar ? "من مبلغ" : "Minimum amount"}
-          />
-          <FieldInput
-            type="decimal"
-            size="sm"
-            value={draft.amountMax == null ? "" : String(draft.amountMax)}
-            onValueChange={(value) => set("amountMax", value ? Number(value) : null)}
-            placeholder={t("common.to")}
-            aria-label={ar ? "إلى مبلغ" : "Maximum amount"}
-          />
-        </div>
-        {draft.amountMin != null || draft.amountMax != null ? (
-          <p className="mt-1.5 text-[11px] text-muted-foreground">
-            {money(draft.amountMin ?? 0)} — {money(draft.amountMax ?? Number.MAX_SAFE_INTEGER)}
-          </p>
-        ) : null}
-      </VortexFilterSection>
     </VortexFilterSheet>
   );
 }
 
-/**
- * A native select styled with the design-system field recipe.
- *
- * Deliberately native rather than the Radix `Select`: these lists are long
- * (suppliers, staff), and a native control gets type-ahead and the OS picker on
- * mobile for free — both of which a custom listbox has to reimplement badly.
- */
-function SelectField({
-  value,
-  onChange,
-  placeholder,
-  options,
-  icon,
-}: {
-  value: string | null;
-  onChange: (value: string | null) => void;
-  placeholder: string;
-  options: { value: string; label: string }[];
-  icon?: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-center gap-2">
-      {icon ? <span className="text-muted-foreground">{icon}</span> : null}
-      <select
-        value={value ?? ""}
-        onChange={(event) => onChange(event.target.value || null)}
-        className="h-9 w-full min-w-0 rounded-full border border-border/70 bg-surface/80 px-3 text-sm text-foreground outline-none transition focus:border-primary/60 focus:ring-2 focus:ring-primary/15"
-      >
-        <option value="">{placeholder}</option>
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
+/* الحالة والسداد والتاريخ والتصنيف فقط — الأبعاد (مركز تكلفة/مشروع/مورد/موظف)
+ * أُزيلت من الفلترة عمداً: تسجيلها من الفورم يكفي، وتعقيدها في السجل
+ * كان يجعل إيجاد مصروف عادي مهمة محاسبية. */

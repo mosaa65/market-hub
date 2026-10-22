@@ -60,13 +60,13 @@ import { Route as AppTrialBalanceRouteImport } from './routes/_app.trial-balance
 import { Route as AppUsersRouteImport } from './routes/_app.users'
 import { Route as AppVortexUiRouteImport } from './routes/_app.vortex-ui'
 import { Route as AppWarehousesRouteImport } from './routes/_app.warehouses'
-import { Route as AppMillingConsumablesRouteImport } from './routes/_app.milling.consumables'
 import { Route as AppMillingCustomerStatementRouteImport } from './routes/_app.milling.customer-statement'
 import { Route as AppMillingDeliveryRouteImport } from './routes/_app.milling.delivery'
 import { Route as AppMillingIntakeRouteImport } from './routes/_app.milling.intake'
 import { Route as AppMillingManufactureRouteImport } from './routes/_app.milling.manufacture'
 import { Route as AppMillingMillingRouteImport } from './routes/_app.milling.milling'
 import { Route as AppMillingOperationsGuideRouteImport } from './routes/_app.milling.operations-guide'
+import { Route as AppMillingPerformanceRouteImport } from './routes/_app.milling.performance'
 import { Route as AppReportsCustomersRouteImport } from './routes/_app.reports.customers'
 import { Route as AppReportsInventoryRouteImport } from './routes/_app.reports.inventory'
 import { Route as AppReportsOperationsAuditRouteImport } from './routes/_app.reports.operations-audit'
@@ -330,11 +330,6 @@ const AppWarehousesRoute = AppWarehousesRouteImport.update({
   path: '/warehouses',
   getParentRoute: () => AppRoute,
 } as any)
-const AppMillingConsumablesRoute = AppMillingConsumablesRouteImport.update({
-  id: '/consumables',
-  path: '/consumables',
-  getParentRoute: () => AppMillingRoute,
-} as any)
 const AppMillingCustomerStatementRoute =
   AppMillingCustomerStatementRouteImport.update({
     id: '/customer-statement',
@@ -367,6 +362,11 @@ const AppMillingOperationsGuideRoute =
     path: '/operations-guide',
     getParentRoute: () => AppMillingRoute,
   } as any)
+const AppMillingPerformanceRoute = AppMillingPerformanceRouteImport.update({
+  id: '/performance',
+  path: '/performance',
+  getParentRoute: () => AppMillingRoute,
+} as any)
 const AppReportsCustomersRoute = AppReportsCustomersRouteImport.update({
   id: '/customers',
   path: '/customers',
@@ -460,13 +460,13 @@ export interface FileRoutesByFullPath {
   '/users': typeof AppUsersRoute
   '/vortex-ui': typeof AppVortexUiRoute
   '/warehouses': typeof AppWarehousesRoute
-  '/milling/consumables': typeof AppMillingConsumablesRoute
   '/milling/customer-statement': typeof AppMillingCustomerStatementRoute
   '/milling/delivery': typeof AppMillingDeliveryRoute
   '/milling/intake': typeof AppMillingIntakeRoute
   '/milling/manufacture': typeof AppMillingManufactureRoute
   '/milling/milling': typeof AppMillingMillingRoute
   '/milling/operations-guide': typeof AppMillingOperationsGuideRoute
+  '/milling/performance': typeof AppMillingPerformanceRoute
   '/reports/customers': typeof AppReportsCustomersRoute
   '/reports/inventory': typeof AppReportsInventoryRoute
   '/reports/operations-audit': typeof AppReportsOperationsAuditRoute
@@ -527,13 +527,13 @@ export interface FileRoutesByTo {
   '/users': typeof AppUsersRoute
   '/vortex-ui': typeof AppVortexUiRoute
   '/warehouses': typeof AppWarehousesRoute
-  '/milling/consumables': typeof AppMillingConsumablesRoute
   '/milling/customer-statement': typeof AppMillingCustomerStatementRoute
   '/milling/delivery': typeof AppMillingDeliveryRoute
   '/milling/intake': typeof AppMillingIntakeRoute
   '/milling/manufacture': typeof AppMillingManufactureRoute
   '/milling/milling': typeof AppMillingMillingRoute
   '/milling/operations-guide': typeof AppMillingOperationsGuideRoute
+  '/milling/performance': typeof AppMillingPerformanceRoute
   '/reports/customers': typeof AppReportsCustomersRoute
   '/reports/inventory': typeof AppReportsInventoryRoute
   '/reports/operations-audit': typeof AppReportsOperationsAuditRoute
@@ -596,13 +596,13 @@ export interface FileRoutesById {
   '/_app/users': typeof AppUsersRoute
   '/_app/vortex-ui': typeof AppVortexUiRoute
   '/_app/warehouses': typeof AppWarehousesRoute
-  '/_app/milling/consumables': typeof AppMillingConsumablesRoute
   '/_app/milling/customer-statement': typeof AppMillingCustomerStatementRoute
   '/_app/milling/delivery': typeof AppMillingDeliveryRoute
   '/_app/milling/intake': typeof AppMillingIntakeRoute
   '/_app/milling/manufacture': typeof AppMillingManufactureRoute
   '/_app/milling/milling': typeof AppMillingMillingRoute
   '/_app/milling/operations-guide': typeof AppMillingOperationsGuideRoute
+  '/_app/milling/performance': typeof AppMillingPerformanceRoute
   '/_app/reports/customers': typeof AppReportsCustomersRoute
   '/_app/reports/inventory': typeof AppReportsInventoryRoute
   '/_app/reports/operations-audit': typeof AppReportsOperationsAuditRoute
@@ -665,13 +665,13 @@ export interface FileRouteTypes {
     | '/users'
     | '/vortex-ui'
     | '/warehouses'
-    | '/milling/consumables'
     | '/milling/customer-statement'
     | '/milling/delivery'
     | '/milling/intake'
     | '/milling/manufacture'
     | '/milling/milling'
     | '/milling/operations-guide'
+    | '/milling/performance'
     | '/reports/customers'
     | '/reports/inventory'
     | '/reports/operations-audit'
@@ -732,13 +732,13 @@ export interface FileRouteTypes {
     | '/users'
     | '/vortex-ui'
     | '/warehouses'
-    | '/milling/consumables'
     | '/milling/customer-statement'
     | '/milling/delivery'
     | '/milling/intake'
     | '/milling/manufacture'
     | '/milling/milling'
     | '/milling/operations-guide'
+    | '/milling/performance'
     | '/reports/customers'
     | '/reports/inventory'
     | '/reports/operations-audit'
@@ -800,13 +800,13 @@ export interface FileRouteTypes {
     | '/_app/users'
     | '/_app/vortex-ui'
     | '/_app/warehouses'
-    | '/_app/milling/consumables'
     | '/_app/milling/customer-statement'
     | '/_app/milling/delivery'
     | '/_app/milling/intake'
     | '/_app/milling/manufacture'
     | '/_app/milling/milling'
     | '/_app/milling/operations-guide'
+    | '/_app/milling/performance'
     | '/_app/reports/customers'
     | '/_app/reports/inventory'
     | '/_app/reports/operations-audit'
@@ -1182,13 +1182,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppWarehousesRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/milling/consumables': {
-      id: '/_app/milling/consumables'
-      path: '/consumables'
-      fullPath: '/milling/consumables'
-      preLoaderRoute: typeof AppMillingConsumablesRouteImport
-      parentRoute: typeof AppMillingRoute
-    }
     '/_app/milling/customer-statement': {
       id: '/_app/milling/customer-statement'
       path: '/customer-statement'
@@ -1229,6 +1222,13 @@ declare module '@tanstack/react-router' {
       path: '/operations-guide'
       fullPath: '/milling/operations-guide'
       preLoaderRoute: typeof AppMillingOperationsGuideRouteImport
+      parentRoute: typeof AppMillingRoute
+    }
+    '/_app/milling/performance': {
+      id: '/_app/milling/performance'
+      path: '/performance'
+      fullPath: '/milling/performance'
+      preLoaderRoute: typeof AppMillingPerformanceRouteImport
       parentRoute: typeof AppMillingRoute
     }
     '/_app/reports/customers': {
@@ -1291,23 +1291,23 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppMillingRouteChildren {
-  AppMillingConsumablesRoute: typeof AppMillingConsumablesRoute
   AppMillingCustomerStatementRoute: typeof AppMillingCustomerStatementRoute
   AppMillingDeliveryRoute: typeof AppMillingDeliveryRoute
   AppMillingIntakeRoute: typeof AppMillingIntakeRoute
   AppMillingManufactureRoute: typeof AppMillingManufactureRoute
   AppMillingMillingRoute: typeof AppMillingMillingRoute
   AppMillingOperationsGuideRoute: typeof AppMillingOperationsGuideRoute
+  AppMillingPerformanceRoute: typeof AppMillingPerformanceRoute
 }
 
 const AppMillingRouteChildren: AppMillingRouteChildren = {
-  AppMillingConsumablesRoute: AppMillingConsumablesRoute,
   AppMillingCustomerStatementRoute: AppMillingCustomerStatementRoute,
   AppMillingDeliveryRoute: AppMillingDeliveryRoute,
   AppMillingIntakeRoute: AppMillingIntakeRoute,
   AppMillingManufactureRoute: AppMillingManufactureRoute,
   AppMillingMillingRoute: AppMillingMillingRoute,
   AppMillingOperationsGuideRoute: AppMillingOperationsGuideRoute,
+  AppMillingPerformanceRoute: AppMillingPerformanceRoute,
 }
 
 const AppMillingRouteWithChildren = AppMillingRoute._addFileChildren(

@@ -697,7 +697,7 @@ export function buildMillingDocumentUnifiedDoc(
       showFinancialDetails: true,
       showPaymentInfo: true,
       showBarcode: true,
-      showQrCode: true,
+      showQrCode: false,
       showSignatures: true,
       showNotes: true,
     },
@@ -1112,7 +1112,7 @@ export function custodyVoucherToDoc(v: CustodyVoucherData): UnifiedDocumentData 
       showFinancialDetails: false,
       showPaymentInfo: false,
       showBarcode: true,
-      showQrCode: true,
+      showQrCode: false,
       showSignatures: true,
     },
   };
@@ -1176,7 +1176,7 @@ export function buildCustodyDeliveryDoc({
       showFinancialDetails: false,
       showPaymentInfo: false,
       showBarcode: true,
-      showQrCode: true,
+      showQrCode: false,
       showSignatures: true,
       showCustomerInfo: true,
       showCompanyInfo: true,
@@ -1188,6 +1188,50 @@ export function buildCustodyDeliveryDoc({
 /* ----------------------------------------- smart manufacture (خطوة 7) */
 
 /** مستند تحويل/تصنيع: وارد قمح يُنقص، صادر نواتج تزيد، تكلفة موزّعة نسبياً. */
+/**
+ * التحويل الداخلي بنموذج «عدّ المنتجات» (V1 المعتمد):
+ * صادر منتج المصدر + وارد النواتج بعدّ صافٍ، فاقد اختياري بوحدات،
+ * بلا توزيع تكلفة ولا قيود — تكلفة كل منتج ثابتة يدوياً.
+ */
+export async function convertStock(input: {
+  warehouseId: string;
+  sourceItemId: string;
+  sourceQty: number;
+  outputs: { itemId: string; qty: number }[];
+  lossQty?: number;
+  notes?: string;
+}): Promise<OpResult> {
+  if (!input.warehouseId || !input.sourceItemId) {
+    return { ok: false, message: "اختر المخزن وصنف المصدر." };
+  }
+  if ((input.sourceQty ?? 0) <= 0) {
+    return { ok: false, message: "كمية المصدر يجب أن تكون أكبر من صفر." };
+  }
+  const validOutputs = (input.outputs ?? []).filter((o) => o.itemId && (o.qty ?? 0) > 0);
+  if (validOutputs.length === 0) {
+    return { ok: false, message: "أضف ناتجاً واحداً على الأقل (منتج + كمية)." };
+  }
+  const lossQty = input.lossQty ?? 0;
+  const totalOut = validOutputs.reduce((s, o) => s + (Number(o.qty) || 0), 0);
+  if (totalOut + lossQty !== input.sourceQty) {
+    return {
+      ok: false,
+      message: `النواتج + الفاقد (${totalOut + lossQty}) يجب أن تساوي كمية المصدر (${input.sourceQty}).`,
+    };
+  }
+
+  const { data, error } = await db.rpc("convert_stock", {
+    _warehouse_id: input.warehouseId,
+    _source_item_id: input.sourceItemId,
+    _source_qty: input.sourceQty,
+    _outputs: validOutputs.map((o) => ({ item_id: o.itemId, qty: o.qty })),
+    _loss_qty: lossQty,
+    _notes: input.notes ?? null,
+  });
+  if (error) return { ok: false, message: translateCustodyError(error.message) };
+  return { ok: true, data: data as string };
+}
+
 export async function smartManufacture(input: {
   warehouseId: string;
   grainItemId: string;
@@ -1217,37 +1261,5 @@ export async function smartManufacture(input: {
   return { ok: true, data: data as string };
 }
 
-/* --------------------------------- internal consumables issue (خطوة 7 — ق4) */
-
-/** فاتورة صرف مستهلكات داخلي: تُنقص كمياتها من مخزن المستهلكات بدقة. */
-export async function consumeInternalSupplies(input: {
-  warehouseId: string;
-  lines: { itemId: string; qty: number }[];
-  notes?: string;
-}): Promise<OpResult> {
-  if (!input.warehouseId) return { ok: false, message: "اختر المخزن." };
-  const validLines = (input.lines ?? []).filter((l) => l.itemId && (l.qty ?? 0) > 0);
-  if (validLines.length === 0) {
-    return { ok: false, message: "أضف سطراً واحداً على الأقل (صنف + كمية)." };
-  }
-
-  const { data, error } = await db.rpc("consume_internal_supplies", {
-    _warehouse_id: input.warehouseId,
-    _lines: validLines.map((l) => ({ item_id: l.itemId, qty: l.qty })),
-    _notes: input.notes ?? null,
-  });
-  if (error) return { ok: false, message: translateCustodyError(error.message) };
-  return { ok: true, data: data as string };
-}
-
-/** مستهلكات (أكياس/خيط/زيت) — تصرف من مخزن المستهلكات. */
-export async function fetchConsumableItems(): Promise<ProductOption[]> {
-  const { data, error } = await db
-    .from("products")
-    .select("id, sku, name, name_ar, item_class, sale_price, package_weight_kg")
-    .in("item_class", ["NON_STOCK_ITEM", "PACKAGING"])
-    .eq("is_active", true)
-    .order("name_ar");
-  if (error) throw error;
-  return (data ?? []) as ProductOption[];
-}
+/* V5 (rebuild-plan-v2 §6): مسار «مستهلكات تعبئة» من المخزون ملغى رسمياً.
+   الأكياس/الخيط/الزيت = سندات مصروفات عادية في وحدة المصروفات — لا صرف مخزني. */

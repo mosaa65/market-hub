@@ -48,7 +48,7 @@ export const DEFAULT_UNIFIED_PRINT_SETTINGS: UnifiedPrintSettings = {
   theme: "standard",
   footerEnabled: false,
   showBarcode: true,
-  showQrCode: true,
+  showQrCode: false,
   showSignatures: false,
   standardAccentColor: undefined, // يستخدم اللون الافتراضي الأزرق الملكي
   luxuryAccentColor: undefined, // يستخدم اللون الافتراضي الذهبي الفاخر

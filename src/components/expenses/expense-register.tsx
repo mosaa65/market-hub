@@ -442,18 +442,6 @@ export function ExpenseRegister({
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           viewModes={["table", "list", "cards"]}
-          action={
-            <Button size="sm" onClick={onCreate}>
-              <Plus className="size-4" />
-              {t("expenses.new")}
-            </Button>
-          }
-          end={
-            <Button variant="outline" size="sm" onClick={onRefresh} disabled={isFetching}>
-              <RefreshCw className={cn("size-3.5", isFetching && "animate-spin")} />
-              <span className="hidden sm:inline">{t("common.retry")}</span>
-            </Button>
-          }
         >
           <QuickFilterBar
             items={quickFilterItems}
@@ -494,38 +482,89 @@ export function ExpenseRegister({
               </Button>
             ),
           }}
-          renderCard={(row) => (
-            <button
-              type="button"
-              onClick={() => onOpen(row)}
-              className="card-mullak flex w-full flex-col gap-2 p-4 text-start transition hover:border-primary/30"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex min-w-0 flex-col">
-                  <span className="truncate text-[13px] font-bold text-foreground">
-                    {row.description || row.primary_category_ar || row.primary_category || "—"}
+          renderCard={(row) => {
+            /* تصميم بطاقات المنتجات الموحد (card-mullak): شريط جانبي ملوّن حسب
+             * حالة السداد + شارات أعلى + عنوان + صف إجمالي سفلي. */
+            const paid = Number(row.paid_amount);
+            const total = Number(row.total_amount);
+            const isSettled = row.status === "PAID" || paid >= total;
+            const overdue = isOverdue(row.due_date, Number(row.remaining_amount), row.status);
+            const accent = overdue
+              ? "border-r-rose-500 hover:border-rose-500/60 shadow-rose-500/5"
+              : isSettled
+                ? "border-r-emerald-500 hover:border-emerald-500/60 shadow-emerald-500/5"
+                : row.status === "DRAFT"
+                  ? "border-r-muted-foreground/40"
+                  : "border-r-amber-500 hover:border-amber-500/60 shadow-amber-500/5";
+            return (
+              <button
+                type="button"
+                onClick={() => onOpen(row)}
+                className={cn(
+                  "card-mullak group relative flex w-full flex-col rounded-2xl border border-r-4 p-3.5 text-start transition-all duration-200 hover:shadow-md",
+                  accent,
+                )}
+              >
+                {/* شارات أعلى: المرجع + الحالة */}
+                <div className="mb-2 flex items-center justify-between gap-1.5">
+                  <span className="inline-flex max-w-[120px] items-center gap-1 truncate rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 font-mono text-[10px] font-semibold text-primary">
+                    {row.reference}
                   </span>
-                  <span className="font-mono text-[11px] text-muted-foreground">
-                    {row.reference} · {row.expense_date}
+                  <ExpenseStatusBadge status={row.status} showLock />
+                </div>
+
+                {/* العنوان: البيان */}
+                <h4
+                  className="mb-1.5 line-clamp-2 text-xs font-bold leading-snug text-foreground transition-colors group-hover:text-primary sm:text-sm"
+                  dir="rtl"
+                >
+                  {row.description || row.primary_category_ar || row.primary_category || "—"}
+                </h4>
+
+                {/* حبيبات: التصنيف والجهة والتاريخ */}
+                <div className="mb-2.5 flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground">
+                  {(row.primary_category_ar || row.primary_category) && (
+                    <span className="rounded-md border border-border/50 bg-surface-2/70 px-1.5 py-0.2">
+                      {ar ? row.primary_category_ar || row.primary_category : row.primary_category}
+                    </span>
+                  )}
+                  {(row.supplier_name ?? row.employee_name ?? row.payee_name) && (
+                    <span className="rounded-md border border-border/50 bg-surface-2/70 px-1.5 py-0.2">
+                      {row.supplier_name ?? row.employee_name ?? row.payee_name}
+                    </span>
+                  )}
+                  <span className="rounded-md border border-border/50 bg-surface-2/70 px-1.5 py-0.2 font-mono">
+                    {row.expense_date}
                   </span>
                 </div>
-                <span className="font-mono text-[13px] font-semibold tabular-nums text-foreground">
-                  {moneyCell(row.total_amount)}
-                </span>
-              </div>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <ExpenseStatusBadge status={row.status} showLock />
-                <ExpensePaymentBadge
-                  paid={Number(row.paid_amount)}
-                  total={Number(row.total_amount)}
-                  status={row.status}
-                />
-              </div>
-              <span className="truncate text-[11px] text-muted-foreground">
-                {row.supplier_name ?? row.employee_name ?? row.payee_name ?? "—"}
-              </span>
-            </button>
-          )}
+
+                {/* صف الإجماليات السفلي */}
+                <div className="mt-auto flex items-center justify-between gap-1.5 border-t border-border/60 pt-2">
+                  <div className="min-w-0">
+                    <p className="text-[9px] font-medium text-muted-foreground sm:text-[10px]">
+                      {ar ? "المتبقي" : "Remaining"}
+                    </p>
+                    <p
+                      className={cn(
+                        "font-mono text-[11px] font-semibold tabular-nums sm:text-xs",
+                        overdue ? "text-destructive" : "text-muted-foreground",
+                      )}
+                    >
+                      {moneyCell(row.remaining_amount)}
+                    </p>
+                  </div>
+                  <div className="text-end">
+                    <p className="text-[9px] font-medium text-muted-foreground sm:text-[10px]">
+                      {ar ? "الإجمالي" : "Total"}
+                    </p>
+                    <p className="font-mono text-xs font-black tabular-nums text-foreground sm:text-sm">
+                      {moneyCell(row.total_amount)}
+                    </p>
+                  </div>
+                </div>
+              </button>
+            );
+          }}
           renderListRow={(row) => (
             <button
               type="button"

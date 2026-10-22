@@ -7,6 +7,7 @@ import {
 } from "./types";
 import { generateBarcodeSvg, generateQrCodeSvg } from "@/lib/printing/barcode-qr";
 import { getCachedCompanyProfile } from "@/lib/printing/company-profile";
+import { formatPrintedDateTime } from "@/lib/printing/date-time";
 import { renderInvoiceRightsFooter, UNIVERSAL_FOOTER_CSS } from "@/lib/printing/footer";
 
 /**
@@ -38,12 +39,14 @@ export function renderThermalMillingTemplate(
     showSignatures: false,
     showFooter: true,
     showBarcode: true,
-    showQrCode: true,
+    showQrCode: false,
     ...options,
     ...doc.options,
   };
 
   const companyName =
+    company.arabicName ||
+    doc.company?.arabicName ||
     doc.company?.legalName ||
     doc.company?.name ||
     company.legalName ||
@@ -83,7 +86,6 @@ export function renderThermalMillingTemplate(
           : ""
       }
       ${l.note ? `<div style="font-size: 10px; color: #475569; margin-top: 1.5px;">${esc(l.note)}</div>` : ""}
-      ${l.code ? `<div style="font-size: 9px; color: #94a3b8; font-family: monospace;">SKU: ${esc(l.code)}</div>` : ""}
     </div>`;
     })
     .join("");
@@ -92,7 +94,7 @@ export function renderThermalMillingTemplate(
     `Seller: ${companyName}`,
     `TaxNo: ${companyVat || "N/A"}`,
     `Invoice: ${doc.number}`,
-    `Date: ${doc.date}`,
+    `Date: ${formatPrintedDateTime(doc.date)}`,
     `Total: ${doc.total || 0} ${c}`,
   ].join("\n");
 
@@ -206,7 +208,7 @@ export function renderThermalMillingTemplate(
         </div>
         <div class="flex-between">
           <span style="color: #64748b;">التاريخ:</span>
-          <span class="font-mono">${esc(doc.date)}</span>
+          <span class="font-mono">${esc(formatPrintedDateTime(doc.date))}</span>
         </div>
       `
           : ""
@@ -251,6 +253,7 @@ export function renderThermalMillingTemplate(
       `
           : ""
       }
+      ${doc.operatorName ? `<div class="flex-between"><span style="color: #64748b;">البائع / المستخدم:</span><span class="font-bold">${esc(doc.operatorName)}</span></div>` : ""}
     </div>
 
     <!-- Items Details Box -->

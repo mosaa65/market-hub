@@ -134,7 +134,7 @@ export function PurchasesReport({
   const outputRows = filteredRows.map((row) => {
     const values: Record<string, string> = {
       reference: row.invoice_number,
-      date: new Date(row.created_at).toLocaleDateString(ar ? "ar-YE" : "en-GB"),
+      date: row.created_at,
       description: row.suppliers?.name ?? "—",
       paymentMethod: ar
         ? row.warehouses?.name_ar || row.warehouses?.name || "—"

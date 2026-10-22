@@ -158,7 +158,7 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
       supabase
         .from("products")
         .select(
-          "id,name,name_ar,sku,barcode,unit_id,cost_price,sale_price,tax_rate,package_weight_kg,unit:units!products_unit_id_fkey(short_name,name,name_ar)",
+          "id,name,name_ar,sku,barcode,unit_id,cost_price,sale_price,tax_rate,unit:units!products_unit_id_fkey(short_name,name,name_ar)",
         )
         .eq("is_active", true)
         .order("name")
@@ -401,7 +401,7 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
       const doc: InvoiceDoc = {
         title,
         number: invoiceNumber,
-        date: currentDate,
+        date: new Date().toISOString(),
         partyLabel: partyTitle,
         partyName: selectedParty?.name || "",
         partyPhone: selectedParty?.phone || undefined,

@@ -35,7 +35,6 @@ export {
   fetchMillingServiceDocument,
   fetchMillingDocuments,
   fetchMillingDocumentDetails,
-  fetchConsumableItems,
   fetchCustodyBalances,
   fetchCustodyStatement,
   fetchCustodyServiceMoney,
@@ -53,7 +52,6 @@ export {
   custodyAdjustment,
   linkCustodyInvoice,
   smartManufacture,
-  consumeInternalSupplies,
   type UnlinkedMillingEntry,
   // print vouchers (05 §بند 8.4)
   buildCustodyVoucher,

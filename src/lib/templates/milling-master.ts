@@ -6,6 +6,7 @@ import {
   CustomFieldOptions,
 } from "./types";
 import { getCachedCompanyProfile } from "@/lib/printing/company-profile";
+import { formatPrintedDateTime } from "@/lib/printing/date-time";
 import { generateBarcodeSvg, generateQrCodeSvg } from "@/lib/printing/barcode-qr";
 import { numberToArabicWords } from "./tafqeet";
 import { renderInvoiceRightsFooter } from "@/lib/printing/footer";
@@ -38,7 +39,7 @@ export function renderMillingMasterTemplate(
     showSignatures: false,
     showFooter: false,
     showBarcode: true,
-    showQrCode: true,
+    showQrCode: false,
     ...options,
     ...doc.options,
   };
@@ -49,9 +50,9 @@ export function renderMillingMasterTemplate(
   );
 
   const compName = esc(
-    doc.company?.legalName ||
-      doc.company?.name ||
-      companyProfile.legalName ||
+      companyProfile.arabicName ||
+    doc.company?.arabicName ||
+    doc.company?.name ||
       companyProfile.name ||
       "المطحنة الحديثة لإنتاج الدقيق والأعلاف",
   );
@@ -66,7 +67,7 @@ export function renderMillingMasterTemplate(
   const qrSvg =
     opts.showQrCode && doc.number
       ? generateQrCodeSvg(
-          `${compName}\nرقم: ${doc.number}\nالتاريخ: ${doc.date}\nالإجمالي: ${doc.total || 0} ${c}`,
+          `${compName}\nرقم: ${doc.number}\nالتاريخ: ${formatPrintedDateTime(doc.date)}\nالإجمالي: ${doc.total || 0} ${c}`,
           75,
         )
       : "";
@@ -267,6 +268,22 @@ export function renderMillingMasterTemplate(
       border-bottom: 1px solid #94a3b8;
     }
 
+    .inama-footer {
+      margin-top: 24px;
+      padding-top: 12px;
+      border-top: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: #64748b;
+    }
+    .inama-badge {
+      display: inline-block;
+      font-weight: 700;
+      color: #0284c7;
+      letter-spacing: 0.2px;
+    }
   </style>
 </head>
 <body onload="window.print()">
@@ -293,7 +310,7 @@ export function renderMillingMasterTemplate(
           ? `
       <div class="meta-item">
         <span class="meta-label">تاريخ ووقت المعاملة:</span>
-        <span class="meta-val">${esc(doc.date)}</span>
+        <span class="meta-val">${esc(formatPrintedDateTime(doc.date))}</span>
       </div>`
           : ""
       }
@@ -333,6 +350,7 @@ export function renderMillingMasterTemplate(
       </div>`
           : ""
       }
+      ${doc.operatorName ? `<div class="meta-item"><span class="meta-label">البائع / المستخدم:</span><span class="meta-val">${esc(doc.operatorName)}</span></div>` : ""}
     </div>
 
     <!-- Table of Lines -->
@@ -453,6 +471,15 @@ export function renderMillingMasterTemplate(
     }
 
     ${renderInvoiceRightsFooter()}
+    ${
+      opts.showFooter
+        ? `
+    <div class="inama-footer">
+      <span>تاريخ الطباعة: ${formatPrintedDateTime(new Date())}</span>
+      ${L.poweredBy ? `<span class="inama-badge">${esc(L.poweredBy)}</span>` : ""}
+    </div>`
+        : ""
+    }
   </div>
 </body>
 </html>`;
@@ -480,7 +507,7 @@ export function renderMillingThermalTemplate(
     showFinancialDetails: true,
     showFooter: false,
     showBarcode: true,
-    showQrCode: true,
+    showQrCode: false,
     ...options,
     ...doc.options,
   };
@@ -489,9 +516,9 @@ export function renderMillingThermalTemplate(
   const title = esc(doc.title || (isDelivery ? "إيصال تسليم أمانات" : "إيصال طحن واستلام فوري"));
 
   const compName = esc(
-    doc.company?.legalName ||
-      doc.company?.name ||
-      companyProfile.legalName ||
+      companyProfile.arabicName ||
+    doc.company?.arabicName ||
+    doc.company?.name ||
       companyProfile.name ||
       "المطحنة الحديثة",
   );
@@ -577,6 +604,15 @@ export function renderMillingThermalTemplate(
       padding: 6px 8px;
       margin: 6px 0;
     }
+    .inama-footer {
+      text-align: center;
+      font-size: 9.5px;
+      font-weight: 800;
+      color: #333;
+      margin-top: 10px;
+      padding-top: 6px;
+      border-top: 1px solid rgba(0, 0, 0, 0.12);
+    }
   </style>
 </head>
 <body onload="window.print()">
@@ -593,7 +629,7 @@ export function renderMillingThermalTemplate(
     opts.showDocNumberDate
       ? `
   <div class="flex-row"><span>رقم المستند:</span><span class="bold">#${esc(doc.number)}</span></div>
-  <div class="flex-row"><span>التاريخ:</span><span>${esc(doc.date)}</span></div>`
+  <div class="flex-row"><span>التاريخ:</span><span>${esc(formatPrintedDateTime(doc.date))}</span></div>`
       : ""
   }
 
@@ -604,6 +640,7 @@ export function renderMillingThermalTemplate(
   ${doc.partyPhone ? `<div class="flex-row"><span>الهاتف:</span><span>${esc(doc.partyPhone)}</span></div>` : ""}`
       : ""
   }
+  ${doc.operatorName ? `<div class="flex-row"><span>البائع / المستخدم:</span><span class="bold">${esc(doc.operatorName)}</span></div>` : ""}
 
   <div class="hairline-divider"></div>
 
@@ -641,6 +678,14 @@ export function renderMillingThermalTemplate(
   }
 
   ${renderInvoiceRightsFooter()}
+  ${
+    opts.showFooter && L.poweredBy
+      ? `
+  <div class="inama-footer">
+    ${esc(L.poweredBy)}
+  </div>`
+      : ""
+  }
 </body>
 </html>`;
 }

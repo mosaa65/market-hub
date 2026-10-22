@@ -32,7 +32,6 @@ import {
   custodyMilling,
   fetchCustodyBalances,
   fetchOutputItems,
-  capacityKgOf,
   custodyVoucherToDoc,
   buildCustodyVoucher,
   type CustodyLine,
@@ -40,6 +39,8 @@ import {
 } from "@/lib/milling";
 import { LuxuryPrintPreviewModal } from "@/components/luxury-print-preview-modal";
 import { UnifiedPrintModal } from "@/components/milling/unified-print-modal";
+import { MillingDocumentsBoard } from "@/components/milling/milling-documents-board";
+import { CustodyAdjustmentPanel } from "@/components/milling/custody-adjustment-panel";
 import type { UnifiedDocumentData } from "@/lib/templates/types";
 import {
   MillingPanel,
@@ -79,14 +80,11 @@ function MillingMillPage() {
   const [grainItemId, setGrainItemId] = useState("");
   const [bagsOut, setBagsOut] = useState("");
   const [kgOut, setKgOut] = useState("");
-  const [kgOutAuto, setKgOutAuto] = useState(false);
   const [outputs, setOutputs] = useState<CustodyLine[]>([{ itemId: "", bags: 0, kg: 0 }]);
-  const [autoKgLines, setAutoKgLines] = useState<Set<number>>(new Set());
 
-  // حقل الفاقد التشغيلي الفعلي أثناء الطحن
+  // حقل الفاقد التشغيلي الفعلي أثناء الطحن — وزن فيزيائي يدوي فقط (V2: بلا سعات)
   const [lossKg, setLossKg] = useState("");
   const [lossBags, setLossBags] = useState("");
-  const [lossPackageKg, setLossPackageKg] = useState("50");
   const [notes, setNotes] = useState("");
 
   // معاينة وطباعة سند الطحن الفاخر
@@ -142,42 +140,22 @@ function MillingMillPage() {
   const grainBalances = (balances.data ?? []).filter(
     (b) => b.item_class === "RAW_MATERIAL" && (b.bags_balance > 0 || b.kg_balance > 0),
   );
+  // أرصدة النواتج الجاهزة للتسليم (E9) — كل غير الحبوب الخام
+  const readyOutputBalances = (balances.data ?? []).filter(
+    (b) => b.item_class !== "RAW_MATERIAL" && (b.bags_balance > 0 || b.kg_balance > 0),
+  );
   const selectedGrain = grainBalances.find((b) => b.item_id === grainItemId);
   const selectedCustomer = (customers.data ?? []).find((c) => c.id === customerId);
 
-  // خريطة سعة العبوات
-  const capacityMap = useQuery({
-    queryKey: ["milling", "capacity-map"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("products")
-        .select("id, package_weight_kg")
-        .eq("is_active", true)
-        .limit(2000);
-      if (error) throw error;
-      const m = new Map<string, number | null>();
-      for (const r of (data ?? []) as { id: string; package_weight_kg: number | null }[]) {
-        m.set(r.id, capacityKgOf(r));
-      }
-      return m;
-    },
-  });
-  const cap = (itemId: string) => capacityMap.data?.get(itemId) ?? null;
-  const grainCapacity = grainItemId ? cap(grainItemId) : null;
+  // V2: لا خريطة سعات ولا حساب تلقائي — كل الأوزان إدخال يدوي فيزيائي.
 
   // تغيير أكياس الحبوب المستهلكة
   function changeBagsOut(v: string) {
     setBagsOut(v);
-    const n = Number(v) || 0;
-    if (grainCapacity && (kgOutAuto || kgOut === "")) {
-      setKgOut(n > 0 ? String(n * grainCapacity) : "");
-      setKgOutAuto(n > 0);
-    }
   }
 
   function changeKgOut(v: string) {
     setKgOut(v);
-    setKgOutAuto(false);
   }
 
   // طحن كامل رصيد الحبوب المتاح
@@ -185,53 +163,24 @@ function MillingMillPage() {
     if (!selectedGrain) return;
     setBagsOut(String(selectedGrain.bags_balance));
     setKgOut(String(selectedGrain.kg_balance));
-    setKgOutAuto(false);
   }
 
-  // تغيير سطر الناتج
+  // تغيير سطر الناتج — بلا أي اشتقاق من السعة
   function changeLineItem(idx: number, itemId: string) {
-    const c = cap(itemId);
-    setOutputs((o) =>
-      o.map((l, i) => {
-        if (i !== idx) return l;
-        const n = Number(l.bags) || 0;
-        const auto = autoKgLines.has(idx) || l.kg === 0;
-        const kg = c && auto && n > 0 ? n * c : l.kg;
-        return { ...l, itemId, kg };
-      }),
-    );
-    if (c) setAutoKgLines((s) => new Set(s).add(idx));
+    setOutputs((o) => o.map((l, i) => (i !== idx ? l : { ...l, itemId })));
   }
 
   function changeLineBags(idx: number, bags: number) {
-    setOutputs((o) =>
-      o.map((l, i) => {
-        if (i !== idx) return l;
-        const c = cap(l.itemId);
-        const auto = autoKgLines.has(idx) || l.kg === 0;
-        if (c && auto) return { ...l, bags, kg: bags > 0 ? bags * c : 0 };
-        return { ...l, bags };
-      }),
-    );
+    setOutputs((o) => o.map((l, i) => (i !== idx ? l : { ...l, bags })));
   }
 
   function changeLineKg(idx: number, kg: number) {
-    setOutputs((o) => o.map((l, i) => (i === idx ? { ...l, kg } : l)));
-    setAutoKgLines((s) => {
-      const n = new Set(s);
-      n.delete(idx);
-      return n;
-    });
+    setOutputs((o) => o.map((l, i) => (i !== idx ? l : { ...l, kg })));
   }
 
-  // تغيير الفاقد بالأكياس
+  // الفاقد: أكياس ووزن مستقلان — بلا ضرب بسعة
   function handleLossBagsChange(v: string) {
     setLossBags(v);
-    const bags = Number(v) || 0;
-    const pkg = Number(lossPackageKg) || 50;
-    if (bags > 0) {
-      setLossKg(String(bags * pkg));
-    }
   }
 
   // الحسابات الرياضية للمطابقة والتحقق
@@ -249,6 +198,14 @@ function MillingMillPage() {
   const actualLossKg = Number(lossKg) || 0;
   const totalOutputsWithLossKg = totalProducedKg + actualLossKg;
   const discrepancyKg = Math.round((currentMilledKg - totalOutputsWithLossKg) * 1000) / 1000;
+  /**
+   * E8: المطابقة «تامة» فقط عند صفر فرق حقيقي. الفروق داخل ربع كيلو
+   * تعبئة تُعرض كـ«مطابقة بتقريب» — رسالة صادقة بلا تضليل، ولا تُدخل
+   * كفاقد مقيّد تلقائياً.
+   */
+  const FILL_TOLERANCE_KG = 0.25;
+  const isExactMatch = discrepancyKg === 0;
+  const isRoundedMatch = !isExactMatch && Math.abs(discrepancyKg) <= FILL_TOLERANCE_KG;
 
   // رصيد الحبوب المتبقي كحبوب خام (لم تُطحن)
   const remainingRawBags = selectedGrain
@@ -311,9 +268,7 @@ function MillingMillPage() {
 
       setBagsOut("");
       setKgOut("");
-      setKgOutAuto(false);
       setOutputs([{ itemId: "", bags: 0, kg: 0 }]);
-      setAutoKgLines(new Set());
       setLossKg("");
       setLossBags("");
       setNotes("");
@@ -453,14 +408,7 @@ function MillingMillPage() {
                     />
                   </MillingField>
 
-                  <MillingField
-                    label="الوزن المطحون (كجم)"
-                    hint={
-                      grainCapacity
-                        ? `محسوب تلقائياً (${grainCapacity} كجم/كيس) — قابل للتعديل`
-                        : "أدخل الوزن الفعلي"
-                    }
-                  >
+                  <MillingField label="الوزن المطحون (كجم)" hint="أدخل الوزن الفعلي على الميزان">
                     <QuantityInput
                       decimals={2}
                       min={0}
@@ -571,26 +519,8 @@ function MillingMillPage() {
                   </span>
                 </div>
 
-                <div className="grid gap-2.5 sm:grid-cols-3">
-                  <MillingField label="سعة العبوة (كجم)">
-                    <MillingSelect
-                      value={lossPackageKg}
-                      onChange={(e) => {
-                        setLossPackageKg(e.target.value);
-                        if (lossBags) {
-                          setLossKg(String((Number(lossBags) || 0) * Number(e.target.value)));
-                        }
-                      }}
-                      className="text-xs"
-                    >
-                      <option value="50">كيس 50 كجم</option>
-                      <option value="25">كيس 25 كجم</option>
-                      <option value="10">كيس 10 كجم</option>
-                      <option value="5">كيس 5 كجم</option>
-                    </MillingSelect>
-                  </MillingField>
-
-                  <MillingField label="أكياس الفاقد">
+                <div className="grid gap-2.5 sm:grid-cols-2">
+                  <MillingField label="أكياس الفاقد" hint="اختياري — بلا احتساب تلقائي">
                     <QuantityInput
                       decimals={0}
                       min={0}
@@ -637,6 +567,14 @@ function MillingMillPage() {
                         <div className="flex items-center gap-1.5 font-bold text-emerald-600 dark:text-emerald-400">
                           <CheckCircle2 className="h-4 w-4" />
                           <span>✓ مطابقة تامة: النواتج والفاقد تعادل الحبوب المطحونة تماماً.</span>
+                        </div>
+                      ) : isRoundedMatch ? (
+                        <div className="flex items-center gap-1.5 font-semibold text-sky-600 dark:text-sky-400">
+                          <CheckCircle2 className="h-4 w-4" />
+                          <span>
+                            ✓ مطابقة بتقريب التعبئة: فرق {fmtNum(Math.abs(discrepancyKg))} كجم
+                            {discrepancyKg > 0 ? " (فاقد صغير غير مسجّل)" : " (زيادة نواتج صغيرة)"}.
+                          </span>
                         </div>
                       ) : (
                         <div className="flex items-center gap-1.5 font-semibold text-amber-600 dark:text-amber-400">
@@ -733,6 +671,43 @@ function MillingMillPage() {
                         </div>
                       </div>
                     ))}
+
+                    {/* E9: النواتج الجاهزة للتسليم — منفصلة تماماً عن الحبوب الخام */}
+                    {readyOutputBalances.length > 0 && (
+                      <div className="pt-2">
+                        <div className="mb-2 flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                          <Package className="h-3.5 w-3.5" />
+                          نواتج جاهزة للتسليم (باسم العميل)
+                        </div>
+                        <div className="space-y-2">
+                          {readyOutputBalances.map((b) => (
+                            <div
+                              key={b.item_id}
+                              className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <span className="font-bold text-xs text-foreground block">
+                                    {b.name_ar}
+                                  </span>
+                                  <span className="text-[11px] text-muted-foreground">
+                                    ناتج جاهز
+                                  </span>
+                                </div>
+                                <div className="text-end">
+                                  <span className="font-black text-sm text-emerald-600 dark:text-emerald-400 block">
+                                    {fmtNum(b.bags_balance)} كيس
+                                  </span>
+                                  <span className="text-[11px] font-mono text-muted-foreground">
+                                    {fmtNum(b.kg_balance)} كجم
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -750,6 +725,24 @@ function MillingMillPage() {
             </div>
           </MillingPanel>
         </div>
+
+        {/* سجل عمليات الطحن: المستندات الموحدة (استلام+فاتورة+طحن) بزاوية المطحون */}
+        <MillingDocumentsBoard focus="milling" title="سجل عمليات الطحن" />
+
+        {/* E5: تسويات الأمانات — الإدخال الموثّق الوحيد للحبوب/النواتج المنفصلة */}
+        <CustodyAdjustmentPanel
+          customerId={customerId}
+          warehouseId={warehouseId}
+          items={[
+            ...(grainBalances.map((b) => ({
+              id: b.item_id,
+              name: b.name_ar,
+              name_ar: b.name_ar,
+              item_class: b.item_class,
+            })) as any),
+            ...((outputItems.data ?? []) as any),
+          ]}
+        />
 
         {/* نافذة معاينة وطباعة سند الطحن الفاخر */}
         {printDoc && (

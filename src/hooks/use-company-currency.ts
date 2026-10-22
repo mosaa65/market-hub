@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { setCompanySettingsCache } from "@/lib/format";
+import { cacheCompanyProfile, getCachedCompanyProfile } from "@/lib/printing/company-profile";
 
 /**
  * المصدر الواحد لعملة العرض في الواجهة.
@@ -11,15 +11,15 @@ import { setCompanySettingsCache } from "@/lib/format";
  */
 export function useCompanyCurrency() {
   const query = useQuery({
-    queryKey: ["company-settings", "currency"],
+    queryKey: ["company-settings", "profile"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("company_settings")
-        .select("currency,currency_symbol")
+        .select("*")
         .eq("id", 1)
         .maybeSingle();
       if (error) throw error;
-      setCompanySettingsCache(data);
+      if (data) cacheCompanyProfile(data as Record<string, unknown>);
       return data;
     },
     staleTime: 5 * 60 * 1000,
@@ -28,6 +28,7 @@ export function useCompanyCurrency() {
   return {
     currency: query.data?.currency?.trim() || "YER",
     currencySymbol: query.data?.currency_symbol?.trim() || "ر.ي",
+    companyProfile: getCachedCompanyProfile(),
     isLoading: query.isLoading,
   };
 }

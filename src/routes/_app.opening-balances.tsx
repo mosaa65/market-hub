@@ -20,6 +20,7 @@ import {
   Undo2,
   Trash2,
   Plus,
+  Pencil,
   Sparkles,
   Package,
   Layers,
@@ -49,6 +50,7 @@ import {
   type OpeningLineDraft,
   type OpeningSection,
   type OpeningSummary,
+  updateOpeningDocument,
 } from "@/lib/opening-balances";
 import { PageHeader } from "@/components/page-header";
 import { AmountInput } from "@/components/ui/amount-input";
@@ -74,6 +76,7 @@ export const Route = createFileRoute("/_app/opening-balances")({
 export function OpeningBalancesPage() {
   const qc = useQueryClient();
   const [draft, setDraft] = useState<OpeningLineDraft[]>([]);
+  const [editingDocumentId, setEditingDocumentId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -171,11 +174,16 @@ export function OpeningBalancesPage() {
     return { debit, credit, diff: debit - credit };
   }, [draft]);
 
-  const run = <TData, TVars>(fn: (v: TVars) => Promise<TData>, okMessage: string) => ({
+  const run = <TData, TVars>(
+    fn: (v: TVars) => Promise<TData>,
+    okMessage: string,
+    afterSuccess?: (data: TData) => void,
+  ) => ({
     mutationFn: fn,
-    onSuccess: () => {
+    onSuccess: (data: TData) => {
       setError(null);
       setNotice(okMessage);
+      afterSuccess?.(data);
       void qc.invalidateQueries({ queryKey: ["opening"] });
     },
     onError: (e: Error) => {
@@ -187,9 +195,60 @@ export function OpeningBalancesPage() {
   const save = useMutation(
     run<string, void>(async () => {
       if (draft.length === 0) throw new Error("أضف بنداً واحداً على الأقل إلى القيد الافتتاحي");
+      if (editingDocumentId) {
+        return updateOpeningDocument({
+          documentId: editingDocumentId,
+          effectiveDate,
+          lines: draft,
+        });
+      }
       return createOpeningDocument({ effectiveDate, lines: draft });
-    }, "تم حفظ مسودة القيد الافتتاحي بنجاح"),
+    }, "تم حفظ مسودة القيد الافتتاحي بنجاح", () => {
+      setDraft([]);
+      setEditingDocumentId(null);
+      setAmount("");
+      setQty("");
+      setUnitCost("");
+      setBagsCount("");
+      setBagCost("");
+      setRefId("");
+      setSelectedAccountCode("");
+      setSelectedId(null);
+    }),
   );
+
+  const editDraft = async (document: OpeningSummary) => {
+    try {
+      setError(null);
+      const savedLines = await fetchOpeningLines(document.id);
+      setDraft(savedLines.map((line) => ({
+        section: line.section,
+        description: line.description,
+        amount: Number(line.amount),
+        product_id: line.product_id,
+        warehouse_id: line.warehouse_id,
+        customer_id: line.customer_id,
+        supplier_id: line.supplier_id,
+        quantity: line.quantity,
+        unit_cost: line.unit_cost,
+        ledger_account_code: line.ledger_account_code,
+      })));
+      setEffectiveDate(document.effective_date);
+      setEditingDocumentId(document.id);
+      setSelectedId(document.id);
+      setNotice(`تعديل مسودة ${document.document_number}`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "تعذّر تحميل المسودة للتعديل");
+    }
+  };
+
+  const cancelDraftEdit = () => {
+    setDraft([]);
+    setEditingDocumentId(null);
+    setSelectedId(null);
+    setError(null);
+    setNotice("تم إلغاء تعديل المسودة");
+  };
 
   const post = useMutation(
     run<void, string>(
@@ -280,8 +339,8 @@ export function OpeningBalancesPage() {
 
   // زر الموازنة التلقائية السريعة برأس المال
   const handleAutoBalanceCapital = () => {
-    if (draftTotals.diff === 0) return;
-    const balanceAmount = Math.abs(draftTotals.diff);
+    if (draftTotals.diff <= 0) return;
+    const balanceAmount = draftTotals.diff;
 
     setDraft((d) => [
       ...d,
@@ -676,7 +735,7 @@ export function OpeningBalancesPage() {
                   <Layers className="h-4 w-4 text-primary" />
                   بنود مسودة القيد الحالية ({draft.length})
                 </h4>
-                {draftTotals.diff !== 0 && (
+                {draftTotals.diff > 0 && (
                   <button
                     type="button"
                     onClick={handleAutoBalanceCapital}
@@ -690,6 +749,11 @@ export function OpeningBalancesPage() {
                   </button>
                 )}
               </div>
+              {draftTotals.diff < 0 && (
+                <p className="text-xs font-semibold text-rose-600" role="status">
+                  الأرصدة الدائنة تتجاوز المدينة بمقدار {yer(Math.abs(draftTotals.diff))}. صحّح بندًا دائنًا قبل الموازنة؛ إضافة رأس المال ستزيد الفرق.
+                </p>
+              )}
 
               <div className="overflow-x-auto rounded-2xl border border-border/70 bg-surface/40">
                 <table className="w-full text-xs">
@@ -783,15 +847,31 @@ export function OpeningBalancesPage() {
                   </Mono>
                 </div>
                 <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => save.mutate(undefined)}
-                    disabled={save.isPending}
-                    className="w-full sm:w-auto h-11 inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 text-xs font-bold text-primary-foreground shadow-md shadow-primary/20 hover:bg-primary/90 transition disabled:opacity-50"
-                  >
-                    <FileCheck className="h-4 w-4" />
-                    {save.isPending ? "جارٍ الحفظ…" : "حفظ القيد الافتتاحي كمسودة"}
-                  </button>
+                  <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                    {editingDocumentId && (
+                      <button
+                        type="button"
+                        onClick={cancelDraftEdit}
+                        disabled={save.isPending}
+                        className="h-11 rounded-xl border border-border px-5 text-xs font-bold text-muted-foreground transition hover:bg-muted disabled:opacity-50"
+                      >
+                        إلغاء التعديل
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => save.mutate(undefined)}
+                      disabled={save.isPending || draft.length === 0}
+                      className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 text-xs font-bold text-primary-foreground shadow-md shadow-primary/20 transition hover:bg-primary/90 disabled:opacity-50 sm:w-auto"
+                    >
+                      <FileCheck className="h-4 w-4" />
+                      {save.isPending
+                        ? "جارٍ الحفظ…"
+                        : editingDocumentId
+                          ? "حفظ تعديلات المسودة"
+                          : "حفظ القيد الافتتاحي كمسودة"}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -894,17 +974,25 @@ export function OpeningBalancesPage() {
                       </td>
                       <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
                         {d.status === "DRAFT" && (
-                          <button
-                            type="button"
-                            onClick={() => post.mutate(d.id)}
-                            disabled={!d.is_balanced || post.isPending}
-                            className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-xs transition hover:bg-emerald-700 disabled:opacity-30 disabled:cursor-not-allowed"
-                            title={
-                              d.is_balanced ? "ترحيل إلى الأستاذ والمخازن" : "القيد غير متوازن"
-                            }
-                          >
-                            ترحيل
-                          </button>
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => void editDraft(d)}
+                              className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-muted"
+                              title="تعديل المسودة"
+                            >
+                              <Pencil className="h-3 w-3" /> تعديل
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => post.mutate(d.id)}
+                              disabled={!d.is_balanced || post.isPending}
+                              className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-xs transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-30"
+                              title={d.is_balanced ? "ترحيل إلى الأستاذ والمخازن" : "القيد غير متوازن"}
+                            >
+                              ترحيل
+                            </button>
+                          </div>
                         )}
                         {d.status === "POSTED" && (
                           <button

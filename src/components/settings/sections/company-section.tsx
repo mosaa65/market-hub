@@ -96,7 +96,7 @@ export function CompanySection({ form, setForm, canEdit, lang }: CompanySectionP
                 value={fieldValue("name_ar")}
                 onChange={(e) => setForm((current) => ({ ...current, name_ar: e.target.value }))}
                 disabled={!canEdit}
-                placeholder={isAr ? "إنماء سوفت للحلول البرمجية" : "Inma Soft for Software Solutions"}
+                placeholder={isAr ? "الاسم العربي المعتمد" : "Official Arabic name"}
                 className="rounded-xl"
               />
             </div>
@@ -110,7 +110,7 @@ export function CompanySection({ form, setForm, canEdit, lang }: CompanySectionP
                 value={fieldValue("name_en")}
                 onChange={(e) => setForm((current) => ({ ...current, name_en: e.target.value }))}
                 disabled={!canEdit}
-                placeholder="Inma Soft for Software Solutions"
+                placeholder="Official English name"
                 className="rounded-xl"
               />
             </div>
@@ -122,7 +122,7 @@ export function CompanySection({ form, setForm, canEdit, lang }: CompanySectionP
                 value={fieldValue("name")}
                 onChange={(e) => setForm((current) => ({ ...current, name: e.target.value }))}
                 disabled={!canEdit}
-                placeholder={isAr ? "إنماء سوفت للحلول البرمجية" : "Inma Soft for Software Solutions"}
+                placeholder={isAr ? "اسم المتجر أو المؤسسة" : "Store or Trade Name"}
                 className="rounded-2xl"
               />
               <span className="text-[11px] text-muted-foreground">
@@ -138,7 +138,7 @@ export function CompanySection({ form, setForm, canEdit, lang }: CompanySectionP
                 value={fieldValue("legal_name")}
                 onChange={(e) => setForm((current) => ({ ...current, legal_name: e.target.value }))}
                 disabled={!canEdit}
-                placeholder={isAr ? "شركة إنماء سوفت للحلول البرمجية والتقنية" : "Inma Soft for Software Solutions"}
+                placeholder={isAr ? "الاسم الرسمي حسب السجل" : "Official Legal Entity Name"}
                 className="rounded-2xl"
               />
               <span className="text-[11px] text-muted-foreground">
@@ -207,33 +207,7 @@ export function CompanySection({ form, setForm, canEdit, lang }: CompanySectionP
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="grid gap-1.5">
-            <Label className="text-xs font-semibold">
-              {isAr ? "هاتف المنشأة الرئيسي" : "Primary phone"}
-            </Label>
-            <Input
-              value={fieldValue("phone")}
-              onChange={(e) => setForm((current) => ({ ...current, phone: e.target.value }))}
-              disabled={!canEdit}
-              placeholder="772217218"
-              className="rounded-2xl font-mono"
-            />
-          </div>
-
-          <div className="grid gap-1.5">
-            <Label className="text-xs font-semibold">
-              {isAr ? "أرقام هواتف إضافية" : "Additional phones"}
-            </Label>
-            <Input
-              value={fieldValue("contact_numbers")}
-              onChange={(e) => setForm((current) => ({ ...current, contact_numbers: e.target.value }))}
-              disabled={!canEdit}
-              placeholder="784795101"
-              className="rounded-2xl font-mono"
-            />
-          </div>
-
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="grid gap-1.5">
             <Label className="text-xs font-semibold">
               {isAr ? "الرقم الضريبي / Tax ID" : "Tax registration number"}
@@ -242,7 +216,20 @@ export function CompanySection({ form, setForm, canEdit, lang }: CompanySectionP
               value={fieldValue("tax_number")}
               onChange={(e) => setForm((current) => ({ ...current, tax_number: e.target.value }))}
               disabled={!canEdit}
-              placeholder="100200300"
+              placeholder="300000000000003"
+              className="rounded-2xl font-mono"
+            />
+          </div>
+
+          <div className="grid gap-1.5">
+            <Label className="text-xs font-semibold">
+              {isAr ? "هاتف المنشأة / للتواصل" : "Company phone number"}
+            </Label>
+            <Input
+              value={fieldValue("phone")}
+              onChange={(e) => setForm((current) => ({ ...current, phone: e.target.value }))}
+              disabled={!canEdit}
+              placeholder="+966 50 000 0000"
               className="rounded-2xl font-mono"
             />
           </div>
@@ -256,7 +243,7 @@ export function CompanySection({ form, setForm, canEdit, lang }: CompanySectionP
               value={fieldValue("email")}
               onChange={(e) => setForm((current) => ({ ...current, email: e.target.value }))}
               disabled={!canEdit}
-              placeholder="info@inmasoft.com"
+              placeholder="info@company.com"
               className="rounded-2xl font-mono"
             />
           </div>
@@ -271,7 +258,11 @@ export function CompanySection({ form, setForm, canEdit, lang }: CompanySectionP
             value={fieldValue("address")}
             onChange={(e) => setForm((current) => ({ ...current, address: e.target.value }))}
             disabled={!canEdit}
-            placeholder={isAr ? "اليمن - إب" : "Yemen - Ibb"}
+            placeholder={
+              isAr
+                ? "المدينة، الشارع، المبنى، الرمز البريدي"
+                : "City, Street, Building, Postal Code"
+            }
             className="rounded-2xl resize-none"
           />
         </div>

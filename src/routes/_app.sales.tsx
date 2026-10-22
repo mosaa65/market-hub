@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Receipt,
+  FileText,
   Eye,
   MessageSquare,
   X,
@@ -343,53 +344,87 @@ export function SalesPage() {
     />
   );
 
-  const statusLabel = (s: string) => {
-    const map: Record<string, string> = {
+  const invoiceStatusMeta = (status: string) => {
+    const labels: Record<string, string> = {
+      draft: isRtl ? "مسودة" : "Draft",
+      confirmed: isRtl ? "مؤكدة" : "Confirmed",
       paid: isRtl ? "مدفوعة بالكامل" : "Paid",
       partial: isRtl ? "دفع جزئي" : "Partial",
       unpaid: isRtl ? "غير مدفوعة (آجل)" : "Unpaid",
       cancelled: isRtl ? "ملغاة" : "Cancelled",
+      returned: isRtl ? "مرتجعة" : "Returned",
+      received: isRtl ? "مستلمة" : "Received",
+      completed: isRtl ? "مكتملة" : "Completed",
     };
-    return map[s] ?? s;
+    const tones: Record<string, { badge: string; bar: string }> = {
+      draft: {
+        badge: "border-border bg-surface-2 text-muted-foreground",
+        bar: "bg-slate-400",
+      },
+      confirmed: {
+        badge: "border-sky-500/30 bg-sky-500/10 text-sky-600 dark:text-sky-400",
+        bar: "bg-sky-500",
+      },
+      paid: {
+        badge: "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+        bar: "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]",
+      },
+      partial: {
+        badge: "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400",
+        bar: "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]",
+      },
+      unpaid: {
+        badge: "border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400",
+        bar: "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]",
+      },
+      cancelled: {
+        badge: "border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400",
+        bar: "bg-red-500",
+      },
+      returned: {
+        badge: "border-violet-500/30 bg-violet-500/10 text-violet-600 dark:text-violet-400",
+        bar: "bg-violet-500",
+      },
+      received: {
+        badge: "border-cyan-500/30 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300",
+        bar: "bg-cyan-500",
+      },
+      completed: {
+        badge: "border-teal-500/30 bg-teal-500/10 text-teal-700 dark:text-teal-300",
+        bar: "bg-teal-500",
+      },
+    };
+    return {
+      label: labels[status] ?? status,
+      ...(tones[status] ?? {
+        badge: "border-border bg-surface-2 text-muted-foreground",
+        bar: "bg-muted-foreground/30",
+      }),
+    };
   };
 
-  const statusBadge = (s: string) => {
-    switch (s) {
-      case "paid":
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-500">
-            <CheckCircle2 className="h-3 w-3" />
-            {statusLabel(s)}
-          </span>
-        );
-      case "partial":
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium text-amber-500">
-            <Clock className="h-3 w-3" />
-            {statusLabel(s)}
-          </span>
-        );
-      case "unpaid":
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full border border-rose-500/30 bg-rose-500/10 px-2.5 py-0.5 text-xs font-medium text-rose-500">
-            <AlertCircle className="h-3 w-3" />
-            {statusLabel(s)}
-          </span>
-        );
-      case "cancelled":
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-0.5 text-xs font-medium text-red-500">
-            <XCircle className="h-3 w-3" />
-            {statusLabel(s)}
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full border border-border bg-surface-2 px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-            {s}
-          </span>
-        );
-    }
+  const statusLabel = (status: string) => invoiceStatusMeta(status).label;
+
+  const statusBadge = (status: string) => {
+    const meta = invoiceStatusMeta(status);
+    const Icon =
+      status === "paid" || status === "completed" || status === "received"
+        ? CheckCircle2
+        : status === "partial" || status === "confirmed"
+          ? Clock
+          : status === "cancelled" || status === "returned"
+            ? XCircle
+            : status === "unpaid"
+              ? AlertCircle
+              : FileText;
+    return (
+      <span
+        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium ${meta.badge}`}
+      >
+        <Icon className="h-3 w-3" />
+        {meta.label}
+      </span>
+    );
   };
 
   // WhatsApp Message Generator via Unified Communication Engine
@@ -437,7 +472,7 @@ export function SalesPage() {
       invoice: {
         id: inv.id,
         invoiceNumber: inv.invoice_number,
-        date: new Date(inv.created_at).toLocaleDateString(isRtl ? "ar-YE" : "en-US"),
+        date: inv.created_at,
         subtotal: Number(inv.subtotal || inv.total),
         total: Number(inv.total),
         paid: Number(inv.paid),
@@ -481,7 +516,7 @@ export function SalesPage() {
     return {
       title: isRtl ? "فاتورة مبيعات ضريبية" : "Tax Sales Invoice",
       number: invoice.invoice_number,
-      date: new Date(invoice.created_at).toLocaleString(isRtl ? "ar-EG" : "en-US"),
+      date: invoice.created_at,
       partyLabel: isRtl ? "العميل / المشترى:" : "Bill To:",
       partyName: invoice.customers?.name ?? (isRtl ? "عميل نقدي" : "Walk-in"),
       warehouse: hasMultiWarehouse ? (whName(invoice.warehouses) ?? undefined) : undefined,
@@ -1054,8 +1089,7 @@ export function SalesPage() {
             >
               <Plus className="h-4 w-4 shrink-0" />
               <span>
-                {t("sales.new_invoice") ||
-                  (isRtl ? "فاتورة مبيعات جديدة" : "New sales invoice")}
+                {t("sales.new_invoice") || (isRtl ? "فاتورة مبيعات جديدة" : "New sales invoice")}
               </span>
             </Link>
           </div>
@@ -1416,14 +1450,7 @@ export function SalesPage() {
                 const paid = Number(inv.paid) || 0;
                 const remaining = Math.max(0, total - paid);
                 const customerName = inv.customers?.name ?? (isRtl ? "عميل نقدي" : "Walk-in");
-                const barColor =
-                  inv.status === "paid"
-                    ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]"
-                    : inv.status === "partial"
-                      ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]"
-                      : inv.status === "unpaid"
-                        ? "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]"
-                        : "bg-muted-foreground/30";
+                const barColor = invoiceStatusMeta(inv.status).bar;
 
                 return (
                   <div

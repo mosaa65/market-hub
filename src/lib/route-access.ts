@@ -54,8 +54,9 @@ export const ROUTE_ACCESS: Record<string, RouteAccessRule> = {
   "/milling/manufacture": {
     allowedRoles: ["owner", "manager", "warehouse"],
   },
-  "/milling/consumables": {
-    allowedRoles: ["owner", "manager", "warehouse"],
+  // تقرير أداء القسم: قراءة مالية — المالك والمدير والمحاسب.
+  "/milling/performance": {
+    allowedRoles: ["owner", "manager", "accountant"],
   },
   // استلام وفواتير: الاستلام للمستودع، وفاتورة أجور الطحن عمل مالي —
   // المحاسب كان محجوباً عنها رغم أنها إصدار فواتير.
@@ -135,7 +136,7 @@ export function canAccessRoute(pathname: string, ctx: AccessContext): boolean {
   if (rule.superadminOnly) return isPlatform;
   if (!rule.allowedRoles) return true;
   if (isPlatform) return true;
-  // If user has no roles assigned yet (e.g. dev mode or new user), allow access to standard routes
-  if (ctx.roles.length === 0) return true;
+  // Role lookup failures and unassigned users must fail closed on restricted routes.
+  if (ctx.roles.length === 0) return false;
   return rule.allowedRoles.some((role) => ctx.roles.includes(role));
 }

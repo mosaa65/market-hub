@@ -50,9 +50,7 @@ const store = new Map<string, string>();
 clearCompanyProfileCache();
 const empty = getCachedCompanyProfile();
 check("empty cache returns the default profile", empty.name === DEFAULT_COMPANY_PROFILE.name);
-check("default profile returns Inma Soft official name", empty.name === "إنماء سوفت للحلول البرمجية");
-check("default profile returns Inma Soft English name", empty.englishName === "Inma Soft for Software Solutions");
-check("default profile returns Inma Soft contacts", empty.contacts.includes("772217218"));
+check("empty profile has no invented contact numbers", empty.contacts.length === 0);
 
 // كتابة صف كامل من قاعدة البيانات
 const row = {
@@ -94,21 +92,23 @@ check("patch is visible on the next read", getCachedCompanyProfile().currency ==
 
 /* ───────────────────────── 3. Fallbacks ───────────────────────────────── */
 
-// صف فارغ تمامًا يعود للافتراضي الرسمي
+// صف فارغ تمامًا
 clearCompanyProfileCache();
 const blank = cacheCompanyProfile({});
-check("blank profile defaults to official company identity", blank.name === DEFAULT_COMPANY_PROFILE.name);
+check("blank profile does not invent contact numbers", blank.contacts.length === 0);
 check("blank row does not throw on contacts", Array.isArray(blank.contacts));
 
-// منشأة مخصصة بدون هواتف لا تخترع هواتف من تلقاء نفسها
-const customTenant = cacheCompanyProfile({
-  name: "متجر الأمل التجاري",
+// قيم null/undefined لا تُنتج "null" نصيًا
+const nullish = cacheCompanyProfile({
+  name: null,
   phone: null,
-  contact_numbers: null,
+  email: null,
+  address: null,
+  footer_contact: null,
 });
-check("custom tenant keeps custom name", customTenant.name === "متجر الأمل التجاري");
-check("custom tenant without phone has empty contacts", customTenant.contacts.length === 0);
-check("null name falls back instead of rendering 'null'", !String(customTenant.name).includes("null"));
+check("null name falls back instead of rendering 'null'", !String(nullish.name).includes("null"));
+check("null phone becomes undefined", nullish.phone === undefined);
+check("null email becomes undefined", nullish.email === undefined);
 
 // مسح الكاش
 clearCompanyProfileCache();

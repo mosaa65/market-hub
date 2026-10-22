@@ -96,7 +96,11 @@ export function MillingOperationsGuidePage() {
           {[
             { id: "counter", label: "1. استقبال وفواتير الطحن (خدمة العميل)", icon: Scale },
             { id: "own_grain", label: "2. قمح المطحنة والتصنيع الذكي", icon: Cog },
-            { id: "supplies", label: "3. المستهلكات (أكياس وخيط وزيت)", icon: PackageMinus },
+            {
+              id: "supplies",
+              label: "3. المستهلكات (مصروفات فقط — بلا مخزون)",
+              icon: PackageMinus,
+            },
             { id: "statement", label: "4. كشف الأمانات والرقابة المالية", icon: Receipt },
             { id: "faq", label: "5. الأسئلة الشائعة والمواقف الميدانية", icon: HelpCircle },
           ].map((tab) => {
@@ -335,28 +339,20 @@ export function MillingOperationsGuidePage() {
                 الحسابات.
               </p>
 
-              <div className="grid gap-4 sm:grid-cols-2 pt-2">
-                <div className="rounded-xl border border-border/80 bg-surface-2/40 p-4 space-y-2">
-                  <h4 className="text-xs font-bold text-foreground">1. شراء وتوريد المستهلكات</h4>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    تُعرّف الأصناف بتصنيف <code>PACKAGING</code> أو <code>NON_STOCK_ITEM</code>،
-                    وتُشترى عبر المشتريات العادية إلى «مخزن المستهلكات» أو المستودع الرئيسي.
-                  </p>
-                </div>
-                <div className="rounded-xl border border-border/80 bg-surface-2/40 p-4 space-y-2">
-                  <h4 className="text-xs font-bold text-foreground">
-                    2. الصرف الداخلي اليومي (
-                    <Link to="/milling/consumables" className="text-primary underline">
-                      /milling/consumables
-                    </Link>
-                    )
-                  </h4>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    عند تسليم العمال حزمة أكياس أو بكرة خيط لصالة الطحن: يدخل المسؤول ويحدد الصنف
-                    والكمية المصروفة. يُصدر النظام سند صرف ببادئة متميزة <strong>`CS-`</strong>{" "}
-                    (Consumables Supply) وتُنقص الكمية فوراً من رصيد المستهلكات.
-                  </p>
-                </div>
+              <div className="rounded-xl border border-border/80 bg-surface-2/40 p-4 space-y-2">
+                <h4 className="text-xs font-bold text-foreground">
+                  القرار المعتمد (rebuild-plan-v2 §6): المستهلكات = مصروفات
+                </h4>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  لا تدخل المستهلكات المخزون ولا تُصرف منه. كل شراء أو استهلاك (أكياس فارغة، خيط،
+                  زيت، غاز) يُسجل كسند مصروف عادي في وحدة المصروفات تحت بند مناسب (مستلزمات تعبئة،
+                  أجور تشغيل، صيانة). هكذا يبقى المخزون أصناف البيع الحقيقية فقط، وتُقرأ تكاليف
+                  القسم شهرياً من
+                  <Link to="/milling/performance" className="text-primary underline">
+                    /milling/performance
+                  </Link>
+                  .
+                </p>
               </div>
             </div>
           </div>

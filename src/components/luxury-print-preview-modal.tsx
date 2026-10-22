@@ -5,19 +5,18 @@ import {
   CheckCircle2,
   FileText,
   Sparkles,
-  Download,
   Share2,
   ZoomIn,
   ZoomOut,
   Maximize2,
-  ShieldCheck,
   Scale,
   QrCode,
-  Check,
-  PenLine,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { WhatsAppIcon } from "@/components/whatsapp-icon";
+import { useAuth } from "@/lib/auth";
+import { supabase } from "@/integrations/supabase/client";
+import { useCompanyCurrency } from "@/hooks/use-company-currency";
 import {
   renderUnifiedDocument,
   printUnifiedDocument,
@@ -66,7 +65,7 @@ function toUnifiedData(
       docType: docType as any,
       title: "مستند",
       number: "—",
-      date: new Date().toLocaleDateString("ar-YE"),
+      date: new Date().toISOString(),
       lines: [],
     };
   }
@@ -83,7 +82,7 @@ function toUnifiedData(
     docType: docType as any,
     title: raw.title || "فاتورة مبيعات",
     number: raw.number || "—",
-    date: raw.date || new Date().toLocaleDateString("ar-YE"),
+    date: raw.date || new Date().toISOString(),
     partyLabel: raw.partyLabel || "العميل",
     partyName: raw.partyName || "",
     partyPhone: raw.partyPhone || "",
@@ -125,6 +124,8 @@ export function LuxuryPrintPreviewModal({
   customerPhone,
   customerName,
 }: LuxuryPrintPreviewModalProps) {
+  const { user } = useAuth();
+  const { companyProfile } = useCompanyCurrency();
   const activeDoc = document ?? doc;
   const handleModalClose = () => {
     if (onClose) onClose();
@@ -185,39 +186,54 @@ export function LuxuryPrintPreviewModal({
   ]);
 
   const [activePaper, setActivePaper] = useState<PrintPaperId>(initialPaperId);
-  // الباركود/QR يتبعان إعدادات قسم المستند الفعلي، لا قيمة ثابتة. القيمة تصل
-  // من `request` (الذي يبنيها المحرك من الإعدادات + overrides) فتظهر المعاينة
-  // والطباعة بنفس الحالة التي اختارها المستخدم في الإعدادات.
-  const [showBarcode, setShowBarcode] = useState<boolean>(request?.showBarcode ?? true);
-  const [showQrCode, setShowQrCode] = useState<boolean>(request?.showQrCode ?? true);
-  const [showSignatures, setShowSignatures] = useState<boolean>(
+  const [showBarcode, setShowBarcode] = useState(request?.showBarcode ?? true);
+  const [showQrCode, setShowQrCode] = useState(request?.showQrCode ?? false);
+  const [showSignatures, setShowSignatures] = useState(
     request?.showSignatures ??
       request?.settings?.overrides[documentType]?.showSignatures ??
       request?.settings?.showSignatures ??
       false,
   );
-  const [zoomLevel, setZoomLevel] = useState<number>(100);
+  const [mobileMenu, setMobileMenu] = useState<"method" | "template" | "paper" | "codes" | null>(null);
+  const [zoomLevel, setZoomLevel] = useState(100);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [isSharingPdf, setIsSharingPdf] = useState(false);
+  const [profileSellerName, setProfileSellerName] = useState("");
   const previewFrameRef = useRef<HTMLIFrameElement>(null);
-  const printToolsRef = useRef<HTMLDetailsElement>(null);
   const [previewContentHeight, setPreviewContentHeight] = useState<number | null>(null);
 
   useEffect(() => {
-    if (open) {
-      setPrintMethod(initialMethod);
-      setActiveTemplate(initialTemplateId);
-      setActivePaper(initialPaperId);
-      setShowBarcode(request?.showBarcode ?? true);
-      setShowQrCode(request?.showQrCode ?? true);
-      setShowSignatures(
-        request?.showSignatures ??
-          request?.settings?.overrides[documentType]?.showSignatures ??
-          request?.settings?.showSignatures ??
-          false,
-      );
-      setPreviewContentHeight(null);
-      setZoomLevel(100);
-    }
+    if (!open || !user?.id) return;
+    let active = true;
+    void supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (active) setProfileSellerName(data?.full_name?.trim() || "");
+      });
+    return () => {
+      active = false;
+    };
+  }, [open, user?.id]);
+
+  useEffect(() => {
+    if (!open) return;
+    setPrintMethod(initialMethod);
+    setActiveTemplate(initialTemplateId);
+    setActivePaper(initialPaperId);
+    setShowBarcode(request?.showBarcode ?? true);
+    setShowQrCode(request?.showQrCode ?? false);
+    setShowSignatures(
+      request?.showSignatures ??
+        request?.settings?.overrides[documentType]?.showSignatures ??
+        request?.settings?.showSignatures ??
+        false,
+    );
+    setPreviewContentHeight(null);
+    setZoomLevel(100);
+    setMobileMenu(null);
   }, [
     open,
     initialMethod,
@@ -230,15 +246,14 @@ export function LuxuryPrintPreviewModal({
     documentType,
   ]);
 
-  useEffect(() => {
-    const media = window.matchMedia("(min-width: 1024px)");
-    const syncDisclosure = () => {
-      if (printToolsRef.current) printToolsRef.current.open = media.matches;
-    };
-    syncDisclosure();
-    media.addEventListener("change", syncDisclosure);
-    return () => media.removeEventListener("change", syncDisclosure);
-  }, [open]);
+  const iframeMinHeight =
+    printMethod === "thermal"
+      ? activePaper === "thermal-58"
+        ? "690px"
+        : "760px"
+      : activePaper === "a5"
+        ? "830px"
+        : "1150px";
 
   const syncPreviewHeight = () => {
     const frameDocument = previewFrameRef.current?.contentDocument;
@@ -251,7 +266,6 @@ export function LuxuryPrintPreviewModal({
     setPreviewContentHeight(contentHeight);
   };
 
-  // When switching method, adjust template and paper to match the method
   const handleMethodChange = (newMethod: PrintMethodType) => {
     setPrintMethod(newMethod);
     const settings = request?.settings ?? getUnifiedPrintSettings();
@@ -267,33 +281,40 @@ export function LuxuryPrintPreviewModal({
       setActivePaper(
         deptOverride?.paperId?.startsWith("thermal") ? deptOverride.paperId : "thermal-80",
       );
-    } else {
-      setActiveTemplate(
-        deptOverride?.templateId && !deptOverride.templateId.startsWith("thermal")
-          ? deptOverride.templateId
-          : "elegant",
-      );
-      setActivePaper(
-        deptOverride?.paperId && !deptOverride.paperId.startsWith("thermal")
-          ? deptOverride.paperId
-          : "a4",
-      );
+      return;
     }
+
+    setActiveTemplate(
+      deptOverride?.templateId && !deptOverride.templateId.startsWith("thermal")
+        ? deptOverride.templateId
+        : "elegant",
+    );
+    setActivePaper(
+      deptOverride?.paperId && !deptOverride.paperId.startsWith("thermal")
+        ? deptOverride.paperId
+        : "a4",
+    );
   };
 
   const unifiedDoc = useMemo(() => {
-    if (request?.doc) return request.doc;
-    return toUnifiedData(activeDoc, documentType);
-  }, [request, activeDoc, documentType]);
+    const source = request?.doc ?? toUnifiedData(activeDoc, documentType);
+    const metadataName =
+      user?.user_metadata?.full_name ||
+      user?.user_metadata?.name ||
+      user?.email?.split("@")[0] ||
+      "";
+    return {
+      ...source,
+      operatorName: source.operatorName || profileSellerName || metadataName || undefined,
+    };
+  }, [request, activeDoc, documentType, profileSellerName, user]);
 
-  // Derive active theme from chosen template
   const activeTheme: PrintTheme = useMemo(() => {
     if (activeTemplate === "elegant") return "luxury";
     if (activeTemplate === "formal") return "formal";
     return "standard";
   }, [activeTemplate]);
 
-  // Construct active print request
   const activeRequest: PrintRequest = useMemo(() => {
     const unifiedSettings = request?.settings ?? getUnifiedPrintSettings();
     const customColor =
@@ -321,8 +342,6 @@ export function LuxuryPrintPreviewModal({
       theme: activeTheme,
       accentColor: customColor,
       settings: unifiedSettings,
-      // تجاوز صريح: القالب يطبّق `doc.options` بعد options المحرك، فتمرّر
-      // القيمتين داخل اللقطة لتفوز دائماً في المعاينة والطباعة.
       showBarcode,
       showQrCode,
       showSignatures,
@@ -341,31 +360,36 @@ export function LuxuryPrintPreviewModal({
     request,
   ]);
 
-  // Generate HTML preview without window.print() auto-run
   const previewHtml = useMemo(() => {
     try {
-      const html = renderUnifiedDocument(activeRequest);
-      return html
+      return renderUnifiedDocument(activeRequest)
         .replace(/\s+onload="[^"]*"/gi, "")
         .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
-    } catch (err) {
-      console.error("Failed to render print preview HTML:", err);
+    } catch (error) {
+      console.error("Failed to render print preview HTML:", error);
       return `<div style="padding:20px;color:red;font-family:sans-serif;">تعذر إنشاء المعاينة.</div>`;
     }
-  }, [activeRequest]);
+  }, [activeRequest, companyProfile]);
 
-  const [isSharingPdf, setIsSharingPdf] = useState(false);
-
-  if (!open) return null;
+  const isThermal = printMethod === "thermal";
+  const containerWidth = isThermal
+    ? activePaper === "thermal-58"
+      ? "w-[310px]"
+      : "w-[390px]"
+    : activePaper === "a5"
+      ? "w-full max-w-[590px]"
+      : "w-full max-w-[850px]";
+  const modalTitle = title || unifiedDoc.title || PRINTING_LABELS[rtl ? "ar" : "en"].preview;
 
   const handlePrint = async () => {
     setIsPrinting(true);
     try {
       await printUnifiedDocument(activeRequest);
       toast.success("تم إرسال المستند للطباعة بنجاح");
-      if (onPrintSuccess) onPrintSuccess();
-    } catch (err: any) {
-      toast.error(err.message || "حدث خطأ أثناء إرسال أمر الطباعة");
+      onPrintSuccess?.();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "حدث خطأ أثناء إرسال أمر الطباعة";
+      toast.error(message);
     } finally {
       setIsPrinting(false);
     }
@@ -374,13 +398,10 @@ export function LuxuryPrintPreviewModal({
   const handleWhatsAppShare = () => {
     const phone = customerPhone || unifiedDoc.partyPhone || "";
     const cleanPhone = phone.replace(/[^0-9]/g, "");
-
-    const msg = `مرحباً ${customerName || unifiedDoc.partyName || "عزيزنا العميل"}،\nمرفق تفاصيل ${unifiedDoc.title || "الفاتورة"} رقم: ${unifiedDoc.number}\nالإجمالي: ${unifiedDoc.total ? Number(unifiedDoc.total).toLocaleString() : "0"} ${unifiedDoc.currency || "ر.ي"}\nشكراً لتعاملكم معنا.`;
-
+    const message = `مرحباً ${customerName || unifiedDoc.partyName || "عزيزنا العميل"}،\nمرفق تفاصيل ${unifiedDoc.title || "الفاتورة"} رقم: ${unifiedDoc.number}\nالإجمالي: ${unifiedDoc.total ? Number(unifiedDoc.total).toLocaleString() : "0"} ${unifiedDoc.currency || "ر.ي"}\nشكراً لتعاملكم معنا.`;
     const url = cleanPhone
-      ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`
-      : `https://wa.me/?text=${encodeURIComponent(msg)}`;
-
+      ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`
+      : `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
@@ -390,9 +411,7 @@ export function LuxuryPrintPreviewModal({
       const { default: html2pdf } = await import("html2pdf.js");
       const previewDocument = previewFrameRef.current?.contentDocument;
       if (!previewDocument?.body) {
-        throw new Error(
-          rtl ? "تعذر الوصول إلى معاينة المستند." : "The document preview is unavailable.",
-        );
+        throw new Error(rtl ? "تعذر الوصول إلى معاينة المستند." : "The document preview is unavailable.");
       }
 
       await previewDocument.fonts?.ready;
@@ -451,497 +470,289 @@ export function LuxuryPrintPreviewModal({
         });
         toast.success("تم فتح نافذة المشاركة بنجاح");
       } else {
-        // Fallback: تنزيل ملف الـ PDF مباشرة للمستخدم
         const url = URL.createObjectURL(blob);
-        const a = window.document.createElement("a");
-        a.href = url;
-        a.download = fileName;
-        window.document.body.appendChild(a);
-        a.click();
-        window.document.body.removeChild(a);
+        const anchor = window.document.createElement("a");
+        anchor.href = url;
+        anchor.download = fileName;
+        window.document.body.appendChild(anchor);
+        anchor.click();
+        window.document.body.removeChild(anchor);
         URL.revokeObjectURL(url);
         toast.success("تم تجهيز وتحميل ملف الـ PDF بنجاح، يمكنك مشاركته الآن.");
       }
-    } catch (err: any) {
-      if (err.name !== "AbortError") {
-        console.error("PDF share error:", err);
-        toast.error("تعذر مشاركة ملف الـ PDF: " + (err.message || "خطأ غير متوقع"));
+    } catch (error) {
+      if (!(error instanceof Error) || error.name !== "AbortError") {
+        const message = error instanceof Error ? error.message : "خطأ غير متوقع";
+        console.error("PDF share error:", error);
+        toast.error(`تعذر مشاركة ملف الـ PDF: ${message}`);
       }
     } finally {
       setIsSharingPdf(false);
     }
   };
 
-  const modalTitle = title || unifiedDoc.title || PRINTING_LABELS[rtl ? "ar" : "en"].preview;
-
-  // Configuration for container sizing
-  const isThermal = printMethod === "thermal";
-  const containerWidth = isThermal
-    ? activePaper === "thermal-58"
-      ? "w-[310px]"
-      : "w-[390px]"
-    : activePaper === "a5"
-      ? "w-full max-w-[590px]"
-      : "w-full max-w-[850px]";
-
-  const iframeMinHeight = isThermal
-    ? activePaper === "thermal-58"
-      ? "690px"
-      : "760px"
-    : activePaper === "a5"
-      ? "830px"
-      : "1150px";
+  if (!open) return null;
 
   return (
     <div
       role="dialog"
       aria-modal="true"
-      dir={rtl ? "rtl" : "ltr"}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-0 md:p-4 animate-in fade-in duration-200"
     >
-      <div className="relative w-full max-w-6xl rounded-3xl border border-border/80 bg-card shadow-2xl overflow-hidden flex flex-col h-[95vh] max-h-[980px]">
-        {/* ── Modal Header ── */}
-        <div className="flex flex-col border-b border-border/80 px-4 sm:px-6 py-3 bg-muted/40 gap-3 shrink-0">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="p-2.5 rounded-2xl bg-primary/10 text-primary shrink-0">
-                <Printer className="h-5 w-5" />
+      <div className="relative flex h-[100dvh] max-h-[980px] w-full max-w-7xl flex-col overflow-hidden rounded-none border border-border/80 bg-card shadow-2xl md:h-[95vh] md:rounded-2xl">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row" dir="ltr">
+          <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-slate-200/70 dark:bg-slate-950/90" aria-label="معاينة الفاتورة">
+            <div className="flex shrink-0 items-center justify-between border-b border-border/50 px-3 py-2" dir="rtl">
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                <span>معاينة مباشرة</span>
               </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm sm:text-base font-bold text-foreground truncate">
-                    {modalTitle}
-                  </h3>
-                  <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded-lg bg-surface-2 border border-border/60 text-muted-foreground">
-                    #{unifiedDoc.number}
-                  </span>
-                </div>
-                <p className="text-[11px] text-muted-foreground truncate">
-                  {unifiedDoc.partyName
-                    ? `الطرف: ${unifiedDoc.partyName}`
-                    : "معاينة المستند المباشرة والقوالب المعتمدة"}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {/* Zoom Controls */}
-              <div className="hidden sm:flex items-center gap-0.5 rounded-xl bg-surface-2/80 p-0.5 border border-border/60 shadow-xs">
-                <button
-                  type="button"
-                  onClick={() => setZoomLevel((z) => Math.max(60, z - 15))}
-                  className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface transition-colors"
-                  title="تصغير"
-                >
-                  <ZoomOut className="h-3.5 w-3.5" />
+              <div className="flex items-center gap-1 rounded-lg border border-border/60 bg-card/80 p-0.5">
+                <button type="button" onClick={() => setZoomLevel((z) => Math.max(60, z - 15))} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground" title="تصغير">
+                  <ZoomOut className="h-4 w-4" />
                 </button>
-                <span className="text-[10px] font-mono px-1 font-semibold text-muted-foreground">
-                  {zoomLevel}%
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setZoomLevel((z) => Math.min(150, z + 15))}
-                  className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface transition-colors"
-                  title="تكبير"
-                >
-                  <ZoomIn className="h-3.5 w-3.5" />
+                <span className="min-w-10 text-center font-mono text-[11px] text-muted-foreground">{zoomLevel}%</span>
+                <button type="button" onClick={() => setZoomLevel((z) => Math.min(150, z + 15))} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground" title="تكبير">
+                  <ZoomIn className="h-4 w-4" />
                 </button>
                 {zoomLevel !== 100 && (
-                  <button
-                    type="button"
-                    onClick={() => setZoomLevel(100)}
-                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface transition-colors"
-                    title="استعادة 100%"
-                  >
-                    <Maximize2 className="h-3.5 w-3.5" />
+                  <button type="button" onClick={() => setZoomLevel(100)} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground" title="استعادة 100%">
+                    <Maximize2 className="h-4 w-4" />
                   </button>
                 )}
               </div>
+            </div>
+            <div className="min-h-0 flex-1 overflow-auto p-3 sm:p-6">
+              <div
+                className={`mx-auto transition-all duration-200 ${containerWidth}`}
+                style={{ transform: zoomLevel !== 100 ? `scale(${zoomLevel / 100})` : undefined, transformOrigin: "top center" }}
+              >
+                <div className={`relative w-full overflow-hidden border border-slate-300 bg-white text-slate-950 shadow-xl dark:border-slate-800 ${isThermal ? "rounded-lg p-2 sm:p-3" : "rounded-sm"}`}>
+                  {isThermal && (
+                    <div className="mb-2 flex w-full items-center justify-between border-b border-dashed border-slate-300 px-3 py-1.5 font-mono text-[10px] text-slate-400">
+                      <span>قص الورقة</span>
+                      <span>{activePaper === "thermal-80" ? "حراري 80 مم" : "حراري 58 مم"}</span>
+                    </div>
+                  )}
+                  <iframe
+                    ref={previewFrameRef}
+                    title={modalTitle}
+                    srcDoc={previewHtml}
+                    onLoad={syncPreviewHeight}
+                    className="w-full border-0 bg-white"
+                    style={{ height: previewContentHeight ?? iframeMinHeight, minHeight: iframeMinHeight }}
+                    sandbox="allow-same-origin"
+                  />
+                  {isThermal && (
+                    <div className="mt-2 w-full border-t border-dashed border-slate-300 py-2 text-center font-mono text-[10px] text-slate-400">
+                      نهاية الإيصال
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </section>
 
+          <aside className="flex max-h-[42%] shrink-0 flex-col overflow-hidden border-t border-border/80 bg-card md:max-h-none md:w-[310px] md:border-l md:border-t-0" dir="rtl">
+            <header className="flex shrink-0 items-center justify-between gap-2 border-b border-border/70 px-3 py-2.5 md:px-4 md:py-3">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <Printer className="size-4.5" />
+                </span>
+                <div className="min-w-0">
+                  <h3 className="truncate text-sm font-bold text-foreground">{modalTitle}</h3>
+                  <p className="truncate text-[11px] text-muted-foreground">
+                    #{unifiedDoc.number}{unifiedDoc.partyName ? ` · ${unifiedDoc.partyName}` : ""}
+                  </p>
+                </div>
+              </div>
               <button
                 type="button"
-                onClick={onClose}
-                className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
+                onClick={handleModalClose}
+                aria-label="إغلاق نافذة الطباعة"
+                className="shrink-0 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
-                <X className="h-5 w-5" />
+                <X className="size-5" />
+              </button>
+            </header>
+
+            <div className="shrink-0 space-y-2 border-b border-border/70 px-3 py-2 md:hidden">
+              <div className="grid grid-cols-4 gap-2">
+                {([
+                  ["method", Printer, "نوع الطباعة"],
+                  ["template", Sparkles, "القالب"],
+                  ["paper", FileText, "مقاس الورق"],
+                  ["codes", QrCode, "الباركود ورمز QR"],
+                ] as const).map(([menu, Icon, label]) => (
+                  <button
+                    key={menu}
+                    type="button"
+                    aria-label={label}
+                    aria-expanded={mobileMenu === menu}
+                    title={label}
+                    onClick={() => setMobileMenu((current) => current === menu ? null : menu)}
+                    className={`flex size-11 items-center justify-center rounded-full border transition-colors ${mobileMenu === menu ? "border-primary bg-primary/10 text-primary" : "border-border bg-background text-muted-foreground hover:text-foreground"}`}
+                  >
+                    <Icon className="size-4.5" />
+                  </button>
+                ))}
+              </div>
+
+              {mobileMenu && (
+                <div className="rounded-xl border border-border bg-background p-2 shadow-lg animate-in fade-in slide-in-from-bottom-1 duration-150">
+                  {mobileMenu === "method" && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button type="button" size="sm" variant={isThermal ? "default" : "outline"} onClick={() => { handleMethodChange("thermal"); setMobileMenu(null); }} className="h-9 rounded-lg">حراري</Button>
+                      <Button type="button" size="sm" variant={!isThermal ? "default" : "outline"} onClick={() => { handleMethodChange("page"); setMobileMenu(null); }} className="h-9 rounded-lg">صفحات A4 / A5</Button>
+                    </div>
+                  )}
+                  {mobileMenu === "template" && (
+                    <div className="grid grid-cols-2 gap-2">
+                      {(isThermal
+                        ? [{ id: "thermal-milling", label: "إيصال احترافي" }, { id: "thermal", label: "نقطة البيع" }, { id: "thermal-qr", label: "باركود و QR" }]
+                        : [{ id: "milling-master", label: "خدمات المطحنة" }, { id: "elegant", label: "تنفيذي فاخر" }, { id: "standard", label: "قياسي مضغوط" }, { id: "milling-clean", label: "مبسط كلاسيكي" }]
+                      ).map((template) => (
+                        <Button key={template.id} type="button" size="sm" variant={activeTemplate === template.id ? "default" : "outline"} onClick={() => { setActiveTemplate(template.id as InvoiceTemplateId); setMobileMenu(null); }} className="h-9 rounded-lg text-xs">{template.label}</Button>
+                      ))}
+                    </div>
+                  )}
+                  {mobileMenu === "paper" && (
+                    <div className="grid grid-cols-2 gap-2">
+                      {(isThermal
+                        ? [{ id: "thermal-80", label: "80 مم" }, { id: "thermal-58", label: "58 مم" }]
+                        : [{ id: "a4", label: "A4 كاملة" }, { id: "a5", label: "A5 نصف صفحة" }]
+                      ).map((paper) => (
+                        <Button key={paper.id} type="button" size="sm" variant={activePaper === paper.id ? "default" : "outline"} onClick={() => { setActivePaper(paper.id as PrintPaperId); setMobileMenu(null); }} className="h-9 rounded-lg">{paper.label}</Button>
+                      ))}
+                    </div>
+                  )}
+                  {mobileMenu === "codes" && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button type="button" size="sm" variant={showBarcode ? "default" : "outline"} aria-pressed={showBarcode} onClick={() => setShowBarcode((value) => !value)} className="h-9 rounded-lg">الباركود {showBarcode ? "مفعّل" : "متوقف"}</Button>
+                      <Button type="button" size="sm" variant={showQrCode ? "default" : "outline"} aria-pressed={showQrCode} onClick={() => setShowQrCode((value) => !value)} className="h-9 rounded-lg">QR {showQrCode ? "مفعّل" : "متوقف"}</Button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="hidden min-h-0 flex-1 space-y-4 overflow-y-auto p-4 md:block">
+              <section className="space-y-2">
+                <h4 className="text-xs font-bold text-muted-foreground">نوع الطباعة</h4>
+                <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted/70 p-1">
+                  <button type="button" onClick={() => handleMethodChange("thermal")} className={`flex items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-semibold transition-colors ${printMethod === "thermal" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-background"}`}>
+                    <Printer className="h-3.5 w-3.5" /> حراري
+                  </button>
+                  <button type="button" onClick={() => handleMethodChange("page")} className={`flex items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-semibold transition-colors ${printMethod === "page" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-background"}`}>
+                    <FileText className="h-3.5 w-3.5" /> صفحات
+                  </button>
+                </div>
+              </section>
+
+              <section className="space-y-2">
+                <h4 className="text-xs font-bold text-muted-foreground">القالب</h4>
+                <div className="space-y-1">
+                  {(isThermal
+                    ? [
+                        { id: "thermal-milling", label: "الإيصال الحراري الاحترافي", icon: <Scale className="h-4 w-4" /> },
+                        { id: "thermal", label: "إيصال نقطة البيع" },
+                        { id: "thermal-qr", label: "باركود و QR", icon: <QrCode className="h-4 w-4" /> },
+                      ]
+                    : [
+                        { id: "milling-master", label: "خدمات وسندات المطحنة", icon: <Scale className="h-4 w-4" /> },
+                        { id: "elegant", label: "تنفيذي فاخر", icon: <Sparkles className="h-4 w-4" /> },
+                        { id: "standard", label: "قياسي مضغوط" },
+                        { id: "milling-clean", label: "مبسط كلاسيكي" },
+                      ]
+                  ).map((template) => (
+                    <button
+                      key={template.id}
+                      type="button"
+                      onClick={() => setActiveTemplate(template.id as InvoiceTemplateId)}
+                      className={`flex w-full items-center gap-2 rounded-md border px-3 py-2 text-right text-xs font-medium transition-colors ${activeTemplate === template.id ? "border-primary/40 bg-primary/10 text-primary" : "border-transparent text-foreground hover:bg-muted"}`}
+                    >
+                      {template.icon}
+                      <span>{template.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <section className="space-y-2">
+                <h4 className="text-xs font-bold text-muted-foreground">مقاس الورق</h4>
+                <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted/70 p-1">
+                  {(isThermal
+                    ? [{ id: "thermal-80", label: "80 مم" }, { id: "thermal-58", label: "58 مم" }]
+                    : [{ id: "a4", label: "A4 كاملة" }, { id: "a5", label: "A5 نصف صفحة" }]
+                  ).map((paper) => (
+                    <button key={paper.id} type="button" onClick={() => setActivePaper(paper.id as PrintPaperId)} className={`rounded-md px-2 py-2 text-xs font-semibold transition-colors ${activePaper === paper.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
+                      {paper.label}
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <section className="space-y-2">
+                <h4 className="text-xs font-bold text-muted-foreground">محتوى الفاتورة</h4>
+                <button type="button" onClick={() => setShowBarcode((prev) => !prev)} aria-pressed={showBarcode} className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-xs font-medium transition-colors ${showBarcode ? "border-primary/30 bg-primary/5 text-foreground" : "border-border text-muted-foreground"}`}>
+                  <span>الباركود</span><span className="text-[11px]">{showBarcode ? "مفعّل" : "متوقف"}</span>
+                </button>
+                <button type="button" onClick={() => setShowQrCode((prev) => !prev)} aria-pressed={showQrCode} className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-xs font-medium transition-colors ${showQrCode ? "border-primary/30 bg-primary/5 text-foreground" : "border-border text-muted-foreground"}`}>
+                  <span className="flex items-center gap-2"><QrCode className="h-3.5 w-3.5" /> رمز QR</span><span className="text-[11px]">{showQrCode ? "مفعّل" : "متوقف"}</span>
+                </button>
+              </section>
+            </div>
+
+            <div className="hidden shrink-0 space-y-2 border-t border-border/80 bg-muted/30 p-3 md:block">
+              <Button type="button" disabled={isPrinting} onClick={handlePrint} className="h-10 w-full gap-2 rounded-md font-bold">
+                <Printer className="h-4 w-4" />
+                <span>طباعة الآن ({isThermal ? (activePaper === "thermal-80" ? "80 مم" : "58 مم") : activePaper.toUpperCase()})</span>
+              </Button>
+              <Button type="button" variant="outline" disabled={isSharingPdf} onClick={handlePdfShare} className="h-9 w-full justify-start gap-2 rounded-md">
+                <Share2 className="h-4 w-4 text-sky-600" />
+                <span>{isSharingPdf ? "جارٍ تجهيز PDF…" : "مشاركة أو تنزيل PDF"}</span>
+              </Button>
+              <Button type="button" variant="outline" onClick={handleWhatsAppShare} className="h-9 w-full justify-start gap-2 rounded-md text-emerald-700 hover:text-emerald-800">
+                <WhatsAppIcon className="h-4 w-4" />
+                <span>مشاركة عبر واتساب</span>
+              </Button>
+              <Button type="button" variant="ghost" onClick={handleModalClose} className="h-9 w-full rounded-md text-muted-foreground">
+                إغلاق
+              </Button>
+            </div>
+
+            <div className="flex shrink-0 items-center justify-center gap-3 border-t border-border/80 bg-card px-3 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] md:hidden" dir="rtl">
+              <button
+                type="button"
+                disabled={isPrinting}
+                onClick={handlePrint}
+                aria-label={`طباعة الآن ${isThermal ? (activePaper === "thermal-80" ? "80 مم" : "58 مم") : activePaper.toUpperCase()}`}
+                title={`طباعة الآن (${isThermal ? (activePaper === "thermal-80" ? "80 مم" : "58 مم") : activePaper.toUpperCase()})`}
+                className="flex size-12 items-center justify-center rounded-full bg-foreground text-background shadow-lg shadow-foreground/15 transition hover:opacity-95 active:scale-[0.98] disabled:opacity-50"
+              >
+                <Printer className="size-5" />
+              </button>
+              <button
+                type="button"
+                disabled={isSharingPdf}
+                onClick={handlePdfShare}
+                aria-label={isSharingPdf ? "جارٍ تجهيز ملف PDF" : "مشاركة أو تنزيل PDF"}
+                title={isSharingPdf ? "جارٍ تجهيز PDF" : "مشاركة أو تنزيل PDF"}
+                className="flex size-12 items-center justify-center rounded-full border border-border bg-background text-sky-700 transition hover:bg-muted active:scale-[0.98] disabled:opacity-50"
+              >
+                <Share2 className="size-5" />
+              </button>
+              <button
+                type="button"
+                onClick={handleWhatsAppShare}
+                aria-label="مشاركة عبر واتساب"
+                title="مشاركة عبر واتساب"
+                className="flex size-12 items-center justify-center rounded-full border border-emerald-600/25 bg-emerald-600/5 text-emerald-700 transition hover:bg-emerald-600/10 active:scale-[0.98]"
+              >
+                <WhatsAppIcon className="size-5" />
               </button>
             </div>
-          </div>
-
-          <details ref={printToolsRef} className="group border-t border-border/50 pt-1">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between rounded-xl border border-border/70 bg-surface-2 px-3 text-sm font-bold text-foreground lg:hidden">
-              <span className="flex items-center gap-2">
-                <Printer className="size-4 text-primary" /> إعدادات الطباعة والقالب
-              </span>
-              <span className="text-xs font-medium text-muted-foreground">
-                {activePaper.toUpperCase()}
-              </span>
-            </summary>
-            <div className="flex max-h-[32vh] flex-wrap items-center justify-between gap-2.5 overflow-y-auto pt-2 lg:max-h-none">
-              {/* Step 1: Print Method (Thermal vs Page) */}
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-muted-foreground shrink-0 hidden sm:inline">
-                  نوع الطباعة:
-                </span>
-                <div className="flex items-center rounded-2xl bg-surface-2/90 p-1 border border-border/70 shadow-xs">
-                  <button
-                    type="button"
-                    onClick={() => handleMethodChange("thermal")}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                      printMethod === "thermal"
-                        ? "bg-primary text-primary-foreground shadow-xs"
-                        : "text-muted-foreground hover:text-foreground hover:bg-surface"
-                    }`}
-                  >
-                    <Printer className="h-3.5 w-3.5" />
-                    <span>طباعة حرارية</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleMethodChange("page")}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                      printMethod === "page"
-                        ? "bg-primary text-primary-foreground shadow-xs"
-                        : "text-muted-foreground hover:text-foreground hover:bg-surface"
-                    }`}
-                  >
-                    <FileText className="h-3.5 w-3.5" />
-                    <span>صفحات (A4 / A5)</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Step 2: Templates corresponding to chosen method */}
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="text-xs font-bold text-muted-foreground shrink-0 hidden sm:inline">
-                  القالب:
-                </span>
-                <div className="flex items-center rounded-2xl bg-surface-2/90 p-1 border border-border/70 shadow-xs flex-wrap gap-0.5">
-                  {isThermal ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => setActiveTemplate("thermal-milling")}
-                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                          activeTemplate === "thermal-milling"
-                            ? "bg-primary text-primary-foreground shadow-xs"
-                            : "text-muted-foreground hover:text-foreground hover:bg-surface"
-                        }`}
-                      >
-                        <Scale className="h-3 w-3 text-amber-300" />
-                        <span>الإيصال الحراري الاحترافي</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setActiveTemplate("thermal")}
-                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                          activeTemplate === "thermal"
-                            ? "bg-primary text-primary-foreground shadow-xs"
-                            : "text-muted-foreground hover:text-foreground hover:bg-surface"
-                        }`}
-                      >
-                        <span>إيصال نقطة البيع</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setActiveTemplate("thermal-qr")}
-                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                          activeTemplate === "thermal-qr"
-                            ? "bg-primary text-primary-foreground shadow-xs"
-                            : "text-muted-foreground hover:text-foreground hover:bg-surface"
-                        }`}
-                      >
-                        <QrCode className="h-3 w-3 text-emerald-400" />
-                        <span>باركود و QR</span>
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => setActiveTemplate("milling-master")}
-                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                          activeTemplate === "milling-master"
-                            ? "bg-primary text-primary-foreground shadow-xs"
-                            : "text-muted-foreground hover:text-foreground hover:bg-surface"
-                        }`}
-                      >
-                        <Scale className="h-3 w-3 text-amber-400" />
-                        <span>خدمات وسندات المطحنة</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setActiveTemplate("elegant")}
-                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                          activeTemplate === "elegant"
-                            ? "bg-primary text-primary-foreground shadow-xs"
-                            : "text-muted-foreground hover:text-foreground hover:bg-surface"
-                        }`}
-                      >
-                        <Sparkles className="h-3 w-3 text-amber-300" />
-                        <span>تنفيذي فاخر</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setActiveTemplate("standard")}
-                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                          activeTemplate === "standard"
-                            ? "bg-primary text-primary-foreground shadow-xs"
-                            : "text-muted-foreground hover:text-foreground hover:bg-surface"
-                        }`}
-                      >
-                        <span>قياسي مضغوط</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setActiveTemplate("milling-clean")}
-                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                          activeTemplate === "milling-clean"
-                            ? "bg-primary text-primary-foreground shadow-xs"
-                            : "text-muted-foreground hover:text-foreground hover:bg-surface"
-                        }`}
-                      >
-                        <span>مبسط كلاسيكي</span>
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Step 3: Paper Size corresponding to chosen method */}
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-muted-foreground shrink-0 hidden sm:inline">
-                  المقاس:
-                </span>
-                <div className="flex items-center rounded-2xl bg-surface-2/90 p-1 border border-border/70 shadow-xs">
-                  {isThermal ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => setActivePaper("thermal-80")}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                          activePaper === "thermal-80"
-                            ? "bg-primary text-primary-foreground shadow-xs"
-                            : "text-muted-foreground hover:text-foreground hover:bg-surface"
-                        }`}
-                      >
-                        80 مم
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setActivePaper("thermal-58")}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                          activePaper === "thermal-58"
-                            ? "bg-primary text-primary-foreground shadow-xs"
-                            : "text-muted-foreground hover:text-foreground hover:bg-surface"
-                        }`}
-                      >
-                        58 مم
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => setActivePaper("a4")}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                          activePaper === "a4"
-                            ? "bg-primary text-primary-foreground shadow-xs"
-                            : "text-muted-foreground hover:text-foreground hover:bg-surface"
-                        }`}
-                      >
-                        A4 (كاملة)
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setActivePaper("a5")}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                          activePaper === "a5"
-                            ? "bg-primary text-primary-foreground shadow-xs"
-                            : "text-muted-foreground hover:text-foreground hover:bg-surface"
-                        }`}
-                      >
-                        A5 (نصف صفحة)
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Step 4: Quick Barcode & QR Code Toggles */}
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-muted-foreground shrink-0 hidden sm:inline">
-                  الترميز:
-                </span>
-                <div className="flex items-center rounded-2xl bg-surface-2/90 p-1 border border-border/70 shadow-xs gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setShowBarcode((prev) => !prev)}
-                    className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
-                      showBarcode
-                        ? "bg-primary/20 text-primary border border-primary/30"
-                        : "text-muted-foreground hover:text-foreground line-through opacity-60"
-                    }`}
-                    title="تفعيل / إلغاء تفعيل الباركود"
-                    aria-pressed={showBarcode}
-                  >
-                    <span>|||| الباركود</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setShowSignatures((prev) => !prev)}
-                    aria-pressed={showSignatures}
-                    className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
-                      showSignatures
-                        ? "bg-primary/20 text-primary border border-primary/30"
-                        : "text-muted-foreground hover:text-foreground opacity-70"
-                    }`}
-                    title="إظهار أو إخفاء التوقيعات"
-                  >
-                    <PenLine className="h-3.5 w-3.5" />
-                    <span>التوقيعات</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setShowQrCode((prev) => !prev)}
-                    className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
-                      showQrCode
-                        ? "bg-primary/20 text-primary border border-primary/30"
-                        : "text-muted-foreground hover:text-foreground line-through opacity-60"
-                    }`}
-                    title="تفعيل / إلغاء تفعيل الـ QR code"
-                    aria-pressed={showQrCode}
-                  >
-                    <QrCode className="h-3.5 w-3.5" />
-                    <span>QR</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </details>
-        </div>
-
-        {/* ── Scrollable Preview Canvas ── */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-200/70 dark:bg-slate-950/90 flex justify-center items-start">
-          <div
-            className={`transition-all duration-200 ${containerWidth} flex flex-col items-center`}
-            style={{
-              transform: zoomLevel !== 100 ? `scale(${zoomLevel / 100})` : undefined,
-              transformOrigin: "top center",
-            }}
-          >
-            {/* Paper Simulation Frame */}
-            <div
-              className={`w-full bg-white text-slate-950 rounded-2xl shadow-2xl border border-slate-300 dark:border-slate-800 overflow-hidden relative ${
-                isThermal ? "p-2 sm:p-3" : "p-0"
-              }`}
-            >
-              {isThermal && (
-                <div className="w-full flex justify-between items-center px-4 py-1.5 border-b border-dashed border-slate-300 text-[10px] text-slate-400 font-mono mb-2">
-                  <span>✂️ قص الورقة</span>
-                  <span>{activePaper === "thermal-80" ? "حراري 80 مم" : "حراري 58 مم"}</span>
-                </div>
-              )}
-
-              {/* Sandboxed iframe rendering exact printable HTML */}
-              <iframe
-                ref={previewFrameRef}
-                title={modalTitle}
-                srcDoc={previewHtml}
-                onLoad={syncPreviewHeight}
-                className="w-full border-0 bg-white"
-                style={{
-                  height: previewContentHeight ?? iframeMinHeight,
-                  minHeight: iframeMinHeight,
-                }}
-                sandbox="allow-same-origin"
-              />
-
-              {isThermal && (
-                <div className="w-full text-center py-2 border-t border-dashed border-slate-300 text-[10px] text-slate-400 font-mono mt-2">
-                  <span>┈┈┈ نهاية الإيصال ┈┈┈</span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* ── Modal Footer Toolbar ── */}
-        <div className="flex flex-wrap items-center justify-between border-t border-border/80 px-4 sm:px-6 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] bg-muted/40 gap-3 shrink-0">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
-            <span className="hidden sm:inline">معاينة حية لمخرجات الطباعة</span>
-            <span className="sm:hidden">معاينة حية لمخرجات الطباعة</span>
-          </div>
-
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={onClose}
-              className="rounded-xl h-10 px-4"
-            >
-              إغلاق
-            </Button>
-
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={isSharingPdf}
-              onClick={handlePdfShare}
-              className="rounded-xl h-10 px-3.5 gap-1.5 text-sky-600 dark:text-sky-400 border-sky-500/30 hover:bg-sky-500/10"
-              title="مشاركة أو تنزيل ملف PDF معتمد"
-            >
-              <Share2 className="h-4 w-4 shrink-0" />
-              <span className="text-xs font-bold">
-                {isSharingPdf ? "جارٍ التجهيز…" : "مشاركة PDF"}
-              </span>
-            </Button>
-
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleWhatsAppShare}
-              className="rounded-xl h-10 px-3.5 gap-1.5 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10"
-              title="مشاركة الفاتورة عبر واتساب"
-            >
-              <WhatsAppIcon className="h-4 w-4 shrink-0" />
-              <span className="text-xs font-bold">واتساب</span>
-            </Button>
-
-            <Button
-              type="button"
-              disabled={isPrinting}
-              onClick={handlePrint}
-              className="rounded-xl h-10 px-5 gap-2 bg-primary text-primary-foreground font-bold shadow-md hover:bg-primary/90"
-            >
-              <Printer className="h-4 w-4" />
-              <span>
-                طباعة الآن (
-                {isThermal
-                  ? activePaper === "thermal-80"
-                    ? "80 مم"
-                    : "58 مم"
-                  : activePaper === "a4"
-                    ? "A4"
-                    : "A5"}
-                )
-              </span>
-            </Button>
-          </div>
+          </aside>
         </div>
       </div>
     </div>
