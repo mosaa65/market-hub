@@ -57,6 +57,18 @@ export const ROUTE_ACCESS: Record<string, RouteAccessRule> = {
   "/milling/consumables": {
     allowedRoles: ["owner", "manager", "warehouse"],
   },
+  // استلام وفواتير: الاستلام للمستودع، وفاتورة أجور الطحن عمل مالي —
+  // المحاسب كان محجوباً عنها رغم أنها إصدار فواتير.
+  "/milling/intake": {
+    allowedRoles: ["owner", "manager", "accountant", "warehouse"],
+  },
+  // التسليم وكشف الأمانات: موقع عمل يخص المستودع والمالية معاً.
+  "/milling/delivery": {
+    allowedRoles: ["owner", "manager", "warehouse"],
+  },
+  "/milling/customer-statement": {
+    allowedRoles: STOCK,
+  },
   "/purchase-pos": { allowedRoles: STOCK },
   "/purchases": { allowedRoles: STOCK },
   "/suppliers": { allowedRoles: STOCK },
@@ -70,6 +82,17 @@ export const ROUTE_ACCESS: Record<string, RouteAccessRule> = {
   "/trial-balance": { allowedRoles: FINANCE },
   "/income-statement": { allowedRoles: FINANCE },
   "/balance-sheet": { allowedRoles: FINANCE },
+  // صفحات المحاسبة المتقدمة كانت غائبة كلياً — أي موظف نشط يفتحها بالرابط
+  // المباشر رغم أنها مالية بحتة. قواعدها FINANCE صراحةً: المالك والمدير
+  // والمحاسب.
+  "/opening-balances": { allowedRoles: FINANCE },
+  "/supplier-ledger": { allowedRoles: FINANCE },
+  "/fiscal-periods": { allowedRoles: FINANCE },
+  "/fiscal-year-close": { allowedRoles: FINANCE },
+  "/fixed-assets": { allowedRoles: FINANCE },
+  "/prepayments": { allowedRoles: FINANCE },
+  "/tax-declarations": { allowedRoles: FINANCE },
+  "/chart-of-accounts": { allowedRoles: FINANCE },
 
   // الإدارة
   "/users": { allowedRoles: ["owner"] },

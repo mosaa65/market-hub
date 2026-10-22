@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { money } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { QuantityInput } from "@/components/ui/quantity-input";
 import {
   Dialog,
   DialogContent,
@@ -29,11 +30,10 @@ import { DynamicPaymentSelector } from "@/components/ui/payment-method/dynamic-p
 import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
 import { paymentMethodLabel } from "@/lib/payments/payment-methods";
 import { usePaymentMethodOverrides } from "@/hooks/use-payment-methods";
-import { Loader2, Plus, Printer, RotateCcw, Search, Trash2, Truck, Wallet } from "lucide-react";
+import { Loader2, Printer, RotateCcw, Search, Trash2, Truck, Wallet } from "lucide-react";
 import { LuxuryPrintPreviewModal } from "@/components/luxury-print-preview-modal";
 import type { UnifiedDocumentData } from "@/lib/templates";
 import { translateRpcError } from "@/lib/errors/rpc-errors";
-import { PrimaryAction } from "@/components/ui/primary-action";
 import { IconButton } from "@/components/ui/icon-button";
 import { VortexMetricCard } from "@/components/vortex-ui";
 import { RecordsView, type RecordsViewMode } from "@/components/ui/records-view";
@@ -428,13 +428,6 @@ function SalesReturnsPage() {
       <PageHeader
         title={isRtl ? "مرتجعات المبيعات" : "Sales Returns"}
         subtitle={isRtl ? "سجل وأداء مرتجعات المبيعات والعملاء" : "Track customer sales returns"}
-        actions={
-          <PrimaryAction
-            label={isRtl ? "مرتجع مبيعات جديد" : "New Sales Return"}
-            icon={<Plus />}
-            onClick={() => setNewReturnOpen(true)}
-          />
-        }
       />
 
       {/* ─── KPI cards ─── */}
@@ -493,13 +486,6 @@ function SalesReturnsPage() {
           label: isRtl ? "ترتيب" : "Sort",
         }}
         viewToggle={<RecordsViewToggle value={viewMode} onChange={setViewMode} />}
-        action={
-          <PrimaryAction
-            label={isRtl ? "مرتجع مبيعات جديد" : "New Sales Return"}
-            icon={<Plus />}
-            onClick={() => setNewReturnOpen(true)}
-          />
-        }
       />
 
       {/* ─── Records: cards / list / classic table — shared scaffold ─── */}
@@ -1097,12 +1083,13 @@ function NewSalesReturn({
                     <tr key={l.product_id} className="border-t border-border/60">
                       <td className="px-3 py-2 font-medium">{l.name}</td>
                       <td className="px-3 py-2">
-                        <Input
-                          type="number"
+                        {/* الكمية المُوحّدة: أرقام في المنتصف، بلا عجلة ماوس. */}
+                        <QuantityInput
+                          decimals={0}
                           min={1}
                           aria-label={lang === "ar" ? "الكمية" : "Quantity"}
                           value={l.quantity}
-                          onChange={(e) => updateQty(l.product_id, parseInt(e.target.value) || 1)}
+                          onValueChange={(v) => updateQty(l.product_id, v == null ? 1 : v)}
                           className="h-8 w-20"
                         />
                       </td>

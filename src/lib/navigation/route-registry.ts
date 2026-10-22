@@ -849,7 +849,8 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
     ),
     category: "milling",
     moduleId: "milling_operations",
-    requiredRoles: STOCK_OPS,
+    // الاستلام والفواتير: فاتورة أجور الطحن عمل مالي — المحاسب يصدرها.
+    requiredRoles: ["owner", "manager", "accountant", "warehouse"],
     i18nKey: "nav.milling_intake",
   },
   {

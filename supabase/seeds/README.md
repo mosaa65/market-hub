@@ -38,14 +38,9 @@ supabase/seeds/
 │   ├── README.md
 │   └── sample-mill.sql          مطحنة دقيق
 │
-├── 04_tests/                    ← يدوي، من الاختبارات الآلية
-│   ├── README.md
-│   └── fixtures.sql.example
-│
-└── _archive/                    ← ملفات موروثة لا تعمل، للمرجعية فقط
+└── 04_tests/                    ← يدوي، من الاختبارات الآلية
     ├── README.md
-    ├── supermarket-inherited.sql
-    └── stationery-inherited.sql
+    └── fixtures.sql.example
 ```
 
 ---

@@ -317,7 +317,7 @@ export function OpeningBalancesPage() {
   }, [accounts.data, section]);
 
   return (
-    <ModuleGuard moduleId="accounting">
+    <ModuleGuard moduleId="expenses">
       <div className="mx-auto max-w-6xl space-y-5 p-3 sm:p-5">
         <PageHeader
           title="الأرصدة الافتتاحية للمنشأة"

@@ -2478,7 +2478,12 @@ function ProductDialog({
     item_nature: product.item_nature ?? "GOOD",
     inventory_policy: product.inventory_policy ?? "TRACKED",
     tracking: product.tracking ?? "NONE",
-    costing_method: product.costing_method ?? "MOVING_AVERAGE",
+    // صنف قديم محفوظ TRACKED بطريقة تقييم NONE (قبل فرض القاعدة)؟ نعدّله
+    // للمتوسط المتحرك عند فتحه للتعديل، وإلا فشل الحفظ برسالة بلا علاج.
+    costing_method:
+      (product.inventory_policy ?? "TRACKED") === "TRACKED" && product.costing_method === "NONE"
+        ? "MOVING_AVERAGE"
+        : (product.costing_method ?? "MOVING_AVERAGE"),
     is_sellable: product.is_sellable ?? true,
     is_purchasable: product.is_purchasable ?? true,
   });
@@ -3175,6 +3180,15 @@ function ProductDialog({
                     ...current,
                     inventory_policy: value as InventoryPolicy,
                     tracking: value === "TRACKED" ? current.tracking : "NONE",
+                    // TRACKED يحتاج طريقة تقييم صالحة: لو صار NONE (مثلًا بعد
+                    // تحويل الصنف خدمة ثم رجوعه سلعة) نرجع المتوسط المتحرك
+                    // افتراضيًا بدل ترك المستخدم عالقًا برسالة خطأ بلا علاج.
+                    costing_method:
+                      value === "TRACKED" && current.costing_method === "NONE"
+                        ? "MOVING_AVERAGE"
+                        : value === "TRACKED"
+                          ? current.costing_method
+                          : "NONE",
                   }))
                 }
               />
@@ -3192,6 +3206,25 @@ function ProductDialog({
                   setPolicy((current) => ({
                     ...current,
                     tracking: value as ItemTracking,
+                  }))
+                }
+              />
+            )}
+
+            {policy.item_nature === "GOOD" && policy.inventory_policy === "TRACKED" && (
+              <SettingsChoice
+                label={lang === "ar" ? "طريقة تقييم المخزون" : "Stock valuation method"}
+                value={policy.costing_method}
+                options={(["MOVING_AVERAGE", "FIFO", "STANDARD"] as CostingMethod[]).map(
+                  (value) => ({
+                    value,
+                    label: COSTING_METHOD_LABELS[value][lang === "ar" ? "ar" : "en"],
+                  }),
+                )}
+                onChange={(value) =>
+                  setPolicy((current) => ({
+                    ...current,
+                    costing_method: value as CostingMethod,
                   }))
                 }
               />

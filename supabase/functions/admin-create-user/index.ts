@@ -330,6 +330,26 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   const newUserId = created.user.id;
 
+  // ---- 5ب) ربط الهاتف بحساب GoTrue ──────────────────────────────────────────
+  // admin.createUser لا يقبل phone، فالهاتف كان يُكتب في profiles فقط،
+  // والدخول بالهاتف يعيد invalid_credentials رغم صحة الرقم وكلمة المرور.
+  // updateUserById بالهاتف يجعل GoTrue نفسه يكمل الأربعة:
+  //   auth.users.phone (بلا +)، هوية provider='phone' مع identity_data.phone،
+  //   providers تتضمن 'phone'، وphone_confirmed_at.
+  if (phone) {
+    const phoneDigits = phone.replace(/[^0-9]/g, "");
+    const phoneE164 = phone.startsWith("+") ? phone : `+${phoneDigits}`;
+    const { error: phoneLinkError } = await admin.auth.admin.updateUserById(newUserId, {
+      phone: phoneE164,
+      phone_confirm: true,
+    });
+    if (phoneLinkError) {
+      // لا نُسقط الحساب كله لفشل الربط: الدخول بالبريد يعمل، والرقم يمكن
+      // ربطه لاحقًا من لوحة Supabase. نسجّل الفشل ونُكمل.
+      console.error("[admin-create-user] phone link failed:", phoneLinkError.message);
+    }
+  }
+
   // ---- 6) Confirm/extend the profile created by `handle_new_user` ----
   // `handle_new_user` already inserted the row on auth.users INSERT, so this
   // is normally an UPDATE. The insert is a defensive fallback for the case

@@ -544,6 +544,78 @@ export const CAPABILITY_MATRIX: CapabilityGroup[] = [
           en: "Strictly hidden from Cashiers & Warehouse",
         },
       },
+      {
+        name: {
+          ar: "شجرة دليل الحسابات ودفتر أستاذ الموردين",
+          en: "Chart of Accounts & Supplier Ledger",
+        },
+        superadmin: "full",
+        owner: "full",
+        manager: "full",
+        accountant: "full",
+        cashier: "none",
+        warehouse: "none",
+        notes: {
+          ar: "العمود الفقري المحاسبي — للمحاسب كاملة",
+          en: "Accounting backbone — Accountant has full access",
+        },
+      },
+      {
+        name: {
+          ar: "الفترات المالية وإقفال السنة",
+          en: "Fiscal Periods & Year-End Close",
+        },
+        superadmin: "full",
+        owner: "full",
+        manager: "partial",
+        accountant: "full",
+        cashier: "none",
+        warehouse: "none",
+        notes: {
+          ar: "المحاسب يدير الفترات والإقفال؛ المدير مطّلع فقط",
+          en: "Accountant manages periods & close; Manager read-only",
+        },
+      },
+      {
+        name: {
+          ar: "الأصول الثابتة والإهلاك الدوري",
+          en: "Fixed Assets & Depreciation",
+        },
+        superadmin: "full",
+        owner: "full",
+        manager: "partial",
+        accountant: "full",
+        cashier: "none",
+        warehouse: "none",
+      },
+      {
+        name: {
+          ar: "المصروفات والإيرادات المقدمة (الاستحقاق)",
+          en: "Prepayments & Deferred (Accruals)",
+        },
+        superadmin: "full",
+        owner: "full",
+        manager: "partial",
+        accountant: "full",
+        cashier: "none",
+        warehouse: "none",
+      },
+      {
+        name: {
+          ar: "الإقرار والتسوية الضريبية (VAT)",
+          en: "VAT Declaration & Settlement",
+        },
+        superadmin: "full",
+        owner: "full",
+        manager: "partial",
+        accountant: "full",
+        cashier: "none",
+        warehouse: "none",
+        notes: {
+          ar: "إقرار القيمة المضافة وتسوية 2311/1316 — للمحاسب",
+          en: "VAT return and 2311/1316 settlement — Accountant's duty",
+        },
+      },
     ],
   },
 ];
