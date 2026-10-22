@@ -688,7 +688,7 @@ export function renderUnifiedLayout(
   opts.showFooter = false;
 
   const qrPayload = [
-    `Seller: ${company.name || "Company"}`,
+    `Seller: ${company.name || company.legalName || doc.company?.name || doc.company?.legalName || ""}`,
     `Invoice: ${doc.number}`,
     `Date: ${doc.date}`,
     `Total: ${doc.total || 0} ${c}`,
@@ -698,19 +698,19 @@ export function renderUnifiedLayout(
     opts.showBarcode !== false && doc.number ? generateBarcodeSvg(doc.number, isA5 ? 14 : 18) : "";
   const qrSvg = opts.showQrCode !== false ? generateQrCodeSvg(qrPayload, isA5 ? 40 : 50) : "";
 
-  const companyName = company.name || doc.company?.name || "";
-  const arabicName = doc.company?.arabicName || company.arabicName || companyName;
-  const englishName = doc.company?.englishName || company.englishName || "";
-  const companyAddress = doc.company?.address || company.address || "";
-  const companyPhone = doc.company?.phone || company.phone || "";
-  const companyVat = doc.company?.vat || company.taxNumber || "";
-  const companyEmail = doc.company?.email || company.email || "";
+  const companyName = company.name || company.legalName || doc.company?.name || doc.company?.legalName || "";
+  const arabicName = company.arabicName || doc.company?.arabicName || companyName;
+  const englishName = company.englishName || doc.company?.englishName || "";
+  const companyAddress = company.address || doc.company?.address || "";
+  const companyPhone = company.phone || doc.company?.phone || "";
+  const companyVat = company.taxNumber || doc.company?.vat || "";
+  const companyEmail = company.email || doc.company?.email || "";
 
   const lines = doc.lines || [];
   const rows = lines
     .map((l, i) => {
-      const itemPrice = l.price ?? 0;
-      const itemTotal = l.total ?? l.qty * itemPrice;
+      const itemPrice = l.price;
+      const itemTotal = l.total ?? (itemPrice != null ? l.qty * itemPrice : undefined);
       return `
     <tr>
       <td class="col-idx">${i + 1}</td>
@@ -719,8 +719,8 @@ export function renderUnifiedLayout(
         ${l.code ? `<div class="prod-code">${rtl ? "الرمز" : "Code"}: ${esc(l.code)}</div>` : ""}
       </td>
       <td class="col-qty num-isolated">${l.qty} ${l.unit ? esc(l.unit) : rtl ? "حبة" : ""}</td>
-      <td class="col-price num-isolated">${money(itemPrice)}</td>
-      <td class="col-total num-isolated">${money(itemTotal)}</td>
+      <td class="col-price num-isolated">${itemPrice == null ? "—" : money(itemPrice)}</td>
+      <td class="col-total num-isolated">${itemTotal == null ? "—" : money(itemTotal)}</td>
     </tr>`;
     })
     .join("");
@@ -734,7 +734,7 @@ export function renderUnifiedLayout(
     .map(([unit, quantity]) => `${quantity}${unit ? ` ${esc(unit)}` : ""}`)
     .join(" · ");
   const itemsTotal = lines.reduce(
-    (sum, line) => sum + (line.total ?? Number(line.qty || 0) * Number(line.price ?? 0)),
+    (sum, line) => sum + (line.total ?? (line.price != null ? Number(line.qty || 0) * Number(line.price) : 0)),
     0,
   );
   const itemsSummaryRow = lines.length

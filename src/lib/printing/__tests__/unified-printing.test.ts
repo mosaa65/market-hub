@@ -381,6 +381,13 @@ check(
   "rights helper contains the approved exact line",
   rightsOccurrences(renderInvoiceRightsFooter()) === 1,
 );
+const rightsFooterHtml = renderInvoiceRightsFooter();
+check(
+  "rights footer keeps the separator between the brand and contact numbers",
+  rightsFooterHtml.indexOf("تطوير وبرمجة إنما سوفت") <
+    rightsFooterHtml.indexOf("|") &&
+    rightsFooterHtml.indexOf("|") < rightsFooterHtml.indexOf("772217218 - 784795101"),
+);
 
 /* Company data must come from Company Profile, not a template constant. */
 const profileDrivenHtml = renderStandardTemplate(docFor("customer_invoice"), LABELS, true, {
