@@ -7,12 +7,25 @@ import {
   Banknote,
   AlertCircle,
   CheckCircle2,
+  ChevronDown,
+  Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { money } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import type { Cashbox, CompanyBankAccount, SplitTenderLine } from "@/lib/payments/treasury-types";
 import { Button } from "@/components/ui/button";
+import { paymentMethodIconAsset } from "@/lib/payments/payment-methods";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
+import { KNOWN_WALLETS } from "@/components/ui/payment-method/compact-payment-selector";
 
 export interface SplitPaymentsManagerProps {
   total: number;
@@ -84,19 +97,33 @@ export function SplitPaymentsManager({
         reference: "",
       };
     } else {
-      const wallet = defaultWallet || wallets[0];
+      const w = defaultWallet || wallets[0];
+      const preferredWalletId = w
+        ? w.name_ar.includes("جيب")
+          ? "jaib"
+          : w.name_ar.includes("فلوسك")
+            ? "floosak"
+            : w.name_ar.includes("كاش")
+              ? "one_cash"
+              : "jawali"
+        : "jaib";
+
       newLine = {
         id: crypto.randomUUID(),
         category: "WALLET",
         method: "mobile_money",
-        paymentMethodId: wallet?.name_ar.includes("جوالي")
-          ? "jawali"
-          : wallet?.name_ar.includes("جيب")
-            ? "jaib"
-            : "mobile_money",
+        paymentMethodId: preferredWalletId,
         amount: nextAmount,
-        bankAccountId: wallet?.id || null,
-        bankAccountName: wallet?.name_ar || (isAr ? "محفظة إلكترونية" : "E-Wallet"),
+        bankAccountId: w?.id || null,
+        bankAccountName:
+          w?.name_ar ||
+          (preferredWalletId === "jaib"
+            ? "محفظة جيب"
+            : preferredWalletId === "floosak"
+              ? "محفظة فلوسك"
+              : preferredWalletId === "one_cash"
+                ? "محفظة ون كاش"
+                : "محفظة جوالي"),
         reference: "",
       };
     }
@@ -214,8 +241,8 @@ export function SplitPaymentsManager({
                   <span className="text-[10px] text-muted-foreground font-mono">#{index + 1}</span>
                 </div>
 
-                {/* الحساب المستلم / الصندوق */}
-                <div className="flex-1 min-w-[140px]">
+                {/* الحساب المستلم / المحفظة / الصندوق */}
+                <div className="flex-1 min-w-[170px]">
                   {isCash ? (
                     <select
                       value={line.cashboxId || ""}
@@ -227,7 +254,7 @@ export function SplitPaymentsManager({
                           cashboxName: box?.name_ar || null,
                         });
                       }}
-                      className="h-8 w-full rounded-lg border border-border/80 bg-background px-2 text-xs font-medium outline-none"
+                      className="h-8.5 w-full rounded-xl border border-border/80 bg-background px-2.5 text-xs font-semibold outline-none focus:border-emerald-500"
                     >
                       {activeCashboxes.map((box) => (
                         <option key={box.id} value={box.id}>
@@ -244,12 +271,12 @@ export function SplitPaymentsManager({
                         handleUpdateLine(line.id, {
                           bankAccountId: e.target.value,
                           bankAccountName: bank?.name_ar || null,
-                          paymentMethodId: bank?.bank_name.includes("كريمي")
+                          paymentMethodId: bank?.bank_name?.includes("كريمي")
                             ? "kuraimi_bank"
                             : "bank_transfer",
                         });
                       }}
-                      className="h-8 w-full rounded-lg border border-border/80 bg-background px-2 text-xs font-medium outline-none"
+                      className="h-8.5 w-full rounded-xl border border-border/80 bg-background px-2.5 text-xs font-semibold outline-none focus:border-indigo-500"
                     >
                       {banks.length === 0 && (
                         <option value="">
@@ -263,34 +290,108 @@ export function SplitPaymentsManager({
                       ))}
                     </select>
                   ) : (
-                    <select
-                      value={line.bankAccountId || ""}
-                      disabled={disabled}
-                      onChange={(e) => {
-                        const wallet = wallets.find((w) => w.id === e.target.value);
-                        handleUpdateLine(line.id, {
-                          bankAccountId: e.target.value,
-                          bankAccountName: wallet?.name_ar || null,
-                          paymentMethodId: wallet?.name_ar.includes("جوالي")
-                            ? "jawali"
-                            : wallet?.name_ar.includes("جيب")
-                              ? "jaib"
-                              : "mobile_money",
-                        });
-                      }}
-                      className="h-8 w-full rounded-lg border border-border/80 bg-background px-2 text-xs font-medium outline-none"
-                    >
-                      {wallets.length === 0 && (
-                        <option value="">
-                          {isAr ? "محفظة جوالي (افتراضي)" : "Jawali (Default)"}
-                        </option>
-                      )}
-                      {wallets.map((w) => (
-                        <option key={w.id} value={w.id}>
-                          {w.name_ar}
-                        </option>
-                      ))}
-                    </select>
+                    /* اختيار المحفظة الإلكترونية بقائمة منسدلة احترافية مع الشعار والاسم */
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild disabled={disabled}>
+                        <button
+                          type="button"
+                          className="h-8.5 w-full flex items-center justify-between gap-1.5 rounded-xl border border-sky-500/30 bg-background px-2.5 text-xs font-semibold hover:bg-sky-500/5 transition outline-none"
+                        >
+                          <div className="flex items-center gap-2 truncate">
+                            {(() => {
+                              const asset = paymentMethodIconAsset(line.paymentMethodId || "jaib");
+                              if (asset) {
+                                return (
+                                  <img
+                                    src={asset.src}
+                                    alt={asset.alt}
+                                    className="h-4 w-4 object-contain shrink-0"
+                                  />
+                                );
+                              }
+                              return <Smartphone className="h-4 w-4 text-sky-600 shrink-0" />;
+                            })()}
+                            <span className="truncate">
+                              {line.bankAccountName ||
+                                (line.paymentMethodId === "jaib"
+                                  ? isAr
+                                    ? "محفظة جيب"
+                                    : "Jaib"
+                                  : line.paymentMethodId === "floosak"
+                                    ? isAr
+                                      ? "محفظة فلوسك"
+                                      : "Floosak"
+                                    : line.paymentMethodId === "one_cash"
+                                      ? isAr
+                                        ? "محفظة ون كاش"
+                                        : "One Cash"
+                                      : isAr
+                                        ? "محفظة جوالي"
+                                        : "Jawali")}
+                            </span>
+                          </div>
+                          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-56 p-1 rounded-2xl shadow-xl">
+                        <DropdownMenuLabel className="text-[10px] text-muted-foreground font-semibold px-2 py-1">
+                          {isAr ? "اختر المحفظة المستلمة" : "Select Wallet"}
+                        </DropdownMenuLabel>
+                        <DropdownMenuSeparator className="my-1" />
+                        {KNOWN_WALLETS.map((kw) => {
+                          const linkedAccount = wallets.find((w) =>
+                            kw.id === "jaib"
+                              ? w.name_ar.includes("جيب")
+                              : kw.id === "floosak"
+                                ? w.name_ar.includes("فلوسك")
+                                : kw.id === "one_cash"
+                                  ? w.name_ar.includes("كاش")
+                                  : w.name_ar.includes("جوالي"),
+                          );
+                          const isSelected =
+                            line.paymentMethodId === kw.id ||
+                            (line.bankAccountId && linkedAccount?.id === line.bankAccountId);
+                          const asset = paymentMethodIconAsset(kw.id);
+
+                          return (
+                            <DropdownMenuItem
+                              key={kw.id}
+                              onClick={() => {
+                                handleUpdateLine(line.id, {
+                                  paymentMethodId: kw.id,
+                                  bankAccountId: linkedAccount?.id || null,
+                                  bankAccountName:
+                                    linkedAccount?.name_ar || (isAr ? kw.nameAr : kw.nameEn),
+                                });
+                              }}
+                              className={cn(
+                                "flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl cursor-pointer text-xs transition",
+                                isSelected &&
+                                  "bg-sky-500/15 font-bold text-sky-950 dark:text-sky-200",
+                              )}
+                            >
+                              <div className="flex items-center gap-2 truncate">
+                                {asset ? (
+                                  <img
+                                    src={asset.src}
+                                    alt={asset.alt}
+                                    className="h-4 w-4 object-contain shrink-0"
+                                  />
+                                ) : (
+                                  <Smartphone className="h-4 w-4 text-sky-600 shrink-0" />
+                                )}
+                                <span className="truncate">
+                                  {linkedAccount?.name_ar || (isAr ? kw.nameAr : kw.nameEn)}
+                                </span>
+                              </div>
+                              {isSelected && (
+                                <Check className="h-3.5 w-3.5 text-sky-600 shrink-0" />
+                              )}
+                            </DropdownMenuItem>
+                          );
+                        })}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   )}
                 </div>
 
@@ -298,15 +399,15 @@ export function SplitPaymentsManager({
                 <div className="w-32 shrink-0">
                   <div className="relative">
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="decimal"
                       min={0}
-                      step="any"
                       dir="ltr"
                       disabled={disabled}
                       value={line.amount === 0 ? "" : line.amount}
                       onChange={(e) =>
                         handleUpdateLine(line.id, {
-                          amount: Math.max(0, Number(e.target.value) || 0),
+                          amount: Math.max(0, Number(e.target.value.replace(/[^\d.]/g, "")) || 0),
                         })
                       }
                       placeholder="0.00"

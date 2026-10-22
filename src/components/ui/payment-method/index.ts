@@ -21,3 +21,9 @@ export {
   SplitPaymentsManager,
   type SplitPaymentsManagerProps,
 } from "@/components/payments/split-payments-manager";
+
+export {
+  CompactPaymentSelector,
+  type CompactPaymentSelectorProps,
+  type PaymentCategory,
+} from "./compact-payment-selector";
