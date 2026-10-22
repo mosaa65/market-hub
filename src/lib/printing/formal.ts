@@ -2,6 +2,7 @@ import type { UnifiedDocumentData, InvoiceLabels, CustomFieldOptions } from "@/l
 import { escapeHtml, formatMoney } from "@/lib/templates/types";
 import type { CompanyProfile } from "./company-profile";
 import { getCachedCompanyProfile } from "./company-profile";
+import { formatPrintedDateTime } from "./date-time";
 import { renderInvoiceRightsFooter, UNIVERSAL_FOOTER_CSS } from "./footer";
 
 export function renderFormalTemplate(
@@ -12,6 +13,7 @@ export function renderFormalTemplate(
   company: CompanyProfile = getCachedCompanyProfile(),
 ): string {
   const e = escapeHtml;
+  doc = { ...doc, date: formatPrintedDateTime(doc.date) };
   const opts = {
     showCompanyInfo: true,
     showCustomerInfo: true,
@@ -26,14 +28,24 @@ export function renderFormalTemplate(
   // `doc.options` must not re-enable a footer the caller disabled.
   if (options?.showFooter === false) opts.showFooter = false;
   // An explicit `options.company` (or the 5th argument) wins over the cache.
-  const resolvedCompany = options?.company ?? company;
+  const profileCompany = options?.company ?? company;
+  const resolvedCompany = {
+    ...profileCompany,
+    legalName:
+      profileCompany.englishName || doc.company?.englishName || profileCompany.legalName || "",
+  };
   // `money` يُعرّف بعد resolvedCompany لأنه يعتمد عليها.
   const money = (n?: number) => formatMoney(n ?? 0, doc.currency ?? resolvedCompany.currency ?? "");
-  const companyName = resolvedCompany.name || doc.company?.name || "";
+  const companyName =
+    resolvedCompany.arabicName ||
+    doc.company?.arabicName ||
+    resolvedCompany.name ||
+    doc.company?.name ||
+    "";
   const rows = doc.lines
     .map(
       (line, i) =>
-        `<tr><td>${i + 1}</td><td><strong>${e(line.product)}</strong>${line.code ? `<small>${e(line.code)}</small>` : ""}</td><td dir="ltr">${e(line.qty)} ${e(line.unit || "")}</td><td dir="ltr">${money(line.price)}</td><td dir="ltr">${money(line.total ?? line.qty * (line.price ?? 0))}</td></tr>`,
+        `<tr><td>${i + 1}</td><td><strong>${e(line.product)}</strong></td><td dir="ltr">${e(line.qty)} ${e(line.unit || "")}</td><td dir="ltr">${money(line.price)}</td><td dir="ltr">${money(line.total ?? line.qty * (line.price ?? 0))}</td></tr>`,
     )
     .join("");
   const footer = renderInvoiceRightsFooter();

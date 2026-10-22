@@ -7,6 +7,7 @@ import {
 } from "./types";
 import { generateBarcodeSvg, generateQrCodeSvg } from "@/lib/printing/barcode-qr";
 import { getCachedCompanyProfile } from "@/lib/printing/company-profile";
+import { formatPrintedDateTime } from "@/lib/printing/date-time";
 import { renderInvoiceRightsFooter, UNIVERSAL_FOOTER_CSS } from "@/lib/printing/footer";
 
 /**
@@ -40,6 +41,8 @@ export function renderThermalQrTemplate(
   };
 
   const companyName =
+    company.arabicName ||
+    doc.company?.arabicName ||
     doc.company?.legalName ||
     doc.company?.name ||
     company.legalName ||
@@ -62,7 +65,6 @@ export function renderThermalQrTemplate(
       </div>
       <div style="display: flex; justify-content: space-between; font-size: 10.5px; color: #64748b; margin-top: 1px;">
         <span>${l.qty} ${l.unit ? esc(l.unit) : ""} × ${money(l.price)}</span>
-        ${l.code ? `<span class="font-mono" style="font-size: 9px;">${esc(l.code)}</span>` : ""}
       </div>
     </div>`,
     )
@@ -73,7 +75,7 @@ export function renderThermalQrTemplate(
     `Seller: ${companyName}`,
     `TaxNo: ${companyVat || "N/A"}`,
     `Invoice: ${doc.number}`,
-    `Date: ${doc.date}`,
+    `Date: ${formatPrintedDateTime(doc.date)}`,
     `Total: ${doc.total || 0} ${c}`,
     `Tax: ${doc.tax || 0} ${c}`,
   ].join("\n");
@@ -172,7 +174,7 @@ export function renderThermalQrTemplate(
       </div>
       <div class="flex-between">
         <span style="color: #64748b;">التاريخ والوقت:</span>
-        <span class="font-mono">${esc(doc.date)}</span>
+        <span class="font-mono">${esc(formatPrintedDateTime(doc.date))}</span>
       </div>
     `
         : ""
@@ -207,6 +209,7 @@ export function renderThermalQrTemplate(
     `
         : ""
     }
+      ${doc.operatorName ? `<div class="flex-between"><span style="color: #64748b;">البائع / المستخدم:</span><span class="font-bold">${esc(doc.operatorName)}</span></div>` : ""}
 
     <div class="divider"></div>
 

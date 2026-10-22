@@ -1,4 +1,6 @@
 import { UnifiedDocumentData, InvoiceLabels, escapeHtml, CustomFieldOptions } from "./types";
+import { getCachedCompanyProfile } from "@/lib/printing/company-profile";
+import { formatPrintedDateTime } from "@/lib/printing/date-time";
 
 export function renderInventoryThermalTemplate(
   doc: UnifiedDocumentData,
@@ -7,6 +9,8 @@ export function renderInventoryThermalTemplate(
   options?: CustomFieldOptions,
 ): string {
   const esc = escapeHtml;
+  const company = getCachedCompanyProfile();
+  const companyArabicName = company.arabicName || doc.company?.arabicName || doc.company?.name || company.name;
   const opts = {
     showLogo: true,
     showCompanyInfo: true,
@@ -22,7 +26,7 @@ export function renderInventoryThermalTemplate(
     .map(
       (l, i) => `
     <div class="li">
-      <div class="ln">${i + 1}. ${esc(l.product)} ${l.code ? `<span class="code">(${esc(l.code)})</span>` : ""}</div>
+      <div class="ln">${i + 1}. ${esc(l.product)}</div>
       <div class="lr">
         <span>${L.qty}: <b>${l.qty} ${l.unit ? esc(l.unit) : ""}</b></span>
       </div>
@@ -53,7 +57,7 @@ export function renderInventoryThermalTemplate(
 <div class="r">
   <div class="c">
     <div class="badge">${esc(doc.title || (rtl ? "مستند حركة مخزون" : "Stock Movement Document"))}</div>
-    ${opts.showCompanyInfo && doc.company?.name ? `<h1>${esc(doc.company.name)}</h1>` : ""}
+    ${opts.showCompanyInfo && companyArabicName ? `<h1>${esc(companyArabicName)}</h1>` : ""}
     ${opts.showCompanyInfo && doc.company?.address ? `<div class="muted">${esc(doc.company.address)}</div>` : ""}
   </div>
   <div class="hr"></div>
@@ -62,7 +66,7 @@ export function renderInventoryThermalTemplate(
       ? `
   <div class="row"><span>${rtl ? "رقم المستند" : "Doc No"}:</span><b>#${esc(doc.number)}</b></div>
   ${doc.relatedRef ? `<div class="row"><span>${rtl ? "العملية المرتبطة" : "Ref No"}:</span><span>#${esc(doc.relatedRef)}</span></div>` : ""}
-  <div class="row"><span>${L.date}:</span><span>${esc(doc.date)}</span></div>
+  <div class="row"><span>${L.date}:</span><span>${esc(formatPrintedDateTime(doc.date))}</span></div>
   `
       : ""
   }
@@ -74,7 +78,7 @@ export function renderInventoryThermalTemplate(
   ${doc.movementType ? `<div class="row"><span>${rtl ? "نوع الحركة" : "Movement"}:</span><b>${esc(doc.movementType)}</b></div>` : ""}
   ${doc.warehouse ? `<div class="row"><span>${rtl ? "المستودع" : "Warehouse"}:</span><span>${esc(doc.warehouse)}</span></div>` : ""}
   ${doc.destinationWarehouse ? `<div class="row"><span>${rtl ? "المستودع الوجهة" : "Destination"}:</span><span>${esc(doc.destinationWarehouse)}</span></div>` : ""}
-  ${doc.operatorName ? `<div class="row"><span>${rtl ? "المسؤول" : "Operator"}:</span><span>${esc(doc.operatorName)}</span></div>` : ""}
+  ${doc.operatorName ? `<div class="row"><span>${rtl ? "البائع / المستخدم" : "Sold by"}:</span><span>${esc(doc.operatorName)}</span></div>` : ""}
   `
       : ""
   }
@@ -115,6 +119,11 @@ export function renderInventoryStandardTemplate(
   options?: CustomFieldOptions,
 ): string {
   const esc = escapeHtml;
+  const company = getCachedCompanyProfile();
+  const companyArabicName = company.arabicName || doc.company?.arabicName || doc.company?.name || company.name;
+  const companyEnglishName = company.englishName || doc.company?.englishName || "";
+  const companyAddress = company.address || doc.company?.address || "";
+  const companyPhone = company.phone || doc.company?.phone || "";
   const opts = {
     showLogo: true,
     showCompanyInfo: true,
@@ -131,7 +140,6 @@ export function renderInventoryStandardTemplate(
       (l, i) => `
     <tr>
       <td class="c">${i + 1}</td>
-      <td class="mono">${esc(l.code ?? "—")}</td>
       <td><b>${esc(l.product)}</b></td>
       <td class="c font-bold">${l.qty}</td>
       <td class="c">${esc(l.unit ?? "حبة")}</td>
@@ -176,9 +184,10 @@ export function renderInventoryStandardTemplate(
   <div class="content">
     <header>
       <div class="co">
-        ${opts.showCompanyInfo && doc.company?.name ? `<h1>${esc(doc.company.name)}</h1>` : "<h1>مستند مخزني</h1>"}
-        ${opts.showCompanyInfo && doc.company?.address ? `<div>${esc(doc.company.address)}</div>` : ""}
-        ${opts.showCompanyInfo && doc.company?.phone ? `<div>هاتف: ${esc(doc.company.phone)}</div>` : ""}
+        ${opts.showCompanyInfo && companyArabicName ? `<h1>${esc(companyArabicName)}</h1>` : "<h1>مستند مخزني</h1>"}
+        ${opts.showCompanyInfo && companyEnglishName ? `<div dir="ltr">${esc(companyEnglishName)}</div>` : ""}
+        ${opts.showCompanyInfo && companyAddress ? `<div>${esc(companyAddress)}</div>` : ""}
+        ${opts.showCompanyInfo && companyPhone ? `<div>هاتف: ${esc(companyPhone)}</div>` : ""}
       </div>
       <div class="inv">
         <div class="type-tag">${esc(doc.title || (rtl ? "مستند حركة مخزون" : "Stock Movement"))}</div>
@@ -187,7 +196,7 @@ export function renderInventoryStandardTemplate(
             ? `
         <div class="n">رقم المستند: #${esc(doc.number)}</div>
         ${doc.relatedRef ? `<div class="n">مرجع العملية: #${esc(doc.relatedRef)}</div>` : ""}
-        <div class="n">التاريخ: ${esc(doc.date)}</div>
+        <div class="n">التاريخ: ${esc(formatPrintedDateTime(doc.date))}</div>
         `
             : ""
         }
@@ -201,7 +210,7 @@ export function renderInventoryStandardTemplate(
       <div class="card"><div class="k">${rtl ? "نوع الحركة" : "Movement Type"}</div><div class="v">${esc(doc.movementType ?? "صرف / تحويل")}</div></div>
       <div class="card"><div class="k">${rtl ? "المستودع الرئيسي" : "Warehouse"}</div><div class="v">${esc(doc.warehouse ?? "—")}</div></div>
       <div class="card"><div class="k">${rtl ? "المستودع الوجهة" : "Destination"}</div><div class="v">${esc(doc.destinationWarehouse ?? "—")}</div></div>
-      <div class="card"><div class="k">${rtl ? "المسؤول / المشغل" : "Operator"}</div><div class="v">${esc(doc.operatorName ?? "—")}</div></div>
+      <div class="card"><div class="k">${rtl ? "البائع / المستخدم" : "Sold by"}</div><div class="v">${esc(doc.operatorName ?? "—")}</div></div>
     </div>
     `
         : ""
@@ -211,7 +220,6 @@ export function renderInventoryStandardTemplate(
       <thead>
         <tr>
           <th class="c" style="width:40px">#</th>
-          <th style="width:130px">${rtl ? "الرمز / الباركود" : "SKU"}</th>
           <th>${rtl ? "اسم المنتج / الصنف" : "Product Description"}</th>
           <th class="c" style="width:90px">${rtl ? "الكمية" : "Qty"}</th>
           <th class="c" style="width:80px">${rtl ? "الوحدة" : "Unit"}</th>

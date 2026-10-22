@@ -90,7 +90,7 @@ function TrialBalancePage() {
         : lang === "ar"
           ? "يوجد فارق تسوية في الأرصدة"
           : "Variance Detected",
-      date: new Date().toLocaleDateString(lang === "ar" ? "ar-YE" : "en-US"),
+      date: new Date().toISOString(),
       periodLabel:
         lang === "ar" ? "من دفتر الأستاذ — تراكمي" : "From the general ledger — cumulative",
       currency: getCompanyCurrencySymbol(),

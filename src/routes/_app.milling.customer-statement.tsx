@@ -59,7 +59,6 @@ import {
   fetchGrainItems,
   custodyMilling,
   custodyDelivery,
-  capacityKgOf,
   buildMillingDocumentUnifiedDoc,
   buildCustodyDeliveryDoc,
   type CustodyStatementRow,
@@ -1022,17 +1021,15 @@ function QuickMillingModal({
   const [customerId, setCustomerId] = useState(initialRow?.customer_id || "");
   const [warehouseId, setWarehouseId] = useState(initialRow?.warehouse_id || "");
   const [grainItemId, setGrainItemId] = useState(initialRow?.item_id || "");
-  const [grainCapacityKg, setGrainCapacityKg] = useState<string>("50");
 
-  // الحبوب المطحونة (الأكياس والوزن تبدأ فارغة لتفادي الـ 0 المزعج)
+  // الحبوب المطحونة — أكياس ووزن مستقلان (V2: بلا اشتقاق من أي سعة)
   const [bagsOut, setBagsOut] = useState("");
   const [kgOut, setKgOut] = useState("");
-  const [kgAuto, setKgAuto] = useState(true);
 
-  // نواتج الطحن (الدقيق والنخالة)
-  const [outputs, setOutputs] = useState<
-    { itemId: string; bags: string; kg: string; capacity: number }[]
-  >([{ itemId: "", bags: "", kg: "", capacity: 50 }]);
+  // نواتج الطحن (الدقيق والنخالة) — أكياس ووزن مستقلان لكل سطر
+  const [outputs, setOutputs] = useState<{ itemId: string; bags: string; kg: string }[]>([
+    { itemId: "", bags: "", kg: "" },
+  ]);
 
   const [notes, setNotes] = useState("");
 
@@ -1040,20 +1037,14 @@ function QuickMillingModal({
   const maxAvailableBags = initialRow ? Number(initialRow.remaining_bags ?? 0) : 9999;
   const maxAvailableKg = initialRow ? Number(initialRow.remaining_kg ?? 0) : 999999;
 
-  // عند تغيير عدد الأكياس المطحونة
+  // عند تغيير عدد الأكياس المطحونة — بلا احتساب تلقائي
   function handleBagsOutChange(v: string) {
     setBagsOut(v);
-    const n = Number(v) || 0;
-    const cap = Number(grainCapacityKg) || 0;
-    if (cap > 0 && (kgAuto || kgOut === "")) {
-      setKgOut(n > 0 ? String(n * cap) : "");
-      setKgAuto(true);
-    }
   }
 
   // إضافة ناتج جديد
   function addOutputLine() {
-    setOutputs((prev) => [...prev, { itemId: "", bags: "", kg: "", capacity: 50 }]);
+    setOutputs((prev) => [...prev, { itemId: "", bags: "", kg: "" }]);
   }
 
   // حذف سطر ناتج
@@ -1061,34 +1052,9 @@ function QuickMillingModal({
     setOutputs((prev) => prev.filter((_, i) => i !== index));
   }
 
-  // تعديل سطر ناتج
-  function updateOutputLine(index: number, field: "itemId" | "bags" | "kg" | "capacity", val: any) {
-    setOutputs((prev) => {
-      const copy = [...prev];
-      const cur = { ...copy[index], [field]: val };
-
-      // إذا غيّر الصنف أو السعة، نحسب الوزن تلقائياً إن وجدت أكياس
-      if (field === "itemId") {
-        const item = outputItems.find((o) => o.id === val);
-        if (item?.package_weight_kg) {
-          cur.capacity = item.package_weight_kg;
-          if (Number(cur.bags) > 0) cur.kg = String(Number(cur.bags) * cur.capacity);
-        }
-      } else if (field === "capacity") {
-        const cap = Number(val) || 0;
-        if (cap > 0 && Number(cur.bags) > 0) {
-          cur.kg = String(Number(cur.bags) * cap);
-        }
-      } else if (field === "bags") {
-        const b = Number(val) || 0;
-        if (cur.capacity > 0) {
-          cur.kg = b > 0 ? String(b * cur.capacity) : "";
-        }
-      }
-
-      copy[index] = cur;
-      return copy;
-    });
+  // تعديل سطر ناتج — بلا أي اشتقاق من السعة
+  function updateOutputLine(index: number, field: "itemId" | "bags" | "kg", val: any) {
+    setOutputs((prev) => prev.map((line, i) => (i !== index ? line : { ...line, [field]: val })));
   }
 
   // حساب إجمالي النواتج لمقارنتها بوزن الحبوب المطحونة
@@ -1233,26 +1199,9 @@ function QuickMillingModal({
           <div className="rounded-xl border border-border/80 bg-surface-2/40 p-3.5 space-y-3">
             <div className="flex items-center justify-between text-xs font-bold text-foreground">
               <span>كمية الحبوب المراد طحنها (المنصرف من الخام):</span>
-              <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-normal text-muted-foreground">سعة الكيس:</span>
-                {PRESET_CAPACITIES.slice(0, 3).map((cap) => (
-                  <button
-                    key={cap}
-                    type="button"
-                    onClick={() => {
-                      setGrainCapacityKg(String(cap));
-                      if (Number(bagsOut) > 0) setKgOut(String(Number(bagsOut) * cap));
-                    }}
-                    className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
-                      Number(grainCapacityKg) === cap
-                        ? "bg-amber-500 text-white"
-                        : "border border-border bg-card"
-                    }`}
-                  >
-                    {cap}كجم
-                  </button>
-                ))}
-              </div>
+              <span className="text-[11px] font-normal text-muted-foreground">
+                الأكياس والوزن مستقلان — الوزن من الميزان
+              </span>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
@@ -1279,7 +1228,6 @@ function QuickMillingModal({
                   value={kgOut === "" ? null : Number(kgOut)}
                   onValueChange={(v) => {
                     setKgOut(v == null ? "" : String(v));
-                    setKgAuto(false);
                   }}
                   className="font-bold"
                 />
@@ -1325,18 +1273,9 @@ function QuickMillingModal({
                     </MillingSelect>
                   </div>
 
-                  {/* سعة الكيس */}
-                  <div className="col-span-2">
-                    <MillingSelect
-                      value={line.capacity}
-                      onChange={(e) => updateOutputLine(idx, "capacity", Number(e.target.value))}
-                      className="text-center font-bold text-xs"
-                    >
-                      <option value={50}>50 كجم</option>
-                      <option value={25}>25 كجم</option>
-                      <option value={20}>20 كجم</option>
-                      <option value={10}>10 كجم</option>
-                    </MillingSelect>
+                  {/* سعة الكيس — معلومة وصفية فقط: لا تُقرأ ولا تُحسب منها */}
+                  <div className="col-span-2 rounded-lg border border-border/60 bg-muted/40 p-1.5 text-center">
+                    <span className="text-[10px] text-muted-foreground">سعة العبوة وصف فقط</span>
                   </div>
 
                   {/* عدد الأكياس */}
@@ -1753,13 +1692,25 @@ function CustomerCustodyHistoryModal({
 
   const lines = ledgerQuery.data ?? [];
 
+  // E4ب: دفتر حركة الأمانات — فلترة بالنوع (INTAKE/MILLING/DELIVERY/ADJUSTMENT)
+  const [typeFilter, setTypeFilter] = useState("ALL");
+  const TYPE_FILTERS = [
+    { v: "ALL", label: "الكل", tone: "" },
+    { v: "INTAKE", label: "استلام", tone: "text-emerald-600" },
+    { v: "MILLING", label: "طحن", tone: "text-amber-600" },
+    { v: "DELIVERY", label: "تسليم", tone: "text-blue-600" },
+    { v: "ADJUSTMENT", label: "تسويات", tone: "text-rose-600" },
+  ] as const;
+  const filteredLines =
+    typeFilter === "ALL" ? lines : lines.filter((l: any) => l.entry_type === typeFilter);
+
   // إعداد مستند للطباعة الموحدة
   function handlePrintStatement() {
     const doc: UnifiedDocumentData = {
       docType: "mill_document",
       title: "كشف حساب أمانات العميل العيني",
       number: `CUST-${row.customer_id.slice(0, 8).toUpperCase()}`,
-      date: new Date().toLocaleDateString("ar-YE"),
+      date: new Date().toISOString(),
       partyLabel: "صاحب الأمانة / العميل:",
       partyName: row.customer_name_ar,
       warehouse: row.warehouse_name_ar || "المستودع الرئيسي",
@@ -1857,13 +1808,30 @@ function CustomerCustodyHistoryModal({
 
         {/* جدول الحركات */}
         <div className="p-4 max-h-96 overflow-y-auto">
+          {/* E4ب: فلترة دفتر الحركة بالنوع */}
+          <div className="mb-3 flex flex-wrap items-center gap-1.5">
+            {TYPE_FILTERS.map((f) => (
+              <button
+                key={f.v}
+                type="button"
+                onClick={() => setTypeFilter(f.v)}
+                className={`rounded-full border px-3 py-1 text-[11px] font-bold transition ${
+                  typeFilter === f.v
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
           {ledgerQuery.isLoading ? (
             <div className="p-8 text-center text-xs text-muted-foreground">
               جارٍ تحميل سجل الحركات…
             </div>
-          ) : lines.length === 0 ? (
+          ) : filteredLines.length === 0 ? (
             <div className="p-8 text-center text-xs text-muted-foreground">
-              لا توجد حركات مسجلة لهذا الصنف.
+              لا توجد حركات مطابقة لهذا الصنف.
             </div>
           ) : (
             <table className="w-full text-xs">
@@ -1878,7 +1846,7 @@ function CustomerCustodyHistoryModal({
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/30">
-                {lines.map((l: any) => (
+                {filteredLines.map((l: any) => (
                   <tr key={l.id} className="hover:bg-muted/30">
                     <td className="py-2.5 font-bold">
                       {l.entry_type === "INTAKE" ? (
@@ -1887,6 +1855,8 @@ function CustomerCustodyHistoryModal({
                         <span className="text-amber-600">طحن</span>
                       ) : l.entry_type === "DELIVERY" ? (
                         <span className="text-blue-600">تسليم ناتج</span>
+                      ) : l.entry_type === "ADJUSTMENT" ? (
+                        <span className="text-rose-600">تسوية موثّقة</span>
                       ) : (
                         <span>تعديل</span>
                       )}

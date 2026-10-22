@@ -317,7 +317,7 @@ export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
       accentColor,
       // حتى ينعكس تفعيل/إلغاء الباركود و QR لهذا القسم فعلياً على المعاينة.
       showBarcode: override?.showBarcode ?? unified.showBarcode ?? true,
-      showQrCode: override?.showQrCode ?? unified.showQrCode ?? true,
+      showQrCode: override?.showQrCode ?? unified.showQrCode ?? false,
       showSignatures: override?.showSignatures ?? unified.showSignatures ?? false,
     };
   }, [sampleDoc, previewDocType, previewTemplateOverride, previewPaperOverride, unified]);
@@ -650,7 +650,7 @@ export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
                             <div className="flex items-center justify-between p-2 rounded-xl border border-border/60 bg-background/60">
                               <span className="text-xs font-medium">رمز QR الإلكتروني</span>
                               <Switch
-                                checked={override.showQrCode ?? unified.showQrCode ?? true}
+                                checked={override.showQrCode ?? unified.showQrCode ?? false}
                                 onCheckedChange={() =>
                                   handleDepartmentBarcodeToggle(dept.id, "showQrCode")
                                 }

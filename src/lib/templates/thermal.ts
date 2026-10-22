@@ -6,6 +6,8 @@ import {
   CustomFieldOptions,
 } from "./types";
 import { renderInvoiceRightsFooter } from "@/lib/printing/footer";
+import { getCachedCompanyProfile } from "@/lib/printing/company-profile";
+import { formatPrintedDateTime } from "@/lib/printing/date-time";
 
 export function renderThermalTemplate(
   doc: UnifiedDocumentData,
@@ -16,6 +18,8 @@ export function renderThermalTemplate(
   const c = doc.currency ?? "";
   const esc = escapeHtml;
   const money = (n?: number) => formatMoney(n, c);
+  const company = getCachedCompanyProfile();
+  const companyArabicName = company.arabicName || doc.company?.arabicName || doc.company?.name || company.name;
   const opts = {
     showLogo: true,
     showCompanyInfo: true,
@@ -62,7 +66,7 @@ export function renderThermalTemplate(
 </style></head><body onload="window.print()">
 <div class="r">
   <div class="c">
-    ${opts.showCompanyInfo && doc.company?.name ? `<h1>${esc(doc.company.name)}</h1>` : ""}
+    ${opts.showCompanyInfo && companyArabicName ? `<h1>${esc(companyArabicName)}</h1>` : ""}
     ${opts.showCompanyInfo && doc.company?.address ? `<div class="muted">${esc(doc.company.address)}</div>` : ""}
     ${opts.showCompanyInfo && doc.company?.phone ? `<div class="muted">${esc(doc.company.phone)}</div>` : ""}
     ${opts.showCompanyInfo && doc.company?.vat ? `<div class="muted">VAT: ${esc(doc.company.vat)}</div>` : ""}
@@ -72,12 +76,13 @@ export function renderThermalTemplate(
     opts.showDocNumberDate
       ? `
   <div class="row"><span>${L.invoice}</span><b>#${esc(doc.number)}</b></div>
-  <div class="row"><span>${L.date}</span><span>${esc(doc.date)}</span></div>
+  <div class="row"><span>${L.date}</span><span>${esc(formatPrintedDateTime(doc.date))}</span></div>
   `
       : ""
   }
   ${opts.showCustomerInfo && doc.partyName ? `<div class="row"><span>${L.billTo}</span><span>${esc(doc.partyName)}</span></div>` : ""}
   ${opts.showPaymentInfo && doc.payment ? `<div class="row"><span>${L.payment}</span><span>${esc(doc.payment)}</span></div>` : ""}
+  ${doc.operatorName ? `<div class="row"><span>${rtl ? "البائع / المستخدم" : "Sold by"}</span><span>${esc(doc.operatorName)}</span></div>` : ""}
   <div class="hr"></div>
   ${rows}
   <div class="hr"></div>

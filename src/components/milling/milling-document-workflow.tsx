@@ -524,7 +524,7 @@ export function MillingDocumentWorkflow({
           invoice={{
             id: details.sales_invoice_id,
             invoiceNumber: document.invoice_number,
-            date: new Date(details.received_at).toISOString().split("T")[0],
+            date: details.received_at,
             subtotal: invTotal,
             total: invTotal,
             paid: invPaid,

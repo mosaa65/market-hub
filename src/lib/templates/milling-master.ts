@@ -6,6 +6,7 @@ import {
   CustomFieldOptions,
 } from "./types";
 import { getCachedCompanyProfile } from "@/lib/printing/company-profile";
+import { formatPrintedDateTime } from "@/lib/printing/date-time";
 import { generateBarcodeSvg, generateQrCodeSvg } from "@/lib/printing/barcode-qr";
 import { numberToArabicWords } from "./tafqeet";
 import { renderInvoiceRightsFooter } from "@/lib/printing/footer";
@@ -38,7 +39,7 @@ export function renderMillingMasterTemplate(
     showSignatures: false,
     showFooter: false,
     showBarcode: true,
-    showQrCode: true,
+    showQrCode: false,
     ...options,
     ...doc.options,
   };
@@ -49,9 +50,9 @@ export function renderMillingMasterTemplate(
   );
 
   const compName = esc(
-    doc.company?.legalName ||
-      doc.company?.name ||
-      companyProfile.legalName ||
+      companyProfile.arabicName ||
+    doc.company?.arabicName ||
+    doc.company?.name ||
       companyProfile.name ||
       "المطحنة الحديثة لإنتاج الدقيق والأعلاف",
   );
@@ -66,7 +67,7 @@ export function renderMillingMasterTemplate(
   const qrSvg =
     opts.showQrCode && doc.number
       ? generateQrCodeSvg(
-          `${compName}\nرقم: ${doc.number}\nالتاريخ: ${doc.date}\nالإجمالي: ${doc.total || 0} ${c}`,
+          `${compName}\nرقم: ${doc.number}\nالتاريخ: ${formatPrintedDateTime(doc.date)}\nالإجمالي: ${doc.total || 0} ${c}`,
           75,
         )
       : "";
@@ -309,7 +310,7 @@ export function renderMillingMasterTemplate(
           ? `
       <div class="meta-item">
         <span class="meta-label">تاريخ ووقت المعاملة:</span>
-        <span class="meta-val">${esc(doc.date)}</span>
+        <span class="meta-val">${esc(formatPrintedDateTime(doc.date))}</span>
       </div>`
           : ""
       }
@@ -349,6 +350,7 @@ export function renderMillingMasterTemplate(
       </div>`
           : ""
       }
+      ${doc.operatorName ? `<div class="meta-item"><span class="meta-label">البائع / المستخدم:</span><span class="meta-val">${esc(doc.operatorName)}</span></div>` : ""}
     </div>
 
     <!-- Table of Lines -->
@@ -473,7 +475,7 @@ export function renderMillingMasterTemplate(
       opts.showFooter
         ? `
     <div class="inama-footer">
-      <span>تاريخ الطباعة: ${new Date().toLocaleDateString("ar-YE")}</span>
+      <span>تاريخ الطباعة: ${formatPrintedDateTime(new Date())}</span>
       ${L.poweredBy ? `<span class="inama-badge">${esc(L.poweredBy)}</span>` : ""}
     </div>`
         : ""
@@ -505,7 +507,7 @@ export function renderMillingThermalTemplate(
     showFinancialDetails: true,
     showFooter: false,
     showBarcode: true,
-    showQrCode: true,
+    showQrCode: false,
     ...options,
     ...doc.options,
   };
@@ -514,9 +516,9 @@ export function renderMillingThermalTemplate(
   const title = esc(doc.title || (isDelivery ? "إيصال تسليم أمانات" : "إيصال طحن واستلام فوري"));
 
   const compName = esc(
-    doc.company?.legalName ||
-      doc.company?.name ||
-      companyProfile.legalName ||
+      companyProfile.arabicName ||
+    doc.company?.arabicName ||
+    doc.company?.name ||
       companyProfile.name ||
       "المطحنة الحديثة",
   );
@@ -627,7 +629,7 @@ export function renderMillingThermalTemplate(
     opts.showDocNumberDate
       ? `
   <div class="flex-row"><span>رقم المستند:</span><span class="bold">#${esc(doc.number)}</span></div>
-  <div class="flex-row"><span>التاريخ:</span><span>${esc(doc.date)}</span></div>`
+  <div class="flex-row"><span>التاريخ:</span><span>${esc(formatPrintedDateTime(doc.date))}</span></div>`
       : ""
   }
 
@@ -638,6 +640,7 @@ export function renderMillingThermalTemplate(
   ${doc.partyPhone ? `<div class="flex-row"><span>الهاتف:</span><span>${esc(doc.partyPhone)}</span></div>` : ""}`
       : ""
   }
+  ${doc.operatorName ? `<div class="flex-row"><span>البائع / المستخدم:</span><span class="bold">${esc(doc.operatorName)}</span></div>` : ""}
 
   <div class="hairline-divider"></div>
 

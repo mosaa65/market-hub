@@ -214,13 +214,15 @@ export async function fetchWarehouses(): Promise<
 export async function fetchAccounts(): Promise<
   { id: string; code: string; name_ar: string; account_type: string }[]
 > {
-  const { data, error } = await db
-    .from("accounts")
-    .select("id, code, name_ar, account_type")
-    .eq("is_active", true)
-    .order("code");
-  if (error) return [];
-  return data ?? [];
+  return unwrap(
+    await db
+      .from("accounts")
+      .select("id, code, name_ar, account_type")
+      .eq("is_active", true)
+      .eq("is_postable", true)
+      .order("code"),
+    "تعذّر تحميل الحسابات القابلة للترحيل",
+  ) as { id: string; code: string; name_ar: string; account_type: string }[];
 }
 
 /* --------------------------------------------------------------- writes */
@@ -231,6 +233,22 @@ export async function createOpeningDocument(input: {
   notes?: string;
 }): Promise<string> {
   const { data, error } = await db.rpc("create_opening_balance", {
+    _effective_date: input.effectiveDate,
+    _lines: input.lines,
+    _notes: input.notes ?? null,
+  });
+  if (error) throw new Error(error.message);
+  return data as string;
+}
+
+export async function updateOpeningDocument(input: {
+  documentId: string;
+  effectiveDate: string;
+  lines: OpeningLineDraft[];
+  notes?: string;
+}): Promise<string> {
+  const { data, error } = await db.rpc("update_opening_balance", {
+    _document_id: input.documentId,
     _effective_date: input.effectiveDate,
     _lines: input.lines,
     _notes: input.notes ?? null,

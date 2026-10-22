@@ -1,4 +1,4 @@
-import {
+﻿import {
   UnifiedDocumentData,
   InvoiceLabels,
   escapeHtml,
@@ -6,6 +6,7 @@ import {
   CustomFieldOptions,
 } from "./types";
 import { getCachedCompanyProfile } from "@/lib/printing/company-profile";
+import { formatPrintedDateTime } from "@/lib/printing/date-time";
 import { renderInvoiceRightsFooter, UNIVERSAL_FOOTER_CSS } from "@/lib/printing/footer";
 import { numberToArabicWords } from "./tafqeet";
 import { generateBarcodeSvg, generateQrCodeSvg } from "@/lib/printing/barcode-qr";
@@ -39,17 +40,17 @@ export function renderMillingCleanTemplate(
     showSignatures: false,
     showFooter: false,
     showBarcode: true,
-    showQrCode: true,
+    showQrCode: false,
     ...options,
     ...doc.options,
   };
 
   const companyName =
-    doc.company?.arabicName || doc.company?.name || company.arabicName || company.name || "";
-  const englishName = doc.company?.englishName || company.englishName || "";
-  const companyAddress = doc.company?.address || company.address || "";
-  const companyPhone = doc.company?.phone || company.phone || "";
-  const companyVat = doc.company?.vat || company.taxNumber || "";
+    company.arabicName || doc.company?.arabicName || doc.company?.name || company.name || "";
+  const englishName = company.englishName || doc.company?.englishName || "";
+  const companyAddress = company.address || doc.company?.address || "";
+  const companyPhone = company.phone || doc.company?.phone || "";
+  const companyVat = company.taxNumber || doc.company?.vat || "";
 
   const docTitle =
     doc.title ||
@@ -68,7 +69,6 @@ export function renderMillingCleanTemplate(
       <td style="text-align: center; font-family: monospace; color: #64748b;">${idx + 1}</td>
       <td>
         <div style="font-weight: 700; color: #0f172a;">${esc(l.product)}</div>
-        ${l.code ? `<div style="font-size: 10px; color: #94a3b8; font-family: monospace;">SKU: ${esc(l.code)}</div>` : ""}
       </td>
       <td style="text-align: center; font-family: monospace; font-weight: 600;">
         ${l.qty} ${l.unit ? `<span style="font-size: 10.5px; color: #64748b;">${esc(l.unit)}</span>` : ""}
@@ -250,7 +250,7 @@ export function renderMillingCleanTemplate(
               #${esc(doc.number)}
             </div>
             <div style="color: #64748b; font-size: 11px; margin-top: 1px;">
-              ${esc(doc.date)}
+              ${esc(formatPrintedDateTime(doc.date))}
             </div>
           `
               : ""
@@ -289,6 +289,7 @@ export function renderMillingCleanTemplate(
             `
                 : ""
             }
+            ${doc.operatorName ? `<div style="margin-top: 3px;"><span style="color: #64748b;">${rtl ? "البائع / المستخدم:" : "Sold by:"}</span><strong style="margin: 0 6px; color: #0f172a;">${esc(doc.operatorName)}</strong></div>` : ""}
           </div>
         </div>
       `
@@ -388,7 +389,6 @@ export function renderMillingCleanTemplate(
                 ? `
               <div class="total-row" style="margin-top: 6px; color: #047857; font-weight: 700;">
                 <span>المدفوع:</span>
-                <span style="font-family: monospace;">${money(doc.paid)}</span>
               </div>
             `
                 : ""

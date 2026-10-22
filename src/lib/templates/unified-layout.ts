@@ -33,23 +33,10 @@ import { renderInvoiceRightsFooter } from "@/lib/printing/footer";
 import { getCachedCompanyProfile, type CompanyProfile } from "@/lib/printing/company-profile";
 import { generateBarcodeSvg, generateQrCodeSvg } from "@/lib/printing/barcode-qr";
 import { getUnifiedPrintSettings } from "@/lib/printing/settings";
+import { formatPrintedDateTime } from "@/lib/printing/date-time";
 import type { PaperProfileId } from "./paper-profiles";
 
-export function formatPrintedDateTime(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Aden",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(date);
-  const part = (type: string) => parts.find((entry) => entry.type === type)?.value ?? "";
-  return `${part("day")}/${part("month")}/${part("year")} ${part("hour")}:${part("minute")}`;
-}
+export { formatPrintedDateTime };
 
 export interface UnifiedLayoutOptions extends CustomFieldOptions {
   /** نمط المستند — يغيّر الهيكل والسمة البصرية (standard / luxury / formal). */
@@ -79,7 +66,7 @@ function themeCss(
   const containerPadding = isA5 ? "4mm 6mm" : "8mm 10mm";
   const containerMinHeight = isA5 ? "200mm" : "282mm";
   const headerPadding = isA5 ? "6px 8px" : "10px 14px";
-  const logoBoxSize = isA5 ? "42px" : "58px";
+  const logoBoxSize = isA5 ? "54px" : "76px";
   const companyTitleSize = isA5 ? "13.5px" : "17.5px";
   const companySubtitleSize = isA5 ? "8px" : "9.5px";
   const invoiceTitleSize = isA5 ? "14px" : "18px";
@@ -91,6 +78,7 @@ function themeCss(
   const notesPadding = isA5 ? "6px 8px" : "9px 12px";
   const totalsPadding = isA5 ? "6px 8px" : "9px 12px";
   const totalAmountSize = isA5 ? "13px" : "16px";
+  const corporateLogoBoxSize = isA5 ? "46px" : "60px";
 
   const primaryAccent = t.accent;
   const softAccent = t.accentSoft;
@@ -206,6 +194,39 @@ function themeCss(
       margin-top: 4px;
       text-align: center;
     }
+    .invoice-document-heading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      margin: ${isA5 ? "-2px 0 7px" : "-3px 0 10px"};
+      text-align: center;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+    .invoice-document-heading h2 {
+      margin: 0;
+      color: var(--print-accent);
+      font-size: ${isA5 ? "14px" : "18px"};
+      font-weight: 900;
+      line-height: 1.25;
+    }
+    .invoice-document-meta {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 5px 10px;
+      color: var(--print-muted);
+      font-size: ${isA5 ? "8px" : "9.5px"};
+      font-weight: 700;
+    }
+    .invoice-document-number {
+      direction: ltr;
+      unicode-bidi: isolate;
+      color: var(--print-ink);
+      font-family: ui-monospace, 'Courier New', monospace;
+    }
     .luxury-logo-box {
       width: ${logoBoxSize};
       height: ${logoBoxSize};
@@ -275,8 +296,37 @@ function themeCss(
       justify-content: center;
       flex-shrink: 0;
     }
-    .luxury-barcode-line {
-      margin-top: 2px;
+    .invoice-code-markers-bottom {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: ${isA5 ? "10px" : "14px"};
+      margin: ${isA5 ? "5px 0 2px" : "8px 0 3px"};
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+    .invoice-barcode-bottom > svg {
+      width: auto;
+      max-width: min(220px, 70vw);
+      max-height: ${isA5 ? "30px" : "36px"};
+    }
+    .invoice-qr-bottom {
+      display: flex;
+      width: ${isA5 ? "34px" : "42px"};
+      height: ${isA5 ? "34px" : "42px"};
+      flex: 0 0 auto;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      border: 1px solid var(--print-line);
+      border-radius: 4px;
+      background: #fff;
+      padding: 2px;
+    }
+    .invoice-qr-bottom svg {
+      display: block;
+      width: 100%;
+      height: 100%;
     }
 
     /* ══════════════════════════════════════════════════════════════
@@ -308,8 +358,8 @@ function themeCss(
     .corporate-center-block { display:flex; flex-direction:column; align-items:center; gap:3px; min-width:0; text-align:center; }
     .corporate-english-block { display:flex; flex-direction:column; align-items:flex-start; gap:2px; min-width:0; text-align:left; direction:ltr; }
     .corporate-logo-box {
-      width: ${isA5 ? "34px" : "44px"};
-      height: ${isA5 ? "34px" : "44px"};
+      width: ${corporateLogoBoxSize};
+      height: ${corporateLogoBoxSize};
       display: flex;
       align-items: center;
       justify-content: center;
@@ -681,7 +731,7 @@ export function renderUnifiedLayout(
     showSignatures: false,
     showFooter: false,
     showBarcode: true,
-    showQrCode: true,
+    showQrCode: false,
     ...options,
     ...doc.options,
   };
@@ -690,7 +740,7 @@ export function renderUnifiedLayout(
   const qrPayload = [
     `Seller: ${company.name || "Company"}`,
     `Invoice: ${doc.number}`,
-    `Date: ${doc.date}`,
+    `Date: ${formatPrintedDateTime(doc.date)}`,
     `Total: ${doc.total || 0} ${c}`,
   ].join("\n");
 
@@ -698,13 +748,13 @@ export function renderUnifiedLayout(
     opts.showBarcode !== false && doc.number ? generateBarcodeSvg(doc.number, isA5 ? 14 : 18) : "";
   const qrSvg = opts.showQrCode !== false ? generateQrCodeSvg(qrPayload, isA5 ? 40 : 50) : "";
 
-  const companyName = company.name || doc.company?.name || "";
-  const arabicName = doc.company?.arabicName || company.arabicName || companyName;
-  const englishName = doc.company?.englishName || company.englishName || "";
-  const companyAddress = doc.company?.address || company.address || "";
-  const companyPhone = doc.company?.phone || company.phone || "";
-  const companyVat = doc.company?.vat || company.taxNumber || "";
-  const companyEmail = doc.company?.email || company.email || "";
+  const companyName = company.arabicName || doc.company?.arabicName || company.name || doc.company?.name || "";
+  const arabicName = company.arabicName || doc.company?.arabicName || doc.company?.name || companyName;
+  const englishName = company.englishName || doc.company?.englishName || "";
+  const companyAddress = company.address || doc.company?.address || "";
+  const companyPhone = company.phone || doc.company?.phone || "";
+  const companyVat = company.taxNumber || doc.company?.vat || "";
+  const companyEmail = company.email || doc.company?.email || "";
 
   const lines = doc.lines || [];
   const rows = lines
@@ -716,7 +766,6 @@ export function renderUnifiedLayout(
       <td class="col-idx">${i + 1}</td>
       <td class="col-desc">
         <div class="prod-name">${esc(l.product)}</div>
-        ${l.code ? `<div class="prod-code">${rtl ? "الرمز" : "Code"}: ${esc(l.code)}</div>` : ""}
       </td>
       <td class="col-qty num-isolated">${l.qty} ${l.unit ? esc(l.unit) : rtl ? "حبة" : ""}</td>
       <td class="col-price num-isolated">${money(itemPrice)}</td>
@@ -771,7 +820,7 @@ export function renderUnifiedLayout(
           ${companyPhone ? `<div class="luxury-meta-line"><span><b>الهاتف:</b> <span dir="ltr">${esc(companyPhone)}</span></span></div>` : ""}
         </div>
 
-        <!-- المنتصف: الشعار ونوع المستند ورقمه وتاريخه -->
+        <!-- المنتصف: الشعار -->
         <div class="luxury-header-center">
           ${
             opts.showLogo
@@ -781,11 +830,6 @@ export function renderUnifiedLayout(
           </div>`
               : "<div></div>"
           }
-          <div class="luxury-document-meta">
-            <div class="luxury-inv-badge-title">${esc(doc.title || (rtl ? "مستند" : "Document"))}</div>
-            <div class="luxury-inv-num-pill">${esc(doc.number)}</div>
-            ${opts.showDocNumberDate ? `<div class="luxury-inv-date-line" dir="ltr">${esc(formatPrintedDateTime(doc.date))}</div>` : ""}
-          </div>
         </div>
 
         <!-- اليسار: بيانات المنشأة الإنجليزية -->
@@ -795,19 +839,18 @@ export function renderUnifiedLayout(
             ${companyVat ? `<div class="luxury-meta-line"><b>Tax ID:</b> <span dir="ltr">${esc(companyVat)}</span></div>` : ""}
             ${companyPhone ? `<div class="luxury-meta-line"><b>Phone:</b> <span dir="ltr">${esc(companyPhone)}</span></div>` : ""}
             ${companyEmail ? `<div class="luxury-meta-line"><b>Email:</b> <span dir="ltr">${esc(companyEmail)}</span></div>` : ""}
-            ${barcodeSvg ? `<div class="luxury-barcode-line">${barcodeSvg}</div>` : ""}
           </div>
-          ${
-            qrSvg
-              ? `
-          <div class="luxury-qr-box">
-            ${qrSvg}
-          </div>`
-              : ""
-          }
         </div>
       </div>
     </header>
+
+    <section class="invoice-document-heading">
+      <h2>${esc(doc.title || (rtl ? "فاتورة مبيعات نقدية" : "Cash Sales Invoice"))}</h2>
+      <div class="invoice-document-meta">
+        <span class="invoice-document-number">${esc(doc.number)}</span>
+        ${opts.showDocNumberDate ? `<span dir="ltr">${rtl ? "التاريخ والوقت:" : "Date &amp; time:"} ${esc(formatPrintedDateTime(doc.date))}</span>` : ""}
+      </div>
+    </section>
 
     <!-- ══════════ بطاقات العميل وبيانات الحركة والدفع ══════════ -->
     <div class="party-info-grid">
@@ -845,7 +888,7 @@ export function renderUnifiedLayout(
         </div>`
             : ""
         }
-        ${doc.operatorName ? `<div class="party-card-row"><span>الموظف المسؤول:</span> <span>${esc(doc.operatorName)}</span></div>` : ""}
+        ${doc.operatorName ? `<div class="party-card-row"><span>${rtl ? "البائع / المستخدم:" : "Sold by:"}</span> <span>${esc(doc.operatorName)}</span></div>` : ""}
       </div>
     </div>`
         : `<!-- ══════════ ترويسة القالب القياسي العملي المضغوط ══════════ -->
@@ -860,12 +903,9 @@ export function renderUnifiedLayout(
           ${companyAddress ? `<div class="corporate-brand-details">${esc(companyAddress)}</div>` : ""}
         </div>
 
-        <!-- المنتصف: الشعار ونوع المستند ورقمه وتاريخه -->
+        <!-- المنتصف: الشعار فقط -->
         <div class="corporate-center-block">
           ${opts.showLogo ? `<div class="corporate-logo-box"><img src="${esc(logoUrl)}" alt="Logo" onerror="this.onerror=null; this.src='${DEFAULT_COMPANY_LOGO}';" /></div>` : ""}
-          <h2 class="corporate-inv-title">${esc(doc.title || (rtl ? "مستند" : "Document"))}</h2>
-          <div class="corporate-inv-meta" dir="ltr">${esc(doc.number)}</div>
-          ${opts.showDocNumberDate ? `<div class="corporate-inv-meta" dir="ltr">${esc(formatPrintedDateTime(doc.date))}</div>` : ""}
         </div>
 
         <!-- اليسار: بيانات المنشأة الإنجليزية -->
@@ -874,11 +914,17 @@ export function renderUnifiedLayout(
           ${companyVat ? `<div class="corporate-brand-details" dir="ltr">Tax ID: ${esc(companyVat)}</div>` : ""}
           ${companyPhone ? `<div class="corporate-brand-details" dir="ltr">Phone: ${esc(companyPhone)}</div>` : ""}
           ${companyEmail ? `<div class="corporate-brand-details" dir="ltr">${esc(companyEmail)}</div>` : ""}
-          ${barcodeSvg ? `<div>${barcodeSvg}</div>` : ""}
-          ${qrSvg ? `<div style="width:${isA5 ? "38px" : "46px"};">${qrSvg}</div>` : ""}
         </div>
       </div>
     </header>
+
+    <section class="invoice-document-heading">
+      <h2>${esc(doc.title || (rtl ? "فاتورة مبيعات نقدية" : "Cash Sales Invoice"))}</h2>
+      <div class="invoice-document-meta">
+        <span class="invoice-document-number">${esc(doc.number)}</span>
+        ${opts.showDocNumberDate ? `<span dir="ltr">${rtl ? "التاريخ والوقت:" : "Date &amp; time:"} ${esc(formatPrintedDateTime(doc.date))}</span>` : ""}
+      </div>
+    </section>
 
     <!-- شريط العميل الموحد المضغوط لتوفير المساحة الرأسية للأصناف -->
     <div class="party-info-compact-bar">
@@ -895,6 +941,7 @@ export function renderUnifiedLayout(
         <span>الحالة:</span>
         <b>${esc(doc.status || (rtl ? "مدفوعة" : "Paid"))}</b>
       </div>
+      ${doc.operatorName ? `<div class="party-compact-item"><span>${rtl ? "البائع:" : "Sold by:"}</span> <b>${esc(doc.operatorName)}</b></div>` : ""}
       ${doc.warehouse ? `<div class="party-compact-item"><span>المستودع:</span> <b>${esc(doc.warehouse)}</b></div>` : ""}
     </div>`
     }
@@ -1009,6 +1056,7 @@ export function renderUnifiedLayout(
     </div>`
         : ""
     }
+      ${barcodeSvg || qrSvg ? `<div class="invoice-code-markers-bottom">${barcodeSvg ? `<div class="invoice-barcode-bottom">${barcodeSvg}</div>` : ""}${qrSvg ? `<div class="invoice-qr-bottom">${qrSvg}</div>` : ""}</div>` : ""}
   </div>
 
   ${renderInvoiceRightsFooter()}

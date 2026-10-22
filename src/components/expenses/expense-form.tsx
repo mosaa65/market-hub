@@ -25,7 +25,6 @@ import { AmountInput } from "@/components/ui/amount-input";
 import { VortexDrawerDialog } from "@/components/vortex-ui";
 import { DynamicPaymentSelector } from "@/components/ui/payment-method/dynamic-payment-selector";
 import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
-import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { useExpenseMutations, type ExpenseLineInput } from "@/hooks/use-expenses";
 import { parseAmount, roundMoney, today } from "@/lib/expenses/query-keys";
 import type {
@@ -115,7 +114,7 @@ export function ExpenseFormDialog({
   const ar = lang === "ar";
   const mutations = useExpenseMutations();
 
-  // وضع العملية المحاسبية المنفصلة
+  // وضع العملية: جديد = سند صرف دائماً (المصروف الآجل فورم منفصل). تعديل = حسب المستند.
   const [opMode, setOpMode] = useState<ExpenseOperationMode>("CASH_PAYMENT");
 
   const [header, setHeader] = useState<ExpenseFormHeader>(blankHeader);
@@ -131,12 +130,13 @@ export function ExpenseFormDialog({
   const [dirty, setDirty] = useState(false);
   const amountInputRef = useRef<HTMLInputElement>(null);
 
-  // استبعاد حسابات مسؤولي المنصة (السوبر أدمن) قطعياً من الموظفين
+  /*
+   * قائمة الموظفين تأتي من RPC المستأجر نفسه (expense_lookups) فلا تحمل
+   * حسابات المنصة إطلاقاً. كانت هنا فلترة بالاسم (تحتوي "admin"/"سوبر")
+   * تحجب موظفين حقيقيين بالخطأ — أزيلت: الاعتماد على نطاق المستأجر فقط.
+   */
   const storeEmployees = useMemo(() => {
-    return (lookups?.employees ?? []).filter((emp) => {
-      const name = (emp.name ?? "").toLowerCase();
-      return !name.includes("سوبر") && !name.includes("superadmin") && !name.includes("admin");
-    });
+    return lookups?.employees ?? [];
   }, [lookups?.employees]);
 
   /* -- تهيئة النموذج عند الفتح ---------------------------------- */
@@ -180,7 +180,8 @@ export function ExpenseFormDialog({
         setLines([blankLine()]);
       }
 
-      setOpMode(entry.status === "PAID" ? "CASH_PAYMENT" : "ACCRUAL_INVOICE");
+      // اشتقاق النمط من المستند نفسه: الآجل له تاريخ استحقاق إلزامي.
+      setOpMode(entry.due_date ? "ACCRUAL_INVOICE" : "CASH_PAYMENT");
       setShowAdvanced(Boolean(entry.warehouse_id || entry.cost_center_id || entry.project_id));
     } else {
       setHeader(blankHeader());
@@ -432,31 +433,17 @@ export function ExpenseFormDialog({
     <VortexDrawerDialog
       open={open}
       onOpenChange={onOpenChange}
-      size="md"
+      size="xl"
       dismissible={!dirty || !saving}
       icon={<Receipt className="size-5 text-primary" />}
       eyebrow={
-        isEditing
-          ? ar
-            ? "تعديل المصروف"
-            : "Edit Expense"
-          : opMode === "CASH_PAYMENT"
-            ? ar
-              ? "سند صرف نقدي / بنكي"
-              : "Cash Payment Voucher"
-            : ar
-              ? "فاتورة مصروف آجل"
-              : "Accrual Expense Bill"
+        isEditing ? (ar ? "تعديل المصروف" : "Edit Expense") : ar ? "سند صرف" : "Payment Voucher"
       }
-      title={isEditing ? editing?.entry.reference : ar ? "توثيق حركة المصروف" : "Record Expense"}
+      title={isEditing ? editing?.entry.reference : ar ? "إضافة مصروف جديد" : "New Expense"}
       subtitle={
-        opMode === "CASH_PAYMENT"
-          ? ar
-            ? "صرف نقدي فوري مباشر من الصندوق أو البنك وتوليد القيد الآلي"
-            : "Direct cash/bank disbursement"
-          : ar
-            ? "إثبات استحقاق مصروف آجل كالتزام على المنشأة يُسدد لاحقاً"
-            : "Accrued bill to be settled later"
+        ar
+          ? "صرف مباشر من الصندوق أو البنك مع توليد القيد الآلي"
+          : "Direct disbursement from cashbox or bank"
       }
       footer={
         <div className="flex w-full flex-wrap items-center justify-between gap-3">
@@ -502,8 +489,8 @@ export function ExpenseFormDialog({
                   : "Save Changes"
                 : opMode === "CASH_PAYMENT"
                   ? ar
-                    ? "صرف وسداد المصروف نقداً"
-                    : "Disburse & Settle"
+                    ? "تسجيل السند وصرف المبلغ"
+                    : "Record & Disburse"
                   : ar
                     ? "إثبات استحقاق المصروف الآجل"
                     : "Record Accrual Bill"}
@@ -513,28 +500,7 @@ export function ExpenseFormDialog({
       }
     >
       <div className="space-y-4">
-        {/* ─── التبويب المحاسبي الفاصل بين الصرف الفوري والآجل ─── */}
-        {!isEditing && (
-          <SegmentedTabs
-            value={opMode}
-            onChange={(v) => {
-              setOpMode(v as ExpenseOperationMode);
-              if (v === "ACCRUAL_INVOICE") {
-                setHeaderField("payee_type", "SUPPLIER");
-              }
-            }}
-            items={[
-              {
-                value: "CASH_PAYMENT",
-                label: ar ? "💵 سند صرف نقدي / بنكي (سداد فوري)" : "Cash / Bank Payment",
-              },
-              {
-                value: "ACCRUAL_INVOICE",
-                label: ar ? "📑 فاتورة مصروف آجل (استحقاق للمورد)" : "Accrued Bill (Pay Later)",
-              },
-            ]}
-          />
-        )}
+        {/* ─── فورم «سند صرف» منفصل: بلا تبويبات — المصروف الآجل فورم مستقل ─── */}
 
         {/* ─── بطاقة المعاينة الفخمة العلوية (Live Preview Card) ─── */}
         <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-br from-card via-card/90 to-primary/5 p-4 shadow-xs sm:p-5 transition-all">
@@ -656,6 +622,14 @@ export function ExpenseFormDialog({
                   {validation.errors.category}
                 </span>
               )}
+              {selectedCategory && (
+                <span className="mt-1 inline-flex items-center gap-1 rounded-md bg-surface-2/70 border border-border/50 px-2 py-0.5 text-[10px] text-muted-foreground">
+                  <Landmark className="size-2.5" />
+                  {ar
+                    ? "يُرحَّل المصروف إلى الحساب المرتبط بهذا التصنيف في دليل الحسابات"
+                    : "Posts to the account mapped to this category in the chart of accounts"}
+                </span>
+              )}
             </div>
 
             {/* تاريخ المصروف */}
@@ -698,14 +672,14 @@ export function ExpenseFormDialog({
           </div>
         </div>
 
-        {/* ─── البطاقة 2: خاصة بنمط العملية المحاسبية المحددة ─── */}
-        {opMode === "CASH_PAYMENT" ? (
+        {/* ─── البطاقة 2: مصدر الصرف والمستلم (فورم سند الصرف) ─── */}
+        {!(isEditing && opMode === "ACCRUAL_INVOICE") ? (
           /* سند الصرف النقدي الفوري */
           <div className="rounded-2xl border border-border/70 bg-surface/50 p-4 sm:p-5 space-y-4">
             <div className="flex items-center gap-2 border-b border-border/50 pb-3">
               <Wallet className="size-4 text-emerald-500" />
               <h3 className="text-sm font-bold text-foreground">
-                {ar ? "2. مصدر السداد النقدي والمستلم" : "2. Cash Source & Recipient"}
+                {ar ? "2. مصدر الصرف والمستلم" : "2. Payment Source & Recipient"}
               </h3>
             </div>
 
@@ -751,8 +725,8 @@ export function ExpenseFormDialog({
                   >
                     {type === "NONE"
                       ? ar
-                        ? "عام (صرف مباشر)"
-                        : "General"
+                        ? "بدون تحديد"
+                        : "Unspecified"
                       : type === "EMPLOYEE"
                         ? ar
                           ? "موظف / عامل"

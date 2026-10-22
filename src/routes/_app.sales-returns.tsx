@@ -30,7 +30,8 @@ import { DynamicPaymentSelector } from "@/components/ui/payment-method/dynamic-p
 import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
 import { paymentMethodLabel } from "@/lib/payments/payment-methods";
 import { usePaymentMethodOverrides } from "@/hooks/use-payment-methods";
-import { Loader2, Printer, RotateCcw, Search, Trash2, Truck, Wallet } from "lucide-react";
+import { PrimaryAction } from "@/components/ui/primary-action";
+import { Loader2, Plus, Printer, RotateCcw, Search, Trash2, Truck, Wallet } from "lucide-react";
 import { LuxuryPrintPreviewModal } from "@/components/luxury-print-preview-modal";
 import type { UnifiedDocumentData } from "@/lib/templates";
 import { translateRpcError } from "@/lib/errors/rpc-errors";
@@ -399,7 +400,7 @@ function SalesReturnsPage() {
       docType: "sales_return",
       title: isRtl ? "إشعار دائن — مرتجع مبيعات" : "Sales Return Credit Note",
       number: r.return_number,
-      date: new Date(r.created_at).toLocaleString(isRtl ? "ar-EG" : "en-US"),
+      date: r.created_at,
       partyLabel: isRtl ? "العميل" : "Customer",
       partyName: customerName(r),
       warehouse: hasMultiWarehouse ? whName(r.warehouses) : undefined,
@@ -486,6 +487,13 @@ function SalesReturnsPage() {
           label: isRtl ? "ترتيب" : "Sort",
         }}
         viewToggle={<RecordsViewToggle value={viewMode} onChange={setViewMode} />}
+        action={
+          <PrimaryAction
+            label={isRtl ? "مرتجع مبيعات جديد" : "New Sales Return"}
+            icon={<Plus />}
+            onClick={() => setNewReturnOpen(true)}
+          />
+        }
       />
 
       {/* ─── Records: cards / list / classic table — shared scaffold ─── */}
@@ -520,6 +528,16 @@ function SalesReturnsPage() {
             : isRtl
               ? "سجّل مرتجع مبيعات جديداً لبدء التتبع."
               : "Record a new sales return to start tracking.",
+          action: (
+            <button
+              type="button"
+              onClick={() => setNewReturnOpen(true)}
+              className="mt-2 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-xs font-bold text-primary-foreground shadow-sm transition hover:bg-primary/90 active:scale-95"
+            >
+              <Plus className="size-4" />
+              <span>{isRtl ? "إضافة مرتجع مبيعات جديد" : "Add New Sales Return"}</span>
+            </button>
+          ),
         }}
       />
 

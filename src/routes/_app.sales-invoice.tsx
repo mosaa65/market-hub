@@ -575,7 +575,7 @@ function SalesInvoicePage() {
               ? "فاتورة مبيعات"
               : "Sales Invoice",
         number: result.invoiceNumber ?? "",
-        date: new Date().toLocaleString(isRtl ? "ar-EG" : "en-US"),
+        date: new Date().toISOString(),
         partyLabel: isRtl ? "العميل" : "Bill To",
         partyName: customerName,
         warehouse: hasMultiWarehouse

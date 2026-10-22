@@ -33,13 +33,13 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   custodyDelivery,
   fetchCustodyBalances,
-  capacityKgOf,
   buildCustodyDeliveryDoc,
   type CustodyLine,
   type CustodyBalance,
 } from "@/lib/milling";
 import { LuxuryPrintPreviewModal } from "@/components/luxury-print-preview-modal";
 import { UnifiedPrintModal } from "@/components/milling/unified-print-modal";
+import { MillingDocumentsBoard } from "@/components/milling/milling-documents-board";
 import type { UnifiedDocumentData } from "@/lib/templates/types";
 import {
   MillingPanel,
@@ -77,7 +77,6 @@ function MillingDeliveryPage() {
   const [customerId, setCustomerId] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
   const [lines, setLines] = useState<CustodyLine[]>([{ itemId: "", bags: 0, kg: 0 }]);
-  const [autoKgLines, setAutoKgLines] = useState<Set<number>>(new Set());
   const [driverName, setDriverName] = useState("");
   const [vehicleNumber, setVehicleNumber] = useState("");
   const [notes, setNotes] = useState("");
@@ -134,24 +133,7 @@ function MillingDeliveryPage() {
     (b) => Number(b.bags_balance) > 0 || Number(b.kg_balance) > 0,
   );
 
-  // خريطة سعة العبوة بالكيلو
-  const capacityMap = useQuery({
-    queryKey: ["milling", "capacity-map"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("products")
-        .select("id, package_weight_kg")
-        .eq("is_active", true)
-        .limit(2000);
-      if (error) throw error;
-      const m = new Map<string, number | null>();
-      for (const r of (data ?? []) as { id: string; package_weight_kg: number | null }[]) {
-        m.set(r.id, capacityKgOf(r));
-      }
-      return m;
-    },
-  });
-  const cap = (itemId: string) => capacityMap.data?.get(itemId) ?? null;
+  // V2: لا خريطة سعات ولا اشتقاق كجم — الأكياس والوزن إدخال يدوي مستقل (كما في شاشة الطحن).
 
   const selectedCustomer = (customers.data ?? []).find((c) => c.id === customerId);
   const selectedWarehouse = (warehouses.data ?? []).find((w) => w.id === warehouseId);
@@ -162,38 +144,15 @@ function MillingDeliveryPage() {
   }
 
   function changeLineItem(idx: number, itemId: string) {
-    const c = cap(itemId);
-    setLines((l) =>
-      l.map((x, i) => {
-        if (i !== idx) return x;
-        const n = Number(x.bags) || 0;
-        const auto = autoKgLines.has(idx) || x.kg === 0;
-        const kg = c && auto && n > 0 ? n * c : x.kg;
-        return { ...x, itemId, kg };
-      }),
-    );
-    if (c) setAutoKgLines((s) => new Set(s).add(idx));
+    setLines((l) => l.map((x, i) => (i !== idx ? x : { ...x, itemId })));
   }
 
   function changeLineBags(idx: number, bags: number) {
-    setLines((l) =>
-      l.map((x, i) => {
-        if (i !== idx) return x;
-        const c = cap(x.itemId);
-        const auto = autoKgLines.has(idx) || x.kg === 0;
-        if (c && auto) return { ...x, bags, kg: bags > 0 ? bags * c : 0 };
-        return { ...x, bags };
-      }),
-    );
+    setLines((l) => l.map((x, i) => (i !== idx ? x : { ...x, bags })));
   }
 
   function changeLineKg(idx: number, kg: number) {
     setLines((l) => l.map((x, i) => (i === idx ? { ...x, kg } : x)));
-    setAutoKgLines((s) => {
-      const n = new Set(s);
-      n.delete(idx);
-      return n;
-    });
   }
 
   // تسليم كامل رصيد سطر محدد بنقرة واحدة
@@ -207,11 +166,6 @@ function MillingDeliveryPage() {
         i === idx ? { ...x, bags: Number(b.bags_balance), kg: Number(b.kg_balance) } : x,
       ),
     );
-    setAutoKgLines((s) => {
-      const n = new Set(s);
-      n.delete(idx);
-      return n;
-    });
   }
 
   // تسليم كل الأرصدة المتاحة للعميل بنقرة واحدة
@@ -223,7 +177,6 @@ function MillingDeliveryPage() {
       kg: Number(b.kg_balance),
     }));
     setLines(newLines);
-    setAutoKgLines(new Set());
   }
 
   // التحقق من تجاوز الكمية المتاحة
@@ -318,7 +271,6 @@ function MillingDeliveryPage() {
 
       // تفريغ النموذج
       setLines([{ itemId: "", bags: 0, kg: 0 }]);
-      setAutoKgLines(new Set());
       setDriverName("");
       setVehicleNumber("");
       setNotes("");
@@ -434,7 +386,6 @@ function MillingDeliveryPage() {
 
                 {lines.map((line, idx) => {
                   const b = line.itemId ? balanceFor(line.itemId) : undefined;
-                  const itemCap = line.itemId ? cap(line.itemId) : null;
                   const remBags = b ? Math.max(0, b.bags_balance - (Number(line.bags) || 0)) : 0;
                   const remKg = b ? Math.max(0, b.kg_balance - (Number(line.kg) || 0)) : 0;
                   const isOver = b && (line.bags > b.bags_balance || line.kg > b.kg_balance);
@@ -688,6 +639,9 @@ function MillingDeliveryPage() {
             </div>
           </MillingPanel>
         </div>
+
+        {/* سجل التسليم والصرف: المستندات الموحدة بزاوية المُسلَّم والمتبقي في الأمانة */}
+        <MillingDocumentsBoard focus="delivery" title="سجل التسليم والصرف" />
 
         {/* نافذة المعاينة والطباعة الفاخرة المعتمدة لسند التسليم الموحد */}
         {deliveryPrintDoc && (

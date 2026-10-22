@@ -1,9 +1,10 @@
 /* eslint-disable react-refresh/only-export-components -- يصدّر ModuleGuard مع منظومة الوحدات والثوابت عمداً */
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { Lock, Sparkles, ArrowUpRight, CheckCircle2, ShieldAlert } from "lucide-react";
 import { Link } from "@tanstack/react-router";
+import { ModulesContext, useModules } from "@/lib/modules-context";
 
 export type ModuleCategory = "core" | "module" | "addon" | "enterprise";
 export type PlatformPlanId = "starter" | "professional" | "enterprise";
@@ -223,8 +224,8 @@ export const SYSTEM_MODULES: PlatformModule[] = [
       "/milling/milling",
       "/milling/delivery",
       "/milling/manufacture",
-      "/milling/consumables",
       "/milling/customer-statement",
+      "/milling/performance",
       "/milling/operations-guide",
     ],
     routes: [
@@ -233,8 +234,8 @@ export const SYSTEM_MODULES: PlatformModule[] = [
       "/_app/milling/milling",
       "/_app/milling/delivery",
       "/_app/milling/manufacture",
-      "/_app/milling/consumables",
       "/_app/milling/customer-statement",
+      "/_app/milling/performance",
       "/_app/milling/operations-guide",
     ],
   },
@@ -330,27 +331,12 @@ export interface QuotaCheckResult {
   message?: { ar: string; en: string };
 }
 
-interface ModulesContextType {
-  currentPlanId: PlatformPlanId;
-  currentPlan: PlatformPlan;
-  plans: PlatformPlan[];
-  modules: PlatformModule[];
-  enabledModules: Set<string>;
-  extraModules: string[];
-  isModuleEnabled: (moduleId?: string) => boolean;
-  isRouteEnabled: (pathname: string) => boolean;
-  getRequiredModuleForRoute: (pathname: string) => PlatformModule | undefined;
-  setPlan: (planId: PlatformPlanId) => Promise<boolean>;
-  toggleExtraModule: (moduleId: string) => Promise<boolean>;
-  resetToDefault: () => Promise<boolean>;
-  isLoading: boolean;
-  checkQuota: (
-    resource: "users" | "warehouses" | "products",
-    currentCount: number,
-  ) => QuotaCheckResult;
-}
-
-const ModulesContext = createContext<ModulesContextType | null>(null);
+/*
+ * سياق الوحدات يعيش في `@/lib/modules-context` (هيدر مستقل لا يُعاد تقييمه
+ * في HMR) — إنشاء نسخة هنا يعيد كسر الصفحات المفتوحة برسالة
+ * «useModules must be used within a ModulesProvider» بعد أي تعديل لهذا الملف.
+ */
+export { ModulesContext, useModules, type ModulesContextType } from "@/lib/modules-context";
 
 const STORAGE_KEY_PLAN = "vortex_active_plan";
 const STORAGE_KEY_EXTRAS = "vortex_extra_modules";
@@ -588,17 +574,6 @@ export function ModulesProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function useModules() {
-  const ctx = useContext(ModulesContext);
-  if (!ctx) {
-    throw new Error("useModules must be used within a ModulesProvider");
-  }
-  return ctx;
-}
-
-/**
- * Premium Upgrade Prompt & Feature Locked Banner
- */
 export function ModuleLockedBanner({ moduleId }: { moduleId: string }) {
   const { lang, dir } = useI18n();
   const isAr = lang === "ar";
