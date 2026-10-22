@@ -169,9 +169,8 @@ interface SplitPaymentLine {
   reference?: string;
 }
 
-// The current SSR ledger posts the invoice before tender split rows are saved.
-// Keep split UI gated until a reviewed backend change posts each tender account.
-const POS_SPLIT_LEDGER_POSTING_READY = false;
+// Multi-tender ledger posting is now supported via migration 49
+const POS_SPLIT_LEDGER_POSTING_READY = true;
 
 const posGuideConfig: PageGuideConfig = {
   title: "دليل نقطة البيع والكاشير المتقدم (POS)",
@@ -2730,14 +2729,14 @@ function POSPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    toast.info(
-                      lang === "ar"
-                        ? "الدفع بأكثر من طريقة سيتاح بعد اكتمال ترحيله المحاسبي"
-                        : "Split payments will be enabled after ledger posting support is complete",
-                    );
+                    if (isSplitPayment) {
+                      setIsSplitPayment(false);
+                      setSplitPayments([]);
+                    } else {
+                      startSplitPayment();
+                    }
                   }}
                   disabled={
-                    !POS_SPLIT_LEDGER_POSTING_READY ||
                     cart.length === 0 ||
                     supportedSplitMethods.length === 0
                   }
@@ -2745,8 +2744,8 @@ function POSPage() {
                   aria-label={lang === "ar" ? "الدفع بأكثر من طريقة" : "Split payment"}
                   title={
                     lang === "ar"
-                      ? "يتطلب دعم الترحيل المحاسبي متعدد الطرق"
-                      : "Requires multi-tender ledger posting support"
+                      ? "الدفع بأكثر من طريقة (نقد، بنك، محفظة)"
+                      : "Split tender payment"
                   }
                   className={`grid size-8 place-items-center rounded-full border transition disabled:opacity-40 ${isSplitPayment ? "border-primary/40 bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-primary/10 hover:text-primary"}`}
                 >
@@ -2855,9 +2854,22 @@ function POSPage() {
               {/* ─── Payment & Summary Section ─── */}
               <div className="grid min-w-0 grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.8fr)] items-end gap-1.5">
                 <div className="flex min-w-0 flex-col gap-1">
-                  <span className="truncate text-[10px] font-semibold leading-none text-muted-foreground">
-                    {lang === "ar" ? "طريقة الدفع" : "Payment method"}
-                  </span>
+                  <div className="flex items-center justify-between">
+                    <span className="truncate text-[10px] font-semibold leading-none text-muted-foreground">
+                      {lang === "ar" ? "طريقة الدفع" : "Payment method"}
+                    </span>
+                    {!isSplitPayment && (
+                      <span className="text-[9px] font-medium text-primary">
+                        {paymentMethod === "cash"
+                          ? defaultCashbox ? `(${defaultCashbox.name_ar})` : ""
+                          : paymentMethod === "bank_transfer"
+                            ? defaultBank ? `(${defaultBank.name_ar})` : ""
+                            : paymentMethod === "mobile_money"
+                              ? defaultWallet ? `(${defaultWallet.name_ar})` : ""
+                              : ""}
+                      </span>
+                    )}
+                  </div>
                   {!isSplitPayment ? (
                     <PaymentMethodPicker
                       context="pos"
@@ -2875,9 +2887,14 @@ function POSPage() {
                       className="h-8 min-w-0 rounded-lg text-[10px] sm:text-[11px]"
                     />
                   ) : (
-                    <div className="flex h-8 min-w-0 items-center truncate rounded-lg border border-primary/20 bg-primary/[0.04] px-2 text-[10px] font-medium text-primary sm:px-3 sm:text-[11px]">
-                      {lang === "ar" ? "طرق دفع متعددة" : "Multiple methods"}
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSplitEditorOpen(true)}
+                      className="flex h-8 min-w-0 items-center justify-between truncate rounded-lg border border-primary/40 bg-primary/10 px-2 text-[10px] font-bold text-primary hover:bg-primary/20 transition sm:px-2.5 sm:text-[11px]"
+                    >
+                      <span>{lang === "ar" ? "دفع مجزأ" : "Split payment"}</span>
+                      <span className="text-[9px] opacity-80">({splitRows.length} طرق)</span>
+                    </button>
                   )}
                 </div>
                 {isSplitPayment ? (
@@ -3136,48 +3153,70 @@ function POSPage() {
                         ?.legacyValue === method.legacyValue,
                   ),
               );
+
+              const isBank = chosen?.ledgerKind === "BANK" || chosen?.legacyValue === "bank_transfer";
+              const isWallet = chosen?.ledgerKind === "WALLET" || chosen?.legacyValue === "mobile_money";
+              const isCash = chosen?.ledgerKind === "CASH" || chosen?.legacyValue === "cash";
+
               return (
                 <div
                   key={line.key}
-                  className="grid grid-cols-[minmax(0,1fr)_minmax(6rem,0.8fr)_2.25rem] items-center gap-1.5 rounded-lg border border-border/60 p-1.5 sm:gap-2 sm:p-2"
+                  className="space-y-1.5 rounded-xl border border-border/70 bg-surface/50 p-2 sm:p-2.5"
                 >
-                  <select
-                    value={line.methodId}
-                    onChange={(event) =>
-                      updateSplitPayment(line.key, { methodId: event.target.value, reference: "" })
-                    }
-                    aria-label={lang === "ar" ? "طريقة الدفع" : "Payment method"}
-                    className="h-9 min-w-0 rounded-full border border-border bg-background px-2 text-[11px] font-medium outline-none focus:border-primary"
-                  >
-                    {choices.map((method) => (
-                      <option key={method.id} value={method.id}>
-                        {lang === "ar" ? method.nameAr : method.nameEn || method.nameAr}
-                      </option>
-                    ))}
-                  </select>
-                  <AmountInput
-                    label={
-                      lang === "ar"
-                        ? `مبلغ ${chosen?.nameAr ?? "الدفع"}`
-                        : `${chosen?.nameEn ?? chosen?.nameAr ?? "Payment"} amount`
-                    }
-                    value={line.amount}
-                    onValueChange={(amount) =>
-                      updateSplitPayment(line.key, { amount, autoAmount: false })
-                    }
-                    invalid={isOverpaid}
-                    placeholder="0"
-                    className="h-9 rounded-full border border-border bg-background px-2 text-xs font-semibold outline-none focus:border-primary"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeSplitPayment(line.key)}
-                    aria-label={lang === "ar" ? "حذف طريقة الدفع" : "Remove payment method"}
-                    title={lang === "ar" ? "حذف" : "Remove"}
-                    className="grid size-8 place-items-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                  >
-                    <Trash2 className="size-3.5" />
-                  </button>
+                  <div className="grid grid-cols-[minmax(0,1fr)_minmax(6rem,0.8fr)_2.25rem] items-center gap-1.5 sm:gap-2">
+                    <select
+                      value={line.methodId}
+                      onChange={(event) =>
+                        updateSplitPayment(line.key, { methodId: event.target.value, reference: "" })
+                      }
+                      aria-label={lang === "ar" ? "طريقة الدفع" : "Payment method"}
+                      className="h-9 min-w-0 rounded-xl border border-border bg-background px-2 text-[11px] font-semibold outline-none focus:border-primary"
+                    >
+                      {choices.map((method) => (
+                        <option key={method.id} value={method.id}>
+                          {lang === "ar" ? method.nameAr : method.nameEn || method.nameAr}
+                        </option>
+                      ))}
+                    </select>
+                    <AmountInput
+                      label={
+                        lang === "ar"
+                          ? `مبلغ ${chosen?.nameAr ?? "الدفع"}`
+                          : `${chosen?.nameEn ?? chosen?.nameAr ?? "Payment"} amount`
+                      }
+                      value={line.amount}
+                      onValueChange={(amount) =>
+                        updateSplitPayment(line.key, { amount, autoAmount: false })
+                      }
+                      invalid={isOverpaid}
+                      placeholder="0"
+                      className="h-9 rounded-xl border border-border bg-background px-2 text-xs font-semibold outline-none focus:border-primary"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeSplitPayment(line.key)}
+                      aria-label={lang === "ar" ? "حذف طريقة الدفع" : "Remove payment method"}
+                      title={lang === "ar" ? "حذف" : "Remove"}
+                      className="grid size-8 place-items-center rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </div>
+
+                  {/* الحساب المالي الفرعي (صندوق أو بنك أو محفظة) */}
+                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground bg-surface-2/60 px-2 py-1 rounded-lg">
+                    <span>{lang === "ar" ? "الحساب المستلم:" : "Receiving pot:"}</span>
+                    <span className="font-semibold text-foreground">
+                      {isCash
+                        ? defaultCashbox ? defaultCashbox.name_ar : lang === "ar" ? "الصندوق الرئيسي" : "Main Till"
+                        : isBank
+                          ? defaultBank ? defaultBank.name_ar : lang === "ar" ? "بنك الكريمي" : "Al-Kuraimi Bank"
+                          : isWallet
+                            ? defaultWallet ? defaultWallet.name_ar : lang === "ar" ? "محفظة جوالي" : "Jawali Wallet"
+                            : "—"}
+                    </span>
+                  </div>
+
                   {chosen?.requiresReference && (
                     <input
                       type="text"
@@ -3190,8 +3229,8 @@ function POSPage() {
                           ? `مرجع ${chosen.nameAr}`
                           : `${chosen.nameEn || chosen.nameAr} reference`
                       }
-                      placeholder={lang === "ar" ? "رقم المرجع" : "Reference"}
-                      className="col-span-3 h-8 min-w-0 rounded-full border border-border bg-background px-3 text-[11px] outline-none focus:border-primary"
+                      placeholder={lang === "ar" ? "رقم المرجع / الحوالة / إشعار المحفظة" : "Reference / transaction no."}
+                      className="h-8 w-full rounded-xl border border-border bg-background px-3 text-[11px] outline-none focus:border-primary"
                     />
                   )}
                 </div>

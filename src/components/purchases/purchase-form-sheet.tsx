@@ -36,7 +36,8 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/feedback";
 import { money } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
-import { PaymentMethodPicker } from "@/components/ui/payment-method";
+import { PaymentMethodPicker, DynamicPaymentSelector } from "@/components/ui/payment-method";
+import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
 import { toLegacyPaymentValue } from "@/lib/payments/payment-methods";
 import { translateRpcError } from "@/lib/errors/rpc-errors";
 import { toast } from "sonner";
@@ -144,6 +145,10 @@ export function PurchaseFormSheet({
   const [discount, setDiscount] = useState<number | null>(null);
   const [paid, setPaid] = useState<number | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<string>("bank_transfer");
+  const [settlement, setSettlement] = useState<PaymentSettlementSelection>({
+    method: "bank_transfer",
+    paymentMethodId: "bank_transfer",
+  });
   const [note, setNote] = useState("");
 
   const [catalogueLoading, setCatalogueLoading] = useState(true);
@@ -319,21 +324,49 @@ export function PurchaseFormSheet({
 
     setSaving(true);
     try {
-      const { error } = await supabase.rpc("create_purchase", {
-        _warehouse_id: warehouseId,
-        _supplier_id: supplierId,
-        // Catalogue id -> the value the ENUM stores, at the RPC boundary only.
-        _payment_method: toLegacyPaymentValue(paymentMethod),
-        _paid: paymentMethod === "credit" ? 0 : (paid ?? total),
-        _discount: Number(discount ?? 0),
-        _note: (note || null) as never,
-        _items: cart.map((l) => ({
-          product_id: l.product_id,
-          quantity: Number(l.quantity),
-          unit_cost: Number(l.unit_cost),
-          tax_rate: Number(l.tax_rate),
-        })),
-      });
+      let invId: string | null = null;
+      let error: any = null;
+
+      try {
+        const res = await (supabase.rpc as any)("create_purchase", {
+          _warehouse_id: warehouseId,
+          _supplier_id: supplierId,
+          _payment_method: toLegacyPaymentValue(paymentMethod),
+          _paid: paymentMethod === "credit" ? 0 : (paid ?? total),
+          _discount: Number(discount ?? 0),
+          _note: (note || null) as never,
+          _items: cart.map((l) => ({
+            product_id: l.product_id,
+            quantity: Number(l.quantity),
+            unit_cost: Number(l.unit_cost),
+            tax_rate: Number(l.tax_rate),
+          })),
+          _cashbox_id: settlement.cashboxId || null,
+          _bank_account_id: settlement.bankAccountId || null,
+          _payment_reference: settlement.reference || null,
+          _payment_method_id: settlement.paymentMethodId || paymentMethod,
+        });
+        invId = res.data;
+        error = res.error;
+      } catch {
+        const res = await supabase.rpc("create_purchase", {
+          _warehouse_id: warehouseId,
+          _supplier_id: supplierId,
+          _payment_method: toLegacyPaymentValue(paymentMethod),
+          _paid: paymentMethod === "credit" ? 0 : (paid ?? total),
+          _discount: Number(discount ?? 0),
+          _note: (note || null) as never,
+          _items: cart.map((l) => ({
+            product_id: l.product_id,
+            quantity: Number(l.quantity),
+            unit_cost: Number(l.unit_cost),
+            tax_rate: Number(l.tax_rate),
+          })),
+        });
+        invId = res.data;
+        error = res.error;
+      }
+
       if (error) throw error;
       toast.success(t("purchases.recorded"));
       resetForm();
@@ -849,23 +882,19 @@ export function PurchaseFormSheet({
           <div className="space-y-3">
             <div>
               <p className="mb-1.5 text-label text-muted-foreground">{t("sales.payment")}</p>
-              {/*
-                The shared picker, purchases context. It returns a catalogue id;
-                `ensureIds` keeps a method already on the draft selectable even
-                if the business has since narrowed this context.
-              */}
-              <PaymentMethodPicker
+              <DynamicPaymentSelector
                 context="purchases"
                 value={paymentMethod}
                 onChange={setPaymentMethod}
-                ensureIds={[paymentMethod]}
-                ariaLabel={isAr ? "طريقة الدفع" : "Payment method"}
+                settlement={settlement}
+                onSettlementChange={setSettlement}
+                includeCredit
               />
             </div>
 
             {paymentMethod !== "credit" && (
               <FormField
-                label={isAr ? "المدفوع" : "Paid amount"}
+                label={isAr ? "المدفوع للمورد" : "Paid amount to supplier"}
                 hint={t("purchases.paid_default", total.toFixed(2))}
               >
                 {(p) => (
