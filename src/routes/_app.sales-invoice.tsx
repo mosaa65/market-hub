@@ -72,10 +72,17 @@ import {
   type ServiceLineInput,
 } from "@/lib/sales-invoice";
 import { MILLING_BAG_SIZES } from "@/components/milling/milling-terms-fields";
-import { PaymentPanel, usePaymentPanel } from "@/components/payments/payment-panel";
+import {
+  PaymentPanel,
+  usePaymentPanel,
+  SplitPaymentsManager,
+} from "@/components/payments/payment-panel";
 import { useFormNavigationScope } from "@/hooks/use-form-navigation";
+import { cn } from "@/lib/utils";
 import { DynamicPaymentSelector } from "@/components/ui/payment-method/dynamic-payment-selector";
-import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
+import { useCashboxes } from "@/hooks/use-cashboxes";
+import { useCompanyBankAccounts } from "@/hooks/use-company-bank-accounts";
+import type { PaymentSettlementSelection, SplitTenderLine } from "@/lib/payments/treasury-types";
 import {
   getPaymentMethodDefinition,
   paymentMethodLabel,
@@ -243,8 +250,13 @@ function SalesInvoicePage() {
     method: "cash",
     paymentMethodId: "cash",
   });
+  const [splitLines, setSplitLines] = useState<SplitTenderLine[]>([]);
+  const [isSplitMode, setIsSplitMode] = useState(false);
   const [paid, setPaid] = useState("");
   const [paymentReference, setPaymentReference] = useState("");
+
+  const { activeCashboxes, defaultCashbox } = useCashboxes();
+  const { banks, defaultBank, wallets, defaultWallet } = useCompanyBankAccounts();
 
   // Keyboard-only operation: arrows/Enter walk the payment block in order
   // (customer → warehouse → method → reference → paid → discount → note),
@@ -468,14 +480,19 @@ function SalesInvoicePage() {
   const discountN = Math.max(0, Number(discount) || 0);
   const total = Math.max(0, Math.round((subtotal - discountN) * 100) / 100);
 
+  const splitAllocatedTotal = useMemo(
+    () => Math.round(splitLines.reduce((s, l) => s + (Number(l.amount) || 0), 0) * 100) / 100,
+    [splitLines],
+  );
+
   // P1-4: the payment arithmetic is the shared panel's, not this screen's.
   const payment = usePaymentPanel({
     total,
-    state: { method: paymentMethod, paidRaw: paid, customerId },
+    state: { method: isSplitMode ? "cash" : paymentMethod, paidRaw: paid, customerId },
     customers,
   });
-  const effectivePaid = payment.paid;
-  const remaining = payment.remaining;
+  const effectivePaid = isSplitMode ? splitAllocatedTotal : payment.paid;
+  const remaining = Math.max(0, Math.round((total - effectivePaid) * 100) / 100);
 
   /* ------------------------------------------------------------ submit */
 
@@ -509,12 +526,25 @@ function SalesInvoicePage() {
           : "Select a customer so the unpaid balance can be recorded as debt",
       );
     }
-    // The panel's rules (overpaid, debt on the cash customer, credit limit) are
-    // the same ones the server enforces — fail here with the same sentence.
-    if (!payment.isPayable) {
-      return toast.error(
-        payment.blockingReason ?? (isRtl ? "بيانات دفع غير صالحة" : "Invalid payment"),
-      );
+    if (isSplitMode) {
+      if (splitLines.length === 0) {
+        return toast.error(
+          isRtl ? "أضف دفعة واحدة على الأقل في الدفع المجزأ" : "Add at least one split line",
+        );
+      }
+      if (effectivePaid > total) {
+        return toast.error(
+          isRtl ? "إجمالي الدفعات المجزأة يتجاوز قيمة الفاتورة" : "Allocated total exceeds invoice",
+        );
+      }
+    } else {
+      // The panel's rules (overpaid, debt on the cash customer, credit limit) are
+      // the same ones the server enforces — fail here with the same sentence.
+      if (!payment.isPayable) {
+        return toast.error(
+          payment.blockingReason ?? (isRtl ? "بيانات دفع غير صالحة" : "Invalid payment"),
+        );
+      }
     }
 
     setSubmitting(true);
@@ -522,11 +552,21 @@ function SalesInvoicePage() {
       const result = await createSalesInvoice({
         warehouseId,
         customerId: customerId || null,
-        paymentMethod: toLegacyPaymentValue(paymentMethod) as PaymentMethod,
+        paymentMethod: isSplitMode
+          ? ("split" as any)
+          : (toLegacyPaymentValue(paymentMethod) as PaymentMethod),
         paid: effectivePaid,
         discount: discountN,
-        // On a ticket the negotiated terms belong on the document, not only on
-        // the line, so the receipt the customer keeps can be re-read later.
+        paymentSplits: isSplitMode
+          ? splitLines.map((l) => ({
+              method: l.method,
+              amount: l.amount,
+              payment_method_id: l.paymentMethodId || null,
+              cashbox_id: l.cashboxId || null,
+              bank_account_id: l.bankAccountId || null,
+              reference: l.reference || null,
+            }))
+          : undefined,
         note:
           [
             mode === "ticket" ? ticketDetail : "",
@@ -538,10 +578,10 @@ function SalesInvoicePage() {
             .filter(Boolean)
             .join(" — ") || undefined,
         lines,
-        cashboxId: settlement.cashboxId || null,
-        bankAccountId: settlement.bankAccountId || null,
-        paymentMethodId: settlement.paymentMethodId || null,
-        paymentReference: settlement.reference || null,
+        cashboxId: isSplitMode ? null : settlement.cashboxId || null,
+        bankAccountId: isSplitMode ? null : settlement.bankAccountId || null,
+        paymentMethodId: isSplitMode ? null : settlement.paymentMethodId || null,
+        paymentReference: isSplitMode ? null : settlement.reference || null,
         chequeNumber: settlement.chequeNumber || null,
         chequeBank: settlement.chequeBank || null,
         chequeDueDate: settlement.chequeDueDate || null,
@@ -1265,35 +1305,89 @@ function SalesInvoicePage() {
             <div className="h-px bg-border" />
 
             <div className="space-y-3">
-              <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
                 <label className="text-xs font-semibold text-muted-foreground">
                   {isRtl ? "طريقة السداد والتوجيه المالي" : "Payment method & settlement"}
                 </label>
-                <DynamicPaymentSelector
-                  context="sales"
-                  value={paymentMethod}
-                  onChange={(method) => {
-                    setPaymentMethod(method);
-                    if (getPaymentMethodDefinition(method)?.isCreditTerm) setPaid("0");
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !isSplitMode;
+                    setIsSplitMode(next);
+                    if (next && splitLines.length === 0) {
+                      setSplitLines([
+                        {
+                          id: crypto.randomUUID(),
+                          category: "CASH",
+                          method: "cash",
+                          paymentMethodId: "cash",
+                          amount: total,
+                          cashboxId: defaultCashbox?.id || activeCashboxes[0]?.id || null,
+                          cashboxName:
+                            defaultCashbox?.name_ar || (isRtl ? "الصندوق الرئيسي" : "Main Till"),
+                        },
+                      ]);
+                    }
                   }}
-                  settlement={settlement}
-                  onSettlementChange={setSettlement}
-                  includeCredit
-                />
+                  className={cn(
+                    "text-[11px] font-bold px-2 py-0.5 rounded-lg transition",
+                    isSplitMode
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-surface-2 text-primary hover:bg-primary/10",
+                  )}
+                >
+                  {isSplitMode
+                    ? isRtl
+                      ? "← العودة للدفع المنفرد"
+                      : "← Single payment"
+                    : isRtl
+                      ? "+ دفع مجزأ متعدد الوسائل"
+                      : "+ Split payment"}
+                </button>
               </div>
-              <PaymentPanel
-                context="sales"
-                total={total}
-                method={paymentMethod}
-                onMethodChange={setPaymentMethod}
-                paid={paid}
-                onPaidChange={setPaid}
-                customerId={customerId}
-                customers={customers}
-                reference={paymentReference}
-                onReferenceChange={setPaymentReference}
-                showShortcuts={false}
-              />
+
+              {isSplitMode ? (
+                <SplitPaymentsManager
+                  total={total}
+                  lines={splitLines}
+                  onChange={setSplitLines}
+                  activeCashboxes={activeCashboxes}
+                  defaultCashbox={defaultCashbox}
+                  banks={banks}
+                  defaultBank={defaultBank}
+                  wallets={wallets}
+                  defaultWallet={defaultWallet}
+                  currency="YER"
+                />
+              ) : (
+                <>
+                  <DynamicPaymentSelector
+                    context="sales"
+                    value={paymentMethod}
+                    onChange={(method) => {
+                      setPaymentMethod(method);
+                      if (getPaymentMethodDefinition(method)?.isCreditTerm) setPaid("0");
+                    }}
+                    settlement={settlement}
+                    onSettlementChange={setSettlement}
+                    includeCredit
+                  />
+                  <PaymentPanel
+                    context="sales"
+                    total={total}
+                    method={paymentMethod}
+                    onMethodChange={setPaymentMethod}
+                    paid={paid}
+                    onPaidChange={setPaid}
+                    customerId={customerId}
+                    customers={customers}
+                    reference={paymentReference}
+                    onReferenceChange={setPaymentReference}
+                    showShortcuts={false}
+                  />
+                </>
+              )}
+
               <div className="grid grid-cols-2 gap-2">
                 <Field label={t("common.discount")}>
                   <AmountInput

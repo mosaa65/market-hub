@@ -1194,10 +1194,27 @@ function POSPage() {
   const missingSplitReference =
     isSplitPayment &&
     splitRows.some((line) => line.method?.requiresReference && !line.reference?.trim());
-  const paymentSplits = splitRows.map((line) => ({
-    method: line.method!.legacyValue,
-    amount: Math.round(line.amount * 100) / 100,
-  }));
+  const paymentSplits = splitRows.map((line) => {
+    const isCash = line.method?.ledgerKind === "CASH" || line.method?.legacyValue === "cash";
+    const isBank =
+      line.method?.ledgerKind === "BANK" || line.method?.legacyValue === "bank_transfer";
+    const isWallet =
+      line.method?.ledgerKind === "WALLET" || line.method?.legacyValue === "mobile_money";
+
+    return {
+      method: line.method!.legacyValue,
+      amount: Math.round(line.amount * 100) / 100,
+      payment_method_id: line.method!.id,
+      cashbox_id: isCash ? defaultCashbox?.id || activeCashboxes[0]?.id || null : null,
+      bank_account_id: isBank
+        ? defaultBank?.id || companyBanks[0]?.id || null
+        : isWallet
+          ? defaultWallet?.id || companyWallets[0]?.id || null
+          : null,
+      reference: line.reference || null,
+      reference_no: line.reference || null,
+    };
+  });
 
   function startSplitPayment() {
     const defaultMethod =

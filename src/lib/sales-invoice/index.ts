@@ -90,6 +90,15 @@ export interface CreateSalesInvoiceInput {
   chequeBank?: string | null;
   chequeDueDate?: string | null;
   chequeDrawer?: string | null;
+  /** تفاصيل الدفع المجزأ المتعدد في حال كانت طريقة الدفع split */
+  paymentSplits?: Array<{
+    method: string;
+    amount: number;
+    payment_method_id?: string | null;
+    cashbox_id?: string | null;
+    bank_account_id?: string | null;
+    reference?: string | null;
+  }>;
 }
 
 export interface SalesInvoiceResult {
@@ -221,22 +230,35 @@ export async function createSalesInvoice(
         ? 0
         : Math.max(0, Math.min(Number(input.paid) || 0, Number.MAX_SAFE_INTEGER));
 
-    // create_sale has THREE overloads and none of them takes a sale date: the
-    // invoice is dated by the engine when it is created. Passing _sale_date
-    // would be ignored silently by PostgREST, so the form's date field is a
-    // display value and the function is called without it.
-    const { data, error } = await db.rpc("create_sale", {
-      _warehouse_id: input.warehouseId,
-      _customer_id: input.customerId || null,
-      _payment_method: input.paymentMethod,
-      _paid: paid,
-      _discount: Number(input.discount ?? 0),
-      _note: input.note ?? null,
-      _items: items,
-    });
-    if (error) throw new Error(error.message);
-
-    const invoiceId = data as string;
+    // إذا كان دفعًا مجزأ، نمرر عبر النسخة المتقدمة من create_sale ذات التسعة وسائط
+    let invoiceId: string;
+    if (input.paymentSplits && input.paymentSplits.length > 0) {
+      const { data, error } = await db.rpc("create_sale", {
+        _warehouse_id: input.warehouseId,
+        _customer_id: input.customerId || null,
+        _payment_method: "split",
+        _paid: paid,
+        _discount: Number(input.discount ?? 0),
+        _note: input.note ?? null,
+        _items: items,
+        _sale_date: input.saleDate || new Date().toISOString().slice(0, 10),
+        _payment_splits: input.paymentSplits,
+      });
+      if (error) throw new Error(error.message);
+      invoiceId = data as string;
+    } else {
+      const { data, error } = await db.rpc("create_sale", {
+        _warehouse_id: input.warehouseId,
+        _customer_id: input.customerId || null,
+        _payment_method: input.paymentMethod,
+        _paid: paid,
+        _discount: Number(input.discount ?? 0),
+        _note: input.note ?? null,
+        _items: items,
+      });
+      if (error) throw new Error(error.message);
+      invoiceId = data as string;
+    }
 
     // Update invoice with specific treasury & settlement routing metadata
     if (input.cashboxId || input.bankAccountId || input.paymentMethodId || input.paymentReference) {
