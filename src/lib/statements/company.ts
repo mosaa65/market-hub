@@ -22,7 +22,11 @@ export const INAMA_SOFT_BRAND = {
 
 /** القيم الافتراضية للطباعة قبل وصول بيانات قاعدة البيانات */
 export const DEFAULT_COMPANY_INFO = {
-  name: "",
+  name: "إنماء سوفت للحلول البرمجية",
+  englishName: "Inma Soft for Software Solutions",
+  phone: "772217218",
+  address: "اليمن - إب",
+  email: "info@inmasoft.com",
   currency: "YER",
   currencySymbol: "ر.ي",
 };
@@ -43,11 +47,11 @@ export interface StatementCompanyInfo {
 
 export const STATEMENT_COMPANY: StatementCompanyInfo = {
   name: DEFAULT_COMPANY_INFO.name,
-  legalName: null,
+  legalName: "شركة إنماء سوفت للحلول البرمجية والتقنية",
   logoUrl: INAMA_SOFT_BRAND.logoUrl,
-  address: null,
-  phone: null,
-  email: null,
+  address: DEFAULT_COMPANY_INFO.address,
+  phone: DEFAULT_COMPANY_INFO.phone,
+  email: DEFAULT_COMPANY_INFO.email,
   taxNumber: null,
   currency: DEFAULT_COMPANY_INFO.currency,
   currencySymbol: DEFAULT_COMPANY_INFO.currencySymbol,
@@ -84,13 +88,12 @@ export async function loadStatementCompany(): Promise<StatementCompanyInfo> {
   const row = (data ?? null) as CompanySettingsRow | null;
 
   return {
-    name: row?.name?.trim() || "",
-    legalName: row?.legal_name?.trim() || null,
-    // fallback إلى شعار النظام عند غياب logo_url من company_settings
+    name: row?.name?.trim() || DEFAULT_COMPANY_INFO.name,
+    legalName: row?.legal_name?.trim() || "شركة إنماء سوفت للحلول البرمجية والتقنية",
     logoUrl: row?.logo_url?.trim() || INAMA_SOFT_BRAND.logoUrl,
-    address: row?.address?.trim() || null,
-    phone: row?.phone?.trim() || null,
-    email: row?.email?.trim() || null,
+    address: row?.address?.trim() || DEFAULT_COMPANY_INFO.address,
+    phone: row?.phone?.trim() || DEFAULT_COMPANY_INFO.phone,
+    email: row?.email?.trim() || DEFAULT_COMPANY_INFO.email,
     taxNumber: row?.tax_number?.trim() || null,
     currency: row?.currency?.trim() || DEFAULT_COMPANY_INFO.currency,
     currencySymbol: row?.currency_symbol?.trim() || DEFAULT_COMPANY_INFO.currencySymbol,

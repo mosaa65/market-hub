@@ -199,6 +199,7 @@ export function LuxuryPrintPreviewModal({
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [isPrinting, setIsPrinting] = useState(false);
   const previewFrameRef = useRef<HTMLIFrameElement>(null);
+  const printToolsRef = useRef<HTMLDetailsElement>(null);
   const [previewContentHeight, setPreviewContentHeight] = useState<number | null>(null);
 
   useEffect(() => {
@@ -228,6 +229,16 @@ export function LuxuryPrintPreviewModal({
     request?.settings,
     documentType,
   ]);
+
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 1024px)");
+    const syncDisclosure = () => {
+      if (printToolsRef.current) printToolsRef.current.open = media.matches;
+    };
+    syncDisclosure();
+    media.addEventListener("change", syncDisclosure);
+    return () => media.removeEventListener("change", syncDisclosure);
+  }, [open]);
 
   const syncPreviewHeight = () => {
     const frameDocument = previewFrameRef.current?.contentDocument;
@@ -485,9 +496,10 @@ export function LuxuryPrintPreviewModal({
     <div
       role="dialog"
       aria-modal="true"
+      dir={rtl ? "rtl" : "ltr"}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto animate-in fade-in duration-200"
     >
-      <div className="relative w-full max-w-5xl rounded-3xl border border-border/80 bg-card shadow-2xl overflow-hidden flex flex-col h-[95vh] max-h-[980px]">
+      <div className="relative w-full max-w-6xl rounded-3xl border border-border/80 bg-card shadow-2xl overflow-hidden flex flex-col h-[95vh] max-h-[980px]">
         {/* ── Modal Header ── */}
         <div className="flex flex-col border-b border-border/80 px-4 sm:px-6 py-3 bg-muted/40 gap-3 shrink-0">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -556,241 +568,267 @@ export function LuxuryPrintPreviewModal({
             </div>
           </div>
 
-          {/* ── Hierarchy Selector Bar: Method ➔ Template ➔ Paper Size ── */}
-          <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1 border-t border-border/50">
-            {/* Step 1: Print Method (Thermal vs Page) */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs font-bold text-muted-foreground shrink-0 hidden sm:inline">
-                نوع الطباعة:
+          <details ref={printToolsRef} className="group border-t border-border/50 pt-1">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between rounded-xl border border-border/70 bg-surface-2 px-3 text-sm font-bold text-foreground lg:hidden">
+              <span className="flex items-center gap-2">
+                <Printer className="size-4 text-primary" /> إعدادات الطباعة والقالب
               </span>
-              <div className="flex items-center rounded-2xl bg-surface-2/90 p-1 border border-border/70 shadow-xs">
-                <button
-                  type="button"
-                  onClick={() => handleMethodChange("thermal")}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                    printMethod === "thermal"
-                      ? "bg-primary text-primary-foreground shadow-xs"
-                      : "text-muted-foreground hover:text-foreground hover:bg-surface"
-                  }`}
-                >
-                  <Printer className="h-3.5 w-3.5" />
-                  <span>طباعة حرارية</span>
-                </button>
+              <span className="text-xs font-medium text-muted-foreground">
+                {activePaper.toUpperCase()}
+              </span>
+            </summary>
+            <div className="flex max-h-[32vh] flex-wrap items-center justify-between gap-2.5 overflow-y-auto pt-2 lg:max-h-none">
+              {/* Step 1: Print Method (Thermal vs Page) */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-muted-foreground shrink-0 hidden sm:inline">
+                  نوع الطباعة:
+                </span>
+                <div className="flex items-center rounded-2xl bg-surface-2/90 p-1 border border-border/70 shadow-xs">
+                  <button
+                    type="button"
+                    onClick={() => handleMethodChange("thermal")}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      printMethod === "thermal"
+                        ? "bg-primary text-primary-foreground shadow-xs"
+                        : "text-muted-foreground hover:text-foreground hover:bg-surface"
+                    }`}
+                  >
+                    <Printer className="h-3.5 w-3.5" />
+                    <span>طباعة حرارية</span>
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => handleMethodChange("page")}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                    printMethod === "page"
-                      ? "bg-primary text-primary-foreground shadow-xs"
-                      : "text-muted-foreground hover:text-foreground hover:bg-surface"
-                  }`}
-                >
-                  <FileText className="h-3.5 w-3.5" />
-                  <span>صفحات (A4 / A5)</span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => handleMethodChange("page")}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      printMethod === "page"
+                        ? "bg-primary text-primary-foreground shadow-xs"
+                        : "text-muted-foreground hover:text-foreground hover:bg-surface"
+                    }`}
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    <span>صفحات (A4 / A5)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Step 2: Templates corresponding to chosen method */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-xs font-bold text-muted-foreground shrink-0 hidden sm:inline">
+                  القالب:
+                </span>
+                <div className="flex items-center rounded-2xl bg-surface-2/90 p-1 border border-border/70 shadow-xs flex-wrap gap-0.5">
+                  {isThermal ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTemplate("thermal-milling")}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                          activeTemplate === "thermal-milling"
+                            ? "bg-primary text-primary-foreground shadow-xs"
+                            : "text-muted-foreground hover:text-foreground hover:bg-surface"
+                        }`}
+                      >
+                        <Scale className="h-3 w-3 text-amber-300" />
+                        <span>الإيصال الحراري الاحترافي</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setActiveTemplate("thermal")}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                          activeTemplate === "thermal"
+                            ? "bg-primary text-primary-foreground shadow-xs"
+                            : "text-muted-foreground hover:text-foreground hover:bg-surface"
+                        }`}
+                      >
+                        <span>إيصال نقطة البيع</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setActiveTemplate("thermal-qr")}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                          activeTemplate === "thermal-qr"
+                            ? "bg-primary text-primary-foreground shadow-xs"
+                            : "text-muted-foreground hover:text-foreground hover:bg-surface"
+                        }`}
+                      >
+                        <QrCode className="h-3 w-3 text-emerald-400" />
+                        <span>باركود و QR</span>
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTemplate("milling-master")}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                          activeTemplate === "milling-master"
+                            ? "bg-primary text-primary-foreground shadow-xs"
+                            : "text-muted-foreground hover:text-foreground hover:bg-surface"
+                        }`}
+                      >
+                        <Scale className="h-3 w-3 text-amber-400" />
+                        <span>خدمات وسندات المطحنة</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setActiveTemplate("elegant")}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                          activeTemplate === "elegant"
+                            ? "bg-primary text-primary-foreground shadow-xs"
+                            : "text-muted-foreground hover:text-foreground hover:bg-surface"
+                        }`}
+                      >
+                        <Sparkles className="h-3 w-3 text-amber-300" />
+                        <span>تنفيذي فاخر</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setActiveTemplate("standard")}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                          activeTemplate === "standard"
+                            ? "bg-primary text-primary-foreground shadow-xs"
+                            : "text-muted-foreground hover:text-foreground hover:bg-surface"
+                        }`}
+                      >
+                        <span>قياسي مضغوط</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setActiveTemplate("milling-clean")}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                          activeTemplate === "milling-clean"
+                            ? "bg-primary text-primary-foreground shadow-xs"
+                            : "text-muted-foreground hover:text-foreground hover:bg-surface"
+                        }`}
+                      >
+                        <span>مبسط كلاسيكي</span>
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Step 3: Paper Size corresponding to chosen method */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-muted-foreground shrink-0 hidden sm:inline">
+                  المقاس:
+                </span>
+                <div className="flex items-center rounded-2xl bg-surface-2/90 p-1 border border-border/70 shadow-xs">
+                  {isThermal ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setActivePaper("thermal-80")}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                          activePaper === "thermal-80"
+                            ? "bg-primary text-primary-foreground shadow-xs"
+                            : "text-muted-foreground hover:text-foreground hover:bg-surface"
+                        }`}
+                      >
+                        80 مم
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setActivePaper("thermal-58")}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                          activePaper === "thermal-58"
+                            ? "bg-primary text-primary-foreground shadow-xs"
+                            : "text-muted-foreground hover:text-foreground hover:bg-surface"
+                        }`}
+                      >
+                        58 مم
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setActivePaper("a4")}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                          activePaper === "a4"
+                            ? "bg-primary text-primary-foreground shadow-xs"
+                            : "text-muted-foreground hover:text-foreground hover:bg-surface"
+                        }`}
+                      >
+                        A4 (كاملة)
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setActivePaper("a5")}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                          activePaper === "a5"
+                            ? "bg-primary text-primary-foreground shadow-xs"
+                            : "text-muted-foreground hover:text-foreground hover:bg-surface"
+                        }`}
+                      >
+                        A5 (نصف صفحة)
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Step 4: Quick Barcode & QR Code Toggles */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-muted-foreground shrink-0 hidden sm:inline">
+                  الترميز:
+                </span>
+                <div className="flex items-center rounded-2xl bg-surface-2/90 p-1 border border-border/70 shadow-xs gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowBarcode((prev) => !prev)}
+                    className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
+                      showBarcode
+                        ? "bg-primary/20 text-primary border border-primary/30"
+                        : "text-muted-foreground hover:text-foreground line-through opacity-60"
+                    }`}
+                    title="تفعيل / إلغاء تفعيل الباركود"
+                    aria-pressed={showBarcode}
+                  >
+                    <span>|||| الباركود</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowSignatures((prev) => !prev)}
+                    aria-pressed={showSignatures}
+                    className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
+                      showSignatures
+                        ? "bg-primary/20 text-primary border border-primary/30"
+                        : "text-muted-foreground hover:text-foreground opacity-70"
+                    }`}
+                    title="إظهار أو إخفاء التوقيعات"
+                  >
+                    <PenLine className="h-3.5 w-3.5" />
+                    <span>التوقيعات</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowQrCode((prev) => !prev)}
+                    className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
+                      showQrCode
+                        ? "bg-primary/20 text-primary border border-primary/30"
+                        : "text-muted-foreground hover:text-foreground line-through opacity-60"
+                    }`}
+                    title="تفعيل / إلغاء تفعيل الـ QR code"
+                    aria-pressed={showQrCode}
+                  >
+                    <QrCode className="h-3.5 w-3.5" />
+                    <span>QR</span>
+                  </button>
+                </div>
               </div>
             </div>
-
-            {/* Step 2: Templates corresponding to chosen method */}
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-xs font-bold text-muted-foreground shrink-0 hidden sm:inline">
-                القالب:
-              </span>
-              <div className="flex items-center rounded-2xl bg-surface-2/90 p-1 border border-border/70 shadow-xs flex-wrap gap-0.5">
-                {isThermal ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setActiveTemplate("thermal-milling")}
-                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                        activeTemplate === "thermal-milling"
-                          ? "bg-primary text-primary-foreground shadow-xs"
-                          : "text-muted-foreground hover:text-foreground hover:bg-surface"
-                      }`}
-                    >
-                      <Scale className="h-3 w-3 text-amber-300" />
-                      <span>الإيصال الحراري الاحترافي</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setActiveTemplate("thermal")}
-                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                        activeTemplate === "thermal"
-                          ? "bg-primary text-primary-foreground shadow-xs"
-                          : "text-muted-foreground hover:text-foreground hover:bg-surface"
-                      }`}
-                    >
-                      <span>إيصال نقطة البيع</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setActiveTemplate("thermal-qr")}
-                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                        activeTemplate === "thermal-qr"
-                          ? "bg-primary text-primary-foreground shadow-xs"
-                          : "text-muted-foreground hover:text-foreground hover:bg-surface"
-                      }`}
-                    >
-                      <QrCode className="h-3 w-3 text-emerald-400" />
-                      <span>باركود و QR</span>
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setActiveTemplate("milling-master")}
-                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                        activeTemplate === "milling-master"
-                          ? "bg-primary text-primary-foreground shadow-xs"
-                          : "text-muted-foreground hover:text-foreground hover:bg-surface"
-                      }`}
-                    >
-                      <Scale className="h-3 w-3 text-amber-400" />
-                      <span>خدمات وسندات المطحنة</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setActiveTemplate("elegant")}
-                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                        activeTemplate === "elegant"
-                          ? "bg-primary text-primary-foreground shadow-xs"
-                          : "text-muted-foreground hover:text-foreground hover:bg-surface"
-                      }`}
-                    >
-                      <Sparkles className="h-3 w-3 text-amber-300" />
-                      <span>تنفيذي فاخر</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setActiveTemplate("standard")}
-                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                        activeTemplate === "standard"
-                          ? "bg-primary text-primary-foreground shadow-xs"
-                          : "text-muted-foreground hover:text-foreground hover:bg-surface"
-                      }`}
-                    >
-                      <span>قياسي مضغوط</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setActiveTemplate("milling-clean")}
-                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                        activeTemplate === "milling-clean"
-                          ? "bg-primary text-primary-foreground shadow-xs"
-                          : "text-muted-foreground hover:text-foreground hover:bg-surface"
-                      }`}
-                    >
-                      <span>مبسط كلاسيكي</span>
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Step 3: Paper Size corresponding to chosen method */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs font-bold text-muted-foreground shrink-0 hidden sm:inline">
-                المقاس:
-              </span>
-              <div className="flex items-center rounded-2xl bg-surface-2/90 p-1 border border-border/70 shadow-xs">
-                {isThermal ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setActivePaper("thermal-80")}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                        activePaper === "thermal-80"
-                          ? "bg-primary text-primary-foreground shadow-xs"
-                          : "text-muted-foreground hover:text-foreground hover:bg-surface"
-                      }`}
-                    >
-                      80 مم
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setActivePaper("thermal-58")}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                        activePaper === "thermal-58"
-                          ? "bg-primary text-primary-foreground shadow-xs"
-                          : "text-muted-foreground hover:text-foreground hover:bg-surface"
-                      }`}
-                    >
-                      58 مم
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setActivePaper("a4")}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                        activePaper === "a4"
-                          ? "bg-primary text-primary-foreground shadow-xs"
-                          : "text-muted-foreground hover:text-foreground hover:bg-surface"
-                      }`}
-                    >
-                      A4 (كاملة)
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setActivePaper("a5")}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                        activePaper === "a5"
-                          ? "bg-primary text-primary-foreground shadow-xs"
-                          : "text-muted-foreground hover:text-foreground hover:bg-surface"
-                      }`}
-                    >
-                      A5 (نصف صفحة)
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Step 4: Quick Barcode & QR Code Toggles */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs font-bold text-muted-foreground shrink-0 hidden sm:inline">
-                الترميز:
-              </span>
-              <div className="flex items-center rounded-2xl bg-surface-2/90 p-1 border border-border/70 shadow-xs gap-1">
-                <button
-                  type="button"
-                  onClick={() => setShowBarcode((prev) => !prev)}
-                  className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
-                    showBarcode
-                      ? "bg-primary/20 text-primary border border-primary/30"
-                      : "text-muted-foreground hover:text-foreground line-through opacity-60"
-                  }`}
-                  title="تفعيل / إلغاء تفعيل الباركود"
-                >
-                  <span>|||| الباركود</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setShowQrCode((prev) => !prev)}
-                  className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
-                    showQrCode
-                      ? "bg-primary/20 text-primary border border-primary/30"
-                      : "text-muted-foreground hover:text-foreground line-through opacity-60"
-                  }`}
-                  title="تفعيل / إلغاء تفعيل الـ QR code"
-                >
-                  <QrCode className="h-3.5 w-3.5" />
-                  <span>QR</span>
-                </button>
-              </div>
-            </div>
-          </div>
+          </details>
         </div>
 
         {/* ── Scrollable Preview Canvas ── */}
@@ -839,11 +877,11 @@ export function LuxuryPrintPreviewModal({
         </div>
 
         {/* ── Modal Footer Toolbar ── */}
-        <div className="flex flex-wrap items-center justify-between border-t border-border/80 px-4 sm:px-6 py-3.5 bg-muted/40 gap-3 shrink-0">
+        <div className="flex flex-wrap items-center justify-between border-t border-border/80 px-4 sm:px-6 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] bg-muted/40 gap-3 shrink-0">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
-            <span className="hidden sm:inline">معاينة حية ومطابقة لمخرجات الطابعة بنسبة 100%</span>
-            <span className="sm:hidden">معاينة مطابقة للطباعة</span>
+            <span className="hidden sm:inline">معاينة حية لمخرجات الطباعة</span>
+            <span className="sm:hidden">معاينة حية لمخرجات الطباعة</span>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">

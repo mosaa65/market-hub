@@ -15,35 +15,67 @@ export interface CompanyProfile {
 }
 
 const CACHE_KEY = "company_settings_cache";
+
 /**
- * Fallback used only when `company_settings` has never been cached.
- * The app must never render a tenant name or contact number of its own.
+ * القيمة الافتراضية الرسمية للمنشأة عند عدم ضبط إعدادات مخصصة
+ * أو قبل تحميل قاعدة البيانات: شركة إنماء سوفت للحلول البرمجية.
  */
 const DEFAULT_PROFILE: CompanyProfile = {
-  name: "",
-  contacts: [],
+  name: "إنماء سوفت للحلول البرمجية",
+  arabicName: "إنماء سوفت للحلول البرمجية",
+  englishName: "Inma Soft for Software Solutions",
+  legalName: "شركة إنماء سوفت للحلول البرمجية والتقنية",
+  phone: "772217218",
+  contacts: ["772217218", "784795101"],
+  address: "اليمن - إب",
+  email: "info@inmasoft.com",
+  taxNumber: "",
   logoUrl: "/vortex-erp-wordmark.png",
+  currency: "ر.ي",
 };
 
 function fromRow(row: Record<string, unknown> | null | undefined): CompanyProfile {
-  const phone = String(row?.phone ?? "").trim();
+  if (!row || Object.keys(row).length === 0) {
+    return DEFAULT_PROFILE;
+  }
+
+  const rowName = String(row?.name ?? "").trim();
+  const rowNameAr = String(row?.name_ar ?? "").trim();
+  const rowNameEn = String(row?.name_en ?? "").trim();
+  const rowLegal = String(row?.legal_name ?? "").trim();
+  const rowPhone = String(row?.phone ?? "").trim();
+  const rowAddress = String(row?.address ?? "").trim();
+  const rowEmail = String(row?.email ?? "").trim();
+  const rowTax = String(row?.tax_number ?? "").trim();
+  const rowLogo = String(row?.logo_url ?? "").trim();
+  const rowCurrency = String(row?.currency_symbol ?? row?.currency ?? "").trim();
+
   const extra = String(row?.contact_numbers ?? "")
     .split(/[,،\n]/)
     .map((v) => v.trim())
     .filter(Boolean);
-  const contacts = Array.from(new Set([phone, ...extra].filter(Boolean)));
+  const parsedContacts = Array.from(new Set([rowPhone, ...extra].filter(Boolean)));
+
+  const isCustomConfigured = Boolean(
+    rowName || rowNameAr || rowNameEn || rowLegal || rowPhone || rowAddress || rowEmail || rowTax,
+  );
+
+  if (!isCustomConfigured) {
+    return DEFAULT_PROFILE;
+  }
+
   return {
-    name: String(row?.name ?? "").trim() || DEFAULT_PROFILE.name,
-    arabicName: String(row?.name_ar ?? "").trim() || undefined,
-    englishName: String(row?.name_en ?? "").trim() || undefined,
-    legalName: String(row?.legal_name ?? "").trim() || undefined,
-    phone: phone || undefined,
-    contacts,
-    address: String(row?.address ?? "").trim() || undefined,
-    email: String(row?.email ?? "").trim() || undefined,
-    taxNumber: String(row?.tax_number ?? "").trim() || undefined,
-    logoUrl: String(row?.logo_url ?? "").trim() || DEFAULT_PROFILE.logoUrl,
-    currency: String(row?.currency_symbol ?? row?.currency ?? "").trim() || undefined,
+    name: rowName || rowNameAr || DEFAULT_PROFILE.name,
+    arabicName: rowNameAr || undefined,
+    englishName: rowNameEn || undefined,
+    legalName: rowLegal || undefined,
+    phone: rowPhone || undefined,
+    contacts: parsedContacts.length > 0 ? parsedContacts : rowPhone ? [rowPhone] : [],
+    address: rowAddress || undefined,
+    email: rowEmail || undefined,
+    taxNumber: rowTax || undefined,
+    logoUrl: rowLogo || DEFAULT_PROFILE.logoUrl,
+    currency: rowCurrency || DEFAULT_PROFILE.currency,
   };
 }
 
@@ -59,7 +91,6 @@ export function getCachedCompanyProfile(): CompanyProfile {
 
 export function cacheCompanyProfile(row: Record<string, unknown>): CompanyProfile {
   if (typeof window === "undefined") return fromRow(row);
-  // ندمج مع الصف المخزّن حتى لا تفقد التحديثات الجزئية بقية الحقول.
   let merged: Record<string, unknown> = row;
   try {
     const raw = localStorage.getItem(CACHE_KEY);
@@ -72,18 +103,10 @@ export function cacheCompanyProfile(row: Record<string, unknown>): CompanyProfil
   return fromRow(merged);
 }
 
-/**
- * تحديث جزئي للكاش (مثل تغيير رمز العملة) دون فقدان بقية حقول الشركة.
- * هذا هو المسار الوحيد المسموح لتحديث كاش Company Profile.
- *
- * يقبل إما أسماء أعمدة قاعدة البيانات (`currency_symbol`) أو أسماء
- * `CompanyProfile` (`currency`) — يُترجم الاثنان إلى نفس المفتاح المخزّن.
- */
 export function patchCompanyProfileCache(patch: Partial<CompanyProfile>): CompanyProfile {
   const rowPatch: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(patch)) {
     if (value === undefined) continue;
-    // خريطة أسماء CompanyProfile → أعمدة قاعدة البيانات.
     const column =
       key === "currency"
         ? "currency_symbol"
@@ -103,7 +126,6 @@ export function patchCompanyProfileCache(patch: Partial<CompanyProfile>): Compan
   return cacheCompanyProfile(rowPatch);
 }
 
-/** يمسح الكاش — يُستخدم عند تسجيل الخروج أو تغيير المنشأة. */
 export function clearCompanyProfileCache(): void {
   if (typeof window !== "undefined") localStorage.removeItem(CACHE_KEY);
 }

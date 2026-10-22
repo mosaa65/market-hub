@@ -267,22 +267,6 @@ export function renderMillingMasterTemplate(
       border-bottom: 1px solid #94a3b8;
     }
 
-    .inama-footer {
-      margin-top: 24px;
-      padding-top: 12px;
-      border-top: 1px solid #e2e8f0;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 11px;
-      color: #64748b;
-    }
-    .inama-badge {
-      display: inline-block;
-      font-weight: 700;
-      color: #0284c7;
-      letter-spacing: 0.2px;
-    }
   </style>
 </head>
 <body onload="window.print()">
@@ -469,15 +453,6 @@ export function renderMillingMasterTemplate(
     }
 
     ${renderInvoiceRightsFooter()}
-    ${
-      opts.showFooter
-        ? `
-    <div class="inama-footer">
-      <span>تاريخ الطباعة: ${new Date().toLocaleDateString("ar-YE")}</span>
-      ${L.poweredBy ? `<span class="inama-badge">${esc(L.poweredBy)}</span>` : ""}
-    </div>`
-        : ""
-    }
   </div>
 </body>
 </html>`;
@@ -602,15 +577,6 @@ export function renderMillingThermalTemplate(
       padding: 6px 8px;
       margin: 6px 0;
     }
-    .inama-footer {
-      text-align: center;
-      font-size: 9.5px;
-      font-weight: 800;
-      color: #333;
-      margin-top: 10px;
-      padding-top: 6px;
-      border-top: 1px solid rgba(0, 0, 0, 0.12);
-    }
   </style>
 </head>
 <body onload="window.print()">
@@ -675,14 +641,6 @@ export function renderMillingThermalTemplate(
   }
 
   ${renderInvoiceRightsFooter()}
-  ${
-    opts.showFooter && L.poweredBy
-      ? `
-  <div class="inama-footer">
-    ${esc(L.poweredBy)}
-  </div>`
-      : ""
-  }
 </body>
 </html>`;
 }
