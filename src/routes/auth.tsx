@@ -93,15 +93,39 @@ function resolvePhoneCandidates(input: string, countryCode: string): string[] {
   return out;
 }
 
-const loginSchema = (t: (key: string) => string, isRtl: boolean) =>
+const phoneSchema = (isRtl: boolean) =>
   z.object({
-    identifier: z
+    phone: z
       .string()
       .trim()
       .min(1, {
+        message: isRtl ? "يرجى إدخال رقم الهاتف" : "Please enter phone number",
+      })
+      .max(32, {
+        message: isRtl ? "رقم الهاتف طويل جداً" : "Phone number is too long",
+      }),
+    password: z
+      .string()
+      .min(6, {
         message: isRtl
-          ? "يرجى إدخال رقم الهاتف أو البريد الإلكتروني"
-          : "Please enter phone number or email",
+          ? "كلمة المرور يجب أن تكون 6 أحرف على الأقل"
+          : "Password must be at least 6 characters",
+      })
+      .max(72, {
+        message: isRtl ? "كلمة المرور لا تزيد عن 72 حرفاً" : "Password too long",
+      }),
+  });
+
+const emailSchema = (t: (key: string) => string, isRtl: boolean) =>
+  z.object({
+    email: z
+      .string()
+      .trim()
+      .min(1, {
+        message: isRtl ? "يرجى إدخال البريد الإلكتروني" : "Please enter your email",
+      })
+      .email({
+        message: isRtl ? "يرجى إدخال بريد إلكتروني صحيح" : "Please enter a valid email address",
       })
       .max(255, { message: t("auth.email_too_long") }),
     password: z
@@ -114,114 +138,99 @@ function AuthPage() {
   const { t, dir } = useI18n();
   const { session } = useAuth();
   const navigate = useNavigate();
+
+  // نمط تسجيل الدخول: هاتف أو بريد إلكتروني
+  const [authMode, setAuthMode] = useState<"phone" | "email">("phone");
+
+  // حقول نموذج الهاتف
   const [country, setCountry] = useState<Country>(DEFAULT_COUNTRY);
-  const [identifier, setIdentifier] = useState("");
-  const [password, setPassword] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [phonePassword, setPhonePassword] = useState("");
+
+  // حقول نموذج البريد الإلكتروني
+  const [emailAddress, setEmailAddress] = useState("");
+  const [emailPassword, setEmailPassword] = useState("");
+
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const logoMarkUrl = "/vortex-erp-mark.png";
   const logoWordmarkUrl = "/vortex-erp-wordmark.png";
   const isRtl = dir === "rtl";
-  /**
-   * التمييز بين البريد والهاتف يجب أن يقبل أثناء الكتابة.
-   *
-   * المشكلة التي كانت: الشرط `includes("@")` يُقرأ مع كل ضغطة مفتاح، وكان
-   * مرتبطاً بـ `maxLength` يتغيّر معه — فحظة كتابة @ يهبط الحد من 15 إلى 255
-   * ثم يعود، فيُقتطع النص ولا يكتمل ".com".
-   *
-   * الآن نوع المُدخَل عقد مستقر يُحسم مرة واحدة من أول حرف غير رقمي، ولا
-   * يُعاد الحكم عليه مع كل حرف.
-   */
-  const [inputMode, setInputMode] = useState<"unknown" | "phone" | "email">("unknown");
-  const isEmailInput =
-    inputMode === "email" || (inputMode === "unknown" && identifier.includes("@"));
-
-  const handleIdentifierChange = (raw: string) => {
-    setIdentifier(raw);
-
-    // الفراغ يعيد النية إلى المجهول، فيصحّ تبديل النوع لاحقاً بدل الجمود
-    // على قرارٍ خاطئ اتُّخذ في حرفٍ سابق.
-    if (raw.trim() === "") {
-      setInputMode("unknown");
-      return;
-    }
-
-    if (/[@A-Za-z]/.test(raw)) {
-      setInputMode("email");
-      return;
-    }
-
-    // رقم فقط بعد أن حُسم النوع بريداً => المستخدم غيّر رأيه، نعود إلى رقم
-    // (يمنع بقاء منتقي الدولة مخفياً مع رقم في يده).
-    if (inputMode === "email" && /^\s*\d/.test(raw)) {
-      setInputMode("phone");
-      return;
-    }
-
-    if (inputMode === "unknown" && /\d/.test(raw)) setInputMode("phone");
-  };
 
   useEffect(() => {
     if (session) navigate({ to: "/dashboard", replace: true });
   }, [session, navigate]);
 
-  async function handleSubmit(e: React.FormEvent) {
+  function getErrorMessage(err: unknown): string {
+    console.error("[Auth] Login error:", err);
+    let rawMsg = "";
+    if (err instanceof Error) {
+      rawMsg = err.message;
+    } else if (typeof err === "object" && err !== null) {
+      rawMsg =
+        (err as any).message ??
+        (err as any).msg ??
+        (err as any).error_description ??
+        JSON.stringify(err);
+    } else {
+      rawMsg = String(err);
+    }
+
+    const message = rawMsg.toLowerCase();
+    return message.includes("invalid login credentials") || message.includes("invalid_credentials")
+      ? isRtl
+        ? "بيانات الدخول غير صحيحة. يرجى التحقق من المدخلات وكلمة المرور."
+        : "Invalid credentials. Please check your credentials and password."
+      : message.includes("email not confirmed")
+        ? isRtl
+          ? "الحساب بحاجة لتأكيد. يرجى مراجعة الإدارة."
+          : "Account not confirmed yet."
+        : message.includes("network") || message.includes("fetch")
+          ? t("auth.network_error")
+          : rawMsg ||
+            (isRtl
+              ? "فشل تسجيل الدخول. يرجى المحاولة لاحقاً."
+              : "Login failed. Please try again later.");
+  }
+
+  async function handlePhoneSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const parsed = loginSchema(t, isRtl).safeParse({ identifier, password });
+    const parsed = phoneSchema(isRtl).safeParse({
+      phone: phoneNumber,
+      password: phonePassword,
+    });
     if (!parsed.success) {
       toast.error(parsed.error.issues[0].message);
       return;
     }
 
     setLoading(true);
-
     try {
       let lastError: any = null;
       let sessionEstablished = false;
+      const trimmed = phoneNumber.trim();
 
-      /*
-       * الدخول بالهاتف مساران، ويجب تجربتهما بالترتيب الصحيح:
-       *
-       *   1. الهاتف الحقيقي — signInWithPassword({ phone }) — وهو المسار
-       *      الصحيح لأي حساب أُنشئ برقم هاتف، لأن GoTrue يبحث في عمود
-       *      auth.users.phone.
-       *
-       *   2. البريد الوهمي (@vortex.local) — للتوافق مع الحسابات القديمة التي
-       *      أُنشئت قبل تفعيل الهاتف، حين كان الحساب الوحيد المتاح بريدًا
-       *      صناعيًا مشتقًا من الرقم.
-       *
-       * كان الترتيب معكوسًا سابقًا: يُجرَّب البريد الصناعي وحده، فحساب زُرع
-       * برقم هاتف حقيقي لا يُوجد أبدًا ويفشل الدخول رغم صحة كل شيء — وهو ما
-       * حدث فعلًا في سجلّ المصادقة: محاولات متتابعة بلا نهاية ناجحة.
-       */
-      const trimmedIdentifier = identifier.trim();
-      const looksLikeEmail = trimmedIdentifier.includes("@");
-
-      if (!looksLikeEmail) {
-        // 1) الهاتف الحقيقي، بجميع صيغه المحتملة.
-        const phoneCandidates = resolvePhoneCandidates(trimmedIdentifier, country.dialCode);
-        for (const phone of phoneCandidates) {
-          const { data: phoneData, error: phoneError } = await supabase.auth.signInWithPassword({
-            phone,
-            password,
-          });
-          if (!phoneError && phoneData?.session) {
-            sessionEstablished = true;
-            break;
-          }
-          if (phoneError) lastError = phoneError;
+      // 1) الهاتف الحقيقي بصيغه المحتملة (المسار المباشر)
+      const phoneCandidates = resolvePhoneCandidates(trimmed, country.dialCode);
+      for (const phone of phoneCandidates) {
+        const { data: phoneData, error: phoneError } = await supabase.auth.signInWithPassword({
+          phone,
+          password: phonePassword,
+        });
+        if (!phoneError && phoneData?.session) {
+          sessionEstablished = true;
+          break;
         }
+        if (phoneError) lastError = phoneError;
       }
 
-      // 2) احتياط أخير: البريد (الحقيقي إن أدخله المستخدم، أو الصناعي القديم).
+      // 2) احتياط: التوافق مع الحسابات القديمة المسجلة بالبريد الوهمي @vortex.local
       if (!sessionEstablished) {
-        const emailCandidates = looksLikeEmail
-          ? [trimmedIdentifier.toLowerCase()]
-          : resolveCandidates(trimmedIdentifier, country.dialCode);
+        const emailCandidates = resolveCandidates(trimmed, country.dialCode);
         for (const email of emailCandidates) {
           const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
             email,
-            password,
+            password: phonePassword,
           });
           if (!signInError && signInData?.session) {
             sessionEstablished = true;
@@ -237,48 +246,48 @@ function AuthPage() {
         return;
       }
 
-      if (lastError) {
-        throw lastError;
-      }
-
-      // Shouldn't reach here, but handle gracefully
+      if (lastError) throw lastError;
       throw new Error(
         isRtl ? "فشل تسجيل الدخول. يرجى المحاولة مرة أخرى." : "Login failed. Please try again.",
       );
     } catch (err: unknown) {
-      console.error("[Auth] Login error:", err);
+      toast.error(getErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  }
 
-      // Extract meaningful error message
-      let rawMsg = "";
-      if (err instanceof Error) {
-        rawMsg = err.message;
-      } else if (typeof err === "object" && err !== null) {
-        rawMsg =
-          (err as any).message ??
-          (err as any).msg ??
-          (err as any).error_description ??
-          JSON.stringify(err);
-      } else {
-        rawMsg = String(err);
+  async function handleEmailSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const parsed = emailSchema(t, isRtl).safeParse({
+      email: emailAddress,
+      password: emailPassword,
+    });
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0].message);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const trimmedEmail = emailAddress.trim().toLowerCase();
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: trimmedEmail,
+        password: emailPassword,
+      });
+
+      if (!error && data?.session) {
+        toast.success(t("auth.signin_success"));
+        navigate({ to: "/dashboard", replace: true });
+        return;
       }
 
-      const message = rawMsg.toLowerCase();
-      const translatedError =
-        message.includes("invalid login credentials") || message.includes("invalid_credentials")
-          ? isRtl
-            ? "بيانات الدخول غير صحيحة. يرجى التحقق من رقم الهاتف/البريد وكلمة المرور."
-            : "Invalid credentials. Please check your phone/email and password."
-          : message.includes("email not confirmed")
-            ? isRtl
-              ? "الحساب بحاجة لتأكيد. يرجى مراجعة الإدارة."
-              : "Account not confirmed yet."
-            : message.includes("network") || message.includes("fetch")
-              ? t("auth.network_error")
-              : rawMsg ||
-                (isRtl
-                  ? "فشل تسجيل الدخول. يرجى المحاولة لاحقاً."
-                  : "Login failed. Please try again later.");
-      toast.error(translatedError);
+      if (error) throw error;
+      throw new Error(
+        isRtl ? "فشل تسجيل الدخول. يرجى المحاولة مرة أخرى." : "Login failed. Please try again.",
+      );
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -397,122 +406,236 @@ function AuthPage() {
                   </p>
                 </div>
 
-                <form onSubmit={handleSubmit} className="mt-8 space-y-5">
-                  <div className="space-y-2">
-                    <label
-                      htmlFor="login-identifier"
-                      className="block text-xs font-bold text-foreground"
-                    >
-                      {isEmailInput
-                        ? isRtl
-                          ? "البريد الإلكتروني"
-                          : "Email address"
-                        : isRtl
-                          ? "رقم الهاتف"
-                          : "Phone number"}
-                    </label>
-                    <div className="flex gap-2">
-                      {!isEmailInput && (
+                {/* شريط زري التنقل بين الهاتف والبريد الإلكتروني */}
+                <div className="mt-6 grid grid-cols-2 gap-1 rounded-2xl bg-surface-2 p-1.5 border border-border/60">
+                  <button
+                    type="button"
+                    onClick={() => setAuthMode("phone")}
+                    className={`flex items-center justify-center gap-2 rounded-xl py-2 text-xs font-bold transition-all cursor-pointer ${
+                      authMode === "phone"
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Phone className="size-3.5" />
+                    <span>{isRtl ? "رقم الهاتف" : "Phone"}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAuthMode("email")}
+                    className={`flex items-center justify-center gap-2 rounded-xl py-2 text-xs font-bold transition-all cursor-pointer ${
+                      authMode === "email"
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Mail className="size-3.5" />
+                    <span>{isRtl ? "البريد الإلكتروني" : "Email"}</span>
+                  </button>
+                </div>
+
+                {/* نموذج تسجيل الدخول برقم الهاتف */}
+                {authMode === "phone" ? (
+                  <form onSubmit={handlePhoneSubmit} className="mt-6 space-y-5">
+                    <div className="space-y-2">
+                      <label
+                        htmlFor="login-phone"
+                        className="block text-xs font-bold text-foreground"
+                      >
+                        {isRtl ? "رقم الهاتف" : "Phone number"}
+                      </label>
+                      <div className="flex gap-2">
                         <CountrySelector value={country} onChange={setCountry} disabled={loading} />
-                      )}
-                      <div className="relative flex-1">
-                        {isEmailInput ? (
-                          <Mail
-                            className="pointer-events-none absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-                            aria-hidden
-                          />
-                        ) : (
+                        <div className="relative flex-1">
                           <Phone
                             className="pointer-events-none absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
                             aria-hidden
                           />
-                        )}
+                          <input
+                            id="login-phone"
+                            value={phoneNumber}
+                            onChange={(e) => setPhoneNumber(e.target.value)}
+                            type="tel"
+                            inputMode="tel"
+                            autoComplete="tel"
+                            spellCheck={false}
+                            required
+                            disabled={loading}
+                            dir="ltr"
+                            className="h-12 w-full rounded-2xl border border-border bg-surface px-4 ps-10 text-sm text-foreground shadow-sm outline-none transition-[border-color,box-shadow,background-color] placeholder:text-muted-foreground hover:border-primary/45 focus:border-primary focus:ring-4 focus:ring-primary/15 disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none"
+                            placeholder={country.placeholder}
+                            maxLength={32}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label
+                        htmlFor="login-phone-password"
+                        className="block text-xs font-bold text-foreground"
+                      >
+                        {t("common.password")}
+                      </label>
+                      <div className="relative">
+                        <Lock
+                          className="pointer-events-none absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                          aria-hidden
+                        />
                         <input
-                          id="login-identifier"
-                          value={identifier}
-                          onChange={(e) => handleIdentifierChange(e.target.value)}
-                          type="text"
-                          inputMode={isEmailInput ? "email" : "tel"}
-                          autoComplete="username"
-                          autoCapitalize="none"
+                          id="login-phone-password"
+                          value={phonePassword}
+                          onChange={(e) => setPhonePassword(e.target.value)}
+                          type={showPassword ? "text" : "password"}
+                          autoComplete="current-password"
+                          required
+                          minLength={6}
+                          disabled={loading}
+                          dir="ltr"
+                          className="h-12 w-full rounded-2xl border border-border bg-surface px-4 ps-10 pe-12 text-sm text-foreground shadow-sm outline-none transition-[border-color,box-shadow,background-color] placeholder:text-muted-foreground hover:border-primary/45 focus:border-primary focus:ring-4 focus:ring-primary/15 disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none"
+                          placeholder="••••••••"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword((visible) => !visible)}
+                          className="absolute end-2 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-xl text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none cursor-pointer"
+                          aria-label={
+                            showPassword
+                              ? isRtl
+                                ? "إخفاء كلمة المرور"
+                                : "Hide password"
+                              : isRtl
+                                ? "إظهار كلمة المرور"
+                                : "Show password"
+                          }
+                          aria-pressed={showPassword}
+                          disabled={loading}
+                        >
+                          {showPassword ? (
+                            <EyeOff className="size-4" aria-hidden />
+                          ) : (
+                            <Eye className="size-4" aria-hidden />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    <Button
+                      type="submit"
+                      size="lg"
+                      loading={loading}
+                      icon={<LogIn aria-hidden />}
+                      className="mt-2 h-12 w-full rounded-2xl bg-primary text-sm font-bold shadow-[0_14px_30px_-12px_color-mix(in_oklab,var(--primary)_80%,transparent)] hover:bg-primary/90 focus-visible:ring-primary/40 cursor-pointer"
+                    >
+                      {loading
+                        ? isRtl
+                          ? "جارٍ تسجيل الدخول..."
+                          : "Signing in..."
+                        : isRtl
+                          ? "تسجيل الدخول بالهاتف"
+                          : "Sign in with Phone"}
+                    </Button>
+                  </form>
+                ) : (
+                  /* نموذج منفصل لتسجيل الدخول بالبريد الإلكتروني */
+                  <form onSubmit={handleEmailSubmit} className="mt-6 space-y-5">
+                    <div className="space-y-2">
+                      <label
+                        htmlFor="login-email"
+                        className="block text-xs font-bold text-foreground"
+                      >
+                        {isRtl ? "البريد الإلكتروني" : "Email address"}
+                      </label>
+                      <div className="relative">
+                        <Mail
+                          className="pointer-events-none absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                          aria-hidden
+                        />
+                        <input
+                          id="login-email"
+                          value={emailAddress}
+                          onChange={(e) => setEmailAddress(e.target.value)}
+                          type="email"
+                          inputMode="email"
+                          autoComplete="email"
                           spellCheck={false}
                           required
                           disabled={loading}
                           dir="ltr"
                           className="h-12 w-full rounded-2xl border border-border bg-surface px-4 ps-10 text-sm text-foreground shadow-sm outline-none transition-[border-color,box-shadow,background-color] placeholder:text-muted-foreground hover:border-primary/45 focus:border-primary focus:ring-4 focus:ring-primary/15 disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none"
-                          placeholder={isEmailInput ? "name@company.com" : `${country.placeholder}`}
-                          maxLength={isEmailInput ? 254 : 32}
+                          placeholder="user@company.com"
+                          maxLength={254}
                         />
                       </div>
                     </div>
-                  </div>
 
-                  <div className="space-y-2">
-                    <label
-                      htmlFor="login-password"
-                      className="block text-xs font-bold text-foreground"
-                    >
-                      {t("common.password")}
-                    </label>
-                    <div className="relative">
-                      <Lock
-                        className="pointer-events-none absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-                        aria-hidden
-                      />
-                      <input
-                        id="login-password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        type={showPassword ? "text" : "password"}
-                        autoComplete="current-password"
-                        required
-                        minLength={6}
-                        disabled={loading}
-                        dir="ltr"
-                        className="h-12 w-full rounded-2xl border border-border bg-surface px-4 ps-10 pe-12 text-sm text-foreground shadow-sm outline-none transition-[border-color,box-shadow,background-color] placeholder:text-muted-foreground hover:border-primary/45 focus:border-primary focus:ring-4 focus:ring-primary/15 disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none"
-                        placeholder="••••••••"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword((visible) => !visible)}
-                        className="absolute end-2 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-xl text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none"
-                        aria-label={
-                          showPassword
-                            ? isRtl
-                              ? "إخفاء كلمة المرور"
-                              : "Hide password"
-                            : isRtl
-                              ? "إظهار كلمة المرور"
-                              : "Show password"
-                        }
-                        aria-pressed={showPassword}
-                        disabled={loading}
+                    <div className="space-y-2">
+                      <label
+                        htmlFor="login-email-password"
+                        className="block text-xs font-bold text-foreground"
                       >
-                        {showPassword ? (
-                          <EyeOff className="size-4" aria-hidden />
-                        ) : (
-                          <Eye className="size-4" aria-hidden />
-                        )}
-                      </button>
+                        {t("common.password")}
+                      </label>
+                      <div className="relative">
+                        <Lock
+                          className="pointer-events-none absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                          aria-hidden
+                        />
+                        <input
+                          id="login-email-password"
+                          value={emailPassword}
+                          onChange={(e) => setEmailPassword(e.target.value)}
+                          type={showPassword ? "text" : "password"}
+                          autoComplete="current-password"
+                          required
+                          minLength={6}
+                          disabled={loading}
+                          dir="ltr"
+                          className="h-12 w-full rounded-2xl border border-border bg-surface px-4 ps-10 pe-12 text-sm text-foreground shadow-sm outline-none transition-[border-color,box-shadow,background-color] placeholder:text-muted-foreground hover:border-primary/45 focus:border-primary focus:ring-4 focus:ring-primary/15 disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none"
+                          placeholder="••••••••"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword((visible) => !visible)}
+                          className="absolute end-2 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-xl text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none cursor-pointer"
+                          aria-label={
+                            showPassword
+                              ? isRtl
+                                ? "إخفاء كلمة المرور"
+                                : "Hide password"
+                              : isRtl
+                                ? "إظهار كلمة المرور"
+                                : "Show password"
+                          }
+                          aria-pressed={showPassword}
+                          disabled={loading}
+                        >
+                          {showPassword ? (
+                            <EyeOff className="size-4" aria-hidden />
+                          ) : (
+                            <Eye className="size-4" aria-hidden />
+                          )}
+                        </button>
+                      </div>
                     </div>
-                  </div>
 
-                  <Button
-                    type="submit"
-                    size="lg"
-                    loading={loading}
-                    icon={<LogIn aria-hidden />}
-                    className="mt-2 h-12 w-full rounded-2xl bg-primary text-sm font-bold shadow-[0_14px_30px_-12px_color-mix(in_oklab,var(--primary)_80%,transparent)] hover:bg-primary/90 focus-visible:ring-primary/40"
-                  >
-                    {loading
-                      ? isRtl
-                        ? "جارٍ تسجيل الدخول..."
-                        : "Signing in..."
-                      : isRtl
-                        ? "تسجيل الدخول"
-                        : "Sign in"}
-                  </Button>
-                </form>
+                    <Button
+                      type="submit"
+                      size="lg"
+                      loading={loading}
+                      icon={<LogIn aria-hidden />}
+                      className="mt-2 h-12 w-full rounded-2xl bg-primary text-sm font-bold shadow-[0_14px_30px_-12px_color-mix(in_oklab,var(--primary)_80%,transparent)] hover:bg-primary/90 focus-visible:ring-primary/40 cursor-pointer"
+                    >
+                      {loading
+                        ? isRtl
+                          ? "جارٍ تسجيل الدخول..."
+                          : "Signing in..."
+                        : isRtl
+                          ? "تسجيل الدخول بالبريد"
+                          : "Sign in with Email"}
+                    </Button>
+                  </form>
+                )}
 
                 <div className="mt-7 flex items-start gap-2.5 border-t border-border/70 pt-5 text-[11px] leading-5 text-muted-foreground">
                   <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />

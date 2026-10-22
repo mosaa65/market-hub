@@ -86,28 +86,49 @@ FROM known k
 WHERE EXISTS (SELECT 1 FROM auth.users u WHERE u.id = k.user_id)
 ON CONFLICT (provider, provider_id) DO NOTHING;
 
-WITH known(user_id) AS (VALUES
-  ('a0000000-0000-4000-a000-000000000001'::uuid),
-  ('a0000000-0000-4000-a000-000000000002'::uuid),
-  ('a0000000-0000-4000-a000-000000000003'::uuid),
-  ('a0000000-0000-4000-a000-000000000004'::uuid)
+WITH known(user_id, phone) AS (VALUES
+  ('a0000000-0000-4000-a000-000000000001'::uuid, '+967772217218'),
+  ('a0000000-0000-4000-a000-000000000002'::uuid, '+967772317950'),
+  ('a0000000-0000-4000-a000-000000000003'::uuid, '+967784795104'),
+  ('a0000000-0000-4000-a000-000000000004'::uuid, '+967779121636')
 )
 INSERT INTO auth.identities (id, user_id, provider_id, provider, identity_data, created_at, updated_at, last_sign_in_at)
 SELECT gen_random_uuid(), k.user_id, k.user_id::text, 'phone',
-       jsonb_build_object('sub', k.user_id::text, 'email_verified', false, 'phone_verified', true),
+       jsonb_build_object(
+         'sub', k.user_id::text,
+         'email_verified', false,
+         'phone_verified', true,
+         -- الرقم إلزامي في identity_data: بلا هذا الحقل لا يجد GoTrue شيئًا
+         -- يطابقه عند الدخول بالهاتف فيعيد invalid_credentials رغم صحة
+         -- الرقم وكلمة المرور (نفس إصلاح البذرة 2026-10-21).
+         'phone', k.phone
+       ),
        now(), now(), NULL
 FROM known k
 WHERE EXISTS (SELECT 1 FROM auth.users u WHERE u.id = k.user_id)
-  AND NOT EXISTS (
-    SELECT 1 FROM auth.identities i
-    WHERE i.user_id = k.user_id AND i.provider = 'phone'
-  );
+ON CONFLICT (provider, provider_id) DO UPDATE
+  SET identity_data = EXCLUDED.identity_data,
+      updated_at    = now();
 
--- ⚠️ سبب وجود NOT EXISTS أعلاه بدل ON CONFLICT وحده:
---   uniIQUE (provider, provider_id) يمنع صفين لنفس (phone, user). لكن حسابًا
---   قديمًا قد يحمل هوية هاتف بـ provider_id مختلف (تصميم أقدم) — فيمرّ
---   ON CONFLICT ويُدرج هوية هاتف ثانية لنفس المستخدم. GoTrue قد يختار
---   عشوائيًا بينهما. الفحص الاسمي يمنع التكرار من أصله.
+-- ⚠️ هوية هاتف قديمة موجودة مسبقًا (زرعتها نسخة أقدم بلا حقل phone في
+-- identity_data)? ON CONFLICT أعلاه يصلحها. وهذا التحديث الإضافي يعالج
+-- هوية هاتف بـ provider_id مختلف (تصميم أقدم) لم يطابق القيد:
+UPDATE auth.identities i
+SET identity_data = jsonb_build_object(
+      'sub', k.user_id::text,
+      'email_verified', false,
+      'phone_verified', true,
+      'phone', k.phone
+    ),
+    updated_at = now()
+FROM known k
+WHERE i.user_id = k.user_id
+  AND i.provider = 'phone'
+  AND NOT (i.identity_data ? 'phone');
+
+-- ملاحظة: القيد UNIQUE (provider, provider_id) يمنع صفين لنفس (user, provider).
+--   حسابًا قديمًا قد يحمل هوية هاتف بـ provider_id مختلف (تصميم أقدم) —
+--   التحديث الإضافي أعلاه يصحّح identity_data فيه بدل إدراج صف ثانٍ.
 
 -- ── (3) profiles: الملف الشخصي لكل حساب في auth.users ينتمي للمنصة ────────
 WITH known(user_id, full_name, phone) AS (VALUES

@@ -202,7 +202,7 @@ export const SYSTEM_MODULES: PlatformModule[] = [
       "/_app/trial-balance",
       "/_app/income-statement",
       "/_app/balance-sheet",
-      "/_app.general-ledger",
+      "/_app/general-ledger",
     ],
   },
   {

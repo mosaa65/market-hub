@@ -82,7 +82,7 @@ END $$;
 WITH seed(user_id, email, phone, password, full_name, role) AS (VALUES
   ('a0000000-0000-4000-a000-000000000001'::uuid, 'mousa.mc13@gmail.com',     '+967772217218', 'Super#2004',   'موسى العواضي',  'superadmin'),
   ('a0000000-0000-4000-a000-000000000002'::uuid, 'shoeabvv@gmail.com',       '+967772317950', 'Super#2004',   'يونس العفيف',   'superadmin'),
-  ('a0000000-0000-4000-a000-000000000003'::uuid, 'emadfasill2001@gmail.com', '+967784795104', 'Support#2002', 'عماد الجماعي', 'support'),
+  ('a0000000-0000-4000-a000-000000000003'::uuid, 'emadfasill2001@gmail.com', '+967784795104', 'Super#2004', 'عماد الجماعي', 'support'),
   ('a0000000-0000-4000-a000-000000000004'::uuid, 'ahmedhetar15@gmail.com', '+967779121636', 'Super#2004', 'أحمد الهتار', 'superadmin')
 )
 INSERT INTO auth.users (
