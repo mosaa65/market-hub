@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CalendarDays, ChevronDown, Clock3 } from "lucide-react";
+import { CalendarDays, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -40,6 +40,13 @@ function formatLongDate(value: string, lang: string): string {
     : value;
 }
 
+function localDateValue(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function PosDatePicker({ value, onChange, lang, label }: PosDatePickerProps) {
   const [open, setOpen] = useState(false);
   const isArabic = lang === "ar";
@@ -62,9 +69,9 @@ export function PosDatePicker({ value, onChange, lang, label }: PosDatePickerPro
       <PopoverContent
         align={isArabic ? "end" : "start"}
         sideOffset={6}
-        className="w-[min(21rem,calc(100vw-1rem))] overflow-hidden rounded-2xl border-border/70 bg-popover p-0 shadow-2xl"
+        className="w-[min(21rem,calc(100vw-1rem))] overflow-hidden rounded-2xl border-primary/20 bg-primary/[0.055] p-0 text-card-foreground shadow-2xl dark:border-primary/30 dark:bg-primary/[0.12]"
       >
-        <div className="flex items-center gap-3 border-b border-border/70 bg-primary/[0.035] px-4 py-3">
+        <div className="flex items-center gap-3 border-b border-primary/15 px-4 py-3 dark:border-primary/25">
           <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-primary/15 bg-primary/10 text-primary">
             <CalendarDays className="size-4" />
           </span>
@@ -79,6 +86,7 @@ export function PosDatePicker({ value, onChange, lang, label }: PosDatePickerPro
         </div>
         <Calendar
           mode="single"
+          showOutsideDays={false}
           selected={parseDate(value)}
           onSelect={(date) => {
             if (!date) return;
@@ -89,27 +97,47 @@ export function PosDatePicker({ value, onChange, lang, label }: PosDatePickerPro
             setOpen(false);
           }}
           dir={isArabic ? "rtl" : "ltr"}
+          weekStartsOn={6}
+          formatters={{
+            formatWeekdayName: (date) =>
+              new Intl.DateTimeFormat(isArabic ? "ar" : "en", { weekday: "long" }).format(date),
+          }}
+          classNames={{
+            month: "flex w-full flex-col gap-2",
+            month_caption: "flex h-8 w-full items-center justify-center px-8 text-sm font-bold",
+            nav: "absolute inset-x-0 top-0 flex w-full items-center justify-between gap-1",
+            weekdays: "flex border-b border-primary/10 pb-1 dark:border-primary/20",
+            weekday:
+              "flex-1 select-none rounded-md px-0 text-center text-[9px] font-semibold text-muted-foreground sm:text-[10px]",
+            week: "mt-1 flex w-full",
+            day_button:
+              "mx-auto size-8 rounded-full text-xs transition-colors hover:bg-primary/10 data-[selected-single=true]:bg-primary data-[selected-single=true]:text-primary-foreground sm:size-9",
+          }}
           initialFocus
-          className="mx-auto p-3"
+          className="mx-auto w-full p-2.5"
         />
-        <div className="flex justify-end border-t border-border/70 px-3 py-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-8 gap-1.5 rounded-full px-3 text-xs font-semibold text-primary hover:bg-primary/10"
-            onClick={() => {
-              const today = new Date();
-              const year = today.getFullYear();
-              const month = String(today.getMonth() + 1).padStart(2, "0");
-              const day = String(today.getDate()).padStart(2, "0");
-              onChange(`${year}-${month}-${day}`);
-              setOpen(false);
-            }}
-          >
-            <Clock3 className="size-3.5" />
-            {isArabic ? "اليوم" : "Today"}
-          </Button>
+        <div className="flex items-center gap-1.5 border-t border-primary/15 px-2.5 py-2 dark:border-primary/25">
+          {[
+            { offset: 0, ar: "اليوم", en: "Today" },
+            { offset: -1, ar: "أمس", en: "Yesterday" },
+            { offset: -2, ar: "أول أمس", en: "2 days ago" },
+          ].map((shortcut) => (
+            <Button
+              key={shortcut.offset}
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 flex-1 rounded-full border border-primary/15 bg-background/35 px-2 text-[11px] font-semibold text-primary hover:border-primary/30 hover:bg-primary/10"
+              onClick={() => {
+                const date = new Date();
+                date.setDate(date.getDate() + shortcut.offset);
+                onChange(localDateValue(date));
+                setOpen(false);
+              }}
+            >
+              {isArabic ? shortcut.ar : shortcut.en}
+            </Button>
+          ))}
         </div>
       </PopoverContent>
     </Popover>
