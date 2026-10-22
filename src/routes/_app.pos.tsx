@@ -76,7 +76,6 @@ import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
 import type { CustomerContext, InvoiceContext } from "@/lib/communication";
 import { translateRpcError } from "@/lib/errors/rpc-errors";
 import { usePaymentPanel, SplitPaymentsManager } from "@/components/payments/payment-panel";
-import { PosMethodField, PosAmountsRow } from "@/components/payments/pos-payment-fields";
 import type { SplitTenderLine } from "@/lib/payments/treasury-types";
 import {
   CompactPaymentSelector,
@@ -2851,51 +2850,190 @@ function POSPage() {
                       onClick={() => setMobilePickerOpen(true)}
                       className="mt-3 grid size-10 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm active:scale-95"
                       title={t("pos.add_product")}
-
-              {/* ─── Payment & Summary Section ─── */}
-              <div className="min-w-0 space-y-1.5">
-                <div className="flex min-w-0 flex-col gap-1">
-                  <span className="text-[10px] font-semibold leading-none text-muted-foreground">
-                    {lang === "ar" ? "طريقة الدفع" : "Payment method"}
-                  </span>
-                  <PosMethodField
-                    methods={posPaymentMethods}
-                    settlement={settlement}
-                    onChange={(next) => {
-                      setIsSplitPayment(false);
-                      setSplitPayments([]);
-                      setSettlement(next);
-                      setPaymentMethod(next.paymentMethodId || next.method || "cash");
-                      setTransferRef(next.reference || "");
-                      setPaid(next.method === "credit" ? "0" : "");
-                      setPaidManuallyEdited(false);
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              ) : (
+                cart.map((l) => (
+                  <CartLineRow
+                    key={l.product_id}
+                    line={{
+                      id: l.product_id,
+                      name: l.name,
+                      quantity: l.quantity,
+                      unitPrice: l.unit_price,
+                      taxRate: l.tax_rate,
+                      isService: l.is_service,
+                      priceModified:
+                        l.base_price != null &&
+                        Math.round(l.base_price * 100) !== Math.round(l.unit_price * 100),
+                      stock: l.is_service ? undefined : (stockMap[l.product_id] ?? 0),
                     }}
-                    isSplit={isSplitPayment}
-                    splitCount={splitRows.length}
-                    onOpenSplit={() => setSplitEditorOpen(true)}
+                    labels={{
+                      price: t("pos.price"),
+                      quantity: t("common.qty"),
+                      remove: t("common.delete"),
+                      priceModified: t("pos.price_override"),
+                      stockLabel: t("pos.stock_available"),
+                    }}
+                    formatMoney={money}
+                    onQuantityCommit={(next) => setQty(l.product_id, next)}
+                    onPriceChange={(next) => setPrice(l.product_id, next)}
+                    onRemove={() => setCart((c) => c.filter((x) => x.product_id !== l.product_id))}
                   />
+                ))
+              )}
+            </div>
+
+            <div
+              ref={posFormScopeRef}
+              data-form-nav-scope
+              className="min-h-0 shrink overflow-y-auto space-y-1.5 border-t border-border/70 bg-surface/95 pt-2 pr-0.5"
+            >
+              {/* ─── Payment & Summary Section ─── */}
+              <div className="grid min-w-0 grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,0.8fr)] items-end gap-1.5">
+                <div className="flex min-w-0 flex-col gap-1">
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="truncate text-[10px] font-semibold leading-none text-muted-foreground">
+                      {lang === "ar" ? "طريقة الدفع" : "Payment method"}
+                    </span>
+                    {isSplitPayment && (
+                      <button
+                        type="button"
+                        onClick={() => setSplitEditorOpen(true)}
+                        className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold text-primary hover:bg-primary/20"
+                      >
+                        <Layers className="h-3 w-3" />
+                        {lang === "ar" ? "دفع مجزأ" : "Split"}
+                      </button>
+                    )}
+                  </div>
+
+                  {isSplitPayment ? (
+                    <button
+                      type="button"
+                      onClick={() => setSplitEditorOpen(true)}
+                      className="flex h-9 min-w-0 items-center justify-between gap-1.5 rounded-xl border border-primary/40 bg-primary/[0.07] px-2.5 text-[11px] font-bold text-primary transition hover:bg-primary/15"
+                    >
+                      <span className="inline-flex min-w-0 items-center gap-1.5">
+                        <Layers className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">
+                          {lang === "ar"
+                            ? `دفع مجزأ · ${splitRows.length} طرق`
+                            : `Split · ${splitRows.length} methods`}
+                        </span>
+                      </span>
+                      <span className="shrink-0 font-mono text-[10px]">
+                        {money(splitPaidTotal)}
+                      </span>
+                    </button>
+                  ) : (
+                    <CompactPaymentSelector
+                      category={paymentCategory}
+                      onCategoryChange={setPaymentCategory}
+                      settlement={settlement}
+                      onSettlementChange={(next) => {
+                        setSettlement(next);
+                        setPaymentMethod(next.method || "cash");
+                        setTransferRef(next.reference || "");
+                        setPaidManuallyEdited(false);
+                      }}
+                      includeCredit
+                      reference={transferRef}
+                      onReferenceChange={setTransferRef}
+                    />
+                  )}
                 </div>
 
-                <PosAmountsRow
-                  paidLabel={lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}
-                  discountLabel={t("pos.discount")}
-                  paid={
-                    paidManuallyEdited
-                      ? paid || "0"
-                      : paymentMethod === "credit"
-                        ? "0"
-                        : String(total)
-                  }
-                  onPaidChange={handlePaidChange}
-                  discount={discount}
-                  onDiscountChange={setDiscount}
-                  isSplit={isSplitPayment}
-                  splitPaidTotal={splitPaidTotal}
-                  isOverpaid={isOverpaid}
-                  onEditSplit={() => setSplitEditorOpen(true)}
-                />
+                {/* ─── المبلغ المدفوع ─── */}
+                <div className="flex min-w-0 flex-col gap-1">
+                  <span className="truncate text-[10px] font-semibold leading-none text-muted-foreground">
+                    {lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}
+                  </span>
+                  {isSplitPayment ? (
+                    <button
+                      type="button"
+                      onClick={() => setSplitEditorOpen(true)}
+                      title={lang === "ar" ? "تعديل توزيع الدفعات" : "Edit payment allocation"}
+                      className="h-9 min-w-0 truncate rounded-xl border border-primary/25 bg-primary/[0.05] px-2.5 text-start font-mono text-[11px] font-bold text-primary"
+                    >
+                      {money(splitPaidTotal)}
+                    </button>
+                  ) : (
+                    <AmountInput
+                      label={lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}
+                      dir={lang === "ar" ? "rtl" : "ltr"}
+                      value={
+                        paidManuallyEdited
+                          ? paid || "0"
+                          : paymentMethod === "credit"
+                            ? "0"
+                            : String(total)
+                      }
+                      onValueChange={handlePaidChange}
+                      invalid={isOverpaid}
+                      data-form-nav
+                      placeholder={lang === "ar" ? "المدفوع" : "Paid"}
+                      className="h-9 min-w-0 rounded-xl border border-border bg-background px-2.5 font-mono text-[11px] font-semibold outline-none focus:border-primary"
+                    />
+                  )}
+                </div>
+                {/* ─── الخصم ─── */}
+                <div className="flex min-w-0 flex-col gap-1">
+                  <span className="truncate text-[10px] font-semibold leading-none text-muted-foreground">
+                    {t("pos.discount")}
+                  </span>
+                  <AmountInput
+                    label={t("pos.discount")}
+                    dir={lang === "ar" ? "rtl" : "ltr"}
+                    value={discount}
+                    onValueChange={setDiscount}
+                    data-form-nav
+                    placeholder={lang === "ar" ? "الخصم" : "Discount"}
+                    className="h-9 min-w-0 rounded-xl border border-border bg-background px-2.5 font-mono text-[11px] font-semibold outline-none focus:border-primary"
+                  />
+                </div>
               </div>
 
+              {/* Notes stay beside the payment controls, not below the totals. */}
+              <input
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                data-form-nav
+                placeholder={t("pos.notes_placeholder")}
+                aria-label={t("pos.notes_placeholder")}
+                className="h-8 w-full rounded-xl border border-input/80 bg-background px-3 text-xs outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:ring-1 focus:ring-primary/20"
+              />
+
+              {/* ─── Royal Totals Summary Card ─── */}
+              <div className="space-y-1.5 rounded-xl border border-primary/25 bg-gradient-to-br from-card via-card to-primary/[0.04] p-2 sm:p-2.5 shadow-sm">
+                {/* Subtotal */}
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>{t("pos.subtotal")}</span>
+                  <span className="font-mono font-semibold text-foreground [unicode-bidi:isolate]">
+                    {money(subtotal)}
+                  </span>
+                </div>
+
+                {/* Discount summary */}
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <span className="text-muted-foreground">{t("pos.discount")}:</span>
+                  <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 [unicode-bidi:isolate]">
+                    {discountN > 0 ? `−${money(discountN)}` : money(0)}
+                  </span>
+                </div>
+
+                {/* Tax */}
+                {taxTotal > 0 && (
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>{t("pos.tax")}</span>
+                    <span className="font-mono font-semibold text-foreground [unicode-bidi:isolate]">
+                      {money(taxTotal)}
+                    </span>
+                  </div>
+                )}
 
                 <div className="flex items-center justify-between text-[11px] text-muted-foreground">
                   <span>{lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}</span>
@@ -3012,526 +3150,204 @@ function POSPage() {
           if (!open && splitTenderLines.length === 0) setIsSplitPayment(false);
         }}
       >
-        <DialogContent
-          dir={lang === "ar" ? "rtl" : "ltr"}
-          className="flex max-h-[90dvh] w-[calc(100vw-0.75rem)] max-w-xl flex-col gap-0 overflow-hidden rounded-2xl border-border/80 p-0 shadow-2xl"
-        >
-          <DialogHeader className="shrink-0 border-b border-border/70 bg-gradient-to-b from-primary/[0.07] via-primary/[0.03] to-transparent px-4 py-3 text-start">
+        <DialogContent className="max-h-[90dvh] w-[calc(100vw-1rem)] max-w-lg overflow-y-auto rounded-2xl p-3 sm:p-5">
+          <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-sm font-bold sm:text-base">
-              <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-primary/15 text-primary">
-                <Layers className="size-4" />
-              </span>
-              <span className="min-w-0 truncate">
+              <Layers className="h-4 w-4 text-primary" />
+              <span>
                 {lang === "ar" ? "توزيع الدفع على أكثر من طريقة" : "Split payment methods"}
               </span>
             </DialogTitle>
-            <p className="text-[11px] leading-relaxed text-muted-foreground">
+            <p className="text-[11px] text-muted-foreground">
               {lang === "ar"
-                ? "وزّع إجمالي الفاتورة على الصناديق والبنوك والمحافظ المتوفرة. أي متبقٍ يُسجَّل على حساب العميل."
-                : "Allocate the invoice total across the available tills, banks and wallets. Any remainder goes on the customer account."}
+                ? "أضف كل وسيلة والمبلغ المدفوع بها. المتبقي يسجل على العميل."
+                : "Add each tender and its amount. The remaining amount goes on the customer account."}
             </p>
           </DialogHeader>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-4">
-            <SplitPaymentsManager
-              total={total}
-              lines={splitTenderLines}
-              onChange={setSplitTenderLines}
-              activeCashboxes={activeCashboxes}
-              defaultCashbox={defaultCashbox}
-              banks={companyBanks}
-              defaultBank={defaultBank}
-              wallets={companyWallets}
+          <SplitPaymentsManager
+            total={total}
+            lines={splitTenderLines}
+            onChange={setSplitTenderLines}
+            activeCashboxes={activeCashboxes}
+            defaultCashbox={defaultCashbox}
+            banks={companyBanks}
+            defaultBank={defaultBank}
+            wallets={companyWallets}
+            defaultWallet={defaultWallet}
+            currency="YER"
+          />
 
-      {/* ─── Split tender editor ───
-          A tender is only complete when its receiving account is named (a
-          cashbox, a bank account, a wallet). Choosing "محفظة" therefore never
-          closes the form: the account list opens underneath the chosen type and
-          stays open until an account — or "general / without account" — is
-          picked. Every account list comes from the live treasury hooks. */}
-      <Dialog
-        open={splitEditorOpen}
-        onOpenChange={(open) => {
-          setSplitEditorOpen(open);
-          if (!open && splitPayments.length === 0) setIsSplitPayment(false);
-        }}
-      >
-        <DialogContent className="flex max-h-[90dvh] w-[calc(100vw-1rem)] max-w-2xl flex-col gap-0 overflow-hidden rounded-2xl border-border/70 p-0 shadow-2xl">
-          {/* Header */}
-          <div className="shrink-0 border-b border-border/70 bg-gradient-to-b from-primary/[0.07] to-transparent px-4 py-3 sm:px-5">
-            <DialogHeader className="space-y-1 text-start">
-              <DialogTitle className="flex items-center gap-2 text-sm font-bold sm:text-base">
-                <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-primary/12 text-primary">
-                  <Layers className="size-4" />
-                </span>
-                <span className="min-w-0">
-                  {lang === "ar" ? "توزيع الدفع على أكثر من طريقة" : "Split payment"}
-                </span>
-              </DialogTitle>
-              <p className="text-[11px] leading-relaxed text-muted-foreground">
-                {lang === "ar"
-                  ? "أضف كل وسيلة والمبلغ المدفوع بها. المتبقي يُسجَّل على العميل كذمة."
-                  : "Add each tender and its amount. The remainder is recorded against the customer."}
-              </p>
-            </DialogHeader>
-          </div>
-
-          {/* Tender lines */}
-          <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-3 py-3 sm:px-5">
-            {splitPayments.map((line, index) => {
-              const chosen = supportedSplitMethods.find((method) => method.id === line.methodId);
-              const choices = supportedSplitMethods.filter(
-                (method) =>
-                  method.id === line.methodId ||
-                  !splitPayments.some(
-                    (other) =>
-                      other.key !== line.key &&
-                      supportedSplitMethods.find((candidate) => candidate.id === other.methodId)
-                        ?.legacyValue === method.legacyValue,
-                  ),
-              );
-
-              const kind = tenderKindOf(chosen);
-              const kindMeta = TENDER_KINDS.find((k) => k.id === kind) ?? TENDER_KINDS[0];
-              const KindIcon = kindMeta.icon;
-              const needsAccount = kind === "CASH" || kind === "BANK" || kind === "WALLET";
-              const openKey = line.key;
-              const open = splitAccountOpenKey === openKey;
-              const receiver = splitReceiverName(kind, line, {
-                cashboxes: splitCashboxes,
-                banks: splitBanks,
-                wallets: splitWallets,
-                defaultCashbox,
-                defaultBank,
-                defaultWallet,
-                isAr: lang === "ar",
-              });
-
-              return (
-                <div
-                  key={line.key}
-                  className="overflow-hidden rounded-xl border border-border/70 bg-card shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition focus-within:border-primary/40"
-                >
-                  {/* Line header */}
-                  <div className="flex items-center justify-between gap-2 border-b border-border/60 bg-muted/35 px-2.5 py-1.5">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span className="grid size-5 shrink-0 place-items-center rounded-full bg-primary/12 font-mono text-[10px] font-extrabold text-primary">
-                        {index + 1}
-                      </span>
-                      <span className="truncate text-[11px] font-bold text-foreground">
-                        {lang === "ar" ? "طريقة الدفع" : "Tender"}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        removeSplitPayment(line.key);
-                        setSplitAccountOpenKey(null);
-                      }}
-                      aria-label={lang === "ar" ? "حذف طريقة الدفع" : "Remove payment method"}
-                      title={lang === "ar" ? "حذف" : "Remove"}
-                      className="inline-flex h-6 shrink-0 items-center gap-1 rounded-lg px-1.5 text-[10px] font-semibold text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
-                    >
-                      <Trash2 className="size-3.5" />
-                      <span className="hidden sm:inline">{lang === "ar" ? "حذف" : "Remove"}</span>
-                    </button>
-                  </div>
-
-                  <div className="space-y-2 p-2.5">
-                    {/* Method + amount: full-width selector, amount beside it */}
-                    <div className="grid grid-cols-[minmax(0,1fr)_7.5rem] items-end gap-2">
-                      <div className="flex min-w-0 flex-col gap-1">
-                        <label className="ps-0.5 text-[10px] font-bold text-muted-foreground">
-                          {lang === "ar" ? "طريقة الدفع" : "Payment method"}
-                        </label>
-                        <div className="relative">
-                          <span
-                            className={cn(
-                              "pointer-events-none absolute inset-y-0 start-2 grid place-items-center",
-                              kindMeta.iconClassName,
-                            )}
-                          >
-                            <KindIcon className="size-3.5" />
-                          </span>
-                          <select
-                            value={line.methodId}
-                            onChange={(event) => {
-                              updateSplitPayment(line.key, {
-                                methodId: event.target.value,
-                                reference: "",
-                                cashboxId: null,
-                                cashboxName: null,
-                                bankAccountId: null,
-                                bankAccountName: null,
-                                chartAccountId: null,
-                              });
-                              setSplitAccountOpenKey(null);
-                            }}
-                            aria-label={lang === "ar" ? "طريقة الدفع" : "Payment method"}
-                            className="h-10 w-full min-w-0 appearance-none rounded-xl border border-border bg-background pe-7 ps-8 text-[11px] font-semibold text-foreground outline-none transition hover:border-primary/40 focus:border-primary focus:ring-2 focus:ring-primary/20"
-                          >
-                            {choices.map((method) => (
-                              <option key={method.id} value={method.id}>
-                                {lang === "ar" ? method.nameAr : method.nameEn || method.nameAr}
-                              </option>
-                            ))}
-                          </select>
-                          <ChevronDown className="pointer-events-none absolute end-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                        </div>
-                      </div>
-                      <div className="flex min-w-0 flex-col gap-1">
-                        <label className="ps-0.5 text-[10px] font-bold text-muted-foreground">
-                          {lang === "ar" ? "المبلغ" : "Amount"}
-                        </label>
-                        <AmountInput
-                          label={lang === "ar" ? "المبلغ" : "Amount"}
-                          dir={lang === "ar" ? "rtl" : "ltr"}
-                          value={line.amount}
-                          onValueChange={(amount) =>
-                            updateSplitPayment(line.key, { amount, autoAmount: false })
-                          }
-                          invalid={isOverpaid}
-                          placeholder="0.00"
-                          className="h-10 w-full min-w-0 rounded-xl border border-border bg-background px-2.5 font-mono text-xs font-bold outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Receiving account — the form stays open until one is picked */}
-                    {needsAccount && (
-                      <div className="rounded-xl border border-dashed border-border/80 bg-muted/20 p-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="text-[10px] font-bold text-muted-foreground">
-                              {kind === "CASH"
-                                ? lang === "ar"
-                                  ? "الصندوق المستلم"
-                                  : "Receiving cashbox"
-                                : kind === "BANK"
-                                  ? lang === "ar"
-                                    ? "الحساب البنكي المستلم"
-                                    : "Receiving bank account"
-                                  : lang === "ar"
-                                    ? "المحفظة المستلمة"
-                                    : "Receiving wallet"}
-                            </p>
-                            <p className="truncate text-[11px] font-bold text-foreground">
-                              {receiver ?? (lang === "ar" ? "لم يُحدَّد بعد" : "Not selected yet")}
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            aria-expanded={open}
-                            onClick={() => setSplitAccountOpenKey(open ? null : openKey)}
-                            className={cn(
-                              "inline-flex h-7 shrink-0 items-center gap-1 rounded-lg border px-2 text-[10px] font-bold transition",
-                              open
-                                ? "border-primary/40 bg-primary/10 text-primary"
-                                : "border-border bg-background text-foreground hover:border-primary/40 hover:text-primary",
-                            )}
-                          >
-                            {open
-                              ? lang === "ar"
-                                ? "إغلاق"
-                                : "Close"
-                              : lang === "ar"
-                                ? "تغيير"
-                                : "Change"}
-                            <ChevronDown
-                              className={cn("size-3 transition", open && "rotate-180")}
-                            />
-                          </button>
-                        </div>
-
-                        {open && (
-                          <div className="mt-2 space-y-2">
-                            {/* Inline account picker: same cards as the POS method dialog */}
-                            <div className="max-h-44 overflow-y-auto rounded-lg border border-border/70 bg-background p-1">
-                              {kind === "CASH" && (
-                                <div role="radiogroup" className="grid gap-1 sm:grid-cols-2">
-                                  {splitCashboxes.length === 0 ? (
-                                    <ChoiceCard
-                                      active={!line.cashboxId}
-                                      onClick={() => chooseSplitAccount(line.key, { kind, cashbox: null })}
-                                      icon={<Wallet className="size-4 text-emerald-600" />}
-                                      title={lang === "ar" ? "الصندوق الرئيسي" : "Main till"}
-                                      subtitle={
-                                        lang === "ar" ? "بدون صندوق مُعرّف" : "No cashbox configured"
-                                      }
-                                      tone="emerald"
-                                    />
-                                  ) : (
-                                    splitCashboxes.map((box) => (
-                                      <ChoiceCard
-                                        key={box.id}
-                                        active={line.cashboxId === box.id}
-                                        onClick={() => chooseSplitAccount(line.key, { kind, cashbox: box })}
-                                        icon={<Wallet className="size-4 text-emerald-600" />}
-                                        title={box.name_ar}
-                                        subtitle={[box.code, box.is_default ? (lang === "ar" ? "افتراضي" : "Default") : null]
-                                          .filter(Boolean)
-                                          .join(" · ")}
-                                        tone="emerald"
-                                      />
-                                    ))
-                                  )}
-                                </div>
-                              )}
-
-                              {kind === "BANK" && (
-                                <div role="radiogroup" className="grid gap-1 sm:grid-cols-2">
-                                  {splitBanks.length === 0 ? (
-                                    <ChoiceCard
-                                      active={!line.bankAccountId}
-                                      onClick={() => chooseSplitAccount(line.key, { kind, bank: null })}
-                                      icon={<Landmark className="size-4 text-indigo-600" />}
-                                      title={lang === "ar" ? "تحويل بنكي (عام)" : "Bank transfer"}
-                                      subtitle={
-                                        lang === "ar" ? "بدون حساب بنكي مُعرّف" : "No bank account configured"
-                                      }
-                                      tone="indigo"
-                                    />
-                                  ) : (
-                                    splitBanks.map((account) => (
-                                      <ChoiceCard
-                                        key={account.id}
-                                        active={line.bankAccountId === account.id}
-                                        onClick={() => chooseSplitAccount(line.key, { kind, bank: account })}
-                                        icon={<Landmark className="size-4 text-indigo-600" />}
-                                        title={account.name_ar}
-                                        subtitle={account.account_number || account.bank_name || null}
-                                        tone="indigo"
-                                      />
-                                    ))
-                                  )}
-                                </div>
-                              )}
-
-                              {kind === "WALLET" && (
-                                <div role="radiogroup" className="grid gap-1 sm:grid-cols-2">
-                                  {splitWallets.map((account) => {
-                                    const walletId = walletIdForAccount(account);
-                                    const asset = paymentMethodIconAsset(walletId);
-                                    return (
-                                      <ChoiceCard
-                                        key={account.id}
-                                        active={line.bankAccountId === account.id}
-                                        onClick={() => chooseSplitAccount(line.key, { kind, wallet: account })}
-                                        icon={
-                                          asset ? (
-                                            <img
-                                              src={asset.src}
-                                              alt={asset.alt}
-                                              className="size-5 object-contain"
-                                            />
-                                          ) : (
-                                            <Smartphone className="size-4 text-sky-600" />
-                                          )
-                                        }
-                                        title={account.name_ar}
-                                        subtitle={
-                                          account.account_number ||
-                                          (lang === "ar" ? "حساب محفظة" : "Wallet account")
-                                        }
-                                        tone="sky"
-                                      />
-                                    );
-                                  })}
-                                  {KNOWN_WALLETS.filter(
-                                    (wallet) =>
-                                      !splitWallets.some(
-                                        (account) => walletIdForAccount(account) === wallet.id,
-                                      ),
-                                  ).map((wallet) => {
-                                    const asset = paymentMethodIconAsset(wallet.id);
-                                    return (
-                                      <ChoiceCard
-                                        key={wallet.id}
-                                        active={
-                                          line.paymentMethodId === wallet.id && !line.bankAccountId
-                                        }
-                                        onClick={() =>
-                                          chooseSplitAccount(line.key, { kind, knownWalletId: wallet.id })
-                                        }
-                                        icon={
-                                          asset ? (
-                                            <img
-                                              src={asset.src}
-                                              alt={asset.alt}
-                                              className="size-5 object-contain"
-                                            />
-                                          ) : (
-                                            <Smartphone className="size-4 text-sky-600" />
-                                          )
-                                        }
-                                        title={lang === "ar" ? wallet.labelAr : wallet.labelEn}
-                                        subtitle={
-                                          lang === "ar" ? "غير مرتبط بحساب" : "Not linked to an account"
-                                        }
-                                        tone="sky"
-                                      />
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </div>
-
-                            {kind !== "CASH" && (
-                              <div className="relative">
-                                <FileCheck2 className="pointer-events-none absolute start-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                                <input
-                                  type="text"
-                                  value={line.reference ?? ""}
-                                  onChange={(event) =>
-                                    updateSplitPayment(line.key, { reference: event.target.value })
-                                  }
-                                  aria-label={
-                                    lang === "ar"
-                                      ? `مرجع ${chosen?.nameAr ?? "الدفع"}`
-                                      : `${chosen?.nameEn || chosen?.nameAr || "Payment"} reference`
-                                  }
-                                  placeholder={
-                                    lang === "ar"
-                                      ? "رقم المرجع / الحوالة / إشعار المحفظة"
-                                      : "Reference / transaction no."
-                                  }
-                                  className="h-9 w-full rounded-lg border border-border bg-background pe-2.5 ps-8 text-[11px] font-medium outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                                />
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Reference for methods that need one without an account step */}
-                    {!needsAccount && chosen?.requiresReference && (
-                      <div className="relative">
-                        <FileCheck2 className="pointer-events-none absolute start-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                        <input
-                          type="text"
-                          value={line.reference ?? ""}
-                          onChange={(event) =>
-                            updateSplitPayment(line.key, { reference: event.target.value })
-                          }
-                          aria-label={
-                            lang === "ar"
-                              ? `مرجع ${chosen.nameAr}`
-                              : `${chosen.nameEn || chosen.nameAr} reference`
-                          }
-                          placeholder={
-                            lang === "ar"
-                              ? "رقم المرجع / الحوالة / إشعار المحفظة"
-                              : "Reference / transaction no."
-                          }
-                          className="h-9 w-full rounded-lg border border-border bg-background pe-2.5 ps-8 text-[11px] font-medium outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-
+          <DialogFooter className="pt-2">
             <button
               type="button"
-              onClick={() => {
-                addSplitPaymentLine();
-                setSplitAccountOpenKey(null);
-              }}
-              disabled={splitPayments.length >= supportedSplitMethods.length}
-              className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-primary/40 bg-primary/[0.04] px-3 text-[11px] font-bold text-primary transition hover:border-primary hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={() => setSplitEditorOpen(false)}
+              disabled={
+                splitTenderLines.length === 0 ||
+                splitPaidTotal > total ||
+                Boolean(splitDebtBlockReason)
+              }
+              className="h-9 rounded-xl bg-primary px-5 text-xs font-bold text-primary-foreground shadow-sm transition hover:opacity-90 disabled:opacity-40"
             >
-              <Plus className="size-4" />
-              {lang === "ar" ? "إضافة طريقة دفع أخرى" : "Add another tender"}
+              {lang === "ar" ? "اعتماد التوزيع" : "Confirm allocation"}
             </button>
-          </div>
-
-          {/* Totals footer — always visible, never scrolls away */}
-          <div className="shrink-0 border-t border-border/70 bg-surface/95 px-3 py-2.5 sm:px-5">
-            <div className="grid grid-cols-3 gap-2">
-              <div className="rounded-lg border border-border/60 bg-background px-2 py-1.5">
-                <p className="text-[10px] font-semibold text-muted-foreground">
-                  {lang === "ar" ? "إجمالي الفاتورة" : "Total"}
-                </p>
-                <p className="truncate font-mono text-[11px] font-bold text-foreground">
-                  {money(total)}
-                </p>
-              </div>
-              <div className="rounded-lg border border-primary/25 bg-primary/[0.06] px-2 py-1.5">
-                <p className="text-[10px] font-semibold text-muted-foreground">
-                  {lang === "ar" ? "المدفوع" : "Paid"}
-                </p>
-                <p className="truncate font-mono text-[11px] font-bold text-primary">
-                  {money(splitPaidTotal)}
-                </p>
-              </div>
-              <div
-                className={cn(
-                  "rounded-lg border px-2 py-1.5",
-                  remainingDebt > 0
-                    ? "border-amber-500/40 bg-amber-500/10"
-                    : "border-emerald-500/40 bg-emerald-500/10",
-                )}
-              >
-                <p className="text-[10px] font-semibold text-muted-foreground">
-                  {lang === "ar" ? "المتبقي على العميل" : "Balance"}
-                </p>
-                <p
-                  className={cn(
-                    "truncate font-mono text-[11px] font-bold",
-                    remainingDebt > 0 ? "text-amber-700 dark:text-amber-300" : "text-emerald-700 dark:text-emerald-300",
-                  )}
-                >
-                  {money(remainingDebt)}
-                </p>
-              </div>
-            </div>
-
-            {(isOverpaid || splitDebtBlockReason) && (
-              <div
-                role="alert"
-                className="mt-2 flex items-start gap-1.5 rounded-lg border border-destructive/30 bg-destructive/[0.08] px-2 py-1.5 text-[11px] font-semibold text-destructive"
-              >
-                <AlertCircle className="mt-0.5 size-3.5 shrink-0" />
-                <span>
-                  {isOverpaid
-                    ? lang === "ar"
-                      ? "مجموع الدفعات يتجاوز إجمالي الفاتورة"
-                      : "Payment total exceeds invoice total"
-                    : splitDebtBlockReason}
-                </span>
-              </div>
-            )}
-
-            <div className="mt-2 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setSplitEditorOpen(false)}
-                className="h-9 rounded-xl border border-border bg-background px-4 text-[11px] font-bold text-foreground transition hover:bg-muted"
-              >
-                {lang === "ar" ? "إلغاء" : "Cancel"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setSplitEditorOpen(false)}
-                disabled={
-                  splitMethodCount === 0 ||
-                  isOverpaid ||
-                  hasInvalidSplitLine ||
-                  missingSplitReference ||
-                  Boolean(splitDebtBlockReason)
-                }
-                className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-primary px-5 text-[11px] font-bold text-primary-foreground shadow-sm shadow-primary/20 transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <Check className="size-3.5" />
-                {lang === "ar" ? "اعتماد التوزيع" : "Apply split"}
-              </button>
-            </div>
-          </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
+      {/* Barcode Scanner Dialog */}
+      <BarcodeScanner
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        continuous
+        onDetected={handleCode}
+      />
+
+      {/* Unified Operation Success Experience (after a confirmed sale) */}
+      <OperationSuccessModal
+        open={Boolean(saleSuccess)}
+        onClose={() => setSaleSuccess(null)}
+        operationId={saleSuccess?.id}
+        title={lang === "ar" ? "تمت عملية البيع بنجاح" : "Sale Completed Successfully"}
+        subtitle={
+          saleSuccess
+            ? lang === "ar"
+              ? `تم إصدار الفاتورة رقم #${saleSuccess.number} بنجاح`
+              : `Invoice #${saleSuccess.number} issued successfully`
+            : undefined
+        }
+        amount={saleSuccess?.total}
+        currency={saleSuccess?.currency}
+        referenceNumber={saleSuccess?.number}
+        customer={saleSuccess?.customer}
+        invoice={saleSuccess?.invoice}
+        eventType="invoice_created"
+      />
+
+      {/* Post-Sale Print Dialog */}
+      {postSaleDoc && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="panel-elevated w-full max-w-md rounded-3xl p-6 shadow-2xl border border-border/80">
+            {/* Header */}
+            <div className="mb-5 flex items-center justify-between border-b border-border/60 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="grid h-10 w-10 place-items-center rounded-2xl bg-primary/10 text-primary">
+                  <Printer className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-foreground">
+                    {lang === "ar" ? "طباعة الفاتورة" : "Print Invoice"}
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    {lang === "ar"
+                      ? `فاتورة #${postSaleDoc.number}`
+                      : `Invoice #${postSaleDoc.number}`}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPostSaleDoc(null)}
+                className="rounded-full p-1.5 text-muted-foreground hover:bg-surface-2 hover:text-foreground transition"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Template Selector */}
+            <div className="mb-5">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                {lang === "ar" ? "اختر قالب الطباعة" : "Choose print template"}
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {(
+                  [
+                    {
+                      id: "thermal",
+                      icon: Receipt,
+                      ar: "فاتورة حرارية",
+                      en: "Thermal 80mm",
+                      sub_ar: "طابعة مدمجة",
+                      sub_en: "Compact printer",
+                    },
+                    {
+                      id: "standard",
+                      icon: FileText,
+                      ar: "A4 عادي",
+                      en: "Standard A4",
+                      sub_ar: "تصميم أعمال",
+                      sub_en: "Business format",
+                    },
+                    {
+                      id: "elegant",
+                      icon: Sparkles,
+                      ar: "A4 فاخر",
+                      en: "Elegant A4",
+                      sub_ar: "لمسات ذهبية",
+                      sub_en: "Gold accents",
+                    },
+                  ] as const
+                ).map((tmpl) => (
+                  <button
+                    key={tmpl.id}
+                    type="button"
+                    onClick={() => setSelectedTemplate(tmpl.id as InvoiceTemplate)}
+                    className={`flex flex-col items-center gap-1.5 rounded-2xl border p-3 text-center transition-all duration-150 ${
+                      selectedTemplate === tmpl.id
+                        ? "border-primary bg-primary/10 text-primary shadow-sm ring-1 ring-primary/30"
+                        : "border-border/80 hover:border-primary/40 hover:bg-surface-2 text-muted-foreground"
+                    }`}
+                  >
+                    <tmpl.icon className="h-5 w-5" />
+                    <span className="text-xs font-semibold leading-tight">
+                      {lang === "ar" ? tmpl.ar : tmpl.en}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground leading-tight">
+                      {lang === "ar" ? tmpl.sub_ar : tmpl.sub_en}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Save as default */}
+            <label className="flex items-center gap-2 mb-5 cursor-pointer group">
+              <input
+                type="checkbox"
+                className="rounded border-border accent-primary"
+                checked={defaultTemplate === selectedTemplate}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    setDefaultTemplate(selectedTemplate);
+                    localStorage.setItem("pos_default_template", selectedTemplate);
+                  }
+                }}
+              />
+              <span className="text-xs text-muted-foreground group-hover:text-foreground transition">
+                {lang === "ar" ? "حفظ كقالب افتراضي" : "Save as default template"}
+              </span>
+            </label>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setPostSaleDoc(null)}
+                className="flex-1 flex items-center justify-center gap-2 h-10 rounded-2xl border border-border/80 text-sm text-muted-foreground hover:bg-surface-2 hover:text-foreground transition"
+              >
+                <SkipForward className="h-4 w-4" />
+                <span>{lang === "ar" ? "تخطي — بدون طباعة" : "Skip — no print"}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const rtl = lang === "ar";
+                  const labels = {
+                    invoice: rtl ? "فاتورة" : "Invoice",
+                    date: rtl ? "التاريخ" : "Date",
+                    billTo: rtl ? "العميل" : "Bill To",
+                    warehouse: rtl ? "المستودع" : "Warehouse",
+                    payment: rtl ? "الدفع" : "Payment",
                     status: rtl ? "الحالة" : "Status",
                     product: rtl ? "المنتج" : "Product",
                     qty: rtl ? "الكمية" : "Qty",
