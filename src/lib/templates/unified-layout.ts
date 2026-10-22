@@ -702,7 +702,10 @@ export function renderUnifiedLayout(
   const arabicName = company.arabicName || doc.company?.arabicName || companyName;
   const englishName = company.englishName || doc.company?.englishName || "";
   const companyAddress = company.address || doc.company?.address || "";
-  const companyPhone = company.phone || doc.company?.phone || "";
+  const companyPhone =
+    company.contacts && company.contacts.length > 1
+      ? company.contacts.join(" - ")
+      : company.phone || (company.contacts && company.contacts.length ? company.contacts[0] : "") || doc.company?.phone || "";
   const companyVat = company.taxNumber || doc.company?.vat || "";
   const companyEmail = company.email || doc.company?.email || "";
 
@@ -792,6 +795,7 @@ export function renderUnifiedLayout(
         <div class="luxury-header-left">
           <div class="luxury-doc-meta-col">
             ${englishName ? `<div style="font-weight: 800; font-size: ${companyTitleSize}; color: var(--print-accent);">${esc(englishName)}</div>` : ""}
+            ${companyAddress ? `<div class="luxury-meta-line"><b>Address:</b> <span>${esc(companyAddress)}</span></div>` : ""}
             ${companyVat ? `<div class="luxury-meta-line"><b>Tax ID:</b> <span dir="ltr">${esc(companyVat)}</span></div>` : ""}
             ${companyPhone ? `<div class="luxury-meta-line"><b>Phone:</b> <span dir="ltr">${esc(companyPhone)}</span></div>` : ""}
             ${companyEmail ? `<div class="luxury-meta-line"><b>Email:</b> <span dir="ltr">${esc(companyEmail)}</span></div>` : ""}
@@ -871,6 +875,7 @@ export function renderUnifiedLayout(
         <!-- اليسار: بيانات المنشأة الإنجليزية -->
         <div class="corporate-doc-block">
           ${englishName ? `<div class="corporate-brand-name" dir="ltr">${esc(englishName)}</div>` : ""}
+          ${companyAddress ? `<div class="corporate-brand-details" dir="ltr">Address: ${esc(companyAddress)}</div>` : ""}
           ${companyVat ? `<div class="corporate-brand-details" dir="ltr">Tax ID: ${esc(companyVat)}</div>` : ""}
           ${companyPhone ? `<div class="corporate-brand-details" dir="ltr">Phone: ${esc(companyPhone)}</div>` : ""}
           ${companyEmail ? `<div class="corporate-brand-details" dir="ltr">${esc(companyEmail)}</div>` : ""}

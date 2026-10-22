@@ -359,8 +359,9 @@ check("engine routes formal theme to the formal template", engineFormal.includes
 
 /* ─────────────────────────── Company Profile ─────────────────────────── */
 
-check("default company profile has no invented tenant name", DEFAULT_COMPANY_PROFILE.name === "");
-check("default company profile invents no contacts", DEFAULT_COMPANY_PROFILE.contacts.length === 0);
+check("default company profile uses Inma Soft name", DEFAULT_COMPANY_PROFILE.name === "إنماء سوفت للحلول البرمجية");
+check("default company profile has English Inma Soft name", DEFAULT_COMPANY_PROFILE.englishName === "Inma Soft for Software Solutions");
+check("default company profile includes Inma Soft contacts", DEFAULT_COMPANY_PROFILE.contacts.includes("772217218"));
 
 const footer = renderUniversalFooter(COMPANY, true);
 check("removed universal footer renders no content", footer === "");

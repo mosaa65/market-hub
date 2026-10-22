@@ -42,15 +42,18 @@ function SettingsPage() {
   const { hasRole } = useAuth();
   const canEdit = hasRole("owner") || hasRole("manager");
   const [form, setForm] = useState<any>({
-    name: "",
-    legal_name: "",
+    name: "إنماء سوفت للحلول البرمجية",
+    name_ar: "إنماء سوفت للحلول البرمجية",
+    name_en: "Inma Soft for Software Solutions",
+    legal_name: "شركة إنماء سوفت للحلول البرمجية والتقنية",
     tax_number: "",
     currency: "YER",
     currency_symbol: "ر.ي",
     tax_rate: 0,
-    address: "",
-    phone: "",
-    email: "",
+    address: "اليمن - إب",
+    phone: "772217218",
+    contact_numbers: "772217218, 784795101",
+    email: "info@inmasoft.com",
     invoice_prefix: "INV-",
     purchase_invoice_prefix: "PO-",
     invoice_number_period: "year_month",
@@ -81,7 +84,11 @@ function SettingsPage() {
         let nextForm: Record<string, unknown> = form;
         let nextServiceFee = enablePosServiceFee;
         if (data) {
-          nextForm = data as Record<string, unknown>;
+          const rowData = data as Record<string, unknown>;
+          const hasIdentity = Boolean(
+            rowData.name || rowData.name_ar || rowData.name_en || rowData.phone || rowData.address,
+          );
+          nextForm = hasIdentity ? rowData : { ...form, ...rowData };
           const catalog = ((data as any).catalog_modules as any) || {};
           if (catalog.enablePosServiceFee !== undefined) {
             nextServiceFee = Boolean(catalog.enablePosServiceFee);
