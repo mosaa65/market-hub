@@ -75,9 +75,10 @@ import { useCompanyBankAccounts } from "@/hooks/use-company-bank-accounts";
 import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
 import type { CustomerContext, InvoiceContext } from "@/lib/communication";
 import { translateRpcError } from "@/lib/errors/rpc-errors";
-import { usePaymentPanel } from "@/components/payments/payment-panel";
+import { usePaymentPanel, SplitPaymentsManager } from "@/components/payments/payment-panel";
+import type { SplitTenderLine } from "@/lib/payments/treasury-types";
 import { useFormNavigationScope } from "@/hooks/use-form-navigation";
-import { PaymentMethodPicker } from "@/components/ui/payment-method";
+import { PaymentMethodPicker, DynamicPaymentSelector } from "@/components/ui/payment-method";
 import {
   Dialog,
   DialogContent,
@@ -403,6 +404,7 @@ function POSPage() {
   const [isSplitPayment, setIsSplitPayment] = useState(false);
   const [splitEditorOpen, setSplitEditorOpen] = useState(false);
   const [splitPayments, setSplitPayments] = useState<SplitPaymentLine[]>([]);
+  const [splitTenderLines, setSplitTenderLines] = useState<SplitTenderLine[]>([]);
 
   const [newCustomerOpen, setNewCustomerOpen] = useState(false);
 
@@ -1184,56 +1186,69 @@ function POSPage() {
         .filter((line) => line.method && line.amount > 0),
     [splitPayments, supportedSplitMethods],
   );
-  const splitPaidTotal =
-    Math.round(splitRows.reduce((sum, line) => sum + line.amount, 0) * 100) / 100;
-  const splitMethodCount = splitRows.length;
-  const hasInvalidSplitLine =
-    isSplitPayment &&
-    splitPayments.some((line) => !Number.isFinite(Number(line.amount)) || Number(line.amount) <= 0);
-  const missingSplitReference =
-    isSplitPayment &&
-    splitRows.some((line) => line.method?.requiresReference && !line.reference?.trim());
-  const paymentSplits = splitRows.map((line) => {
-    const isCash = line.method?.ledgerKind === "CASH" || line.method?.legacyValue === "cash";
-    const isBank =
-      line.method?.ledgerKind === "BANK" || line.method?.legacyValue === "bank_transfer";
-    const isWallet =
-      line.method?.ledgerKind === "WALLET" || line.method?.legacyValue === "mobile_money";
+  const splitPaidTotal = useMemo(() => {
+    if (splitTenderLines.length > 0) {
+      return Math.round(splitTenderLines.reduce((sum, line) => sum + (Number(line.amount) || 0), 0) * 100) / 100;
+    }
+    return Math.round(splitRows.reduce((sum, line) => sum + line.amount, 0) * 100) / 100;
+  }, [splitTenderLines, splitRows]);
 
-    return {
-      method: line.method!.legacyValue,
-      amount: Math.round(line.amount * 100) / 100,
-      payment_method_id: line.method!.id,
-      cashbox_id: isCash ? defaultCashbox?.id || activeCashboxes[0]?.id || null : null,
-      bank_account_id: isBank
-        ? defaultBank?.id || companyBanks[0]?.id || null
-        : isWallet
-          ? defaultWallet?.id || companyWallets[0]?.id || null
-          : null,
-      reference: line.reference || null,
-      reference_no: line.reference || null,
-    };
-  });
+  const splitMethodCount = splitTenderLines.length > 0 ? splitTenderLines.length : splitRows.length;
+
+  const paymentSplits = useMemo(() => {
+    if (splitTenderLines.length > 0) {
+      return splitTenderLines.map((line) => ({
+        method: line.method,
+        amount: Math.round(line.amount * 100) / 100,
+        payment_method_id: line.paymentMethodId || line.method,
+        cashbox_id: line.cashboxId || null,
+        bank_account_id: line.bankAccountId || null,
+        reference: line.reference || null,
+        reference_no: line.reference || null,
+      }));
+    }
+    return splitRows.map((line) => {
+      const isCash = line.method?.ledgerKind === "CASH" || line.method?.legacyValue === "cash";
+      const isBank =
+        line.method?.ledgerKind === "BANK" || line.method?.legacyValue === "bank_transfer";
+      const isWallet =
+        line.method?.ledgerKind === "WALLET" || line.method?.legacyValue === "mobile_money";
+
+      return {
+        method: line.method!.legacyValue,
+        amount: Math.round(line.amount * 100) / 100,
+        payment_method_id: line.method!.id,
+        cashbox_id: isCash ? defaultCashbox?.id || activeCashboxes[0]?.id || null : null,
+        bank_account_id: isBank
+          ? defaultBank?.id || companyBanks[0]?.id || null
+          : isWallet
+            ? defaultWallet?.id || companyWallets[0]?.id || null
+            : null,
+        reference: line.reference || null,
+        reference_no: line.reference || null,
+      };
+    });
+  }, [splitTenderLines, splitRows, defaultCashbox, activeCashboxes, defaultBank, companyBanks, defaultWallet, companyWallets]);
 
   function startSplitPayment() {
-    const defaultMethod =
-      supportedSplitMethods.find((method) => method.legacyValue === "cash") ??
-      supportedSplitMethods[0];
     setIsSplitPayment(true);
     setSplitEditorOpen(true);
     setPaid("");
-    setSplitPayments(
-      defaultMethod
-        ? [
-            {
-              key: crypto.randomUUID(),
-              methodId: defaultMethod.id,
-              amount: String(total),
-              autoAmount: true,
-            },
-          ]
-        : [],
-    );
+    if (splitTenderLines.length === 0) {
+      const box = defaultCashbox || activeCashboxes[0];
+      setSplitTenderLines([
+        {
+          id: crypto.randomUUID(),
+          category: "CASH",
+          method: "cash",
+          paymentMethodId: "cash",
+          amount: total,
+          cashboxId: box?.id || null,
+          cashboxName: box?.name_ar || (lang === "ar" ? "الصندوق الرئيسي" : "Main Till"),
+          reference: "",
+        },
+      ]);
+    }
   }
 
   function addSplitPaymentLine() {
@@ -1407,6 +1422,18 @@ function POSPage() {
           : "Please allocate the payment to at least one method",
       );
     }
+    const hasInvalidSplitLine =
+      isSplitPayment &&
+      (splitTenderLines.length > 0
+        ? splitTenderLines.some((l) => !Number.isFinite(Number(l.amount)) || Number(l.amount) <= 0)
+        : splitPayments.some((l) => !Number.isFinite(Number(l.amount)) || Number(l.amount) <= 0));
+
+    const missingSplitReference =
+      isSplitPayment &&
+      (splitTenderLines.length > 0
+        ? splitTenderLines.some((l) => l.category !== "CASH" && l.category === "BANK" && !l.reference?.trim())
+        : splitRows.some((l) => l.method?.requiresReference && !l.reference?.trim()));
+
     if (hasInvalidSplitLine) {
       return toast.error(
         lang === "ar"
@@ -2852,95 +2879,97 @@ function POSPage() {
               className="min-h-0 shrink overflow-y-auto space-y-1.5 border-t border-border/70 bg-surface/95 pt-2 pr-0.5"
             >
               {/* ─── Payment & Summary Section ─── */}
-              <div className="grid min-w-0 grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.8fr)] items-end gap-1.5">
-                <div className="flex min-w-0 flex-col gap-1">
-                  <div className="flex items-center justify-between">
-                    <span className="truncate text-[10px] font-semibold leading-none text-muted-foreground">
-                      {lang === "ar" ? "طريقة الدفع" : "Payment method"}
-                    </span>
-                    {!isSplitPayment && (
-                      <span className="text-[9px] font-medium text-primary">
-                        {paymentMethod === "cash"
-                          ? defaultCashbox ? `(${defaultCashbox.name_ar})` : ""
-                          : paymentMethod === "bank_transfer"
-                            ? defaultBank ? `(${defaultBank.name_ar})` : ""
-                            : paymentMethod === "mobile_money"
-                              ? defaultWallet ? `(${defaultWallet.name_ar})` : ""
-                              : ""}
-                      </span>
-                    )}
-                  </div>
-                  {!isSplitPayment ? (
-                    <PaymentMethodPicker
-                      context="pos"
-                      value={isSplitPayment ? "" : paymentMethod}
-                      onChange={(method) => {
-                        setIsSplitPayment(false);
-                        setSplitPayments([]);
-                        setPaymentMethod(method);
-                        setPaid(method === "credit" ? "0" : "");
-                        setPaidManuallyEdited(false);
-                      }}
-                      ensureIds={[paymentMethod]}
-                      ariaLabel={lang === "ar" ? "طريقة الدفع" : "Payment method"}
-                      data-form-nav
-                      className="h-8 min-w-0 rounded-lg text-[10px] sm:text-[11px]"
-                    />
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setSplitEditorOpen(true)}
-                      className="flex h-8 min-w-0 items-center justify-between truncate rounded-lg border border-primary/40 bg-primary/10 px-2 text-[10px] font-bold text-primary hover:bg-primary/20 transition sm:px-2.5 sm:text-[11px]"
-                    >
-                      <span>{lang === "ar" ? "دفع مجزأ" : "Split payment"}</span>
-                      <span className="text-[9px] opacity-80">({splitRows.length} طرق)</span>
-                    </button>
-                  )}
-                </div>
-                {isSplitPayment ? (
-                  <div className="flex min-w-0 flex-col gap-1">
-                    <span className="truncate text-[10px] font-semibold leading-none text-muted-foreground">
-                      {lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setSplitEditorOpen(true)}
-                      className="h-8 min-w-0 truncate rounded-lg border border-primary/20 bg-primary/[0.04] px-2.5 text-start text-[10px] font-medium text-primary"
-                      title={lang === "ar" ? "تعديل توزيع الدفعات" : "Edit payment allocation"}
-                    >
-                      {money(splitPaidTotal)}
-                    </button>
-                  </div>
-                ) : (
-                  <AmountInput
-                    label={lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}
-                    showLabel
-                    dir={lang === "ar" ? "rtl" : "ltr"}
-                    value={
-                      paidManuallyEdited
-                        ? paid || "0"
-                        : paymentMethod === "credit"
-                          ? "0"
-                          : String(total)
-                    }
-                    onValueChange={handlePaidChange}
-                    invalid={isOverpaid}
-                    data-form-nav
-                    placeholder={lang === "ar" ? "المدفوع" : "Paid"}
-                    className="h-8 min-w-0 rounded-lg border border-border bg-background px-2 text-[10px] font-semibold outline-none focus:border-primary sm:px-2.5 sm:text-[11px]"
+              {!isSplitPayment ? (
+                <div className="space-y-1.5">
+                  <DynamicPaymentSelector
+                    context="pos"
+                    value={paymentMethod}
+                    onChange={(method) => {
+                      setPaymentMethod(method);
+                      setPaid(method === "credit" ? "0" : "");
+                      setPaidManuallyEdited(false);
+                    }}
+                    settlement={settlement}
+                    onSettlementChange={(next) => {
+                      setSettlement(next);
+                      if (next.reference) setTransferRef(next.reference);
+                    }}
+                    includeCredit
                   />
-                )}
-                <AmountInput
-                  label={t("pos.discount")}
-                  showLabel
-                  dir={lang === "ar" ? "rtl" : "ltr"}
-                  value={discount}
-                  onValueChange={setDiscount}
-                  data-form-nav
-                  placeholder={lang === "ar" ? "الخصم" : "Discount"}
-                  className="h-8 min-w-0 rounded-lg border border-border bg-background px-2 text-[10px] font-semibold outline-none focus:border-primary sm:px-2.5 sm:text-[11px]"
-                />
-              </div>
+
+                  <div className="grid min-w-0 grid-cols-2 items-end gap-1.5 pt-0.5">
+                    <AmountInput
+                      label={lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}
+                      showLabel
+                      dir={lang === "ar" ? "rtl" : "ltr"}
+                      value={
+                        paidManuallyEdited
+                          ? paid || "0"
+                          : paymentMethod === "credit"
+                            ? "0"
+                            : String(total)
+                      }
+                      onValueChange={handlePaidChange}
+                      invalid={isOverpaid}
+                      data-form-nav
+                      placeholder={lang === "ar" ? "المدفوع" : "Paid"}
+                      className="h-8 min-w-0 rounded-lg border border-border bg-background px-2 text-[10px] font-semibold outline-none focus:border-primary sm:px-2.5 sm:text-[11px]"
+                    />
+                    <AmountInput
+                      label={t("pos.discount")}
+                      showLabel
+                      dir={lang === "ar" ? "rtl" : "ltr"}
+                      value={discount}
+                      onValueChange={setDiscount}
+                      data-form-nav
+                      placeholder={lang === "ar" ? "الخصم" : "Discount"}
+                      className="h-8 min-w-0 rounded-lg border border-border bg-background px-2 text-[10px] font-semibold outline-none focus:border-primary sm:px-2.5 sm:text-[11px]"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between rounded-xl border border-primary/30 bg-primary/10 p-2">
+                    <div className="flex items-center gap-1.5">
+                      <Layers className="h-4 w-4 text-primary" />
+                      <span className="text-xs font-bold text-primary">
+                        {lang === "ar" ? "دفع مجزأ متعدد الوسائل" : "Split payment active"}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">
+                        ({splitRows.length} طرق مضافة)
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSplitEditorOpen(true)}
+                      className="rounded-lg bg-primary px-2.5 py-1 text-[10px] font-bold text-primary-foreground shadow-2xs hover:opacity-90"
+                    >
+                      {lang === "ar" ? "تعديل التوزيع" : "Edit allocation"}
+                    </button>
+                  </div>
+
+                  <div className="grid min-w-0 grid-cols-2 items-end gap-1.5">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-[10px] text-muted-foreground">
+                        {lang === "ar" ? "إجمالي المدفوع الموزع:" : "Allocated paid:"}
+                      </span>
+                      <div className="flex h-8 items-center rounded-lg border border-border/80 bg-surface px-2.5 font-mono text-xs font-bold text-emerald-600">
+                        {money(splitPaidTotal)}
+                      </div>
+                    </div>
+                    <AmountInput
+                      label={t("pos.discount")}
+                      showLabel
+                      dir={lang === "ar" ? "rtl" : "ltr"}
+                      value={discount}
+                      onValueChange={setDiscount}
+                      data-form-nav
+                      placeholder={lang === "ar" ? "الخصم" : "Discount"}
+                      className="h-8 min-w-0 rounded-lg border border-border bg-background px-2 text-[10px] font-semibold outline-none focus:border-primary sm:px-2.5 sm:text-[11px]"
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Transfer reference input */}
               {!isSplitPayment &&
@@ -3125,173 +3154,49 @@ function POSPage() {
         open={splitEditorOpen}
         onOpenChange={(open) => {
           setSplitEditorOpen(open);
-          if (!open && splitPayments.length === 0) setIsSplitPayment(false);
+          if (!open && splitTenderLines.length === 0 && splitPayments.length === 0) {
+            setIsSplitPayment(false);
+          }
         }}
       >
-        <DialogContent className="max-h-[88dvh] w-[calc(100vw-1rem)] max-w-lg overflow-y-auto rounded-2xl p-3 sm:p-5">
+        <DialogContent className="max-h-[92dvh] w-[calc(100vw-1rem)] max-w-2xl overflow-y-auto rounded-3xl p-4 sm:p-6 shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="text-sm sm:text-base">
-              {lang === "ar" ? "توزيع الدفع على أكثر من طريقة" : "Split payment methods"}
+            <DialogTitle className="text-base sm:text-lg font-bold flex items-center gap-2">
+              <Layers className="h-5 w-5 text-primary" />
+              <span>{lang === "ar" ? "توزيع الدفع المجزأ متعدد الوسائل" : "Split payment methods"}</span>
             </DialogTitle>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               {lang === "ar"
-                ? "أضف كل وسيلة والمبلغ المدفوع بها. المتبقي يسجل على العميل."
-                : "Add each tender and its amount. The remaining amount is recorded against the customer."}
+                ? "حدد مبالغ السداد عبر النقد والبنوك والمحافظ. كل جزء يُرحَّل مباشرةً لحسابه المالي المحدد."
+                : "Allocate amounts across cash, banks, and mobile wallets. Each part posts directly to its treasury account."}
             </p>
           </DialogHeader>
 
-          <div className="space-y-2">
-            {splitPayments.map((line) => {
-              const chosen = supportedSplitMethods.find((method) => method.id === line.methodId);
-              const choices = supportedSplitMethods.filter(
-                (method) =>
-                  method.id === line.methodId ||
-                  !splitPayments.some(
-                    (other) =>
-                      other.key !== line.key &&
-                      supportedSplitMethods.find((candidate) => candidate.id === other.methodId)
-                        ?.legacyValue === method.legacyValue,
-                  ),
-              );
+          <SplitPaymentsManager
+            total={total}
+            lines={splitTenderLines}
+            onChange={setSplitTenderLines}
+            activeCashboxes={activeCashboxes}
+            defaultCashbox={defaultCashbox}
+            banks={companyBanks}
+            defaultBank={defaultBank}
+            wallets={companyWallets}
+            defaultWallet={defaultWallet}
+            currency="YER"
+          />
 
-              const isBank = chosen?.ledgerKind === "BANK" || chosen?.legacyValue === "bank_transfer";
-              const isWallet = chosen?.ledgerKind === "WALLET" || chosen?.legacyValue === "mobile_money";
-              const isCash = chosen?.ledgerKind === "CASH" || chosen?.legacyValue === "cash";
-
-              return (
-                <div
-                  key={line.key}
-                  className="space-y-1.5 rounded-xl border border-border/70 bg-surface/50 p-2 sm:p-2.5"
-                >
-                  <div className="grid grid-cols-[minmax(0,1fr)_minmax(6rem,0.8fr)_2.25rem] items-center gap-1.5 sm:gap-2">
-                    <select
-                      value={line.methodId}
-                      onChange={(event) =>
-                        updateSplitPayment(line.key, { methodId: event.target.value, reference: "" })
-                      }
-                      aria-label={lang === "ar" ? "طريقة الدفع" : "Payment method"}
-                      className="h-9 min-w-0 rounded-xl border border-border bg-background px-2 text-[11px] font-semibold outline-none focus:border-primary"
-                    >
-                      {choices.map((method) => (
-                        <option key={method.id} value={method.id}>
-                          {lang === "ar" ? method.nameAr : method.nameEn || method.nameAr}
-                        </option>
-                      ))}
-                    </select>
-                    <AmountInput
-                      label={
-                        lang === "ar"
-                          ? `مبلغ ${chosen?.nameAr ?? "الدفع"}`
-                          : `${chosen?.nameEn ?? chosen?.nameAr ?? "Payment"} amount`
-                      }
-                      value={line.amount}
-                      onValueChange={(amount) =>
-                        updateSplitPayment(line.key, { amount, autoAmount: false })
-                      }
-                      invalid={isOverpaid}
-                      placeholder="0"
-                      className="h-9 rounded-xl border border-border bg-background px-2 text-xs font-semibold outline-none focus:border-primary"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeSplitPayment(line.key)}
-                      aria-label={lang === "ar" ? "حذف طريقة الدفع" : "Remove payment method"}
-                      title={lang === "ar" ? "حذف" : "Remove"}
-                      className="grid size-8 place-items-center rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
-                  </div>
-
-                  {/* الحساب المالي الفرعي (صندوق أو بنك أو محفظة) */}
-                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground bg-surface-2/60 px-2 py-1 rounded-lg">
-                    <span>{lang === "ar" ? "الحساب المستلم:" : "Receiving pot:"}</span>
-                    <span className="font-semibold text-foreground">
-                      {isCash
-                        ? defaultCashbox ? defaultCashbox.name_ar : lang === "ar" ? "الصندوق الرئيسي" : "Main Till"
-                        : isBank
-                          ? defaultBank ? defaultBank.name_ar : lang === "ar" ? "بنك الكريمي" : "Al-Kuraimi Bank"
-                          : isWallet
-                            ? defaultWallet ? defaultWallet.name_ar : lang === "ar" ? "محفظة جوالي" : "Jawali Wallet"
-                            : "—"}
-                    </span>
-                  </div>
-
-                  {chosen?.requiresReference && (
-                    <input
-                      type="text"
-                      value={line.reference ?? ""}
-                      onChange={(event) =>
-                        updateSplitPayment(line.key, { reference: event.target.value })
-                      }
-                      aria-label={
-                        lang === "ar"
-                          ? `مرجع ${chosen.nameAr}`
-                          : `${chosen.nameEn || chosen.nameAr} reference`
-                      }
-                      placeholder={lang === "ar" ? "رقم المرجع / الحوالة / إشعار المحفظة" : "Reference / transaction no."}
-                      className="h-8 w-full rounded-xl border border-border bg-background px-3 text-[11px] outline-none focus:border-primary"
-                    />
-                  )}
-                </div>
-              );
-            })}
-            <button
-              type="button"
-              onClick={addSplitPaymentLine}
-              disabled={splitPayments.length >= supportedSplitMethods.length}
-              className="inline-flex h-9 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-3 text-xs font-semibold text-primary hover:bg-primary/10 disabled:opacity-40"
-            >
-              <Plus className="size-4" />
-              {lang === "ar" ? "إضافة طريقة دفع" : "Add payment method"}
-            </button>
-          </div>
-
-          <div className="space-y-1 rounded-xl border border-primary/20 bg-primary/[0.04] p-2.5 text-xs">
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">
-                {lang === "ar" ? "إجمالي الفاتورة" : "Invoice total"}
-              </span>
-              <span className="font-mono font-semibold">{money(total)}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">{lang === "ar" ? "المدفوع" : "Paid"}</span>
-              <span className="font-mono font-semibold">{money(splitPaidTotal)}</span>
-            </div>
-            <div className="flex items-center justify-between border-t border-border/50 pt-1">
-              <span className="text-muted-foreground">
-                {lang === "ar" ? "المتبقي على العميل" : "Customer balance"}
-              </span>
-              <span className="font-mono font-bold text-amber-600">{money(remainingDebt)}</span>
-            </div>
-            {isOverpaid && (
-              <p role="alert" className="pt-1 text-[11px] font-semibold text-destructive">
-                {lang === "ar"
-                  ? "مجموع الدفعات يتجاوز إجمالي الفاتورة"
-                  : "Payment total exceeds invoice total"}
-              </p>
-            )}
-            {splitDebtBlockReason && (
-              <p role="alert" className="pt-1 text-[11px] font-semibold text-destructive">
-                {splitDebtBlockReason}
-              </p>
-            )}
-          </div>
-
-          <DialogFooter>
+          <DialogFooter className="pt-2">
             <button
               type="button"
               onClick={() => setSplitEditorOpen(false)}
               disabled={
-                splitMethodCount === 0 ||
-                isOverpaid ||
-                hasInvalidSplitLine ||
-                missingSplitReference ||
+                splitTenderLines.length === 0 ||
+                splitPaidTotal > total ||
                 Boolean(splitDebtBlockReason)
               }
-              className="h-9 rounded-full bg-primary px-5 text-xs font-semibold text-primary-foreground disabled:opacity-40"
+              className="h-10 rounded-xl bg-primary px-6 text-xs font-bold text-primary-foreground shadow-sm hover:opacity-90 disabled:opacity-40 transition"
             >
-              {lang === "ar" ? "تم" : "Done"}
+              {lang === "ar" ? "اعتماد توزيع الدفعات" : "Confirm allocation"}
             </button>
           </DialogFooter>
         </DialogContent>
