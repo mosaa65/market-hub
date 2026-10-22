@@ -265,54 +265,115 @@ export function DynamicPaymentSelector({
         {/* CASE B: WALLET -> Specific Wallet Selection + Transaction Ref */}
         {currentKind === "WALLET" && (
           <div className="space-y-2">
-            <label className="block text-[11px] font-medium text-muted-foreground">
-              {isAr ? "اختر المحفظة المستلمة:" : "Select Receiving Wallet:"}
-            </label>
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+              <span className="flex items-center gap-1 font-medium">
+                <Smartphone className="h-3.5 w-3.5 text-sky-600" />
+                {isAr ? "اختر المحفظة المستلمة:" : "Select Receiving Wallet:"}
+              </span>
+              {defaultWallet && (
+                <span className="text-[10px] text-muted-foreground/80">
+                  {isAr
+                    ? `(الافتراضية: ${defaultWallet.name_ar})`
+                    : `(Default: ${defaultWallet.name_ar})`}
+                </span>
+              )}
+            </div>
 
-            {/* Wallet Pills with SVG Icons */}
+            {/* Wallet Pills with SVG / System Icons */}
             <div className="flex flex-wrap gap-1.5">
-              {/* Shipped/Registered Wallets */}
-              {methods
-                .filter((m) => m.ledgerKind === "WALLET")
-                .map((w) => {
-                  const isChosen = settlement.paymentMethodId === w.id;
-                  const asset = paymentMethodIconAsset(w.id);
+              {/* المحافظ المسجلة في حسابات الشركة (أصلية ودقيقة) أو الكتالوج */}
+              {wallets.length > 0
+                ? wallets.map((w) => {
+                    const isChosen = settlement.bankAccountId === w.id;
+                    const catId = w.name_ar.includes("جوالي")
+                      ? "jawali"
+                      : w.name_ar.includes("جيب")
+                        ? "jaib"
+                        : w.name_ar.includes("فلوسك")
+                          ? "floosak"
+                          : w.name_ar.includes("كاش")
+                            ? "one_cash"
+                            : "mobile_money";
+                    const asset = paymentMethodIconAsset(catId);
 
-                  return (
-                    <button
-                      key={w.id}
-                      type="button"
-                      disabled={disabled}
-                      onClick={() => {
-                        const matchedAcc = wallets.find(
-                          (acc) =>
-                            acc.bank_name.includes(w.nameAr) || acc.name_ar.includes(w.nameAr),
-                        );
-                        onSettlementChange({
-                          ...settlement,
-                          paymentMethodId: w.id,
-                          bankAccountId: matchedAcc?.id || settlement.bankAccountId,
-                          bankAccountName: w.nameAr,
-                          chartAccountId: matchedAcc?.account_id || settlement.chartAccountId,
-                        });
-                      }}
-                      className={cn(
-                        "inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition",
-                        isChosen
-                          ? "border-sky-500 bg-sky-500/15 text-sky-950 dark:text-sky-200 shadow-2xs ring-1 ring-sky-500/30"
-                          : "border-border/80 bg-background text-muted-foreground hover:text-foreground hover:bg-muted/40",
-                      )}
-                    >
-                      {asset ? (
-                        <img src={asset.src} alt={asset.alt} className="h-4 w-4 object-contain" />
-                      ) : (
-                        <Smartphone className="h-4 w-4 text-sky-600" />
-                      )}
-                      <span>{isAr ? w.nameAr : (w.nameEn ?? w.nameAr)}</span>
-                      {isChosen && <Check className="h-3 w-3 text-sky-600 shrink-0" />}
-                    </button>
-                  );
-                })}
+                    return (
+                      <button
+                        key={w.id}
+                        type="button"
+                        disabled={disabled}
+                        onClick={() => {
+                          onSettlementChange({
+                            ...settlement,
+                            paymentMethodId: catId,
+                            bankAccountId: w.id,
+                            bankAccountName: w.name_ar,
+                            chartAccountId: w.account_id,
+                          });
+                        }}
+                        className={cn(
+                          "inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition",
+                          isChosen
+                            ? "border-sky-500 bg-sky-500/15 text-sky-950 dark:text-sky-200 shadow-2xs ring-1 ring-sky-500/30 font-bold"
+                            : "border-border/80 bg-background text-muted-foreground hover:text-foreground hover:bg-muted/40",
+                        )}
+                      >
+                        {asset ? (
+                          <img src={asset.src} alt={asset.alt} className="h-4 w-4 object-contain" />
+                        ) : (
+                          <Smartphone className="h-4 w-4 text-sky-600" />
+                        )}
+                        <span>{w.name_ar}</span>
+                        {w.is_default && (
+                          <Badge
+                            variant="outline"
+                            className="text-[9px] px-1 py-0 border-sky-400 text-sky-700 dark:text-sky-300"
+                          >
+                            {isAr ? "افتراضي" : "Default"}
+                          </Badge>
+                        )}
+                        {isChosen && <Check className="h-3 w-3 text-sky-600 shrink-0" />}
+                      </button>
+                    );
+                  })
+                : methods
+                    .filter((m) => m.ledgerKind === "WALLET")
+                    .map((w) => {
+                      const isChosen = settlement.paymentMethodId === w.id;
+                      const asset = paymentMethodIconAsset(w.id);
+
+                      return (
+                        <button
+                          key={w.id}
+                          type="button"
+                          disabled={disabled}
+                          onClick={() => {
+                            onSettlementChange({
+                              ...settlement,
+                              paymentMethodId: w.id,
+                              bankAccountName: w.nameAr,
+                            });
+                          }}
+                          className={cn(
+                            "inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition",
+                            isChosen
+                              ? "border-sky-500 bg-sky-500/15 text-sky-950 dark:text-sky-200 shadow-2xs ring-1 ring-sky-500/30"
+                              : "border-border/80 bg-background text-muted-foreground hover:text-foreground hover:bg-muted/40",
+                          )}
+                        >
+                          {asset ? (
+                            <img
+                              src={asset.src}
+                              alt={asset.alt}
+                              className="h-4 w-4 object-contain"
+                            />
+                          ) : (
+                            <Smartphone className="h-4 w-4 text-sky-600" />
+                          )}
+                          <span>{isAr ? w.nameAr : (w.nameEn ?? w.nameAr)}</span>
+                          {isChosen && <Check className="h-3 w-3 text-sky-600 shrink-0" />}
+                        </button>
+                      );
+                    })}
             </div>
 
             {/* Transaction Reference */}
@@ -337,14 +398,25 @@ export function DynamicPaymentSelector({
         {currentKind === "BANK" && value !== "cheque" && (
           <div className="space-y-2">
             <div className="space-y-1">
-              <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
-                <Landmark className="h-3.5 w-3.5 text-indigo-600" />
-                {isAr ? "الحساب البنكي المودع فيه:" : "Deposited Bank Account:"}
-              </label>
+              <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                <span className="flex items-center gap-1 font-medium">
+                  <Landmark className="h-3.5 w-3.5 text-indigo-600" />
+                  {isAr ? "الحساب البنكي المودع فيه:" : "Deposited Bank Account:"}
+                </span>
+                {defaultBank && (
+                  <span className="text-[10px] text-muted-foreground/80">
+                    {isAr
+                      ? `(الافتراضي: ${defaultBank.name_ar})`
+                      : `(Default: ${defaultBank.name_ar})`}
+                  </span>
+                )}
+              </div>
 
               {banks.length === 0 ? (
                 <div className="rounded-lg border border-indigo-500/20 bg-indigo-500/10 p-2 text-[11px] text-indigo-700 dark:text-indigo-300">
-                  {isAr ? "بنك الكريمي (الحساب الافتراضي)" : "Al-Kuraimi Bank (Default)"}
+                  {isAr
+                    ? "لا يوجد حساب بنكي مسجل. أضف حسابك من الإعدادات."
+                    : "No bank accounts registered. Add one from Settings."}
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
@@ -360,6 +432,9 @@ export function DynamicPaymentSelector({
                             ...settlement,
                             bankAccountId: b.id,
                             bankAccountName: b.name_ar,
+                            paymentMethodId: b.bank_name.includes("كريمي")
+                              ? "kuraimi_bank"
+                              : settlement.paymentMethodId,
                             chartAccountId: b.account_id,
                           })
                         }
@@ -371,7 +446,17 @@ export function DynamicPaymentSelector({
                         )}
                       >
                         <div className="truncate">
-                          <p className="truncate font-semibold">{b.name_ar}</p>
+                          <div className="flex items-center gap-1">
+                            <p className="truncate font-semibold">{b.name_ar}</p>
+                            {b.is_default && (
+                              <Badge
+                                variant="outline"
+                                className="text-[9px] px-1 py-0 border-indigo-400 text-indigo-700 dark:text-indigo-300"
+                              >
+                                {isAr ? "افتراضي" : "Default"}
+                              </Badge>
+                            )}
+                          </div>
                           {b.account_number && (
                             <p className="text-[10px] text-muted-foreground/80 font-mono truncate">
                               {b.account_number}

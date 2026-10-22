@@ -16,3 +16,8 @@ export {
   AddPaymentMethodDialog,
   type AddPaymentMethodDialogProps,
 } from "./add-payment-method-dialog";
+
+export {
+  SplitPaymentsManager,
+  type SplitPaymentsManagerProps,
+} from "@/components/payments/split-payments-manager";

@@ -21,6 +21,8 @@ import {
   useCompanyBankAccounts,
   useCreateCompanyBankAccount,
   useUpdateCompanyBankAccount,
+  useSetDefaultTreasuryAccount,
+  useClearDefaultTreasuryAccount,
 } from "@/hooks/use-company-bank-accounts";
 import { usePostableAssetAccounts } from "@/hooks/use-chart-accounts";
 import type { BankAccountKind } from "@/lib/payments/treasury-types";
@@ -34,6 +36,8 @@ export function BankAccountsManagement() {
   const { data: chartAccounts = [] } = usePostableAssetAccounts();
   const createAccount = useCreateCompanyBankAccount();
   const updateAccount = useUpdateCompanyBankAccount();
+  const setDefaultAccount = useSetDefaultTreasuryAccount();
+  const clearDefaultAccount = useClearDefaultTreasuryAccount();
 
   const [activeTab, setActiveTab] = useState<"ALL" | "BANK" | "WALLET">("ALL");
   const [searchQuery, setSearchQuery] = useState("");
@@ -133,17 +137,20 @@ export function BankAccountsManagement() {
     currentDefault: boolean,
     itemKind: BankAccountKind,
   ) => {
-    if (currentDefault) return;
     try {
-      await updateAccount.mutateAsync({
-        id: accountItemId,
-        kind: itemKind,
-        is_default: true,
-      });
-      toast.success(isAr ? "تم تعيين الحساب كافتراضي" : "Account set as default");
+      if (currentDefault) {
+        // إزالة صفة الافتراضي: ليصبح بلا افتراضي صراحة
+        await clearDefaultAccount.mutateAsync(itemKind);
+        toast.success(isAr ? "تم إزالة البنك الافتراضي" : "Default bank cleared");
+      } else {
+        await setDefaultAccount.mutateAsync({ id: accountItemId, kind: itemKind });
+        toast.success(isAr ? "تم تعيين الحساب كافتراضي" : "Account set as default");
+      }
       refetch();
     } catch (err: any) {
-      toast.error(err.message || (isAr ? "تعذر تعيين الافتراضي" : "Failed to set default"));
+      toast.error(
+        err.message || (isAr ? "تعذر تحديث البنك الافتراضي" : "Failed to update default"),
+      );
     }
   };
 
@@ -349,15 +356,30 @@ export function BankAccountsManagement() {
                     </span>
                   </div>
 
-                  {!isDef && acc.is_active && (
+                  {acc.is_active && (
                     <Button
-                      variant="ghost"
+                      variant={isDef ? "secondary" : "ghost"}
                       size="sm"
                       onClick={() => handleToggleDefault(acc.id, acc.is_default, acc.kind)}
-                      className="h-7 text-[11px] gap-1 text-muted-foreground hover:text-primary hover:bg-primary/10"
+                      className={cn(
+                        "h-7 text-[11px] gap-1 transition",
+                        isDef
+                          ? "text-amber-700 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 font-bold"
+                          : "text-muted-foreground hover:text-primary hover:bg-primary/10",
+                      )}
                     >
-                      <Star className="h-3.5 w-3.5" />
-                      <span>{isAr ? "تعيين كافتراضي" : "Set Default"}</span>
+                      <Star
+                        className={cn("h-3.5 w-3.5", isDef ? "fill-amber-500 text-amber-500" : "")}
+                      />
+                      <span>
+                        {isDef
+                          ? isAr
+                            ? "إلغاء الافتراضي"
+                            : "Unset Default"
+                          : isAr
+                            ? "تعيين كافتراضي"
+                            : "Set Default"}
+                      </span>
                     </Button>
                   )}
                 </div>

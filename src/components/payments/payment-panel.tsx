@@ -407,3 +407,5 @@ export function PaymentPanel(props: PaymentPanelProps) {
     </div>
   );
 }
+
+export { SplitPaymentsManager, type SplitPaymentsManagerProps } from "./split-payments-manager";

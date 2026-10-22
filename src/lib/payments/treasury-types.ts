@@ -100,3 +100,20 @@ export interface PaymentSettlementSelection {
     drawerName?: string | null;
   } | null;
 }
+
+/** سطر فردي ضمن الدفع المجزأ المتعدد */
+export interface SplitTenderLine {
+  id: string;
+  category: "CASH" | "BANK" | "WALLET";
+  /** الكود القديم: cash, bank_transfer, mobile_money, card, cheque */
+  method: string;
+  /** المعرف الكتالوجي الدقيق (kuraimi_bank, jawali, cash...) */
+  paymentMethodId?: string | null;
+  amount: number;
+  cashboxId?: string | null;
+  cashboxName?: string | null;
+  bankAccountId?: string | null;
+  bankAccountName?: string | null;
+  reference?: string | null;
+  note?: string | null;
+}

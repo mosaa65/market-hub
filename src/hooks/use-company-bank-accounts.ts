@@ -41,8 +41,9 @@ export function useCompanyBankAccounts(kind?: BankAccountKind) {
   const activeAccounts = accounts.filter((a) => a.is_active);
   const banks = activeAccounts.filter((a) => a.kind === "BANK");
   const wallets = activeAccounts.filter((a) => a.kind === "WALLET");
-  const defaultBank = banks.find((b) => b.is_default) ?? banks[0];
-  const defaultWallet = wallets.find((w) => w.is_default) ?? wallets[0];
+  // لا تخمين لبنك أو محفظة عشوائية؛ إما أن يكون الافتراضي صريحاً ومحدداً من الإعدادات، أو undefined
+  const defaultBank = banks.find((b) => b.is_default);
+  const defaultWallet = wallets.find((w) => w.is_default);
 
   return {
     accounts,
@@ -137,6 +138,41 @@ export function useUpdateCompanyBankAccount() {
 
       if (error) throw error;
       return data as CompanyBankAccount;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: COMPANY_BANK_ACCOUNTS_QUERY_KEY });
+    },
+  });
+}
+
+export function useSetDefaultTreasuryAccount() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, kind }: { id: string; kind?: BankAccountKind }) => {
+      const { data, error } = await db.rpc("set_default_treasury_account", {
+        p_id: id,
+        p_kind: kind || null,
+      });
+      if (error) throw error;
+      return data as CompanyBankAccount;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: COMPANY_BANK_ACCOUNTS_QUERY_KEY });
+    },
+  });
+}
+
+export function useClearDefaultTreasuryAccount() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (kind: BankAccountKind) => {
+      const { data, error } = await db.rpc("clear_default_treasury_account", {
+        p_kind: kind,
+      });
+      if (error) throw error;
+      return data as number;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: COMPANY_BANK_ACCOUNTS_QUERY_KEY });
