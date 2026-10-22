@@ -839,7 +839,7 @@ const SidebarContents = memo(function SidebarContents({
       {/* Footer Profile & Sign Out */}
       <div
         className={cn(
-          "border-t border-sidebar-border/60 p-2.5",
+          "border-t border-sidebar-border/60 p-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]",
           collapsed && "flex justify-center p-2",
         )}
       >
@@ -971,7 +971,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const sideEdge = dir === "rtl" ? "border-l" : "border-r";
 
   return (
-    <div className="relative z-10 flex h-screen w-full overflow-hidden text-foreground">
+    <div className="relative z-10 flex h-[100dvh] w-full overflow-hidden text-foreground ps-[env(safe-area-inset-left,0px)] pe-[env(safe-area-inset-right,0px)]">
       {/* Desktop sidebar */}
       <aside
         className={cn(
@@ -990,7 +990,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetContent
           side={dir === "rtl" ? "right" : "left"}
-          className="w-72 p-0 bg-sidebar border-sidebar-border/60 overflow-hidden"
+          className="w-72 p-0 bg-sidebar border-sidebar-border/60 overflow-hidden flex flex-col pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)]"
         >
           <SidebarContents onNavigate={() => setMobileOpen(false)} />
         </SheetContent>
@@ -1002,7 +1002,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <ConnectionBanner />
 
         {/* Top bar */}
-        <header className="sticky top-0 z-30 flex h-16 items-center gap-2.5 border-b border-border/60 bg-background/70 px-4 backdrop-blur-xl sm:px-6">
+        <header className="sticky top-0 z-30 flex min-h-[calc(4rem+env(safe-area-inset-top,0px))] flex-none items-center gap-2.5 border-b border-border/60 bg-background/80 px-4 pt-[env(safe-area-inset-top,0px)] pb-1 backdrop-blur-xl sm:px-6">
           {/* Mobile menu toggle - smoothly hides when search is focused */}
           <button
             type="button"
@@ -1154,7 +1154,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <main
           className={cn(
-            "flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar",
+            "flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar pb-[env(safe-area-inset-bottom,0px)]",
             isPosRoute ? "flex flex-col" : "",
           )}
         >

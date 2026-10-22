@@ -1,8 +1,9 @@
 import { PrimaryAction } from "@/components/ui/primary-action";
+import { InvoiceSectionTabs } from "@/components/invoices/invoice-section-tabs";
 import { usePersistedViewMode } from "@/hooks/use-persisted-view-mode";
 import { cn } from "@/lib/utils";
 import { ModuleGuard, useModules } from "@/lib/modules";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import {
   ShoppingCart,
@@ -136,6 +137,7 @@ interface CartLine {
 }
 
 function PurchasesPage() {
+  const navigate = useNavigate();
   const { isModuleEnabled } = useModules();
   const hasMultiWarehouse = isModuleEnabled("multi_warehouse");
   const { t, lang } = useI18n();
@@ -669,6 +671,7 @@ function PurchasesPage() {
 
   return (
     <div className="space-y-5 pb-12">
+      <InvoiceSectionTabs kind="purchase" active="list" />
       {/* ─── Unified Top Header & Quick Action Bar — Full width & responsive ─── */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
         <div>
@@ -706,7 +709,7 @@ function PurchasesPage() {
 
             <button
               type="button"
-              onClick={() => setCreating(true)}
+              onClick={() => void navigate({ to: "/purchase-invoice" })}
               className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-primary px-3 sm:px-3.5 text-xs font-semibold text-primary-foreground shadow-xs hover:opacity-95 transition"
               title={isRtl ? "فاتورة شراء جديدة" : "New Purchase"}
             >
@@ -813,7 +816,7 @@ function PurchasesPage() {
             label={isRtl ? "فاتورة شراء جديدة" : "New Purchase"}
             icon={<Plus />}
 
-            onClick={() => setCreating(true)}
+            onClick={() => void navigate({ to: "/purchase-invoice" })}
           />
         }
       >

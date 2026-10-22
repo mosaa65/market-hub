@@ -41,6 +41,7 @@ import { Route as AppPlatformAdminRouteImport } from './routes/_app.platform-adm
 import { Route as AppPosRouteImport } from './routes/_app.pos'
 import { Route as AppPrepaymentsRouteImport } from './routes/_app.prepayments'
 import { Route as AppProductsRouteImport } from './routes/_app.products'
+import { Route as AppPurchaseInvoiceRouteImport } from './routes/_app.purchase-invoice'
 import { Route as AppPurchasePosRouteImport } from './routes/_app.purchase-pos'
 import { Route as AppPurchaseReturnsRouteImport } from './routes/_app.purchase-returns'
 import { Route as AppPurchasesRouteImport } from './routes/_app.purchases'
@@ -72,6 +73,7 @@ import { Route as AppReportsOperationsAuditRouteImport } from './routes/_app.rep
 import { Route as AppReportsPurchasesRouteImport } from './routes/_app.reports.purchases'
 import { Route as AppReportsSalesRouteImport } from './routes/_app.reports.sales'
 import { Route as AppReportsSuppliersRouteImport } from './routes/_app.reports.suppliers'
+import { Route as AppSalesInvoiceNewRouteImport } from './routes/_app.sales-invoice.new'
 import { Route as AppStatementsEntityTypeRouteImport } from './routes/_app.statements.$entityType'
 
 const IndexRoute = IndexRouteImport.update({
@@ -233,6 +235,11 @@ const AppProductsRoute = AppProductsRouteImport.update({
   path: '/products',
   getParentRoute: () => AppRoute,
 } as any)
+const AppPurchaseInvoiceRoute = AppPurchaseInvoiceRouteImport.update({
+  id: '/purchase-invoice',
+  path: '/purchase-invoice',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppPurchasePosRoute = AppPurchasePosRouteImport.update({
   id: '/purchase-pos',
   path: '/purchase-pos',
@@ -391,6 +398,11 @@ const AppReportsSuppliersRoute = AppReportsSuppliersRouteImport.update({
   path: '/suppliers',
   getParentRoute: () => AppReportsRoute,
 } as any)
+const AppSalesInvoiceNewRoute = AppSalesInvoiceNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => AppSalesInvoiceRoute,
+} as any)
 const AppStatementsEntityTypeRoute = AppStatementsEntityTypeRouteImport.update({
   id: '/statements/$entityType',
   path: '/statements/$entityType',
@@ -429,13 +441,14 @@ export interface FileRoutesByFullPath {
   '/pos': typeof AppPosRoute
   '/prepayments': typeof AppPrepaymentsRoute
   '/products': typeof AppProductsRoute
+  '/purchase-invoice': typeof AppPurchaseInvoiceRoute
   '/purchase-pos': typeof AppPurchasePosRoute
   '/purchase-returns': typeof AppPurchaseReturnsRoute
   '/purchases': typeof AppPurchasesRoute
   '/reports': typeof AppReportsRouteWithChildren
   '/returns': typeof AppReturnsRoute
   '/sales': typeof AppSalesRoute
-  '/sales-invoice': typeof AppSalesInvoiceRoute
+  '/sales-invoice': typeof AppSalesInvoiceRouteWithChildren
   '/sales-returns': typeof AppSalesReturnsRoute
   '/settings': typeof AppSettingsRoute
   '/settlements': typeof AppSettlementsRoute
@@ -460,6 +473,7 @@ export interface FileRoutesByFullPath {
   '/reports/purchases': typeof AppReportsPurchasesRoute
   '/reports/sales': typeof AppReportsSalesRoute
   '/reports/suppliers': typeof AppReportsSuppliersRoute
+  '/sales-invoice/new': typeof AppSalesInvoiceNewRoute
   '/statements/$entityType': typeof AppStatementsEntityTypeRoute
 }
 export interface FileRoutesByTo {
@@ -494,13 +508,14 @@ export interface FileRoutesByTo {
   '/pos': typeof AppPosRoute
   '/prepayments': typeof AppPrepaymentsRoute
   '/products': typeof AppProductsRoute
+  '/purchase-invoice': typeof AppPurchaseInvoiceRoute
   '/purchase-pos': typeof AppPurchasePosRoute
   '/purchase-returns': typeof AppPurchaseReturnsRoute
   '/purchases': typeof AppPurchasesRoute
   '/reports': typeof AppReportsRouteWithChildren
   '/returns': typeof AppReturnsRoute
   '/sales': typeof AppSalesRoute
-  '/sales-invoice': typeof AppSalesInvoiceRoute
+  '/sales-invoice': typeof AppSalesInvoiceRouteWithChildren
   '/sales-returns': typeof AppSalesReturnsRoute
   '/settings': typeof AppSettingsRoute
   '/settlements': typeof AppSettlementsRoute
@@ -525,6 +540,7 @@ export interface FileRoutesByTo {
   '/reports/purchases': typeof AppReportsPurchasesRoute
   '/reports/sales': typeof AppReportsSalesRoute
   '/reports/suppliers': typeof AppReportsSuppliersRoute
+  '/sales-invoice/new': typeof AppSalesInvoiceNewRoute
   '/statements/$entityType': typeof AppStatementsEntityTypeRoute
 }
 export interface FileRoutesById {
@@ -561,13 +577,14 @@ export interface FileRoutesById {
   '/_app/pos': typeof AppPosRoute
   '/_app/prepayments': typeof AppPrepaymentsRoute
   '/_app/products': typeof AppProductsRoute
+  '/_app/purchase-invoice': typeof AppPurchaseInvoiceRoute
   '/_app/purchase-pos': typeof AppPurchasePosRoute
   '/_app/purchase-returns': typeof AppPurchaseReturnsRoute
   '/_app/purchases': typeof AppPurchasesRoute
   '/_app/reports': typeof AppReportsRouteWithChildren
   '/_app/returns': typeof AppReturnsRoute
   '/_app/sales': typeof AppSalesRoute
-  '/_app/sales-invoice': typeof AppSalesInvoiceRoute
+  '/_app/sales-invoice': typeof AppSalesInvoiceRouteWithChildren
   '/_app/sales-returns': typeof AppSalesReturnsRoute
   '/_app/settings': typeof AppSettingsRoute
   '/_app/settlements': typeof AppSettlementsRoute
@@ -592,6 +609,7 @@ export interface FileRoutesById {
   '/_app/reports/purchases': typeof AppReportsPurchasesRoute
   '/_app/reports/sales': typeof AppReportsSalesRoute
   '/_app/reports/suppliers': typeof AppReportsSuppliersRoute
+  '/_app/sales-invoice/new': typeof AppSalesInvoiceNewRoute
   '/_app/statements/$entityType': typeof AppStatementsEntityTypeRoute
 }
 export interface FileRouteTypes {
@@ -628,6 +646,7 @@ export interface FileRouteTypes {
     | '/pos'
     | '/prepayments'
     | '/products'
+    | '/purchase-invoice'
     | '/purchase-pos'
     | '/purchase-returns'
     | '/purchases'
@@ -659,6 +678,7 @@ export interface FileRouteTypes {
     | '/reports/purchases'
     | '/reports/sales'
     | '/reports/suppliers'
+    | '/sales-invoice/new'
     | '/statements/$entityType'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -693,6 +713,7 @@ export interface FileRouteTypes {
     | '/pos'
     | '/prepayments'
     | '/products'
+    | '/purchase-invoice'
     | '/purchase-pos'
     | '/purchase-returns'
     | '/purchases'
@@ -724,6 +745,7 @@ export interface FileRouteTypes {
     | '/reports/purchases'
     | '/reports/sales'
     | '/reports/suppliers'
+    | '/sales-invoice/new'
     | '/statements/$entityType'
   id:
     | '__root__'
@@ -759,6 +781,7 @@ export interface FileRouteTypes {
     | '/_app/pos'
     | '/_app/prepayments'
     | '/_app/products'
+    | '/_app/purchase-invoice'
     | '/_app/purchase-pos'
     | '/_app/purchase-returns'
     | '/_app/purchases'
@@ -790,6 +813,7 @@ export interface FileRouteTypes {
     | '/_app/reports/purchases'
     | '/_app/reports/sales'
     | '/_app/reports/suppliers'
+    | '/_app/sales-invoice/new'
     | '/_app/statements/$entityType'
   fileRoutesById: FileRoutesById
 }
@@ -1025,6 +1049,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppProductsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/purchase-invoice': {
+      id: '/_app/purchase-invoice'
+      path: '/purchase-invoice'
+      fullPath: '/purchase-invoice'
+      preLoaderRoute: typeof AppPurchaseInvoiceRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/purchase-pos': {
       id: '/_app/purchase-pos'
       path: '/purchase-pos'
@@ -1242,6 +1273,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppReportsSuppliersRouteImport
       parentRoute: typeof AppReportsRoute
     }
+    '/_app/sales-invoice/new': {
+      id: '/_app/sales-invoice/new'
+      path: '/new'
+      fullPath: '/sales-invoice/new'
+      preLoaderRoute: typeof AppSalesInvoiceNewRouteImport
+      parentRoute: typeof AppSalesInvoiceRoute
+    }
     '/_app/statements/$entityType': {
       id: '/_app/statements/$entityType'
       path: '/statements/$entityType'
@@ -1298,6 +1336,18 @@ const AppReportsRouteWithChildren = AppReportsRoute._addFileChildren(
   AppReportsRouteChildren,
 )
 
+interface AppSalesInvoiceRouteChildren {
+  AppSalesInvoiceNewRoute: typeof AppSalesInvoiceNewRoute
+}
+
+const AppSalesInvoiceRouteChildren: AppSalesInvoiceRouteChildren = {
+  AppSalesInvoiceNewRoute: AppSalesInvoiceNewRoute,
+}
+
+const AppSalesInvoiceRouteWithChildren = AppSalesInvoiceRoute._addFileChildren(
+  AppSalesInvoiceRouteChildren,
+)
+
 interface AppRouteChildren {
   AppAnalyticsRoute: typeof AppAnalyticsRoute
   AppAuditRoute: typeof AppAuditRoute
@@ -1328,13 +1378,14 @@ interface AppRouteChildren {
   AppPosRoute: typeof AppPosRoute
   AppPrepaymentsRoute: typeof AppPrepaymentsRoute
   AppProductsRoute: typeof AppProductsRoute
+  AppPurchaseInvoiceRoute: typeof AppPurchaseInvoiceRoute
   AppPurchasePosRoute: typeof AppPurchasePosRoute
   AppPurchaseReturnsRoute: typeof AppPurchaseReturnsRoute
   AppPurchasesRoute: typeof AppPurchasesRoute
   AppReportsRoute: typeof AppReportsRouteWithChildren
   AppReturnsRoute: typeof AppReturnsRoute
   AppSalesRoute: typeof AppSalesRoute
-  AppSalesInvoiceRoute: typeof AppSalesInvoiceRoute
+  AppSalesInvoiceRoute: typeof AppSalesInvoiceRouteWithChildren
   AppSalesReturnsRoute: typeof AppSalesReturnsRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppSettlementsRoute: typeof AppSettlementsRoute
@@ -1379,13 +1430,14 @@ const AppRouteChildren: AppRouteChildren = {
   AppPosRoute: AppPosRoute,
   AppPrepaymentsRoute: AppPrepaymentsRoute,
   AppProductsRoute: AppProductsRoute,
+  AppPurchaseInvoiceRoute: AppPurchaseInvoiceRoute,
   AppPurchasePosRoute: AppPurchasePosRoute,
   AppPurchaseReturnsRoute: AppPurchaseReturnsRoute,
   AppPurchasesRoute: AppPurchasesRoute,
   AppReportsRoute: AppReportsRouteWithChildren,
   AppReturnsRoute: AppReturnsRoute,
   AppSalesRoute: AppSalesRoute,
-  AppSalesInvoiceRoute: AppSalesInvoiceRoute,
+  AppSalesInvoiceRoute: AppSalesInvoiceRouteWithChildren,
   AppSalesReturnsRoute: AppSalesReturnsRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppSettlementsRoute: AppSettlementsRoute,
