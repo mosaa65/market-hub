@@ -211,7 +211,7 @@ BEGIN
   END IF;
 
   SELECT substring(pg_get_functiondef('public.generate_tax_declaration(date,date)'::regprocedure)
-                   FROM 'AS \$[a-z]*\$(.*\$[a-z]*\$)\s*$')
+                   FROM 'AS \$[a-z]*\$(.*)\$[a-z]*\$\s*$')
     INTO v_body;
 
   v_body := regexp_replace(coalesce(v_body, ''), '--[^\n]*', '', 'g');   -- أسطر التعليق

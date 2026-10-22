@@ -220,6 +220,10 @@ REVOKE ALL ON public.supplier_ledger, public.supplier_payments FROM anon;
 -- sync_idempotency_keys: الكتابة عبر sync_apply_operation فقط (SECURITY DEFINER).
 -- القراءة المباشرة لمفاتيح أجهزة غير الجهاز الحالي تسريب لا حاجة له.
 DROP POLICY IF EXISTS "Authenticated users can check and insert idempotency keys" ON public.sync_idempotency_keys;
+-- Idempotent: the policy name is re-created by later runs of this file on a
+-- database that already carried it (drift repair / replay), and CREATE POLICY has
+-- no IF NOT EXISTS form.
+DROP POLICY IF EXISTS "Idempotency keys are service managed" ON public.sync_idempotency_keys;
 
 CREATE POLICY "Idempotency keys are service managed" ON public.sync_idempotency_keys
   AS PERMISSIVE FOR SELECT TO authenticated
