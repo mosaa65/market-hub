@@ -1,0 +1,18 @@
+{
+  "$comment": "سجل أيقونات طرق الدفع. المفتاح = public.payment_methods.icon_key، والقيمة = مسار الملف داخل public/.",
+  "version": 2,
+  "baseUrl": "/payment-icons",
+  "icons": {
+    "cash": "cash.svg",
+    "credit": "credit.svg",
+    "bank-transfer": "bank-transfer.svg",
+    "kuraimi": "kuraimi.svg",
+    "bank": "bank.svg",
+    "mobile-money": "mobile-money.svg",
+    "jaib": "jaib.svg",
+    "wallet": "wallet.svg",
+    "card": "card.svg",
+    "split": "split.svg",
+    "generic": "generic.svg"
+  }
+}

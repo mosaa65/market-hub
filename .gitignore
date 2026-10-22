@@ -1,0 +1,56 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+ui-ux-pro-max-skill-main
+dist-ssr
+.output
+.vinxi
+.tanstack/**
+.nitro
+*.local
+
+# Wrangler / Cloudflare
+.wrangler/
+.dev.vars
+
+# Local tooling caches
+.playwright-mcp/
+.codebuddy/
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+#env filess
+.env
+.env.local
+.env.*
+.codebuddy
+
+# Supabase CLI local state (machine-specific, never commit)
+supabase/.temp/
+supabase/.branches/
+supabase/.linter/
+
+# Local QA / dev scratch files
+qa-login*.mjs
+dev-server.log
+metadata.json
+
+.qa-session.json
+temp_*.txt
+.aistudio/

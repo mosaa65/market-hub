@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="طريقة دفع">
+  <rect x="6" y="10" width="36" height="28" rx="6" fill="#64748b"/>
+  <rect x="6" y="17" width="36" height="5" fill="#475569"/>
+  <rect x="12" y="27" width="14" height="3.5" rx="1.75" fill="#ffffff" opacity="0.9"/>
+  <rect x="12" y="33" width="8" height="3.5" rx="1.75" fill="#ffffff" opacity="0.6"/>
+</svg>

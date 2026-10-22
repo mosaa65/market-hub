@@ -1,0 +1,785 @@
+import * as React from "react";
+import { ArrowDown, ArrowUp, ChevronDown, ChevronsUpDown, Inbox, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useI18n } from "@/lib/i18n";
+import { EmptyState, Spinner } from "@/components/ui/feedback";
+import { QueryErrorState, InlineRefreshing } from "@/components/ui/connection";
+import { useBreakpoint } from "@/design/breakpoints";
+
+/* ------------------------------------------------------------------ */
+/*  Types                                                             */
+/* ------------------------------------------------------------------ */
+
+export interface DataTableColumn<T> {
+  /** Stable identifier; also used as the default sort accessor key. */
+  key: string;
+  /** Localized header label. */
+  header: React.ReactNode;
+  /** Cell renderer. */
+  cell: (row: T, index: number) => React.ReactNode;
+  align?: "start" | "end" | "center";
+  /** Extra class applied to both header and body cells. */
+  className?: string;
+  /** Enables click-to-sort for this column. */
+  sortable?: boolean;
+  /** Value used for client-side sorting. Defaults to the raw field. */
+  sortValue?: (row: T) => string | number | null | undefined;
+  /** Hide the column entirely (e.g. permission-gated cost). */
+  hidden?: boolean;
+  /**
+   * Hide this column below a viewport width, so a wide table fits a phone
+   * without horizontal scrolling. CSS-only (a Tailwind responsive class), so it
+   * costs no measurement and does not affect sticky positioning.
+   *
+   * - `sm`  → hidden under 640px
+   * - `md`  → hidden under 768px
+   * - `lg`  → hidden under 1024px
+   */
+  hideBelow?: "sm" | "md" | "lg";
+  /** Tailwind width class, e.g. `w-32`. */
+  width?: string;
+  /** Allow wrapping (default: columns stay on one line). */
+  wrap?: boolean;
+  /** Pin this column while the table scrolls horizontally. */
+  sticky?: boolean;
+}
+
+export interface DataTableSort {
+  key: string;
+  direction: "asc" | "desc";
+}
+
+export interface DataTableProps<T> {
+  columns: DataTableColumn<T>[];
+  rows: T[];
+  rowKey: (row: T) => string;
+
+  loading?: boolean;
+  /** True only for the very first load (renders skeletons). */
+  initialLoading?: boolean;
+  error?: Error | null;
+  onRetry?: () => void;
+  /** Background refetch: dims the body but keeps rows visible. */
+  refreshing?: boolean;
+
+  /** Controlled sort. */
+  sort?: DataTableSort | null;
+  onSortChange?: (sort: DataTableSort | null) => void;
+
+  /** Rendered above the table (toolbar). */
+  toolbar?: React.ReactNode;
+
+  onRowClick?: (row: T) => void;
+
+  empty?: {
+    title: string;
+    description?: string;
+    icon?: React.ReactNode;
+    action?: React.ReactNode;
+  };
+
+  /**
+   * Extra props applied to each `<tr>`. Used for hover tracking (row-scoped
+   * keyboard shortcuts read it) without making every caller wire up pointer
+   * state by hand. Applied after `onClick`, so a caller cannot accidentally
+   * replace the row's own click handler.
+   */
+  rowProps?: (row: T) => React.HTMLAttributes<HTMLTableRowElement>;
+
+  /* ---- Infinite scroll ---- */
+  /** Enables "load more as you scroll" behaviour. */
+  infinite?: boolean;
+  /** Whether more rows exist on the server. */
+  hasMore?: boolean;
+  /** Fired when the sentinel scrolls into view. */
+  onLoadMore?: () => void;
+  /** True while the next page is being fetched. */
+  loadingMore?: boolean;
+  /** Rows per page, used for the caption. 0 hides the caption. */
+  pageSize?: number;
+  /** Total row count when known (server-side count). */
+  totalCount?: number;
+
+  /* ---- Legacy client-side paging (accounting tables) ---- */
+  paginate?: boolean;
+  initialPageSize?: number;
+
+  className?: string;
+  scrollClassName?: string;
+  stickyHeader?: boolean;
+  /** Minimum table width before horizontal scrolling kicks in. */
+  minWidth?: number;
+  /**
+   * Deliberate side-to-side scrolling for dense operational tables.  This is
+   * opt-in: a scroll container and a vertically sticky table header cannot
+   * share the same wrapper reliably, so callers should disable `stickyHeader`
+   * for the compact layout when enabling it.
+   */
+  horizontalScroll?: boolean;
+  /** Pin the first column while scrolling horizontally. */
+  stickyFirstColumn?: boolean;
+
+  /**
+   * Offset from the top of the scrolling container at which the sticky toolbar
+   * pins. Defaults to `0px`.
+   *
+   * This is deliberately **not** the app-header height: the app shell renders
+   * the header as a flex sibling *above* `<main>`, and `<main>` is the element
+   * that actually scrolls. A sticky element measures `top` from its nearest
+   * scrolling ancestor, so `0` places the toolbar directly beneath the header.
+   * Only override this for an embedded table with its own scroll parent.
+   */
+  stickyTop?: string;
+}
+
+const DEFAULT_PAGE_SIZE = 50;
+
+/** Tailwind classes that hide a column below the given breakpoint. */
+const HIDE_BELOW: Record<"sm" | "md" | "lg", string> = {
+  sm: "hidden sm:table-cell",
+  md: "hidden md:table-cell",
+  lg: "hidden lg:table-cell",
+};
+
+/* ------------------------------------------------------------------ */
+/*  Component                                                         */
+/* ------------------------------------------------------------------ */
+
+/**
+ * DataTable — the single table implementation for Market Hub.
+ *
+ * Key decisions (per requirements):
+ *  - **Always a real table, including on phones.** Records scroll horizontally
+ *    rather than becoming stacked cards, so a dense ERP list stays scannable and
+ *    column-aligned. `minWidth` keeps the numeric columns readable.
+ *  - **Infinite scroll, no pagination arrows.** Rows arrive 50 at a time as the
+ *    user reaches the bottom, with a subtle loading indicator. When everything is
+ *    loaded the list simply ends.
+ *  - **Full bleed.** No horizontal padding around the table, so rows fill the
+ *    panel edge to edge.
+ */
+function parseColumnWidth(width?: string): number | null {
+  if (!width) return null;
+  const pxMatch = width.match(/w-\[(\d+(?:\.\d+)?)px\]/);
+  if (pxMatch) return parseFloat(pxMatch[1]);
+  const remMatch = width.match(/w-\[(\d+(?:\.\d+)?)rem\]/);
+  if (remMatch) return parseFloat(remMatch[1]) * 16;
+  const numMatch = width.match(/w-(\d+)/);
+  if (numMatch) return parseFloat(numMatch[1]) * 4;
+  return null;
+}
+
+export function DataTable<T>({
+  columns,
+  rows,
+  rowKey,
+  loading = false,
+  initialLoading,
+  error = null,
+  onRetry,
+  refreshing = false,
+  sort = null,
+  onSortChange,
+  toolbar,
+  onRowClick,
+  rowProps,
+  empty,
+  infinite = false,
+  hasMore = false,
+  onLoadMore,
+  loadingMore = false,
+  pageSize = DEFAULT_PAGE_SIZE,
+  totalCount,
+  paginate = false,
+  initialPageSize = 25,
+  className,
+  scrollClassName,
+  stickyHeader = true,
+  minWidth,
+  horizontalScroll = false,
+  stickyFirstColumn = false,
+  stickyTop,
+}: DataTableProps<T>) {
+  const { t } = useI18n();
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+  const headerScrollRef = React.useRef<HTMLDivElement>(null);
+  const sentinelRef = React.useRef<HTMLDivElement>(null);
+  const toolbarRef = React.useRef<HTMLDivElement>(null);
+  const activeScrollerRef = React.useRef<"header" | "body" | null>(null);
+  const scrollTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [page, setPage] = React.useState(1);
+  const breakpoint = useBreakpoint();
+
+  /*
+   * Sticky geometry: the toolbar height has to be known so the table header can
+   * pin directly beneath it.
+   *
+   * The height is not constant — the filter-chips row appears and disappears, and
+   * the toolbar wraps on narrow viewports — so it is written to the
+   * `--ds-toolbar-h` custom property by a ResizeObserver rather than guessed. The
+   * property is set directly on the DOM node (no React state), so the write can
+   * never cause a render loop or lag a paint.
+   *
+   * This hook is declared here, with the other hooks, because it must run on
+   * every render — the error branch below returns early.
+   */
+  const hasToolbar = Boolean(toolbar);
+  React.useEffect(() => {
+    const el = toolbarRef.current;
+    if (!el) return;
+    const host = el.parentElement;
+    if (!host) return;
+
+    const sync = () => host.style.setProperty("--ds-toolbar-h", `${el.offsetHeight}px`);
+    sync();
+    const ro = new ResizeObserver(sync);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [hasToolbar]);
+
+  // فلترة الأعمدة الحية حسب نقطة التوقف (Breakpoint):
+  // منع إضافة مساحات وهمية (ghost space) في colgroup أو الجدول، بحيث ينتهي الجدول
+  // عند آخر عمود فعلي تماماً ويعود بمطاطية متناسقة في اليمين واليسار (RTL/LTR).
+  const isColumnVisible = React.useCallback(
+    (col: DataTableColumn<T>) => {
+      if (col.hidden) return false;
+      if (!col.hideBelow) return true;
+      const order = ["xs", "sm", "md", "lg", "xl", "2xl"];
+      const currentIdx = order.indexOf(breakpoint);
+      const hideIdx = order.indexOf(col.hideBelow);
+      if (currentIdx === -1) return true;
+      return currentIdx >= hideIdx;
+    },
+    [breakpoint],
+  );
+
+  const visibleColumns = React.useMemo(
+    () => columns.filter(isColumnVisible),
+    [columns, isColumnVisible],
+  );
+
+  const pinFirst = stickyFirstColumn;
+
+  /* ---- sorting ---- */
+  const sortedRows = React.useMemo(() => {
+    if (!sort) return rows;
+    const col = visibleColumns.find((c) => c.key === sort.key);
+    if (!col) return rows;
+
+    const valueOf = (row: T): string | number | null | undefined => {
+      if (col.sortValue) return col.sortValue(row);
+      const raw = (row as Record<string, unknown>)[col.key];
+      if (raw == null) return null;
+      if (typeof raw === "number" || typeof raw === "string") return raw;
+      return String(raw);
+    };
+
+    const factor = sort.direction === "asc" ? 1 : -1;
+    return [...rows].sort((a, b) => {
+      const av = valueOf(a);
+      const bv = valueOf(b);
+      // Nulls always sort last, whichever direction is active.
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      if (typeof av === "number" && typeof bv === "number") return (av - bv) * factor;
+      return (
+        String(av).localeCompare(String(bv), undefined, { numeric: true, sensitivity: "base" }) *
+        factor
+      );
+    });
+  }, [rows, sort, visibleColumns]);
+
+  /* ---- legacy client-side paging (accounting tables only) ---- */
+  const legacyPageRows = React.useMemo(() => {
+    if (!paginate) return sortedRows;
+    return sortedRows.slice(0, page * initialPageSize);
+  }, [sortedRows, paginate, page, initialPageSize]);
+
+  const displayRows = paginate ? legacyPageRows : sortedRows;
+
+  const showSkeleton = initialLoading ?? loading;
+  const showEmpty = !showSkeleton && displayRows.length === 0;
+
+  /* ---- infinite scroll sentinel ---- */
+  /*
+   * `onLoadMore` is read through a ref so the observer is created once per
+   * (infinite, hasMore) change instead of once per parent render. Callers pass
+   * inline arrows (`onLoadMore={() => fetchNextPage()}`), and rebuilding an
+   * IntersectionObserver on every render re-fires the callback while the
+   * sentinel stays visible — which is how a single scroll ends up issuing
+   * repeated page requests.
+   *
+   * The `loadingMore` guard is applied inside the callback (not as an effect
+   * dependency) for the same reason, and a ref-level latch swallows the extra
+   * intersection callbacks the browser delivers before React has re-rendered
+   * with `loadingMore = true`.
+   */
+  const onLoadMoreRef = React.useRef(onLoadMore);
+  onLoadMoreRef.current = onLoadMore;
+  const loadingMoreRef = React.useRef(loadingMore);
+  loadingMoreRef.current = loadingMore;
+  const loadMoreLatchRef = React.useRef(false);
+
+  React.useEffect(() => {
+    if (!loadingMore) loadMoreLatchRef.current = false;
+  }, [loadingMore]);
+
+  React.useEffect(() => {
+    if (!infinite || !hasMore) return;
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const root = scrollRef.current;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return;
+        if (loadingMoreRef.current || loadMoreLatchRef.current) return;
+        const loadMore = onLoadMoreRef.current;
+        if (!loadMore) return;
+        loadMoreLatchRef.current = true;
+        loadMore();
+      },
+      // Begin loading slightly before the user actually reaches the bottom.
+      {
+        root: root && root.scrollHeight > root.clientHeight ? root : null,
+        rootMargin: "480px 0px",
+      },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [infinite, hasMore]);
+
+  const loadedCount = displayRows.length;
+
+  /*
+   * Sticky geometry.
+   *
+   * The toolbar and the table header both pin while the list scrolls. Their
+   * containing block is `<main>` in the app shell, so `stickyTop` defaults to
+   * `0px` — *not* the app-header height (the header is a flex sibling above
+   * `<main>`, not the scroll container). The toolbar height measurement lives
+   * with the other hooks at the top of the component.
+   */
+  const stickyOffset = stickyTop ?? "0px";
+  const isScrollable = Boolean(horizontalScroll || minWidth);
+  const detachedHeader = isScrollable && stickyHeader;
+
+  // Hooks must run before any early return, so the width geometry lives above
+  // the error branch (react-hooks/rules-of-hooks).
+  const columnWidths = React.useMemo(() => {
+    return visibleColumns.map((c) => parseColumnWidth(c.width) ?? 130);
+  }, [visibleColumns]);
+
+  const totalExplicitWidth = React.useMemo(() => {
+    return columnWidths.reduce((sum, w) => sum + w, 0);
+  }, [columnWidths]);
+
+  /* ---- error ---- */
+  if (error) {
+    return (
+      <div className={cn("flex min-w-0 flex-col", className)}>
+        {toolbar ? <div className="border-b border-border/60 px-3 py-2.5">{toolbar}</div> : null}
+        <QueryErrorState error={error} onRetry={onRetry} />
+      </div>
+    );
+  }
+
+  const effectiveTableWidth = isScrollable
+    ? Math.max(minWidth ?? 0, totalExplicitWidth)
+    : undefined;
+
+  const tableStyle: React.CSSProperties = {
+    width: "100%",
+    minWidth: effectiveTableWidth ? `${effectiveTableWidth}px` : "100%",
+    tableLayout: "fixed",
+  };
+
+  const alignedTableClassName = "w-full border-collapse text-sm table-fixed";
+
+  const colGroup = visibleColumns.length ? (
+    <colgroup>
+      {visibleColumns.map((c, i) => {
+        const w = columnWidths[i];
+        return (
+          <col
+            key={c.key}
+            className={c.width}
+            style={w ? { width: `${w}px`, minWidth: `${w}px` } : undefined}
+          />
+        );
+      })}
+    </colgroup>
+  ) : null;
+
+  // مزامنة أفقية موحدة وفورية تمنع حلقة الصدى (echo loop) والتقطع،
+  // وتسمح للمتصفح بالاحتفاظ بعزم الحركة الطبيعي (120Hz momentum) والمطاطية (rubber-band)
+  const syncHorizontalScroll =
+    (source: "header" | "body") => (event: React.UIEvent<HTMLDivElement>) => {
+      if (activeScrollerRef.current && activeScrollerRef.current !== source) return;
+
+      activeScrollerRef.current = source;
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+      scrollTimeoutRef.current = setTimeout(() => {
+        activeScrollerRef.current = null;
+      }, 100);
+
+      const target = source === "header" ? scrollRef.current : headerScrollRef.current;
+      if (target && target.scrollLeft !== event.currentTarget.scrollLeft) {
+        target.scrollLeft = event.currentTarget.scrollLeft;
+      }
+    };
+
+  return (
+    <div
+      className={cn("flex min-w-0 flex-col", className)}
+      style={{ "--ds-sticky-top": stickyOffset } as React.CSSProperties}
+    >
+      {toolbar ? (
+        <div
+          ref={toolbarRef}
+          className="sticky z-30 rounded-t-[var(--radius-panel)] rounded-b-none border-b border-border/60 bg-surface/90 backdrop-blur-xl"
+          style={{ top: stickyOffset }}
+        >
+          <div className="px-3 py-2.5 sm:px-3.5">{toolbar}</div>
+        </div>
+      ) : null}
+
+      {showEmpty ? (
+        <EmptyState
+          icon={empty?.icon ?? <Inbox />}
+          title={empty?.title ?? "No records"}
+          description={empty?.description}
+          action={empty?.action}
+        />
+      ) : (
+        <>
+          {/* A horizontally scrollable element cannot also anchor a sticky table
+           * header to the page. Keep an identical, scroll-synchronised header
+           * outside the panning body: labels stay visible while the page scrolls
+           * and the body retains natural two-axis touch gestures. */}
+          {detachedHeader ? (
+            <div
+              className="sticky z-20 overflow-hidden rounded-b-[var(--radius-panel)] rounded-t-none border border-border bg-surface-2/85 shadow-[0_5px_14px_oklch(0_0_0/0.06)] backdrop-blur-xl"
+              style={{ top: "calc(var(--ds-sticky-top,0px) + var(--ds-toolbar-h,0px))" }}
+            >
+              <div
+                ref={headerScrollRef}
+                onScroll={syncHorizontalScroll("header")}
+                className="w-full overflow-x-auto touch-auto [-webkit-overflow-scrolling:touch] overscroll-x-contain scrollbar-x-none"
+              >
+                <table className={alignedTableClassName} style={tableStyle}>
+                  {colGroup}
+                  <TableHead
+                    columns={visibleColumns}
+                    columnWidths={columnWidths}
+                    sort={sort}
+                    onSortChange={onSortChange}
+                    pinFirst={pinFirst}
+                  />
+                </table>
+              </div>
+            </div>
+          ) : null}
+          <div
+            ref={scrollRef}
+            onScroll={detachedHeader ? syncHorizontalScroll("body") : undefined}
+            className={cn(
+              /* الحاوية متزامنة بسلاسة ومطاطية طبيعية مع الرأس */
+              horizontalScroll || minWidth
+                ? "w-full overflow-x-auto touch-auto [-webkit-overflow-scrolling:touch] overscroll-x-contain scrollbar-x-none"
+                : "w-full overscroll-x-auto",
+              refreshing && "opacity-70 transition-opacity",
+              scrollClassName,
+            )}
+          >
+            <table
+              /* `table-layout: auto` with `w-full` lets the browser grow the table
+               * past its container when a cell's content needs more room — on a
+               * 390px phone the four remaining columns summed to 384px inside a
+               * 344px container, pushing the table 17px off-screen and clipping
+               * the row-action buttons (measured: `childWiderThanParent: true`).
+               *
+               * `table-fixed` makes the declared width authoritative so cells wrap
+               * instead of expanding the table. It is applied from `sm` up only
+               * when a `minWidth` is requested (wide accounting tables that are
+               * *meant* to scroll); otherwise it applies at every width. */
+              className={alignedTableClassName}
+              style={tableStyle}
+            >
+              {colGroup}
+              <TableHead
+                columns={visibleColumns}
+                columnWidths={columnWidths}
+                sort={sort}
+                onSortChange={onSortChange}
+                pinFirst={pinFirst}
+                sticky={stickyHeader && !detachedHeader}
+                visuallyHidden={detachedHeader}
+              />
+
+              <tbody className="divide-y divide-border/60">
+                {showSkeleton
+                  ? Array.from({ length: 7 }).map((_, rowIndex) => (
+                      <tr
+                        key={`skeleton-row-${rowIndex}`}
+                        className="border-b border-border/50 transition-colors"
+                      >
+                        {visibleColumns.map((col, colIdx) => {
+                          const stickyCol = col.sticky ?? (pinFirst && col === visibleColumns[0]);
+                          const w = columnWidths[colIdx];
+                          return (
+                            <td
+                              key={col.key}
+                              style={w ? { minWidth: `${w}px` } : undefined}
+                              className={cn(
+                                "px-3 py-3 align-middle first:ps-4 last:pe-5",
+                                col.align === "end"
+                                  ? "text-end"
+                                  : col.align === "center"
+                                    ? "text-center"
+                                    : "text-start",
+                                col.className,
+                                col.hideBelow && HIDE_BELOW[col.hideBelow],
+                                stickyCol && "sticky start-0 z-10 bg-surface",
+                              )}
+                            >
+                              <div
+                                className={cn(
+                                  "shimmer h-3.5 rounded-md bg-surface-3/70",
+                                  col.align === "end"
+                                    ? "ms-auto w-16"
+                                    : col.align === "center"
+                                      ? "mx-auto w-12"
+                                      : colIdx === 0
+                                        ? "w-36 max-w-[85%]"
+                                        : "w-20 max-w-[70%]",
+                                )}
+                              />
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))
+                  : displayRows.map((row, index) => (
+                      <tr
+                        key={rowKey(row)}
+                        className={cn(
+                          "border-b border-border/60 transition-colors duration-150 hover:bg-accent/40",
+                          onRowClick && "cursor-pointer",
+                        )}
+                        onClick={onRowClick ? () => onRowClick(row) : undefined}
+                        {...(rowProps ? rowProps(row) : {})}
+                      >
+                        {visibleColumns.map((col, colIdx) => {
+                          const stickyCol = col.sticky ?? (pinFirst && col === visibleColumns[0]);
+                          const w = columnWidths[colIdx];
+                          return (
+                            <td
+                              key={col.key}
+                              style={w ? { minWidth: `${w}px` } : undefined}
+                              className={cn(
+                                "px-3 py-2.5 align-middle first:ps-4 last:pe-5",
+                                !col.wrap ? "whitespace-nowrap" : "break-words",
+                                col.align === "end"
+                                  ? "text-end tabular-nums"
+                                  : col.align === "center"
+                                    ? "text-center"
+                                    : "text-start",
+                                col.className,
+                                col.hideBelow && HIDE_BELOW[col.hideBelow],
+                                stickyCol && "sticky start-0 z-10 bg-surface",
+                              )}
+                            >
+                              {col.cell(row, index)}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+              </tbody>
+            </table>
+
+            {/* ---------- Infinite-scroll footer ---------- */}
+            {!showSkeleton && infinite ? (
+              <div ref={sentinelRef} className="flex items-center justify-center gap-2 py-4">
+                {loadingMore ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin text-muted-foreground" aria-hidden />
+                    <span className="text-[11px] text-muted-foreground">
+                      {t("records.loading_more")}
+                    </span>
+                  </>
+                ) : hasMore ? (
+                  <ChevronDown
+                    className="size-4 animate-bounce text-muted-foreground/50"
+                    aria-hidden
+                  />
+                ) : loadedCount > 0 ? (
+                  <span className="text-[11px] text-muted-foreground/70">
+                    {t("records.all_loaded").replace("{count}", String(loadedCount))}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
+
+            {/* ---------- "Load more" for legacy paged tables ---------- */}
+            {!showSkeleton && paginate && legacyPageRows.length < sortedRows.length ? (
+              <div className="flex justify-center py-3">
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => p + 1)}
+                  className="rounded-full border border-border bg-surface px-4 py-1.5 text-xs font-medium transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                >
+                  {t("records.load_more")}
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </>
+      )}
+
+      {/* ---------- Caption ---------- */}
+      {!showSkeleton && !showEmpty && (pageSize > 0 || totalCount != null) ? (
+        <div className="flex items-center justify-between gap-3 border-t border-border/60 px-4 py-1.5">
+          <p className="text-[11px] tabular-nums text-muted-foreground">
+            {totalCount != null ? `عرض ${loadedCount} من ${totalCount}` : `عرض ${loadedCount} سجل`}
+          </p>
+          {refreshing ? <InlineRefreshing /> : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Skeleton                                                          */
+/* ------------------------------------------------------------------ */
+
+function TableHead<T>({
+  columns,
+  columnWidths,
+  sort,
+  onSortChange,
+  pinFirst,
+  sticky = false,
+  visuallyHidden = false,
+}: {
+  columns: DataTableColumn<T>[];
+  columnWidths?: number[];
+  sort: DataTableSort | null;
+  onSortChange?: (sort: DataTableSort | null) => void;
+  pinFirst: boolean;
+  sticky?: boolean;
+  visuallyHidden?: boolean;
+}) {
+  const toggleSort = (column: DataTableColumn<T>) => {
+    if (!column.sortable || !onSortChange) return;
+    if (sort?.key !== column.key) return onSortChange({ key: column.key, direction: "asc" });
+    if (sort.direction === "asc") return onSortChange({ key: column.key, direction: "desc" });
+    onSortChange(null);
+  };
+
+  return (
+    <thead
+      aria-hidden={visuallyHidden ? "true" : undefined}
+      className={cn(
+        visuallyHidden
+          ? "invisible h-0 border-none select-none pointer-events-none [&_th]:h-0 [&_th]:py-0 [&_th]:border-none [&_th]:leading-[0px] [&_th_*]:hidden"
+          : sticky &&
+              "sticky z-20 bg-surface-2/70 backdrop-blur-md [top:calc(var(--ds-sticky-top,0px)+var(--ds-toolbar-h,0px))]",
+        !sticky && !visuallyHidden && "bg-surface-2/50",
+      )}
+    >
+      <tr className="border-b border-border">
+        {columns.map((column, index) => {
+          const active = sort?.key === column.key;
+          const stickyColumn = column.sticky ?? (pinFirst && index === 0);
+          const w = columnWidths?.[index];
+          return (
+            <th
+              key={column.key}
+              style={w ? { width: `${w}px`, minWidth: `${w}px` } : undefined}
+              scope="col"
+              aria-sort={
+                active
+                  ? sort?.direction === "asc"
+                    ? "ascending"
+                    : "descending"
+                  : column.sortable
+                    ? "none"
+                    : undefined
+              }
+              className={cn(
+                "h-10 px-3 align-middle text-[11px] font-semibold uppercase tracking-wider text-muted-foreground first:rounded-s-xl first:ps-4 last:rounded-e-xl last:pe-5",
+                !column.wrap ? "whitespace-nowrap" : "break-words",
+                column.align === "end"
+                  ? "text-end tabular-nums"
+                  : column.align === "center"
+                    ? "text-center"
+                    : "text-start",
+                column.width,
+                column.className,
+                column.hideBelow && HIDE_BELOW[column.hideBelow],
+                stickyColumn && "sticky start-0 z-30 bg-surface-2",
+              )}
+            >
+              {column.sortable && onSortChange ? (
+                <button
+                  type="button"
+                  onClick={() => toggleSort(column)}
+                  aria-label={
+                    typeof column.header === "string" ? `Sort by ${column.header}` : "Sort"
+                  }
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-sm transition-colors hover:text-foreground",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                    column.align === "end" && "justify-end w-full",
+                    column.align === "center" && "justify-center w-full",
+                    active && "text-primary",
+                  )}
+                >
+                  <span>{column.header}</span>
+                  {active ? (
+                    sort?.direction === "asc" ? (
+                      <ArrowUp className="size-3" aria-hidden />
+                    ) : (
+                      <ArrowDown className="size-3" aria-hidden />
+                    )
+                  ) : (
+                    <ChevronsUpDown className="size-3 opacity-40" aria-hidden />
+                  )}
+                </button>
+              ) : (
+                column.header
+              )}
+            </th>
+          );
+        })}
+      </tr>
+    </thead>
+  );
+}
+
+function TableSkeleton({ columns }: { columns: number }) {
+  return (
+    <div role="status" aria-live="polite" className="flex flex-col">
+      <div className="flex items-center gap-4 border-b border-border px-3 py-2.5">
+        {Array.from({ length: columns }).map((_, i) => (
+          <div key={i} className="shimmer h-3 flex-1 rounded" />
+        ))}
+      </div>
+      {Array.from({ length: 8 }).map((_, r) => (
+        <div key={r} className="flex items-center gap-4 border-b border-border/60 px-3 py-3">
+          {Array.from({ length: columns }).map((_, c) => (
+            <div key={c} className="shimmer h-4 flex-1 rounded" />
+          ))}
+        </div>
+      ))}
+      <span className="sr-only">
+        <Spinner /> Loading
+      </span>
+    </div>
+  );
+}

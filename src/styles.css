@@ -1,0 +1,724 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ============================================================
+ * Vortex ERP — Linear/Vercel inspired design system
+ * Sharp, dense, premium dark. Bilingual (EN/AR), RTL aware.
+ * ========================================================== */
+
+@theme inline {
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+
+  /* Control role radii — the single place to retune shape across the app. */
+  --radius-control: 10px;
+  --radius-control-lg: 14px;
+  --radius-panel: 16px;
+  --radius-chip: 999px;
+  --radius-sheet: 24px;
+
+  /* Elevation scale — replaces raw shadow-sm/xs/2xl scatter. */
+  --shadow-control: 0 1px 2px 0 oklch(0 0 0 / 0.24);
+  --shadow-raised: 0 1px 3px 0 oklch(0 0 0 / 0.28), 0 1px 2px -1px oklch(0 0 0 / 0.24);
+  --shadow-panel: 0 1px 2px 0 oklch(0 0 0 / 0.22), 0 12px 32px -20px oklch(0 0 0 / 0.45);
+  --shadow-popover: 0 4px 12px -2px oklch(0 0 0 / 0.32), 0 16px 40px -16px oklch(0 0 0 / 0.5);
+  --shadow-overlay: 0 24px 64px -24px oklch(0 0 0 / 0.6);
+  --shadow-focus: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
+
+  /* Control size scale — one height per size, everywhere. */
+  --control-h-xs: 28px;
+  --control-h-sm: 32px;
+  --control-h-md: 36px;
+  --control-h-lg: 44px;
+  --control-h-xl: 48px;
+  --control-px: 12px;
+  --control-px-lg: 16px;
+
+  /* Motion scale. */
+  --duration-fast: 120ms;
+  --duration-normal: 200ms;
+  --duration-slow: 320ms;
+  --ease-standard: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  /* Table metrics. */
+  --table-cell-x: 12px;
+  --table-cell-y: 10px;
+  --table-header-h: 40px;
+  --table-row-h: 44px;
+
+  --font-sans: "Inter", "SF Pro Display", "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Inter", "Geist", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Geist Mono", ui-monospace, monospace;
+  --font-arabic: "IBM Plex Sans Arabic", "Cairo", "Tajawal", "Noto Sans Arabic", sans-serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* Secondary surfaces referenced by overlay/panel components. */
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+
+  /* Semantic status tones — replaces the emerald/sky/violet/amber/rose literals
+     currently hard-coded across list pages. */
+  --color-tone-neutral: var(--tone-neutral);
+  --color-tone-neutral-fg: var(--tone-neutral-fg);
+  --color-tone-info: var(--tone-info);
+  --color-tone-info-fg: var(--tone-info-fg);
+  --color-tone-success: var(--tone-success);
+  --color-tone-success-fg: var(--tone-success-fg);
+  --color-tone-warning: var(--tone-warning);
+  --color-tone-warning-fg: var(--tone-warning-fg);
+  --color-tone-danger: var(--tone-danger);
+  --color-tone-danger-fg: var(--tone-danger-fg);
+  --color-tone-primary: var(--tone-primary);
+  --color-tone-primary-fg: var(--tone-primary-fg);
+
+  /* Foreground-only status colors for inline messages/icons. */
+  --color-success-fg: var(--tone-success-fg);
+  --color-warning-fg: var(--tone-warning-fg);
+  --color-danger-fg: var(--tone-danger-fg);
+  --color-info-fg: var(--tone-info-fg);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --shadow-elegant: 0 1px 0 0 oklch(1 0 0 / 0.04) inset, 0 1px 2px 0 oklch(0 0 0 / 0.4);
+  --shadow-glow: 0 0 0 1px oklch(0.6 0.2 260 / 0.3), 0 8px 32px -8px oklch(0.6 0.2 260 / 0.4);
+
+  --z-header: 30;
+  --z-dropdown: 40;
+  --z-overlay: 50;
+  --z-modal: 60;
+  --z-toast: 70;
+
+  --breakpoint-xs: 380px;
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
+}
+
+/* ============================================================
+ * Refined Luxury Themes (Dark & Light)
+ * Balanced contrast, no harsh pitch-black, no blinding stark-white
+ * ========================================================== */
+
+:root,
+.dark {
+  /* Ultra-Luxury Obsidian Midnight Velvet — deep, majestic depth, zero washed-out haze */
+  --background: oklch(0.128 0.018 260);
+  --foreground: oklch(0.985 0.006 60);
+  --surface: oklch(0.162 0.022 260);
+  --surface-elevated: oklch(0.195 0.025 260);
+  --surface-2: oklch(0.218 0.027 260);
+  --surface-3: oklch(0.255 0.028 260);
+
+  --card: oklch(0.172 0.024 260);
+  --card-foreground: oklch(0.985 0.006 60);
+  --popover: oklch(0.192 0.025 260);
+  --popover-foreground: oklch(0.985 0.006 60);
+
+  --primary: oklch(0.66 0.22 255); /* Royal Electric Sapphire / Luxury Jewel Cobalt */
+  --primary-foreground: oklch(1 0 0);
+
+  --secondary: oklch(0.215 0.025 260);
+  --secondary-foreground: oklch(0.96 0.008 260);
+
+  --muted: oklch(0.2 0.022 260);
+  --muted-foreground: oklch(0.7 0.018 260);
+
+  --accent: oklch(0.225 0.026 260);
+  --accent-foreground: oklch(0.98 0.006 260);
+
+  --destructive: oklch(0.63 0.23 27);
+  --destructive-foreground: oklch(0.99 0.01 27);
+  --success: oklch(0.68 0.18 152);
+  --success-foreground: oklch(0.08 0 0);
+  --warning: oklch(0.79 0.16 78);
+  --warning-foreground: oklch(0.15 0 0);
+
+  --border: oklch(1 0 0 / 0.09);
+  --input: oklch(1 0 0 / 0.1);
+  --ring: oklch(0.66 0.22 255 / 0.6);
+  --scrollbar-thumb: oklch(1 0 0 / 0.14);
+  --scrollbar-thumb-hover: oklch(1 0 0 / 0.28);
+
+  --chart-1: oklch(0.66 0.22 255);
+  --chart-2: oklch(0.72 0.19 175);
+  --chart-3: oklch(0.76 0.16 80);
+  --chart-4: oklch(0.68 0.23 325);
+  --chart-5: oklch(0.68 0.18 152);
+
+  --sidebar: oklch(0.112 0.016 260);
+  --sidebar-foreground: oklch(0.86 0.012 260);
+  --sidebar-primary: oklch(0.66 0.22 255);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.185 0.024 260);
+  --sidebar-accent-foreground: oklch(0.98 0.006 260);
+  --sidebar-border: oklch(1 0 0 / 0.08);
+  --sidebar-ring: oklch(0.66 0.22 255 / 0.6);
+  /* الحلقة الداخلية لعتصر القائمة النشط: بيضاء في الليلي، وداكنة في الفاتح.
+     كانت مكتوبة oklch(1 0 0 / 0.08) مباشرة في الوسم، فتصير غير مرئية في
+     الوضع الفاتح. */
+  --sidebar-active-ring: oklch(1 0 0 / 0.1);
+
+  /* Status tones (dark) */
+  --tone-neutral: oklch(0.26 0.018 260);
+  --tone-neutral-fg: oklch(0.78 0.014 260);
+  --tone-info: oklch(0.66 0.2 255 / 0.2);
+  --tone-info-fg: oklch(0.84 0.14 255);
+  --tone-success: oklch(0.68 0.18 152 / 0.2);
+  --tone-success-fg: oklch(0.85 0.14 152);
+  --tone-warning: oklch(0.79 0.16 78 / 0.2);
+  --tone-warning-fg: oklch(0.88 0.13 80);
+  --tone-danger: oklch(0.63 0.23 27 / 0.2);
+  --tone-danger-fg: oklch(0.84 0.16 27);
+  --tone-primary: oklch(0.66 0.22 255 / 0.2);
+  --tone-primary-fg: oklch(0.84 0.14 255);
+}
+
+.light {
+  /* Luxury Alabaster & Warm Porcelain Canvas (Mullak aesthetic) — soothing, elite, pristine */
+  --background: oklch(0.985 0.006 60);
+  --foreground: oklch(0.17 0.04 258); /* Rich Charcoal Slate / Deep Ink */
+  --surface: oklch(0.972 0.008 60);
+  --surface-elevated: oklch(1 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.17 0.04 258);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.17 0.04 258);
+  --primary: oklch(0.55 0.22 258); /* Deep Majestic Royal Sapphire */
+  --primary-foreground: oklch(0.99 0.01 55);
+  --secondary: oklch(0.948 0.008 60);
+  --secondary-foreground: oklch(0.18 0.035 258);
+  --muted: oklch(0.948 0.008 60);
+  --muted-foreground: oklch(0.48 0.024 258);
+  --accent: oklch(0.945 0.01 60);
+  --accent-foreground: oklch(0.17 0.04 258);
+  --destructive: oklch(0.6 0.23 27);
+  --destructive-foreground: oklch(1 0 0);
+  --success: oklch(0.56 0.18 152);
+  --success-foreground: oklch(1 0 0);
+  --warning: oklch(0.72 0.16 78);
+  --warning-foreground: oklch(0.15 0 0);
+
+  /* ألوان الرسوم البيانية: الـ fallback في tokens.ts يشير إلى هذه المتغيّرات،
+     فبدونها تفقد المخططات ألوانها في الوضع الفاتح. */
+  --chart-1: oklch(0.55 0.2 255);
+  --chart-2: oklch(0.6 0.16 175);
+  --chart-3: oklch(0.66 0.14 80);
+  --chart-4: oklch(0.58 0.2 325);
+  --chart-5: oklch(0.56 0.16 152);
+  --border: oklch(0.2 0.03 258 / 0.09);
+  --input: oklch(0.2 0.03 258 / 0.09);
+  --ring: oklch(0.55 0.22 258 / 0.5);
+  --scrollbar-thumb: oklch(0.3 0.03 258 / 0.24);
+  --scrollbar-thumb-hover: oklch(0.3 0.03 258 / 0.42);
+  --sidebar: oklch(0.99 0.004 60);
+  --sidebar-foreground: oklch(0.22 0.035 258);
+  /* لازم معرّفة هنا أيضاً: هي ما يلوّن عنصر القائمة النشط، وغيابها في الوضع
+     الفاتح كان يجعل القائمة بلا لون إطلاقاً. */
+  --sidebar-primary: oklch(0.52 0.2 258);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.94 0.01 60);
+  --sidebar-accent-foreground: oklch(0.16 0.04 258);
+  --sidebar-border: oklch(0.2 0.03 258 / 0.08);
+  --sidebar-ring: oklch(0.52 0.2 258 / 0.5);
+  --sidebar-active-ring: oklch(0.52 0.2 258 / 0.18);
+
+  --surface-2: oklch(0.945 0.01 60);
+  --surface-3: oklch(0.915 0.012 60);
+
+  /* Status tones (light) */
+  --tone-neutral: oklch(0.93 0.008 60);
+  --tone-neutral-fg: oklch(0.38 0.02 258);
+  --tone-info: oklch(0.55 0.18 255 / 0.12);
+  --tone-info-fg: oklch(0.38 0.18 255);
+  --tone-success: oklch(0.56 0.18 152 / 0.14);
+  --tone-success-fg: oklch(0.34 0.16 152);
+  --tone-warning: oklch(0.74 0.16 78 / 0.18);
+  --tone-warning-fg: oklch(0.4 0.15 75);
+  --tone-danger: oklch(0.6 0.23 27 / 0.12);
+  --tone-danger-fg: oklch(0.44 0.2 27);
+  --tone-primary: oklch(0.55 0.22 258 / 0.12);
+  --tone-primary-fg: oklch(0.38 0.18 258);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: "IBM Plex Sans Arabic", "Cairo", "Tajawal", "Noto Sans Arabic", var(--font-sans);
+    font-feature-settings: "cv11", "ss01", "ss03";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    letter-spacing: -0.01em;
+  }
+
+  html[dir="rtl"] body,
+  html[dir="rtl"] body * {
+    font-family:
+      "IBM Plex Sans Arabic", "Cairo", "Tajawal", "Noto Sans Arabic", var(--font-arabic) !important;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  .font-display {
+    font-family: var(--font-display);
+  }
+
+  /* Subtle radial backdrop — dynamic ambient glow using the active theme accent */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background:
+      radial-gradient(
+        60rem 40rem at 80% -10%,
+        color-mix(in srgb, var(--primary) 9%, transparent),
+        transparent 65%
+      ),
+      radial-gradient(
+        50rem 30rem at -10% 100%,
+        color-mix(in srgb, var(--primary) 5%, transparent),
+        transparent 60%
+      );
+  }
+
+  html.light body::before {
+    background:
+      radial-gradient(
+        60rem 40rem at 80% -10%,
+        color-mix(in srgb, var(--primary) 5%, transparent),
+        transparent 65%
+      ),
+      radial-gradient(
+        50rem 30rem at -10% 100%,
+        color-mix(in srgb, var(--primary) 3%, transparent),
+        transparent 60%
+      );
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--primary) 30%, transparent);
+    color: var(--foreground);
+  }
+
+  /*
+   * Placeholder colour.
+   *
+   * Tailwind's `placeholder:` variant was losing to the element's own colour in
+   * this build, leaving placeholders at full foreground opacity (they looked like
+   * real values). Declaring the pseudo-element here is reliable and applies to
+   * every input in the app from one place.
+   */
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--muted-foreground);
+    opacity: 1;
+  }
+
+  input:disabled::placeholder,
+  textarea:disabled::placeholder {
+    color: color-mix(in oklab, var(--muted-foreground) 60%, transparent);
+  }
+
+  /* Prevent unwanted double-tap zoom and gesture distortions on iOS mobile */
+  html,
+  body {
+    touch-action: manipulation;
+  }
+  input,
+  textarea,
+  select,
+  button {
+    touch-action: manipulation;
+  }
+
+  /* Minimalist overlay scrollbar — the track remains invisible.
+   * اللون يعتمد على السمة: كان أبيضَ شبه شفاف في الاثنتين، فيختفي تماماً على
+   * خلفية الوضع الفاتح ويصبح شريط التمرير غير مرئي. */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+    background: transparent;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 9999px;
+    border: 1px solid transparent;
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+    background-clip: padding-box;
+  }
+}
+
+@layer utilities {
+  .glass {
+    background: color-mix(in oklab, var(--surface) 70%, transparent);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    border: 1px solid var(--color-border);
+  }
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-panel);
+  }
+  .panel-elevated {
+    background: var(--surface-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-panel);
+    box-shadow: var(--shadow-panel);
+  }
+  .text-gradient {
+    background: linear-gradient(135deg, oklch(0.96 0.005 270), oklch(0.7 0.05 270));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .ring-focus:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px var(--color-background),
+      0 0 0 4px var(--color-ring);
+  }
+
+  /* ---- Motion utilities (single transition language) ---- */
+  .motion-fast {
+    transition-duration: var(--duration-fast);
+    transition-timing-function: var(--ease-standard);
+  }
+  .motion-normal {
+    transition-duration: var(--duration-normal);
+    transition-timing-function: var(--ease-standard);
+  }
+  .motion-slow {
+    transition-duration: var(--duration-slow);
+    transition-timing-function: var(--ease-emphasized);
+  }
+
+  /* ---- Typography helpers (bilingual-safe line heights) ---- */
+  .text-title {
+    font-size: 1.375rem;
+    line-height: 1.85rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .text-section {
+    font-size: 1rem;
+    line-height: 1.5rem;
+    font-weight: 600;
+  }
+  .text-label {
+    font-size: 0.75rem;
+    line-height: 1.125rem;
+    font-weight: 600;
+  }
+  .text-caption {
+    font-size: 0.6875rem;
+    line-height: 1rem;
+  }
+  .text-cell-num {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  /* ---- Safe-area aware padding for mobile sheets/action bars/headers ---- */
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .pb-safe {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+  }
+  .ps-safe {
+    padding-inline-start: env(safe-area-inset-left, 0px);
+  }
+  .pe-safe {
+    padding-inline-end: env(safe-area-inset-right, 0px);
+  }
+  .p-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+  .mb-safe {
+    margin-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* ---- Overlay entry/exit (shared by Modal, Drawer, Popover, Toast) ---- */
+  .overlay-enter {
+    animation: overlay-in var(--duration-normal) var(--ease-standard);
+  }
+  .overlay-exit {
+    animation: overlay-out var(--duration-fast) var(--ease-exit);
+  }
+  .panel-enter {
+    animation: panel-in var(--duration-normal) var(--ease-emphasized);
+  }
+  .sheet-enter {
+    animation: sheet-in var(--duration-slow) var(--ease-emphasized);
+  }
+}
+
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes overlay-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+@keyframes sheet-in {
+  from {
+    transform: translate3d(0, 100%, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* Respect the user's motion preference globally (was previously ignored). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Barcode labels are intentionally constrained on-screen only; printing keeps
+   its own physical sheet dimensions and is unaffected. */
+.barcode-preview-scroll,
+.barcode-preview-scroll .sheet {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media screen {
+  .barcode-preview-sheet {
+    grid-template-columns: repeat(var(--barcode-cols, 4), minmax(0, 1fr)) !important;
+  }
+
+  .barcode-preview-sheet > .lbl {
+    min-width: 0;
+  }
+
+  .barcode-preview-sheet > .lbl > svg {
+    max-width: 100%;
+    height: auto;
+  }
+}
+
+/* A thin thumb provides an affordance for the deliberate horizontal product
+   * scroll without adding a heavy track around the table. */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--muted-foreground) 32%, transparent) transparent;
+  overscroll-behavior: contain;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: color-mix(in oklab, var(--muted-foreground) 32%, transparent);
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in oklab, var(--muted-foreground) 55%, transparent);
+}
+
+/* يخفف شريط التمرير الأفقي بصريًا مع بقاء التمرير بالسحب/اللمس/العجلة الأفقية يعمل. */
+.scrollbar-x-none {
+  scrollbar-width: none;
+}
+
+.scrollbar-x-none::-webkit-scrollbar {
+  display: none;
+  height: 0;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+.shimmer {
+  background: linear-gradient(90deg, transparent, oklch(1 0 0 / 0.05), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+
+/* Universal sleek minimalist scrollbar: track completely transparent everywhere */
+*,
+*::before,
+*::after {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.25) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+  background: transparent !important;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--muted-foreground) / 0.22);
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--muted-foreground) / 0.45);
+}
+
+/* ============================================================
+ * Mullak-inspired Luxury Real Estate & Executive UI tokens
+ * ========================================================== */
+.card-mullak {
+  border-radius: 1.25rem;
+  border: 1px solid var(--border);
+  background: var(--card);
+  box-shadow:
+    0 1px 3px 0 oklch(0 0 0 / 0.04),
+    0 4px 16px -4px oklch(0 0 0 / 0.06);
+  transition: all 0.2s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.dark .card-mullak,
+:root:not(.light) .card-mullak {
+  border-color: oklch(1 0 0 / 0.09);
+  background: color-mix(in oklab, var(--card) 96%, transparent);
+  box-shadow: 0 4px 20px -4px oklch(0 0 0 / 0.45);
+}
+
+.card-mullak:hover {
+  border-color: color-mix(in oklab, var(--primary) 35%, transparent);
+  box-shadow: 0 8px 24px -4px oklch(0 0 0 / 0.1);
+  transform: translateY(-1px);
+}
+
+.dark .card-mullak:hover,
+:root:not(.light) .card-mullak:hover {
+  box-shadow: 0 12px 36px -8px oklch(0 0 0 / 0.6);
+}
+
+.table-row-mullak {
+  transition: all 0.15s ease;
+}
+
+.table-row-mullak:hover {
+  background-color: color-mix(in oklab, var(--surface-2) 75%, transparent);
+}
