@@ -126,25 +126,45 @@ export function useCatalogModules() {
 
   // الإعداد يُخزَّن في القاعدة أيضاً ليصل إلى الأجهزة الأخرى.
   useEffect(() => {
-    supabase
+    let active = true;
+    const applyRemote = (row: any) => {
+      if (!active || !row) return;
+      const remote = coerceConfig({
+        ...(row.catalog_modules as Record<string, unknown> | null),
+        // علم المنشأة القديم يشارك في الترحيل حين لا يوجد المفتاح الأحدث.
+        barcodeEnabled: row.barcode_enabled,
+      });
+      if (!remote) return;
+      setConfigState(remote);
+      if (typeof window !== "undefined") {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(remote));
+      }
+    };
+
+    void supabase
       .from("company_settings")
       .select("catalog_modules, barcode_enabled" as any)
       .eq("id", 1)
       .maybeSingle()
       .then(({ data, error }) => {
-        if (error || !data) return;
+        if (error || !active || !data) return;
         const row = data as any;
-        const remote = coerceConfig({
-          ...(row.catalog_modules as Record<string, unknown> | null),
-          // علم المنشأة القديم يشارك في الترحيل حين لا يوجد المفتاح الأحدث.
-          barcodeEnabled: row.barcode_enabled,
-        });
-        if (!remote) return;
-        setConfigState(remote);
-        if (typeof window !== "undefined") {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(remote));
-        }
+        applyRemote(row);
       });
+
+    const channel = supabase
+      .channel("catalog-modules-live")
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "company_settings", filter: "id=eq.1" },
+        (payload) => applyRemote(payload.new),
+      )
+      .subscribe();
+
+    return () => {
+      active = false;
+      void supabase.removeChannel(channel);
+    };
   }, []);
 
   const updateConfig = (updates: Partial<CatalogModulesConfig>) => {

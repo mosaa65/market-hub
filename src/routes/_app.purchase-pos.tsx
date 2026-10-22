@@ -5,6 +5,7 @@ import {
   ArrowDown,
   ArrowDownUp,
   ArrowUp,
+  Building2,
   Search,
   Plus,
   Minus,
@@ -15,7 +16,6 @@ import {
   Filter,
   ChevronDown,
   UserPlus,
-  CalendarDays,
   ShoppingBag,
   Sparkles,
   AlertCircle,
@@ -23,13 +23,11 @@ import {
   CheckCircle2,
   CreditCard,
   Banknote,
-  Building2,
   Clock,
   Printer,
   Receipt,
   FileText,
   Truck,
-  ArrowRight,
   PackagePlus,
   Coins,
 } from "lucide-react";
@@ -50,6 +48,9 @@ import { TableToolbar, type FilterValues } from "@/components/ui/table-toolbar";
 import { RecordsViewToggle } from "@/components/ui/records-view-toggle";
 import { PaymentMethodPicker } from "@/components/ui/payment-method";
 import { AmountInput } from "@/components/commerce/amount-input";
+import { PosDatePicker } from "@/components/commerce/pos-date-picker";
+import { PartyPicker } from "@/components/commerce/party-picker";
+import { PosTotalsCard } from "@/components/commerce/pos-totals-card";
 import { usePaymentMethodsForContext } from "@/hooks/use-payment-methods";
 import { usePersistedViewMode } from "@/hooks/use-persisted-view-mode";
 import { SupplierFormDialog } from "@/components/contacts/supplier-form-dialog";
@@ -109,6 +110,7 @@ interface Supplier {
   id: string;
   name: string;
   phone?: string | null;
+  balance?: number | null;
 }
 
 interface MetaOption {
@@ -355,6 +357,84 @@ function PurchasePOSPage() {
     if (warehouseId) void loadStock(warehouseId);
   }, [warehouseId]);
 
+  useEffect(() => {
+    const channel = supabase.channel("purchase-pos-live-meta");
+    channel.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "suppliers" },
+      (payload) => {
+        if (payload.eventType === "DELETE") {
+          const deleted = payload.old as { id: string };
+          setSuppliers((current) => current.filter((supplier) => supplier.id !== deleted.id));
+          return;
+        }
+        const supplier = payload.new as Supplier;
+        setSuppliers((current) =>
+          [...current.filter((entry) => entry.id !== supplier.id), supplier].sort((a, b) =>
+            a.name.localeCompare(b.name),
+          ),
+        );
+      },
+    );
+    channel.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "products" },
+      (payload) => {
+        if (payload.eventType === "DELETE") {
+          const deleted = payload.old as { id: string };
+          setProducts((current) => current.filter((product) => product.id !== deleted.id));
+          return;
+        }
+        const product = payload.new as Product;
+        setProducts((current) =>
+          current.some((entry) => entry.id === product.id)
+            ? current.map((entry) => (entry.id === product.id ? { ...entry, ...product } : entry))
+            : [product, ...current],
+        );
+      },
+    );
+    channel.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "warehouses" },
+      (payload) => {
+        if (payload.eventType === "DELETE") {
+          const deleted = payload.old as { id: string };
+          setWarehouses((current) => current.filter((warehouse) => warehouse.id !== deleted.id));
+          return;
+        }
+        const warehouse = payload.new as Warehouse;
+        setWarehouses((current) =>
+          current.some((entry) => entry.id === warehouse.id)
+            ? current.map((entry) =>
+                entry.id === warehouse.id ? { ...entry, ...warehouse } : entry,
+              )
+            : [...current, warehouse],
+        );
+      },
+    );
+    channel.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "inventory" },
+      (payload) => {
+        const row = (payload.new || payload.old) as {
+          product_id?: string;
+          warehouse_id?: string;
+          quantity?: number | null;
+        };
+        if (!row.product_id || row.warehouse_id !== warehouseId) return;
+        setStockMap((current) => ({
+          ...current,
+          [row.product_id as string]:
+            payload.eventType === "DELETE" ? 0 : Number(row.quantity ?? 0),
+        }));
+      },
+    );
+    channel.subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [warehouseId]);
+
   async function loadAll() {
     try {
       const [
@@ -371,7 +451,7 @@ function PurchasePOSPage() {
         { data: compats },
       ] = await Promise.all([
         supabase.from("warehouses").select("id,name,name_ar").eq("is_active", true).order("name"),
-        supabase.from("suppliers").select("id,name,phone").order("name"),
+        supabase.from("suppliers").select("id,name,phone,balance").order("name"),
         supabase
           .from("products")
           .select(
@@ -876,8 +956,8 @@ function PurchasePOSPage() {
   }
 
   return (
-    <div className="grid h-full min-h-0 flex-1 grid-rows-[auto_auto_minmax(0,1fr)] gap-2 overflow-hidden bg-[radial-gradient(ellipse_at_top,_color-mix(in_oklab,var(--primary)_10%,transparent),transparent_48%)] lg:grid-cols-[minmax(0,1fr)_minmax(400px,460px)] lg:grid-rows-[auto_auto_minmax(0,1fr)]">
-      <div className="flex min-w-0 items-center gap-2 px-1 py-0.5 lg:col-start-1 lg:row-start-1">
+    <div className="grid h-full min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden bg-[radial-gradient(ellipse_at_top,_color-mix(in_oklab,var(--primary)_10%,transparent),transparent_48%)] sm:gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(400px,460px)] lg:grid-rows-[auto_auto_minmax(0,1fr)]">
+      <div className="hidden min-w-0 items-center gap-2 px-1 py-0.5 sm:flex lg:col-start-2 lg:row-start-1">
         <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
           <PackagePlus className="size-4" />
         </div>
@@ -893,20 +973,18 @@ function PurchasePOSPage() {
         </div>
       </div>
       {/* Top Bar / Header */}
-      <div className="m-0 flex min-w-0 shrink-0 items-center gap-2 overflow-visible rounded-xl border border-border/80 bg-surface/95 px-2 py-2 shadow-sm backdrop-blur-md sm:px-3 lg:col-start-1 lg:row-start-2">
+      <div className="m-0 flex min-w-0 shrink-0 items-center gap-1 overflow-x-auto overscroll-x-contain rounded-xl border border-border/80 bg-surface/95 px-1.5 py-1.5 shadow-sm backdrop-blur-md sm:gap-2 sm:px-3 sm:py-2 lg:col-start-1 lg:row-start-1">
         {/* Global Toolbar Selectors */}
-        <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center justify-end gap-1 sm:gap-1.5 2xl:flex 2xl:flex-nowrap">
+        <div className="flex w-full min-w-0 flex-1 items-center justify-between gap-1 sm:gap-1.5">
           {/* Warehouse Selector */}
-          <div className="flex h-9 min-w-0 items-center gap-1 rounded-xl border border-border/80 bg-surface px-1.5 text-xs shadow-2xs sm:gap-1.5 sm:px-2.5">
-            <Building2 className="h-3.5 w-3.5 text-primary shrink-0" />
-            <span className="sr-only sm:not-sr-only sm:inline text-muted-foreground font-medium">
-              {lang === "ar" ? "المستودع:" : "Warehouse:"}
-            </span>
+          <div className="flex h-9 min-w-0 shrink-0 items-center gap-1.5 rounded-full border border-amber-500/25 bg-amber-500/[0.07] px-2 text-amber-700 transition hover:bg-amber-500/10 dark:text-amber-300 sm:px-3">
+            <Building2 className="size-4 shrink-0" />
             <select
               dir={lang === "ar" ? "rtl" : "ltr"}
               value={warehouseId}
               onChange={(e) => setWarehouseId(e.target.value)}
-              className="min-w-0 max-w-full bg-transparent font-medium text-foreground outline-none text-[10px] cursor-pointer sm:text-xs"
+              aria-label={lang === "ar" ? "المستودع" : "Warehouse"}
+              className="min-w-0 max-w-[5.5rem] cursor-pointer appearance-none bg-transparent text-[10px] font-semibold text-inherit outline-none sm:max-w-28 xl:max-w-44 xl:text-xs"
             >
               {warehouses.map((w) => (
                 <option key={w.id} value={w.id}>
@@ -914,62 +992,46 @@ function PurchasePOSPage() {
                 </option>
               ))}
             </select>
+            <span className="hidden text-[11px] font-medium xl:inline">
+              {lang === "ar" ? "المستودع" : "Warehouse"}
+            </span>
           </div>
 
           {/* Supplier Selector with Cash Supplier Default */}
-          <div className="flex h-9 min-w-0 items-center gap-1 rounded-xl border border-border/80 bg-surface px-1.5 text-xs shadow-2xs sm:gap-1.5 sm:px-2.5">
-            <Truck className="h-3.5 w-3.5 text-primary shrink-0" />
-            <span className="sr-only sm:not-sr-only sm:inline text-muted-foreground font-medium">
-              {lang === "ar" ? "المورد:" : "Supplier:"}
-            </span>
-            <select
-              dir={lang === "ar" ? "rtl" : "ltr"}
+          <div className="flex min-w-0 flex-1 items-center gap-1">
+            <PartyPicker
+              options={suppliers}
               value={supplierId}
-              onChange={(e) => setSupplierId(e.target.value)}
-              className="h-8 min-w-0 w-full bg-transparent px-0.5 text-[10px] font-medium text-foreground outline-none cursor-pointer sm:px-1 sm:text-xs 2xl:w-56 2xl:text-sm"
-            >
-              {suppliers.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
+              onChange={setSupplierId}
+              lang={lang}
+              label={lang === "ar" ? "المورد" : "Supplier"}
+              kind="supplier"
+              className="h-10 min-w-0 flex-1 rounded-2xl border-primary/20 bg-primary/[0.035] text-xs hover:border-primary/50 hover:bg-primary/[0.07]"
+            />
             <button
               type="button"
               onClick={() => setNewSupplierOpen(true)}
               title={lang === "ar" ? "إضافة مورد جديد" : "Add new supplier"}
-              className="grid size-8 shrink-0 place-items-center rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition disabled:opacity-40"
+              className="grid size-9 shrink-0 place-items-center rounded-full border border-primary/25 bg-primary/10 text-primary shadow-sm transition hover:border-primary/40 hover:bg-primary/15 active:scale-95 disabled:opacity-40"
               disabled={!canManageSuppliers}
             >
-              <UserPlus className="h-3 w-3" />
+              <UserPlus className="h-4 w-4" />
             </button>
           </div>
 
-          <div className="col-span-2 flex items-center justify-end gap-1 2xl:contents">
-            <Link
-              to="/purchases"
-              aria-label={lang === "ar" ? "العودة إلى سجل المشتريات" : "Back to purchases list"}
-              title={lang === "ar" ? "العودة إلى سجل المشتريات" : "Back to purchases list"}
-              className="grid size-9 shrink-0 place-items-center rounded-full border border-border/80 bg-surface text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
-            >
-              <ArrowRight className={`size-4 ${lang === "ar" ? "" : "rotate-180"}`} />
-            </Link>
+          <div className="flex shrink-0 items-center gap-1 2xl:contents">
             {/* Purchase Date */}
-            <label className="relative grid size-9 shrink-0 place-items-center rounded-full border border-border/80 bg-surface text-xs shadow-2xs sm:flex sm:w-auto sm:items-center sm:gap-1.5 sm:rounded-full sm:px-2.5">
-              <CalendarDays className="h-3.5 w-3.5 text-primary shrink-0" />
-              <input
-                type="date"
-                value={purchaseDate}
-                onChange={(e) => setPurchaseDate(e.target.value)}
-                aria-label={lang === "ar" ? "تاريخ الفاتورة" : "Purchase date"}
-                className="absolute inset-0 h-full w-full cursor-pointer opacity-0 sm:static sm:h-auto sm:w-28 sm:opacity-100 sm:bg-transparent sm:text-xs sm:text-foreground sm:outline-none sm:font-mono"
-              />
-            </label>
+            <PosDatePicker
+              value={purchaseDate}
+              onChange={setPurchaseDate}
+              lang={lang}
+              label={lang === "ar" ? "تاريخ فاتورة الشراء" : "Purchase invoice date"}
+            />
 
             {/* Page Guide Button */}
             <PageGuideButton
               config={purchasePosGuideConfig}
-              className="!size-9 !rounded-full shrink-0"
+              className="!size-8 !rounded-full shrink-0 sm:!size-9"
             />
 
             {/* Barcode Camera Modal Trigger */}
@@ -991,18 +1053,24 @@ function PurchasePOSPage() {
                       ? "Disable barcode reader"
                       : "Enable barcode reader"
                 }
-                className={`grid size-9 shrink-0 place-items-center rounded-full border transition ${barcodeReaderEnabled ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600" : "border-border bg-surface text-muted-foreground"}`}
+                className={`inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full border px-2.5 transition xl:w-auto xl:px-3 ${barcodeReaderEnabled ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600" : "border-border bg-surface text-muted-foreground"}`}
               >
                 <ScanBarcode className="h-4 w-4" />
+                <span className="hidden text-[11px] font-semibold lg:inline">
+                  {lang === "ar" ? "قارئ" : "Reader"}
+                </span>
               </button>
             ) : (!isDesktop || isTouchDevice) && catalogConfig.enableBarcode ? (
               <button
                 type="button"
                 onClick={() => setScannerOpen(true)}
-                className="grid size-9 shrink-0 place-items-center rounded-full border border-border/80 bg-surface text-muted-foreground hover:text-foreground hover:bg-surface-2 transition shadow-2xs"
+                className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full border border-border/80 bg-surface px-2.5 text-muted-foreground shadow-2xs transition hover:bg-surface-2 hover:text-foreground xl:w-auto xl:px-3"
                 title={lang === "ar" ? "مسح الباركود بالكاميرا" : "Scan barcode with camera"}
               >
                 <ScanBarcode className="h-4 w-4" />
+                <span className="hidden text-[11px] font-semibold lg:inline">
+                  {lang === "ar" ? "مسح" : "Scan"}
+                </span>
               </button>
             ) : null}
           </div>
@@ -1010,7 +1078,7 @@ function PurchasePOSPage() {
       </div>
 
       {/* Main Content Area: Products Grid (Left) + Cart & Totals (Right) */}
-      <div className="flex min-h-0 flex-col gap-2 overflow-hidden px-1.5 pb-1.5 sm:px-2 sm:pb-2 lg:contents">
+      <div className="flex min-h-0 flex-col gap-0 overflow-hidden px-1.5 pb-1.5 sm:gap-2 sm:px-2 sm:pb-2 lg:contents lg:row-start-2">
         {/* Left Column: Search, Filters & Product Grid — desktop only. */}
         {isDesktop && (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-border/80 bg-surface/95 shadow-sm ring-1 ring-background/40 lg:col-start-1 lg:row-start-3 lg:mx-2 lg:mb-2">
@@ -1558,7 +1626,7 @@ function PurchasePOSPage() {
         )}
 
         {/* Right Column: Purchase Cart & Invoicing — the primary workspace. */}
-        <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-3xl border border-primary/15 bg-surface/95 p-2 shadow-xl ring-1 ring-border/50 backdrop-blur-md sm:p-2.5 lg:col-start-2 lg:row-span-2 lg:row-start-2 lg:mx-2 lg:mb-2">
+        <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-primary/15 bg-surface/95 p-2 shadow-xl ring-1 ring-border/50 backdrop-blur-md sm:rounded-3xl sm:p-2.5 lg:col-start-2 lg:row-span-2 lg:row-start-2 lg:mx-2 lg:mb-2">
           {/* Cart Header */}
           <div className="mb-2 flex shrink-0 items-center justify-between border-b border-border/60 px-1 pb-2">
             <div className="flex items-center gap-2">
@@ -1593,51 +1661,55 @@ function PurchasePOSPage() {
             )}
           </div>
 
-          {/* Cart Lines Scrollable Area */}
-          <div className="my-1 min-h-0 flex-1 space-y-1 overflow-y-auto pr-1 custom-scrollbar">
-            {cart.length === 0 ? (
-              <div className="grid place-items-center py-14 text-center text-sm text-muted-foreground">
-                <div className="grid h-12 w-12 place-items-center rounded-2xl border border-dashed border-border bg-surface-2/50 mb-2">
-                  <ShoppingBag className="h-6 w-6 opacity-40 text-muted-foreground" />
+          {/* Cart lines and payment details share one scroll region. */}
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain custom-scrollbar">
+            <div className="my-1 space-y-1 pr-1">
+              {cart.length === 0 ? (
+                <div className="grid place-items-center py-14 text-center text-sm text-muted-foreground">
+                  <div className="grid h-12 w-12 place-items-center rounded-2xl border border-dashed border-border bg-surface-2/50 mb-2">
+                    <ShoppingBag className="h-6 w-6 opacity-40 text-muted-foreground" />
+                  </div>
+                  <p className="text-xs font-semibold">
+                    {lang === "ar" ? "سلة المشتريات فارغة" : "Purchase cart is empty"}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground/80 mt-1 max-w-[200px]">
+                    {lang === "ar"
+                      ? "انقر على أي منتج أو امسح الباركود لإضافته لأمر الشراء"
+                      : "Click any item or scan barcode to add to purchase order"}
+                  </p>
                 </div>
-                <p className="text-xs font-semibold">
-                  {lang === "ar" ? "سلة المشتريات فارغة" : "Purchase cart is empty"}
-                </p>
-                <p className="text-[11px] text-muted-foreground/80 mt-1 max-w-[200px]">
-                  {lang === "ar"
-                    ? "انقر على أي منتج أو امسح الباركود لإضافته لأمر الشراء"
-                    : "Click any item or scan barcode to add to purchase order"}
-                </p>
-              </div>
-            ) : (
-              cart.map((line) => (
-                <CartLineRow
-                  key={line.product_id}
-                  line={{
-                    id: line.product_id,
-                    name: line.name,
-                    quantity: line.quantity,
-                    unitPrice: line.unit_cost,
-                    taxRate: line.tax_rate,
-                    stock: stockMap[line.product_id],
-                    unboundedQuantity: true,
-                  }}
-                  labels={{
-                    price: lang === "ar" ? "سعر الشراء" : "Cost",
-                    quantity: lang === "ar" ? "الكمية" : "Qty",
-                    remove: lang === "ar" ? "حذف" : "Remove",
-                  }}
-                  formatMoney={money}
-                  onQuantityCommit={(next) => setQty(line.product_id, next)}
-                  onPriceChange={(next) => setCost(line.product_id, next)}
-                  onRemove={() => setCart((c) => c.filter((x) => x.product_id !== line.product_id))}
-                />
-              ))
-            )}
+              ) : (
+                cart.map((line) => (
+                  <CartLineRow
+                    key={line.product_id}
+                    line={{
+                      id: line.product_id,
+                      name: line.name,
+                      quantity: line.quantity,
+                      unitPrice: line.unit_cost,
+                      taxRate: line.tax_rate,
+                      stock: stockMap[line.product_id],
+                      unboundedQuantity: true,
+                    }}
+                    labels={{
+                      price: lang === "ar" ? "سعر الشراء" : "Cost",
+                      quantity: lang === "ar" ? "الكمية" : "Qty",
+                      remove: lang === "ar" ? "حذف" : "Remove",
+                    }}
+                    formatMoney={money}
+                    onQuantityCommit={(next) => setQty(line.product_id, next)}
+                    onPriceChange={(next) => setCost(line.product_id, next)}
+                    onRemove={() =>
+                      setCart((c) => c.filter((x) => x.product_id !== line.product_id))
+                    }
+                  />
+                ))
+              )}
+            </div>
           </div>
 
           {/* Fixed payment and totals footer */}
-          <div className="min-h-0 shrink overflow-y-auto space-y-1.5 border-t border-border/70 bg-surface/95 pt-2 pr-1">
+          <div className="max-h-[56dvh] shrink-0 space-y-1.5 overflow-y-auto overscroll-contain border-t border-border/70 bg-surface/95 pt-2 pr-1">
             <div className="grid min-w-0 grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.8fr)] items-end gap-1.5">
               <div className="flex min-w-0 flex-col gap-1">
                 <span className="truncate text-[10px] font-semibold leading-none text-muted-foreground">
@@ -1741,61 +1813,50 @@ function PurchasePOSPage() {
               className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2.5 text-xs text-foreground placeholder:text-muted-foreground/70 outline-none focus:border-primary"
             />
 
-            <div className="space-y-1 rounded-xl border border-primary/20 bg-primary/5 p-2">
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>{lang === "ar" ? "المجموع الفرعي" : "Subtotal"}</span>
-                <span className="font-mono font-semibold text-foreground">{money(subtotal)}</span>
-              </div>
-
-              {discountN > 0 && (
-                <div className="flex items-center justify-between text-xs text-emerald-600 dark:text-emerald-400">
-                  <span className="font-medium">{lang === "ar" ? "الخصم" : "Discount"}</span>
-                  <span className="font-mono font-bold [unicode-bidi:isolate]">
-                    −{money(discountN)}
-                  </span>
-                </div>
-              )}
-
-              {taxTotal > 0 && (
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>{lang === "ar" ? "الضريبة" : "Tax"}</span>
-                  <span className="font-mono font-semibold text-foreground">{money(taxTotal)}</span>
-                </div>
-              )}
-
-              <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                <span>{lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}</span>
-                <span className="font-mono font-semibold text-foreground">{money(paidN)}</span>
-              </div>
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="text-muted-foreground">
-                  {lang === "ar" ? "المتبقي للمورد" : "Supplier balance"}
-                </span>
-                <span className="font-mono font-bold text-amber-600">
-                  {money(Math.max(0, total - paidN))}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between border-t border-primary/20 pt-2">
-                <span className="text-xs font-bold text-foreground">
-                  {lang === "ar" ? "الإجمالي" : "Total"}
-                </span>
-                <span className="font-mono text-base font-extrabold tracking-tight text-primary">
-                  <span dir="ltr" className="[unicode-bidi:isolate]">
-                    {money(total)}
-                  </span>
-                </span>
-              </div>
-            </div>
+            <PosTotalsCard
+              countLabel={lang === "ar" ? "عدد الأصناف" : "Items"}
+              count={cart.reduce((sum, line) => sum + line.quantity, 0)}
+              rows={[
+                {
+                  label: lang === "ar" ? "الإجمالي بدون ضريبة" : "Subtotal",
+                  value: money(subtotal),
+                },
+                ...(taxTotal > 0
+                  ? [{ label: lang === "ar" ? "قيمة الضريبة" : "Tax", value: money(taxTotal) }]
+                  : []),
+                ...(discountN > 0
+                  ? [
+                      {
+                        label: lang === "ar" ? "الخصم" : "Discount",
+                        value: `−${money(discountN)}`,
+                      },
+                    ]
+                  : []),
+                { label: lang === "ar" ? "المبلغ المدفوع" : "Amount paid", value: money(paidN) },
+                ...(total - paidN > 0
+                  ? [
+                      {
+                        label: lang === "ar" ? "المتبقي للمورد" : "Supplier balance",
+                        value: money(total - paidN),
+                      },
+                    ]
+                  : []),
+              ]}
+              totalLabel={lang === "ar" ? "الإجمالي" : "Total"}
+              total={money(total)}
+            />
           </div>
 
           {/* Actions stay outside the only scroll region. */}
-          <div className="mt-2 flex shrink-0 gap-2 border-t border-border/70 bg-surface/95 pb-1 pt-2">
+          <div
+            className="mt-2 flex shrink-0 gap-2 border-t border-border/70 bg-surface/95 pb-1 pt-2"
+            dir={lang === "ar" ? "rtl" : "ltr"}
+          >
             <button
               type="button"
               onClick={openPurchaseQuotation}
               disabled={cart.length === 0}
-              className="flex h-11 shrink-0 items-center justify-center gap-2 rounded-2xl border border-transparent bg-foreground px-4 text-sm font-semibold text-background transition hover:opacity-90 active:scale-[0.99] disabled:opacity-50"
+              className={`flex h-11 shrink-0 items-center justify-center gap-2 rounded-2xl border border-transparent bg-foreground px-4 text-sm font-semibold text-background transition hover:opacity-90 active:scale-[0.99] disabled:opacity-50 ${lang === "ar" ? "order-last" : ""}`}
             >
               <FileText className="h-4 w-4" />
               <span className="hidden sm:inline">
@@ -1806,7 +1867,7 @@ function PurchasePOSPage() {
               type="button"
               onClick={submitPurchase}
               disabled={loading || cart.length === 0 || isOverpaid}
-              className="flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-primary to-primary/90 px-4 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition hover:shadow-primary/35 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50"
+              className={`flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-primary to-primary/90 px-4 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition hover:shadow-primary/35 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50 ${lang === "ar" ? "order-first" : ""}`}
             >
               {loading ? (
                 <>
