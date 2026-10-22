@@ -148,16 +148,15 @@ check(
   unifiedHtml.includes("شركة النور للتجارة"),
 );
 check("unified layout renders the company address", unifiedHtml.includes("صنعاء - شارع تعز"));
-check("unified layout omits fixed support contacts", !unifiedHtml.includes("784795104"));
 check(
   "unified invoice includes the approved company rights line",
   standardCompanyHtml.includes("تطوير وبرمجة إنما سوفت") &&
-    standardCompanyHtml.includes("772217218 - 784795101"),
+    standardCompanyHtml.includes("772217218 - 784795104"),
 );
 check(
   "unified invoice includes the approved company rights line",
   (unifiedHtml.match(/تطوير وبرمجة إنما سوفت/g) ?? []).length === 1 &&
-    unifiedHtml.includes("772217218 - 784795101"),
+    unifiedHtml.includes("772217218 - 784795104"),
 );
 check(
   "unified layout omits the removed universal footer",

@@ -1907,7 +1907,7 @@ function POSPage() {
         </header>
 
         {/* ─── Main Content Split: Products Catalog (Desktop) & Cart (All) ─── */}
-        <div className="grid min-h-0 grid-cols-1 items-stretch gap-2 lg:contents">
+        <div className="grid min-h-0 grid-cols-1 grid-rows-[minmax(0,1fr)] items-stretch gap-2 lg:contents">
           {/* ─── Products Panel (Desktop & Tablet) ─── */}
           {isDesktop && (
             <div className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-border/80 bg-surface/95 p-3 shadow-sm ring-1 ring-background/40 lg:col-start-1 lg:row-start-3">
