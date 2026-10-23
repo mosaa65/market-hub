@@ -56,6 +56,7 @@ import { SupplierFormDialog } from "@/components/contacts/supplier-form-dialog";
 import { UniversalPrintPreview } from "@/components/universal-print-preview";
 import type { PrintRequest } from "@/lib/printing";
 import { DynamicPaymentSelector } from "@/components/ui/payment-method/dynamic-payment-selector";
+import { SplitPaymentEditor, type SplitPaymentEditorLine } from "@/components/payments/split-payment-editor";
 import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
 import { toLegacyPaymentValue, getPaymentMethodDefinition } from "@/lib/payments/payment-methods";
 
@@ -311,9 +312,19 @@ function PurchasePOSPage() {
   const [paidManuallyEdited, setPaidManuallyEdited] = useState(false);
   const [discount, setDiscount] = useState<string>("");
   const [paymentMethod, setPaymentMethod] = useState<string>("cash");
+  const [splitPaymentLines, setSplitPaymentLines] = useState<SplitPaymentEditorLine[]>([]);
   const selectedPurchasePaymentMethod = purchasePaymentMethods.find(
     (method) => method.id === paymentMethod,
   );
+  const splitPaymentMethods = purchasePaymentMethods
+    .filter((method) => !method.isCreditTerm && method.legacyValue !== "split")
+    .map((method) => ({
+      id: method.id,
+      nameAr: method.nameAr,
+      nameEn: method.nameEn,
+      legacyValue: method.legacyValue,
+      requiresReference: method.requiresReference,
+    }));
   const [paymentSelection, setPaymentSelection] = useState<PaymentSettlementSelection>({
     method: "cash",
   });
@@ -1669,6 +1680,16 @@ function PurchasePOSPage() {
                   className="h-8 min-w-0 rounded-lg text-[10px] sm:text-xs"
                 />
               </div>
+              {paymentMethod === "split" && (
+                <SplitPaymentEditor
+                  total={total}
+                  lines={splitPaymentLines}
+                  methods={splitPaymentMethods}
+                  onChange={setSplitPaymentLines}
+                  lang={lang === "ar" ? "ar" : "en"}
+                  className="col-span-full"
+                />
+              )}
               <AmountInput
                 label={lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}
                 showLabel
