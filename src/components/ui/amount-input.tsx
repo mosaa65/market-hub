@@ -188,7 +188,7 @@ export const AmountInput = React.forwardRef<HTMLInputElement, AmountInputProps>(
     );
 
     return (
-      <div className={cn("w-full min-w-0", containerClassName)}>
+      <div className={cn("relative w-full min-w-0", containerClassName)}>
         <FieldInput
           {...props}
           ref={(el) => {
@@ -201,7 +201,10 @@ export const AmountInput = React.forwardRef<HTMLInputElement, AmountInputProps>(
           clearable={clearable && !hideClear}
           suffix={
             resolvedSymbol ? (
-              <span className="pointer-events-none select-none text-xs font-bold text-muted-foreground">
+              <span
+                aria-label={`العملة: ${resolvedSymbol}`}
+                className="pointer-events-none inline-flex h-6 min-w-9 items-center justify-center rounded-full border border-primary/15 bg-primary/[0.08] px-2 text-[10px] font-bold tracking-wide text-primary/80 shadow-sm"
+              >
                 {resolvedSymbol}
               </span>
             ) : undefined
