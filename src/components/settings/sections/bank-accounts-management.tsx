@@ -217,13 +217,9 @@ export function BankAccountsManagement() {
             />
           </div>
 
-          <Button
-            onClick={() => handleOpenAdd(activeTab === "WALLET" ? "WALLET" : "BANK")}
-            className="gap-1.5 rounded-xl shadow-xs"
-          >
-            <Plus className="h-4 w-4" />
-            <span>{isAr ? "إضافة حساب / محفظة" : "Add Account / Wallet"}</span>
-          </Button>
+          <div className="rounded-xl border border-primary/15 bg-primary/5 px-3 py-2 text-[11px] font-medium text-primary">
+            {isAr ? "الحسابات والمحافظ الافتراضية المرتبطة بالدليل المحاسبي" : "Default accounts and wallets linked to the chart of accounts"}
+          </div>
         </div>
       </div>
 
