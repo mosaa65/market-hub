@@ -961,10 +961,37 @@ function CustomersPage() {
       >
         <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-x-none">
           {[
-            { id: "all", label: lang === "ar" ? "الكل" : "All", count: rows.length, active: "border-primary bg-primary text-primary-foreground", idle: "border-border/70 bg-surface/70 text-muted-foreground hover:bg-primary/10 hover:text-primary", badge: "bg-primary/10 text-primary" },
-            { id: "debt", label: lang === "ar" ? "عليهم مبالغ" : "With Debt", count: debtCount, active: "border-rose-600 bg-rose-600 text-white", idle: "border-rose-500/25 bg-rose-500/5 text-rose-700 hover:bg-rose-500/10 dark:text-rose-300", badge: "bg-rose-500/15 text-rose-700 dark:text-rose-300" },
-            { id: "credit", label: lang === "ar" ? "لهم رصيد" : "With Credit", active: "border-emerald-600 bg-emerald-600 text-white", idle: "border-emerald-500/25 bg-emerald-500/5 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-300", badge: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" },
-            { id: "active", label: lang === "ar" ? "النشطين" : "Active", count: activeCount, active: "border-sky-600 bg-sky-600 text-white", idle: "border-sky-500/25 bg-sky-500/5 text-sky-700 hover:bg-sky-500/10 dark:text-sky-300", badge: "bg-sky-500/15 text-sky-700 dark:text-sky-300" },
+            {
+              id: "all",
+              label: lang === "ar" ? "الكل" : "All",
+              count: rows.length,
+              active: "border-primary bg-primary text-primary-foreground",
+              idle: "border-border/70 bg-surface/70 text-muted-foreground hover:bg-primary/10 hover:text-primary",
+              badge: "bg-primary/10 text-primary",
+            },
+            {
+              id: "debt",
+              label: lang === "ar" ? "عليهم مبالغ" : "With Debt",
+              count: debtCount,
+              active: "border-rose-600 bg-rose-600 text-white",
+              idle: "border-rose-500/25 bg-rose-500/5 text-rose-700 hover:bg-rose-500/10 dark:text-rose-300",
+              badge: "bg-rose-500/15 text-rose-700 dark:text-rose-300",
+            },
+            {
+              id: "credit",
+              label: lang === "ar" ? "لهم رصيد" : "With Credit",
+              active: "border-emerald-600 bg-emerald-600 text-white",
+              idle: "border-emerald-500/25 bg-emerald-500/5 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-300",
+              badge: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+            },
+            {
+              id: "active",
+              label: lang === "ar" ? "النشطين" : "Active",
+              count: activeCount,
+              active: "border-sky-600 bg-sky-600 text-white",
+              idle: "border-sky-500/25 bg-sky-500/5 text-sky-700 hover:bg-sky-500/10 dark:text-sky-300",
+              badge: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
+            },
           ].map((f) => (
             <button
               key={f.id}

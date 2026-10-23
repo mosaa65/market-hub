@@ -10,7 +10,8 @@ export function renderInventoryThermalTemplate(
 ): string {
   const esc = escapeHtml;
   const company = getCachedCompanyProfile();
-  const companyArabicName = company.arabicName || doc.company?.arabicName || doc.company?.name || company.name;
+  const companyArabicName =
+    company.arabicName || doc.company?.arabicName || doc.company?.name || company.name;
   const opts = {
     showLogo: true,
     showCompanyInfo: true,
@@ -120,7 +121,8 @@ export function renderInventoryStandardTemplate(
 ): string {
   const esc = escapeHtml;
   const company = getCachedCompanyProfile();
-  const companyArabicName = company.arabicName || doc.company?.arabicName || doc.company?.name || company.name;
+  const companyArabicName =
+    company.arabicName || doc.company?.arabicName || doc.company?.name || company.name;
   const companyEnglishName = company.englishName || doc.company?.englishName || "";
   const companyAddress = company.address || doc.company?.address || "";
   const companyPhone = company.phone || doc.company?.phone || "";

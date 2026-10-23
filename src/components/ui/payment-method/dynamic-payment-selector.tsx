@@ -198,11 +198,15 @@ export function DynamicPaymentSelector({
                     ? "جيب"
                     : account.name_ar
                   : method.ledgerKind === "CREDIT"
-                    ? (isAr ? "ذمم العميل" : "Customer receivable")
-                    : (isAr ? "غير مرتبط" : "Not linked");
+                    ? isAr
+                      ? "ذمم العميل"
+                      : "Customer receivable"
+                    : isAr
+                      ? "غير مرتبط"
+                      : "Not linked";
                 return (
                   <option key={method.id} value={method.id}>
-                    {isAr ? method.nameAr : method.nameEn ?? method.nameAr} — {accountName}
+                    {isAr ? method.nameAr : (method.nameEn ?? method.nameAr)} — {accountName}
                   </option>
                 );
               })}
@@ -211,15 +215,25 @@ export function DynamicPaymentSelector({
           </div>
           <div className="flex min-h-6 items-center gap-1.5 border-t border-border/50 bg-muted/25 px-3 py-1 text-[10px] leading-tight">
             {currentKind === "CREDIT" ? (
-              <span className="font-medium text-violet-700 dark:text-violet-300">{isAr ? "ذمم العميل — لا يوجد حساب تحصيل" : "Customer receivable — no collection account"}</span>
+              <span className="font-medium text-violet-700 dark:text-violet-300">
+                {isAr
+                  ? "ذمم العميل — لا يوجد حساب تحصيل"
+                  : "Customer receivable — no collection account"}
+              </span>
             ) : selectedAccountName ? (
               <>
                 <Check className="size-3 shrink-0 text-emerald-600" />
-                <span className="truncate font-medium text-emerald-700 dark:text-emerald-400">{selectedAccountName}</span>
-                <span className="shrink-0 text-muted-foreground">· {isAr ? "مرتبط بالدليل المحاسبي" : "Ledger linked"}</span>
+                <span className="truncate font-medium text-emerald-700 dark:text-emerald-400">
+                  {selectedAccountName}
+                </span>
+                <span className="shrink-0 text-muted-foreground">
+                  · {isAr ? "مرتبط بالدليل المحاسبي" : "Ledger linked"}
+                </span>
               </>
             ) : (
-              <span className="text-amber-700 dark:text-amber-400">{isAr ? "لم يتم ربط حساب افتراضي بعد" : "No default account linked"}</span>
+              <span className="text-amber-700 dark:text-amber-400">
+                {isAr ? "لم يتم ربط حساب افتراضي بعد" : "No default account linked"}
+              </span>
             )}
           </div>
         </div>

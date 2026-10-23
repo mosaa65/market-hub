@@ -50,9 +50,9 @@ export function renderMillingMasterTemplate(
   );
 
   const compName = esc(
-      companyProfile.arabicName ||
-    doc.company?.arabicName ||
-    doc.company?.name ||
+    companyProfile.arabicName ||
+      doc.company?.arabicName ||
+      doc.company?.name ||
       companyProfile.name ||
       "المطحنة الحديثة لإنتاج الدقيق والأعلاف",
   );
@@ -516,9 +516,9 @@ export function renderMillingThermalTemplate(
   const title = esc(doc.title || (isDelivery ? "إيصال تسليم أمانات" : "إيصال طحن واستلام فوري"));
 
   const compName = esc(
-      companyProfile.arabicName ||
-    doc.company?.arabicName ||
-    doc.company?.name ||
+    companyProfile.arabicName ||
+      doc.company?.arabicName ||
+      doc.company?.name ||
       companyProfile.name ||
       "المطحنة الحديثة",
   );

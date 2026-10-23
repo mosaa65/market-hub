@@ -19,7 +19,8 @@ export function renderThermalTemplate(
   const esc = escapeHtml;
   const money = (n?: number) => formatMoney(n, c);
   const company = getCachedCompanyProfile();
-  const companyArabicName = company.arabicName || doc.company?.arabicName || doc.company?.name || company.name;
+  const companyArabicName =
+    company.arabicName || doc.company?.arabicName || doc.company?.name || company.name;
   const opts = {
     showLogo: true,
     showCompanyInfo: true,

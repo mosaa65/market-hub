@@ -193,46 +193,52 @@ export function OpeningBalancesPage() {
   });
 
   const save = useMutation(
-    run<string, void>(async () => {
-      if (draft.length === 0) throw new Error("أضف بنداً واحداً على الأقل إلى القيد الافتتاحي");
-      if (editingDocumentId) {
-        return updateOpeningDocument({
-          documentId: editingDocumentId,
-          effectiveDate,
-          lines: draft,
-        });
-      }
-      return createOpeningDocument({ effectiveDate, lines: draft });
-    }, "تم حفظ مسودة القيد الافتتاحي بنجاح", () => {
-      setDraft([]);
-      setEditingDocumentId(null);
-      setAmount("");
-      setQty("");
-      setUnitCost("");
-      setBagsCount("");
-      setBagCost("");
-      setRefId("");
-      setSelectedAccountCode("");
-      setSelectedId(null);
-    }),
+    run<string, void>(
+      async () => {
+        if (draft.length === 0) throw new Error("أضف بنداً واحداً على الأقل إلى القيد الافتتاحي");
+        if (editingDocumentId) {
+          return updateOpeningDocument({
+            documentId: editingDocumentId,
+            effectiveDate,
+            lines: draft,
+          });
+        }
+        return createOpeningDocument({ effectiveDate, lines: draft });
+      },
+      "تم حفظ مسودة القيد الافتتاحي بنجاح",
+      () => {
+        setDraft([]);
+        setEditingDocumentId(null);
+        setAmount("");
+        setQty("");
+        setUnitCost("");
+        setBagsCount("");
+        setBagCost("");
+        setRefId("");
+        setSelectedAccountCode("");
+        setSelectedId(null);
+      },
+    ),
   );
 
   const editDraft = async (document: OpeningSummary) => {
     try {
       setError(null);
       const savedLines = await fetchOpeningLines(document.id);
-      setDraft(savedLines.map((line) => ({
-        section: line.section,
-        description: line.description,
-        amount: Number(line.amount),
-        product_id: line.product_id,
-        warehouse_id: line.warehouse_id,
-        customer_id: line.customer_id,
-        supplier_id: line.supplier_id,
-        quantity: line.quantity,
-        unit_cost: line.unit_cost,
-        ledger_account_code: line.ledger_account_code,
-      })));
+      setDraft(
+        savedLines.map((line) => ({
+          section: line.section,
+          description: line.description,
+          amount: Number(line.amount),
+          product_id: line.product_id,
+          warehouse_id: line.warehouse_id,
+          customer_id: line.customer_id,
+          supplier_id: line.supplier_id,
+          quantity: line.quantity,
+          unit_cost: line.unit_cost,
+          ledger_account_code: line.ledger_account_code,
+        })),
+      );
       setEffectiveDate(document.effective_date);
       setEditingDocumentId(document.id);
       setSelectedId(document.id);
@@ -751,7 +757,8 @@ export function OpeningBalancesPage() {
               </div>
               {draftTotals.diff < 0 && (
                 <p className="text-xs font-semibold text-rose-600" role="status">
-                  الأرصدة الدائنة تتجاوز المدينة بمقدار {yer(Math.abs(draftTotals.diff))}. صحّح بندًا دائنًا قبل الموازنة؛ إضافة رأس المال ستزيد الفرق.
+                  الأرصدة الدائنة تتجاوز المدينة بمقدار {yer(Math.abs(draftTotals.diff))}. صحّح
+                  بندًا دائنًا قبل الموازنة؛ إضافة رأس المال ستزيد الفرق.
                 </p>
               )}
 
@@ -988,7 +995,9 @@ export function OpeningBalancesPage() {
                               onClick={() => post.mutate(d.id)}
                               disabled={!d.is_balanced || post.isPending}
                               className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-xs transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-30"
-                              title={d.is_balanced ? "ترحيل إلى الأستاذ والمخازن" : "القيد غير متوازن"}
+                              title={
+                                d.is_balanced ? "ترحيل إلى الأستاذ والمخازن" : "القيد غير متوازن"
+                              }
                             >
                               ترحيل
                             </button>

@@ -100,7 +100,7 @@ export function StockConversionPage() {
         .order("item_class")
         .order("name_ar");
       if (error) throw error;
-      return ((data ?? []) as unknown) as ProductOption[];
+      return (data ?? []) as unknown as ProductOption[];
     },
   });
 

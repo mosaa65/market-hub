@@ -395,50 +395,55 @@ function SuppliersPage() {
       lang,
     });
 
-  const openSupplier = useCallback(async (supplier: Supplier) => {
-    setSelectedSupplier(supplier);
-    setSupplierActivity([]);
-    setActivityFilter("all");
-    setActivityLoading(true);
-    try {
-      const [purchaseResult, paymentResult] = await Promise.all([
-        supabase
-          .from("purchase_invoices")
-          .select("invoice_number,created_at,total")
-          .eq("supplier_id", supplier.id)
-          .order("created_at", { ascending: false })
-          .limit(30),
-        supabase
-          .from("supplier_payments")
-          .select("payment_date,amount,payment_method")
-          .eq("supplier_id", supplier.id)
-          .order("payment_date", { ascending: false })
-          .limit(30),
-      ]);
-      if (purchaseResult.error) throw purchaseResult.error;
-      if (paymentResult.error) throw paymentResult.error;
+  const openSupplier = useCallback(
+    async (supplier: Supplier) => {
+      setSelectedSupplier(supplier);
+      setSupplierActivity([]);
+      setActivityFilter("all");
+      setActivityLoading(true);
+      try {
+        const [purchaseResult, paymentResult] = await Promise.all([
+          supabase
+            .from("purchase_invoices")
+            .select("invoice_number,created_at,total")
+            .eq("supplier_id", supplier.id)
+            .order("created_at", { ascending: false })
+            .limit(30),
+          supabase
+            .from("supplier_payments")
+            .select("payment_date,amount,payment_method")
+            .eq("supplier_id", supplier.id)
+            .order("payment_date", { ascending: false })
+            .limit(30),
+        ]);
+        if (purchaseResult.error) throw purchaseResult.error;
+        if (paymentResult.error) throw paymentResult.error;
 
-      setSupplierActivity([
-        ...(purchaseResult.data ?? []).map((purchase) => ({
-          label: `${isRtl ? "فاتورة شراء" : "Purchase invoice"} ${purchase.invoice_number ?? ""}`,
-          date: purchase.created_at,
-          amount: Number(purchase.total ?? 0),
-          kind: "purchase" as const,
-        })),
-        ...(paymentResult.data ?? []).map((payment) => ({
-          label: `${isRtl ? "سند صرف" : "Payment voucher"}${payment.payment_method ? ` · ${payment.payment_method}` : ""}`,
-          date: payment.payment_date,
-          amount: Number(payment.amount ?? 0),
-          kind: "payment" as const,
-        })),
-      ].sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime()));
-    } catch (cause) {
-      console.error("Failed to load supplier activity", cause);
-      toast.error(isRtl ? "تعذر تحميل حركات المورد" : "Could not load supplier activity");
-    } finally {
-      setActivityLoading(false);
-    }
-  }, [isRtl]);
+        setSupplierActivity(
+          [
+            ...(purchaseResult.data ?? []).map((purchase) => ({
+              label: `${isRtl ? "فاتورة شراء" : "Purchase invoice"} ${purchase.invoice_number ?? ""}`,
+              date: purchase.created_at,
+              amount: Number(purchase.total ?? 0),
+              kind: "purchase" as const,
+            })),
+            ...(paymentResult.data ?? []).map((payment) => ({
+              label: `${isRtl ? "سند صرف" : "Payment voucher"}${payment.payment_method ? ` · ${payment.payment_method}` : ""}`,
+              date: payment.payment_date,
+              amount: Number(payment.amount ?? 0),
+              kind: "payment" as const,
+            })),
+          ].sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime()),
+        );
+      } catch (cause) {
+        console.error("Failed to load supplier activity", cause);
+        toast.error(isRtl ? "تعذر تحميل حركات المورد" : "Could not load supplier activity");
+      } finally {
+        setActivityLoading(false);
+      }
+    },
+    [isRtl],
+  );
 
   const supplierActivityTotals = useMemo(() => {
     const purchases = supplierActivity.filter((entry) => entry.kind === "purchase");
@@ -699,10 +704,37 @@ function SuppliersPage() {
       >
         <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-x-none">
           {[
-            { id: "all", label: isRtl ? "الكل" : "All", count: rows.length, active: "border-primary bg-primary text-primary-foreground", idle: "border-border/70 bg-surface/70 text-muted-foreground hover:bg-primary/10 hover:text-primary", badge: "bg-primary/10 text-primary" },
-            { id: "payable", label: isRtl ? "مستحق لهم" : "Payable", count: payableCount, active: "border-amber-600 bg-amber-600 text-white", idle: "border-amber-500/25 bg-amber-500/5 text-amber-700 hover:bg-amber-500/10 dark:text-amber-300", badge: "bg-amber-500/15 text-amber-700 dark:text-amber-300" },
-            { id: "advance", label: isRtl ? "دفعات مقدمة" : "Advance", active: "border-emerald-600 bg-emerald-600 text-white", idle: "border-emerald-500/25 bg-emerald-500/5 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-300", badge: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" },
-            { id: "active", label: isRtl ? "النشطين" : "Active", count: activeCount, active: "border-sky-600 bg-sky-600 text-white", idle: "border-sky-500/25 bg-sky-500/5 text-sky-700 hover:bg-sky-500/10 dark:text-sky-300", badge: "bg-sky-500/15 text-sky-700 dark:text-sky-300" },
+            {
+              id: "all",
+              label: isRtl ? "الكل" : "All",
+              count: rows.length,
+              active: "border-primary bg-primary text-primary-foreground",
+              idle: "border-border/70 bg-surface/70 text-muted-foreground hover:bg-primary/10 hover:text-primary",
+              badge: "bg-primary/10 text-primary",
+            },
+            {
+              id: "payable",
+              label: isRtl ? "مستحق لهم" : "Payable",
+              count: payableCount,
+              active: "border-amber-600 bg-amber-600 text-white",
+              idle: "border-amber-500/25 bg-amber-500/5 text-amber-700 hover:bg-amber-500/10 dark:text-amber-300",
+              badge: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+            },
+            {
+              id: "advance",
+              label: isRtl ? "دفعات مقدمة" : "Advance",
+              active: "border-emerald-600 bg-emerald-600 text-white",
+              idle: "border-emerald-500/25 bg-emerald-500/5 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-300",
+              badge: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+            },
+            {
+              id: "active",
+              label: isRtl ? "النشطين" : "Active",
+              count: activeCount,
+              active: "border-sky-600 bg-sky-600 text-white",
+              idle: "border-sky-500/25 bg-sky-500/5 text-sky-700 hover:bg-sky-500/10 dark:text-sky-300",
+              badge: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
+            },
           ].map((f) => (
             <button
               key={f.id}
@@ -801,7 +833,11 @@ function SuppliersPage() {
           <aside
             role="dialog"
             aria-modal="true"
-            aria-label={isRtl ? `تفاصيل المورد ${selectedSupplier.name}` : `Supplier details ${selectedSupplier.name}`}
+            aria-label={
+              isRtl
+                ? `تفاصيل المورد ${selectedSupplier.name}`
+                : `Supplier details ${selectedSupplier.name}`
+            }
             dir={isRtl ? "rtl" : "ltr"}
             className="relative flex h-full w-full max-w-xl flex-col overflow-hidden border-s border-border bg-background shadow-2xl animate-in slide-in-from-right duration-200"
           >
@@ -811,8 +847,12 @@ function SuppliersPage() {
                   {selectedSupplier.name.slice(0, 1)}
                 </span>
                 <div className="min-w-0">
-                  <h2 className="truncate text-base font-bold text-foreground">{selectedSupplier.name}</h2>
-                  <span className={`mt-1 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${getRecordIndicator(selectedSupplier).toneClass}`}>
+                  <h2 className="truncate text-base font-bold text-foreground">
+                    {selectedSupplier.name}
+                  </h2>
+                  <span
+                    className={`mt-1 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${getRecordIndicator(selectedSupplier).toneClass}`}
+                  >
                     {selectedSupplier.is_active ? t("common.active") : t("common.inactive")}
                     {Number(selectedSupplier.balance) > 0
                       ? ` · ${isRtl ? "مستحق له" : "Payable"}`
@@ -835,59 +875,95 @@ function SuppliersPage() {
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4 sm:p-5">
               <section className="grid grid-cols-2 gap-2.5">
                 <div className="rounded-xl border border-border/70 bg-surface/60 p-3">
-                  <p className="text-[11px] text-muted-foreground">{isRtl ? "الرصيد الحالي" : "Current balance"}</p>
-                  <p className={`mt-1 truncate font-mono text-base font-black ${balanceTone(Number(selectedSupplier.balance))}`}>
+                  <p className="text-[11px] text-muted-foreground">
+                    {isRtl ? "الرصيد الحالي" : "Current balance"}
+                  </p>
+                  <p
+                    className={`mt-1 truncate font-mono text-base font-black ${balanceTone(Number(selectedSupplier.balance))}`}
+                  >
                     {money(Number(selectedSupplier.balance))}
                   </p>
                 </div>
                 <div className="rounded-xl border border-border/70 bg-surface/60 p-3">
-                  <p className="text-[11px] text-muted-foreground">{isRtl ? "عدد الحركات المحملة" : "Loaded activity"}</p>
-                  <p className="mt-1 font-mono text-base font-black text-foreground">{toSystemDigits(String(supplierActivity.length))}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {isRtl ? "عدد الحركات المحملة" : "Loaded activity"}
+                  </p>
+                  <p className="mt-1 font-mono text-base font-black text-foreground">
+                    {toSystemDigits(String(supplierActivity.length))}
+                  </p>
                 </div>
                 <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
-                  <p className="text-[11px] text-muted-foreground">{isRtl ? "الفواتير" : "Purchases"}</p>
-                  <p className="mt-1 truncate font-mono text-sm font-bold text-amber-700 dark:text-amber-300">{money(supplierActivityTotals.purchases)}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {isRtl ? "الفواتير" : "Purchases"}
+                  </p>
+                  <p className="mt-1 truncate font-mono text-sm font-bold text-amber-700 dark:text-amber-300">
+                    {money(supplierActivityTotals.purchases)}
+                  </p>
                 </div>
                 <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3">
-                  <p className="text-[11px] text-muted-foreground">{isRtl ? "المدفوعات" : "Payments"}</p>
-                  <p className="mt-1 truncate font-mono text-sm font-bold text-emerald-700 dark:text-emerald-300">{money(supplierActivityTotals.payments)}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {isRtl ? "المدفوعات" : "Payments"}
+                  </p>
+                  <p className="mt-1 truncate font-mono text-sm font-bold text-emerald-700 dark:text-emerald-300">
+                    {money(supplierActivityTotals.payments)}
+                  </p>
                 </div>
               </section>
 
               <section className="space-y-2 rounded-xl border border-border/70 p-3.5">
-                <h3 className="text-xs font-bold text-foreground">{isRtl ? "بيانات التواصل" : "Contact details"}</h3>
+                <h3 className="text-xs font-bold text-foreground">
+                  {isRtl ? "بيانات التواصل" : "Contact details"}
+                </h3>
                 {selectedSupplier.phone && (
-                  <a href={`tel:${selectedSupplier.phone}`} className="flex items-center gap-2 py-1 text-xs text-muted-foreground hover:text-foreground" dir="ltr">
-                    <Phone className="size-3.5" /> <span>{toSystemDigits(selectedSupplier.phone)}</span>
+                  <a
+                    href={`tel:${selectedSupplier.phone}`}
+                    className="flex items-center gap-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+                    dir="ltr"
+                  >
+                    <Phone className="size-3.5" />{" "}
+                    <span>{toSystemDigits(selectedSupplier.phone)}</span>
                   </a>
                 )}
                 {selectedSupplier.email && (
-                  <div className="flex items-center gap-2 py-1 text-xs text-muted-foreground" dir="ltr">
-                    <Mail className="size-3.5 shrink-0" /> <span className="truncate">{selectedSupplier.email}</span>
+                  <div
+                    className="flex items-center gap-2 py-1 text-xs text-muted-foreground"
+                    dir="ltr"
+                  >
+                    <Mail className="size-3.5 shrink-0" />{" "}
+                    <span className="truncate">{selectedSupplier.email}</span>
                   </div>
                 )}
                 {selectedSupplier.address && (
                   <div className="flex items-start gap-2 py-1 text-xs text-muted-foreground">
-                    <MapPin className="mt-0.5 size-3.5 shrink-0" /> <span>{selectedSupplier.address}</span>
+                    <MapPin className="mt-0.5 size-3.5 shrink-0" />{" "}
+                    <span>{selectedSupplier.address}</span>
                   </div>
                 )}
                 {selectedSupplier.created_at && (
                   <div className="flex items-center gap-2 py-1 text-xs text-muted-foreground">
                     <CalendarDays className="size-3.5" />
-                    <span>{new Date(selectedSupplier.created_at).toLocaleDateString(isRtl ? "ar-YE" : "en-GB")}</span>
+                    <span>
+                      {new Date(selectedSupplier.created_at).toLocaleDateString(
+                        isRtl ? "ar-YE" : "en-GB",
+                      )}
+                    </span>
                   </div>
                 )}
               </section>
 
               <section className="space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="text-xs font-bold text-foreground">{isRtl ? "آخر الحركات" : "Recent activity"}</h3>
+                  <h3 className="text-xs font-bold text-foreground">
+                    {isRtl ? "آخر الحركات" : "Recent activity"}
+                  </h3>
                   <div className="flex items-center gap-1 rounded-full border border-border/70 bg-surface/60 p-0.5">
-                    {([
-                      ["all", isRtl ? "الكل" : "All"],
-                      ["purchases", isRtl ? "المشتريات" : "Purchases"],
-                      ["payments", isRtl ? "المدفوعات" : "Payments"],
-                    ] as const).map(([filter, label]) => (
+                    {(
+                      [
+                        ["all", isRtl ? "الكل" : "All"],
+                        ["purchases", isRtl ? "المشتريات" : "Purchases"],
+                        ["payments", isRtl ? "المدفوعات" : "Payments"],
+                      ] as const
+                    ).map(([filter, label]) => (
                       <button
                         key={filter}
                         type="button"
@@ -901,28 +977,52 @@ function SuppliersPage() {
                 </div>
                 {activityLoading ? (
                   <div className="flex items-center justify-center gap-2 rounded-xl border border-border/70 p-8 text-xs text-muted-foreground">
-                    <Loader2 className="size-4 animate-spin" /> {isRtl ? "جارٍ تحميل الحركات…" : "Loading activity…"}
+                    <Loader2 className="size-4 animate-spin" />{" "}
+                    {isRtl ? "جارٍ تحميل الحركات…" : "Loading activity…"}
                   </div>
-                ) : supplierActivity.filter((entry) => activityFilter === "all" || entry.kind === (activityFilter === "purchases" ? "purchase" : "payment")).length === 0 ? (
+                ) : supplierActivity.filter(
+                    (entry) =>
+                      activityFilter === "all" ||
+                      entry.kind === (activityFilter === "purchases" ? "purchase" : "payment"),
+                  ).length === 0 ? (
                   <p className="rounded-xl border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
                     {isRtl ? "لا توجد حركات مسجلة" : "No recorded activity"}
                   </p>
                 ) : (
                   <div className="divide-y divide-border/60 rounded-xl border border-border/70">
                     {supplierActivity
-                      .filter((entry) => activityFilter === "all" || entry.kind === (activityFilter === "purchases" ? "purchase" : "payment"))
+                      .filter(
+                        (entry) =>
+                          activityFilter === "all" ||
+                          entry.kind === (activityFilter === "purchases" ? "purchase" : "payment"),
+                      )
                       .map((entry, index) => (
-                        <div key={`${entry.kind}-${entry.date}-${index}`} className="flex items-center justify-between gap-3 p-3">
+                        <div
+                          key={`${entry.kind}-${entry.date}-${index}`}
+                          className="flex items-center justify-between gap-3 p-3"
+                        >
                           <div className="flex min-w-0 items-center gap-2.5">
-                            <span className={`grid size-8 shrink-0 place-items-center rounded-lg ${entry.kind === "purchase" ? "bg-amber-500/10 text-amber-600" : "bg-emerald-500/10 text-emerald-600"}`}>
-                              {entry.kind === "purchase" ? <FileText className="size-4" /> : <Wallet className="size-4" />}
+                            <span
+                              className={`grid size-8 shrink-0 place-items-center rounded-lg ${entry.kind === "purchase" ? "bg-amber-500/10 text-amber-600" : "bg-emerald-500/10 text-emerald-600"}`}
+                            >
+                              {entry.kind === "purchase" ? (
+                                <FileText className="size-4" />
+                              ) : (
+                                <Wallet className="size-4" />
+                              )}
                             </span>
                             <div className="min-w-0">
-                              <p className="truncate text-xs font-semibold text-foreground">{entry.label}</p>
-                              <p className="mt-0.5 text-[10px] text-muted-foreground">{new Date(entry.date).toLocaleDateString(isRtl ? "ar-YE" : "en-GB")}</p>
+                              <p className="truncate text-xs font-semibold text-foreground">
+                                {entry.label}
+                              </p>
+                              <p className="mt-0.5 text-[10px] text-muted-foreground">
+                                {new Date(entry.date).toLocaleDateString(isRtl ? "ar-YE" : "en-GB")}
+                              </p>
                             </div>
                           </div>
-                          <span className="shrink-0 font-mono text-xs font-bold text-foreground">{money(entry.amount)}</span>
+                          <span className="shrink-0 font-mono text-xs font-bold text-foreground">
+                            {money(entry.amount)}
+                          </span>
                         </div>
                       ))}
                   </div>
@@ -931,14 +1031,47 @@ function SuppliersPage() {
             </div>
 
             <footer className="flex shrink-0 flex-wrap gap-2 border-t border-border/70 bg-background/95 p-3.5">
-              {selectedSupplier.phone && <WhatsAppButton phone={selectedSupplier.phone} message={whatsAppFor(selectedSupplier)} />}
-              <button type="button" onClick={() => void navigate({ to: "/supplier-ledger" as never, search: { supplierId: selectedSupplier.id } as never })} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-semibold text-foreground hover:bg-muted">
+              {selectedSupplier.phone && (
+                <WhatsAppButton
+                  phone={selectedSupplier.phone}
+                  message={whatsAppFor(selectedSupplier)}
+                />
+              )}
+              <button
+                type="button"
+                onClick={() =>
+                  void navigate({
+                    to: "/supplier-ledger" as never,
+                    search: { supplierId: selectedSupplier.id } as never,
+                  })
+                }
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-semibold text-foreground hover:bg-muted"
+              >
                 <Receipt className="size-3.5" /> {isRtl ? "دفتر المورد" : "Ledger"}
               </button>
-              <button type="button" onClick={() => void navigate({ to: "/statements/$entityType" as never, params: { entityType: "supplier" } as never, search: { entityId: selectedSupplier.id } as never })} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-semibold text-foreground hover:bg-muted">
+              <button
+                type="button"
+                onClick={() =>
+                  void navigate({
+                    to: "/statements/$entityType" as never,
+                    params: { entityType: "supplier" } as never,
+                    search: { entityId: selectedSupplier.id } as never,
+                  })
+                }
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-semibold text-foreground hover:bg-muted"
+              >
                 <FileText className="size-3.5" /> {isRtl ? "كشف حساب" : "Statement"}
               </button>
-              <button type="button" onClick={() => void navigate({ to: "/purchase-pos" as never, search: { supplierId: selectedSupplier.id } as never })} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-bold text-primary-foreground hover:bg-primary/90">
+              <button
+                type="button"
+                onClick={() =>
+                  void navigate({
+                    to: "/purchase-pos" as never,
+                    search: { supplierId: selectedSupplier.id } as never,
+                  })
+                }
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-bold text-primary-foreground hover:bg-primary/90"
+              >
                 <ShoppingCart className="size-3.5" /> {isRtl ? "فاتورة شراء" : "New purchase"}
               </button>
             </footer>

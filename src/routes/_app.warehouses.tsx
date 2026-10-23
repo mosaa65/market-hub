@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { ModuleGuard, useModules } from "@/lib/modules";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";

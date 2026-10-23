@@ -11,15 +11,35 @@ const platformAccess = {
 
 const cases: Array<[string, boolean]> = [
   ["empty role list is denied on financial routes", !canAccessRoute(financeRoute, platformAccess)],
-  ["cashier is denied on financial routes", !canAccessRoute(financeRoute, { ...platformAccess, roles: ["cashier"] })],
-  ["warehouse is denied on financial routes", !canAccessRoute(financeRoute, { ...platformAccess, roles: ["warehouse"] })],
-  ["accountant is allowed on financial routes", canAccessRoute(financeRoute, { ...platformAccess, roles: ["accountant"] })],
-  ["owner is allowed on financial routes", canAccessRoute(financeRoute, { ...platformAccess, roles: ["owner"] })],
-  ["unrestricted routes remain accessible without roles", canAccessRoute(standardRoute, platformAccess)],
-  ["platform support can access financial routes", canAccessRoute(financeRoute, { ...platformAccess, isPlatformAdmin: true })],
+  [
+    "cashier is denied on financial routes",
+    !canAccessRoute(financeRoute, { ...platformAccess, roles: ["cashier"] }),
+  ],
+  [
+    "warehouse is denied on financial routes",
+    !canAccessRoute(financeRoute, { ...platformAccess, roles: ["warehouse"] }),
+  ],
+  [
+    "accountant is allowed on financial routes",
+    canAccessRoute(financeRoute, { ...platformAccess, roles: ["accountant"] }),
+  ],
+  [
+    "owner is allowed on financial routes",
+    canAccessRoute(financeRoute, { ...platformAccess, roles: ["owner"] }),
+  ],
+  [
+    "unrestricted routes remain accessible without roles",
+    canAccessRoute(standardRoute, platformAccess),
+  ],
+  [
+    "platform support can access financial routes",
+    canAccessRoute(financeRoute, { ...platformAccess, isPlatformAdmin: true }),
+  ],
 ];
 
-for (const entry of ROUTE_REGISTRY.filter((route) => route.category === "finance" && route.requiredRoles)) {
+for (const entry of ROUTE_REGISTRY.filter(
+  (route) => route.category === "finance" && route.requiredRoles,
+)) {
   const declared = [...(entry.requiredRoles ?? [])].sort().join(",");
   const guarded = [...(getRouteRule(entry.path)?.allowedRoles ?? [])].sort().join(",");
   cases.push([`navigation and direct-route roles agree for ${entry.path}`, declared === guarded]);

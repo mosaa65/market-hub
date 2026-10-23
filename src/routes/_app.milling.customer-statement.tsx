@@ -40,7 +40,11 @@ import {
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { ModuleGuard } from "@/lib/modules";
-import { TableToolbar, type FilterDefinition, type FilterValues } from "@/components/ui/table-toolbar";
+import {
+  TableToolbar,
+  type FilterDefinition,
+  type FilterValues,
+} from "@/components/ui/table-toolbar";
 import { PrimaryAction } from "@/components/ui/primary-action";
 import { RecordsViewToggle } from "@/components/ui/records-view-toggle";
 import { QuickFilterBar } from "@/components/ui/quick-filter-bar";
@@ -232,7 +236,10 @@ function CustomerCustodyPage() {
       const remB = Number(r.remaining_bags ?? 0);
       const remK = Number(r.remaining_kg ?? 0);
       const isZero = remB <= 0 && remK <= 0;
-      if (isZero) { zero++; continue; }
+      if (isZero) {
+        zero++;
+        continue;
+      }
       active++;
       if (r.item_class === "RAW_MATERIAL") raw++;
       else output++;
@@ -293,12 +300,14 @@ function CustomerCustodyPage() {
             return (b.customer_name_ar || "").localeCompare(a.customer_name_ar || "", "ar");
           case "remaining_desc":
             return (
-              Number(b.remaining_bags) * 50 + Number(b.remaining_kg) -
+              Number(b.remaining_bags) * 50 +
+              Number(b.remaining_kg) -
               (Number(a.remaining_bags) * 50 + Number(a.remaining_kg))
             );
           case "remaining_asc":
             return (
-              Number(a.remaining_bags) * 50 + Number(a.remaining_kg) -
+              Number(a.remaining_bags) * 50 +
+              Number(a.remaining_kg) -
               (Number(b.remaining_bags) * 50 + Number(b.remaining_kg))
             );
           case "recent_desc":
@@ -313,7 +322,15 @@ function CustomerCustodyPage() {
     }
 
     return list;
-  }, [rawRows, custodyFilters, selectedCustomer, selectedWarehouse, typeFilter, searchTerm, sortKey]);
+  }, [
+    rawRows,
+    custodyFilters,
+    selectedCustomer,
+    selectedWarehouse,
+    typeFilter,
+    searchTerm,
+    sortKey,
+  ]);
 
   // تعريفات الفلاتر الموحدة (لوحة الفلترة الجانبية)
   const custodyFilterDefinitions: FilterDefinition[] = useMemo(
@@ -412,9 +429,7 @@ function CustomerCustodyPage() {
                 {isRaw ? "حبوب خام" : "ناتج طحن"}
               </span>
             </div>
-            {r.sku && (
-              <span className="text-[10px] font-mono text-muted-foreground">{r.sku}</span>
-            )}
+            {r.sku && <span className="text-[10px] font-mono text-muted-foreground">{r.sku}</span>}
           </div>
         );
       },
@@ -485,9 +500,7 @@ function CustomerCustodyPage() {
       sortValue: (r) => r.last_movement_at ?? "",
       cell: (r) => (
         <span className="text-[11px] text-muted-foreground">
-          {r.last_movement_at
-            ? new Date(r.last_movement_at).toLocaleDateString("ar-EG")
-            : "—"}
+          {r.last_movement_at ? new Date(r.last_movement_at).toLocaleDateString("ar-EG") : "—"}
         </span>
       ),
     },
@@ -1607,12 +1620,16 @@ function QuickDeliveryModal({
                 </div>
                 <div className="min-w-0">
                   <span className="block text-[10px] text-muted-foreground">صنف الأمانة</span>
-                  <p className="truncate font-bold text-foreground text-xs">{initialRow.item_name_ar}</p>
+                  <p className="truncate font-bold text-foreground text-xs">
+                    {initialRow.item_name_ar}
+                  </p>
                 </div>
               </div>
 
               <div className="text-end shrink-0">
-                <span className="block text-[10px] text-muted-foreground">الرصيد المتاح للتسليم</span>
+                <span className="block text-[10px] text-muted-foreground">
+                  الرصيد المتاح للتسليم
+                </span>
                 <div className="font-black tabular-nums text-emerald-700 dark:text-emerald-300">
                   {fmtNum(initialRow.remaining_bags)} كيس ({fmtNum(initialRow.remaining_kg)} كجم)
                 </div>
@@ -1837,21 +1854,28 @@ function CustomerCustodyHistoryModal({
         {/* ملخص الرصيد الحالي — بطاقات موحدة للتصميم المتماسك */}
         <div className="grid grid-cols-3 gap-3 p-4 border-b border-border/60 text-xs">
           <div className="flex flex-col items-center justify-center gap-1 rounded-xl bg-muted/40 p-3 text-center">
-            <span className="block text-[11px] font-medium text-muted-foreground">إجمالي الوارد (مستلم)</span>
+            <span className="block text-[11px] font-medium text-muted-foreground">
+              إجمالي الوارد (مستلم)
+            </span>
             <p className="font-bold text-foreground text-sm leading-tight">
-              {fmtNum(row.received_bags)} <span className="text-[10px] font-normal">كيس</span> ({fmtNum(row.received_kg)} كجم)
+              {fmtNum(row.received_bags)} <span className="text-[10px] font-normal">كيس</span> (
+              {fmtNum(row.received_kg)} كجم)
             </p>
           </div>
           <div className="flex flex-col items-center justify-center gap-1 rounded-xl bg-muted/40 p-3 text-center">
-            <span className="block text-[11px] font-medium text-muted-foreground">إجمالي المنصرف (صادر)</span>
+            <span className="block text-[11px] font-medium text-muted-foreground">
+              إجمالي المنصرف (صادر)
+            </span>
             <p className="font-bold text-foreground text-sm leading-tight">
-              {fmtNum(row.issued_bags)} <span className="text-[10px] font-normal">كيس</span> ({fmtNum(row.issued_kg)} كجم)
+              {fmtNum(row.issued_bags)} <span className="text-[10px] font-normal">كيس</span> (
+              {fmtNum(row.issued_kg)} كجم)
             </p>
           </div>
           <div className="flex flex-col items-center justify-center gap-1 rounded-xl border border-primary/20 bg-primary/5 p-3 text-center">
             <span className="block text-[11px] font-bold text-primary">الرصيد المتبقي حالياً</span>
             <p className="font-black text-primary text-base leading-tight">
-              {fmtNum(row.remaining_bags)} <span className="text-[10px] font-semibold">كيس</span> ({fmtNum(row.remaining_kg)} كجم)
+              {fmtNum(row.remaining_bags)} <span className="text-[10px] font-semibold">كيس</span> (
+              {fmtNum(row.remaining_kg)} كجم)
             </p>
           </div>
         </div>
@@ -1886,7 +1910,9 @@ function CustomerCustodyHistoryModal({
                 <FileText className="h-4 w-4 text-muted-foreground" />
               </div>
               <h5 className="font-bold text-sm text-foreground mb-0.5">لا توجد حركات مطابقة</h5>
-              <p className="text-xs text-muted-foreground">لا توجد حركات مسجلة لهذا الصنف أو ضمن التصفية المحددة.</p>
+              <p className="text-xs text-muted-foreground">
+                لا توجد حركات مسجلة لهذا الصنف أو ضمن التصفية المحددة.
+              </p>
             </div>
           ) : (
             <table className="w-full text-xs">
@@ -1905,15 +1931,25 @@ function CustomerCustodyHistoryModal({
                   <tr key={l.id} className="transition-colors hover:bg-muted/20">
                     <td className="px-3 py-2.5">
                       {l.entry_type === "INTAKE" ? (
-                        <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600">استلام أمانة</span>
+                        <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600">
+                          استلام أمانة
+                        </span>
                       ) : l.entry_type === "MILLING" ? (
-                        <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-600">طحن</span>
+                        <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-600">
+                          طحن
+                        </span>
                       ) : l.entry_type === "DELIVERY" ? (
-                        <span className="inline-flex items-center rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] font-bold text-blue-600">تسليم ناتج</span>
+                        <span className="inline-flex items-center rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] font-bold text-blue-600">
+                          تسليم ناتج
+                        </span>
                       ) : l.entry_type === "ADJUSTMENT" ? (
-                        <span className="inline-flex items-center rounded-full bg-rose-500/10 px-2 py-0.5 text-[10px] font-bold text-rose-600">تسوية موثّقة</span>
+                        <span className="inline-flex items-center rounded-full bg-rose-500/10 px-2 py-0.5 text-[10px] font-bold text-rose-600">
+                          تسوية موثّقة
+                        </span>
                       ) : (
-                        <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">تعديل</span>
+                        <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
+                          تعديل
+                        </span>
                       )}
                     </td>
                     <td className="px-3 py-2.5 font-mono text-foreground font-semibold text-[11px]">
@@ -1929,7 +1965,9 @@ function CustomerCustodyHistoryModal({
                         ? `${fmtNum(l.bags_out)} كيس (${fmtNum(l.kg_out)} كجم)`
                         : "—"}
                     </td>
-                    <td className="px-3 py-2.5 text-muted-foreground text-[11px]">{l.notes || "—"}</td>
+                    <td className="px-3 py-2.5 text-muted-foreground text-[11px]">
+                      {l.notes || "—"}
+                    </td>
                     <td className="px-3 py-2.5 text-end text-muted-foreground text-[11px] tabular-nums">
                       {new Date(l.created_at).toLocaleString("ar-EG")}
                     </td>

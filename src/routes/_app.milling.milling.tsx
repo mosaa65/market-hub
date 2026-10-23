@@ -198,9 +198,7 @@ function MillingMillPage() {
 
     // 1) الفاقد الافتراضي من نسبة النوع (بوحدة كجم من المطحون)
     if (type.default_loss_rate_pct > 0 && milledKg > 0) {
-      setLossKg(
-        String(Math.round(((milledKg * type.default_loss_rate_pct) / 100) * 100) / 100),
-      );
+      setLossKg(String(Math.round(((milledKg * type.default_loss_rate_pct) / 100) * 100) / 100));
     }
 
     // 2) النواتج الافتراضية: أطابق نسب النوع مع أصناف النواتج الفعلية بالاسم
