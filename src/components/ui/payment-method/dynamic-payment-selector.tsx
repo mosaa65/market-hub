@@ -163,75 +163,65 @@ export function DynamicPaymentSelector({
   }, [methods]);
 
   if (compact) {
-    const accountOptions =
-      currentKind === "CASH"
-        ? activeCashboxes.map((account) => ({ id: account.id, name: account.name_ar, code: account.account?.code, accountId: account.account_id }))
-        : currentKind === "BANK"
-          ? banks.map((account) => ({ id: account.id, name: account.name_ar, code: account.account?.code, accountId: account.account_id }))
-          : currentKind === "WALLET"
-            ? wallets.map((account) => ({ id: account.id, name: currentMethod?.id === "jaib" && /الأهدل|الاهدل/i.test(account.name_ar) ? "جيب" : account.name_ar, code: account.account?.code, accountId: account.account_id }))
-            : [];
-    const selectedAccountId = currentKind === "CASH" ? settlement.cashboxId : settlement.bankAccountId;
-    const selectedAccount = accountOptions.find((account) => account.id === selectedAccountId);
+    const accountForMethod = (method: ResolvedPaymentMethod) => {
+      if (method.ledgerKind === "CASH") return defaultCashbox;
+      if (method.ledgerKind === "BANK") return defaultBank;
+      if (method.ledgerKind === "WALLET") return defaultWallet;
+      return null;
+    };
+
+    const selectedAccount = currentMethod ? accountForMethod(currentMethod) : null;
+    const selectedAccountName = selectedAccount
+      ? currentMethod?.id === "jaib" && /الأهدل|الاهدل/i.test(selectedAccount.name_ar)
+        ? "جيب"
+        : selectedAccount.name_ar
+      : settlement.cashboxName || settlement.bankAccountName;
 
     return (
       <div className={cn("min-w-0", className)}>
-        <div className="rounded-xl border border-border/70 bg-card p-1.5 shadow-sm">
-          <div className="flex min-w-0 items-center gap-1.5">
-            <div className="relative min-w-0 flex-1">
-              <select
-                value={currentMethod?.id ?? value}
-                disabled={disabled || methodsLoading}
-                onChange={(event) => {
-                  const method = primaryButtons.find((item) => item.id === event.target.value);
-                  if (method) handleSelectPrimary(method);
-                }}
-                aria-label={isAr ? "طريقة الدفع" : "Payment method"}
-                className="h-9 w-full appearance-none rounded-lg border border-border bg-background px-2.5 pe-7 text-[11px] font-semibold outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-              >
-                {primaryButtons.map((method) => (
+        <div className="overflow-hidden rounded-xl border border-border/70 bg-card shadow-sm">
+          <div className="relative">
+            <select
+              value={currentMethod?.id ?? value}
+              disabled={disabled || methodsLoading}
+              onChange={(event) => {
+                const method = primaryButtons.find((item) => item.id === event.target.value);
+                if (method) handleSelectPrimary(method);
+              }}
+              aria-label={isAr ? "طريقة الدفع والحساب" : "Payment method and account"}
+              className="h-10 w-full appearance-none bg-background px-3 pe-10 text-xs font-semibold text-foreground outline-none transition focus:bg-muted/30 focus:ring-2 focus:ring-primary/20"
+            >
+              {primaryButtons.map((method) => {
+                const account = accountForMethod(method);
+                const accountName = account
+                  ? method.id === "jaib" && /الأهدل|الاهدل/i.test(account.name_ar)
+                    ? "جيب"
+                    : account.name_ar
+                  : method.ledgerKind === "CREDIT"
+                    ? (isAr ? "ذمم العميل" : "Customer receivable")
+                    : (isAr ? "غير مرتبط" : "Not linked");
+                return (
                   <option key={method.id} value={method.id}>
-                    {isAr ? method.nameAr : method.nameEn ?? method.nameAr}
+                    {isAr ? method.nameAr : method.nameEn ?? method.nameAr} — {accountName}
                   </option>
-                ))}
-              </select>
-              <Wallet className="pointer-events-none absolute end-2 top-1/2 size-3.5 -translate-y-1/2 text-primary" />
-            </div>
+                );
+              })}
+            </select>
+            <Wallet className="pointer-events-none absolute end-3 top-1/2 size-4 -translate-y-1/2 text-primary" />
+          </div>
+          <div className="flex min-h-6 items-center gap-1.5 border-t border-border/50 bg-muted/25 px-3 py-1 text-[10px] leading-tight">
             {currentKind === "CREDIT" ? (
-              <span className="shrink-0 rounded-lg bg-violet-500/10 px-2 py-2 text-[10px] font-semibold text-violet-700 dark:text-violet-300">
-                {isAr ? "ذمم العميل" : "Receivable"}
-              </span>
+              <span className="font-medium text-violet-700 dark:text-violet-300">{isAr ? "ذمم العميل — لا يوجد حساب تحصيل" : "Customer receivable — no collection account"}</span>
+            ) : selectedAccountName ? (
+              <>
+                <Check className="size-3 shrink-0 text-emerald-600" />
+                <span className="truncate font-medium text-emerald-700 dark:text-emerald-400">{selectedAccountName}</span>
+                <span className="shrink-0 text-muted-foreground">· {isAr ? "مرتبط بالدليل المحاسبي" : "Ledger linked"}</span>
+              </>
             ) : (
-              <div className="relative min-w-0 flex-1">
-                <select
-                  value={selectedAccountId ?? ""}
-                  disabled={disabled || accountOptions.length === 0 || cashboxesLoading || banksLoading}
-                  onChange={(event) => {
-                    const account = accountOptions.find((item) => item.id === event.target.value);
-                    if (!account) return;
-                    onSettlementChange({
-                      ...settlement,
-                      ...(currentKind === "CASH" ? { cashboxId: account.id, cashboxName: account.name } : { bankAccountId: account.id, bankAccountName: account.name }),
-                      chartAccountId: account.accountId,
-                    });
-                  }}
-                  aria-label={isAr ? "الحساب المرتبط" : "Linked account"}
-                  className="h-9 w-full appearance-none rounded-lg border border-border bg-background px-2.5 pe-7 text-[11px] font-semibold outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                >
-                  {accountOptions.length === 0 ? <option value="">{isAr ? "لا يوجد حساب" : "No account"}</option> : accountOptions.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
-                </select>
-                <Landmark className="pointer-events-none absolute end-2 top-1/2 size-3.5 -translate-y-1/2 text-emerald-600" />
-              </div>
+              <span className="text-amber-700 dark:text-amber-400">{isAr ? "لم يتم ربط حساب افتراضي بعد" : "No default account linked"}</span>
             )}
           </div>
-          {currentKind !== "CREDIT" && selectedAccount && (
-            <div className="mt-1 flex items-center gap-1.5 px-1 text-[9px] font-medium text-emerald-600 dark:text-emerald-400">
-              <Check className="size-3" />
-              <span className="truncate">{selectedAccount.name}</span>
-              <span className="text-muted-foreground">{selectedAccount.code ?? ""}</span>
-              <span className="ms-auto">{isAr ? "مرتبط بالدليل" : "Ledger linked"}</span>
-            </div>
-          )}
         </div>
       </div>
     );

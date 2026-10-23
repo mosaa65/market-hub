@@ -477,8 +477,15 @@
   .pt-safe {
     padding-top: env(safe-area-inset-top, 0px);
   }
+  /* Keep fixed/sticky actions and scrollable content above the PWA home indicator.
+     The extra breathing room also covers browsers that report a zero inset while
+     their bottom toolbar overlays the viewport. */
   .pb-safe {
-    padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+    padding-bottom: max(1rem, calc(env(safe-area-inset-bottom, 0px) + 0.75rem));
+  }
+
+  .pb-app-safe {
+    padding-bottom: max(1.25rem, calc(env(safe-area-inset-bottom, 0px) + 1rem));
   }
   .ps-safe {
     padding-inline-start: env(safe-area-inset-left, 0px);
