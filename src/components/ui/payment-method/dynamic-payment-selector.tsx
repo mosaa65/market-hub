@@ -192,14 +192,19 @@ export function DynamicPaymentSelector({
                 kind: "WALLET",
               }))
             : [];
-    const selectedAccountId = currentKind === "CASH" ? settlement.cashboxId : settlement.bankAccountId;
+    const selectedAccountId =
+      currentKind === "CASH" ? settlement.cashboxId : settlement.bankAccountId;
 
     return (
       <div className={cn("grid min-w-0 gap-2 sm:grid-cols-2", className)}>
         <section className="min-w-0 rounded-xl border border-border/70 bg-card p-2">
           <div className="mb-1.5 flex items-center justify-between gap-2">
-            <span className="text-[10px] font-bold text-foreground">{isAr ? "طريقة الدفع" : "Payment method"}</span>
-            <span className="text-[9px] text-muted-foreground">{methodsLoading ? "..." : `${primaryButtons.length}`}</span>
+            <span className="text-[10px] font-bold text-foreground">
+              {isAr ? "طريقة الدفع" : "Payment method"}
+            </span>
+            <span className="text-[9px] text-muted-foreground">
+              {methodsLoading ? "..." : `${primaryButtons.length}`}
+            </span>
           </div>
           <div className="grid grid-cols-2 gap-1">
             {primaryButtons.map((m) => {
@@ -213,7 +218,9 @@ export function DynamicPaymentSelector({
                   onClick={() => handleSelectPrimary(m)}
                   className={cn(
                     "flex min-h-11 items-center gap-1.5 rounded-lg border px-2 text-start text-[10px] font-semibold transition",
-                    selected ? "border-primary bg-primary/10 text-primary ring-1 ring-primary/20" : "border-border/70 bg-background text-muted-foreground hover:text-foreground",
+                    selected
+                      ? "border-primary bg-primary/10 text-primary ring-1 ring-primary/20"
+                      : "border-border/70 bg-background text-muted-foreground hover:text-foreground",
                   )}
                 >
                   <Icon className="h-3.5 w-3.5 shrink-0" />
@@ -227,8 +234,12 @@ export function DynamicPaymentSelector({
 
         <section className="min-w-0 rounded-xl border border-border/70 bg-card p-2">
           <div className="mb-1.5 flex items-center justify-between gap-2">
-            <span className="text-[10px] font-bold text-foreground">{isAr ? "الحساب المرتبط" : "Linked account"}</span>
-            <span className="text-[9px] text-muted-foreground">{accountOptions.length ? (isAr ? "من الدليل" : "Ledger") : "—"}</span>
+            <span className="text-[10px] font-bold text-foreground">
+              {isAr ? "الحساب المرتبط" : "Linked account"}
+            </span>
+            <span className="text-[9px] text-muted-foreground">
+              {accountOptions.length ? (isAr ? "من الدليل" : "Ledger") : "—"}
+            </span>
           </div>
           {currentKind === "CREDIT" ? (
             <div className="flex min-h-11 items-center rounded-lg border border-violet-500/20 bg-violet-500/10 px-2 text-[10px] font-semibold text-violet-700 dark:text-violet-300">
@@ -258,10 +269,14 @@ export function DynamicPaymentSelector({
                     }
                     className={cn(
                       "flex min-h-11 items-center justify-between gap-2 rounded-lg border px-2 text-start transition",
-                      selected ? "border-emerald-500 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300" : "border-border/70 bg-background text-muted-foreground hover:text-foreground",
+                      selected
+                        ? "border-emerald-500 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300"
+                        : "border-border/70 bg-background text-muted-foreground hover:text-foreground",
                     )}
                   >
-                    <span className="min-w-0 truncate text-[10px] font-semibold">{account.name}</span>
+                    <span className="min-w-0 truncate text-[10px] font-semibold">
+                      {account.name}
+                    </span>
                     <span className="flex shrink-0 items-center gap-1 text-[9px] text-muted-foreground">
                       {account.code ?? "—"}
                       {selected && <Check className="h-3 w-3 text-emerald-600" />}

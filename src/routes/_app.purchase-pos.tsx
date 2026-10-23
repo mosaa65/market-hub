@@ -57,7 +57,10 @@ import { SupplierFormDialog } from "@/components/contacts/supplier-form-dialog";
 import { UniversalPrintPreview } from "@/components/universal-print-preview";
 import type { PrintRequest } from "@/lib/printing";
 import { DynamicPaymentSelector } from "@/components/ui/payment-method/dynamic-payment-selector";
-import { SplitPaymentEditor, type SplitPaymentEditorLine } from "@/components/payments/split-payment-editor";
+import {
+  SplitPaymentEditor,
+  type SplitPaymentEditorLine,
+} from "@/components/payments/split-payment-editor";
 import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
 import { toLegacyPaymentValue, getPaymentMethodDefinition } from "@/lib/payments/payment-methods";
 

@@ -160,7 +160,7 @@ export function buildSidebarView(
   const availableFocusGroups = materializeGroups(entries, definitions);
   const groups =
     mode === "explorer"
-      ? availableFocusGroups
+      ? availableFocusGroups.filter((group) => group.key === focusGroup)
       : mode === "focus"
         ? [
             ...availableFocusGroups.filter((group) => group.key === "command_center"),

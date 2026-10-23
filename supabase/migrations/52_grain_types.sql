@@ -45,15 +45,25 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_grain_types_name_en
 CREATE INDEX IF NOT EXISTS idx_grain_types_active
   ON public.grain_types (is_active, name_ar);
 
+CREATE OR REPLACE FUNCTION public.grain_types_output_map_ratio_is_valid(p_output_map jsonb)
+ RETURNS boolean
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO 'pg_catalog'
+AS $function$
+  SELECT CASE
+    WHEN jsonb_typeof(p_output_map) <> 'array' THEN false
+    ELSE COALESCE((
+      SELECT SUM((entry->>'ratio')::numeric)
+      FROM jsonb_array_elements(p_output_map) AS entry
+    ), 0) <= 100
+  END;
+$function$;
+
 -- تحقق: مجموع نسب النواتج الافتراضية لا يتجاوز 100%
 ALTER TABLE public.grain_types
   ADD CONSTRAINT grain_types_output_map_ratio_check
-  CHECK (
-    COALESCE((
-      SELECT SUM((e->>'ratio')::numeric)
-      FROM jsonb_array_elements(default_output_map) AS e
-    ), 0) <= 100
-  );
+  CHECK (public.grain_types_output_map_ratio_is_valid(default_output_map));
 
 -- ── RLS ─────────────────────────────────────────────────────────────
 ALTER TABLE public.grain_types ENABLE ROW LEVEL SECURITY;

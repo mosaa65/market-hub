@@ -523,46 +523,22 @@ const SidebarContents = memo(function SidebarContents({
           )}
         </div>
         {displayGroups.map((sec, secIdx) => {
-            const sectionKey = sec.key;
-            const sectionOpen = preferences.mode === "explorer" || collapsed ? true : isSectionOpen(sectionKey);
-            const activeInSection = activeGroupKey === sectionKey;
+          const sectionKey = sec.key;
+          const sectionOpen =
+            preferences.mode === "explorer" || collapsed ? true : isSectionOpen(sectionKey);
+          const activeInSection = activeGroupKey === sectionKey;
 
-            return (
-              <div key={sectionKey}>
-                {preferences.mode === "explorer" ? (
-                  !collapsed && (
-                    <div
-                      className={cn(
-                        "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold tracking-[0.04em]",
-                        activeInSection ? "text-foreground" : "text-muted-foreground",
-                      )}
-                    >
-                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary/70" aria-hidden />
-                      <span className="min-w-0 flex-1 truncate text-start">
-                        {t(
-                          sec.key === "favorites"
-                            ? "nav.view.favorites"
-                            : sec.key === "recent"
-                              ? "nav.view.recent"
-                              : `nav.view.group.${sec.key}`,
-                        )}
-                      </span>
-                    </div>
-                  )
-                ) : !collapsed ? (
-                  <button
-                    type="button"
-                    onClick={() => toggleSection(sectionKey)}
-                    aria-expanded={sectionOpen}
-                    aria-controls={`sidebar-section-${sectionKey}`}
+          return (
+            <div key={sectionKey}>
+              {preferences.mode === "explorer" ? (
+                !collapsed && (
+                  <div
                     className={cn(
-                      "flex w-full items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-[0.12em]",
-                      "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
-                      activeInSection
-                        ? "text-foreground"
-                        : "text-muted-foreground/80 hover:bg-sidebar-accent/60 hover:text-foreground",
+                      "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold tracking-[0.04em]",
+                      activeInSection ? "text-foreground" : "text-muted-foreground",
                     )}
                   >
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary/70" aria-hidden />
                     <span className="min-w-0 flex-1 truncate text-start">
                       {t(
                         sec.key === "favorites"
@@ -572,151 +548,190 @@ const SidebarContents = memo(function SidebarContents({
                             : `nav.view.group.${sec.key}`,
                       )}
                     </span>
-                    <span
-                      className={cn(
-                        "grid size-5 shrink-0 place-items-center rounded-md text-muted-foreground/70 transition-transform duration-200",
-                        sectionOpen ? "rotate-0" : dir === "rtl" ? "rotate-90" : "-rotate-90",
-                      )}
-                      aria-hidden
-                    >
-                      <ChevronDown className="size-3.5" />
-                    </span>
-                  </button>
-                ) : (
-                  secIdx > 0 && <div className="my-2 h-px w-7 mx-auto bg-sidebar-border/60" />
-                )}
-
-                <ul
-                  id={`sidebar-section-${sectionKey}`}
-                  hidden={!sectionOpen}
-                  className={cn(collapsed ? "space-y-1.5" : "space-y-1 mt-0.5")}
+                  </div>
+                )
+              ) : !collapsed ? (
+                <button
+                  type="button"
+                  onClick={() => toggleSection(sectionKey)}
+                  aria-expanded={sectionOpen}
+                  aria-controls={`sidebar-section-${sectionKey}`}
+                  className={cn(
+                    "flex w-full items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-[0.12em]",
+                    "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                    activeInSection
+                      ? "text-foreground"
+                      : "text-muted-foreground/80 hover:bg-sidebar-accent/60 hover:text-foreground",
+                  )}
                 >
-                  {sec.entries.map((it) => {
-                    /*
-                     * Active-link matching.
-                     *
-                     * Entries that differ only by `?section=` share one pathname,
-                     * so comparing paths alone lit up every settings link at once.
-                     * A sectioned entry is active only when its own section is the
-                     * selected one; the unsectioned `/settings` entry ("/settings")
-                     * stays active for the hub itself.
-                     */
-                    const [entryPath, entryQuery] = it.path.split("?");
-                    const entrySearch = new URLSearchParams(entryQuery ?? "");
-                    const hasEntryQuery = Array.from(entrySearch.keys()).length > 0;
-                    const queryMatches = Array.from(entrySearch.entries()).every(
-                      ([key, value]) => currentSearchParams.get(key) === value,
-                    );
+                  <span className="min-w-0 flex-1 truncate text-start">
+                    {t(
+                      sec.key === "favorites"
+                        ? "nav.view.favorites"
+                        : sec.key === "recent"
+                          ? "nav.view.recent"
+                          : `nav.view.group.${sec.key}`,
+                    )}
+                  </span>
+                  <span
+                    className={cn(
+                      "grid size-5 shrink-0 place-items-center rounded-md text-muted-foreground/70 transition-transform duration-200",
+                      sectionOpen ? "rotate-0" : dir === "rtl" ? "rotate-90" : "-rotate-90",
+                    )}
+                    aria-hidden
+                  >
+                    <ChevronDown className="size-3.5" />
+                  </span>
+                </button>
+              ) : (
+                secIdx > 0 && <div className="my-2 h-px w-7 mx-auto bg-sidebar-border/60" />
+              )}
 
-                    const active = hasEntryQuery
-                      ? pathname === entryPath && queryMatches
-                      : entryPath === "/settings"
-                        ? // The hub itself: active only when no section is chosen,
-                          // otherwise the sectioned link below it takes the mark.
-                          pathname === "/settings" && !currentSection
-                        : pathname === entryPath ||
-                          (entryPath !== "/dashboard" && pathname.startsWith(`${entryPath}/`));
-                    const Icon = routeIcon(it.id);
-                    const translated = it.i18nKey ? t(it.i18nKey) : undefined;
-                    const title =
-                      translated && translated !== it.i18nKey
-                        ? translated
-                        : isAr
-                          ? it.titleAr
-                          : it.titleEn;
-                    const catStyle = getSidebarStyle(sec.styleCategory, sec.key, preferences);
-                    const isFavorite = preferences.favorites.includes(it.id);
-                    const iconShapeClass =
-                      preferences.iconShape === "circle" ? "rounded-full" : "rounded-lg";
+              <ul
+                id={`sidebar-section-${sectionKey}`}
+                hidden={!sectionOpen}
+                className={cn(collapsed ? "space-y-1.5" : "space-y-1 mt-0.5")}
+              >
+                {sec.entries.map((it) => {
+                  /*
+                   * Active-link matching.
+                   *
+                   * Entries that differ only by `?section=` share one pathname,
+                   * so comparing paths alone lit up every settings link at once.
+                   * A sectioned entry is active only when its own section is the
+                   * selected one; the unsectioned `/settings` entry ("/settings")
+                   * stays active for the hub itself.
+                   */
+                  const [entryPath, entryQuery] = it.path.split("?");
+                  const entrySearch = new URLSearchParams(entryQuery ?? "");
+                  const hasEntryQuery = Array.from(entrySearch.keys()).length > 0;
+                  const queryMatches = Array.from(entrySearch.entries()).every(
+                    ([key, value]) => currentSearchParams.get(key) === value,
+                  );
 
-                    return (
-                      <li key={it.id} className="relative">
-                        {/* In the collapsed rail the label must appear on hover —
-                         *  a unified tooltip, never a bare `title`. */}
-                        <Hint
-                          label={collapsed ? title : undefined}
-                          side={dir === "rtl" ? "left" : "right"}
-                        >
-                          <Link
-                            /*
-                             * `to` هو المسار فقط؛ معاملات كل رابط (قسم إعدادات
-                             * أو تقرير محدد) تمرر عبر `search`، وإلا يعاملها
-                             * الموجّه كجزء من pathname ولا يجد المسار.
-                             */
-                            to={entryPath}
-                            search={
-                              hasEntryQuery
-                                ? (Object.fromEntries(entrySearch.entries()) as any)
-                                : undefined
-                            }
-                            onClick={onNavigate}
-                            className={cn(
-                              "group relative flex items-center transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
-                              collapsed
-                                ? cn(
-                                    "h-10 w-10 mx-auto justify-center p-0",
-                                    preferences.iconShape === "circle"
-                                      ? "rounded-full"
-                                      : "rounded-xl",
+                  const active = hasEntryQuery
+                    ? pathname === entryPath && queryMatches
+                    : entryPath === "/settings"
+                      ? // The hub itself: active only when no section is chosen,
+                        // otherwise the sectioned link below it takes the mark.
+                        pathname === "/settings" && !currentSection
+                      : pathname === entryPath ||
+                        (entryPath !== "/dashboard" && pathname.startsWith(`${entryPath}/`));
+                  const Icon = routeIcon(it.id);
+                  const translated = it.i18nKey ? t(it.i18nKey) : undefined;
+                  const title =
+                    translated && translated !== it.i18nKey
+                      ? translated
+                      : isAr
+                        ? it.titleAr
+                        : it.titleEn;
+                  const catStyle = getSidebarStyle(sec.styleCategory, sec.key, preferences);
+                  const isFavorite = preferences.favorites.includes(it.id);
+                  const iconShapeClass =
+                    preferences.iconShape === "circle" ? "rounded-full" : "rounded-lg";
+
+                  return (
+                    <li key={it.id} className="relative">
+                      {/* In the collapsed rail the label must appear on hover —
+                       *  a unified tooltip, never a bare `title`. */}
+                      <Hint
+                        label={collapsed ? title : undefined}
+                        side={dir === "rtl" ? "left" : "right"}
+                      >
+                        <Link
+                          /*
+                           * `to` هو المسار فقط؛ معاملات كل رابط (قسم إعدادات
+                           * أو تقرير محدد) تمرر عبر `search`، وإلا يعاملها
+                           * الموجّه كجزء من pathname ولا يجد المسار.
+                           */
+                          to={entryPath}
+                          search={
+                            hasEntryQuery
+                              ? (Object.fromEntries(entrySearch.entries()) as any)
+                              : undefined
+                          }
+                          onClick={onNavigate}
+                          className={cn(
+                            "group relative flex items-center transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                            collapsed
+                              ? cn(
+                                  "h-10 w-10 mx-auto justify-center p-0",
+                                  preferences.iconShape === "circle"
+                                    ? "rounded-full"
+                                    : "rounded-xl",
+                                )
+                              : "gap-3 ps-3 pe-10 py-2.5 rounded-xl text-[13.5px] sm:text-sm font-medium",
+                            active
+                              ? collapsed
+                                ? cn("shadow-md ring-2 ring-white/10", catStyle.iconBoxActive)
+                                : cn(
+                                    "text-foreground font-semibold shadow-sm border",
+                                    catStyle.activeBg,
                                   )
-                                : "gap-3 ps-3 pe-10 py-2.5 rounded-xl text-[13.5px] sm:text-sm font-medium",
-                              active
-                                ? collapsed
-                                  ? cn("shadow-md ring-2 ring-white/10", catStyle.iconBoxActive)
-                                  : cn(
-                                      "text-foreground font-semibold shadow-sm border",
-                                      catStyle.activeBg,
-                                    )
-                                : collapsed
-                                  ? "text-muted-foreground hover:bg-surface-2 hover:text-foreground hover:scale-105"
-                                  : "text-muted-foreground hover:bg-sidebar-accent/70 hover:text-foreground",
+                              : collapsed
+                                ? "text-muted-foreground hover:bg-surface-2 hover:text-foreground hover:scale-105"
+                                : "text-muted-foreground hover:bg-sidebar-accent/70 hover:text-foreground",
+                          )}
+                        >
+                          {active && !collapsed && (
+                            <span
+                              className={cn(
+                                "absolute inset-y-2 w-[3.5px] rounded-full",
+                                catStyle.accentPill,
+                                dir === "rtl" ? "right-0" : "left-0",
+                              )}
+                            />
+                          )}
+
+                          <div
+                            className={cn(
+                              "grid place-items-center transition-all duration-200 shrink-0",
+                              collapsed
+                                ? "h-full w-full"
+                                : cn(
+                                    cn("h-7 w-7", iconShapeClass),
+                                    active ? catStyle.iconBoxActive : catStyle.iconBoxInactive,
+                                  ),
                             )}
                           >
-                            {active && !collapsed && (
-                              <span
-                                className={cn(
-                                  "absolute inset-y-2 w-[3.5px] rounded-full",
-                                  catStyle.accentPill,
-                                  dir === "rtl" ? "right-0" : "left-0",
-                                )}
-                              />
-                            )}
-
-                            <div
+                            <Icon
                               className={cn(
-                                "grid place-items-center transition-all duration-200 shrink-0",
+                                "shrink-0 transition-all duration-200",
                                 collapsed
-                                  ? "h-full w-full"
-                                  : cn(
-                                      cn("h-7 w-7", iconShapeClass),
-                                      active ? catStyle.iconBoxActive : catStyle.iconBoxInactive,
-                                    ),
+                                  ? active
+                                    ? "h-5 w-5 stroke-[2.4]"
+                                    : "h-5 w-5 group-hover:scale-110"
+                                  : active
+                                    ? cn("h-4 w-4", catStyle.iconActive)
+                                    : cn("h-4 w-4", catStyle.iconInactive),
                               )}
-                            >
-                              <Icon
-                                className={cn(
-                                  "shrink-0 transition-all duration-200",
-                                  collapsed
-                                    ? active
-                                      ? "h-5 w-5 stroke-[2.4]"
-                                      : "h-5 w-5 group-hover:scale-110"
-                                    : active
-                                      ? cn("h-4 w-4", catStyle.iconActive)
-                                      : cn("h-4 w-4", catStyle.iconInactive),
-                                )}
-                              />
-                            </div>
+                            />
+                          </div>
 
-                            {!collapsed && (
-                              <span className="truncate leading-tight font-medium group-hover:text-foreground transition-colors">
-                                {title}
-                              </span>
-                            )}
-                          </Link>
-                        </Hint>
-                        {!collapsed && sectionKey !== "recent" && (
-                          <Hint
-                            label={
+                          {!collapsed && (
+                            <span className="truncate leading-tight font-medium group-hover:text-foreground transition-colors">
+                              {title}
+                            </span>
+                          )}
+                        </Link>
+                      </Hint>
+                      {!collapsed && sectionKey !== "recent" && (
+                        <Hint
+                          label={
+                            isFavorite
+                              ? isAr
+                                ? "إزالة من المفضلة"
+                                : "Remove from favorites"
+                              : isAr
+                                ? "إضافة إلى المفضلة"
+                                : "Add to favorites"
+                          }
+                          side={dir === "rtl" ? "left" : "right"}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => toggleFavorite(it.id)}
+                            aria-label={
                               isFavorite
                                 ? isAr
                                   ? "إزالة من المفضلة"
@@ -725,39 +740,25 @@ const SidebarContents = memo(function SidebarContents({
                                   ? "إضافة إلى المفضلة"
                                   : "Add to favorites"
                             }
-                            side={dir === "rtl" ? "left" : "right"}
+                            aria-pressed={isFavorite}
+                            className="absolute inset-y-0 end-1 my-auto grid size-8 place-items-center rounded-md text-muted-foreground/70 opacity-70 transition-opacity hover:bg-sidebar-accent hover:text-amber-500 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 group-hover:opacity-100"
                           >
-                            <button
-                              type="button"
-                              onClick={() => toggleFavorite(it.id)}
-                              aria-label={
-                                isFavorite
-                                  ? isAr
-                                    ? "إزالة من المفضلة"
-                                    : "Remove from favorites"
-                                  : isAr
-                                    ? "إضافة إلى المفضلة"
-                                    : "Add to favorites"
-                              }
-                              aria-pressed={isFavorite}
-                              className="absolute inset-y-0 end-1 my-auto grid size-8 place-items-center rounded-md text-muted-foreground/70 opacity-70 transition-opacity hover:bg-sidebar-accent hover:text-amber-500 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 group-hover:opacity-100"
-                            >
-                              <Star
-                                className={cn(
-                                  "size-3.5",
-                                  isFavorite && "fill-amber-400 text-amber-500",
-                                )}
-                              />
-                            </button>
-                          </Hint>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            );
-          })}
+                            <Star
+                              className={cn(
+                                "size-3.5",
+                                isFavorite && "fill-amber-400 text-amber-500",
+                              )}
+                            />
+                          </button>
+                        </Hint>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          );
+        })}
       </nav>
 
       {/* ERP Tour trigger button */}

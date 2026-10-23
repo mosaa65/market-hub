@@ -113,6 +113,12 @@ ON CONFLICT (provider, provider_id) DO UPDATE
 -- ⚠️ هوية هاتف قديمة موجودة مسبقًا (زرعتها نسخة أقدم بلا حقل phone في
 -- identity_data)? ON CONFLICT أعلاه يصلحها. وهذا التحديث الإضافي يعالج
 -- هوية هاتف بـ provider_id مختلف (تصميم أقدم) لم يطابق القيد:
+WITH known(user_id, phone) AS (VALUES
+  ('a0000000-0000-4000-a000-000000000001'::uuid, '+967772217218'),
+  ('a0000000-0000-4000-a000-000000000002'::uuid, '+967772317950'),
+  ('a0000000-0000-4000-a000-000000000003'::uuid, '+967784795104'),
+  ('a0000000-0000-4000-a000-000000000004'::uuid, '+967779121636')
+)
 UPDATE auth.identities i
 SET identity_data = jsonb_build_object(
       'sub', k.user_id::text,

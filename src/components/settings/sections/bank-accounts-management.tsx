@@ -218,7 +218,9 @@ export function BankAccountsManagement() {
           </div>
 
           <div className="rounded-xl border border-primary/15 bg-primary/5 px-3 py-2 text-[11px] font-medium text-primary">
-            {isAr ? "الحسابات والمحافظ الافتراضية المرتبطة بالدليل المحاسبي" : "Default accounts and wallets linked to the chart of accounts"}
+            {isAr
+              ? "الحسابات والمحافظ الافتراضية المرتبطة بالدليل المحاسبي"
+              : "Default accounts and wallets linked to the chart of accounts"}
           </div>
         </div>
       </div>
