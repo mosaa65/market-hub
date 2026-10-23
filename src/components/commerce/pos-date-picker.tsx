@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { CalendarDays, ChevronDown } from "lucide-react";
+import { ar } from "date-fns/locale";
+import { CalendarDays, ChevronDown, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -49,7 +50,7 @@ function localDateValue(date: Date): string {
 
 export function PosDatePicker({ value, onChange, lang, label }: PosDatePickerProps) {
   const [open, setOpen] = useState(false);
-  const isArabic = lang === "ar";
+  const isArabic = lang.toLowerCase().startsWith("ar");
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -69,13 +70,13 @@ export function PosDatePicker({ value, onChange, lang, label }: PosDatePickerPro
       <PopoverContent
         align={isArabic ? "end" : "start"}
         sideOffset={6}
-        className="w-[min(21rem,calc(100vw-1rem))] overflow-hidden rounded-2xl border-primary/20 bg-primary/[0.055] p-0 text-card-foreground shadow-2xl dark:border-primary/30 dark:bg-primary/[0.12]"
+        className="w-[min(21rem,calc(100vw-1rem))] overflow-hidden rounded-2xl border border-border/80 bg-card p-0 text-card-foreground shadow-2xl"
       >
-        <div className="flex items-center gap-3 border-b border-primary/15 px-4 py-3 dark:border-primary/25">
-          <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-primary/15 bg-primary/10 text-primary">
+        <div className="flex items-center gap-3 border-b border-border/70 bg-card px-4 py-2.5">
+          <span className="grid size-9 shrink-0 place-items-center rounded-full border border-primary/15 bg-primary/10 text-primary">
             <CalendarDays className="size-4" />
           </span>
-          <span className="min-w-0">
+          <span className="min-w-0 flex-1">
             <span className="block truncate text-xs font-semibold text-muted-foreground">
               {label}
             </span>
@@ -83,9 +84,19 @@ export function PosDatePicker({ value, onChange, lang, label }: PosDatePickerPro
               {formatLongDate(value, lang)}
             </span>
           </span>
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            aria-label={isArabic ? "إغلاق التقويم" : "Close calendar"}
+            title={isArabic ? "إغلاق" : "Close"}
+            className="grid size-8 shrink-0 place-items-center rounded-full border border-border/70 bg-card text-muted-foreground transition hover:border-primary/30 hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+          >
+            <X className="size-4" />
+          </button>
         </div>
         <Calendar
           mode="single"
+          locale={isArabic ? ar : undefined}
           showOutsideDays={false}
           selected={parseDate(value)}
           onSelect={(date) => {
@@ -94,49 +105,52 @@ export function PosDatePicker({ value, onChange, lang, label }: PosDatePickerPro
             const month = String(date.getMonth() + 1).padStart(2, "0");
             const day = String(date.getDate()).padStart(2, "0");
             onChange(`${year}-${month}-${day}`);
-            setOpen(false);
           }}
           dir={isArabic ? "rtl" : "ltr"}
           weekStartsOn={6}
           formatters={{
             formatWeekdayName: (date) =>
-              new Intl.DateTimeFormat(isArabic ? "ar" : "en", { weekday: "long" }).format(date),
+              new Intl.DateTimeFormat(isArabic ? "ar-SA" : "en", { weekday: "long" }).format(date),
           }}
           classNames={{
-            month: "flex w-full flex-col gap-2",
-            month_caption: "flex h-8 w-full items-center justify-center px-8 text-sm font-bold",
-            nav: "absolute inset-x-0 top-0 flex w-full items-center justify-between gap-1",
-            weekdays: "flex border-b border-primary/10 pb-1 dark:border-primary/20",
+            root: "mx-auto w-full",
+            month: "flex w-full flex-col gap-0",
+            month_caption:
+              "flex h-8 w-full items-center justify-center px-10 text-sm font-bold text-foreground",
+            nav: "absolute inset-x-0 top-0 flex w-full items-center justify-between px-1",
+            button_previous:
+              "grid size-8 place-items-center rounded-full border border-border/70 bg-card text-foreground transition hover:border-primary/40 hover:bg-muted active:scale-95",
+            button_next:
+              "grid size-8 place-items-center rounded-full border border-border/70 bg-card text-foreground transition hover:border-primary/40 hover:bg-muted active:scale-95",
+            weekdays: "grid grid-cols-7 border-b border-border/70 pb-1",
             weekday:
-              "flex-1 select-none rounded-md px-0 text-center text-[9px] font-semibold text-muted-foreground sm:text-[10px]",
-            week: "mt-1 flex w-full",
+              "min-w-0 select-none px-0 text-center text-[9px] font-semibold text-muted-foreground sm:text-[10px]",
+            week: "mt-0 grid grid-cols-7",
+            day: "mx-auto grid size-8 place-items-center p-0",
             day_button:
-              "mx-auto size-8 rounded-full text-xs transition-colors hover:bg-primary/10 data-[selected-single=true]:bg-primary data-[selected-single=true]:text-primary-foreground sm:size-9",
+              "grid size-8 place-items-center rounded-full text-xs font-medium transition-colors hover:bg-primary/10 data-[today=true]:border data-[today=true]:border-primary/40 data-[selected-single=true]:bg-primary data-[selected-single=true]:font-bold data-[selected-single=true]:text-primary-foreground",
           }}
           initialFocus
-          className="mx-auto w-full p-2.5"
+          className="mx-auto w-full bg-card px-3 py-1.5"
         />
-        <div className="flex items-center gap-1.5 border-t border-primary/15 px-2.5 py-2 dark:border-primary/25">
+        <div className="flex items-center gap-1.5 border-t border-border/70 bg-card px-2.5 py-1.5">
           {[
             { offset: 0, ar: "اليوم", en: "Today" },
             { offset: -1, ar: "أمس", en: "Yesterday" },
             { offset: -2, ar: "أول أمس", en: "2 days ago" },
           ].map((shortcut) => (
-            <Button
+            <button
               key={shortcut.offset}
               type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 flex-1 rounded-full border border-primary/15 bg-background/35 px-2 text-[11px] font-semibold text-primary hover:border-primary/30 hover:bg-primary/10"
+              className="h-8 flex-1 rounded-full border border-border/70 bg-card px-2 text-[11px] font-semibold text-primary transition hover:border-primary/35 hover:bg-muted active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
               onClick={() => {
                 const date = new Date();
                 date.setDate(date.getDate() + shortcut.offset);
                 onChange(localDateValue(date));
-                setOpen(false);
               }}
             >
               {isArabic ? shortcut.ar : shortcut.en}
-            </Button>
+            </button>
           ))}
         </div>
       </PopoverContent>

@@ -2386,7 +2386,7 @@ function POSPage() {
                           key={p.id}
                           onClick={() => addToCart(p)}
                           disabled={low}
-                          className="group relative flex flex-col items-start justify-between gap-2 rounded-2xl border border-border/80 bg-card/80 p-2.5 text-start transition-all duration-150 hover:border-primary/50 hover:bg-card hover:shadow-md active:scale-[0.98] disabled:opacity-40"
+                          className="group relative flex flex-col items-start justify-between gap-2 rounded-2xl border border-border/80 bg-white p-2.5 text-start transition-all duration-150 hover:border-primary/50 hover:shadow-md active:scale-[0.98] disabled:opacity-40 dark:bg-card"
                         >
                           <div className="w-full">
                             {/* Tags Strip */}
@@ -2489,7 +2489,7 @@ function POSPage() {
                       return (
                         <div
                           key={p.id}
-                          className="group flex items-center justify-between gap-2.5 rounded-xl border border-border/70 bg-card/75 p-2 transition-all hover:border-primary/50 hover:bg-card hover:shadow-xs"
+                          className="group flex items-center justify-between gap-2.5 rounded-xl border border-border/70 bg-white p-2 transition-all hover:border-primary/50 hover:shadow-xs dark:bg-card"
                         >
                           {/* Code / Barcode */}
                           {(p.barcode || p.sku) && (

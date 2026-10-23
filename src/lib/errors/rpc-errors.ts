@@ -153,6 +153,72 @@ const RULES: Rule[] = [
     ar: "السجل مرتبط بسجلات أخرى — لا يمكن تنفيذ العملية بهذه الصورة.",
     en: "The record is referenced elsewhere and cannot be changed this way.",
   },
+  /* ─── قواعد أمانات الطحن (سابقاً في translateCustodyError) ─── */
+  {
+    test: /balance.*less than the requested|less than the requested.*balance/i,
+    ar: "الكمية المطلوبة أكبر من رصيد العميل المتبقي.",
+    en: "The requested amount exceeds the customer's remaining balance.",
+  },
+  {
+    test: /must be an active RAW_MATERIAL grain|input must be a RAW_MATERIAL/i,
+    ar: "صنف الاستلام يجب أن يكون حبوباً خاماً.",
+    en: "The intake item must be an active RAW_MATERIAL grain.",
+  },
+  {
+    test: /must be FINISHED_GOOD or BY_PRODUCT|outputs must be FINISHED_GOOD/i,
+    ar: "صنف الناتج يجب أن يكون منتجاً نهائياً أو ناتجاً جانبياً.",
+    en: "Output items must be FINISHED_GOOD or BY_PRODUCT.",
+  },
+  {
+    test: /reason is required/i,
+    ar: "سبب التعديل إلزامي.",
+    en: "An adjustment reason is required.",
+  },
+  {
+    test: /Customer, warehouse and grain item are required|Customer, warehouse and item are required/i,
+    ar: "يرجى تحديد العميل والمخزن والصنف.",
+    en: "Customer, warehouse and item are required.",
+  },
+  {
+    test: /not permitted to record custody milling/i,
+    ar: "لا تملك صلاحية تسجيل عمليات الطحن.",
+    en: "You are not permitted to record custody milling.",
+  },
+  {
+    test: /not permitted to (adjust|intake|deliver|transfer)/i,
+    ar: "لا تملك صلاحية هذه العملية.",
+    en: "You are not permitted to perform this custody operation.",
+  },
+  {
+    test: /Grain type is not active or does not exist/i,
+    ar: "نوع الحبة غير نشط أو غير موجود — أعد اختياره من القائمة.",
+    en: "The selected grain type is inactive or missing.",
+  },
+  {
+    test: /Milling must consume at least one bag/i,
+    ar: "الطحن يحتاج كمية: أكيس واحد على الأقل أو وزناً موجباً من الحبوب.",
+    en: "Milling must consume at least one bag or a positive weight.",
+  },
+  {
+    test: /At least one output line is required/i,
+    ar: "أضف سطر ناتج واحد على الأقل قبل الترحيل.",
+    en: "At least one output line is required.",
+  },
+  {
+    test: /Every output line needs an item/i,
+    ar: "كل سطر ناتج يحتاج اختيار صنف.",
+    en: "Every output line needs an item.",
+  },
+  {
+    test: /Every output line needs bags or a positive weight/i,
+    ar: "كل سطر ناتج يحتاج أكياساً أو وزناً موجباً.",
+    en: "Every output line needs bags or a positive weight.",
+  },
+  {
+    test: /Output quantities cannot be negative/i,
+    ar: "كميات النواتج لا تكون سالبة.",
+    en: "Output quantities cannot be negative.",
+  },
 ];
 
 /** يحوّل نص خطأ (من RPC أو PostgREST أو fetch) إلى رسالة قابلة للعرض. */

@@ -17,7 +17,6 @@ import {
   Scale,
   Cog,
   PackageCheck,
-  Sparkles,
   Plus,
   Trash2,
   Check,
@@ -843,7 +842,14 @@ function CustomerCustodyPage() {
           }}
           viewToggle={<RecordsViewToggle value={viewMode} onChange={setViewMode} />}
           action={
-            <PrimaryAction label="عملية جديدة" icon={<Sparkles />} onClick={() => setSelectedRow(null)} />
+            <PrimaryAction
+              label="طحن أمانة"
+              icon={<Cog />}
+              onClick={() => {
+                setSelectedRow(null);
+                setMillingModalOpen(true);
+              }}
+            />
           }
         >
           {/* أزرار التصفية السريعة الموحدة (QuickFilterBar) — مرئية في كل أنماط العرض */}
@@ -1249,13 +1255,8 @@ function QuickMillingModal({
                     </MillingSelect>
                   </div>
 
-                  {/* سعة الكيس — معلومة وصفية فقط: لا تُقرأ ولا تُحسب منها */}
-                  <div className="col-span-2 rounded-lg border border-border/60 bg-muted/40 p-1.5 text-center">
-                    <span className="text-[10px] text-muted-foreground">سعة العبوة وصف فقط</span>
-                  </div>
-
                   {/* عدد الأكياس */}
-                  <div className="col-span-2">
+                  <div className="col-span-3">
                     <QuantityInput
                       decimals={0}
                       min={0}
@@ -1270,7 +1271,7 @@ function QuickMillingModal({
                   </div>
 
                   {/* الوزن كجم */}
-                  <div className="col-span-2">
+                  <div className="col-span-3">
                     <QuantityInput
                       decimals={2}
                       min={0}

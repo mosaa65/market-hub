@@ -1434,7 +1434,7 @@ function PurchasePOSPage() {
                         key={p.id}
                         type="button"
                         onClick={() => addToCart(p)}
-                        className="group flex flex-col justify-between rounded-2xl border border-border/80 bg-surface/90 p-3 text-start transition-all hover:border-primary/60 hover:bg-surface-2 hover:shadow-md active:scale-[0.98]"
+                        className="group flex flex-col justify-between rounded-2xl border border-border/80 bg-white p-3 text-start transition-all hover:border-primary/60 hover:bg-muted/50 hover:shadow-md active:scale-[0.98] dark:bg-card"
                       >
                         <div className="w-full">
                           {/* Quality & Category Badges */}
@@ -1497,7 +1497,7 @@ function PurchasePOSPage() {
                       key={product.id}
                       type="button"
                       onClick={() => addToCart(product)}
-                      className="flex w-full items-center justify-between gap-3 rounded-lg border border-border/70 bg-surface px-3 py-2 text-start transition hover:border-primary/40 hover:bg-surface-2"
+                      className="flex w-full items-center justify-between gap-3 rounded-lg border border-border/70 bg-white px-3 py-2 text-start transition hover:border-primary/40 hover:bg-muted/50 dark:bg-card"
                     >
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-semibold">

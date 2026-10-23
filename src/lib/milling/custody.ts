@@ -201,18 +201,22 @@ export interface OpResult<T = string> {
 
 /* --------------------------------------------------------- label helpers */
 
+/**
+ * E7/M7 — أدوات ترجمة أخطاء أمانات الطحن.
+ *
+ * كانت وظيفة هذه الدالة قاعدة معرفة مستقلة في ملف الأمانات، فبقيت قواعد
+ * الأخطاء الخاصة بالأمانات (رصيد أقل من المطلوب، RAW_MATERIAL، سبب
+ * إلزامي...) منفصلة عن قواعد RPC العامة في `lib/errors/rpc-errors.ts`.
+ *
+ * التوحيد المطلوب: الأمانات لا تحتاج قاعدة معرفة ثانية — نحول كل قواعد
+ * الأمانات إلى قواعد Regex في `rpc-errors.ts`، وتصبح هذه الدالة غلافًا
+ * رقيقًا حول `translateRpcError` حتى لا ينكسر أي مستدِ قائم.
+ */
+import { translateRpcError } from "@/lib/errors/rpc-errors";
+
 export function translateCustodyError(msg: string): string {
   if (!msg) return "حدث خطأ غير متوقع في معالجة العملية.";
-  if (msg.includes("balance") && msg.includes("less than"))
-    return "الكمية المطلوبة أكبر من رصيد العميل المتبقي.";
-  if (msg.includes("RAW_MATERIAL")) return "صنف الاستلام يجب أن يكون حبوباً خاماً.";
-  if (msg.includes("FINISHED_GOOD"))
-    return "صنف الناتج يجب أن يكون منتجاً نهائياً أو ناتجاً جانبياً.";
-  if (msg.includes("reason is required")) return "سبب التعديل إلزامي.";
-  if (msg.includes("Customer, warehouse")) return "يرجى تحديد العميل والمخزن والصنف.";
-  if (msg.includes("Not authenticated")) return "يجب تسجيل الدخول أولاً.";
-  if (msg.includes("not permitted")) return "لا تملك صلاحية هذه العملية.";
-  return msg;
+  return translateRpcError(msg, "ar", msg);
 }
 
 /* ------------------------------------------------------------- item reads */
