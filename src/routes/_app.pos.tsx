@@ -72,6 +72,7 @@ import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
 import type { CustomerContext, InvoiceContext } from "@/lib/communication";
 import { translateRpcError } from "@/lib/errors/rpc-errors";
 import { usePaymentPanel } from "@/components/payments/payment-panel";
+import { resolvePaidAmount } from "@/lib/payments/payment-rules";
 import { useFormNavigationScope } from "@/hooks/use-form-navigation";
 import { DynamicPaymentSelector } from "@/components/ui/payment-method/dynamic-payment-selector";
 import {
@@ -168,9 +169,9 @@ interface SplitPaymentLine {
   reference?: string;
 }
 
-  // Split allocations are persisted through the guarded split RPC and each tender
-  // is validated before checkout, so the cashier can use multiple methods safely.
-  const POS_SPLIT_LEDGER_POSTING_READY = true;
+// Split allocations are persisted through the guarded split RPC and each tender
+// is validated before checkout, so the cashier can use multiple methods safely.
+const POS_SPLIT_LEDGER_POSTING_READY = true;
 
 const posGuideConfig: PageGuideConfig = {
   title: "دليل نقطة البيع والكاشير المتقدم (POS)",
@@ -349,11 +350,6 @@ function POSPage() {
   const [cart, setCart] = useState<CartLine[]>([]);
   const [paid, setPaid] = useState<string>("");
   const [paidManuallyEdited, setPaidManuallyEdited] = useState(false);
-  const [discount, setDiscount] = useState<string>("");
-  // Holds a catalogue id: the five quick tabs write 'cash'/'card'/... exactly as
-  // before, and the "أخرى" tab writes any other id from the same catalogue —
-  // `toLegacyPaymentValue` converts it to the stored value at checkout.
-  const [paymentMethod, setPaymentMethod] = useState<string>("cash");
   const [note, setNote] = useState("");
   /** Transfer reference — appended to the note on submit; no DB column needed. */
   const [transferRef, setTransferRef] = useState("");
@@ -1252,14 +1248,7 @@ function POSPage() {
   // Auto-Paid & Smart Payment Logic
   // إذا كانت وسيلة الدفع "آجل" وترك حقل المدفوع فارغاً، فالافتراضي هو 0 (دين بالكامل)
   // أما في الوسائل الأخرى (نقدي/بطاقة/تحويل/محفظة)، فالفارغ يعني سداد كامل المبلغ تلقائياً
-  const isPaidEmpty = paid.trim() === "";
-  const singlePaidNum = paidManuallyEdited
-    ? isPaidEmpty
-      ? 0
-      : Math.max(0, Number(paid))
-    : paymentMethod === "credit"
-      ? 0
-      : total;
+  const singlePaidNum = resolvePaidAmount(total, paymentMethod, paid, paidManuallyEdited);
   const effectivePaid = isSplitPayment ? splitPaidTotal : singlePaidNum;
   const isOverpaid = effectivePaid > total;
   const remainingDebt = Math.max(0, Math.round((total - effectivePaid) * 100) / 100);
@@ -1366,8 +1355,15 @@ function POSPage() {
     // Same guard the invoice form and the server apply: the seeded cash
     // customer exists to settle, never to owe.
     if (!isSplitPayment && !singlePayment.isPayable) {
+      const paymentError =
+        singlePayment.blockingReason === "credit_method_requires_zero_paid"
+          ? lang === "ar"
+            ? "الآجل لا يسجل مبلغًا مدفوعًا. للسداد الجزئي اختر وسيلة التحصيل الفعلية مثل النقد أو التحويل."
+            : "Credit records no payment. For a partial payment, choose the actual tender method, such as cash or bank transfer."
+          : null;
       return toast.error(
-        singlePayment.blockingReason ??
+        paymentError ??
+          singlePayment.blockingReason ??
           (lang === "ar" ? "بيانات الدفع غير صالحة" : "Invalid payment details"),
       );
     }
@@ -2912,7 +2908,10 @@ function POSPage() {
                           : String(total)
                     }
                     onValueChange={handlePaidChange}
-                    invalid={isOverpaid}
+                    invalid={
+                      isOverpaid ||
+                      singlePayment.blockingReason === "credit_method_requires_zero_paid"
+                    }
                     data-form-nav
                     placeholder={lang === "ar" ? "المدفوع" : "Paid"}
                     className="h-8 min-w-0 rounded-lg border border-border bg-background px-2 text-[10px] font-semibold outline-none focus:border-primary sm:px-2.5 sm:text-[11px]"

@@ -40,6 +40,9 @@ project_id = "kwzqvgdyadylwnvjghqn"
 enabled = true
 sql_paths = [
   "./seeds/01_system/*.sql",
+  "./seeds/03_samples/*.sql"
+
+  
 ]
 
 

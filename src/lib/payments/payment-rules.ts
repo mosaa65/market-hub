@@ -33,7 +33,11 @@ export interface PaymentCustomer {
 }
 
 export type PaymentBlockingReason =
-  "overpaid" | "customer_required_for_credit" | "credit_customer_locked" | "credit_limit";
+  | "overpaid"
+  | "credit_method_requires_zero_paid"
+  | "customer_required_for_credit"
+  | "credit_customer_locked"
+  | "credit_limit";
 
 export interface PaymentResolution {
   definition: PaymentMethodDefinition | undefined;
@@ -76,6 +80,22 @@ export interface ResolvePaymentInput {
   customers?: PaymentCustomer[];
 }
 
+export function resolvePaidAmount(
+  total: number,
+  method: string,
+  paidRaw: string,
+  paidManuallyEdited: boolean,
+): number {
+  const totalN = Math.max(0, roundMoney(total));
+  if (method === "credit") return 0;
+  if (!paidManuallyEdited) return totalN;
+
+  const trimmed = paidRaw.trim();
+  if (trimmed === "") return 0;
+  const typed = Number(trimmed);
+  return Math.max(0, Number.isFinite(typed) ? typed : 0);
+}
+
 export function resolvePayment({
   total,
   method,
@@ -90,14 +110,12 @@ export function resolvePayment({
 
   const isPaidEmpty = paidRaw.trim() === "";
   const typed = isPaidEmpty ? NaN : Number(paidRaw);
+  const paidAmount = resolvePaidAmount(totalN, method, paidRaw, !isPaidEmpty);
+  const creditMethodHasPayment = isCredit && !isPaidEmpty && Number.isFinite(typed) && typed > 0;
 
   // 1. A credit term collects nothing now. Anything else defaults to "paid in
   //    full" when the field is left empty — the counter's usual case.
-  const paid = isCredit
-    ? 0
-    : isPaidEmpty
-      ? totalN
-      : Math.max(0, Math.min(Number.isFinite(typed) ? typed : 0, totalN));
+  const paid = isCredit ? 0 : Math.min(paidAmount, totalN);
 
   // 2. Above the total is CHANGE on cash, and an error on anything else.
   const overTender = !isCredit && !isPaidEmpty && Number.isFinite(typed) && typed > totalN;
@@ -125,13 +143,15 @@ export function resolvePayment({
   // 3. One reason at a time, in the order the operator can act on it.
   const blockingReason: PaymentBlockingReason | null = isOverpaid
     ? "overpaid"
-    : debtWithoutCustomer
-      ? "customer_required_for_credit"
-      : debtOnSystemCustomer
-        ? "credit_customer_locked"
-        : exceedsCreditLimit
-          ? "credit_limit"
-          : null;
+    : creditMethodHasPayment
+      ? "credit_method_requires_zero_paid"
+      : debtWithoutCustomer
+        ? "customer_required_for_credit"
+        : debtOnSystemCustomer
+          ? "credit_customer_locked"
+          : exceedsCreditLimit
+            ? "credit_limit"
+            : null;
 
   return {
     definition,

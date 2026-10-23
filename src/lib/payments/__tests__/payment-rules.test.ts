@@ -11,7 +11,7 @@
  * and identical to what the panel renders.
  */
 import assert from "node:assert/strict";
-import { resolvePayment, type PaymentCustomer } from "../payment-rules";
+import { resolvePaidAmount, resolvePayment, type PaymentCustomer } from "../payment-rules";
 
 const cashCustomer: PaymentCustomer = {
   id: "cash",
@@ -43,6 +43,15 @@ function resolve(input: {
   });
 }
 
+/* ── 0. POS paid amount defaults must match the payment validation ── */
+{
+  assert.equal(resolvePaidAmount(500, "credit", "", false), 0);
+  assert.equal(resolvePaidAmount(500, "credit", "200", true), 0);
+  assert.equal(resolvePaidAmount(500, "cash", "", false), 500);
+  assert.equal(resolvePaidAmount(500, "cash", "200", true), 200);
+  assert.equal(resolvePaidAmount(500, "cash", "invalid", true), 0);
+}
+
 /* ── 1. Empty paid field means "settled in full" for anything but credit ── */
 {
   const r = resolve({ total: 1000, method: "cash", paid: "" });
@@ -51,12 +60,30 @@ function resolve(input: {
   assert.equal(r.payable, true);
 }
 
-/* ── 2. A credit term collects nothing, whatever was typed ── */
+/* ── 2. Credit is a zero-payment tender; a paid part needs a real method ── */
 {
-  const r = resolve({ total: 1000, method: "credit", paid: "1000" });
+  const r = resolve({ total: 500, method: "credit", paid: "0", customerId: "c1" });
   assert.equal(r.paid, 0);
-  assert.equal(r.remaining, 1000);
+  assert.equal(r.remaining, 500);
   assert.equal(r.isCredit, true);
+  assert.equal(r.payable, true);
+}
+
+/* ── 2b. Credit plus a partial payment is rejected before ledger posting ── */
+{
+  const r = resolve({ total: 500, method: "credit", paid: "200", customerId: "c1" });
+  assert.equal(r.payable, false);
+  assert.equal(r.blockingReason, "credit_method_requires_zero_paid");
+  assert.equal(r.paid, 0);
+}
+
+/* ── 2c. A partial cash payment may leave an affordable customer debt ── */
+{
+  const r = resolve({ total: 500, method: "cash", paid: "200", customerId: "c1" });
+  assert.equal(r.paid, 200);
+  assert.equal(r.remaining, 300);
+  assert.equal(r.projectedBalance, 700);
+  assert.equal(r.payable, true);
 }
 
 /* ── 3. Debt needs a customer that can carry it ── */
