@@ -117,7 +117,10 @@ SELECT
   now(),
   now()
 FROM seed s
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO UPDATE
+  SET encrypted_password = EXCLUDED.encrypted_password
+  WHERE auth.users.encrypted_password IS NULL
+    AND auth.users.email = EXCLUDED.email;
 
 -- ── 2) auth.identities ──────────────────────────────────────────────────────
 -- GoTrue لا يقرأ البريد من auth.users مباشرة عند الدخول، بل من هنا — صف لكل

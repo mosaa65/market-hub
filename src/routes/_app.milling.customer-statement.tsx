@@ -57,6 +57,7 @@ import {
   fetchCustodyServiceMoney,
   fetchOutputItems,
   fetchGrainItems,
+  fetchGrainTypes,
   custodyMilling,
   custodyDelivery,
   buildMillingDocumentUnifiedDoc,
@@ -1015,7 +1016,49 @@ function QuickMillingModal({
 
   const [notes, setNotes] = useState("");
 
-  // رصيد الحبوب المتاح لهذا العميل والصنف
+  // E6/M5: نوع الحبة المرجعي — يعبّئ الفاقد ونسب النواتج الافتراضية
+  const [grainTypeId, setGrainTypeId] = useState("");
+  const grainTypes = useQuery({
+    queryKey: ["milling", "grain-types"],
+    queryFn: fetchGrainTypes,
+    enabled: open,
+  });
+
+  const selectedGrainType = useMemo(
+    () => (grainTypes.data ?? []).find((t) => t.id === grainTypeId) ?? null,
+    [grainTypes.data, grainTypeId],
+  );
+
+  /**
+   * تغيير نوع الحبة المرجعي: تعبئة تلقائية للفاقد ونسبة النواتج
+   * من الخصائص الافتراضية للنوع. كل القيم تبقى قابلة للتعديل يدوياً.
+   */
+  function changeGrainType(id: string) {
+    setGrainTypeId(id);
+    const type = (grainTypes.data ?? []).find((t) => t.id === id);
+    if (!type) return;
+
+    const milledKg = Number(kgOut) || 0;
+
+    // سطور النواتج الافتراضية: مطابقة نسب النوع مع كتالوج النواتج
+    // (الفاقد الافتراضي يظهر كتلميح — هذا المودال بلا حقل فاقد مستقل)
+    const map = type.default_output_map ?? [];
+    if (map.length > 0) {
+      const prefilled = map
+        .map((g) => {
+          const match = outputItems.find(
+            (p) =>
+              (p.name_ar && g.label && p.name_ar.includes(g.label)) ||
+              (p.name && g.label && p.name.toLowerCase().includes(g.label.toLowerCase())),
+          );
+          if (!match) return null;
+          const kg = milledKg > 0 ? Math.round(((milledKg * g.ratio) / 100) * 100) / 100 : 0;
+          return { itemId: match.id, bags: "", kg: kg ? String(kg) : "" };
+        })
+        .filter((l): l is { itemId: string; bags: string; kg: string } => l !== null);
+      if (prefilled.length > 0) setOutputs(prefilled);
+    }
+  }
   const maxAvailableBags = initialRow ? Number(initialRow.remaining_bags ?? 0) : 9999;
   const maxAvailableKg = initialRow ? Number(initialRow.remaining_kg ?? 0) : 999999;
 
@@ -1065,6 +1108,7 @@ function QuickMillingModal({
         kgOut: Number(kgOut) || 0,
         outputs: validOutputs,
         notes: notes.trim() || undefined,
+        grainTypeId: grainTypeId || null,
       });
     },
     onSuccess: (res) => {
@@ -1160,6 +1204,29 @@ function QuickMillingModal({
               </MillingSelect>
             </MillingField>
           </div>
+
+          {/* E6/M5: نوع الحبة المرجعي — يعبّئ نسب النواتج الافتراضية */}
+          <MillingField
+            label="نوع الحبة المرجعي (اختياري)"
+            hint={
+              selectedGrainType
+                ? `فاقد افتراضي للنوع: ${selectedGrainType.default_loss_rate_pct}% — نسب النواتج معبأة تلقائياً وقابلة للتعديل`
+                : "الأنواع المرجعية معرّفة في جدول grain_types — تعبّئ نسب النواتج الافتراضية"
+            }
+          >
+            <MillingSelect
+              value={grainTypeId}
+              onChange={(e) => changeGrainType(e.target.value)}
+              className="font-semibold text-xs"
+            >
+              <option value="">— بلا نوع مرجعي (إدخال يدوي كامل) —</option>
+              {(grainTypes.data ?? []).map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name_ar} (فاقد افتراضي {t.default_loss_rate_pct}%)
+                </option>
+              ))}
+            </MillingSelect>
+          </MillingField>
 
           {/* بطاقة الرصيد المتاح للحبوب */}
           {initialRow && (
@@ -1531,35 +1598,41 @@ function QuickDeliveryModal({
             </MillingField>
           </div>
 
-          {/* بطاقة الرصيد المتاح للصنف المسلم */}
+          {/* بطاقة الرصيد المتاح للصنف المسلم — بطاقة موحدة */}
           {initialRow && (
-            <div className="flex items-center justify-between rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-3 text-xs">
-              <div>
-                <span className="text-muted-foreground">صنف الأمانة:</span>
-                <p className="font-bold text-foreground text-sm">{initialRow.item_name_ar}</p>
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/5 px-3.5 py-2.5 text-xs">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-emerald-500/15 text-emerald-600">
+                  <PackageCheck className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <span className="block text-[10px] text-muted-foreground">صنف الأمانة</span>
+                  <p className="truncate font-bold text-foreground text-xs">{initialRow.item_name_ar}</p>
+                </div>
               </div>
 
-              <div className="text-end">
-                <span className="text-muted-foreground">الرصيد المتاح للتسليم:</span>
-                <div className="font-black text-emerald-700 dark:text-emerald-300">
+              <div className="text-end shrink-0">
+                <span className="block text-[10px] text-muted-foreground">الرصيد المتاح للتسليم</span>
+                <div className="font-black tabular-nums text-emerald-700 dark:text-emerald-300">
                   {fmtNum(initialRow.remaining_bags)} كيس ({fmtNum(initialRow.remaining_kg)} كجم)
                 </div>
               </div>
             </div>
           )}
 
-          {/* كمية التسليم وزر تسليم كامل الرصيد */}
-          <div className="space-y-2">
+          {/* كمية التسليم وزر تسليم كامل الرصيد — قسم موحد */}
+          <div className="rounded-xl border border-border/80 bg-surface-2/40 p-3.5 space-y-3">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-semibold text-muted-foreground">
-                الكمية المراد تسليمها للعميل:
+              <label className="text-xs font-bold text-foreground">
+                الكمية المراد تسليمها للعميل
               </label>
               {initialRow && (
                 <button
                   type="button"
                   onClick={handleDeliverAll}
-                  className="rounded-lg bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20"
+                  className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/10 px-2.5 py-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20 transition"
                 >
+                  <PackageCheck className="h-3 w-3" />
                   تسليم كامل الرصيد
                 </button>
               )}
@@ -1761,29 +1834,29 @@ function CustomerCustodyHistoryModal({
           </div>
         </div>
 
-        {/* ملخص الرصيد الحالي */}
-        <div className="grid grid-cols-3 gap-3 p-4 bg-surface-2/40 border-b border-border/60 text-xs text-center">
-          <div>
-            <span className="text-muted-foreground">إجمالي الوارد (مستلم):</span>
-            <p className="font-bold text-foreground mt-0.5">
-              {fmtNum(row.received_bags)} كيس ({fmtNum(row.received_kg)} كجم)
+        {/* ملخص الرصيد الحالي — بطاقات موحدة للتصميم المتماسك */}
+        <div className="grid grid-cols-3 gap-3 p-4 border-b border-border/60 text-xs">
+          <div className="flex flex-col items-center justify-center gap-1 rounded-xl bg-muted/40 p-3 text-center">
+            <span className="block text-[11px] font-medium text-muted-foreground">إجمالي الوارد (مستلم)</span>
+            <p className="font-bold text-foreground text-sm leading-tight">
+              {fmtNum(row.received_bags)} <span className="text-[10px] font-normal">كيس</span> ({fmtNum(row.received_kg)} كجم)
             </p>
           </div>
-          <div>
-            <span className="text-muted-foreground">إجمالي المنصرف (صادر):</span>
-            <p className="font-bold text-foreground mt-0.5">
-              {fmtNum(row.issued_bags)} كيس ({fmtNum(row.issued_kg)} كجم)
+          <div className="flex flex-col items-center justify-center gap-1 rounded-xl bg-muted/40 p-3 text-center">
+            <span className="block text-[11px] font-medium text-muted-foreground">إجمالي المنصرف (صادر)</span>
+            <p className="font-bold text-foreground text-sm leading-tight">
+              {fmtNum(row.issued_bags)} <span className="text-[10px] font-normal">كيس</span> ({fmtNum(row.issued_kg)} كجم)
             </p>
           </div>
-          <div className="bg-primary/10 rounded-xl p-1.5">
-            <span className="text-primary font-bold">الرصيد المتبقي حالياً:</span>
-            <p className="font-black text-primary text-sm mt-0.5">
-              {fmtNum(row.remaining_bags)} كيس ({fmtNum(row.remaining_kg)} كجم)
+          <div className="flex flex-col items-center justify-center gap-1 rounded-xl border border-primary/20 bg-primary/5 p-3 text-center">
+            <span className="block text-[11px] font-bold text-primary">الرصيد المتبقي حالياً</span>
+            <p className="font-black text-primary text-base leading-tight">
+              {fmtNum(row.remaining_bags)} <span className="text-[10px] font-semibold">كيس</span> ({fmtNum(row.remaining_kg)} كجم)
             </p>
           </div>
         </div>
 
-        {/* جدول الحركات */}
+        {/* جدول الحركات — دفتر الحركة الموحد */}
         <div className="p-4 max-h-96 overflow-y-auto">
           {/* E4ب: فلترة دفتر الحركة بالنوع */}
           <div className="mb-3 flex flex-wrap items-center gap-1.5">
@@ -1792,10 +1865,10 @@ function CustomerCustodyHistoryModal({
                 key={f.v}
                 type="button"
                 onClick={() => setTypeFilter(f.v)}
-                className={`rounded-full border px-3 py-1 text-[11px] font-bold transition ${
+                className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors ${
                   typeFilter === f.v
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border text-muted-foreground hover:bg-muted"
+                    ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                    : "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
               >
                 {f.label}
@@ -1803,56 +1876,61 @@ function CustomerCustodyHistoryModal({
             ))}
           </div>
           {ledgerQuery.isLoading ? (
-            <div className="p-8 text-center text-xs text-muted-foreground">
+            <div className="flex flex-col items-center justify-center p-8 text-xs text-muted-foreground">
+              <RefreshCw className="h-4 w-4 animate-spin mb-2 text-primary/60" />
               جارٍ تحميل سجل الحركات…
             </div>
           ) : filteredLines.length === 0 ? (
-            <div className="p-8 text-center text-xs text-muted-foreground">
-              لا توجد حركات مطابقة لهذا الصنف.
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/80 p-8 text-center">
+              <div className="grid h-9 w-9 place-items-center rounded-full bg-muted/50 mb-2">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <h5 className="font-bold text-sm text-foreground mb-0.5">لا توجد حركات مطابقة</h5>
+              <p className="text-xs text-muted-foreground">لا توجد حركات مسجلة لهذا الصنف أو ضمن التصفية المحددة.</p>
             </div>
           ) : (
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-border/60 text-muted-foreground font-bold">
-                  <th className="pb-2 text-start">نوع الحركة</th>
-                  <th className="pb-2 text-start">رقم السند/المستند</th>
-                  <th className="pb-2 text-center">وارد (داخل)</th>
-                  <th className="pb-2 text-center">منصرف (خارج)</th>
-                  <th className="pb-2 text-start">الملاحظات</th>
-                  <th className="pb-2 text-end">التاريخ والوقت</th>
+                <tr className="border-b border-border/60 bg-muted/20 text-muted-foreground font-bold">
+                  <th className="px-3 py-2.5 text-start text-[11px]">نوع الحركة</th>
+                  <th className="px-3 py-2.5 text-start text-[11px]">رقم السند/المستند</th>
+                  <th className="px-3 py-2.5 text-center text-[11px]">وارد (داخل)</th>
+                  <th className="px-3 py-2.5 text-center text-[11px]">منصرف (خارج)</th>
+                  <th className="px-3 py-2.5 text-start text-[11px]">الملاحظات</th>
+                  <th className="px-3 py-2.5 text-end text-[11px]">التاريخ والوقت</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/30">
                 {filteredLines.map((l: any) => (
-                  <tr key={l.id} className="hover:bg-muted/30">
-                    <td className="py-2.5 font-bold">
+                  <tr key={l.id} className="transition-colors hover:bg-muted/20">
+                    <td className="px-3 py-2.5">
                       {l.entry_type === "INTAKE" ? (
-                        <span className="text-emerald-600">استلام أمانة</span>
+                        <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600">استلام أمانة</span>
                       ) : l.entry_type === "MILLING" ? (
-                        <span className="text-amber-600">طحن</span>
+                        <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-600">طحن</span>
                       ) : l.entry_type === "DELIVERY" ? (
-                        <span className="text-blue-600">تسليم ناتج</span>
+                        <span className="inline-flex items-center rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] font-bold text-blue-600">تسليم ناتج</span>
                       ) : l.entry_type === "ADJUSTMENT" ? (
-                        <span className="text-rose-600">تسوية موثّقة</span>
+                        <span className="inline-flex items-center rounded-full bg-rose-500/10 px-2 py-0.5 text-[10px] font-bold text-rose-600">تسوية موثّقة</span>
                       ) : (
-                        <span>تعديل</span>
+                        <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">تعديل</span>
                       )}
                     </td>
-                    <td className="py-2.5 font-mono text-foreground font-semibold">
+                    <td className="px-3 py-2.5 font-mono text-foreground font-semibold text-[11px]">
                       {l.doc_number || "—"}
                     </td>
-                    <td className="py-2.5 text-center tabular-nums font-semibold text-emerald-600">
+                    <td className="px-3 py-2.5 text-center tabular-nums font-semibold text-emerald-600">
                       {Number(l.bags_in) > 0 || Number(l.kg_in) > 0
                         ? `${fmtNum(l.bags_in)} كيس (${fmtNum(l.kg_in)} كجم)`
                         : "—"}
                     </td>
-                    <td className="py-2.5 text-center tabular-nums font-semibold text-rose-600">
+                    <td className="px-3 py-2.5 text-center tabular-nums font-semibold text-rose-600">
                       {Number(l.bags_out) > 0 || Number(l.kg_out) > 0
                         ? `${fmtNum(l.bags_out)} كيس (${fmtNum(l.kg_out)} كجم)`
                         : "—"}
                     </td>
-                    <td className="py-2.5 text-muted-foreground">{l.notes || "—"}</td>
-                    <td className="py-2.5 text-end text-muted-foreground text-[11px]">
+                    <td className="px-3 py-2.5 text-muted-foreground text-[11px]">{l.notes || "—"}</td>
+                    <td className="px-3 py-2.5 text-end text-muted-foreground text-[11px] tabular-nums">
                       {new Date(l.created_at).toLocaleString("ar-EG")}
                     </td>
                   </tr>
