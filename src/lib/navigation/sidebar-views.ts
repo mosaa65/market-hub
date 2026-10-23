@@ -31,22 +31,22 @@ const DAILY_GROUPS: GroupDefinition[] = [
   },
   {
     key: "sales",
-    titleAr: "المبيعات",
-    titleEn: "Sales",
+    titleAr: "فواتير المبيعات",
+    titleEn: "Sales Invoices",
     styleCategory: "sales",
     matches: (entry) => entry.category === "sales",
   },
   {
     key: "inventory",
-    titleAr: "المخزون",
-    titleEn: "Inventory",
+    titleAr: "المخزون والأصناف",
+    titleEn: "Inventory & Items",
     styleCategory: "inventory",
     matches: (entry) => entry.category === "inventory",
   },
   {
     key: "procurement",
-    titleAr: "المشتريات",
-    titleEn: "Procurement",
+    titleAr: "المشتريات والموردون",
+    titleEn: "Purchases & Suppliers",
     styleCategory: "procurement",
     matches: (entry) => entry.category === "procurement",
   },
@@ -91,8 +91,8 @@ const ACTIVITY_GROUPS: GroupDefinition[] = [
   DAILY_GROUPS[0],
   {
     key: "sales",
-    titleAr: "المبيعات",
-    titleEn: "Sales",
+    titleAr: "فواتير المبيعات",
+    titleEn: "Sales Invoices",
     styleCategory: "sales",
     matches: (entry) =>
       entry.category === "sales" && !["customers", "payments", "debts"].includes(entry.id),
@@ -107,8 +107,8 @@ const ACTIVITY_GROUPS: GroupDefinition[] = [
   DAILY_GROUPS[3],
   {
     key: "procurement",
-    titleAr: "المشتريات",
-    titleEn: "Procurement",
+    titleAr: "المشتريات والموردون",
+    titleEn: "Purchases & Suppliers",
     styleCategory: "procurement",
     matches: (entry) => entry.category === "procurement" && entry.id !== "suppliers",
   },
@@ -159,17 +159,16 @@ export function buildSidebarView(
   const definitions = GROUPS_BY_MODE[mode === "daily" ? "daily" : "activity"];
   const availableFocusGroups = materializeGroups(entries, definitions);
   const groups =
-    mode === "focus" || mode === "explorer"
-      ? [
-          ...(mode === "focus"
-            ? availableFocusGroups.filter((group) => group.key === "command_center")
-            : []),
-          ...availableFocusGroups.filter(
-            (group) =>
-              group.key === focusGroup && (mode === "explorer" || group.key !== "command_center"),
-          ),
-        ]
-      : materializeGroups(entries, definitions);
+    mode === "explorer"
+      ? availableFocusGroups
+      : mode === "focus"
+        ? [
+            ...availableFocusGroups.filter((group) => group.key === "command_center"),
+            ...availableFocusGroups.filter(
+              (group) => group.key === focusGroup && group.key !== "command_center",
+            ),
+          ]
+        : materializeGroups(entries, definitions);
 
   return { groups, availableFocusGroups };
 }

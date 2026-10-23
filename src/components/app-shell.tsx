@@ -3,7 +3,6 @@ import { HeaderNavArrows } from "@/components/header-nav-arrows";
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowRight,
   Bell,
   Check,
   ChevronDown,
@@ -523,97 +522,22 @@ const SidebarContents = memo(function SidebarContents({
             </div>
           )}
         </div>
-        {preferences.mode === "explorer" && !preferences.explorerGroup && (
-          <div className={cn("grid gap-2 pb-3", collapsed ? "grid-cols-1" : "grid-cols-2")}>
-            {availableFocusGroups.map((group) => {
-              const Icon = routeIcon(group.entries[0]?.id ?? "dashboard");
-              const style = getSidebarStyle(group.styleCategory, group.key, preferences);
-              return (
-                <Hint
-                  key={group.key}
-                  label={collapsed ? t(`nav.view.group.${group.key}`) : undefined}
-                  side={dir === "rtl" ? "left" : "right"}
-                >
-                  <button
-                    type="button"
-                    onClick={() => update({ explorerGroup: group.key })}
-                    aria-label={t(`nav.view.group.${group.key}`)}
-                    className={cn(
-                      "group flex flex-col items-center justify-center gap-2 border border-sidebar-border/60 bg-sidebar-accent/20 text-center transition-colors hover:border-primary/30 hover:bg-sidebar-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
-                      collapsed ? "min-h-11 rounded-lg p-1" : "min-h-[88px] rounded-xl px-2 py-3",
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "grid place-items-center",
-                        collapsed ? "size-8" : "size-10",
-                        preferences.iconShape === "circle" ? "rounded-full" : "rounded-lg",
-                        style.iconBoxInactive,
-                      )}
-                    >
-                      <Icon className={cn("size-5", style.iconInactive)} />
-                    </span>
-                    {!collapsed && (
-                      <span className="line-clamp-2 text-xs font-semibold leading-4 text-foreground">
-                        {t(`nav.view.group.${group.key}`)}
-                      </span>
-                    )}
-                  </button>
-                </Hint>
-              );
-            })}
-          </div>
-        )}
-        {preferences.mode === "explorer" && preferences.explorerGroup && (
-          <div className="mb-2 space-y-2">
-            <button
-              type="button"
-              onClick={() => update({ explorerGroup: null })}
-              className={cn(
-                "flex min-h-10 w-full items-center gap-2 rounded-lg border border-sidebar-border/60 text-sm font-semibold text-foreground transition-colors hover:bg-sidebar-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
-                collapsed ? "justify-center px-1" : "px-3",
-              )}
-              aria-label={t("nav.view.back_to_units")}
-            >
-              {dir === "rtl" ? (
-                <ArrowRight className="size-4" />
-              ) : (
-                <ArrowRight className="size-4 rotate-180" />
-              )}
-              {!collapsed && <span>{t("nav.view.back_to_units")}</span>}
-            </button>
-            {!collapsed && (
-              <div className="px-2 text-xs font-bold text-muted-foreground">
-                {t(`nav.view.group.${preferences.explorerGroup}`)}
-              </div>
-            )}
-          </div>
-        )}
-        {(preferences.mode !== "explorer" || preferences.explorerGroup) &&
-          displayGroups.map((sec, secIdx) => {
+        {displayGroups.map((sec, secIdx) => {
             const sectionKey = sec.key;
-            const sectionOpen = collapsed ? true : isSectionOpen(sectionKey);
+            const sectionOpen = preferences.mode === "explorer" || collapsed ? true : isSectionOpen(sectionKey);
             const activeInSection = activeGroupKey === sectionKey;
 
             return (
               <div key={sectionKey}>
-                {!collapsed ? (
-                  <>
-                    {/* One open/close control per main section, operable by touch
-                     *  and keyboard, with `aria-expanded` + `aria-controls`. */}
-                    <button
-                      type="button"
-                      onClick={() => toggleSection(sectionKey)}
-                      aria-expanded={sectionOpen}
-                      aria-controls={`sidebar-section-${sectionKey}`}
+                {preferences.mode === "explorer" ? (
+                  !collapsed && (
+                    <div
                       className={cn(
-                        "flex w-full items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-[0.12em]",
-                        "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
-                        activeInSection
-                          ? "text-foreground"
-                          : "text-muted-foreground/80 hover:bg-sidebar-accent/60 hover:text-foreground",
+                        "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold tracking-[0.04em]",
+                        activeInSection ? "text-foreground" : "text-muted-foreground",
                       )}
                     >
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary/70" aria-hidden />
                       <span className="min-w-0 flex-1 truncate text-start">
                         {t(
                           sec.key === "favorites"
@@ -623,17 +547,41 @@ const SidebarContents = memo(function SidebarContents({
                               : `nav.view.group.${sec.key}`,
                         )}
                       </span>
-                      <span
-                        className={cn(
-                          "grid size-5 shrink-0 place-items-center rounded-md text-muted-foreground/70 transition-transform duration-200",
-                          sectionOpen ? "rotate-0" : dir === "rtl" ? "rotate-90" : "-rotate-90",
-                        )}
-                        aria-hidden
-                      >
-                        <ChevronDown className="size-3.5" />
-                      </span>
-                    </button>
-                  </>
+                    </div>
+                  )
+                ) : !collapsed ? (
+                  <button
+                    type="button"
+                    onClick={() => toggleSection(sectionKey)}
+                    aria-expanded={sectionOpen}
+                    aria-controls={`sidebar-section-${sectionKey}`}
+                    className={cn(
+                      "flex w-full items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-[0.12em]",
+                      "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                      activeInSection
+                        ? "text-foreground"
+                        : "text-muted-foreground/80 hover:bg-sidebar-accent/60 hover:text-foreground",
+                    )}
+                  >
+                    <span className="min-w-0 flex-1 truncate text-start">
+                      {t(
+                        sec.key === "favorites"
+                          ? "nav.view.favorites"
+                          : sec.key === "recent"
+                            ? "nav.view.recent"
+                            : `nav.view.group.${sec.key}`,
+                      )}
+                    </span>
+                    <span
+                      className={cn(
+                        "grid size-5 shrink-0 place-items-center rounded-md text-muted-foreground/70 transition-transform duration-200",
+                        sectionOpen ? "rotate-0" : dir === "rtl" ? "rotate-90" : "-rotate-90",
+                      )}
+                      aria-hidden
+                    >
+                      <ChevronDown className="size-3.5" />
+                    </span>
+                  </button>
                 ) : (
                   secIdx > 0 && <div className="my-2 h-px w-7 mx-auto bg-sidebar-border/60" />
                 )}
@@ -921,7 +869,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   // لا يتم تحميل قائمة التنبيهات كاملة داخل الغلاف؛ صفحة التنبيهات هي المسؤولة عن ذلك.
   // إبقاء الملخص بقيمة آمنة يمنع تعطل الغلاف قبل فتح صفحة التنبيهات، بينما يظل
-  // تنبيه النسخة الاحتياطية الفوري يعمل بشكل مستقل.
+  // تنبيه ��لنسخة الاحتياطية الفوري يعمل بشكل مستقل.
   const alertsSummary = { total: 0, hasDanger: false };
 
   const [collapsed, setCollapsed] = useState<boolean>(() => {

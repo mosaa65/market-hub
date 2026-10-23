@@ -73,7 +73,7 @@ import type { CustomerContext, InvoiceContext } from "@/lib/communication";
 import { translateRpcError } from "@/lib/errors/rpc-errors";
 import { usePaymentPanel } from "@/components/payments/payment-panel";
 import { useFormNavigationScope } from "@/hooks/use-form-navigation";
-import { PaymentMethodPicker } from "@/components/ui/payment-method";
+import { DynamicPaymentSelector } from "@/components/ui/payment-method/dynamic-payment-selector";
 import {
   Dialog,
   DialogContent,
@@ -2862,20 +2862,22 @@ function POSPage() {
                     {lang === "ar" ? "طريقة الدفع" : "Payment method"}
                   </span>
                   {!isSplitPayment ? (
-                    <PaymentMethodPicker
+                    <DynamicPaymentSelector
                       context="pos"
-                      value={isSplitPayment ? "" : paymentMethod}
+                      value={paymentMethod}
+                      settlement={settlement}
+                      onSettlementChange={setSettlement}
+                      compact
                       onChange={(method) => {
                         setIsSplitPayment(false);
                         setSplitPayments([]);
                         setPaymentMethod(method);
+                        setSettlement((current) => ({ ...current, method }));
                         setPaid(method === "credit" ? "0" : "");
                         setPaidManuallyEdited(false);
                       }}
-                      ensureIds={[paymentMethod]}
-                      ariaLabel={lang === "ar" ? "طريقة الدفع" : "Payment method"}
-                      data-form-nav
-                      className="h-8 min-w-0 rounded-lg text-[10px] sm:text-[11px]"
+                      disabled={loading}
+                      className="col-span-1 sm:col-span-2"
                     />
                   ) : (
                     <div className="flex h-8 min-w-0 items-center truncate rounded-lg border border-primary/20 bg-primary/[0.04] px-2 text-[10px] font-medium text-primary sm:px-3 sm:text-[11px]">

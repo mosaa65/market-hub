@@ -402,7 +402,7 @@ export function PaymentMethodsSection() {
           )}
         >
           <Landmark className="h-4 w-4" />
-          <span>{isAr ? "الحسابات والمحافظ" : "Bank & Wallets"}</span>
+          <span>{isAr ? "الحسابات الافتراضية" : "Default accounts"}</span>
         </button>
 
         <button
@@ -434,7 +434,7 @@ export function PaymentMethodsSection() {
           */}
           <div className="rounded-2xl border border-border/70 bg-surface/60 p-3.5 text-[11px] leading-relaxed text-muted-foreground">
             {isAr
-              ? "هذه هي طرق الدفع المعتمدة في النظام. يمكنك تعديل اسم أي طريقة وأيقونتها كما تناسب منشأتك، وتفعيلها أو تعطيلها، واختيار الأقسام التي تظهر فيها. نوع الحساب المحاسبي لا يتغيّر بالتعديل، فيبقى الترحيل كما هو."
+              ? "هذه هي طرق الدفع المعتمدة في النظام. يمكنك تفعيل الطريقة أو تعطيلها وترتيب ظهورها فقط. الحسابات والصناديق والمحافظ الافتراضية مرتبطة بالدليل المحاسبي ولا تُنشأ من هذه الشاشة."
               : "These are the system's approved payment methods. You can rename or re-icon any of them to suit your business, enable or disable them, and choose the sections they appear in. The accounting family is not affected by a rename, so posting stays exactly as it was."}
           </div>
 
@@ -468,7 +468,7 @@ export function PaymentMethodsSection() {
               <CardDescription className="mt-1.5 text-xs">
                 {isAr
                   ? "الطريقة غير المفعّلة لا تظهر في أي شاشة. وتخصيص الأقسام مستقل لكل طريقة."
-                  : "A disabled method appears nowhere. Section scoping is independent per method."}
+                  : "A disabled method appears nowhere. Default settlement accounts are linked to the chart of accounts and are not created from this screen."}
               </CardDescription>
             </CardHeader>
 

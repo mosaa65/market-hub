@@ -142,10 +142,9 @@ export function CashboxesManagement() {
           />
         </div>
 
-        <Button onClick={handleOpenAdd} className="gap-1.5 rounded-xl shadow-xs">
-          <Plus className="h-4 w-4" />
-          <span>{isAr ? "إضافة صندوق / خزينة جديدة" : "Add New Cashbox"}</span>
-        </Button>
+        <div className="rounded-xl border border-primary/15 bg-primary/5 px-3 py-2 text-[11px] font-medium text-primary">
+          {isAr ? "الصناديق الافتراضية المرتبطة بالدليل المحاسبي" : "Default cashboxes linked to the chart of accounts"}
+        </div>
       </div>
 
       {/* Cashboxes Grid */}
