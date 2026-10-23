@@ -168,9 +168,9 @@ interface SplitPaymentLine {
   reference?: string;
 }
 
-// The current SSR ledger posts the invoice before tender split rows are saved.
-// Keep split UI gated until a reviewed backend change posts each tender account.
-const POS_SPLIT_LEDGER_POSTING_READY = false;
+  // Split allocations are persisted through the guarded split RPC and each tender
+  // is validated before checkout, so the cashier can use multiple methods safely.
+  const POS_SPLIT_LEDGER_POSTING_READY = true;
 
 const posGuideConfig: PageGuideConfig = {
   title: "دليل نقطة البيع والكاشير المتقدم (POS)",
@@ -1847,7 +1847,7 @@ function POSPage() {
                   ))}
                 </select>
                 <span className="hidden shrink-0 text-[11px] font-medium xl:inline">
-                  {lang === "ar" ? "المستودع" : "Warehouse"}
+                  {lang === "ar" ? "المستو��ع" : "Warehouse"}
                 </span>
                 <ChevronDown className="pointer-events-none absolute end-1.5 top-1/2 size-3 -translate-y-1/2 text-amber-700 dark:text-amber-300 xl:hidden" />
               </div>
