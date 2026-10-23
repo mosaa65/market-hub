@@ -29,7 +29,7 @@
 --   الاسم العربي مكانه name_ar.
 --
 -- ثابت (Idempotent): يُشغَّل أكثر من مرة بأمان عبر ON CONFLICT على (name).
--- المرجع: supabase/MIGRATIONS_RULES.md — القاعدة R-19.
+-- المرجع: supabase/docs/2026-10-12_guide_migrations-rules.md — القاعدة R-19.
 -- ============================================================================
 
 BEGIN;

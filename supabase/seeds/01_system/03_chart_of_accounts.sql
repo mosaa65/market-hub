@@ -45,7 +45,7 @@
 --   requires_reconciliation = true  حساب نقدي أو بنكي يُطابق مع الواقع.
 --
 -- ثابت (Idempotent): ON CONFLICT على (code).
--- المرجع: supabase/MIGRATIONS_RULES.md — القاعدتان R-19 و R-30.
+-- المرجع: supabase/docs/2026-10-12_guide_migrations-rules.md — القاعدتان R-19 و R-30.
 -- ============================================================================
 
 BEGIN;

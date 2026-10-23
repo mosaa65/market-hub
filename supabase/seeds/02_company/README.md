@@ -12,7 +12,7 @@
 
 > كل عميل يبدأ باسم شركة أخرى، وبعملة أخرى، وبمستودع لا يخصّه.
 
-هذا ممنوع بنصّ `MIGRATIONS_RULES.md` القاعدة R-02.
+هذا ممنوع بنصّ `../docs/2026-10-12_guide_migrations-rules.md` القاعدة R-02.
 
 ---
 
@@ -129,5 +129,5 @@ SELECT public.post_opening_balance('<معرّف المستند>');
 ## المراجع
 
 - `supabase/seeds/README.md` — الدليل الرئيسي
-- `supabase/MIGRATIONS_RULES.md` — القاعدتان R-02 و R-18
+- `supabase/docs/2026-10-12_guide_migrations-rules.md` — القاعدتان R-02 و R-18
 - `ACCOUNTING_GAPS_AUDIT_REPORT.md` — الفجوة المحاسبية في الأرصدة الافتتاحية

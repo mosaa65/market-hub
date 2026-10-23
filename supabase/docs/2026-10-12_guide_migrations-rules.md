@@ -1,6 +1,6 @@
 # قانون الترحيلات الرسمي — Market Hub ERP
 
-> **الملف:** `supabase/MIGRATIONS_RULES.md`
+> **الملف:** `supabase/docs/2026-10-12_guide_migrations-rules.md`
 > **الحالة:** قانون ملزم. يُقرأ **قبل** أي عمل على قاعدة البيانات.
 > **النطاق:** كل من يضيف أو يعدّل migration أو seed أو دالة أو سياسة.
 

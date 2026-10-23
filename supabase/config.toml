@@ -35,12 +35,11 @@ project_id = "kwzqvgdyadylwnvjghqn"
 #   supabase/seeds/02_company/  — هوية العميل وأرصدته الافتتاحية.
 #   supabase/seeds/03_samples/  — بيانات عرض لكل نشاط (مطحنة…).
 #   supabase/seeds/04_tests/    — مثبتات الاختبارات الآلية.
-# راجع supabase/seeds/README.md و supabase/MIGRATIONS_RULES.md.
+# راجع supabase/seeds/README.md و supabase/docs/2026-10-12_guide_migrations-rules.md.
 
 enabled = true
 sql_paths = [
   "./seeds/01_system/*.sql",
-  "./seeds/03_samples/sample-mill.sql"
 ]
 
 
@@ -69,12 +68,17 @@ enable_signup = true
 [auth.sms]
 # تسجيل الدخول بكلمة مرور أو OTP عبر الهاتف.
 #
-# ⚠️ لا يوجد مفتاح اسمه `enable_phone` في CLI 2.120 — وهذا كان سبب خطأ: 'auth' has invalid keys: enable_phone
-# مخطط CLI مُحكم الإغلاق: أي مفتاح لا يعرفه في القسم يُرفض ويمنع `db reset` و`start` كليهما [auth].
+# لا تضف مفاتيح خارج مخطط Supabase CLI؛ المفتاح المرفوض يمنع start وdb reset.
 #
-# [تم الإيقاف حالياً]: تم تحويل القيمة إلى false لإيقاف الهاتف بناءً على طلب الإدارة.
-enable_signup = false
+# تسجيل الهاتف للتطوير المحلي. CLI يحذر من عدم وجود مزود SMS، لكن test_otp أدناه
+# يوفر رمزًا ثابتًا للرقم التجريبي دون إرسال رسائل.
+enable_signup = true
 enable_confirmations = false
+
+# OTP ثابت للتطوير المحلي ورقم العرض فقط؛ لا يعتمد على إرسال SMS.
+# رقم الاختبار ورمزه ليسا سرّين، لكن لا تستخدمهما في السحابة أو لأي حساب حقيقي.
+[auth.sms.test_otp]
+"+967772217218" = "123456"
 
 # ── مزوّد الهاتف الخارجي (External Phone Provider) ────────────────────────
 [auth.external.phone]
@@ -82,17 +86,10 @@ enable_confirmations = false
 # كان الدخول بالهاتف يفشل دائماً بـ {"error_code":"phone_provider_disabled"} لأن GoTrue يرى GOTRUE_EXTERNAL_PHONE_ENABLED=false.
 # قسم [auth.external.phone] هو المخطط المعتمد للتحكم بالمزود السحابي والمحلي.
 #
-# [وضع الإيقاف الحالي]: تم تعيين التفعيل إلى false لإيقاف مسار الهاتف تماماً وحذف المفاتيح الإضافية المرفوضة من الـ CLI.
-enabled = false
+# Auth المحلي يقبل رقم الاختبار أعلاه دون إرسال SMS خارجي.
+enabled = true
 client_id = "local-dev-placeholder"
 secret = "local-dev-placeholder-not-a-real-secret"
 
-# ⚠️ لا يوجد مفتاح `template` في [auth.sms] في CLI 2.120 — المفتاحان المعترف بهما هنا هما `enable_signup` و`enable_confirmations` فقط.
-# نص الرسالة يُضبط من لوحة Supabase (Auth ← Templates) لا من هذا الملف. وترك مفتاح غير معروف هنا يُنتج نفس خطأ `invalid keys` الذي منع db reset [auth].
-#
-# ── مزوّد SMS ────────────────────────────────────────────────────────────────
-# لا مزوّد مُعلن هنا عن قصد. CLI 2.120 يقبل مزوّدًا حقيقيًا فقط (twilio / twilio_verify / messagebird / textlocal / vonage) 
-# بمفاتيح صحيحة، ولا يقبل قيمًا وهمية. وفي التطوير لا نحتاج مزوّدًا أصلًا: تأكيد الهاتف محليًا ينجح بلا إرسال 
-# (sms_autoconfirm مفعّل في البيئة المحلية)، والرمز يُطبع في سجلّ حاوية auth.
-#
-# ⚠️ قبل النشر لعميل حقيقي: أضف قسم مزوّد حقيقيًا هنا أو في لوحة Supabase.
+# لا تضف مفاتيح template أو مزود SMS وهميًا هنا؛ استخدم إعداد مزود حقيقي
+# للسحابة فقط. إعداد SMS السحابي مستقل عن OTP المحلي.

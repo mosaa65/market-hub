@@ -28,7 +28,7 @@
 --   customers/suppliers لا مفتاح وحيد على الاسم، فالتياق يُحقق بـ
 --   WHERE NOT EXISTS — نفس الضمان (R-19): لا تكرار مهما أُعيد التشغيل.
 --
--- المرجع: supabase/MIGRATIONS_RULES.md
+-- المرجع: supabase/docs/2026-10-12_guide_migrations-rules.md
 -- ============================================================================
 
 BEGIN;

@@ -28,7 +28,8 @@ supabase/seeds/
 │   ├── 05_expense_categories.sql تصنيفات المصروفات (مربوطة بحساباتها)
 │   ├── 06_platform_admins.sql   حسابات منصة (استثناء مقصود)
 │   ├── 07_document_numbering.sql إعداد ترقيم المستندات
-│   └── 08_payment_methods.sql   طرق الدفع + إعداد المنشأة الافتراضي
+│   ├── 08_payment_methods.sql   طرق الدفع + إعداد المنشأة الافتراضي
+│   └── 09_essential_partners.sql شركاء النظام الأساسيون
 │
 ├── 02_company/                  ← يدوي، مرة واحدة لكل عميل
 │   ├── README.md
@@ -106,7 +107,7 @@ WHEN 'SERVICE'      THEN '4311';              -- الإيراد
 
 اسم الشركة والعملة والرقم الضريبي والشعار **إعداد** يحرّره العميل من الشاشة.
 وصولها من ملف يعني أن كل عميل يبدأ باسم وعملة عميل آخر. هذا ممنوع بنصّ
-`MIGRATIONS_RULES.md` القاعدة R-02.
+`supabase/docs/2026-10-12_guide_migrations-rules.md` القاعدة R-02.
 
 ---
 
@@ -133,7 +134,7 @@ psql "$DATABASE_URL" -f supabase/seeds/03_samples/sample-mill.sql
 ## قواعد كتابة أي ملف بيانات
 
 هذه القواعد ملزمة لكل ملف في هذا المجلد. المرجع الكامل:
-`supabase/MIGRATIONS_RULES.md`.
+`supabase/docs/2026-10-12_guide_migrations-rules.md`.
 
 ### 1. ثابت (Idempotent)
 كل `INSERT` ينتهي بـ `ON CONFLICT` على **مفتاح أعمال حقيقي** — اسم أو رمز أو
@@ -187,6 +188,6 @@ SKU. **لا** على UUID عشوائي، لأن الصفّ المكرر يظهر
 
 ## المراجع
 
-- `supabase/MIGRATIONS_RULES.md` — قانون الترحيلات والبيانات (ملزم)
+- `supabase/docs/2026-10-12_guide_migrations-rules.md` — قانون الترحيلات والبيانات (ملزم)
 - `supabase/SEEDS_AND_REFERENCE_REFACTOR_PLAN.md` — خطة هذا التنظيم
 - `supabase/migrations/README.md` — دليل البنية

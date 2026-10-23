@@ -9,7 +9,7 @@
 
 | الملف | النشاط | المحتوى |
 | --- | --- | --- |
-| `sample-mill.sql` | مطحنة دقيق | 19 منتجًا، 12 تصنيفًا، 5 درجات حبوب، مورد، عميلان |
+| `sample-mill.sql` | مطحنة دقيق | 28 صنفًا تجريبيًا، 14 تصنيفًا، بيانات موردين وعملاء عرض؛ وتوفر migrations أربعة أنواع حبوب |
 
 ### عيّنتان موروثتان — حُذفتا
 
@@ -127,4 +127,4 @@ ON CONFLICT (sku) DO NOTHING;
 ## المراجع
 
 - `supabase/seeds/README.md` — الدليل الرئيسي
-- `supabase/MIGRATIONS_RULES.md` — القاعدتان R-08 و R-19
+- `supabase/docs/2026-10-12_guide_migrations-rules.md` — القاعدتان R-08 و R-19

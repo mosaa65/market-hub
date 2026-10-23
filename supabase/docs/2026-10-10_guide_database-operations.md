@@ -1,8 +1,12 @@
 # دليل تشغيل قاعدة البيانات — Market Hub ERP
 
-> **الملف:** `docs/DATABASE_OPERATIONS_GUIDE.md`
+> **الملف:** `supabase/docs/2026-10-10_guide_database-operations.md`
 > **الجمهور:** من يدير قاعدة البيانات أو ينقل النظام لعميل جديد
-> **المتطلبات المسبقة:** قراءة `supabase/MIGRATIONS_RULES.md`
+> **المسار المعتمد الحالي:** `supabase/docs/2026-10-23_guide_local-cloud-setup.md`
+
+> هذا المستند يحتوي شرحًا تفصيليًا تاريخيًا. إذا خالف أمثلة الأوامر أدناه
+> الدليل الموحد، فاتبع الدليل الموحد: المحلي يستخدم `db:local:*` والسحابة
+> تستخدم `db:cloud:push`. لا تشغّل reset على مشروع linked.
 
 هذا الدليل يشرح **كل أمر تحتاجه**، ومتى تستخدمه، وما يفعله بالضبط. لا يفترض
 معرفة سابقة بـ Supabase أو PostgreSQL.
@@ -71,9 +75,9 @@ psql --version
 ```
 supabase/
 ├── config.toml          ← إعدادات المشروع ومسارات الـ seeds
-├── migrations/          ← 13 ملف بنية
+├── migrations/          ← السلسلة المعتمدة (01–55، مع فجوات تاريخية مقصودة)
 ├── seeds/               ← البيانات
-└── MIGRATIONS_RULES.md  ← القانون
+└── docs/                ← قواعد migrations وأدلة التشغيل
 ```
 
 ### 2.3 ملف المتغيرات `.env`
@@ -93,26 +97,20 @@ SUPABASE_DB_PASSWORD=...
 ### 3.1 الطريقة الأولى: Supabase محلي (للتطوير)
 
 ```bash
-# ابدأ Docker أولًا، ثم:
-supabase start
+# التشغيل اليومي، من دون مسح البيانات:
+npm run db:local:start
 ```
 
 سيطبع لك عناوين لوحة التحكم المحلية وقاعدة البيانات.
 
-**لبناء المخطط والبيانات معًا:**
+**لإعادة بناء قاعدة Docker بالكامل مع عينة المطحنة:**
 
-```bash
-supabase db reset
+```powershell
+npm run db:local:rebuild
 ```
 
-**ما يفعله هذا الأمر بالضبط:**
-
-| الخطوة | ما يحدث |
-|---|---|
-| 1 | يحذف قاعدة البيانات المحلية **بالكامل** |
-| 2 | ينشئ قاعدة فارغة |
-| 3 | يطبّق كل ملف في `migrations/` بالترتيب الرقمي |
-| 4 | يطبّق ملفات `seeds/01_system/*.sql` |
+يطلب السكربت عبارة تأكيد محلية، ثم يشغّل migrations والبذور النظامية والعينة،
+ويتحقق من وصول migration إلى 55 ووجود بيانات المطحنة. لا يستخدم `--linked`.
 
 > ⚠️ **`db reset` يحذف كل شيء.** لا تشغّله على إنتاج أبدًا.
 
@@ -121,58 +119,27 @@ supabase db reset
 **الخطوة 1 — أنشئ المشروع** من [supabase.com](https://supabase.com):
 New Project ← اختر المنطقة الأقرب لعميلك.
 
-**الخطوة 2 — اربط المشروع محليًا:**
-
-```bash
-supabase link --project-ref <معرف-المشروع>
-```
-
-المعرف في رابط لوحة التحكم:
-`https://supabase.com/dashboard/project/**abcdefghijk**`
-
-**الخطوة 3 — طبّق الترحيلات:**
-
-```bash
-supabase db push
-```
-
-**ما يفعله:** يطبّق ملفات `migrations/` الجديدة فقط على القاعدة السحابية.
-
-> ⚠️ **`db push` لا يُشغّل الـ seeds.** البيانات تُشغَّل يدويًا (القسم 4).
-
-**الخطوة 4 — شغّل بيانات النظام:**
-
-```bash
-psql "$DATABASE_URL" -f supabase/seeds/01_system/01_modules.sql
-psql "$DATABASE_URL" -f supabase/seeds/01_system/02_plans.sql
-psql "$DATABASE_URL" -f supabase/seeds/01_system/03_chart_of_accounts.sql
-psql "$DATABASE_URL" -f supabase/seeds/01_system/04_units.sql
-psql "$DATABASE_URL" -f supabase/seeds/01_system/05_expense_categories.sql
-```
-
-أو شغّل كل الملفات بأمر واحد (PowerShell):
+**المسار الحالي الآمن** يربط المشروع ويطلب تأكيد معرفه، ثم يدفع migrations
+غير المطبقة ويشغّل بذور النظام المرجعية فقط:
 
 ```powershell
-Get-ChildItem supabase\seeds\01_system\*.sql | Sort-Object Name | ForEach-Object {
-  Write-Host "تشغيل: $($_.Name)"
-  psql "$env:DATABASE_URL" -f $_.FullName
-}
+npm run db:cloud:push -- -ProjectRef <project-ref>
 ```
 
-أو Bash:
-
-```bash
-for f in supabase/seeds/01_system/*.sql; do psql "$DATABASE_URL" -f "$f"; done
-```
+لا يحذف قاعدة السحابة ولا يغير تاريخ migrations. إذا كان التاريخ مختلفًا،
+يتوقف. لا تستخدم `--include-all` أو `migration repair` لتجاوز التوقف.
+عينة المطحنة وحسابات التطوير لا تُزرع سحابيًا افتراضيًا؛ خيار demo منفصل
+ويتطلب تأكيدًا إضافيًا، ولا يجوز استعماله على قاعدة عميل أو إنتاج.
 
 ### 3.3 متى يستخدم كل أمر؟
 
 | الحالة | الأمر |
 |---|---|
-| قاعدة محلية جديدة | `supabase db reset` |
-| قاعدة سحابية جديدة | `supabase db push` ثم الـ seeds يدويًا |
+| تشغيل Docker دون مسح | `npm run db:local:start` |
+| إعادة بناء Docker كاملة | `npm run db:local:rebuild` بعد التأكيد |
+| تحديث مشروع سحابي | `npm run db:cloud:push -- -ProjectRef <ref>` |
 | تعديل ملف migration قديم | **ممنوع** — أنشئ migration جديدًا |
-| إعادة بناء كاملة محليًا | `supabase db reset` |
+| بيانات demo سحابية | خيار `-IncludeDemoData` على مشروع اختباري قابل للمسح فقط |
 
 ---
 
@@ -182,12 +149,23 @@ for f in supabase/seeds/01_system/*.sql; do psql "$DATABASE_URL" -f "$f"; done
 
 | المجلد | يُشغَّل | متى |
 |---|---|---|
-| `01_system/` | **تلقائيًا** في `db reset` | لا تفعل شيئًا محليًا |
+| `01_system/` | تلقائيًا عند reset المحلي؛ وتطبّق المرجعيات عبر `db:cloud:push` | لا تشغّلها يدويًا إلا للتشخيص |
 | `02_company/` | يدويًا | مرة لكل عميل جديد |
 | `03_samples/` | يدويًا | عند الحاجة لبيانات عرض |
 | `04_tests/` | من الاختبارات | آليًا |
 
-### 4.2 تشغيل ملف واحد
+### 4.2 تشغيل بيانات عرض للمطحنة
+
+محليًا، استخدم `npm run db:local:rebuild`؛ فهو يضيف العينة ويتحقق منها. لا
+تستخدم `psql` أو SQL Editor على قاعدة سحابية عادية لبيانات demo.
+
+لمشروع سحابي تجريبي قابل للمسح فقط، وبعد التأكد من معرفه:
+
+```powershell
+npm run db:cloud:push -- -ProjectRef <project-ref> -IncludeDemoData
+```
+
+### 4.3 تشغيل ملف seed يدويًا للتشخيص فقط
 
 **PowerShell:**
 ```powershell
@@ -201,7 +179,7 @@ psql "$DATABASE_URL" -f supabase/seeds/03_samples/sample-mill.sql
 
 **أو من لوحة Supabase:** SQL Editor ← الصق محتوى الملف ← Run.
 
-### 4.3 ملفات النظام — بالترتيب
+### 4.4 ملفات النظام — بالترتيب
 
 الترتيب **مقصود**، كل ملف يعتمد على ما قبله:
 
@@ -220,7 +198,7 @@ psql "$DATABASE_URL" -f supabase/seeds/01_system/05_expense_categories.sql
 باقة تشير إلى وحدات غير مسجّلة في platform_modules: ...
 ```
 
-### 4.4 التحقق بعد التشغيل
+### 4.5 التحقق بعد التشغيل
 
 ```sql
 -- في محرر SQL
@@ -236,12 +214,12 @@ UNION ALL SELECT 'تصنيفات المصروف', count(*) FROM public.expense_c
 | البيان | العدد |
 |---|---|
 | الوحدات | 13 |
-| الحسابات | ~52 |
+| الحسابات | 83 |
 | وحدات النظام | 14 |
 | الباقات | 3 |
-| تصنيفات المصروف | 10 |
+| تصنيفات المصروف | 11 |
 
-### 4.5 هل البيانات صحيحة؟
+### 4.6 هل البيانات صحيحة؟
 
 هذا فحص مهم — يجب أن يكون **صفرًا** في قاعدة جديدة:
 
@@ -263,19 +241,17 @@ SELECT
 ### 5.1 الخطوات بالترتيب
 
 ```
-1. أنشئ مشروع Supabase جديد للعميل
-2. اربطه: supabase link --project-ref <المعرف>
-3. طبّق البنية: supabase db push
-4. شغّل بيانات النظام (6 ملفات من 01_system)
-5. أنشئ حساب المالك الأول (قسم 5.2)
-6. أنشئ المستودع الأول من شاشة المستودعات
-7. أدخل الأرصدة الافتتاحية إن وُجدت (قسم 5.3)
-8. العميل يحرّر هوية شركته من شاشة الإعدادات
+1. أنشئ مشروع Supabase جديد للعميل واحفظ project ref.
+2. اربطه وطبّق البنية والبذور المرجعية بأمر `npm run db:cloud:push -- -ProjectRef <ref>`.
+3. أنشئ حساب المالك الأول (قسم 5.2).
+4. أنشئ المستودع الأول من شاشة المستودعات.
+5. أدخل الأرصدة الافتتاحية إن وُجدت (قسم 5.3).
+6. العميل يحرّر هوية شركته من شاشة الإعدادات.
 ```
 
-> **الخطوة 4 تُنشئ أيضًا حسابات المنصة** (سوبر أدمن ودعم) من
-> `06_platform_admins.sql` — لأن `db push` لا يشغّل البذور، شغّل هذا الملف
-> يدويًا. وهو **للنظام لا للعميل**، وغيّر كلمات مروره فور التسليم.
+> **لا تشغّل `06_platform_admins.sql` على مشروع عميل.** يحتوي حسابات تطوير
+> وكلمات مرور ثابتة؛ مسار cloud الآمن يستثنيه. أنشئ مالك العميل عبر مسار إدارة
+> المستخدمين المعتمد للمشروع.
 
 ### 5.2 إنشاء المالك الأول — **بلا كلمات مرور في ملفات**
 
@@ -314,7 +290,7 @@ psql "$DATABASE_URL" -f acme-2026.sql
 | تشغيل `db reset` على الإنتاج | يحذف كل شيء |
 | وضع كلمة مرور في ملف | تبقى في تاريخ المستودع |
 | نسخ بيانات عميل آخر | ممنوع قانونيًا ومحاسبيًا |
-| تشغيل `db push` على قاعدة مبنية | يحاول إنشاء كائنات موجودة فيفشل |
+| اختلاف سجل migrations عن الملفات | يتوقف `db push`؛ طابق المصدر ولا تستخدم `--include-all` أو history repair عشوائيًا |
 
 ---
 
@@ -512,7 +488,7 @@ export DATABASE_URL="postgresql://postgres.xxxx:pass@aws-0-ap-northeast-1.pooler
 
 | الملف | الدور |
 |---|---|
-| `supabase/MIGRATIONS_RULES.md` | قانون الترحيلات والبيانات (ملزم) |
+| `supabase/docs/2026-10-12_guide_migrations-rules.md` | قانون الترحيلات والبيانات (ملزم) |
 | `supabase/migrations/README.md` | الدليل المعماري للبنية |
 | `supabase/SCHEMA_REFERENCE.md` | مرجع الجداول والدوال |
 | `supabase/seeds/README.md` | دليل البيانات |

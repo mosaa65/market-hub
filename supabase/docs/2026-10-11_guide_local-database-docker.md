@@ -1,10 +1,13 @@
 # دليل قاعدة البيانات المحلية على Docker — Market Hub ERP
 
-> **الملف:** `supabase/LOCAL_DATABASE_DOCKER_GUIDE.md`
+> **الملف:** `supabase/docs/2026-10-11_guide_local-database-docker.md`
 > **الجمهور:** المبرمج الذي يريد تشغيل قاعدة بيانات محلية على جهازه
 > **النطاق:** **البيئة المحلية فقط** (Docker). لا يشرح السحابة.
-> **الدليل السحابي:** `docs/DATABASE_OPERATIONS_GUIDE.md` — دليل منفصل تماماً،
+> **الدليل السحابي:** `supabase/docs/2026-10-10_guide_database-operations.md` — دليل منفصل،
 > لإنشاء مشروع Supabase سحابي ونقل النظام لعميل. لا تخلط بينهما.
+
+> **المسار المعتمد الحالي:** `supabase/docs/2026-10-23_guide_local-cloud-setup.md`.
+> إذا خالف مثال تاريخي أدناه هذا الدليل، فاتبع مسار التشغيل الموحد.
 
 هذا الملف مكتوب من تجربة تشغيل حقيقية على Windows، ويسجّل **كل عقبة ظهرت
 فعلاً** وكيف حُلّت. اقرأه إذا أردت تشغيل قاعدة محلية، أو إذا واجهت خطأً من
@@ -23,6 +26,7 @@
 7. [التحقق من سلامة البيانات](#7-التحقق-من-سلامة-البيانات)
 8. [مرجع سريع](#8-مرجع-سريع)
 9. [ربط المشروع المحلي من الطرفية — خطوة بخطوة](#9-ربط-المشروع-المحلي-من-الطرفية--خطوة-بخطوة)
+10. [المسار المعتمد اليوم](#10-المسار-المعتمد-اليوم)
 
 ---
 
@@ -34,7 +38,7 @@ Docker. لا اتصال بالإنترنت بعد التنزيل الأول، و
 **لماذا نستخدمها؟** لأنها الطريقة الوحيدة الآمنة للتأكد أن الترحيلات والبذور
 تُبنى من الصفر بلا أخطاء (`db reset`) قبل أن نلمس أي شيء سحابي.
 
-الحاويات التي تُشغَّل (11 حاوية):
+الحاويات التي تُشغَّل (بحسب الخدمات المفعّلة في config المحلي):
 
 | الحاوية | الوظيفة |
 |---|---|
@@ -111,16 +115,17 @@ npx supabase start
 **انتبه:** أول تشغيل **ينزّل نحو غيغابايت** من الصور، ويستغرق **عدة دقائق**.
 قد تنتهي مهلة طرفيتك قبل أن ينتهي هو — لا يعني ذلك فشلاً، بل استمر في العمل.
 
-**الطريقة الآمنة — شغّله في الخلفية وسجّل مخرجاته:**
+**الأمر المفضل:**
 
 ```powershell
-npx supabase start 2>&1 | Out-File supabase-start.log -Encoding utf8
+npm run db:local:start
 ```
 
-ثم تابع التقدم في نافذة أخرى:
+للتحقق من عناوين الخدمات:
 
 ```powershell
-Get-Content supabase-start.log -Tail 10
+npm run db:local:status
+docker ps --filter "name=supabase_" --format "table {{.Names}}`t{{.Status}}"
 ```
 
 > **إن ظهرت رسالة `The process cannot access the file ... because it is being
@@ -141,14 +146,22 @@ Get-Content supabase-start.log -Tail 10
 docker ps --format "{{.Names}}: {{.Status}}"
 ```
 
-النتيجة السليمة:
+النتيجة السليمة: قاعدة البيانات وAuth وREST وGateway وStudio وStorage تعمل؛
+قد تبقى خدمات اختيارية مثل imgproxy أو pooler متوقفة بحسب الإعداد.
 
 ```
 supabase_db_kwzqvgdyadylwnvjghqn: Up X minutes (healthy)
 supabase_auth_kwzqvgdyadylwnvjghqn: Up X minutes (healthy)
-...
-supabase_vector_kwzqvgdyadylwnvjghqn: Restarting (0) ...   ← هذا عادي، انظر 5.4
+supabase_rest_kwzqvgdyadylwnvjghqn: Up X minutes
+supabase_kong_kwzqvgdyadylwnvjghqn: Up X minutes (healthy)
 ```
+
+### تسجيل الدخول المحلي
+
+بعد `npm run db:local:rebuild`، حسابات التطوير الأربعة لها كلمات مرور وهويات
+بريد وهاتف. كلمة مرور التطوير `Super#2004`. يمكن تسجيل الدخول بالبريد أو
+بالهاتف للحساب التجريبي `+967772217218`؛ إعداد `auth.sms.test_otp` يثبت الرمز
+المحلي على `123456` بلا إرسال SMS خارجي. لا تستخدم الحسابات أو الرمز في السحابة.
 
 ---
 
@@ -214,7 +227,22 @@ $env:Path += ";C:\Program Files\Docker\Docker\resources\bin;C:\Program Files\Git
 docker info --format "{{.ServerVersion}}"
 ```
 
-### 5.3 `The '<' operator is reserved for future use`
+### 5.3 `supabase start is already running` مع خدمات متوقفة
+
+إذا قال `supabase start` إن البيئة تعمل، لكن `docker ps` يظهر قاعدة البيانات
+فقط وبقية الخدمات `Exited`، أوقف حاويات هذا المشروع مع إبقاء volumes، ثم ابدأها:
+
+```powershell
+supabase stop --project-id kwzqvgdyadylwnvjghqn
+npm run db:local:start
+npm run db:local:status
+```
+
+لا تستخدم `--no-backup` أو تحذف Docker volumes. إذا أردت مطابقة schema مع
+المigrations الحالية، استخدم `npm run db:local:rebuild`؛ هذا يمسح قاعدة Docker
+بعد عبارة تأكيد، لكنه لا يستهدف السحابة.
+
+### 5.4 `The '<' operator is reserved for future use`
 
 **الأعراض:** حاولت تمرير ملف SQL إلى psql:
 ```powershell
@@ -234,7 +262,7 @@ docker exec supabase_db_kwzqvgdyadylwnvjghqn psql -U postgres -d postgres -v ON_
 
 هذه هي الطريقة التي استخدمناها فعلاً وهي الأكثر موثوقية.
 
-### 5.4 `syntax error at or near ""` — علامة BOM تالفة
+### 5.5 `syntax error at or near ""` — علامة BOM تالفة
 
 **الأعراض:** جرّبت البديل الأنبوبي فظهر:
 ```
@@ -258,7 +286,7 @@ Get-Content file.sql -Raw | docker exec -i ...
 > **بديل جزئي:** إن أضفت تحويل ترميز صريحاً قد يُحَلّ الأمر، لكن `docker cp`
 > أنظف وأضمن. لا تعتمد على الأنبوب في ملفات SQL.
 
-### 5.5 `The process cannot access the file 'supabase-start.log' because it is being used by another process`
+### 5.6 `The process cannot access the file 'supabase-start.log' because it is being used by another process`
 
 **السبب:** نسخة سابقة من `supabase start` لا تزال تعمل وتكتب في الملف.
 
@@ -276,7 +304,7 @@ Get-Process -Name "supabase","node" -ErrorAction SilentlyContinue |
 Get-Content supabase-start.log -Tail 10
 ```
 
-### 5.6 حاوية `supabase_vector_*` تُعيد التشغيل باستمرار
+### 5.7 حاوية `supabase_vector_*` تُعيد التشغيل باستمرار
 
 **الأعراض:**
 ```
@@ -298,7 +326,7 @@ WARNING: Analytics on Windows requires Docker daemon exposed on tcp://localhost:
 
 > لا تفعل هذا على جهاز بعيد عن الثقة: كشف الديمون على TCP بلا TLS خطر أمني.
 
-### 5.7 الطرفية "تتوقف" عند 120 ثانية
+### 5.8 الطرفية "تتوقف" عند 120 ثانية
 
 **الأعراض:** ينتهي الأمر برسالة `Command exceeded 120s and was terminated`.
 أو بلا مخرجات إطلاقاً.
@@ -310,7 +338,7 @@ start` يعمل في الخلفية بحق.
 `Get-Content supabase-start.log -Tail 10`. **لا تُعد التشغيل** — ستتعارض
 النسختان (المشكلة 5.5).
 
-### 5.8 `Cannot find project ref. Have you run supabase link?`
+### 5.9 `Cannot find project ref. Have you run supabase link?`
 
 **الأعراض:** عند تشغيل `npx supabase migration list`.
 
@@ -329,21 +357,49 @@ npx supabase db query "SELECT count(*) FROM supabase_migrations.schema_migration
 ### 6.1 إعادة بناء القاعدة من الصفر
 
 ```powershell
-npx supabase db reset
+npm run db:local:rebuild
 ```
 
-**ما يفعله:** يمحو القاعدة المحلية بالكامل، ويعيد بناءها بتطبيق **16 ترحيلاً**،
-ثم يشغّل تلقائياً ملفات `seeds/01_system/*.sql` الثمانية.
+هذا هو الأمر المعتمد الآن. يبدأ خدمات Docker، ويطلب كتابة
+`RESET LOCAL kwzqvgdyadylwnvjghqn`، ثم يمحو **قاعدة Docker المحلية فقط** ويعيد
+إنشاءها من جميع migrations الحالية (01–55)، ويشغّل بذور النظام، ثم يضيف عيّنة
+المطحنة ويتحقق من أعداد الجداول والبيانات.
 
 > ⚠️ **لا تشغّله على السحابة أبداً.** محلي فقط.
 
-إن أردت البناء بلا بذور (لتشغيلها يدوياً بنفسك):
+للتشغيل اليومي من دون حذف البيانات:
 
 ```powershell
-npx supabase db reset --no-seed
+npm run db:local:start
+npm run db:local:status
 ```
 
-### 6.2 تشغيل البذور النظامية يدوياً
+لا تستخدم `supabase db reset --linked` لهذا المشروع. خياره `--linked` يستهدف
+قاعدة السحابة المرتبطة، وليس Docker.
+
+### 6.2 البذور وبيانات العينة
+
+`supabase/config.toml` يشغّل بذور النظام الآمنة تلقائيًا. بيانات المطحنة
+التجريبية لا تُشغّل تلقائيًا عند reset عام؛ سكربت `db:local:rebuild` يشغّلها
+صراحةً بعد نجاح migrations. هذا يمنع تسريب منتجات وعملاء تجريبيين إلى قاعدة
+عميل سحابية جديدة.
+
+حسابات المنصة التجريبية الأربعة تستخدم كلمة مرور محلية واحدة `Super#2004`.
+هذه الحسابات للتطوير، ولا تستخدمها في مشروع إنتاج. تفعيلها محليًا جزء من
+إعادة البناء المحلية فقط.
+
+إن احتجت تشغيل seed محلي يدويًا:
+
+```powershell
+supabase db query --local --file supabase/seeds/03_samples/sample-mill.sql
+```
+
+لا تشغّل هذا الملف على السحابة إلا لمشروع تجريبي قابل للمسح وبعد مراجعة
+الدليل الموحد.
+
+### ملاحظة تاريخية: البذور النظامية يدوياً
+
+الخطوات التالية مخصصة فقط لتشخيص قاعدة قديمة؛ المسار الطبيعي هو السكربت أعلاه.
 
 الترتيب **مقصود** — كل ملف يعتمد على ما قبله:
 
@@ -357,6 +413,7 @@ npx supabase db reset --no-seed
 | 6 | `06_platform_admins.sql` | حسابات المنصة (بلاها لا لوحة إدارية) |
 | 7 | `07_document_numbering.sql` | إعداد الترقيم — محرّك 14 يقرأ منه |
 | 8 | `08_payment_methods.sql` | طرق الدفع + إعداد المنشأة — الترحيل 16 وحرّاس الكتابة يقرؤون منه |
+| 9 | `09_essential_partners.sql` | الشركاء النظاميون الأساسيون |
 
 > لو شغّلت `05_expense_categories.sql` قبل `03_chart_of_accounts.sql` لما وجد
 > الحساب، ولرفع فحصه الذاتي استثناءً. وكذلك `07` و`08` يفحصان نوع المستند وكود
@@ -366,7 +423,7 @@ npx supabase db reset --no-seed
 
 ```powershell
 $ref = (docker ps --format "{{.Names}}" | Select-String "supabase_db_").ToString()
-foreach ($f in @("01_modules","02_plans","03_chart_of_accounts","04_units","05_expense_categories","06_platform_admins","07_document_numbering","08_payment_methods")) {
+foreach ($f in @("01_modules","02_plans","03_chart_of_accounts","04_units","05_expense_categories","06_platform_admins","07_document_numbering","08_payment_methods","09_essential_partners")) {
   Write-Host "--- $f ---"
   docker cp "supabase\seeds\01_system\$f.sql" "${ref}:/tmp/$f.sql"
   docker exec $ref psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f "/tmp/$f.sql"
@@ -382,9 +439,10 @@ foreach ($f in @("01_modules","02_plans","03_chart_of_accounts","04_units","05_e
 | 03_chart_of_accounts | `INSERT 0 58` |
 | 04_units | `INSERT 0 13` |
 | 05_expense_categories | `INSERT 0 11` |
-| 06_platform_admins | `INSERT 0 3` |
-| 07_document_numbering | `INSERT 0 17` |
+| 06_platform_admins | `INSERT 0 4` (بيانات تطوير محلية فقط) |
+| 07_document_numbering | `INSERT 0 16` |
 | 08_payment_methods | `INSERT 0 13` (+ 6 صفوف إعداد) |
+| 09_essential_partners | شركاء نظاميين ثابتين |
 
 > **`-v ON_ERROR_STOP=1` مهم:** يجعل psql يتوقف عند أول خطأ بدل أن يكمل
 > ويطبع نجاحاً كاذباً.
@@ -402,13 +460,13 @@ npx supabase db query "SELECT (SELECT count(*) FROM units) AS units, (SELECT cou
 | البيان | المتوقع |
 |---|---|
 | الوحدات | 13 |
-| الحسابات | 58 |
+| الحسابات | 83 |
 | وحدات النظام | 14 |
 | الباقات | 3 |
 | تصنيفات المصروف | 11 |
 | طرق الدفع | 13 |
 | إعداد المنشأة (طرق الدفع) | 6 |
-| أنواع المستندات | 17 |
+| أنواع المستندات | 16 |
 
 ### 7.2 لا بيانات أعمال تسرّبت
 
@@ -505,12 +563,11 @@ npx supabase db query "SELECT m.id, m.name_ar, public.payment_method_ledger_acco
 
 | الأمر | ما يفعله |
 |---|---|
-| `npx supabase start` | يشغّل البيئة المحلية (أول مرة: دقائق) |
-| `npx supabase stop` | يوقفها |
-| `npx supabase status` | يعرض العناوين والمفاتيح |
-| `npx supabase db reset` | **يمحو ويعيد البناء محلياً** |
-| `npx supabase db query "<SQL>"` | ينفّذ استعلاماً على القاعدة المحلية |
-| `npx supabase db push` | يرفع الترحيلات **للسحابة** (بعد `link`) |
+| `npm run db:local:start` | يشغّل البيئة المحلية دون مسح القاعدة |
+| `npm run db:local:status` | يعرض عناوين الخدمات المحلية |
+| `npm run db:local:rebuild` | **يمحو ويعيد بناء Docker محليًا فقط** بعد عبارة تأكيد |
+| `supabase db query --local "<SQL>"` | ينفّذ استعلامًا محليًا فقط |
+| `npm run db:cloud:push -- -ProjectRef <ref>` | يطلب تأكيد المشروع ثم يطبق migrations والبذور المرجعية الآمنة على السحابة؛ لا reset |
 | `npx supabase login` | يدخل بحساب Supabase للسحابة |
 | `docker ps --format "{{.Names}}: {{.Status}}"` | يعرض الحاويات |
 | `docker logs <auth-container> --tail 50` | يعرض رموز OTP المطبوعة محلياً |
@@ -552,16 +609,16 @@ docker info --format "{{.ServerVersion}}"
 cd c:\Users\mousa\Desktop\project\market-hup
 
 # 2) شغّل البيئة المحلية (أول مرة: عدة دقائق لتنزيل الصور)
-npx supabase start
+npm run db:local:start
 
-# 3) اطبع العناوين والمفاتيح (API / DB / Studio / Inbucket)
-npx supabase status
+# 3) اطبع العناوين فقط؛ لا يعرض المفاتيح
+npm run db:local:status
 
-# 4) ابنِ القاعدة من الصفر: 16 ترحيلًا ثم 8 بذور نظامية
-npx supabase db reset
+# 4) أعد بناء Docker المحلي حتى migration 55 وأضف بيانات المطحنة
+npm run db:local:rebuild
 
 # 5) نفّذ استعلامًا للتأكد (راجع القسم 7)
-npx supabase db query "SELECT count(*) FROM public.accounts;"   -- 58
+supabase db query --local "SELECT count(*) FROM public.accounts;"   # 83
 ```
 
 **ماذا يعني `db reset` بالضبط؟** يمحو قاعدة `postgres` المحلية، ثم يعيد بناءها
@@ -607,33 +664,32 @@ Try rerunning the command with --debug to troubleshoot the error.
 في هذا الإصدار **مُحكم الإغلاق (closed)**: أي مفتاح لا يعرفه داخل قسم يُرفض،
 **ويمنع `db reset` و`start` كليهما** — فهو خطأ إعداد لا خطأ قاعدة.
 
-**الحل (مُطبَّق فعلاً في `config.toml`):**
+**الحل:** لا تضف `enable_phone` إلى قسم `[auth]` ولا تضف مزود SMS وهميًا؛ مفاتيح
+Auth غير المعروفة تمنع CLI من بدء الخدمات أو reset.
 
-1. حُذف `enable_phone = true` من قسم `[auth]` — لا وجود له في هذا الإصدار.
-2. حُذف قسم `[auth.sms.twilio]` بمفاتيح `placeholder` — لا يقبله CLI، وGoTrue
-   تحاول الاتصال بـTwilio بمفاتيح وهمية فتفشل.
+**الاختبار المحلي:** يفعّل `supabase/config.toml` الرقم التجريبي المحدد في
+`[auth.sms.test_otp]` مع OTP ثابت `123456`، ويتيح تسجيل الدخول بالبريد والهاتف
+للحساب التجريبي بلا إرسال SMS. قد يطبع CLI تحذيرًا لعدم وجود مزوّد SMS خارجي؛
+تحقق من `/auth/v1/settings` وجرّب تسجيل الدخول بدل الاعتماد على التحذير وحده.
+لا تضع مزودًا وهميًا، ولا تستخدم رقم/OTP التجربة في السحابة أو لحساب حقيقي.
 
-**تفعيل الهاتف الصحيح:** يتم عبر قسم `[auth.sms]` مع `enable_signup = true`،
-وبلا مزوّد SMS تُطبع رموز الـOTP في سجلّ حاوية `auth` بدل إرسالها:
-
-```powershell
-docker logs supabase_auth_kwzqvgdyadylwnvjghqn --tail 50
-```
+تأكد أولًا من إعداد Auth في `/auth/v1/settings` ثم اختبر البريد والهاتف للحساب
+التجريبي. OTP `123456` صالح محليًا للرقم المحدد فقط؛ لا ترسله ولا تستخدمه سحابيًا.
 
 ### 9.5 كيف تعرف أن كل شيء سليم؟
 
 ```powershell
-# عدد الترحيلات المطبقة — المتوقع 16
-npx supabase db query "SELECT count(*) FROM supabase_migrations.schema_migrations;"
+# عدد الترحيلات المطبقة — 52 ملفًا حاليًا، وأعلى نسخة 55 (توجد فجوات ترقيم مقصودة)
+supabase db query --local "SELECT count(*) AS migrations, max(version) AS latest FROM supabase_migrations.schema_migrations;"
 
-# الجداول — المتوقع 84
-npx supabase db query "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';"
+# الجداول — 84 في المخطط المعتمد الحالي
+supabase db query --local "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';"
 
 # لا جدول بلا RLS — المتوقع صفر صفوف
-npx supabase db query "SELECT tablename FROM pg_tables WHERE schemaname='public' AND NOT rowsecurity;"
+supabase db query --local "SELECT tablename FROM pg_tables WHERE schemaname='public' AND NOT rowsecurity;"
 
 # صفر بيانات أعمال في قاعدة جديدة
-npx supabase db query "SELECT (SELECT count(*) FROM public.products) AS products, (SELECT count(*) FROM public.company_settings) AS company;"
+supabase db query --local "SELECT (SELECT count(*) FROM public.products) AS products, (SELECT count(*) FROM public.company_settings) AS company;"
 ```
 
 ### 9.6 إن أردت ربط مشروع سحابي (لاحقًا)
@@ -642,12 +698,22 @@ npx supabase db query "SELECT (SELECT count(*) FROM public.products) AS products
 
 ```powershell
 npx supabase login
-npx supabase link --project-ref <project-ref>
-npx supabase db push          # يرفع الترحيلات للسحابة
+npm run db:cloud:push -- -ProjectRef <project-ref>
 ```
 
 > ⚠️ لا تشغّل `db reset` على مشروع سحابي أبدًا — العملية تُفقد البيانات.
-> و`db push` يخصّ السحابة فقط. التفاصيل في `docs/DATABASE_OPERATIONS_GUIDE.md`.
+> أمر السحابة يتحقق من معرف المشروع وconnection URL، ولا يزرع بيانات demo افتراضيًا.
+> التفاصيل في `supabase/docs/2026-10-10_guide_database-operations.md`.
+
+---
+
+## 10. المسار المعتمد اليوم
+
+الأوامر القديمة في أمثلة أو سجلات الأقسام السابقة توثّق محاولات تاريخية.
+للتشغيل الحالي استخدم [الدليل الموحد المحلي والسحابي](2026-10-23_guide_local-cloud-setup.md).
+المحلي يُبنى بـ`npm run db:local:rebuild`، والسحابي يُحدّث بـ
+`npm run db:cloud:push -- -ProjectRef <ref>` فقط. لا يوجد أمر مشترك يعيد ضبط
+القاعدتين معًا، عمداً.
 
 ---
 
@@ -655,9 +721,9 @@ npx supabase db push          # يرفع الترحيلات للسحابة
 
 | الملف | الدور |
 |---|---|
-| `docs/DATABASE_OPERATIONS_GUIDE.md` | **الدليل السحابي** — مشروع جديد ونقل لعميل |
+| `supabase/docs/2026-10-10_guide_database-operations.md` | **الدليل السحابي** — مشروع جديد ونقل لعميل |
 | `supabase/DATABASE_AUDIT_AND_FIX_REPORT.md` | تقرير تدقيق البيانات والإصلاحات الأخيرة |
-| `supabase/MIGRATIONS_RULES.md` | قانون الترحيلات والبيانات (ملزم) |
+| `supabase/docs/2026-10-12_guide_migrations-rules.md` | قانون الترحيلات والبيانات (ملزم) |
 | `supabase/migrations/README.md` | الدليل المعماري للبنية |
 | `supabase/seeds/README.md` | دليل البيانات |
 | `supabase/SCHEMA_REFERENCE.md` | مرجع الجداول والدوال |

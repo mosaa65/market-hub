@@ -1,36 +1,109 @@
-# push-cloud.ps1
-# يطبّق ترحيلات المستودع + بذور 01_system على المشروع السحابي المرتبط.
-# يستخدم `db query --linked` الذي يمرّ عبر Management API (HTTPS) — لا pooler ولا IPv6.
-# تشغيل:  powershell -NoProfile -File scripts\push-cloud.ps1
+param(
+  [string]$ProjectRef,
+  [switch]$IncludeDemoData
+)
 
 $ErrorActionPreference = "Stop"
-$env:Path = "C:\Program Files\nodejs;C:\Users\mousa\AppData\Roaming\npm;" + $env:Path
-$cli = "node_modules\supabase\dist\supabase.js"
+$repoRoot = Split-Path -Parent $PSScriptRoot
 
-Write-Host "== 1. سكيما public نظيفة ==" -ForegroundColor Cyan
-node $cli db query "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO postgres; GRANT ALL ON SCHEMA public TO public; GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role; TRUNCATE TABLE supabase_migrations.schema_migrations;" --linked | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "فشل تهيئة السكيما" }
+function Invoke-Supabase {
+  param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
 
-Write-Host "== 2. تطبيق الترحيلات ==" -ForegroundColor Cyan
-$migs = Get-ChildItem "supabase\migrations\*.sql" | Sort-Object Name
-foreach ($m in $migs) {
-  Write-Host "   -> $($m.Name)"
-  node $cli db query -f $m.FullName --linked | Out-Null
-  if ($LASTEXITCODE -ne 0) { throw "فشل الترحيل: $($m.Name)" }
+  $previousPreference = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  $output = & supabase @Arguments 2>&1
+  $exitCode = $LASTEXITCODE
+  $ErrorActionPreference = $previousPreference
+
+  foreach ($line in $output) {
+    $text = [string]$line
+    if ($text -match 'ANON_KEY|PUBLISHABLE_KEY|SECRET_KEY|SERVICE_ROLE_KEY|JWT_SECRET|S3_PROTOCOL_ACCESS_KEY') {
+      continue
+    }
+    Write-Host $text
+  }
+  if ($exitCode -ne 0) {
+    throw "Supabase CLI command failed: supabase $($Arguments -join ' ')"
+  }
 }
 
-Write-Host "== 3. تسجيل النسخ ==" -ForegroundColor Cyan
-foreach ($m in $migs) {
-  $ver  = ($m.BaseName -split '_')[0]
-  $name = $m.BaseName.Substring($ver.Length + 1)
-  node $cli db query "INSERT INTO supabase_migrations.schema_migrations (version, name) VALUES ('$ver','$name') ON CONFLICT (version) DO NOTHING;" --linked | Out-Null
-}
+Push-Location $repoRoot
+try {
+  $envFile = Join-Path $repoRoot ".env"
+  if (Test-Path $envFile) {
+    foreach ($line in Get-Content $envFile) {
+      $trimmed = $line.Trim()
+      if ($trimmed -match '^[A-Za-z_][A-Za-z0-9_]*\s*=') {
+        $parts = $trimmed -split '=', 2
+        $name = $parts[0].Trim()
+        $value = $parts[1].Trim().Trim('"').Trim("'")
+        [Environment]::SetEnvironmentVariable($name, $value, "Process")
+      }
+    }
+  }
 
-Write-Host "== 4. البذور ==" -ForegroundColor Cyan
-foreach ($s in (Get-ChildItem "supabase\seeds\01_system\*.sql" | Sort-Object Name)) {
-  Write-Host "   -> $($s.Name)"
-  node $cli db query -f $s.FullName --linked | Out-Null
-  if ($LASTEXITCODE -ne 0) { throw "فشلت البذرة: $($s.Name)" }
-}
+  $linkedRefPath = Join-Path $repoRoot "supabase\.temp\project-ref"
 
-Write-Host "== تمّ ==" -ForegroundColor Green
+  if ($ProjectRef) {
+    Write-Host "Linking this workspace to cloud project $ProjectRef..." -ForegroundColor Cyan
+    Invoke-Supabase link --project-ref $ProjectRef
+  }
+
+  if (-not (Test-Path $linkedRefPath)) {
+    throw "No cloud project is linked. Run: supabase link --project-ref <project-ref>"
+  }
+  $linkedRef = (Get-Content $linkedRefPath -Raw).Trim()
+  if ($ProjectRef -and $linkedRef -ne $ProjectRef) {
+    throw "Linked project mismatch: expected $ProjectRef, found $linkedRef."
+  }
+
+  if (-not $env:SUPABASE_DB_URL) {
+    throw "Set SUPABASE_DB_URL to this project's direct database URL before deployment. Its value is never printed or stored by this script."
+  }
+  try {
+    $databaseHost = ([uri]$env:SUPABASE_DB_URL).Host
+  } catch {
+    throw "SUPABASE_DB_URL is not a valid URL."
+  }
+  $databaseUri = [uri]$env:SUPABASE_DB_URL
+  $databaseUserInfo = [uri]::UnescapeDataString($databaseUri.UserInfo)
+  $databaseCredentials = $databaseUserInfo -split ":", 2
+  if ($databaseCredentials.Count -ne 2 -or -not $databaseCredentials[1]) {
+    throw "SUPABASE_DB_URL must include the target database password in its user-info section."
+  }
+
+  $directConnection = $databaseHost -eq "db.$linkedRef.supabase.co" -and $databaseCredentials[0] -eq "postgres"
+  $poolerConnection = $databaseHost -match '^aws-\d+-[a-z0-9-]+\.pooler\.supabase\.com$' -and $databaseCredentials[0] -eq "postgres.$linkedRef"
+  if (-not ($directConnection -or $poolerConnection)) {
+    throw "SUPABASE_DB_URL host/user does not identify linked project $linkedRef."
+  }
+  $env:SUPABASE_DB_PASSWORD = $databaseCredentials[1]
+
+  Write-Host "Target cloud project: $linkedRef" -ForegroundColor Yellow
+  Write-Host "This command applies pending migrations and safe system reference seeds only. It never resets the cloud database." -ForegroundColor Yellow
+  $confirmation = Read-Host "Type CLOUD $linkedRef to continue"
+  if ($confirmation -cne "CLOUD $linkedRef") {
+    throw "Cloud deployment cancelled. No database changes were made."
+  }
+
+  Invoke-Supabase db push --linked
+
+  if ($IncludeDemoData) {
+    Write-Host "WARNING: this adds test platform accounts and fictitious mill business data." -ForegroundColor Red
+    $demoConfirmation = Read-Host "Type DEMO DATA $linkedRef to continue"
+    if ($demoConfirmation -cne "DEMO DATA $linkedRef") {
+      throw "Demo seed cancelled. Migrations and safe reference seeds remain applied."
+    }
+  }
+
+  $seedArgs = @("scripts/apply-cloud-seeds.mjs", $linkedRef)
+  if ($IncludeDemoData) { $seedArgs += "--include-demo" }
+  node @seedArgs
+  if ($LASTEXITCODE -ne 0) { throw "Cloud seed application failed. The database URL was not printed." }
+
+  Write-Host "Cloud migrations and safe reference seeds completed for $linkedRef." -ForegroundColor Green
+  Write-Host "Verify with: supabase db push --linked --dry-run"
+}
+finally {
+  Pop-Location
+}

@@ -26,7 +26,7 @@
 --   حدّ max_products = NULL يعني بلا سقف.
 --
 -- ثابت (Idempotent): ON CONFLICT على (id).
--- المرجع: supabase/MIGRATIONS_RULES.md — القاعدة R-30.
+-- المرجع: supabase/docs/2026-10-12_guide_migrations-rules.md — القاعدة R-30.
 -- ============================================================================
 
 BEGIN;

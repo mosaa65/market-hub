@@ -86,4 +86,4 @@ psql "$DATABASE_URL" -f supabase/seeds/04_tests/fixtures.sql
 ## المراجع
 
 - `supabase/seeds/README.md` — الدليل الرئيسي
-- `supabase/MIGRATIONS_RULES.md` — القاعدة R-08
+- `supabase/docs/2026-10-12_guide_migrations-rules.md` — القاعدة R-08
