@@ -45,7 +45,7 @@ export function CartLine({
   const lineTotal = line.quantity * line.unitPrice;
 
   return (
-    <div className="group relative grid grid-cols-[minmax(0,1fr)_auto_auto_1.75rem] items-center gap-1 rounded-md border-b border-border/60 bg-transparent px-1.5 py-1 transition-colors hover:bg-primary/[0.035] sm:gap-1.5 sm:px-2">
+    <div className="group relative grid grid-cols-[minmax(0,1fr)_auto_auto_1.75rem] items-center gap-1 rounded-md border-b border-emerald-500/35 bg-transparent px-1.5 py-1 transition-colors last:border-b-0 hover:bg-primary/[0.035] sm:gap-1.5 sm:px-2">
       <div className="flex min-w-0 items-center gap-1.5">
         {line.isService ? (
           <span

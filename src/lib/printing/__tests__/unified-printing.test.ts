@@ -530,7 +530,7 @@ check(
 check("document output omits legacy footer fields", !stdHtml.includes("footer-contact"));
 check(
   "unified invoice renders the approved rights line exactly once",
-  rightsOccurrences(stdHtml) === 1 && stdHtml.includes("772217218 - 784795101"),
+  rightsOccurrences(stdHtml) === 1 && stdHtml.includes("772217218 - 784795104"),
 );
 
 const invoiceTemplateOutputs = [

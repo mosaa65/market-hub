@@ -28,8 +28,12 @@ export {
   type MillingServiceDocumentCreated,
   type MillingDocumentLine,
   type MillingDocumentDetails,
+  type GrainType,
+  type GrainOutputDefault,
   // reads
   fetchGrainItems,
+  fetchGrainTypes,
+  fetchGrainType,
   fetchOutputItems,
   fetchServiceItem,
   fetchMillingServiceDocument,

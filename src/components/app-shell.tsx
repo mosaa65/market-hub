@@ -1018,9 +1018,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Menu className="h-4.5 w-4.5" />
           </button>
 
-          {/* Smart back/forward — page-tracking arrows (disabled at stack edges,
-           *  hidden on the POS full-screen routes like the rest of the header). */}
-          {!isPosRoute ? <HeaderNavArrows /> : null}
+          {/* Smart back/forward navigation remains available on POS routes. */}
+          <HeaderNavArrows />
 
           {/*
            * Desktop sidebar collapse / expand — the plan's control (§4.2).

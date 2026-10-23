@@ -194,7 +194,9 @@ export function LuxuryPrintPreviewModal({
       request?.settings?.showSignatures ??
       false,
   );
-  const [mobileMenu, setMobileMenu] = useState<"method" | "template" | "paper" | "codes" | null>(null);
+  const [mobileMenu, setMobileMenu] = useState<"method" | "template" | "paper" | "codes" | null>(
+    null,
+  );
   const [zoomLevel, setZoomLevel] = useState(100);
   const [isPrinting, setIsPrinting] = useState(false);
   const [isSharingPdf, setIsSharingPdf] = useState(false);
@@ -247,13 +249,7 @@ export function LuxuryPrintPreviewModal({
   ]);
 
   const iframeMinHeight =
-    printMethod === "thermal"
-      ? activePaper === "thermal-58"
-        ? "690px"
-        : "760px"
-      : activePaper === "a5"
-        ? "830px"
-        : "1150px";
+    printMethod === "thermal" ? "120px" : activePaper === "a5" ? "830px" : "1150px";
 
   const syncPreviewHeight = () => {
     const frameDocument = previewFrameRef.current?.contentDocument;
@@ -411,7 +407,9 @@ export function LuxuryPrintPreviewModal({
       const { default: html2pdf } = await import("html2pdf.js");
       const previewDocument = previewFrameRef.current?.contentDocument;
       if (!previewDocument?.body) {
-        throw new Error(rtl ? "تعذر الوصول إلى معاينة المستند." : "The document preview is unavailable.");
+        throw new Error(
+          rtl ? "تعذر الوصول إلى معاينة المستند." : "The document preview is unavailable.",
+        );
       }
 
       await previewDocument.fonts?.ready;
@@ -501,22 +499,45 @@ export function LuxuryPrintPreviewModal({
     >
       <div className="relative flex h-[100dvh] max-h-[980px] w-full max-w-7xl flex-col overflow-hidden rounded-none border border-border/80 bg-card shadow-2xl md:h-[95vh] md:rounded-2xl">
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row" dir="ltr">
-          <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-slate-200/70 dark:bg-slate-950/90" aria-label="معاينة الفاتورة">
-            <div className="flex shrink-0 items-center justify-between border-b border-border/50 px-3 py-2" dir="rtl">
+          <section
+            className="flex min-h-0 min-w-0 flex-1 flex-col bg-slate-200/70 dark:bg-slate-950/90"
+            aria-label="معاينة الفاتورة"
+          >
+            <div
+              className="flex shrink-0 items-center justify-between border-b border-border/50 px-3 py-2"
+              dir="rtl"
+            >
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                 <span>معاينة مباشرة</span>
               </div>
               <div className="flex items-center gap-1 rounded-lg border border-border/60 bg-card/80 p-0.5">
-                <button type="button" onClick={() => setZoomLevel((z) => Math.max(60, z - 15))} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground" title="تصغير">
+                <button
+                  type="button"
+                  onClick={() => setZoomLevel((z) => Math.max(60, z - 15))}
+                  className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  title="تصغير"
+                >
                   <ZoomOut className="h-4 w-4" />
                 </button>
-                <span className="min-w-10 text-center font-mono text-[11px] text-muted-foreground">{zoomLevel}%</span>
-                <button type="button" onClick={() => setZoomLevel((z) => Math.min(150, z + 15))} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground" title="تكبير">
+                <span className="min-w-10 text-center font-mono text-[11px] text-muted-foreground">
+                  {zoomLevel}%
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setZoomLevel((z) => Math.min(150, z + 15))}
+                  className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  title="تكبير"
+                >
                   <ZoomIn className="h-4 w-4" />
                 </button>
                 {zoomLevel !== 100 && (
-                  <button type="button" onClick={() => setZoomLevel(100)} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground" title="استعادة 100%">
+                  <button
+                    type="button"
+                    onClick={() => setZoomLevel(100)}
+                    className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                    title="استعادة 100%"
+                  >
                     <Maximize2 className="h-4 w-4" />
                   </button>
                 )}
@@ -525,9 +546,14 @@ export function LuxuryPrintPreviewModal({
             <div className="min-h-0 flex-1 overflow-auto p-3 sm:p-6">
               <div
                 className={`mx-auto transition-all duration-200 ${containerWidth}`}
-                style={{ transform: zoomLevel !== 100 ? `scale(${zoomLevel / 100})` : undefined, transformOrigin: "top center" }}
+                style={{
+                  transform: zoomLevel !== 100 ? `scale(${zoomLevel / 100})` : undefined,
+                  transformOrigin: "top center",
+                }}
               >
-                <div className={`relative w-full overflow-hidden border border-slate-300 bg-white text-slate-950 shadow-xl dark:border-slate-800 ${isThermal ? "rounded-lg p-2 sm:p-3" : "rounded-sm"}`}>
+                <div
+                  className={`relative w-full overflow-hidden border border-slate-300 bg-white text-slate-950 shadow-xl dark:border-slate-800 ${isThermal ? "rounded-lg p-2 sm:p-3" : "rounded-sm"}`}
+                >
                   {isThermal && (
                     <div className="mb-2 flex w-full items-center justify-between border-b border-dashed border-slate-300 px-3 py-1.5 font-mono text-[10px] text-slate-400">
                       <span>قص الورقة</span>
@@ -540,7 +566,10 @@ export function LuxuryPrintPreviewModal({
                     srcDoc={previewHtml}
                     onLoad={syncPreviewHeight}
                     className="w-full border-0 bg-white"
-                    style={{ height: previewContentHeight ?? iframeMinHeight, minHeight: iframeMinHeight }}
+                    style={{
+                      height: previewContentHeight ?? iframeMinHeight,
+                      minHeight: iframeMinHeight,
+                    }}
                     sandbox="allow-same-origin"
                   />
                   {isThermal && (
@@ -553,7 +582,10 @@ export function LuxuryPrintPreviewModal({
             </div>
           </section>
 
-          <aside className="flex max-h-[42%] shrink-0 flex-col overflow-hidden border-t border-border/80 bg-card md:max-h-none md:w-[310px] md:border-l md:border-t-0" dir="rtl">
+          <aside
+            className="flex max-h-[42%] shrink-0 flex-col overflow-hidden border-t border-border/80 bg-card md:max-h-none md:w-[310px] md:border-l md:border-t-0"
+            dir="rtl"
+          >
             <header className="flex shrink-0 items-center justify-between gap-2 border-b border-border/70 px-3 py-2.5 md:px-4 md:py-3">
               <div className="flex min-w-0 items-center gap-2.5">
                 <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -562,7 +594,8 @@ export function LuxuryPrintPreviewModal({
                 <div className="min-w-0">
                   <h3 className="truncate text-sm font-bold text-foreground">{modalTitle}</h3>
                   <p className="truncate text-[11px] text-muted-foreground">
-                    #{unifiedDoc.number}{unifiedDoc.partyName ? ` · ${unifiedDoc.partyName}` : ""}
+                    #{unifiedDoc.number}
+                    {unifiedDoc.partyName ? ` · ${unifiedDoc.partyName}` : ""}
                   </p>
                 </div>
               </div>
@@ -578,19 +611,21 @@ export function LuxuryPrintPreviewModal({
 
             <div className="shrink-0 space-y-2 border-b border-border/70 px-3 py-2 md:hidden">
               <div className="grid grid-cols-4 gap-2">
-                {([
-                  ["method", Printer, "نوع الطباعة"],
-                  ["template", Sparkles, "القالب"],
-                  ["paper", FileText, "مقاس الورق"],
-                  ["codes", QrCode, "الباركود ورمز QR"],
-                ] as const).map(([menu, Icon, label]) => (
+                {(
+                  [
+                    ["method", Printer, "نوع الطباعة"],
+                    ["template", Sparkles, "القالب"],
+                    ["paper", FileText, "مقاس الورق"],
+                    ["codes", QrCode, "الباركود ورمز QR"],
+                  ] as const
+                ).map(([menu, Icon, label]) => (
                   <button
                     key={menu}
                     type="button"
                     aria-label={label}
                     aria-expanded={mobileMenu === menu}
                     title={label}
-                    onClick={() => setMobileMenu((current) => current === menu ? null : menu)}
+                    onClick={() => setMobileMenu((current) => (current === menu ? null : menu))}
                     className={`flex size-11 items-center justify-center rounded-full border transition-colors ${mobileMenu === menu ? "border-primary bg-primary/10 text-primary" : "border-border bg-background text-muted-foreground hover:text-foreground"}`}
                   >
                     <Icon className="size-4.5" />
@@ -602,34 +637,101 @@ export function LuxuryPrintPreviewModal({
                 <div className="rounded-xl border border-border bg-background p-2 shadow-lg animate-in fade-in slide-in-from-bottom-1 duration-150">
                   {mobileMenu === "method" && (
                     <div className="grid grid-cols-2 gap-2">
-                      <Button type="button" size="sm" variant={isThermal ? "default" : "outline"} onClick={() => { handleMethodChange("thermal"); setMobileMenu(null); }} className="h-9 rounded-lg">حراري</Button>
-                      <Button type="button" size="sm" variant={!isThermal ? "default" : "outline"} onClick={() => { handleMethodChange("page"); setMobileMenu(null); }} className="h-9 rounded-lg">صفحات A4 / A5</Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={isThermal ? "default" : "outline"}
+                        onClick={() => handleMethodChange("thermal")}
+                        className="h-9 rounded-lg"
+                      >
+                        حراري
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={!isThermal ? "default" : "outline"}
+                        onClick={() => handleMethodChange("page")}
+                        className="h-9 rounded-lg"
+                      >
+                        صفحات A4 / A5
+                      </Button>
                     </div>
                   )}
                   {mobileMenu === "template" && (
                     <div className="grid grid-cols-2 gap-2">
                       {(isThermal
-                        ? [{ id: "thermal-milling", label: "إيصال احترافي" }, { id: "thermal", label: "نقطة البيع" }, { id: "thermal-qr", label: "باركود و QR" }]
-                        : [{ id: "milling-master", label: "خدمات المطحنة" }, { id: "elegant", label: "تنفيذي فاخر" }, { id: "standard", label: "قياسي مضغوط" }, { id: "milling-clean", label: "مبسط كلاسيكي" }]
+                        ? [
+                            { id: "thermal-milling", label: "إيصال احترافي" },
+                            { id: "thermal", label: "نقطة البيع" },
+                            { id: "thermal-qr", label: "باركود و QR" },
+                          ]
+                        : [
+                            { id: "milling-master", label: "خدمات المطحنة" },
+                            { id: "elegant", label: "تنفيذي فاخر" },
+                            { id: "standard", label: "قياسي مضغوط" },
+                            { id: "milling-clean", label: "مبسط كلاسيكي" },
+                          ]
                       ).map((template) => (
-                        <Button key={template.id} type="button" size="sm" variant={activeTemplate === template.id ? "default" : "outline"} onClick={() => { setActiveTemplate(template.id as InvoiceTemplateId); setMobileMenu(null); }} className="h-9 rounded-lg text-xs">{template.label}</Button>
+                        <Button
+                          key={template.id}
+                          type="button"
+                          size="sm"
+                          variant={activeTemplate === template.id ? "default" : "outline"}
+                          onClick={() => setActiveTemplate(template.id as InvoiceTemplateId)}
+                          className="h-9 rounded-lg text-xs"
+                        >
+                          {template.label}
+                        </Button>
                       ))}
                     </div>
                   )}
                   {mobileMenu === "paper" && (
                     <div className="grid grid-cols-2 gap-2">
                       {(isThermal
-                        ? [{ id: "thermal-80", label: "80 مم" }, { id: "thermal-58", label: "58 مم" }]
-                        : [{ id: "a4", label: "A4 كاملة" }, { id: "a5", label: "A5 نصف صفحة" }]
+                        ? [
+                            { id: "thermal-80", label: "80 مم" },
+                            { id: "thermal-58", label: "58 مم" },
+                          ]
+                        : [
+                            { id: "a4", label: "A4 كاملة" },
+                            { id: "a5", label: "A5 نصف صفحة" },
+                          ]
                       ).map((paper) => (
-                        <Button key={paper.id} type="button" size="sm" variant={activePaper === paper.id ? "default" : "outline"} onClick={() => { setActivePaper(paper.id as PrintPaperId); setMobileMenu(null); }} className="h-9 rounded-lg">{paper.label}</Button>
+                        <Button
+                          key={paper.id}
+                          type="button"
+                          size="sm"
+                          variant={activePaper === paper.id ? "default" : "outline"}
+                          onClick={() => setActivePaper(paper.id as PrintPaperId)}
+                          className="h-9 rounded-lg"
+                        >
+                          {paper.label}
+                        </Button>
                       ))}
                     </div>
                   )}
                   {mobileMenu === "codes" && (
                     <div className="grid grid-cols-2 gap-2">
-                      <Button type="button" size="sm" variant={showBarcode ? "default" : "outline"} aria-pressed={showBarcode} onClick={() => setShowBarcode((value) => !value)} className="h-9 rounded-lg">الباركود {showBarcode ? "مفعّل" : "متوقف"}</Button>
-                      <Button type="button" size="sm" variant={showQrCode ? "default" : "outline"} aria-pressed={showQrCode} onClick={() => setShowQrCode((value) => !value)} className="h-9 rounded-lg">QR {showQrCode ? "مفعّل" : "متوقف"}</Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={showBarcode ? "default" : "outline"}
+                        aria-pressed={showBarcode}
+                        onClick={() => setShowBarcode((value) => !value)}
+                        className="h-9 rounded-lg"
+                      >
+                        الباركود {showBarcode ? "مفعّل" : "متوقف"}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={showQrCode ? "default" : "outline"}
+                        aria-pressed={showQrCode}
+                        onClick={() => setShowQrCode((value) => !value)}
+                        className="h-9 rounded-lg"
+                      >
+                        QR {showQrCode ? "مفعّل" : "متوقف"}
+                      </Button>
                     </div>
                   )}
                 </div>
@@ -640,10 +742,18 @@ export function LuxuryPrintPreviewModal({
               <section className="space-y-2">
                 <h4 className="text-xs font-bold text-muted-foreground">نوع الطباعة</h4>
                 <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted/70 p-1">
-                  <button type="button" onClick={() => handleMethodChange("thermal")} className={`flex items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-semibold transition-colors ${printMethod === "thermal" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-background"}`}>
+                  <button
+                    type="button"
+                    onClick={() => handleMethodChange("thermal")}
+                    className={`flex items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-semibold transition-colors ${printMethod === "thermal" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-background"}`}
+                  >
                     <Printer className="h-3.5 w-3.5" /> حراري
                   </button>
-                  <button type="button" onClick={() => handleMethodChange("page")} className={`flex items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-semibold transition-colors ${printMethod === "page" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-background"}`}>
+                  <button
+                    type="button"
+                    onClick={() => handleMethodChange("page")}
+                    className={`flex items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-semibold transition-colors ${printMethod === "page" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-background"}`}
+                  >
                     <FileText className="h-3.5 w-3.5" /> صفحات
                   </button>
                 </div>
@@ -654,13 +764,29 @@ export function LuxuryPrintPreviewModal({
                 <div className="space-y-1">
                   {(isThermal
                     ? [
-                        { id: "thermal-milling", label: "الإيصال الحراري الاحترافي", icon: <Scale className="h-4 w-4" /> },
+                        {
+                          id: "thermal-milling",
+                          label: "الإيصال الحراري الاحترافي",
+                          icon: <Scale className="h-4 w-4" />,
+                        },
                         { id: "thermal", label: "إيصال نقطة البيع" },
-                        { id: "thermal-qr", label: "باركود و QR", icon: <QrCode className="h-4 w-4" /> },
+                        {
+                          id: "thermal-qr",
+                          label: "باركود و QR",
+                          icon: <QrCode className="h-4 w-4" />,
+                        },
                       ]
                     : [
-                        { id: "milling-master", label: "خدمات وسندات المطحنة", icon: <Scale className="h-4 w-4" /> },
-                        { id: "elegant", label: "تنفيذي فاخر", icon: <Sparkles className="h-4 w-4" /> },
+                        {
+                          id: "milling-master",
+                          label: "خدمات وسندات المطحنة",
+                          icon: <Scale className="h-4 w-4" />,
+                        },
+                        {
+                          id: "elegant",
+                          label: "تنفيذي فاخر",
+                          icon: <Sparkles className="h-4 w-4" />,
+                        },
                         { id: "standard", label: "قياسي مضغوط" },
                         { id: "milling-clean", label: "مبسط كلاسيكي" },
                       ]
@@ -682,10 +808,21 @@ export function LuxuryPrintPreviewModal({
                 <h4 className="text-xs font-bold text-muted-foreground">مقاس الورق</h4>
                 <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted/70 p-1">
                   {(isThermal
-                    ? [{ id: "thermal-80", label: "80 مم" }, { id: "thermal-58", label: "58 مم" }]
-                    : [{ id: "a4", label: "A4 كاملة" }, { id: "a5", label: "A5 نصف صفحة" }]
+                    ? [
+                        { id: "thermal-80", label: "80 مم" },
+                        { id: "thermal-58", label: "58 مم" },
+                      ]
+                    : [
+                        { id: "a4", label: "A4 كاملة" },
+                        { id: "a5", label: "A5 نصف صفحة" },
+                      ]
                   ).map((paper) => (
-                    <button key={paper.id} type="button" onClick={() => setActivePaper(paper.id as PrintPaperId)} className={`rounded-md px-2 py-2 text-xs font-semibold transition-colors ${activePaper === paper.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
+                    <button
+                      key={paper.id}
+                      type="button"
+                      onClick={() => setActivePaper(paper.id as PrintPaperId)}
+                      className={`rounded-md px-2 py-2 text-xs font-semibold transition-colors ${activePaper === paper.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                    >
                       {paper.label}
                     </button>
                   ))}
@@ -694,43 +831,94 @@ export function LuxuryPrintPreviewModal({
 
               <section className="space-y-2">
                 <h4 className="text-xs font-bold text-muted-foreground">محتوى الفاتورة</h4>
-                <button type="button" onClick={() => setShowBarcode((prev) => !prev)} aria-pressed={showBarcode} className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-xs font-medium transition-colors ${showBarcode ? "border-primary/30 bg-primary/5 text-foreground" : "border-border text-muted-foreground"}`}>
-                  <span>الباركود</span><span className="text-[11px]">{showBarcode ? "مفعّل" : "متوقف"}</span>
+                <button
+                  type="button"
+                  onClick={() => setShowBarcode((prev) => !prev)}
+                  aria-pressed={showBarcode}
+                  className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-xs font-medium transition-colors ${showBarcode ? "border-primary/30 bg-primary/5 text-foreground" : "border-border text-muted-foreground"}`}
+                >
+                  <span>الباركود</span>
+                  <span className="text-[11px]">{showBarcode ? "مفعّل" : "متوقف"}</span>
                 </button>
-                <button type="button" onClick={() => setShowQrCode((prev) => !prev)} aria-pressed={showQrCode} className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-xs font-medium transition-colors ${showQrCode ? "border-primary/30 bg-primary/5 text-foreground" : "border-border text-muted-foreground"}`}>
-                  <span className="flex items-center gap-2"><QrCode className="h-3.5 w-3.5" /> رمز QR</span><span className="text-[11px]">{showQrCode ? "مفعّل" : "متوقف"}</span>
+                <button
+                  type="button"
+                  onClick={() => setShowQrCode((prev) => !prev)}
+                  aria-pressed={showQrCode}
+                  className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-xs font-medium transition-colors ${showQrCode ? "border-primary/30 bg-primary/5 text-foreground" : "border-border text-muted-foreground"}`}
+                >
+                  <span className="flex items-center gap-2">
+                    <QrCode className="h-3.5 w-3.5" /> رمز QR
+                  </span>
+                  <span className="text-[11px]">{showQrCode ? "مفعّل" : "متوقف"}</span>
                 </button>
               </section>
             </div>
 
             <div className="hidden shrink-0 space-y-2 border-t border-border/80 bg-muted/30 p-3 md:block">
-              <Button type="button" disabled={isPrinting} onClick={handlePrint} className="h-10 w-full gap-2 rounded-md font-bold">
+              <Button
+                type="button"
+                disabled={isPrinting}
+                onClick={handlePrint}
+                className="h-10 w-full gap-2 rounded-md font-bold"
+              >
                 <Printer className="h-4 w-4" />
-                <span>طباعة الآن ({isThermal ? (activePaper === "thermal-80" ? "80 مم" : "58 مم") : activePaper.toUpperCase()})</span>
+                <span>
+                  طباعة الآن (
+                  {isThermal
+                    ? activePaper === "thermal-80"
+                      ? "80 مم"
+                      : "58 مم"
+                    : activePaper.toUpperCase()}
+                  )
+                </span>
               </Button>
-              <Button type="button" variant="outline" disabled={isSharingPdf} onClick={handlePdfShare} className="h-9 w-full justify-start gap-2 rounded-md">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isSharingPdf}
+                onClick={handlePdfShare}
+                className="h-9 w-full justify-start gap-2 rounded-md"
+              >
                 <Share2 className="h-4 w-4 text-sky-600" />
                 <span>{isSharingPdf ? "جارٍ تجهيز PDF…" : "مشاركة أو تنزيل PDF"}</span>
               </Button>
-              <Button type="button" variant="outline" onClick={handleWhatsAppShare} className="h-9 w-full justify-start gap-2 rounded-md text-emerald-700 hover:text-emerald-800">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleWhatsAppShare}
+                className="h-9 w-full justify-start gap-2 rounded-md text-emerald-700 hover:text-emerald-800"
+              >
                 <WhatsAppIcon className="h-4 w-4" />
                 <span>مشاركة عبر واتساب</span>
               </Button>
-              <Button type="button" variant="ghost" onClick={handleModalClose} className="h-9 w-full rounded-md text-muted-foreground">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={handleModalClose}
+                className="h-9 w-full rounded-md text-muted-foreground"
+              >
                 إغلاق
               </Button>
             </div>
 
-            <div className="flex shrink-0 items-center justify-center gap-3 border-t border-border/80 bg-card px-3 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] md:hidden" dir="rtl">
+            <div
+              className="grid shrink-0 grid-cols-[minmax(0,1fr)_48px_48px] items-center gap-2 border-t border-border/80 bg-card px-3 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] md:hidden"
+              dir="rtl"
+            >
               <button
                 type="button"
                 disabled={isPrinting}
                 onClick={handlePrint}
                 aria-label={`طباعة الآن ${isThermal ? (activePaper === "thermal-80" ? "80 مم" : "58 مم") : activePaper.toUpperCase()}`}
                 title={`طباعة الآن (${isThermal ? (activePaper === "thermal-80" ? "80 مم" : "58 مم") : activePaper.toUpperCase()})`}
-                className="flex size-12 items-center justify-center rounded-full bg-foreground text-background shadow-lg shadow-foreground/15 transition hover:opacity-95 active:scale-[0.98] disabled:opacity-50"
+                className="flex h-12 min-w-0 items-center justify-center gap-2 rounded-2xl bg-foreground px-3 text-background shadow-lg shadow-foreground/15 transition hover:opacity-95 active:scale-[0.98] disabled:opacity-50"
               >
-                <Printer className="size-5" />
+                <Printer className="size-5 shrink-0" />
+                <span className="truncate text-xs font-bold">
+                  {isPrinting
+                    ? "جارٍ الطباعة…"
+                    : `طباعة الآن (${isThermal ? (activePaper === "thermal-80" ? "80 مم" : "58 مم") : activePaper.toUpperCase()})`}
+                </span>
               </button>
               <button
                 type="button"

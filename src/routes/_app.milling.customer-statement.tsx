@@ -17,17 +17,10 @@ import {
   Scale,
   Cog,
   PackageCheck,
-  Search,
-  Filter,
-  LayoutGrid,
-  List,
-  TableProperties,
   Sparkles,
   Plus,
   Trash2,
-  ChevronLeft,
   Check,
-  AlertCircle,
   Phone,
   Warehouse,
   User,
@@ -48,6 +41,14 @@ import {
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { ModuleGuard } from "@/lib/modules";
+import { TableToolbar, type FilterDefinition, type FilterValues } from "@/components/ui/table-toolbar";
+import { PrimaryAction } from "@/components/ui/primary-action";
+import { RecordsViewToggle } from "@/components/ui/records-view-toggle";
+import { QuickFilterBar } from "@/components/ui/quick-filter-bar";
+import { RecordsView } from "@/components/ui/records-view";
+import type { DataTableColumn, DataTableSort } from "@/components/ui/data-table";
+import { VortexMetricCard } from "@/components/vortex-ui";
+import { RecordsSkeleton } from "@/components/ui/records-states";
 import { LuxuryPrintPreviewModal } from "@/components/luxury-print-preview-modal";
 import { UnifiedPrintModal } from "@/components/milling/unified-print-modal";
 import { DocumentShareDialog } from "@/components/communication/document-share-dialog";
@@ -74,7 +75,6 @@ import {
   MillingTextarea,
   Pill,
   Mono,
-  MillingEmpty,
   fmtNum,
 } from "@/components/milling/milling-ui";
 import { QuantityInput } from "@/components/ui/quantity-input";
@@ -103,12 +103,8 @@ function CustomerCustodyPage() {
     from: "/_app/milling/customer-statement",
   });
 
-  /* Unified records vocabulary: cards | list (was "compact") | table — persisted per screen. */
+  /* Unified records vocabulary: cards | list | table — persisted per screen. */
   const [viewMode, setViewMode] = usePersistedViewMode("milling-custody", "table");
-
-  function changeViewMode(mode: RecordsViewMode) {
-    setViewMode(mode);
-  }
 
   // معايير البحث والفلترة
   const [searchTerm, setSearchTerm] = useState("");
@@ -222,18 +218,42 @@ function CustomerCustodyPage() {
     };
   }, [rawRows]);
 
+  // ── حالة الفلاتر والترتيب الموحدة (Unified Filter/Sort State) ──
+  const [custodyFilters, setCustodyFilters] = useState<FilterValues>({});
+  const [sortKey, setSortKey] = useState("");
+
+  // عدادات سريعة لشارات الفلاتر السريعة
+  const counts = useMemo(() => {
+    let active = 0;
+    let raw = 0;
+    let output = 0;
+    let zero = 0;
+    for (const r of rawRows) {
+      const remB = Number(r.remaining_bags ?? 0);
+      const remK = Number(r.remaining_kg ?? 0);
+      const isZero = remB <= 0 && remK <= 0;
+      if (isZero) { zero++; continue; }
+      active++;
+      if (r.item_class === "RAW_MATERIAL") raw++;
+      else output++;
+    }
+    return { active, raw, output, zero };
+  }, [rawRows]);
+
   // تصفية السجلات
   const filteredRows = useMemo(() => {
     let list = rawRows;
 
-    // تصفية العميل
-    if (selectedCustomer !== "ALL") {
-      list = list.filter((r) => r.customer_id === selectedCustomer);
+    // تصفية العميل (من الفلاتر الموحدة أو الاختيار المسبق من الرابط)
+    const customerFilter = (custodyFilters.customer_id as string) || selectedCustomer;
+    if (customerFilter && customerFilter !== "ALL") {
+      list = list.filter((r) => r.customer_id === customerFilter);
     }
 
-    // تصفية المستودع
-    if (selectedWarehouse !== "ALL") {
-      list = list.filter((r) => r.warehouse_id === selectedWarehouse);
+    // تصفية المستودع (من الفلاتر الموحدة)
+    const warehouseFilter = (custodyFilters.warehouse_id as string) || selectedWarehouse;
+    if (warehouseFilter && warehouseFilter !== "ALL") {
+      list = list.filter((r) => r.warehouse_id === warehouseFilter);
     }
 
     // تصفية نوع الأمانة والرصيد
@@ -263,8 +283,81 @@ function CustomerCustodyPage() {
       );
     }
 
+    // الترتيب الموحد
+    if (sortKey) {
+      list = [...list].sort((a, b) => {
+        switch (sortKey) {
+          case "customer_asc":
+            return (a.customer_name_ar || "").localeCompare(b.customer_name_ar || "", "ar");
+          case "customer_desc":
+            return (b.customer_name_ar || "").localeCompare(a.customer_name_ar || "", "ar");
+          case "remaining_desc":
+            return (
+              Number(b.remaining_bags) * 50 + Number(b.remaining_kg) -
+              (Number(a.remaining_bags) * 50 + Number(a.remaining_kg))
+            );
+          case "remaining_asc":
+            return (
+              Number(a.remaining_bags) * 50 + Number(a.remaining_kg) -
+              (Number(b.remaining_bags) * 50 + Number(b.remaining_kg))
+            );
+          case "recent_desc":
+            return (
+              new Date(b.last_movement_at || 0).getTime() -
+              new Date(a.last_movement_at || 0).getTime()
+            );
+          default:
+            return 0;
+        }
+      });
+    }
+
     return list;
-  }, [rawRows, selectedCustomer, selectedWarehouse, typeFilter, searchTerm]);
+  }, [rawRows, custodyFilters, selectedCustomer, selectedWarehouse, typeFilter, searchTerm, sortKey]);
+
+  // تعريفات الفلاتر الموحدة (لوحة الفلترة الجانبية)
+  const custodyFilterDefinitions: FilterDefinition[] = useMemo(
+    () => [
+      {
+        key: "warehouse_id",
+        label: "المستودع",
+        type: "select" as const,
+        options: [
+          { value: "ALL", label: "كل المستودعات" },
+          ...(warehousesQuery.data ?? []).map((w) => ({
+            value: w.id,
+            label: w.name_ar || w.name,
+          })),
+        ],
+      },
+      {
+        key: "customer_id",
+        label: "العميل",
+        type: "select" as const,
+        options: [
+          { value: "ALL", label: "كل العملاء" },
+          ...(customersQuery.data ?? []).map((c) => ({
+            value: c.id,
+            label: c.name,
+          })),
+        ],
+      },
+    ],
+    [warehousesQuery.data, customersQuery.data],
+  );
+
+  // خيارات الترتيب الموحدة
+  const custodySortOptions = useMemo(
+    () => [
+      { value: "", label: "الترتيب الافتراضي" },
+      { value: "customer_asc", label: "العميل (أ - ي)" },
+      { value: "customer_desc", label: "العميل (ي - أ)" },
+      { value: "remaining_desc", label: "الأعلى رصيداً" },
+      { value: "remaining_asc", label: "الأقل رصيداً" },
+      { value: "recent_desc", label: "الأحدث حركة" },
+    ],
+    [],
+  );
 
   // فتح نافذة الطحن المباشر لصنف محدد
   function openMilling(row: CustodyStatementRow) {
@@ -283,6 +376,358 @@ function CustomerCustodyPage() {
     setSelectedRow(row);
     setHistoryModalOpen(true);
   }
+
+  // ── الحالة المشتركة للترتيب في نمط الجدول (رأس الجدول) ──
+  const [tableSort, setTableSort] = useState<DataTableSort | null>(null);
+
+  // ── أعمدة جدول السجلات الموحدة (DataTable) ──
+  const custodyColumns: DataTableColumn<CustodyStatementRow>[] = [
+    {
+      key: "customer_name_ar",
+      header: "العميل صاحب الأمانة",
+      align: "start",
+      sortable: true,
+      sortValue: (r) => r.customer_name_ar ?? "",
+      cell: (r) => <div className="font-bold text-foreground">{r.customer_name_ar || "—"}</div>,
+    },
+    {
+      key: "item_name_ar",
+      header: "صنف الأمانة",
+      align: "start",
+      sortable: true,
+      sortValue: (r) => r.item_name_ar ?? "",
+      cell: (r) => {
+        const isRaw = r.item_class === "RAW_MATERIAL";
+        return (
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-foreground">{r.item_name_ar}</span>
+              <span
+                className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
+                  isRaw
+                    ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
+                    : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                }`}
+              >
+                {isRaw ? "حبوب خام" : "ناتج طحن"}
+              </span>
+            </div>
+            {r.sku && (
+              <span className="text-[10px] font-mono text-muted-foreground">{r.sku}</span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: "warehouse_name_ar",
+      header: "المستودع",
+      align: "start",
+      hideBelow: "md",
+      cell: (r) => <span className="text-muted-foreground">{r.warehouse_name_ar || "—"}</span>,
+    },
+    {
+      key: "received_bags",
+      header: "الوارد (المستلم)",
+      align: "center",
+      hideBelow: "lg",
+      sortable: true,
+      sortValue: (r) => Number(r.received_bags),
+      cell: (r) => (
+        <div className="tabular-nums text-muted-foreground">
+          <div>{fmtNum(r.received_bags)} كيس</div>
+          <div className="text-[10px]">({fmtNum(r.received_kg)} كجم)</div>
+        </div>
+      ),
+    },
+    {
+      key: "issued_bags",
+      header: "المنصرف (المطحون/المسلّم)",
+      align: "center",
+      hideBelow: "lg",
+      sortable: true,
+      sortValue: (r) => Number(r.issued_bags),
+      cell: (r) => (
+        <div className="tabular-nums text-muted-foreground">
+          <div>{fmtNum(r.issued_bags)} كيس</div>
+          <div className="text-[10px]">({fmtNum(r.issued_kg)} كجم)</div>
+        </div>
+      ),
+    },
+    {
+      key: "remaining_bags",
+      header: "الرصيد المتبقي الحالي",
+      align: "center",
+      sortable: true,
+      sortValue: (r) => Number(r.remaining_bags),
+      cell: (r) => {
+        const remB = Number(r.remaining_bags ?? 0);
+        const remK = Number(r.remaining_kg ?? 0);
+        const isZero = remB <= 0 && remK <= 0;
+        return isZero ? (
+          <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-bold text-muted-foreground">
+            تم التسليم بالكامل
+          </span>
+        ) : (
+          <div className="tabular-nums space-y-0.5">
+            <span className="text-sm font-black text-primary">{fmtNum(remB)} كيس</span>
+            <div className="text-[11px] font-bold text-foreground">{fmtNum(remK)} كجم</div>
+          </div>
+        );
+      },
+    },
+    {
+      key: "last_movement_at",
+      header: "آخر حركة",
+      align: "center",
+      hideBelow: "lg",
+      sortable: true,
+      sortValue: (r) => r.last_movement_at ?? "",
+      cell: (r) => (
+        <span className="text-[11px] text-muted-foreground">
+          {r.last_movement_at
+            ? new Date(r.last_movement_at).toLocaleDateString("ar-EG")
+            : "—"}
+        </span>
+      ),
+    },
+    {
+      key: "actions",
+      header: "الإجراءات السريعة",
+      align: "end",
+      width: "w-56",
+      cell: (r) => {
+        const remB = Number(r.remaining_bags ?? 0);
+        const remK = Number(r.remaining_kg ?? 0);
+        const isRaw = r.item_class === "RAW_MATERIAL";
+        const isZero = remB <= 0 && remK <= 0;
+        return (
+          <div className="inline-flex items-center gap-1.5">
+            {isRaw && !isZero && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openMilling(r);
+                }}
+                title="طحن من رصيد حبوب هذا العميل"
+                className="inline-flex items-center gap-1 rounded-xl bg-amber-500/15 px-2.5 py-1 text-xs font-bold text-amber-700 dark:text-amber-300 hover:bg-amber-500/25 transition"
+              >
+                <Cog className="h-3.5 w-3.5" />
+                <span>طحن</span>
+              </button>
+            )}
+            {!isZero && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openDelivery(r);
+                }}
+                title="تسليم الأمانة للعميل"
+                className="inline-flex items-center gap-1 rounded-xl bg-emerald-500/15 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/25 transition"
+              >
+                <PackageCheck className="h-3.5 w-3.5" />
+                <span>تسليم</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                openHistory(r);
+              }}
+              title="كشف حساب الأمانة للعميل"
+              className="inline-flex items-center gap-1 rounded-xl border border-border bg-card px-2 py-1 text-xs font-medium text-foreground hover:bg-muted transition"
+            >
+              <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="hidden sm:inline">الكشف</span>
+            </button>
+          </div>
+        );
+      },
+    },
+  ];
+
+  // ── بطاقة السجل الموحدة (نمط البطائق) ──
+  const renderCustodyCard = (r: CustodyStatementRow) => {
+    const remB = Number(r.remaining_bags ?? 0);
+    const remK = Number(r.remaining_kg ?? 0);
+    const isRaw = r.item_class === "RAW_MATERIAL";
+    const isZero = remB <= 0 && remK <= 0;
+
+    return (
+      <div className="flex h-full flex-col justify-between gap-3 rounded-2xl border border-border/80 bg-surface-1/90 p-4 shadow-sm transition hover:border-primary/40 hover:shadow-md">
+        <div>
+          {/* رأس البطاقة: العميل ونوع الصنف */}
+          <div className="flex items-start justify-between gap-2 border-b border-border/60 pb-2.5">
+            <div>
+              <h4 className="font-bold text-sm text-foreground">{r.customer_name_ar || "—"}</h4>
+              <span className="text-[11px] text-muted-foreground">
+                مستودع: {r.warehouse_name_ar || "—"}
+              </span>
+            </div>
+            <span
+              className={`rounded-lg px-2 py-0.5 text-[10px] font-bold ${
+                isRaw
+                  ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
+                  : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+              }`}
+            >
+              {isRaw ? "حبوب خام" : "ناتج طحن"}
+            </span>
+          </div>
+
+          {/* الصنف والرصيد المتبقي الرئيسي */}
+          <div className="mt-3 flex items-center justify-between">
+            <div>
+              <span className="text-xs text-muted-foreground">صنف الأمانة:</span>
+              <p className="font-bold text-sm text-foreground">{r.item_name_ar}</p>
+            </div>
+
+            <div className="text-end">
+              <span className="text-[11px] text-muted-foreground">الرصيد المتبقي:</span>
+              {isZero ? (
+                <p className="text-xs font-bold text-muted-foreground">مصفاة بالكامل</p>
+              ) : (
+                <div>
+                  <span className="text-xl font-black text-primary">
+                    {fmtNum(remB)}{" "}
+                    <span className="text-xs font-semibold text-muted-foreground">كيس</span>
+                  </span>
+                  <div className="text-xs font-bold text-foreground">{fmtNum(remK)} كجم</div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ملخص الوارد والمنصرف */}
+          <div className="mt-3 grid grid-cols-2 gap-2 rounded-xl bg-muted/40 p-2.5 text-[11px]">
+            <div>
+              <span className="text-muted-foreground">المستلم (وارد):</span>
+              <div className="font-bold text-foreground">
+                {fmtNum(r.received_bags)} كيس ({fmtNum(r.received_kg)} كجم)
+              </div>
+            </div>
+            <div>
+              <span className="text-muted-foreground">المصروف (صادر):</span>
+              <div className="font-bold text-foreground">
+                {fmtNum(r.issued_bags)} كيس ({fmtNum(r.issued_kg)} كجم)
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* أزرار العمليات السريعة بأسفل البطاقة */}
+        <div className="flex items-center justify-between gap-2 border-t border-border/60 pt-2">
+          <button
+            type="button"
+            onClick={() => openHistory(r)}
+            className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-foreground"
+          >
+            <FileText className="h-3.5 w-3.5" />
+            كشف الحركات
+          </button>
+
+          <div className="flex items-center gap-1.5">
+            {isRaw && !isZero && (
+              <button
+                type="button"
+                onClick={() => openMilling(r)}
+                className="inline-flex items-center gap-1 rounded-xl bg-amber-500/15 px-3 py-1.5 text-xs font-bold text-amber-700 dark:text-amber-300 hover:bg-amber-500/25 transition"
+              >
+                <Cog className="h-3.5 w-3.5" />
+                طحن
+              </button>
+            )}
+
+            {!isZero && (
+              <button
+                type="button"
+                onClick={() => openDelivery(r)}
+                className="inline-flex items-center gap-1 rounded-xl bg-emerald-500 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-emerald-600 transition"
+              >
+                <PackageCheck className="h-3.5 w-3.5" />
+                تسليم
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ── سطر القائمة المضغوطة الموحد (نمط القائمة) ──
+  const renderCustodyListRow = (r: CustodyStatementRow) => {
+    const remB = Number(r.remaining_bags ?? 0);
+    const remK = Number(r.remaining_kg ?? 0);
+    const isRaw = r.item_class === "RAW_MATERIAL";
+    const isZero = remB <= 0 && remK <= 0;
+
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 text-xs transition hover:bg-muted/40">
+        <div className="flex min-w-56 items-center gap-3">
+          <span className="font-bold text-foreground">{r.customer_name_ar}</span>
+          <span className="text-muted-foreground">•</span>
+          <span className="font-semibold text-muted-foreground">{r.item_name_ar}</span>
+          <span
+            className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
+              isRaw
+                ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
+                : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+            }`}
+          >
+            {isRaw ? "خام" : "ناتج"}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <div className="text-muted-foreground">
+            المستودع: <span className="font-semibold">{r.warehouse_name_ar}</span>
+          </div>
+
+          <div className="tabular-nums">
+            الرصيد:{" "}
+            {isZero ? (
+              <span className="font-semibold text-muted-foreground">مصفاة</span>
+            ) : (
+              <strong className="font-black text-primary">
+                {fmtNum(remB)} كيس ({fmtNum(remK)} كجم)
+              </strong>
+            )}
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            {isRaw && !isZero && (
+              <button
+                type="button"
+                onClick={() => openMilling(r)}
+                className="rounded-lg bg-amber-500/15 px-2 py-0.5 text-[11px] font-bold text-amber-700 dark:text-amber-300"
+              >
+                طحن
+              </button>
+            )}
+            {!isZero && (
+              <button
+                type="button"
+                onClick={() => openDelivery(r)}
+                className="rounded-lg bg-emerald-500/15 px-2 py-0.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-300"
+              >
+                تسليم
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => openHistory(r)}
+              className="rounded-lg border border-border px-2 py-0.5 text-[11px] font-semibold text-muted-foreground hover:text-foreground"
+            >
+              كشف
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <ModuleGuard moduleId="milling_operations">
@@ -330,582 +775,113 @@ function CustomerCustodyPage() {
           }
         />
 
-        {/* بطاقات الإحصائيات العلوية الفخمة (KPIs) */}
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {/* إجمالي رصيد الأمانات */}
-          <div className="rounded-2xl border border-border/80 bg-surface-1/90 p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-muted-foreground">
-                إجمالي رصيد الأمانات
-              </span>
-              <div className="grid h-8 w-8 place-items-center rounded-xl bg-primary/10 text-primary">
-                <Scale className="h-4 w-4" />
-              </div>
-            </div>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl font-black tabular-nums text-foreground">
-                {fmtNum(stats.totalRemainingBags)}
-              </span>
-              <span className="text-xs font-bold text-muted-foreground">كيس</span>
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              الوزن الصافي:{" "}
-              <strong className="text-foreground">{fmtNum(stats.totalRemainingKg)}</strong> كجم
-            </p>
-          </div>
-
-          {/* حبوب خام بانتظار الطحن */}
-          <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-amber-700 dark:text-amber-300">
-                حبوب خام (بانتظار الطحن)
-              </span>
-              <div className="grid h-8 w-8 place-items-center rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400">
-                <Wheat className="h-4 w-4" />
-              </div>
-            </div>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl font-black tabular-nums text-amber-600 dark:text-amber-400">
-                {fmtNum(stats.rawBags)}
-              </span>
-              <span className="text-xs font-bold text-muted-foreground">كيس</span>
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              الوزن: <strong className="text-foreground">{fmtNum(stats.rawKg)}</strong> كجم بانتظار
-              الطحن
-            </p>
-          </div>
-
-          {/* نواتج جاهزة للتسليم */}
-          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-                نواتج (جاهزة للتسليم)
-              </span>
-              <div className="grid h-8 w-8 place-items-center rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
-                <Boxes className="h-4 w-4" />
-              </div>
-            </div>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl font-black tabular-nums text-emerald-600 dark:text-emerald-400">
-                {fmtNum(stats.outputBags)}
-              </span>
-              <span className="text-xs font-bold text-muted-foreground">كيس</span>
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              الوزن: <strong className="text-foreground">{fmtNum(stats.outputKg)}</strong> كجم دقيق
-              ونخالة
-            </p>
-          </div>
-
-          {/* العملاء والمستودعات */}
-          <div className="rounded-2xl border border-border/80 bg-surface-1/90 p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-muted-foreground">العملاء النشطون</span>
-              <div className="grid h-8 w-8 place-items-center rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400">
-                <User className="h-4 w-4" />
-              </div>
-            </div>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl font-black tabular-nums text-foreground">
-                {fmtNum(stats.activeCustomersCount)}
-              </span>
-              <span className="text-xs font-bold text-muted-foreground">عميل له أمانات</span>
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              موزعة في <strong className="text-foreground">{stats.activeWarehousesCount}</strong>{" "}
-              مستودعات
-            </p>
-          </div>
+        {/* بطاقات الإحصائيات العلوية (KPIs) — VortexMetricCard الموحدة */}
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4">
+          <VortexMetricCard
+            title="إجمالي رصيد الأمانات"
+            value={fmtNum(stats.totalRemainingBags)}
+            subtitle={`الوزن الصافي: ${fmtNum(stats.totalRemainingKg)} كجم`}
+            icon={<Scale className="size-5" />}
+            iconClassName="bg-primary/10 text-primary border border-primary/20"
+            badge="الكلي"
+            highlight={typeFilter === "ACTIVE"}
+            onClick={() => setTypeFilter("ACTIVE")}
+            className="cursor-pointer"
+          />
+          <VortexMetricCard
+            title="حبوب خام (بانتظار الطحن)"
+            value={fmtNum(stats.rawBags)}
+            subtitle={`الوزن: ${fmtNum(stats.rawKg)} كجم بانتظار الطحن`}
+            icon={<Wheat className="size-5" />}
+            iconClassName="bg-amber-500/10 text-amber-500 border border-amber-500/20"
+            badge="للطحن"
+            highlight={typeFilter === "RAW"}
+            onClick={() => setTypeFilter("RAW")}
+            className="cursor-pointer"
+          />
+          <VortexMetricCard
+            title="نواتج (جاهزة للتسليم)"
+            value={fmtNum(stats.outputBags)}
+            subtitle={`الوزن: ${fmtNum(stats.outputKg)} كجم دقيق ونخالة`}
+            icon={<Boxes className="size-5" />}
+            iconClassName="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+            badge="للتسليم"
+            highlight={typeFilter === "OUTPUT"}
+            onClick={() => setTypeFilter("OUTPUT")}
+            className="cursor-pointer"
+          />
+          <VortexMetricCard
+            title="العملاء النشطون"
+            value={fmtNum(stats.activeCustomersCount)}
+            subtitle={`موزعة في ${stats.activeWarehousesCount} مستودعات`}
+            icon={<User className="size-5" />}
+            iconClassName="bg-sky-500/10 text-sky-500 border border-sky-500/20"
+            badge="أمانات"
+            onClick={() => setTypeFilter("ALL")}
+            className="cursor-pointer"
+          />
         </div>
 
-        {/* شريط الأدوات والفلاتر والبحث اللحظي */}
-        <div className="rounded-2xl border border-border/80 bg-surface-1/90 p-4 shadow-sm space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            {/* حقل البحث */}
-            <div className="relative w-full sm:w-80">
-              <Search className="pointer-events-none absolute start-3 top-2.5 h-4 w-4 text-muted-foreground" />
-              <MillingInput
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="بحث بالعميل، الصنف، الكود، المستودع…"
-                className="ps-9 font-medium"
-              />
-              {searchTerm && (
-                <button
-                  type="button"
-                  onClick={() => setSearchTerm("")}
-                  className="absolute end-2.5 top-2.5 text-muted-foreground hover:text-foreground"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
+        {/* ─── شريط الأدوات الموحد: بحث + فلاتر + ترتيب + تبديل العرض + إجراء رئيسي ─── */}
+        <TableToolbar
+          sticky
+          search={{
+            value: searchTerm,
+            onValueChange: setSearchTerm,
+            placeholder: "ابحث بالعميل، الصنف، الكود، المستودع…",
+            resultCount: filteredRows.length,
+          }}
+          filters={{
+            definitions: custodyFilterDefinitions,
+            values: custodyFilters,
+            onValueChange: setCustodyFilters,
+          }}
+          sort={{
+            options: custodySortOptions,
+            value: sortKey,
+            onValueChange: setSortKey,
+          }}
+          viewToggle={<RecordsViewToggle value={viewMode} onChange={setViewMode} />}
+          action={
+            <PrimaryAction label="عملية جديدة" icon={<Sparkles />} onClick={() => setSelectedRow(null)} />
+          }
+        >
+          {/* أزرار التصفية السريعة الموحدة (QuickFilterBar) — مرئية في كل أنماط العرض */}
+          <QuickFilterBar
+            items={[
+              { id: "ALL", label: "جميع السجلات", count: rawRows.length },
+              { id: "ACTIVE", label: "أرصدة متبقية نشطة", count: counts.active, tone: "success" },
+              { id: "RAW", label: "حبوب خام (للطحن)", count: counts.raw, tone: "warning" },
+              { id: "OUTPUT", label: "نواتج (للتسليم)", count: counts.output, tone: "info" },
+              { id: "ZERO", label: "مصفاة بالكامل", count: counts.zero, tone: "danger" },
+            ]}
+            value={typeFilter}
+            onChange={(id) => setTypeFilter(id as TypeFilter)}
+          />
+        </TableToolbar>
 
-            {/* الفلاتر المنسدلة: المستودع والعميل */}
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="w-44">
-                <MillingSelect
-                  value={selectedWarehouse}
-                  onChange={(e) => setSelectedWarehouse(e.target.value)}
-                  className="text-xs font-semibold"
-                >
-                  <option value="ALL">كل المستودعات</option>
-                  {(warehousesQuery.data ?? []).map((w) => (
-                    <option key={w.id} value={w.id}>
-                      {w.name_ar || w.name}
-                    </option>
-                  ))}
-                </MillingSelect>
-              </div>
-
-              <div className="w-48">
-                <MillingSelect
-                  value={selectedCustomer}
-                  onChange={(e) => setSelectedCustomer(e.target.value)}
-                  className="text-xs font-semibold"
-                >
-                  <option value="ALL">كل العملاء</option>
-                  {(customersQuery.data ?? []).map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </MillingSelect>
-              </div>
-
-              {/* أزرار تبديل نمط العرض (مثل المخزون) */}
-              <div className="flex rounded-xl bg-muted p-1 border border-border">
-                <button
-                  type="button"
-                  onClick={() => changeViewMode("table")}
-                  className={`p-1.5 rounded-lg transition ${
-                    viewMode === "table"
-                      ? "bg-background text-foreground shadow-xs"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                  title="عرض جدول البيانات"
-                >
-                  <TableProperties className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => changeViewMode("cards")}
-                  className={`p-1.5 rounded-lg transition ${
-                    viewMode === "cards"
-                      ? "bg-background text-foreground shadow-xs"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                  title="عرض البطاقات"
-                >
-                  <LayoutGrid className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => changeViewMode("list")}
-                  className={`p-1.5 rounded-lg transition ${
-                    viewMode === "list"
-                      ? "bg-background text-foreground shadow-xs"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                  title="عرض مضغوط مكثف"
-                >
-                  <List className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* أزرار التصفية السريعة (Filter Chips) */}
-          <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-border/60">
-            {[
-              { id: "ACTIVE", label: "أرصدة متبقية نشطة" },
-              { id: "RAW", label: "حبوب خام (للطحن)" },
-              { id: "OUTPUT", label: "نواتج (للتسليم)" },
-              { id: "ALL", label: "جميع السجلات" },
-              { id: "ZERO", label: "مصفاة بالكامل (0)" },
-            ].map((f) => (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => setTypeFilter(f.id as TypeFilter)}
-                className={`rounded-xl px-3 py-1 text-xs font-semibold transition ${
-                  typeFilter === f.id
-                    ? "bg-primary text-primary-foreground shadow-xs"
-                    : "border border-border/80 bg-surface-2/60 text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
-
-            <span className="ms-auto text-xs text-muted-foreground">
-              عرض {filteredRows.length} صنف أمانة
-            </span>
-          </div>
-        </div>
-
-        {/* عرض البيانات حسب النمط المختار */}
-        {statementQuery.isLoading ? (
-          <div className="rounded-2xl border border-border p-12 text-center">
-            <RefreshCw className="h-6 w-6 animate-spin mx-auto text-primary" />
-            <p className="mt-2 text-xs font-semibold text-muted-foreground">
-              جارٍ تحميل أرصدة وسجلات الأمانات…
-            </p>
-          </div>
-        ) : filteredRows.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border/80 p-12 text-center">
-            <MillingEmpty
-              title="لا توجد أمانات مطابقة لمعايير البحث الحالية"
-              hint="غيّر معايير الفلترة أو اختر مستودعاً أو عميلاً آخر."
-            />
-          </div>
-        ) : viewMode === "table" ? (
-          /* نمط الجدول الرئيسي المتقدم */
-          <div className="overflow-hidden rounded-2xl border border-border/80 bg-surface-1/90 shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-border/70 text-muted-foreground bg-muted/40 font-bold">
-                    <th className="px-4 py-3 text-start">العميل صاحب الأمانة</th>
-                    <th className="px-3 py-3 text-start">صنف الأمانة</th>
-                    <th className="px-3 py-3 text-start">المستودع</th>
-                    <th className="px-3 py-3 text-center">الوارد (المستلم)</th>
-                    <th className="px-3 py-3 text-center">المنصرف (المطحون/المسلّم)</th>
-                    <th className="px-4 py-3 text-center bg-primary/5 text-primary">
-                      الرصيد المتبقي الحالي
-                    </th>
-                    <th className="px-3 py-3 text-center">آخر حركة</th>
-                    <th className="px-4 py-3 text-end">الإجراءات السريعة</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/40">
-                  {filteredRows.map((r, idx) => {
-                    const remB = Number(r.remaining_bags ?? 0);
-                    const remK = Number(r.remaining_kg ?? 0);
-                    const isRaw = r.item_class === "RAW_MATERIAL";
-                    const isZero = remB <= 0 && remK <= 0;
-
-                    return (
-                      <tr
-                        key={`${r.customer_id}-${r.item_id}-${r.warehouse_id}-${idx}`}
-                        className="transition hover:bg-muted/40"
-                      >
-                        {/* العميل */}
-                        <td className="px-4 py-3 font-bold text-foreground">
-                          <div>{r.customer_name_ar || "—"}</div>
-                        </td>
-
-                        {/* الصنف وشارة التصنيف */}
-                        <td className="px-3 py-3">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-foreground">{r.item_name_ar}</span>
-                            <span
-                              className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
-                                isRaw
-                                  ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
-                                  : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-                              }`}
-                            >
-                              {isRaw ? "حبوب خام" : "ناتج طحن"}
-                            </span>
-                          </div>
-                          {r.sku && (
-                            <span className="text-[10px] font-mono text-muted-foreground">
-                              {r.sku}
-                            </span>
-                          )}
-                        </td>
-
-                        {/* المستودع */}
-                        <td className="px-3 py-3 text-muted-foreground">
-                          {r.warehouse_name_ar || "—"}
-                        </td>
-
-                        {/* الوارد */}
-                        <td className="px-3 py-3 text-center tabular-nums text-muted-foreground">
-                          <div>{fmtNum(r.received_bags)} كيس</div>
-                          <div className="text-[10px]">({fmtNum(r.received_kg)} كجم)</div>
-                        </td>
-
-                        {/* المنصرف */}
-                        <td className="px-3 py-3 text-center tabular-nums text-muted-foreground">
-                          <div>{fmtNum(r.issued_bags)} كيس</div>
-                          <div className="text-[10px]">({fmtNum(r.issued_kg)} كجم)</div>
-                        </td>
-
-                        {/* الرصيد المتبقي الحالي */}
-                        <td className="px-4 py-3 text-center tabular-nums bg-primary/5">
-                          {isZero ? (
-                            <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-bold text-muted-foreground">
-                              تم التسليم بالكامل
-                            </span>
-                          ) : (
-                            <div className="space-y-0.5">
-                              <span className="text-sm font-black text-primary">
-                                {fmtNum(remB)} كيس
-                              </span>
-                              <div className="text-[11px] font-bold text-foreground">
-                                {fmtNum(remK)} كجم
-                              </div>
-                            </div>
-                          )}
-                        </td>
-
-                        {/* آخر حركة */}
-                        <td className="px-3 py-3 text-center text-muted-foreground text-[11px]">
-                          {r.last_movement_at
-                            ? new Date(r.last_movement_at).toLocaleDateString("ar-EG")
-                            : "—"}
-                        </td>
-
-                        {/* الإجراءات السريعة */}
-                        <td className="px-4 py-3 text-end">
-                          <div className="inline-flex items-center gap-1.5">
-                            {/* زر طحن إذا كان الصنف مادة خام وله رصيد */}
-                            {isRaw && !isZero && (
-                              <button
-                                type="button"
-                                onClick={() => openMilling(r)}
-                                className="inline-flex items-center gap-1 rounded-xl bg-amber-500/15 px-2.5 py-1 text-xs font-bold text-amber-700 dark:text-amber-300 hover:bg-amber-500/25 transition"
-                                title="طحن من رصيد حبوب هذا العميل"
-                              >
-                                <Cog className="h-3.5 w-3.5" />
-                                <span>طحن</span>
-                              </button>
-                            )}
-
-                            {/* زر تسليم إذا كان له رصيد */}
-                            {!isZero && (
-                              <button
-                                type="button"
-                                onClick={() => openDelivery(r)}
-                                className="inline-flex items-center gap-1 rounded-xl bg-emerald-500/15 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/25 transition"
-                                title="تسليم الأمانة للعميل"
-                              >
-                                <PackageCheck className="h-3.5 w-3.5" />
-                                <span>تسليم</span>
-                              </button>
-                            )}
-
-                            {/* زر عرض الكشف */}
-                            <button
-                              type="button"
-                              onClick={() => openHistory(r)}
-                              className="inline-flex items-center gap-1 rounded-xl border border-border bg-card px-2 py-1 text-xs font-medium text-foreground hover:bg-muted transition"
-                              title="كشف حساب الأمانة للعميل"
-                            >
-                              <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-                              <span className="hidden sm:inline">الكشف</span>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        ) : viewMode === "cards" ? (
-          /* نمط البطاقات التفاعلية (Cards Grid) */
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredRows.map((r, idx) => {
-              const remB = Number(r.remaining_bags ?? 0);
-              const remK = Number(r.remaining_kg ?? 0);
-              const isRaw = r.item_class === "RAW_MATERIAL";
-              const isZero = remB <= 0 && remK <= 0;
-
-              return (
-                <div
-                  key={`${r.customer_id}-${r.item_id}-${r.warehouse_id}-${idx}`}
-                  className="rounded-2xl border border-border/80 bg-surface-1/90 p-4 shadow-sm flex flex-col justify-between space-y-3 transition hover:border-primary/40 hover:shadow-md"
-                >
-                  <div>
-                    {/* رأس البطاقة: العميل ونوع الصنف */}
-                    <div className="flex items-start justify-between gap-2 border-b border-border/60 pb-2.5">
-                      <div>
-                        <h4 className="font-bold text-sm text-foreground">
-                          {r.customer_name_ar || "—"}
-                        </h4>
-                        <span className="text-[11px] text-muted-foreground">
-                          مستودع: {r.warehouse_name_ar || "—"}
-                        </span>
-                      </div>
-                      <span
-                        className={`rounded-lg px-2 py-0.5 text-[10px] font-bold ${
-                          isRaw
-                            ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
-                            : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-                        }`}
-                      >
-                        {isRaw ? "حبوب خام" : "ناتج طحن"}
-                      </span>
-                    </div>
-
-                    {/* الصنف والرصيد المتبقي الرئيسي */}
-                    <div className="mt-3 flex items-center justify-between">
-                      <div>
-                        <span className="text-xs text-muted-foreground">صنف الأمانة:</span>
-                        <p className="font-bold text-sm text-foreground">{r.item_name_ar}</p>
-                      </div>
-
-                      <div className="text-end">
-                        <span className="text-[11px] text-muted-foreground">الرصيد المتبقي:</span>
-                        {isZero ? (
-                          <p className="text-xs font-bold text-muted-foreground">مصفاة بالكامل</p>
-                        ) : (
-                          <div>
-                            <span className="text-xl font-black text-primary">
-                              {fmtNum(remB)}{" "}
-                              <span className="text-xs font-semibold text-muted-foreground">
-                                كيس
-                              </span>
-                            </span>
-                            <div className="text-xs font-bold text-foreground">
-                              {fmtNum(remK)} كجم
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* ملخص الوارد والمنصرف */}
-                    <div className="mt-3 grid grid-cols-2 gap-2 rounded-xl bg-muted/40 p-2.5 text-[11px]">
-                      <div>
-                        <span className="text-muted-foreground">المستلم (وارد):</span>
-                        <div className="font-bold text-foreground">
-                          {fmtNum(r.received_bags)} كيس ({fmtNum(r.received_kg)} كجم)
-                        </div>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">المصروف (صادر):</span>
-                        <div className="font-bold text-foreground">
-                          {fmtNum(r.issued_bags)} كيس ({fmtNum(r.issued_kg)} كجم)
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* أزرار العمليات السريعة بأسفل البطاقة */}
-                  <div className="pt-2 border-t border-border/60 flex items-center justify-between gap-2">
-                    <button
-                      type="button"
-                      onClick={() => openHistory(r)}
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-foreground"
-                    >
-                      <FileText className="h-3.5 w-3.5" />
-                      كشف الحركات
-                    </button>
-
-                    <div className="flex items-center gap-1.5">
-                      {isRaw && !isZero && (
-                        <button
-                          type="button"
-                          onClick={() => openMilling(r)}
-                          className="inline-flex items-center gap-1 rounded-xl bg-amber-500/15 px-3 py-1.5 text-xs font-bold text-amber-700 dark:text-amber-300 hover:bg-amber-500/25 transition"
-                        >
-                          <Cog className="h-3.5 w-3.5" />
-                          طحن
-                        </button>
-                      )}
-
-                      {!isZero && (
-                        <button
-                          type="button"
-                          onClick={() => openDelivery(r)}
-                          className="inline-flex items-center gap-1 rounded-xl bg-emerald-500 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-emerald-600 transition"
-                        >
-                          <PackageCheck className="h-3.5 w-3.5" />
-                          تسليم
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          /* نمط العرض المضغوط عالي الكثافة (Compact View) */
-          <div className="overflow-hidden rounded-2xl border border-border/80 bg-surface-1/90 shadow-sm">
-            <div className="divide-y divide-border/40">
-              {filteredRows.map((r, idx) => {
-                const remB = Number(r.remaining_bags ?? 0);
-                const remK = Number(r.remaining_kg ?? 0);
-                const isRaw = r.item_class === "RAW_MATERIAL";
-                const isZero = remB <= 0 && remK <= 0;
-
-                return (
-                  <div
-                    key={`${r.customer_id}-${r.item_id}-${r.warehouse_id}-${idx}`}
-                    className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 text-xs hover:bg-muted/40 transition"
-                  >
-                    <div className="flex items-center gap-3 min-w-56">
-                      <span className="font-bold text-foreground">{r.customer_name_ar}</span>
-                      <span className="text-muted-foreground">•</span>
-                      <span className="font-semibold text-muted-foreground">{r.item_name_ar}</span>
-                      <span
-                        className={`rounded-md px-1.5 py-0.2 text-[10px] font-bold ${
-                          isRaw
-                            ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
-                            : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-                        }`}
-                      >
-                        {isRaw ? "خام" : "ناتج"}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-4">
-                      <div className="text-muted-foreground">
-                        المستودع: <span className="font-semibold">{r.warehouse_name_ar}</span>
-                      </div>
-
-                      <div className="tabular-nums">
-                        الرصيد:{" "}
-                        {isZero ? (
-                          <span className="text-muted-foreground font-semibold">مصفاة</span>
-                        ) : (
-                          <strong className="text-primary font-black">
-                            {fmtNum(remB)} كيس ({fmtNum(remK)} كجم)
-                          </strong>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-1.5">
-                        {isRaw && !isZero && (
-                          <button
-                            type="button"
-                            onClick={() => openMilling(r)}
-                            className="rounded-lg bg-amber-500/15 px-2 py-0.5 text-[11px] font-bold text-amber-700 dark:text-amber-300"
-                          >
-                            طحن
-                          </button>
-                        )}
-                        {!isZero && (
-                          <button
-                            type="button"
-                            onClick={() => openDelivery(r)}
-                            className="rounded-lg bg-emerald-500/15 px-2 py-0.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-300"
-                          >
-                            تسليم
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => openHistory(r)}
-                          className="rounded-lg border border-border px-2 py-0.5 text-[11px] font-semibold text-muted-foreground hover:text-foreground"
-                        >
-                          كشف
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        {/* ─── سجلات الأمانات: عرض موحد (جدول / بطائق / قائمة) عبر RecordsView ─── */}
+        <RecordsView<CustodyStatementRow>
+          rows={filteredRows}
+          getRowId={(r) => `${r.customer_id}-${r.item_id}-${r.warehouse_id}`}
+          viewMode={viewMode}
+          loading={statementQuery.isLoading}
+          refreshing={statementQuery.isFetching && !statementQuery.isLoading}
+          error={statementQuery.error}
+          onRetry={() => void statementQuery.refetch()}
+          columns={custodyColumns}
+          sort={tableSort}
+          onSortChange={setTableSort}
+          minWidth={1120}
+          horizontalScroll
+          renderCard={renderCustodyCard}
+          renderListRow={renderCustodyListRow}
+          empty={{
+            icon: <Boxes />,
+            title: "لا توجد أمانات مطابقة لمعايير البحث الحالية",
+            description: "غيّر معايير الفلترة أو اختر مستودعاً أو عميلاً آخر.",
+          }}
+        />
 
         {/* ─── مودال الطحن السريع (Quick Milling Dialog) المصلح بالكامل ─── */}
         {millingModalOpen && (

@@ -32,10 +32,12 @@ import {
   custodyMilling,
   fetchCustodyBalances,
   fetchOutputItems,
+  fetchGrainTypes,
   custodyVoucherToDoc,
   buildCustodyVoucher,
   type CustodyLine,
   type ProductOption,
+  type GrainType,
 } from "@/lib/milling";
 import { LuxuryPrintPreviewModal } from "@/components/luxury-print-preview-modal";
 import { UnifiedPrintModal } from "@/components/milling/unified-print-modal";
@@ -87,6 +89,9 @@ function MillingMillPage() {
   const [lossBags, setLossBags] = useState("");
   const [notes, setNotes] = useState("");
 
+  // E6/M5: نوع الحبة المرجعي (grain_types) — يعبّئ الفاقد والنواتج الافتراضية
+  const [grainTypeId, setGrainTypeId] = useState("");
+
   // معاينة وطباعة سند الطحن الفاخر
   const [printDoc, setPrintDoc] = useState<UnifiedDocumentData | null>(null);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
@@ -130,6 +135,12 @@ function MillingMillPage() {
     queryFn: fetchOutputItems,
   });
 
+  // E6/M5: الأنواع المرجعية للحبوب — قائمة مستقلة عن كتالوج الشراء
+  const grainTypes = useQuery({
+    queryKey: ["milling", "grain-types"],
+    queryFn: fetchGrainTypes,
+  });
+
   const balances = useQuery({
     queryKey: ["milling", "balances", customerId, warehouseId],
     queryFn: () => fetchCustodyBalances(customerId || undefined, warehouseId || undefined),
@@ -163,6 +174,55 @@ function MillingMillPage() {
     if (!selectedGrain) return;
     setBagsOut(String(selectedGrain.bags_balance));
     setKgOut(String(selectedGrain.kg_balance));
+  }
+
+  // E6/M5: النوع المرجعي المختار
+  const selectedGrainType = useMemo(
+    () => (grainTypes.data ?? []).find((t) => t.id === grainTypeId) ?? null,
+    [grainTypes.data, grainTypeId],
+  );
+
+  /**
+   * E6/M5: تغيير نوع الحبة المرجعي.
+   * يعبّئ تلقائياً:
+   *  - الفاقد الافتراضي = الوزن المطحون × نسبة الفاقد الافتراضية للنوع
+   *  - سطور النواتج الافتراضية (لمنتجات موجودة في كتالوج النواتج)، كلٍّ بنسبته
+   * كل القيم تبقى قابلة للتعديل يدوياً بعد التعبئة (طبيعة كل طرقة حجر).
+   */
+  function changeGrainType(id: string) {
+    setGrainTypeId(id);
+    const type = (grainTypes.data ?? []).find((t) => t.id === id);
+    if (!type) return;
+
+    const milledKg = Number(kgOut) || 0;
+
+    // 1) الفاقد الافتراضي من نسبة النوع (بوحدة كجم من المطحون)
+    if (type.default_loss_rate_pct > 0 && milledKg > 0) {
+      setLossKg(
+        String(Math.round(((milledKg * type.default_loss_rate_pct) / 100) * 100) / 100),
+      );
+    }
+
+    // 2) النواتج الافتراضية: أطابق نسب النوع مع أصناف النواتج الفعلية بالاسم
+    const map = type.default_output_map ?? [];
+    if (map.length > 0) {
+      const outputsPool = outputItems.data ?? [];
+      const prefilled = map
+        .map((g) => {
+          const match =
+            (g.product_id && outputsPool.find((p) => p.id === g.product_id)) ||
+            outputsPool.find(
+              (p) =>
+                (p.name_ar && g.label && p.name_ar.includes(g.label)) ||
+                (p.name && g.label && p.name.toLowerCase().includes(g.label.toLowerCase())),
+            );
+          if (!match) return null;
+          const kg = milledKg > 0 ? Math.round(((milledKg * g.ratio) / 100) * 100) / 100 : 0;
+          return { itemId: match.id, bags: 0, kg };
+        })
+        .filter((l): l is CustodyLine => l !== null);
+      if (prefilled.length > 0) setOutputs(prefilled);
+    }
   }
 
   // تغيير سطر الناتج — بلا أي اشتقاق من السعة
@@ -241,6 +301,7 @@ function MillingMillPage() {
         kgOut: currentMilledKg,
         outputs,
         notes: combinedNotes || undefined,
+        grainTypeId: grainTypeId || null,
       });
     },
     onSuccess: async (res) => {
@@ -383,6 +444,29 @@ function MillingMillPage() {
                       <option key={b.item_id} value={b.item_id}>
                         {b.name_ar} — رصيد متبقٍ: {fmtNum(b.bags_balance)} كيس (
                         {fmtNum(b.kg_balance)} كجم)
+                      </option>
+                    ))}
+                  </MillingSelect>
+                </MillingField>
+
+                {/* E6/M5: نوع الحبة المرجعي — يعبّئ الفاقد ونسب النواتج الافتراضية */}
+                <MillingField
+                  label="نوع الحبة المرجعي (اختياري)"
+                  hint={
+                    selectedGrainType
+                      ? `فاقد افتراضي: ${selectedGrainType.default_loss_rate_pct}% — قابل للتعديل يدوياً`
+                      : "الأنواع المرجعية معرّفة في جدول grain_types — تعبّئ الفاقد والنواتج الافتراضية"
+                  }
+                >
+                  <MillingSelect
+                    value={grainTypeId}
+                    onChange={(e) => changeGrainType(e.target.value)}
+                    className="font-bold text-xs"
+                  >
+                    <option value="">— بلا نوع مرجعي (إدخال يدوي كامل) —</option>
+                    {(grainTypes.data ?? []).map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name_ar} (فاقد افتراضي {t.default_loss_rate_pct}%)
                       </option>
                     ))}
                   </MillingSelect>

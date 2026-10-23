@@ -224,10 +224,65 @@ export async function fetchGrainItems(): Promise<ProductOption[]> {
     .select("id, sku, name, name_ar, item_class, sale_price, cost_price, package_weight_kg")
     .eq("item_class", "RAW_MATERIAL")
     .eq("is_active", true)
-    .order("name_ar");
+    .order("name_ar", { ascending: true, nullsFirst: false })
+    .order("name");
 
   if (error) throw error;
   return (data ?? []) as ProductOption[];
+}
+
+/* ------------------------------------------------------------------ */
+/* E6 / M5 — أنواع الحبوب المرجعية (grain_types)                        */
+/*                                                                      */
+/* البيانات المرجعية للحبوب مستقلة عن كتالوج الشراء (products). كل نوع   */
+/* يحمل نسبة فاقد افتراضية ونسب نواتج افتراضية قابلة للتعديل لكل عملية.  */
+/* ------------------------------------------------------------------ */
+
+export interface GrainOutputDefault {
+  /** معرّف منتج الكتالوج الذي يمثّل الناتج (اختياري في التسوية اليدوية). */
+  product_id?: string | null;
+  /** اسم الناتج بالعربية (يُستخدم عند غياب product_id). */
+  label: string;
+  /** النسبة المئوية لوزن الحبوب (مثال: 78 = 78% دقيق). */
+  ratio: number;
+}
+
+export interface GrainType {
+  id: string;
+  name_ar: string;
+  name_en: string | null;
+  default_loss_rate_pct: number;
+  default_output_map: GrainOutputDefault[];
+  representative_product_id: string | null;
+  notes: string | null;
+  is_active: boolean;
+}
+
+/** أنواع الحبوب المرجعية النشطة — مصدر القائمة في شاشة الطحن. */
+export async function fetchGrainTypes(): Promise<GrainType[]> {
+  const { data, error } = await db
+    .from("grain_types")
+    .select(
+      "id, name_ar, name_en, default_loss_rate_pct, default_output_map, representative_product_id, notes, is_active",
+    )
+    .eq("is_active", true)
+    .order("name_ar");
+  if (error) throw error;
+  return (data ?? []) as GrainType[];
+}
+
+/** نوع حبة واحد بالمعرّف — يستخدمه فورم الطحن لتعبئة الفاقد الافتراضي. */
+export async function fetchGrainType(id: string): Promise<GrainType | null> {
+  if (!id) return null;
+  const { data, error } = await db
+    .from("grain_types")
+    .select(
+      "id, name_ar, name_en, default_loss_rate_pct, default_output_map, representative_product_id, notes, is_active",
+    )
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  return (data ?? null) as GrainType | null;
 }
 
 /** نواتج (منتجات نهائية + نواتج جانبية). */
@@ -746,6 +801,8 @@ export interface CustodyMillingInput {
   kgOut: number;
   outputs: CustodyLine[];
   notes?: string;
+  /** E6/M5: نوع الحبة المرجعي (grain_types) — اختياري، يوثّق في السجل والتدقيق. */
+  grainTypeId?: string | null;
 }
 
 export async function custodyMilling(input: CustodyMillingInput): Promise<OpResult> {
@@ -774,6 +831,7 @@ export async function custodyMilling(input: CustodyMillingInput): Promise<OpResu
       kg: o.kg ?? 0,
     })),
     _notes: input.notes ?? null,
+    _grain_type_id: input.grainTypeId ?? null,
   });
   if (error) return { ok: false, message: translateCustodyError(error.message) };
   return { ok: true, data: data as string };
