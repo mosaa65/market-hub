@@ -736,6 +736,7 @@ export function renderUnifiedLayout(
     ...doc.options,
   };
   opts.showFooter = false;
+  opts.showQrCode = true;
 
   const qrPayload = [
     `Seller: ${company.name || "Company"}`,
@@ -841,6 +842,7 @@ export function renderUnifiedLayout(
             ${companyVat ? `<div class="luxury-meta-line"><b>Tax ID:</b> <span dir="ltr">${esc(companyVat)}</span></div>` : ""}
             ${companyPhone ? `<div class="luxury-meta-line"><b>Phone:</b> <span dir="ltr">${esc(companyPhone)}</span></div>` : ""}
             ${companyEmail ? `<div class="luxury-meta-line"><b>Email:</b> <span dir="ltr">${esc(companyEmail)}</span></div>` : ""}
+            ${qrSvg ? `<div class="luxury-qr-box" style="margin-top: 6px;">${qrSvg}</div>` : ""}
           </div>
         </div>
       </div>
@@ -912,6 +914,7 @@ export function renderUnifiedLayout(
 
         <!-- اليسار: بيانات المنشأة الإنجليزية -->
         <div class="corporate-doc-block">
+          ${qrSvg && !isLuxury ? `<div class="luxury-qr-box" style="margin-bottom: 6px;">${qrSvg}</div>` : ""}
           ${englishName ? `<div class="corporate-brand-name" dir="ltr">${esc(englishName)}</div>` : ""}
           ${companyVat ? `<div class="corporate-brand-details" dir="ltr">Tax ID: ${esc(companyVat)}</div>` : ""}
           ${companyPhone ? `<div class="corporate-brand-details" dir="ltr">Phone: ${esc(companyPhone)}</div>` : ""}

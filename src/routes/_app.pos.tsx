@@ -348,7 +348,9 @@ function POSPage() {
   const [selectedModel, setSelectedModel] = useState("");
 
   const [cart, setCart] = useState<CartLine[]>([]);
+  const [paymentMethod, setPaymentMethod] = useState("cash");
   const [paid, setPaid] = useState<string>("");
+  const [discount, setDiscount] = useState<string>("");
   const [paidManuallyEdited, setPaidManuallyEdited] = useState(false);
   const [note, setNote] = useState("");
   /** Transfer reference — appended to the note on submit; no DB column needed. */

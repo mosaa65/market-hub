@@ -20,7 +20,7 @@ export const DEFAULT_PRINT_SETTINGS: PrintSettings = {
   showSignatures: false,
   showFooter: false,
   showBarcode: true,
-  showQrCode: false,
+  showQrCode: true,
   standardAccentColor: undefined,
   luxuryAccentColor: undefined,
 };

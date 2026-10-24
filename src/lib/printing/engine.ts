@@ -120,7 +120,7 @@ export function renderUnifiedDocument(request: PrintRequest): string {
     showFooter: false,
     showSignatures: request.showSignatures ?? override?.showSignatures ?? settings.showSignatures,
     showBarcode: override?.showBarcode ?? settings.showBarcode ?? true,
-    showQrCode: override?.showQrCode ?? settings.showQrCode ?? false,
+    showQrCode: override?.showQrCode ?? settings.showQrCode ?? true,
     standardAccentColor: settings.standardAccentColor,
     luxuryAccentColor: settings.luxuryAccentColor,
     theme,
