@@ -155,10 +155,6 @@ export function BackupSettingsCard() {
 
   const reminderStatus = checkBackupReminderStatus();
 
-  useEffect(() => {
-    getBackupLogHistoryFromDB().then((data) => setLogs(data));
-  }, []);
-
   const handleFetchPreview = async () => {
     setLoadingPreview(true);
     try {
