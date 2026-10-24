@@ -132,10 +132,14 @@ export async function restoreTenantDataServerSide(
 export function getDefaultBackupSettings(): BackupSettingsConfig {
   return {
     enabled: true,
+    // الافتراضي: محلي + سحابي معاً (المستخدم طلب النسخ المحلي والسحابي معاً)
     destination: "both",
+    // الافتراضي: كل 12 ساعة (ظهراً و12 ليلاً)
     frequency: "twice_daily",
-    execution_time: "09:00",
-    retention_count: 15,
+    // الافتراضي: 12 ليلاً (00:00)
+    execution_time: "00:00",
+    // الافتراضي: الاحتفاظ بكل النسخ
+    retention_count: "all",
     reminder_enabled: true,
     reminder_frequency: "twice_daily",
   };

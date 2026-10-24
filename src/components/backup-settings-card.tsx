@@ -66,6 +66,12 @@ import {
 } from "@/lib/backup/engine";
 import { checkBackupReminderStatus } from "@/lib/backup/reminder";
 import {
+  getSchedulerStatus,
+  listCloudBackups,
+  deleteCloudBackup,
+  type CloudBackupFileInfo,
+} from "@/lib/backup/auto-scheduler";
+import {
   BackupLogRecord,
   BackupSettingsConfig,
   TableCategorySummary,
@@ -90,8 +96,26 @@ export function BackupSettingsCard() {
   const [passphrase, setPassphrase] = useState("VORTEX_SECURE_BACKUP_2026");
   const [previewStats, setPreviewStats] = useState<TableCategorySummary | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
+  const [serverTotals, setServerTotals] = useState<{
+    tableCount: number;
+    totalRows: number;
+  } | null>(null);
   const [customDirs, setCustomDirs] = useState<{ id: number; name: string }[]>([]);
   const [addingDir, setAddingDir] = useState(false);
+  const [cloudFiles, setCloudFiles] = useState<CloudBackupFileInfo[]>([]);
+  const [loadingCloud, setLoadingCloud] = useState(false);
+  const [deletingFile, setDeletingFile] = useState<string | null>(null);
+  const [schedulerStatus, setSchedulerStatus] = useState(() => getSchedulerStatus());
+
+  const refreshCloudFiles = async () => {
+    setLoadingCloud(true);
+    try {
+      const files = await listCloudBackups();
+      setCloudFiles(files);
+    } finally {
+      setLoadingCloud(false);
+    }
+  };
 
   const refreshCustomDirs = async () => {
     setCustomDirs(await listCustomBackupDirectories());
@@ -100,6 +124,10 @@ export function BackupSettingsCard() {
   useEffect(() => {
     getBackupLogHistoryFromDB().then((data) => setLogs(data));
     refreshCustomDirs();
+    void refreshCloudFiles();
+    // تحديث حالة المجدول كل دقيقة
+    const t = setInterval(() => setSchedulerStatus(getSchedulerStatus()), 60_000);
+    return () => clearInterval(t);
   }, []);
 
   const handleAddCustomDir = async () => {
@@ -127,17 +155,22 @@ export function BackupSettingsCard() {
 
   const reminderStatus = checkBackupReminderStatus();
 
-  useEffect(() => {
-    getBackupLogHistoryFromDB().then((data) => setLogs(data));
-  }, []);
-
   const handleFetchPreview = async () => {
     setLoadingPreview(true);
     try {
-      const payload = await extractTenantDataReadOnly("default", user?.id);
-      const stats = calculateCategoryStats(payload.tables);
+      // v3: العد من الخادم (RPC backup_export_all) — أرقام حقيقية لكل جدول ديناميكياً
+      const serverPayload = await exportTenantDataServerSide();
+      const stats = calculateCategoryStats(serverPayload.tables as any);
       setPreviewStats(stats);
-      toast.success(isAr ? "تم تحديث معاينة جداول النظام بنجاح" : "System tables preview updated");
+      setServerTotals({
+        tableCount: serverPayload.table_count,
+        totalRows: serverPayload.total_rows,
+      });
+      toast.success(
+        isAr
+          ? `تم الفحص: ${serverPayload.table_count} جدول و${serverPayload.total_rows.toLocaleString()} صف`
+          : `Scanned: ${serverPayload.table_count} tables / ${serverPayload.total_rows} rows`,
+      );
     } catch {
       toast.error(isAr ? "فشل جلب إحصائيات جداول النظام" : "Failed to load table stats");
     } finally {
@@ -149,6 +182,7 @@ export function BackupSettingsCard() {
     setSaving(true);
     saveBackupSettings(settings);
     setSaving(false);
+    setSchedulerStatus(getSchedulerStatus(settings));
     toast.success(
       isAr ? "تم حفظ إعدادات النسخ الاحتياطي والجدولة بنجاح" : "Backup settings saved successfully",
     );
@@ -399,6 +433,13 @@ export function BackupSettingsCard() {
                   disabled={!canManage || !settings.enabled}
                   className="rounded-xl text-xs"
                 />
+                <div className="text-[10px] text-muted-foreground">
+                  {isAr
+                    ? settings.frequency === "twice_daily"
+                      ? `ينفّذ على ${settings.execution_time} و12 ساعة بعدها — الافتراضي 12 ليلاً (00:00)`
+                      : `ينفّذ على ${settings.execution_time}`
+                    : undefined}
+                </div>
               </div>
 
               <div className="space-y-1.5">
@@ -407,16 +448,22 @@ export function BackupSettingsCard() {
                 </Label>
                 <Select
                   value={String(settings.retention_count)}
-                  onValueChange={(v) => setSettings({ ...settings, retention_count: Number(v) })}
+                  onValueChange={(v) =>
+                    setSettings({
+                      ...settings,
+                      retention_count: v === "all" ? "all" : Number(v),
+                    })
+                  }
                   disabled={!canManage || !settings.enabled}
                 >
                   <SelectTrigger className="rounded-xl text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="7">أحدث 7 نسخ</SelectItem>
-                    <SelectItem value="15">أحدث 15 نسخة</SelectItem>
+                    <SelectItem value="all">الكل (لا يُحذف أي نسخة — موصى به)</SelectItem>
                     <SelectItem value="30">أحدث 30 نسخة</SelectItem>
+                    <SelectItem value="15">أحدث 15 نسخة</SelectItem>
+                    <SelectItem value="7">أحدث 7 نسخ</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -511,7 +558,154 @@ export function BackupSettingsCard() {
             </div>
           ) : null}
 
-          {/* Section 2: System Tables Breakdown Inspector Preview */}
+          {/* Section 1.7: حالة المجدول التلقائي */}
+          <div className="p-4 rounded-2xl border border-primary/20 bg-primary/5 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="text-xs font-bold text-foreground flex items-center gap-2">
+                <Clock className="size-4 text-primary" />
+                <span>المجدول التلقائي (نسخ حقيقية تنفّذ في الخلفية — ليست مجرد تذكير)</span>
+              </div>
+              {schedulerStatus.enabled ? (
+                <span
+                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold border ${
+                    schedulerStatus.isDue
+                      ? "bg-amber-500/10 text-amber-700 border-amber-500/30"
+                      : "bg-emerald-500/10 text-emerald-700 border-emerald-500/30"
+                  }`}
+                >
+                  {schedulerStatus.isDue ? "مستحق الآن — سينفّذ خلال دقائق" : "الجدولة محدّثة"}
+                </span>
+              ) : (
+                <span className="rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-bold text-muted-foreground border border-border">
+                  معطّل — فعّل النسخ التلقائي أعلاه
+                </span>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+              <span>
+                الدورية:{" "}
+                <strong className="text-foreground">{schedulerStatus.intervalLabelAr}</strong>
+              </span>
+              {schedulerStatus.lastRunAt && (
+                <span>
+                  آخر نسخة:{" "}
+                  <strong className="text-foreground">
+                    {new Date(schedulerStatus.lastRunAt).toLocaleString("ar-YE")}
+                  </strong>
+                </span>
+              )}
+              {schedulerStatus.nextRunAt && (
+                <span>
+                  الموعد القادم:{" "}
+                  <strong className="text-foreground">
+                    {new Date(schedulerStatus.nextRunAt).toLocaleString("ar-YE")}
+                  </strong>
+                </span>
+              )}
+              <span>
+                الوجهة:{" "}
+                <strong className="text-foreground">
+                  سحابي (Supabase Storage) + مسارات الجهاز
+                </strong>{" "}
+                — والتنزيل اليدوي متاح دائماً
+              </span>
+            </div>
+          </div>
+
+          {/* Section 1.8: مخزن النسخ السحابي (Supabase Storage — محلي/سحابي) */}
+          <div className="p-4 rounded-2xl border border-border/80 bg-surface/80 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="text-xs font-bold text-foreground flex items-center gap-2">
+                <Cloud className="size-4 text-sky-500" />
+                <span>مخزن النسخ السحابي (tenant-backups)</span>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => void refreshCloudFiles()}
+                disabled={loadingCloud}
+                className="h-7 text-xs gap-1"
+              >
+                <RefreshCw className={`size-3 ${loadingCloud ? "animate-spin" : ""}`} />
+                تحديث
+              </Button>
+            </div>
+
+            {cloudFiles.length > 0 ? (
+              <>
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div className="rounded-xl bg-surface-2/60 border border-border/60 p-2.5 text-center">
+                    <div className="text-[10px] text-muted-foreground">عدد النسخ</div>
+                    <div className="text-base font-black font-mono text-foreground">
+                      {cloudFiles.length}
+                    </div>
+                  </div>
+                  <div className="rounded-xl bg-surface-2/60 border border-border/60 p-2.5 text-center">
+                    <div className="text-[10px] text-muted-foreground">إجمالي الحجم</div>
+                    <div className="text-base font-black font-mono text-foreground">
+                      {(
+                        cloudFiles.reduce((s, f) => s + (f.size_bytes || 0), 0) /
+                        1024 /
+                        1024
+                      ).toFixed(1)}{" "}
+                      MB
+                    </div>
+                  </div>
+                  <div className="rounded-xl bg-surface-2/60 border border-border/60 p-2.5 text-center">
+                    <div className="text-[10px] text-muted-foreground">الاحتفاظ</div>
+                    <div className="text-base font-black text-foreground">
+                      {settings.retention_count === "all"
+                        ? "الكل"
+                        : `أحدث ${settings.retention_count}`}
+                    </div>
+                  </div>
+                </div>
+                <div className="max-h-40 overflow-y-auto space-y-1">
+                  {cloudFiles.slice(0, 8).map((f) => (
+                    <div
+                      key={f.name}
+                      className="flex items-center justify-between gap-2 text-[11px] px-2.5 py-1.5 rounded-lg border border-border/50 bg-surface-2/30"
+                    >
+                      <span className="font-mono truncate flex-1" dir="ltr">
+                        {f.name}
+                      </span>
+                      <span className="font-mono text-muted-foreground shrink-0">
+                        {((f.size_bytes || 0) / 1024 / 1024).toFixed(2)} MB
+                      </span>
+                      {canManage && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-5 w-5 p-0 text-rose-500 hover:text-rose-600"
+                          disabled={deletingFile === f.name}
+                          onClick={async () => {
+                            setDeletingFile(f.name);
+                            const ok = await deleteCloudBackup(f.name);
+                            setDeletingFile(null);
+                            if (ok) {
+                              toast.success(isAr ? "حُذفت النسخة السحابية" : "Deleted");
+                              void refreshCloudFiles();
+                            } else {
+                              toast.error(isAr ? "فشل الحذف" : "Delete failed");
+                            }
+                          }}
+                        >
+                          <Trash2 className="size-3" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="text-xs text-muted-foreground bg-surface-2/40 p-3 rounded-xl border border-dashed border-border/60">
+                {loadingCloud
+                  ? "جارٍ فحص المخزن السحابي…"
+                  : "لا توجد نسخ سحابية بعد — ستظهر هنا تلقائياً بعد أول نسخة (تأكد أن حاوية tenant-backups موجودة في Supabase Storage)."}
+              </div>
+            )}
+          </div>
           <div className="p-4 rounded-2xl border border-border/80 bg-surface/80 space-y-3">
             <div className="flex items-center justify-between">
               <div className="text-xs font-bold text-foreground flex items-center gap-2">
@@ -537,64 +731,77 @@ export function BackupSettingsCard() {
             </div>
 
             {previewStats ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 pt-1 text-xs">
-                <div className="p-2.5 rounded-xl border border-border/60 bg-surface-2/60 space-y-1">
-                  <div className="text-muted-foreground flex items-center gap-1">
-                    <Building2 className="size-3 text-cyan-500" />
-                    <span>إعدادات وإدارة</span>
+              <div className="space-y-2 pt-1">
+                {serverTotals && (
+                  <div className="flex flex-wrap items-center gap-3 rounded-xl bg-primary/5 border border-primary/20 px-3 py-2 text-xs">
+                    <span className="font-bold text-foreground">
+                      الإجمالي من الخادم: {serverTotals.tableCount} جدول
+                    </span>
+                    <span className="text-muted-foreground">•</span>
+                    <span className="font-bold text-foreground">
+                      {serverTotals.totalRows.toLocaleString()} صف بيانات
+                    </span>
                   </div>
-                  <div className="text-base font-bold font-mono text-foreground">
-                    {previewStats.core}
+                )}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-xs">
+                  <div className="p-2.5 rounded-xl border border-border/60 bg-surface-2/60 space-y-1">
+                    <div className="text-muted-foreground flex items-center gap-1">
+                      <Building2 className="size-3 text-cyan-500" />
+                      <span>إعدادات وإدارة</span>
+                    </div>
+                    <div className="text-base font-bold font-mono text-foreground">
+                      {previewStats.core}
+                    </div>
                   </div>
-                </div>
 
-                <div className="p-2.5 rounded-xl border border-border/60 bg-surface-2/60 space-y-1">
-                  <div className="text-muted-foreground flex items-center gap-1">
-                    <Layers className="size-3 text-amber-500" />
-                    <span>منتجات ومخزون</span>
+                  <div className="p-2.5 rounded-xl border border-border/60 bg-surface-2/60 space-y-1">
+                    <div className="text-muted-foreground flex items-center gap-1">
+                      <Layers className="size-3 text-amber-500" />
+                      <span>منتجات ومخزون</span>
+                    </div>
+                    <div className="text-base font-bold font-mono text-foreground">
+                      {previewStats.productsAndStock}
+                    </div>
                   </div>
-                  <div className="text-base font-bold font-mono text-foreground">
-                    {previewStats.productsAndStock}
-                  </div>
-                </div>
 
-                <div className="p-2.5 rounded-xl border border-border/60 bg-surface-2/60 space-y-1">
-                  <div className="text-muted-foreground flex items-center gap-1">
-                    <Receipt className="size-3 text-emerald-500" />
-                    <span>مبيعات ومشتريات</span>
+                  <div className="p-2.5 rounded-xl border border-border/60 bg-surface-2/60 space-y-1">
+                    <div className="text-muted-foreground flex items-center gap-1">
+                      <Receipt className="size-3 text-emerald-500" />
+                      <span>مبيعات ومشتريات</span>
+                    </div>
+                    <div className="text-base font-bold font-mono text-foreground">
+                      {previewStats.salesAndPurchases}
+                    </div>
                   </div>
-                  <div className="text-base font-bold font-mono text-foreground">
-                    {previewStats.salesAndPurchases}
-                  </div>
-                </div>
 
-                <div className="p-2.5 rounded-xl border border-border/60 bg-surface-2/60 space-y-1">
-                  <div className="text-muted-foreground flex items-center gap-1">
-                    <Users className="size-3 text-primary" />
-                    <span>عملاء وذمم ومالية</span>
+                  <div className="p-2.5 rounded-xl border border-border/60 bg-surface-2/60 space-y-1">
+                    <div className="text-muted-foreground flex items-center gap-1">
+                      <Users className="size-3 text-primary" />
+                      <span>عملاء وذمم ومالية</span>
+                    </div>
+                    <div className="text-base font-bold font-mono text-foreground">
+                      {previewStats.financeAndLedgers}
+                    </div>
                   </div>
-                  <div className="text-base font-bold font-mono text-foreground">
-                    {previewStats.financeAndLedgers}
-                  </div>
-                </div>
 
-                <div className="p-2.5 rounded-xl border border-border/60 bg-surface-2/60 space-y-1">
-                  <div className="text-muted-foreground flex items-center gap-1">
-                    <Factory className="size-3 text-amber-600" />
-                    <span>وحدة المطاحن</span>
+                  <div className="p-2.5 rounded-xl border border-border/60 bg-surface-2/60 space-y-1">
+                    <div className="text-muted-foreground flex items-center gap-1">
+                      <Factory className="size-3 text-amber-600" />
+                      <span>وحدة المطاحن</span>
+                    </div>
+                    <div className="text-base font-bold font-mono text-foreground">
+                      {previewStats.millingModule}
+                    </div>
                   </div>
-                  <div className="text-base font-bold font-mono text-foreground">
-                    {previewStats.millingModule}
-                  </div>
-                </div>
 
-                <div className="p-2.5 rounded-xl border border-border/60 bg-surface-2/60 space-y-1">
-                  <div className="text-muted-foreground flex items-center gap-1">
-                    <Receipt className="size-3 text-purple-500" />
-                    <span>المصروفات ERP</span>
-                  </div>
-                  <div className="text-base font-bold font-mono text-foreground">
-                    {previewStats.expenseModule}
+                  <div className="p-2.5 rounded-xl border border-border/60 bg-surface-2/60 space-y-1">
+                    <div className="text-muted-foreground flex items-center gap-1">
+                      <Receipt className="size-3 text-purple-500" />
+                      <span>المصروفات ERP</span>
+                    </div>
+                    <div className="text-base font-bold font-mono text-foreground">
+                      {previewStats.expenseModule}
+                    </div>
                   </div>
                 </div>
               </div>
