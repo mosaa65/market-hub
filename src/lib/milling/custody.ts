@@ -166,19 +166,27 @@ export interface MillingDocumentLine {
   created_at: string;
 }
 
+export interface IntakeGrainSummary {
+  itemId: string;
+  nameAr: string;
+  packageWeightKg: number | null;
+  bagsReceived: number;
+  kgReceived: number;
+  bagsMilled: number;
+  kgMilled: number;
+  bagsRemaining: number;
+  kgRemaining: number;
+}
+
 export interface MillingDocumentDetails extends MillingServiceDocument {
   lines: MillingDocumentLine[];
-  intakeGrain: {
-    itemId: string;
-    nameAr: string;
-    packageWeightKg: number | null;
-    bagsReceived: number;
-    kgReceived: number;
-    bagsMilled: number;
-    kgMilled: number;
-    bagsRemaining: number;
-    kgRemaining: number;
-  } | null;
+  /**
+   * ملخص الحبوب المستلمة — متعدد الأصناف: سطر لكل نوع حبوب مستلم
+   * في المستند (بر 50كجم + بر 25كجم + …) بإجماليات مستقلة.
+   */
+  intakeGrains: IntakeGrainSummary[];
+  /** توافق خلفي: أول سطر حبوب فقط (تستخدمه بعض الشاشات القديمة). */
+  intakeGrain: IntakeGrainSummary | null;
   outputsSummary: {
     itemId: string;
     nameAr: string;
@@ -631,38 +639,39 @@ export async function fetchMillingDocumentDetails(
     created_at: r.created_at,
   }));
 
-  // 1) Intake grain summary
+  // 1) ملخص الحبوب المستلمة — متعدد الأصناف: سطر لكل نوع حبوب مستلم
   const intakeLines = lines.filter((l) => l.entry_type === "INTAKE");
-  let intakeGrain: MillingDocumentDetails["intakeGrain"] = null;
-  if (intakeLines.length > 0) {
-    const firstIntake = intakeLines[0];
-    const totalBagsIn = intakeLines.reduce((acc, l) => acc + l.bags_in, 0);
-    const totalKgIn = intakeLines.reduce((acc, l) => acc + l.kg_in, 0);
-    const milledLines = lines.filter(
-      (l) =>
-        l.entry_type === "MILLING" &&
-        l.item_id === firstIntake.item_id &&
-        l.bags_out + l.kg_out > 0,
-    );
-    const totalBagsMilled = milledLines.reduce((acc, l) => acc + l.bags_out, 0);
-    const totalKgMilled = milledLines.reduce((acc, l) => acc + l.kg_out, 0);
+  const intakeGrains: NonNullable<MillingDocumentDetails["intakeGrains"]> = intakeLines.map(
+    (first) => {
+      const sameItemLines = intakeLines.filter((l) => l.item_id === first.item_id);
+      const totalBagsIn = sameItemLines.reduce((acc, l) => acc + l.bags_in, 0);
+      const totalKgIn = sameItemLines.reduce((acc, l) => acc + l.kg_in, 0);
+      const milledLines = lines.filter(
+        (l) =>
+          l.entry_type === "MILLING" && l.item_id === first.item_id && l.bags_out + l.kg_out > 0,
+      );
+      const totalBagsMilled = milledLines.reduce((acc, l) => acc + l.bags_out, 0);
+      const totalKgMilled = milledLines.reduce((acc, l) => acc + l.kg_out, 0);
 
-    const derivedCapacity =
-      firstIntake.package_weight_kg ||
-      (totalBagsIn > 0 && totalKgIn > 0 ? Math.round(totalKgIn / totalBagsIn) : null);
+      const derivedCapacity =
+        first.package_weight_kg ||
+        (totalBagsIn > 0 && totalKgIn > 0 ? Math.round(totalKgIn / totalBagsIn) : null);
 
-    intakeGrain = {
-      itemId: firstIntake.item_id,
-      nameAr: firstIntake.item_name_ar,
-      packageWeightKg: derivedCapacity,
-      bagsReceived: totalBagsIn,
-      kgReceived: totalKgIn,
-      bagsMilled: totalBagsMilled,
-      kgMilled: totalKgMilled,
-      bagsRemaining: Math.max(0, totalBagsIn - totalBagsMilled),
-      kgRemaining: Math.max(0, totalKgIn - totalKgMilled),
-    };
-  }
+      return {
+        itemId: first.item_id,
+        nameAr: first.item_name_ar,
+        packageWeightKg: derivedCapacity,
+        bagsReceived: totalBagsIn,
+        kgReceived: totalKgIn,
+        bagsMilled: totalBagsMilled,
+        kgMilled: totalKgMilled,
+        bagsRemaining: Math.max(0, totalBagsIn - totalBagsMilled),
+        kgRemaining: Math.max(0, totalKgIn - totalKgMilled),
+      };
+    },
+  );
+  // توافق خلفي: أول سطر حبوب فقط
+  const intakeGrain = intakeGrains[0] ?? null;
 
   // 2) Outputs summary
   const outputLines = lines.filter(
@@ -713,6 +722,7 @@ export async function fetchMillingDocumentDetails(
   return {
     ...doc,
     lines,
+    intakeGrains,
     intakeGrain,
     outputsSummary,
   };
@@ -737,12 +747,11 @@ export function buildMillingDocumentUnifiedDoc(
 
   const lines: any[] = [];
 
-  // سطر الاستلام
-  if (details.intakeGrain) {
-    const g = details.intakeGrain;
+  // أسطر الحبوب المستلمة — سطر لكل نوع حبوب (متعدد الأصناف)
+  for (const g of details.intakeGrains ?? (details.intakeGrain ? [details.intakeGrain] : [])) {
     const bagSize =
       g.packageWeightKg ||
-      (g.bagsReceived > 0 && g.kgReceived > 0 ? Math.round(g.kgReceived / g.bagsReceived) : 50);
+      (g.bagsReceived > 0 && g.kgReceived > 0 ? Math.round(g.kgReceived / g.bagsReceived) : 0);
     lines.push({
       product: `حبوب مستلمة: ${g.nameAr}`,
       qty: g.bagsReceived > 0 ? g.bagsReceived : g.kgReceived,
@@ -752,8 +761,8 @@ export function buildMillingDocumentUnifiedDoc(
       remainingKg: g.kgReceived,
       note:
         g.bagsReceived > 0
-          ? `${g.bagsReceived} كيس سعة ${bagSize} كجم (إجمالي ${g.kgReceived.toLocaleString()} كجم)`
-          : `إجمالي ${g.kgReceived.toLocaleString()} كجم`,
+          ? `${g.bagsReceived} كيس${bagSize ? ` سعة ${bagSize} كجم` : ""} (إجمالي ${g.kgReceived.toLocaleString()} كجم) — المتبقي غير المطحون: ${g.bagsRemaining} كيس`
+          : `إجمالي ${g.kgReceived.toLocaleString()} كجم — المتبقي غير المطحون: ${g.kgRemaining.toLocaleString()} كجم`,
     });
   }
 
@@ -783,32 +792,32 @@ export function buildMillingDocumentUnifiedDoc(
     }
   }
 
-  // سطر فاتورة أجور الطحن الرسمية — P1-1: أساس التسعير من المستند نفسه،
-  // لا من قسمة الإجمالي على عدد الأكياس (كان يعطي رقماً غير متعاقد عليه).
-  const bagCount = details.intakeGrain?.bagsReceived || 0;
+  // سطر فاتورة أجور الطحن الرسمية — أساس التسعير على مستوى العملية كلها
+  const totalReceivedBags = (details.intakeGrains ?? []).reduce((s, g) => s + g.bagsReceived, 0);
+  const totalReceivedKg = (details.intakeGrains ?? []).reduce((s, g) => s + g.kgReceived, 0);
   const basis =
     details.billing_basis === "PER_BAG" || details.billing_basis === "PER_KG"
       ? details.billing_basis
-      : bagCount > 0
+      : totalReceivedBags > 0
         ? "PER_BAG"
         : "PER_KG";
   const feeQty =
     Number(details.fee_quantity) > 0
       ? Number(details.fee_quantity)
       : basis === "PER_BAG"
-        ? bagCount || 1
-        : Number(details.intakeGrain?.kgReceived) || 1;
+        ? totalReceivedBags || 1
+        : totalReceivedKg || 1;
   const feePerUnit =
     Number(details.fee_per_unit) > 0
       ? Number(details.fee_per_unit)
       : Number((subtotal / feeQty).toFixed(2));
   lines.push({
-    product: `أجور طحن وتجهيز (${details.intakeGrain?.nameAr || "حبوب"})`,
+    product: "أجور طحن وتجهيز (العملية كاملة)",
     qty: feeQty,
     unit: basis === "PER_BAG" ? "كيس" : "كجم",
     price: feePerUnit,
     total: subtotal,
-    note: inv?.invoice_number ? `فاتورة مبيعات رسمية #${inv.invoice_number}` : undefined,
+    note: inv?.invoice_number ? `فاتورة أجور رسمية #${inv.invoice_number}` : undefined,
   });
 
   const statusLabel =
@@ -825,10 +834,10 @@ export function buildMillingDocumentUnifiedDoc(
     relatedRef: inv?.invoice_number ? `فاتورة رسمية #${inv.invoice_number}` : undefined,
     date: formatFormalDateTime(details.received_at).date,
     partyLabel: "صاحب الأمانة / العميل:",
-    partyName: details.customers?.name || "عميل أمانة",
+    partyName: details.customers?.name || "صاحب الأمانة",
     partyPhone: details.customers?.phone || undefined,
     warehouse: details.warehouses?.name_ar || details.warehouses?.name || "المستودع الرئيسي",
-    movementType: "أمانة عينية خاصة بالعميل + فاتورة مبيعات رسمية لأجور الخدمة",
+    movementType: "أمانة عينية خاصة بالعميل + فاتورة أجور رسمية للعملية كاملة",
     status: statusLabel,
     lines,
     subtotal,

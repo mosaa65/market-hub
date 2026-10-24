@@ -37,6 +37,15 @@ export interface UnifiedTicketPrintData {
 
   // Grain & Intake info
   grainType?: string;
+  /** أسطر الحبوب المستلمة متعددة الأصناف (بر 50كجم + بر 25كجم + …) — تُعرض إن وُجدت. */
+  grainLines?: Array<{
+    name: string;
+    bags: number;
+    bagSizeKg?: number;
+    kg: number;
+    bagsRemaining?: number;
+    kgRemaining?: number;
+  }>;
   millingTypeLabel?: string;
   bagCount?: number;
   bagSizeKg?: number;
@@ -107,6 +116,20 @@ export function documentDetailsToTicketData(
     grain?.packageWeightKg ||
     (bagCount > 0 && totalWeightKg > 0 ? Math.round(totalWeightKg / bagCount) : undefined);
 
+  // أسطر الحبوب المستلمة متعددة الأصناف (سطر لكل نوع حبوب في المستند)
+  const grainLines = (details.intakeGrains ?? (grain ? [grain] : [])).map((g) => ({
+    name: g.nameAr,
+    bags: g.bagsReceived,
+    bagSizeKg:
+      g.packageWeightKg ||
+      (g.bagsReceived > 0 && g.kgReceived > 0
+        ? Math.round(g.kgReceived / g.bagsReceived)
+        : undefined),
+    kg: g.kgReceived,
+    bagsRemaining: g.bagsRemaining,
+    kgRemaining: g.kgRemaining,
+  }));
+
   const items = (details.outputsSummary ?? []).map((out) => ({
     name: out.nameAr,
     bags: stage === "delivery" ? out.bagsDelivered || 0 : out.bagsProduced || 0,
@@ -149,6 +172,7 @@ export function documentDetailsToTicketData(
     warehouseName: details.warehouses?.name_ar || details.warehouses?.name || "المستودع الرئيسي",
     createdAt: details.received_at || new Date().toISOString(),
     grainType: grain?.nameAr || "—",
+    grainLines,
     // P1-5: لا نختلق «طحن ناعم قياسي» ولا «أكياس العميل» — تُعرض فقط إن سجّلها
     // المستند. القيم الافتراضية القديمة كانت تظهر في إعادة الطباعة كأنها بيانات.
     millingTypeLabel: (details as { milling_type?: string | null }).milling_type || undefined,
@@ -576,28 +600,50 @@ export function UnifiedPrintModal({
                     </span>
                   </div>
                   <div className="bg-slate-50/90 p-3 rounded-2xl border border-slate-200/80 space-y-1.5 text-[11px]">
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-600">نوع الحبوب:</span>
-                      <span className="font-black text-slate-950">{data.grainType}</span>
-                    </div>
+                    {/* أسطر الحبوب المستلمة متعددة الأصناف */}
+                    {(data.grainLines && data.grainLines.length > 0
+                      ? data.grainLines
+                      : [
+                          {
+                            name: data.grainType || "—",
+                            bags: data.bagCount || 0,
+                            bagSizeKg: data.bagSizeKg,
+                            kg: data.totalWeightKg || 0,
+                          },
+                        ]
+                    ).map((g, gi) => (
+                      <div
+                        key={gi}
+                        className={
+                          data.grainLines && data.grainLines.length > 1
+                            ? "rounded-lg bg-white border border-slate-200 px-2 py-1.5"
+                            : "contents"
+                        }
+                      >
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-600">نوع الحبوب:</span>
+                          <span className="font-black text-slate-950">{g.name}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-600">الكمية والأكياس:</span>
+                          <span className="font-black text-slate-900 font-mono">
+                            {g.bags} كيس{g.bagSizeKg ? ` × ${g.bagSizeKg} كجم` : ""}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-600">الوزن الصافي:</span>
+                          <span className="font-black text-slate-950 font-mono text-xs">
+                            {(g.kg || 0).toLocaleString()} كجم
+                          </span>
+                        </div>
+                      </div>
+                    ))}
                     {data.millingTypeLabel && (
                       <div className="flex justify-between items-center">
                         <span className="text-slate-600">ملاحظات الطحن:</span>
                         <span className="font-bold text-amber-700">{data.millingTypeLabel}</span>
                       </div>
                     )}
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-600">الكمية والأكياس:</span>
-                      <span className="font-black text-slate-900 font-mono">
-                        {data.bagCount} كيس{data.bagSizeKg ? ` × ${data.bagSizeKg} كجم` : ""}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-600">الوزن الصافي:</span>
-                      <span className="font-black text-slate-950 font-mono text-xs">
-                        {(data.totalWeightKg || 0).toLocaleString()} كجم
-                      </span>
-                    </div>
                   </div>
                 </div>
               ) : isDelivery ? (
@@ -1158,12 +1204,27 @@ function renderThermalHtml(d: UnifiedTicketPrintData, width: ThermalWidth = "80m
     isIntake
       ? `
   <div class="bold" style="margin-bottom: 4px;">تفاصيل الحبوب المستلمة:</div>
+  ${(d.grainLines && d.grainLines.length > 0
+    ? d.grainLines
+    : [
+        {
+          name: d.grainType || "—",
+          bags: d.bagCount || 0,
+          bagSizeKg: d.bagSizeKg,
+          kg: d.totalWeightKg || 0,
+        },
+      ]
+  )
+    .map(
+      (g) => `
   <div class="box">
-    <div class="flex"><span>نوع الحبوب:</span><span class="bold">${d.grainType || "—"}</span></div>
-    ${d.millingTypeLabel ? `<div class="flex"><span>ملاحظات الطحن:</span><span class="bold" style="color: #b45309;">${d.millingTypeLabel}</span></div>` : ""}
-    <div class="flex"><span>الكمية والأكياس:</span><span class="bold">${d.bagCount} كيس${d.bagSizeKg ? ` × ${d.bagSizeKg} كجم` : ""}</span></div>
-    <div class="flex"><span>الوزن الصافي:</span><span class="bold">${(d.totalWeightKg || 0).toLocaleString()} كجم</span></div>
-  </div>`
+    <div class="flex"><span>نوع الحبوب:</span><span class="bold">${g.name}</span></div>
+    <div class="flex"><span>الكمية والأكياس:</span><span class="bold">${g.bags} كيس${g.bagSizeKg ? ` × ${g.bagSizeKg} كجم` : ""}</span></div>
+    <div class="flex"><span>الوزن الصافي:</span><span class="bold">${(g.kg || 0).toLocaleString()} كجم</span></div>
+  </div>`,
+    )
+    .join("")}
+  ${d.millingTypeLabel ? `<div class="flex"><span>ملاحظات الطحن:</span><span class="bold" style="color: #b45309;">${d.millingTypeLabel}</span></div>` : ""}`
       : isDelivery
         ? `
   <div class="bold" style="margin-bottom: 4px;">تفاصيل نواتج الطحن المسلمة:</div>
@@ -1341,13 +1402,27 @@ function renderA4Html(d: UnifiedTicketPrintData): string {
       </tr>
     </thead>
     <tbody>
+      ${(d.grainLines && d.grainLines.length > 0
+        ? d.grainLines
+        : [
+            {
+              name: d.grainType || "—",
+              bags: d.bagCount || 0,
+              bagSizeKg: d.bagSizeKg,
+              kg: d.totalWeightKg || 0,
+            },
+          ]
+      )
+        .map(
+          (g) => `
       <tr>
-        <td><strong>${d.grainType || "—"}</strong></td>
-        <td>${d.millingTypeLabel || "—"}</td>
-        <td style="text-align: center;">${d.bagCount} كيس${d.bagSizeKg ? ` × ${d.bagSizeKg} كجم` : ""}</td>
-        <td style="text-align: center;"><strong>${(d.totalWeightKg || 0).toLocaleString()} كجم</strong></td>
+        <td><strong>${g.name}</strong></td>
+        <td style="text-align: center;">${g.bags} كيس${g.bagSizeKg ? ` × ${g.bagSizeKg} كجم` : ""}</td>
+        <td style="text-align: center;"><strong>${(g.kg || 0).toLocaleString()} كجم</strong></td>
         <td style="text-align: left; font-weight: bold;">${(d.millingFeeTotal || 0).toLocaleString()} ر.ي</td>
-      </tr>
+      </tr>`,
+        )
+        .join("")}
       ${
         d.packagingTotal !== undefined && d.packagingTotal > 0
           ? `

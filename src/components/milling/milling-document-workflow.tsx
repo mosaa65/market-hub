@@ -85,18 +85,19 @@ export function MillingDocumentWorkflow({
 
   const details = docQuery.data;
 
-  // الضبط التلقائي لصنف الحبوب المطحونة من حبوب المستند المستلمة
+  // الضبط التلقائي: يستخدم أول سطر حبوب لم يُطحن بعد من المستند
+  const grainOptions = useMemo(
+    () => details?.intakeGrains ?? (details?.intakeGrain ? [details.intakeGrain] : []),
+    [details?.intakeGrains, details?.intakeGrain],
+  );
   useEffect(() => {
-    if (details?.intakeGrain && !grainItemId) {
-      setGrainItemId(details.intakeGrain.itemId);
-      if (details.intakeGrain.bagsRemaining > 0) {
-        setBagsOut(String(details.intakeGrain.bagsRemaining));
-      }
-      if (details.intakeGrain.kgRemaining > 0) {
-        setKgOut(String(details.intakeGrain.kgRemaining));
-      }
+    if (grainOptions.length > 0 && !grainItemId) {
+      const first = grainOptions[0];
+      setGrainItemId(first.itemId);
+      if (first.bagsRemaining > 0) setBagsOut(String(first.bagsRemaining));
+      if (first.kgRemaining > 0) setKgOut(String(first.kgRemaining));
     }
-  }, [details?.intakeGrain, grainItemId]);
+  }, [grainOptions, grainItemId]);
 
   const process = useMutation({
     mutationFn: () =>
@@ -137,10 +138,7 @@ export function MillingDocumentWorkflow({
     onError: (error) => toast.error(error instanceof Error ? error.message : "خطأ غير متوقع"),
   });
 
-  const hasGrainToProcess = Boolean(
-    details?.intakeGrain &&
-    (details.intakeGrain.bagsRemaining > 0 || details.intakeGrain.kgRemaining > 0),
-  );
+  const hasGrainToProcess = grainOptions.some((g) => g.bagsRemaining > 0 || g.kgRemaining > 0);
 
   const canProcess = Boolean(
     grainItemId &&
@@ -272,29 +270,36 @@ export function MillingDocumentWorkflow({
         </div>
       </div>
 
-      {/* الحبوب المستلمة في هذا المستند */}
-      {details?.intakeGrain && (
-        <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 px-4 py-2.5 text-xs flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-blue-900 dark:text-blue-200">
-              الحبوب المستلمة في هذا المستند: {details.intakeGrain.nameAr}
-            </span>
-            {details.intakeGrain.packageWeightKg && (
-              <span className="text-muted-foreground">
-                (سعة العبوة: {details.intakeGrain.packageWeightKg} كجم)
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-3 font-mono">
-            <span>
-              المستلم: {fmtNum(details.intakeGrain.bagsReceived)} كيس /{" "}
-              {fmtNum(details.intakeGrain.kgReceived)} كجم
-            </span>
-            <span className="font-bold text-foreground">
-              المتبقي للطحن: {fmtNum(details.intakeGrain.bagsRemaining)} كيس /{" "}
-              {fmtNum(details.intakeGrain.kgRemaining)} كجم
-            </span>
-          </div>
+      {/* الحبوب المستلمة في هذا المستند — سطر لكل نوع حبوب (متعدد الأصناف) */}
+      {(details?.intakeGrains ?? (details?.intakeGrain ? [details.intakeGrain] : [])).length >
+        0 && (
+        <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 px-4 py-3 text-xs space-y-1.5">
+          <span className="font-bold text-blue-900 dark:text-blue-200 block">
+            الحبوب المستلمة في هذا المستند:
+          </span>
+          {(details?.intakeGrains ?? (details?.intakeGrain ? [details.intakeGrain] : [])).map(
+            (g) => (
+              <div
+                key={g.itemId}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-background/60 px-2.5 py-1.5"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-foreground">{g.nameAr}</span>
+                  {g.packageWeightKg && (
+                    <span className="text-muted-foreground">(سعة {g.packageWeightKg} كجم)</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-3 font-mono">
+                  <span>
+                    المستلم: {fmtNum(g.bagsReceived)} كيس / {fmtNum(g.kgReceived)} كجم
+                  </span>
+                  <span className="font-bold text-foreground">
+                    المتبقي للطحن: {fmtNum(g.bagsRemaining)} كيس / {fmtNum(g.kgRemaining)} كجم
+                  </span>
+                </div>
+              </div>
+            ),
+          )}
         </div>
       )}
 
@@ -323,13 +328,12 @@ export function MillingDocumentWorkflow({
                     value={grainItemId}
                     onChange={(e) => setGrainItemId(e.target.value)}
                   >
-                    {details?.intakeGrain && (
-                      <option value={details.intakeGrain.itemId}>
-                        {details.intakeGrain.nameAr} — المتبقي:{" "}
-                        {fmtNum(details.intakeGrain.bagsRemaining)} كيس /{" "}
-                        {fmtNum(details.intakeGrain.kgRemaining)} كجم
+                    {grainOptions.map((g) => (
+                      <option key={g.itemId} value={g.itemId}>
+                        {g.nameAr} — المتبقي: {fmtNum(g.bagsRemaining)} كيس /{" "}
+                        {fmtNum(g.kgRemaining)} كجم
                       </option>
-                    )}
+                    ))}
                   </MillingSelect>
                 </MillingField>
 
@@ -355,22 +359,25 @@ export function MillingDocumentWorkflow({
                   </MillingField>
                 </div>
 
-                {details?.intakeGrain && (
-                  <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-2.5 text-xs flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-blue-900 dark:text-blue-200">
-                      <strong>المتبقي كحبوب خام لم تُطحن:</strong>{" "}
-                      {fmtNum(
-                        Math.max(0, details.intakeGrain.bagsRemaining - (Number(bagsOut) || 0)),
-                      )}{" "}
-                      كيس (
-                      {fmtNum(Math.max(0, details.intakeGrain.kgRemaining - (Number(kgOut) || 0)))}{" "}
-                      كجم)
-                    </span>
-                    <span className="text-[11px] font-semibold text-blue-700 dark:text-blue-300">
-                      ✓ يبقى في رصيد العميل العيني ولا يُسجل كفاقد.
-                    </span>
-                  </div>
-                )}
+                {(() => {
+                  const selectedGrainOpt = grainOptions.find((g) => g.itemId === grainItemId);
+                  return selectedGrainOpt ? (
+                    <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-2.5 text-xs flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-blue-900 dark:text-blue-200">
+                        <strong>المتبقي كحبوب خام لم تُطحن ({selectedGrainOpt.nameAr}):</strong>{" "}
+                        {fmtNum(
+                          Math.max(0, selectedGrainOpt.bagsRemaining - (Number(bagsOut) || 0)),
+                        )}{" "}
+                        كيس (
+                        {fmtNum(Math.max(0, selectedGrainOpt.kgRemaining - (Number(kgOut) || 0)))}{" "}
+                        كجم)
+                      </span>
+                      <span className="text-[11px] font-semibold text-blue-700 dark:text-blue-300">
+                        ✓ يبقى في رصيد العميل العيني ولا يُسجل كفاقد.
+                      </span>
+                    </div>
+                  ) : null;
+                })()}
 
                 <LinesEditor
                   lines={outputs}
