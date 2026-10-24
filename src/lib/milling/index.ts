@@ -48,10 +48,13 @@ export {
   fetchCustodyDocNumber,
   // writes (RPC only)
   custodyIntake,
+  custodyIntakeMulti,
   createMillingServiceDocument,
+  createMillingServiceDocumentMulti,
   processMillingServiceDocument,
   deliverMillingServiceDocument,
   custodyMilling,
+  custodyMillingMulti,
   custodyDelivery,
   custodyAdjustment,
   linkCustodyInvoice,

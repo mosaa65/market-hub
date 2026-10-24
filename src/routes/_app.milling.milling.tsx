@@ -29,7 +29,7 @@ import { PageHeader } from "@/components/page-header";
 import { ModuleGuard } from "@/lib/modules";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  custodyMilling,
+  custodyMillingMulti,
   fetchCustodyBalances,
   fetchOutputItems,
   fetchGrainTypes,
@@ -79,9 +79,7 @@ function MillingMillPage() {
   const qc = useQueryClient();
   const [customerId, setCustomerId] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
-  const [grainItemId, setGrainItemId] = useState("");
-  const [bagsOut, setBagsOut] = useState("");
-  const [kgOut, setKgOut] = useState("");
+  const [grains, setGrains] = useState<CustodyLine[]>([{ itemId: "", bags: 0, kg: 0 }]);
   const [outputs, setOutputs] = useState<CustodyLine[]>([{ itemId: "", bags: 0, kg: 0 }]);
 
   // حقل الفاقد التشغيلي الفعلي أثناء الطحن — وزن فيزيائي يدوي فقط (V2: بلا سعات)
@@ -155,26 +153,38 @@ function MillingMillPage() {
   const readyOutputBalances = (balances.data ?? []).filter(
     (b) => b.item_class !== "RAW_MATERIAL" && (b.bags_balance > 0 || b.kg_balance > 0),
   );
-  const selectedGrain = grainBalances.find((b) => b.item_id === grainItemId);
   const selectedCustomer = (customers.data ?? []).find((c) => c.id === customerId);
 
+  // ── أدوات أسطر الحبوب المطحونة (تعدد الأصناف في عملية واحدة) ──
+  function changeGrainItem(idx: number, itemId: string) {
+    setGrains((g) => g.map((l, i) => (i !== idx ? l : { ...l, itemId })));
+  }
+  function changeGrainBags(idx: number, bags: number) {
+    setGrains((g) => g.map((l, i) => (i !== idx ? l : { ...l, bags })));
+  }
+  function changeGrainKg(idx: number, kg: number) {
+    setGrains((g) => g.map((l, i) => (i !== idx ? l : { ...l, kg })));
+  }
+  function addGrainLine() {
+    setGrains((g) => [...g, { itemId: "", bags: 0, kg: 0 }]);
+  }
+  function removeGrainLine(idx: number) {
+    setGrains((g) => (g.length > 1 ? g.filter((_, i) => i !== idx) : g));
+  }
+  /** طحن كامل رصيد سطر محدد */
+  function handleMillAllForLine(idx: number) {
+    const line = grains[idx];
+    if (!line.itemId) return;
+    const b = grainBalances.find((x) => x.item_id === line.itemId);
+    if (!b) return;
+    setGrains((g) =>
+      g.map((l, i) =>
+        i !== idx ? l : { ...l, bags: Number(b.bags_balance), kg: Number(b.kg_balance) },
+      ),
+    );
+  }
+
   // V2: لا خريطة سعات ولا حساب تلقائي — كل الأوزان إدخال يدوي فيزيائي.
-
-  // تغيير أكياس الحبوب المستهلكة
-  function changeBagsOut(v: string) {
-    setBagsOut(v);
-  }
-
-  function changeKgOut(v: string) {
-    setKgOut(v);
-  }
-
-  // طحن كامل رصيد الحبوب المتاح
-  function handleMillAllGrain() {
-    if (!selectedGrain) return;
-    setBagsOut(String(selectedGrain.bags_balance));
-    setKgOut(String(selectedGrain.kg_balance));
-  }
 
   // E6/M5: النوع المرجعي المختار
   const selectedGrainType = useMemo(
@@ -194,7 +204,7 @@ function MillingMillPage() {
     const type = (grainTypes.data ?? []).find((t) => t.id === id);
     if (!type) return;
 
-    const milledKg = Number(kgOut) || 0;
+    const milledKg = grains.reduce((s, g) => s + (Number(g.kg) || 0), 0);
 
     // 1) الفاقد الافتراضي من نسبة النوع (بوحدة كجم من المطحون)
     if (type.default_loss_rate_pct > 0 && milledKg > 0) {
@@ -241,9 +251,9 @@ function MillingMillPage() {
     setLossBags(v);
   }
 
-  // الحسابات الرياضية للمطابقة والتحقق
-  const currentMilledKg = Number(kgOut) || 0;
-  const currentMilledBags = Number(bagsOut) || 0;
+  // الحسابات الرياضية للمطابقة والتحقق — الإجماليات عبر كل أسطر الحبوب
+  const currentMilledKg = grains.reduce((s, g) => s + (Number(g.kg) || 0), 0);
+  const currentMilledBags = grains.reduce((s, g) => s + (Number(g.bags) || 0), 0);
 
   const totalProducedKg = useMemo(() => {
     return outputs.reduce((sum, o) => sum + (Number(o.kg) || 0), 0);
@@ -265,41 +275,30 @@ function MillingMillPage() {
   const isExactMatch = discrepancyKg === 0;
   const isRoundedMatch = !isExactMatch && Math.abs(discrepancyKg) <= FILL_TOLERANCE_KG;
 
-  // رصيد الحبوب المتبقي كحبوب خام (لم تُطحن)
-  const remainingRawBags = selectedGrain
-    ? Math.max(0, selectedGrain.bags_balance - currentMilledBags)
-    : 0;
-  const remainingRawKg = selectedGrain
-    ? Math.max(0, selectedGrain.kg_balance - currentMilledKg)
-    : 0;
-
-  const isOverRawBalance = selectedGrain
-    ? currentMilledBags > selectedGrain.bags_balance || currentMilledKg > selectedGrain.kg_balance
-    : false;
-
+  // تجاوز الرصيد: يُفحص لكل سطر حبوب على حدة
+  const overGrainLine = grains.find((g) => {
+    if (!g.itemId) return false;
+    const b = grainBalances.find((x) => x.item_id === g.itemId);
+    if (!b) return false;
+    return (Number(g.bags) || 0) > b.bags_balance || (Number(g.kg) || 0) > b.kg_balance;
+  });
   const canSubmit = Boolean(
     customerId &&
     warehouseId &&
-    grainItemId &&
-    !isOverRawBalance &&
-    (currentMilledBags > 0 || currentMilledKg > 0) &&
+    !overGrainLine &&
+    grains.some((g) => g.itemId && (g.bags > 0 || g.kg > 0)) &&
     outputs.some((o) => o.itemId && (o.bags > 0 || o.kg > 0)),
   );
-
   const submit = useMutation({
     mutationFn: () => {
       const lossNote = actualLossKg > 0 ? `[فاقد تشغيلي مقيّد: ${actualLossKg} كجم]` : "";
       const combinedNotes = [notes.trim(), lossNote].filter(Boolean).join(" — ");
-
-      return custodyMilling({
+      return custodyMillingMulti({
         customerId,
         warehouseId,
-        grainItemId,
-        bagsOut: currentMilledBags,
-        kgOut: currentMilledKg,
+        grains: grains.filter((g) => g.itemId && (g.bags > 0 || g.kg > 0)),
         outputs,
         notes: combinedNotes || undefined,
-        grainTypeId: grainTypeId || null,
       });
     },
     onSuccess: async (res) => {
@@ -325,8 +324,7 @@ function MillingMillPage() {
         }
       }
 
-      setBagsOut("");
-      setKgOut("");
+      setGrains([{ itemId: "", bags: 0, kg: 0 }]);
       setOutputs([{ itemId: "", bags: 0, kg: 0 }]);
       setLossKg("");
       setLossBags("");
@@ -380,7 +378,7 @@ function MillingMillPage() {
                     value={customerId}
                     onChange={(e) => {
                       setCustomerId(e.target.value);
-                      setGrainItemId("");
+                      setGrains([{ itemId: "", bags: 0, kg: 0 }]);
                     }}
                     className="font-bold text-xs"
                   >
@@ -409,114 +407,196 @@ function MillingMillPage() {
                 </MillingField>
               </div>
 
-              {/* اختيار الحبوب والكمية المطحونة في هذه الدفعة */}
+              {/* أسطر الحبوب المطحونة — صنف مستقل لكل سطر من رصيد أمانات العميل */}
               <div className="rounded-2xl border border-border/80 bg-surface-2/30 p-3.5 space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
                     <Wheat className="h-4 w-4 text-amber-500" />
                     <span>الحبوب الخام المستهلكة في الطحن</span>
                   </h4>
-                  {selectedGrain && (
-                    <button
-                      type="button"
-                      onClick={handleMillAllGrain}
-                      className="rounded-lg bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold text-amber-700 dark:text-amber-300 hover:bg-amber-500/20"
+                  <button
+                    type="button"
+                    onClick={addGrainLine}
+                    className="inline-flex items-center gap-1 rounded-xl border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-bold text-amber-700 dark:text-amber-300 hover:bg-amber-500/20"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> نوع حبوب آخر
+                  </button>
+                </div>
+                {grains.map((line, idx) => {
+                  const b = line.itemId
+                    ? grainBalances.find((x) => x.item_id === line.itemId)
+                    : undefined;
+                  const isOver =
+                    b && ((line.bags || 0) > b.bags_balance || (line.kg || 0) > b.kg_balance);
+                  const remBags = b ? Math.max(0, b.bags_balance - (line.bags || 0)) : 0;
+                  const remKg = b ? Math.max(0, b.kg_balance - (line.kg || 0)) : 0;
+                  return (
+                    <div
+                      key={idx}
+                      className={`space-y-2 rounded-xl border p-3 ${
+                        isOver ? "border-rose-500/50 bg-rose-500/5" : "border-border/70 bg-card/70"
+                      }`}
                     >
-                      طحن كامل الرصيد
-                    </button>
-                  )}
-                </div>
+                      <div className="grid grid-cols-[1fr_auto] items-center gap-2">
+                        <MillingSelect
+                          value={line.itemId}
+                          onChange={(e) => changeGrainItem(idx, e.target.value)}
+                          className="font-bold text-xs"
+                        >
+                          <option value="">اختر صنف الحبوب من رصيد العميل…</option>
+                          {grainBalances.map((g) => (
+                            <option key={g.item_id} value={g.item_id}>
+                              {g.name_ar} — رصيد متبقٍ: {fmtNum(g.bags_balance)} كيس (
+                              {fmtNum(g.kg_balance)} كجم)
+                            </option>
+                          ))}
+                        </MillingSelect>
+                        <div className="flex items-center gap-1">
+                          {b && (
+                            <button
+                              type="button"
+                              onClick={() => handleMillAllForLine(idx)}
+                              className="rounded-lg bg-amber-500/10 px-2 py-1 text-[11px] font-bold text-amber-700 dark:text-amber-300 hover:bg-amber-500/20"
+                            >
+                              طحن الكل
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            disabled={grains.length === 1}
+                            onClick={() => removeGrainLine(idx)}
+                            className="grid h-8 w-8 place-items-center rounded-lg text-rose-500 hover:bg-rose-500/10 disabled:opacity-30"
+                            aria-label="حذف السطر"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
 
-                <MillingField label="صنف الحبوب المراد طحنها *">
-                  <MillingSelect
-                    value={grainItemId}
-                    onChange={(e) => {
-                      setGrainItemId(e.target.value);
-                      setBagsOut("");
-                      setKgOut("");
-                    }}
-                    className="font-bold text-xs"
-                  >
-                    <option value="">اختر صنف الحبوب من رصيد العميل…</option>
-                    {grainBalances.map((b) => (
-                      <option key={b.item_id} value={b.item_id}>
-                        {b.name_ar} — رصيد متبقٍ: {fmtNum(b.bags_balance)} كيس (
-                        {fmtNum(b.kg_balance)} كجم)
-                      </option>
-                    ))}
-                  </MillingSelect>
-                </MillingField>
+                      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 items-center">
+                        <div>
+                          <span className="block text-[11px] font-semibold text-muted-foreground mb-1">
+                            الأكياس المطحونة:
+                          </span>
+                          <QuantityInput
+                            decimals={0}
+                            min={0}
+                            emptyAsZero
+                            placeholder="0 كيس"
+                            aria-label="الأكياس المطحونة"
+                            value={line.bags || null}
+                            onValueChange={(v) => changeGrainBags(idx, v ?? 0)}
+                            className="font-bold text-amber-600 dark:text-amber-400"
+                          />
+                        </div>
+                        <div>
+                          <span className="block text-[11px] font-semibold text-muted-foreground mb-1">
+                            الوزن المطحون (كجم):
+                          </span>
+                          <QuantityInput
+                            decimals={2}
+                            min={0}
+                            emptyAsZero
+                            unit="kg"
+                            placeholder="0.00 كجم"
+                            aria-label="الوزن المطحون (كجم)"
+                            value={line.kg || null}
+                            onValueChange={(v) => changeGrainKg(idx, v ?? 0)}
+                            className="font-bold"
+                          />
+                        </div>
+                        <div className="rounded-lg bg-muted/40 p-2 text-center text-xs">
+                          <span className="block text-[10px] text-muted-foreground">
+                            الرصيد المتاح:
+                          </span>
+                          <span className="font-bold text-foreground">
+                            {b ? `${fmtNum(b.bags_balance)} كيس` : "—"}
+                          </span>
+                          <span className="block text-[10px] text-muted-foreground">
+                            {b ? `(${fmtNum(b.kg_balance)} كجم)` : ""}
+                          </span>
+                        </div>
+                        <div className="rounded-lg bg-blue-500/10 p-2 text-center text-xs">
+                          <span className="block text-[10px] text-blue-700 dark:text-blue-300 font-semibold">
+                            المتبقي بعد الطحن:
+                          </span>
+                          <span className="font-black text-blue-700 dark:text-blue-300">
+                            {b ? `${fmtNum(remBags)} كيس` : "—"}
+                          </span>
+                          <span className="block text-[10px] text-blue-700/80 dark:text-blue-300/80">
+                            {b ? `(${fmtNum(remKg)} كجم)` : ""}
+                          </span>
+                        </div>
+                      </div>
 
-                {/* E6/M5: نوع الحبة المرجعي — يعبّئ الفاقد ونسب النواتج الافتراضية */}
-                <MillingField
-                  label="نوع الحبة المرجعي (اختياري)"
-                  hint={
-                    selectedGrainType
-                      ? `فاقد افتراضي: ${selectedGrainType.default_loss_rate_pct}% — قابل للتعديل يدوياً`
-                      : "الأنواع المرجعية معرّفة في جدول grain_types — تعبّئ الفاقد والنواتج الافتراضية"
-                  }
-                >
-                  <MillingSelect
-                    value={grainTypeId}
-                    onChange={(e) => changeGrainType(e.target.value)}
-                    className="font-bold text-xs"
-                  >
-                    <option value="">— بلا نوع مرجعي (إدخال يدوي كامل) —</option>
-                    {(grainTypes.data ?? []).map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name_ar} (فاقد افتراضي {t.default_loss_rate_pct}%)
-                      </option>
-                    ))}
-                  </MillingSelect>
-                </MillingField>
+                      {isOver && (
+                        <div className="flex items-center gap-1.5 rounded-lg bg-rose-500/10 px-2.5 py-1 text-xs font-bold text-rose-600 dark:text-rose-300">
+                          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                          <span>
+                            الكمية المطلوبة أكبر من رصيد الحبوب المتاح! الحد الأقصى:{" "}
+                            {fmtNum(b.bags_balance)} كيس / {fmtNum(b.kg_balance)} كجم.
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
 
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <MillingField
-                    label="الأكياس المطحونة بهذه الدفعة"
-                    hint={
-                      selectedGrain
-                        ? `الرصيد المتاح: ${fmtNum(selectedGrain.bags_balance)} كيس`
-                        : undefined
-                    }
-                  >
-                    <QuantityInput
-                      decimals={0}
-                      min={0}
-                      placeholder="0 كيس"
-                      aria-label="الأكياس المطحونة بهذه الدفعة"
-                      value={bagsOut === "" ? null : Number(bagsOut)}
-                      onValueChange={(v) => changeBagsOut(v == null ? "" : String(v))}
-                      className="font-bold text-amber-600 dark:text-amber-400"
-                    />
-                  </MillingField>
-
-                  <MillingField label="الوزن المطحون (كجم)" hint="أدخل الوزن الفعلي على الميزان">
-                    <QuantityInput
-                      decimals={2}
-                      min={0}
-                      unit="kg"
-                      placeholder="0.00 كجم"
-                      aria-label="الوزن المطحون (كجم)"
-                      value={kgOut === "" ? null : Number(kgOut)}
-                      onValueChange={(v) => changeKgOut(v == null ? "" : String(v))}
-                      className="font-bold"
-                    />
-                  </MillingField>
-                </div>
-
-                {/* مؤشر رصيد الحبوب المتبقي كحبوب خام (لم تُطحن) */}
-                {selectedGrain && (
-                  <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-2.5 text-xs flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-blue-900 dark:text-blue-200">
-                      <strong>المتبقي كحبوب خام لم تُطحن:</strong> {fmtNum(remainingRawBags)} كيس (
-                      {fmtNum(remainingRawKg)} كجم)
+                {/* شريط إجماليات الحبوب والنواتج */}
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-muted/60 p-3 text-xs">
+                  <div className="flex items-center gap-3">
+                    <span>
+                      حبوب مطحونة:{" "}
+                      <strong className="text-foreground">{fmtNum(currentMilledBags)}</strong> كيس (
+                      {fmtNum(currentMilledKg)} كجم)
                     </span>
-                    <span className="text-[11px] font-semibold text-blue-700 dark:text-blue-300">
-                      ✓ يبقى في رصيد العميل العيني ولا يُسجل كفاقد.
+                    <span>•</span>
+                    <span>
+                      إجمالي النواتج:{" "}
+                      <strong className="text-foreground">{fmtNum(totalProducedBags)}</strong> كيس (
+                      {fmtNum(totalProducedKg)} كجم)
+                    </span>
+                    <span>•</span>
+                    <span className="text-muted-foreground">
+                      الفاقد المقيّد: {fmtNum(actualLossKg)} كجم
                     </span>
                   </div>
-                )}
+                  <span
+                    className={`rounded-lg px-2 py-0.5 font-black tabular-nums ${
+                      discrepancyKg === 0
+                        ? "bg-emerald-500/10 text-emerald-600"
+                        : Math.abs(discrepancyKg) <= FILL_TOLERANCE_KG
+                          ? "bg-amber-500/10 text-amber-600"
+                          : "bg-rose-500/10 text-rose-600"
+                    }`}
+                  >
+                    فرق المطابقة: {discrepancyKg} كجم
+                  </span>
+                </div>
               </div>
+
+              {/* E6/M5: نوع الحبة المرجعي — يعبّئ الفاقد ونسب النواتج الافتراضية */}
+              <MillingField
+                label="نوع الحبة المرجعي (اختياري)"
+                hint={
+                  selectedGrainType
+                    ? `فاقد افتراضي: ${selectedGrainType.default_loss_rate_pct}% — قابل للتعديل يدوياً`
+                    : "الأنواع المرجعية معرّفة في جدول grain_types — تعبّئ الفاقد والنواتج الافتراضية"
+                }
+              >
+                <MillingSelect
+                  value={grainTypeId}
+                  onChange={(e) => changeGrainType(e.target.value)}
+                  className="font-bold text-xs"
+                >
+                  <option value="">— بلا نوع مرجعي (إدخال يدوي كامل) —</option>
+                  {(grainTypes.data ?? []).map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name_ar} (فاقد افتراضي {t.default_loss_rate_pct}%)
+                    </option>
+                  ))}
+                </MillingSelect>
+              </MillingField>
 
               {/* النواتج المستخرجة */}
               <div className="space-y-3 rounded-2xl border border-border/80 bg-surface-2/30 p-3.5">
@@ -730,7 +810,7 @@ function MillingMillPage() {
                       <div
                         key={b.item_id}
                         className={`rounded-xl border p-3 transition-colors ${
-                          b.item_id === grainItemId
+                          grains.some((g) => g.itemId === b.item_id)
                             ? "border-amber-500 bg-amber-500/10 shadow-xs"
                             : "border-border/70 bg-card hover:border-border"
                         }`}

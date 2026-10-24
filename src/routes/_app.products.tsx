@@ -2511,6 +2511,8 @@ function ProductDialog({
     origin_id: initial?.origin_id ?? "",
     quality_grade_id: initial?.quality_grade_id ?? "",
     is_active: initial?.is_active ?? true,
+    is_custody_item:
+      (initial as unknown as { is_custody_item?: boolean })?.is_custody_item ?? false,
   });
   const [saving, setSaving] = useState(false);
 
@@ -2583,6 +2585,9 @@ function ProductDialog({
         costing_method: policy.costing_method,
         is_sellable: policy.is_sellable,
         is_purchasable: policy.is_purchasable,
+        // طاحونة الأمانات: تعليم المنتج كمنتج أمانات (حبوب/نواتج) — عزله عن قوائم البيع والشراء.
+        is_custody_item:
+          (form as unknown as { is_custody_item?: boolean }).is_custody_item ?? false,
       };
       const request: any = initial
         ? (supabase.from("products") as any)
@@ -3242,6 +3247,24 @@ function ProductDialog({
                 onChange={(checked) => setPolicy((c) => ({ ...c, is_purchasable: checked }))}
               />
             </div>
+
+            {/* طاحونة الأمانات: عزل المنتج عن قوائم البيع والشراء وتخصيصه لقوائم أمانات المطحنة */}
+            <SettingsToggle
+              label={
+                lang === "ar"
+                  ? "منتج أمانات مطحنة (حبوب/نواتج)"
+                  : "Mill custody item (grain/output)"
+              }
+              description={
+                lang === "ar"
+                  ? "يظهر فقط في قوائم أمانات المطحنة (الاستلام، الطحن، التسليم) — ويختفي من البيع والشراء والمخزون التجاري"
+                  : "Shows only in mill custody lists (intake, milling, delivery) — hidden from sales, purchases and commercial stock"
+              }
+              checked={(form as unknown as { is_custody_item?: boolean }).is_custody_item ?? false}
+              onChange={(checked) =>
+                setForm((c) => ({ ...c, is_custody_item: checked }) as typeof c)
+              }
+            />
           </div>
         </section>
       </form>

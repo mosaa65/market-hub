@@ -33,8 +33,10 @@ import type { InfraActionId } from "./types";
 // حارس الدور — owner أو مدير منصة فقط
 // ---------------------------------------------------------------------------
 
-const guard = createServerFn({ method: "GET" }).handler(async ({ context }: any) => {
-  const userId: string = (context as any)?.userId ?? "anonymous";
+async function resolveInfraAccess(userId: string) {
+  if (!userId || userId === "anonymous") {
+    return { userId: null, allowed: false, role: null, isSuperadmin: false };
+  }
   // تحقق من الدور: مالك المنشأة (user_roles) أو مدير منصة فائق (platform_admins).
   // التحميل الديناميكي يمنع تسريب عميل service-role إلى حزمة العميل.
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -43,6 +45,9 @@ const guard = createServerFn({ method: "GET" }).handler(async ({ context }: any)
     adminClient.from("user_roles").select("role").eq("user_id", userId),
     adminClient.from("platform_admins").select("role, is_active").eq("user_id", userId),
   ]);
+  if (rolesRes.error || adminRes.error) {
+    throw new Error("تعذر التحقق من صلاحيات البنية التحتية. أعد المحاولة أو راجع اتصال قاعدة البيانات.");
+  }
   const roles = (rolesRes.data ?? []) as { role: string }[];
   const isSuperadmin = ((adminRes.data ?? []) as { role: string; is_active: boolean }[]).some(
     (a) => a.role === "superadmin" && a.is_active,
@@ -51,13 +56,18 @@ const guard = createServerFn({ method: "GET" }).handler(async ({ context }: any)
     userId,
     allowed: roles.some((r) => r.role === "owner") || isSuperadmin,
     role: roles[0]?.role ?? null,
+    isSuperadmin,
   };
-});
+}
 
-async function requireInfraAdmin() {
-  const g = await guard();
+const guard = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }: any) => resolveInfraAccess(context?.userId ?? "anonymous"));
+
+async function requireInfraAdmin(userId: string) {
+  const g = await resolveInfraAccess(userId);
   if (!g.allowed) {
-    throw new Error("هذه الصلاحية لمالك المتجر فقط (Owner).");
+    throw new Error("هذه اللوحة متاحة لمالك المتجر (Owner) أو مسؤول المنصة الفائق (Superadmin) فقط.");
   }
   return g;
 }
@@ -71,8 +81,8 @@ export const getInfraAccess = guard;
 
 export const getHealthReport = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async () => {
-    await requireInfraAdmin();
+  .handler(async ({ context }: any) => {
+    await requireInfraAdmin(context.userId);
     const report = await buildHealthReport();
     // الإشعارات المشتقة من التقرير — الواجهة تستخدمها للتنبيه.
     return { report, issues: diagnose(report, []).issues };
@@ -80,8 +90,8 @@ export const getHealthReport = createServerFn({ method: "GET" })
 
 export const getDiagnosis = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async () => {
-    await requireInfraAdmin();
+  .handler(async ({ context }: any) => {
+    await requireInfraAdmin(context.userId);
     const report = await buildHealthReport();
     const status = await supabaseStatus();
     return diagnose(report, status.local.running ? [] : status.local.stoppedServices);
@@ -89,8 +99,8 @@ export const getDiagnosis = createServerFn({ method: "GET" })
 
 export const getDockerExplorer = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async () => {
-    await requireInfraAdmin();
+  .handler(async ({ context }: any) => {
+    await requireInfraAdmin(context.userId);
     const [images, volumes, networks] = await Promise.all([
       listImages(),
       listVolumes(),
@@ -101,29 +111,29 @@ export const getDockerExplorer = createServerFn({ method: "GET" })
 
 export const getSupabaseStatus = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async () => {
-    await requireInfraAdmin();
+  .handler(async ({ context }: any) => {
+    await requireInfraAdmin(context.userId);
     return supabaseStatus();
   });
 
 export const getMigrations = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async () => {
-    await requireInfraAdmin();
+  .handler(async ({ context }: any) => {
+    await requireInfraAdmin(context.userId);
     return migrationsStatus();
   });
 
 export const getGitStatus = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async () => {
-    await requireInfraAdmin();
+  .handler(async ({ context }: any) => {
+    await requireInfraAdmin(context.userId);
     return gitStatus();
   });
 
 export const getGitUpdateCheck = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async () => {
-    await requireInfraAdmin();
+  .handler(async ({ context }: any) => {
+    await requireInfraAdmin(context.userId);
     return gitUpdateCheck();
   });
 
@@ -135,24 +145,24 @@ export const getContainerLogs = createServerFn({ method: "GET" })
     }),
   )
   .middleware([requireSupabaseAuth])
-  .handler(async ({ data }) => {
-    await requireInfraAdmin();
+  .handler(async ({ data, context }: any) => {
+    await requireInfraAdmin(context.userId);
     return containerLogs(data.container, data.tail);
   });
 
 export const inspectContainerFn = createServerFn({ method: "POST" })
   .validator(z.object({ container: z.string().min(1).max(200) }))
   .middleware([requireSupabaseAuth])
-  .handler(async ({ data }) => {
-    await requireInfraAdmin();
+  .handler(async ({ data, context }: any) => {
+    await requireInfraAdmin(context.userId);
     return inspectContainer(data.container);
   });
 
 export const runProbeFn = createServerFn({ method: "POST" })
   .validator(z.object({ container: z.string().min(1).max(200), probe: z.string().min(1).max(40) }))
   .middleware([requireSupabaseAuth])
-  .handler(async ({ data }) => {
-    await requireInfraAdmin();
+  .handler(async ({ data, context }: any) => {
+    await requireInfraAdmin(context.userId);
     return runSafeProbe(
       data.container,
       data.probe as keyof typeof import("./actions").SAFE_SHELL_PROBES,
@@ -161,15 +171,15 @@ export const runProbeFn = createServerFn({ method: "POST" })
 
 export const getBackups = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async () => {
-    await requireInfraAdmin();
+  .handler(async ({ context }: any) => {
+    await requireInfraAdmin(context.userId);
     return listBackups();
   });
 
 export const getAuditLog = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async () => {
-    await requireInfraAdmin();
+  .handler(async ({ context }: any) => {
+    await requireInfraAdmin(context.userId);
     return readAudit(200);
   });
 
@@ -217,8 +227,8 @@ const containerActionSchema = z.object({
 export const containerAction = createServerFn({ method: "POST" })
   .validator(containerActionSchema)
   .middleware([requireSupabaseAuth])
-  .handler(async ({ data }) => {
-    const g = await requireInfraAdmin();
+  .handler(async ({ data, context }: any) => {
+    const g = await requireInfraAdmin(context.userId);
     return audited(g.userId, `container.${data.action}`, async () => {
       if (data.action === "recreate") return recreateContainer(data.container);
       return performContainerAction(data.action, data.container);
@@ -228,8 +238,8 @@ export const containerAction = createServerFn({ method: "POST" })
 export const supabaseAction = createServerFn({ method: "POST" })
   .validator(z.object({ action: z.enum(["start", "stop"]) }))
   .middleware([requireSupabaseAuth])
-  .handler(async ({ data }) => {
-    const g = await requireInfraAdmin();
+  .handler(async ({ data, context }: any) => {
+    const g = await requireInfraAdmin(context.userId);
     return audited(g.userId, `supabase.${data.action}`, async () => {
       if (data.action === "start") return supabaseStart();
       return supabaseStop();
@@ -245,8 +255,8 @@ export const dbAction = createServerFn({ method: "POST" })
     }),
   )
   .middleware([requireSupabaseAuth])
-  .handler(async ({ data }) => {
-    const g = await requireInfraAdmin();
+  .handler(async ({ data, context }: any) => {
+    const g = await requireInfraAdmin(context.userId);
     return audited(g.userId, `db.${data.action}`, async () => {
       switch (data.action) {
         case "backup":
@@ -271,8 +281,8 @@ export const dbAction = createServerFn({ method: "POST" })
 export const seedAction = createServerFn({ method: "POST" })
   .validator(z.object({ file: z.string().min(1).max(300) }))
   .middleware([requireSupabaseAuth])
-  .handler(async ({ data }) => {
-    const g = await requireInfraAdmin();
+  .handler(async ({ data, context }: any) => {
+    const g = await requireInfraAdmin(context.userId);
     return audited(g.userId, "seed.run", async () => runSeedFile(data.file));
   });
 
@@ -284,8 +294,8 @@ export const migrationAction = createServerFn({ method: "POST" })
     }),
   )
   .middleware([requireSupabaseAuth])
-  .handler(async ({ data }) => {
-    const g = await requireInfraAdmin();
+  .handler(async ({ data, context }: any) => {
+    const g = await requireInfraAdmin(context.userId);
     return audited(g.userId, `migrations.${data.action}`, async () => {
       const { supabase } = await import("./tools");
       switch (data.action) {
@@ -334,8 +344,8 @@ export const gitActionFn = createServerFn({ method: "POST" })
     }),
   )
   .middleware([requireSupabaseAuth])
-  .handler(async ({ data }) => {
-    const g = await requireInfraAdmin();
+  .handler(async ({ data, context }: any) => {
+    const g = await requireInfraAdmin(context.userId);
     return audited(g.userId, `git.${data.action}`, async () => gitAction(data));
   });
 
@@ -354,8 +364,8 @@ export const maintenanceAction = createServerFn({ method: "POST" })
     }),
   )
   .middleware([requireSupabaseAuth])
-  .handler(async ({ data }) => {
-    const g = await requireInfraAdmin();
+  .handler(async ({ data, context }: any) => {
+    const g = await requireInfraAdmin(context.userId);
     const dangerous: Record<string, string> = {
       pruneImages: "PRUNE IMAGES",
       pruneContainers: "PRUNE CONTAINERS",

@@ -221,17 +221,24 @@ export function translateCustodyError(msg: string): string {
 
 /* ------------------------------------------------------------- item reads */
 
-/** حبوب خام للقوائم — من القاعدة لا من مصفوفات الكود. */
+/**
+ * حبوب خام للأمانات فقط — من RPC `custody_grain_items` المعزول: كل حبوب
+ * `is_custody_item = true` (بغضّ النظر عن ملكيتها للشركة أو لعملاء الأمانات).
+ */
 export async function fetchGrainItems(): Promise<ProductOption[]> {
-  const { data, error } = await db
-    .from("products")
-    .select("id, sku, name, name_ar, item_class, sale_price, cost_price, package_weight_kg")
-    .eq("item_class", "RAW_MATERIAL")
-    .eq("is_active", true)
-    .order("name_ar", { ascending: true, nullsFirst: false })
-    .order("name");
-
-  if (error) throw error;
+  const { data, error } = await db.rpc("custody_grain_items");
+  if (error) {
+    // Fallback مؤقت قبل ترحيل الـ RPC: نفس المنطق محلياً.
+    const { data: fallback, error: fbErr } = await db
+      .from("products")
+      .select("id, sku, name, name_ar, item_class, sale_price, cost_price, package_weight_kg")
+      .eq("item_class", "RAW_MATERIAL")
+      .eq("is_active", true)
+      .order("name_ar", { ascending: true, nullsFirst: false })
+      .order("name");
+    if (fbErr) throw fbErr;
+    return (fallback ?? []) as ProductOption[];
+  }
   return (data ?? []) as ProductOption[];
 }
 
@@ -289,16 +296,19 @@ export async function fetchGrainType(id: string): Promise<GrainType | null> {
   return (data ?? null) as GrainType | null;
 }
 
-/** نواتج (منتجات نهائية + نواتج جانبية). */
+/** نواتج الأمانات فقط — من RPC `custody_output_items` المعزول. */
 export async function fetchOutputItems(): Promise<ProductOption[]> {
-  const { data, error } = await db
-    .from("products")
-    .select("id, sku, name, name_ar, item_class, sale_price, cost_price, package_weight_kg")
-    .in("item_class", ["FINISHED_GOOD", "BY_PRODUCT"])
-    .eq("is_active", true)
-    .order("name_ar");
-
-  if (error) throw error;
+  const { data, error } = await db.rpc("custody_output_items");
+  if (error) {
+    const { data: fallback, error: fbErr } = await db
+      .from("products")
+      .select("id, sku, name, name_ar, item_class, sale_price, cost_price, package_weight_kg")
+      .in("item_class", ["FINISHED_GOOD", "BY_PRODUCT"])
+      .eq("is_active", true)
+      .order("name_ar");
+    if (fbErr) throw fbErr;
+    return (fallback ?? []) as ProductOption[];
+  }
   return (data ?? []) as ProductOption[];
 }
 
@@ -384,6 +394,42 @@ export async function custodyIntake(input: CustodyIntakeInput): Promise<OpResult
 }
 
 /**
+ * استلام أمانة متعدد الأصناف: قد يستلم العميل عدة أنواع حبوب في عملية واحدة
+ * (مثال: بر خريف كيس 50 كجم ×10 + بر خريف كيس 25 كجم ×10 + أي صنف آخر).
+ * كل سطر يمثل نوع حبوب مستقلاً بأكياسه ووزنه — سند واحد للعملية كلها.
+ */
+export interface CustodyIntakeLineInput {
+  itemId: string;
+  bags: number;
+  kg: number;
+}
+
+export async function custodyIntakeMulti(input: {
+  customerId: string;
+  warehouseId: string;
+  lines: CustodyIntakeLineInput[];
+  notes?: string;
+}): Promise<OpResult> {
+  if (!input.customerId) return { ok: false, message: "اختر العميل صاحب الأمانات." };
+  if (!input.warehouseId) return { ok: false, message: "اختر المستودع." };
+  const valid = (input.lines ?? []).filter(
+    (l) => l.itemId && ((l.bags ?? 0) > 0 || (l.kg ?? 0) > 0),
+  );
+  if (valid.length === 0) {
+    return { ok: false, message: "سجّل صنف حبوب واحد على الأقل مع كميته." };
+  }
+
+  const { error } = await db.rpc("custody_intake_multi", {
+    _customer_id: input.customerId,
+    _warehouse_id: input.warehouseId,
+    _lines: valid.map((l) => ({ item_id: l.itemId, bags: l.bags, kg: l.kg })),
+    _notes: input.notes ?? null,
+  });
+  if (error) return { ok: false, message: translateCustodyError(error.message) };
+  return { ok: true };
+}
+
+/**
  * ينشئ من كاونتر المطحنة عملية واحدة حقيقية: استلام أمانة + فاتورة مبيعات
  * رسمية + أثر الذمة عند وجود آجل. لا يوجد ربط فاتورة لاحق.
  */
@@ -450,6 +496,47 @@ export async function createMillingServiceDocument(input: {
   }
 
   return { ok: true, data: created };
+}
+
+/**
+ * مستند استلام متعدد الأصناف: فاتورة أجور واحدة للعملية كلها + سطر استلام
+ * لكل نوع حبوب (بر 50كجم ×10 + بر 25كجم ×10 + ...). الحساب المالي يبقى
+ * على مستوى العملية (إجمالي الأكياس × سعر الكيس).
+ */
+export async function createMillingServiceDocumentMulti(input: {
+  customerId: string;
+  warehouseId: string;
+  grains: CustodyIntakeLineInput[];
+  serviceItemId: string;
+  serviceTotal: number;
+  discount?: number;
+  paymentMethod: string;
+  paid: number;
+  notes?: string;
+}): Promise<OpResult<MillingServiceDocumentCreated>> {
+  const valid = (input.grains ?? []).filter(
+    (g) => g.itemId && ((g.bags ?? 0) > 0 || (g.kg ?? 0) > 0),
+  );
+  if (!input.customerId || !input.warehouseId || !input.serviceItemId) {
+    return { ok: false, message: "اختر العميل والمخزن وخدمة الطحن." };
+  }
+  if (valid.length === 0) {
+    return { ok: false, message: "سجّل نوع حبوب واحد على الأقل مع كميته." };
+  }
+
+  const { data, error } = await db.rpc("create_milling_service_document_multi", {
+    _customer_id: input.customerId,
+    _warehouse_id: input.warehouseId,
+    _grains: valid.map((g) => ({ item_id: g.itemId, bags: g.bags, kg: g.kg })),
+    _service_item_id: input.serviceItemId,
+    _service_unit_price: input.serviceTotal ?? 0,
+    _discount: input.discount ?? 0,
+    _payment_method: input.paymentMethod,
+    _paid: input.paid ?? 0,
+    _notes: input.notes ?? null,
+  });
+  if (error) return { ok: false, message: translateCustodyError(error.message) };
+  return { ok: true, data: data as MillingServiceDocumentCreated };
 }
 
 export async function fetchMillingServiceDocument(
@@ -836,6 +923,48 @@ export async function custodyMilling(input: CustodyMillingInput): Promise<OpResu
     })),
     _notes: input.notes ?? null,
     _grain_type_id: input.grainTypeId ?? null,
+  });
+  if (error) return { ok: false, message: translateCustodyError(error.message) };
+  return { ok: true, data: data as string };
+}
+
+/**
+ * طحن أمانات متعدد الأصناف: قد يطحن المشغّل أكثر من نوع حبوب في عملية واحدة
+ * ويُنتج أكثر من ناتج — أسطر حبوب صادرة + أسطر نواتج واردة في سند واحد.
+ * كل صنف من أمانات العميل مباشرة (يُتحقّق رصيده سطراً سطراً في RPC).
+ */
+export async function custodyMillingMulti(input: {
+  customerId: string;
+  warehouseId: string;
+  grains: CustodyIntakeLineInput[];
+  outputs: CustodyLine[];
+  notes?: string;
+}): Promise<OpResult> {
+  if (!input.customerId) return { ok: false, message: "اختر العميل." };
+  if (!input.warehouseId) return { ok: false, message: "اختر المستودع." };
+  const validGrains = (input.grains ?? []).filter(
+    (g) => g.itemId && ((g.bags ?? 0) > 0 || (g.kg ?? 0) > 0),
+  );
+  const validOutputs = (input.outputs ?? []).filter(
+    (o) => o.itemId && ((o.bags ?? 0) > 0 || (o.kg ?? 0) > 0),
+  );
+  if (validGrains.length === 0) {
+    return { ok: false, message: "سجّل صنف حبوب مطحونة واحداً على الأقل مع كميته." };
+  }
+  if (validOutputs.length === 0) {
+    return { ok: false, message: "أضف ناتجاً واحداً على الأقل (صنف + كمية)." };
+  }
+
+  const { data, error } = await db.rpc("custody_milling_multi", {
+    _customer_id: input.customerId,
+    _warehouse_id: input.warehouseId,
+    _grains: validGrains.map((g) => ({ item_id: g.itemId, bags: g.bags, kg: g.kg })),
+    _outputs: validOutputs.map((o) => ({
+      item_id: o.itemId,
+      bags: o.bags ?? 0,
+      kg: o.kg ?? 0,
+    })),
+    _notes: input.notes ?? null,
   });
   if (error) return { ok: false, message: translateCustodyError(error.message) };
   return { ok: true, data: data as string };
