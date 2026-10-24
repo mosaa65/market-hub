@@ -459,7 +459,7 @@ function MillingIntakePage() {
                 className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-xs font-bold text-primary-foreground shadow-xs transition hover:bg-primary/90"
               >
                 <Printer className="h-4 w-4" />
-                معاينة وطباعة الفاتورة الفاخرة
+                معاينة وطباعة سند الاستلام وفاتورة الأجور
               </button>
 
               <button
@@ -1004,7 +1004,7 @@ function MillingIntakePage() {
           </MillingPanel>
         </div>
 
-        {/* قالب فاتورة وإيصال المطحنة الأنيق المعتمد والمطابق لقالب الاستلام السريع */}
+        {/* سند الاستلام وفاتورة الأجور — القالب الموحد المعتمد */}
         {(activeDetails || printDoc) && (
           <UnifiedPrintModal
             open={printModalOpen}
@@ -1019,7 +1019,7 @@ function MillingIntakePage() {
         <DocumentShareDialog
           open={shareDialogOpen}
           onClose={() => setShareDialogOpen(false)}
-          title="مشاركة الفاتورة وسند الاستلام"
+          title="مشاركة سند الاستلام وفاتورة الأجور"
           documentType="milling_document"
           millingDocumentNumber={createdDocument?.document_number || ""}
           customer={

@@ -1,7 +1,7 @@
 /**
  * خطوات المستند الموحد داخل كاونتر المطحنة.
  * لا تنشئ هذه الواجهة فاتورة أو مخزوناً مستقلاً: كل حركة تمر برقم المستند
- * الذي أُنشئ في الاستلام مع فاتورة المبيعات الرسمية.
+ * الذي أُنشئ في الاستلام مع فاتورة أجور الطحن الرسمية.
  */
 import { useState, type Dispatch, type SetStateAction, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -242,7 +242,7 @@ export function MillingDocumentWorkflow({
       {/* بطاقة الفاتورة الرسمية المرتبطة دائماً */}
       <div className="grid gap-3 sm:grid-cols-4 rounded-xl border border-border/80 bg-card p-3.5 text-xs">
         <div>
-          <span className="text-muted-foreground block text-[11px]">الفاتورة الرسمية:</span>
+          <span className="text-muted-foreground block text-[11px]">فاتورة الأجور:</span>
           <div className="flex items-center gap-1.5 mt-0.5">
             <Receipt className="h-3.5 w-3.5 text-amber-500" />
             <Mono className="font-bold">#{document.invoice_number}</Mono>
@@ -489,7 +489,7 @@ export function MillingDocumentWorkflow({
         </MillingPanel>
       </div>
 
-      {/* قالب فاتورة وإيصال المطحنة الموحد الأنيق */}
+      {/* سند المستند وفاتورة الأجور — القالب الموحد */}
       {printRequest && details && (
         <UnifiedPrintModal
           open={Boolean(printRequest)}

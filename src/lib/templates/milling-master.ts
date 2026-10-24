@@ -298,7 +298,7 @@ export function renderMillingMasterTemplate(
       </div>
       <div class="doc-badge">
         <h2>${title}</h2>
-        ${opts.showDocNumberDate ? `<div class="doc-num">#${esc(doc.number)}</div>` : ""}
+        ${opts.showDocNumberDate ? `<div class="doc-num">${esc(doc.number)}</div>` : ""}
         ${qrSvg ? `<div style="margin-top: 6px;">${qrSvg}</div>` : ""}
       </div>
     </div>
@@ -513,7 +513,9 @@ export function renderMillingThermalTemplate(
   };
 
   const isDelivery = doc.docType === "delivery_note";
-  const title = esc(doc.title || (isDelivery ? "إيصال تسليم أمانات" : "إيصال طحن واستلام فوري"));
+  const title = esc(
+    doc.title || (isDelivery ? "سند تسليم نواتج الأمانة" : "سند استلام أمانة وفاتورة أجور"),
+  );
 
   const compName = esc(
     companyProfile.arabicName ||
@@ -628,7 +630,7 @@ export function renderMillingThermalTemplate(
   ${
     opts.showDocNumberDate
       ? `
-  <div class="flex-row"><span>رقم المستند:</span><span class="bold">#${esc(doc.number)}</span></div>
+  <div class="flex-row"><span>رقم المستند:</span><span class="bold">${esc(doc.number)}</span></div>
   <div class="flex-row"><span>التاريخ:</span><span>${esc(formatPrintedDateTime(doc.date))}</span></div>`
       : ""
   }

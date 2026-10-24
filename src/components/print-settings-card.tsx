@@ -172,15 +172,14 @@ export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
   ] as const;
 
   function handleToggle(key: keyof PrintSettings) {
+    const nextValue = !settings[key];
     setSettings((current) => ({
       ...current,
-      [key]: !current[key],
-      ...(key === "autoPrintCustomerInvoice" ? { printMode: !current[key] ? "auto" : "ask" } : {}),
+      [key]: nextValue,
+      ...(key === "autoPrintCustomerInvoice" ? { printMode: nextValue ? "auto" : "ask" } : {}),
     }));
-    /* مفاتيح إظهار/إخفاء العناصر تُزامن مع الإعدادات الموحدة حتى تنعكس
-     * فعلياً على الطباعة (محرك الطباعة الموحد يقرأ منها). */
     if ((FIELD_TOGGLE_KEYS as readonly string[]).includes(key)) {
-      updateUnified({ [key]: !unified[key as "showLogo"] } as never);
+      updateUnified({ [key]: nextValue } as never);
     }
   }
 
@@ -1001,7 +1000,7 @@ export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
                                 border: `1px solid ${tokens.line}`,
                               }}
                             >
-                              <span>ترويسة المستند القياسي #INV-2026</span>
+                              <span>ترويسة المستند القياسي · INV-2026</span>
                               <span
                                 className="text-white text-[10px] px-2 py-0.5 rounded-full"
                                 style={{ backgroundColor: tokens.accent }}
@@ -1206,7 +1205,7 @@ export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
                                 border: `1.5px solid ${tokens.line}`,
                               }}
                             >
-                              <span>ترويسة المستند التنفيذي #LUX-2026</span>
+                              <span>ترويسة المستند التنفيذي · LUX-2026</span>
                               <span
                                 className="text-white text-[10px] px-2 py-0.5 rounded-full"
                                 style={{ backgroundColor: tokens.accent }}
@@ -1452,13 +1451,25 @@ export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
           {/* ═════════════════════════════════════════════════════════════════ */}
           {activeTab === "fields" && (
             <div className="space-y-4">
-              <div className="rounded-2xl border border-border/70 bg-muted/20 p-3.5">
-                <div className="text-xs font-bold text-foreground">
-                  تخصيص البيانات الظاهرة في ترويسة وجدول الفواتير
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/70 bg-muted/20 p-3.5">
+                <div>
+                  <div className="text-xs font-bold text-foreground">
+                    تخصيص البيانات الظاهرة في الفواتير
+                  </div>
+                  <div className="mt-0.5 text-[11px] text-muted-foreground">
+                    تسري التغييرات على المعاينة والطباعة بعد حفظها لهذا الجهاز والمستخدم.
+                  </div>
                 </div>
-                <div className="text-[11px] text-muted-foreground mt-0.5">
-                  حدد ما يظهر وما يُخفى في مطبوعات الفواتير والسندات لتقليل الطول أو إبراز التفاصيل
-                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={saveAllSettings}
+                  disabled={!canEdit || !isDirty || isSaving}
+                  className="gap-1.5"
+                >
+                  <Check className="size-3.5" />
+                  {isSaving ? "جارٍ الحفظ..." : "حفظ إعدادات الفاتورة"}
+                </Button>
               </div>
 
               <div className="flex items-center justify-between gap-4 rounded-xl border border-border/70 bg-surface/60 p-3.5">
@@ -1515,11 +1526,11 @@ export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
       {canEdit && (
         <div className="sticky bottom-4 z-30 flex items-center justify-between gap-3 rounded-2xl border-primary/30 bg-background/95 px-4 py-3 shadow-xl backdrop-blur">
           <span className="text-xs text-muted-foreground">
-            {isDirty ? "لديك تغييرات غير محفوظة في هذا المكون" : "كل تغييرات الطباعة محفوظة"}
+            {isDirty ? "لديك تغييرات غير محفوظة" : "الإعدادات محفوظة"}
           </span>
           <Button type="button" onClick={saveAllSettings} disabled={!isDirty || isSaving}>
             <Check className="h-4 w-4" />
-            {isSaving ? "جارٍ الحفظ..." : "حفظ إعدادات الطباعة"}
+            {isSaving ? "جارٍ الحفظ..." : "حفظ الإعدادات"}
           </Button>
         </div>
       )}

@@ -170,7 +170,7 @@ export function renderThermalQrTemplate(
         ? `
       <div class="flex-between">
         <span style="color: #64748b;">رقم الفاتورة:</span>
-        <span class="font-bold font-mono">#${esc(doc.number)}</span>
+        <span class="font-bold font-mono">${esc(doc.number)}</span>
       </div>
       <div class="flex-between">
         <span style="color: #64748b;">التاريخ والوقت:</span>

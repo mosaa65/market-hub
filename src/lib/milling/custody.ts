@@ -643,10 +643,10 @@ export function buildMillingDocumentUnifiedDoc(
   const remaining = Math.max(0, total - paid);
   const title =
     stage === "delivery"
-      ? "سند تسليم أمانة وفاتورة أجور"
+      ? "سند تسليم نواتج الأمانة"
       : stage === "milled"
-        ? "فاتورة أجور وسند استلام أمانة (محدّث بالنواتج)"
-        : "فاتورة أجور وسند استلام أمانة";
+        ? "سند طحن أمانة"
+        : "سند استلام أمانة وفاتورة أجور";
 
   const lines: any[] = [];
 
@@ -1210,7 +1210,7 @@ export function buildCustodyDeliveryDoc({
 }): UnifiedDocumentData {
   return {
     docType: "delivery_note",
-    title: "سند تسليم أمانات نواتج طحن",
+    title: "سند تسليم نواتج الأمانة",
     number: docNumber,
     date: date || new Date().toLocaleString("ar-EG"),
     partyLabel: "العميل المستلم:",

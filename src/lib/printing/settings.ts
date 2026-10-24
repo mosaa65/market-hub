@@ -48,6 +48,45 @@ export interface UnifiedPrintSettings {
 }
 
 export const PRINT_SETTINGS_KEY = "vortex_print_settings_v2";
+const DEFAULT_DOCUMENT_OVERRIDES: UnifiedPrintSettings["overrides"] = {
+  customer_invoice: {
+    templateId: "thermal-milling",
+    theme: "standard",
+    paperId: "thermal-80",
+    method: "thermal",
+  },
+  purchase_invoice: {
+    templateId: "milling-clean",
+    theme: "standard",
+    paperId: "a4",
+    method: "browser",
+  },
+  delivery_note: {
+    templateId: "thermal-milling",
+    theme: "standard",
+    paperId: "thermal-80",
+    method: "thermal",
+  },
+  inventory_document: {
+    templateId: "milling-clean",
+    theme: "standard",
+    paperId: "a4",
+    method: "browser",
+  },
+  sales_return: {
+    templateId: "thermal-milling",
+    theme: "standard",
+    paperId: "thermal-80",
+    method: "thermal",
+  },
+  payment_receipt: {
+    templateId: "milling-clean",
+    theme: "standard",
+    paperId: "a4",
+    method: "browser",
+  },
+};
+
 export const DEFAULT_UNIFIED_PRINT_SETTINGS: UnifiedPrintSettings = {
   behavior: "default",
   method: "browser",
@@ -71,7 +110,7 @@ export const DEFAULT_UNIFIED_PRINT_SETTINGS: UnifiedPrintSettings = {
   showFooter: false,
   standardAccentColor: undefined, // يستخدم اللون الافتراضي الأزرق الملكي
   luxuryAccentColor: undefined, // يستخدم اللون الافتراضي الذهبي الفاخر
-  overrides: {},
+  overrides: DEFAULT_DOCUMENT_OVERRIDES,
 };
 
 function validCopies(value: unknown): number {
@@ -96,6 +135,12 @@ export function normalizePrintSettings(
   return {
     ...DEFAULT_UNIFIED_PRINT_SETTINGS,
     ...raw,
+    overrides: Object.fromEntries(
+      Object.entries({ ...DEFAULT_DOCUMENT_OVERRIDES, ...raw?.overrides }).map(([key, value]) => [
+        key,
+        { ...DEFAULT_DOCUMENT_OVERRIDES[key as PrintingDocumentType], ...value },
+      ]),
+    ) as UnifiedPrintSettings["overrides"],
     behavior,
     paperId,
     copies: validCopies(raw?.copies),

@@ -247,7 +247,7 @@ export function renderMillingCleanTemplate(
             opts.showDocNumberDate
               ? `
             <div style="font-weight: 800; font-family: monospace; font-size: 13px; color: #0f172a; margin-top: 2px;">
-              #${esc(doc.number)}
+              ${esc(doc.number)}
             </div>
             <div style="color: #64748b; font-size: 11px; margin-top: 1px;">
               ${esc(formatPrintedDateTime(doc.date))}
@@ -427,6 +427,7 @@ export function renderMillingCleanTemplate(
           : ""
       }
     </div>
+    ${opts.showFooter ? `<div style="margin-top:8px;text-align:center;font-size:10px">${esc(L.thanks)}</div>` : ""}
     ${renderInvoiceRightsFooter()}
   </div>
 </body>

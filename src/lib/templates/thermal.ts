@@ -76,7 +76,7 @@ export function renderThermalTemplate(
   ${
     opts.showDocNumberDate
       ? `
-  <div class="row"><span>${L.invoice}</span><b>#${esc(doc.number)}</b></div>
+  <div class="row"><span>${L.invoice}</span><b>${esc(doc.number)}</b></div>
   <div class="row"><span>${L.date}</span><span>${esc(formatPrintedDateTime(doc.date))}</span></div>
   `
       : ""

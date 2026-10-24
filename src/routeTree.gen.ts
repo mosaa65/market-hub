@@ -61,6 +61,7 @@ import { Route as AppTrialBalanceRouteImport } from './routes/_app.trial-balance
 import { Route as AppUsersRouteImport } from './routes/_app.users'
 import { Route as AppVortexUiRouteImport } from './routes/_app.vortex-ui'
 import { Route as AppWarehousesRouteImport } from './routes/_app.warehouses'
+import { Route as AppMillingCustodyDeliveryRouteImport } from './routes/_app.milling.custody-delivery'
 import { Route as AppMillingCustomerStatementRouteImport } from './routes/_app.milling.customer-statement'
 import { Route as AppMillingDeliveryRouteImport } from './routes/_app.milling.delivery'
 import { Route as AppMillingIntakeRouteImport } from './routes/_app.milling.intake'
@@ -336,6 +337,12 @@ const AppWarehousesRoute = AppWarehousesRouteImport.update({
   path: '/warehouses',
   getParentRoute: () => AppRoute,
 } as any)
+const AppMillingCustodyDeliveryRoute =
+  AppMillingCustodyDeliveryRouteImport.update({
+    id: '/custody-delivery',
+    path: '/custody-delivery',
+    getParentRoute: () => AppMillingRoute,
+  } as any)
 const AppMillingCustomerStatementRoute =
   AppMillingCustomerStatementRouteImport.update({
     id: '/customer-statement',
@@ -467,6 +474,7 @@ export interface FileRoutesByFullPath {
   '/users': typeof AppUsersRoute
   '/vortex-ui': typeof AppVortexUiRoute
   '/warehouses': typeof AppWarehousesRoute
+  '/milling/custody-delivery': typeof AppMillingCustodyDeliveryRoute
   '/milling/customer-statement': typeof AppMillingCustomerStatementRoute
   '/milling/delivery': typeof AppMillingDeliveryRoute
   '/milling/intake': typeof AppMillingIntakeRoute
@@ -535,6 +543,7 @@ export interface FileRoutesByTo {
   '/users': typeof AppUsersRoute
   '/vortex-ui': typeof AppVortexUiRoute
   '/warehouses': typeof AppWarehousesRoute
+  '/milling/custody-delivery': typeof AppMillingCustodyDeliveryRoute
   '/milling/customer-statement': typeof AppMillingCustomerStatementRoute
   '/milling/delivery': typeof AppMillingDeliveryRoute
   '/milling/intake': typeof AppMillingIntakeRoute
@@ -605,6 +614,7 @@ export interface FileRoutesById {
   '/_app/users': typeof AppUsersRoute
   '/_app/vortex-ui': typeof AppVortexUiRoute
   '/_app/warehouses': typeof AppWarehousesRoute
+  '/_app/milling/custody-delivery': typeof AppMillingCustodyDeliveryRoute
   '/_app/milling/customer-statement': typeof AppMillingCustomerStatementRoute
   '/_app/milling/delivery': typeof AppMillingDeliveryRoute
   '/_app/milling/intake': typeof AppMillingIntakeRoute
@@ -675,6 +685,7 @@ export interface FileRouteTypes {
     | '/users'
     | '/vortex-ui'
     | '/warehouses'
+    | '/milling/custody-delivery'
     | '/milling/customer-statement'
     | '/milling/delivery'
     | '/milling/intake'
@@ -743,6 +754,7 @@ export interface FileRouteTypes {
     | '/users'
     | '/vortex-ui'
     | '/warehouses'
+    | '/milling/custody-delivery'
     | '/milling/customer-statement'
     | '/milling/delivery'
     | '/milling/intake'
@@ -812,6 +824,7 @@ export interface FileRouteTypes {
     | '/_app/users'
     | '/_app/vortex-ui'
     | '/_app/warehouses'
+    | '/_app/milling/custody-delivery'
     | '/_app/milling/customer-statement'
     | '/_app/milling/delivery'
     | '/_app/milling/intake'
@@ -1201,6 +1214,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppWarehousesRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/milling/custody-delivery': {
+      id: '/_app/milling/custody-delivery'
+      path: '/custody-delivery'
+      fullPath: '/milling/custody-delivery'
+      preLoaderRoute: typeof AppMillingCustodyDeliveryRouteImport
+      parentRoute: typeof AppMillingRoute
+    }
     '/_app/milling/customer-statement': {
       id: '/_app/milling/customer-statement'
       path: '/customer-statement'
@@ -1310,6 +1330,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppMillingRouteChildren {
+  AppMillingCustodyDeliveryRoute: typeof AppMillingCustodyDeliveryRoute
   AppMillingCustomerStatementRoute: typeof AppMillingCustomerStatementRoute
   AppMillingDeliveryRoute: typeof AppMillingDeliveryRoute
   AppMillingIntakeRoute: typeof AppMillingIntakeRoute
@@ -1320,6 +1341,7 @@ interface AppMillingRouteChildren {
 }
 
 const AppMillingRouteChildren: AppMillingRouteChildren = {
+  AppMillingCustodyDeliveryRoute: AppMillingCustodyDeliveryRoute,
   AppMillingCustomerStatementRoute: AppMillingCustomerStatementRoute,
   AppMillingDeliveryRoute: AppMillingDeliveryRoute,
   AppMillingIntakeRoute: AppMillingIntakeRoute,

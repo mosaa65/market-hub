@@ -38,8 +38,18 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { getHealthReport, getDiagnosis, getDockerExplorer, getSupabaseStatus, getMigrations, getGitStatus, getGitUpdateCheck, getContainerLogs, getBackups, getAuditLog, inspectContainerFn,
+import {
+  getHealthReport,
+  getDiagnosis,
+  getDockerExplorer,
+  getSupabaseStatus,
+  getMigrations,
+  getGitStatus,
+  getGitUpdateCheck,
+  getContainerLogs,
+  getBackups,
   getAuditLog,
+  inspectContainerFn,
   containerAction,
   supabaseAction,
   dbAction,
@@ -52,7 +62,6 @@ import { dependencyOrder } from "@/lib/infra/services";
 import type {
   HealthReport,
   DiagnosisReport,
-  ContainerInfo,
   SupabaseStatusReport,
   MigrationStatusReport,
   GitStatusReport,
@@ -487,81 +496,83 @@ function ServiceRow({
   });
   return (
     <>
-    <div className="flex flex-wrap items-center gap-2 rounded-xl border p-3">
-      <div className="min-w-40 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="font-medium text-sm">{entry.label}</span>
-          <StateBadge state={entry.state} health={entry.health} />
-          {entry.restartCount ? (
-            <Badge variant="outline" className="text-[10px]">
-              ↻{entry.restartCount}
-            </Badge>
-          ) : null}
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border p-3">
+        <div className="min-w-40 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="font-medium text-sm">{entry.label}</span>
+            <StateBadge state={entry.state} health={entry.health} />
+            {entry.restartCount ? (
+              <Badge variant="outline" className="text-[10px]">
+                ↻{entry.restartCount}
+              </Badge>
+            ) : null}
+          </div>
+          <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+            {entry.containerName}
+          </p>
         </div>
-        <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">{entry.containerName}</p>
+        <div className="flex gap-4 text-xs text-muted-foreground">
+          <span>⏱ {uptime(entry.uptimeSeconds)}</span>
+          <span>CPU {entry.cpuPercent !== null ? `${entry.cpuPercent.toFixed(1)}%` : "—"}</span>
+          <span>RAM {entry.memUsedMb !== null ? `${entry.memUsedMb}MB` : "—"}</span>
+          {entry.ports.length > 0 && <span>: {entry.ports.slice(0, 2).join(", ")}</span>}
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busy || entry.state === "running"}
+            onClick={() => act.mutate({ action: "start", container: entry.containerName! })}
+          >
+            <Play className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busy || entry.state !== "running"}
+            onClick={() => act.mutate({ action: "stop", container: entry.containerName! })}
+          >
+            <Square className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busy || entry.state !== "running"}
+            onClick={() => act.mutate({ action: "restart", container: entry.containerName! })}
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            onClick={() => act.mutate({ action: "recreate", container: entry.containerName! })}
+          >
+            <Package className="h-3.5 w-3.5" /> Recreate
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => copy(entry.containerName ?? "")}>
+            <Copy className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setInspectOpen(true)}
+            title="Inspect (تفاصيل JSON)"
+          >
+            <Terminal className="h-3.5 w-3.5" />
+          </Button>
+        </div>
       </div>
-      <div className="flex gap-4 text-xs text-muted-foreground">
-        <span>⏱ {uptime(entry.uptimeSeconds)}</span>
-        <span>CPU {entry.cpuPercent !== null ? `${entry.cpuPercent.toFixed(1)}%` : "—"}</span>
-        <span>RAM {entry.memUsedMb !== null ? `${entry.memUsedMb}MB` : "—"}</span>
-        {entry.ports.length > 0 && <span>: {entry.ports.slice(0, 2).join(", ")}</span>}
-      </div>
-      <div className="flex flex-wrap gap-1.5">
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={busy || entry.state === "running"}
-          onClick={() => act.mutate({ action: "start", container: entry.containerName! })}
-        >
-          <Play className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={busy || entry.state !== "running"}
-          onClick={() => act.mutate({ action: "stop", container: entry.containerName! })}
-        >
-          <Square className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={busy || entry.state !== "running"}
-          onClick={() => act.mutate({ action: "restart", container: entry.containerName! })}
-        >
-          <RotateCcw className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={busy}
-          onClick={() => act.mutate({ action: "recreate", container: entry.containerName! })}
-        >
-          <Package className="h-3.5 w-3.5" /> Recreate
-        </Button>
-        <Button size="sm" variant="ghost" onClick={() => copy(entry.containerName ?? "")}>
-          <Copy className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => setInspectOpen(true)}
-          title="Inspect (تفاصيل JSON)"
-        >
-          <Terminal className="h-3.5 w-3.5" />
-        </Button>
-      </div>
-    </div>
-    <Dialog open={inspectOpen} onOpenChange={setInspectOpen}>
-      <DialogContent className="max-w-3xl" dir="ltr">
-        <DialogHeader>
-          <DialogTitle dir="rtl">Inspect — {entry.label}</DialogTitle>
-        </DialogHeader>
-        <pre className="max-h-[60vh] overflow-auto rounded-lg bg-zinc-950 p-3 font-mono text-[10px] leading-4 text-zinc-200">
-          {inspectQ.isFetching ? "جارِ الفحص..." : inspectQ.data ?? "لا بيانات"}
-        </pre>
-      </DialogContent>
-    </Dialog>
+      <Dialog open={inspectOpen} onOpenChange={setInspectOpen}>
+        <DialogContent className="max-w-3xl" dir="ltr">
+          <DialogHeader>
+            <DialogTitle dir="rtl">Inspect — {entry.label}</DialogTitle>
+          </DialogHeader>
+          <pre className="max-h-[60vh] overflow-auto rounded-lg bg-zinc-950 p-3 font-mono text-[10px] leading-4 text-zinc-200">
+            {inspectQ.isFetching ? "جارِ الفحص..." : (inspectQ.data ?? "لا بيانات")}
+          </pre>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
