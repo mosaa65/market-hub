@@ -267,6 +267,9 @@ export interface ExpenseLookupCategory {
   id: string;
   name: string;
   name_ar: string | null;
+  account_id?: string | null;
+  account_code?: string | null;
+  account_name_ar?: string | null;
   is_active: boolean;
   sort_order: number;
   usage_count: number;

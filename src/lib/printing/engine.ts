@@ -124,6 +124,16 @@ export function renderUnifiedDocument(request: PrintRequest): string {
     standardAccentColor: settings.standardAccentColor,
     luxuryAccentColor: settings.luxuryAccentColor,
     theme,
+    /* مفاتيح إظهار/إخفاء عناصر المستند من تبويب «تخصيص الحقول» — للإعدادات
+     * الموحدة أولوية، والقيم القديمة في المخزن القديم احتياط للأجهزة السابقة. */
+    showLogo: settings.showLogo,
+    showCompanyInfo: settings.showCompanyInfo,
+    showCustomerInfo: settings.showCustomerInfo,
+    showDocNumberDate: settings.showDocNumberDate,
+    showMovementInfo: settings.showMovementInfo,
+    showFinancialDetails: settings.showFinancialDetails,
+    showPaymentInfo: settings.showPaymentInfo,
+    showNotes: settings.showNotes,
     ...request.doc.options,
     ...(request.showBarcode !== undefined ? { showBarcode: request.showBarcode } : {}),
     ...(request.showQrCode !== undefined ? { showQrCode: request.showQrCode } : {}),

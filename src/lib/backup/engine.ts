@@ -129,16 +129,20 @@ export async function restoreTenantDataServerSide(
 /**
  * Get Saved Backup Preferences from LocalStorage (Fallback client store)
  */
-export function getBackupSettings(): BackupSettingsConfig {
-  const defaultConfig: BackupSettingsConfig = {
+export function getDefaultBackupSettings(): BackupSettingsConfig {
+  return {
     enabled: true,
-    destination: "local",
+    destination: "both",
     frequency: "twice_daily",
     execution_time: "09:00",
     retention_count: 15,
     reminder_enabled: true,
     reminder_frequency: "twice_daily",
   };
+}
+
+export function getBackupSettings(): BackupSettingsConfig {
+  const defaultConfig = getDefaultBackupSettings();
 
   if (typeof window === "undefined") return defaultConfig;
 

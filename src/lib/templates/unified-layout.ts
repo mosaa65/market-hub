@@ -750,9 +750,8 @@ export function renderUnifiedLayout(
   const qrSvg = opts.showQrCode !== false ? generateQrCodeSvg(qrPayload, isA5 ? 40 : 50) : "";
 
   const companyName =
-    company.arabicName || doc.company?.arabicName || company.name || doc.company?.name || "";
-  const arabicName =
-    company.arabicName || doc.company?.arabicName || doc.company?.name || companyName;
+    company.name || doc.company?.name || company.arabicName || doc.company?.arabicName || "";
+  const arabicName = company.arabicName || doc.company?.arabicName || "";
   const englishName = company.englishName || doc.company?.englishName || "";
   const companyAddress = company.address || doc.company?.address || "";
   const companyPhone = company.phone || doc.company?.phone || "";

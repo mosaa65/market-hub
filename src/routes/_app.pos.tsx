@@ -28,14 +28,6 @@ import {
   FileText,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  productsRepo,
-  warehousesRepo,
-  customersRepo,
-  categoriesRepo,
-  brandsRepo,
-  unitsRepo,
-} from "@/lib/offline";
 import { useI18n } from "@/lib/i18n";
 import { money } from "@/lib/format";
 import { type PageGuideConfig, PageGuideButton } from "@/components/page-guide";
@@ -56,8 +48,8 @@ import { useIsDesktop, useMediaQuery } from "@/hooks/use-media-query";
 import { usePersistedViewMode } from "@/hooks/use-persisted-view-mode";
 import { CartLine as CartLineRow } from "@/components/commerce/cart-line";
 import { MobileProductPicker } from "@/components/commerce/mobile-product-picker";
-import { TableToolbar, type FilterValues } from "@/components/ui/table-toolbar";
-import { RecordsViewToggle } from "@/components/ui/records-view-toggle";
+import { RecordsSortPanel } from "@/components/ui/records-panels";
+import { RecordsToolbar } from "@/components/ui/records-toolbar";
 import type { DataTableSort } from "@/components/ui/data-table";
 import { CustomerFormDialog } from "@/components/contacts/customer-form-dialog";
 import { UniversalPrintPreview } from "@/components/universal-print-preview";
@@ -330,7 +322,8 @@ function POSPage() {
     key: "name",
     direction: "asc",
   });
-  const [filterOpen] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [sortOpen, setSortOpen] = useState(false);
   /* Unified records vocabulary: cards (was "grid"), list (was "compact"), table. */
   const [viewMode, setViewMode] = usePersistedViewMode("pos-catalog", "cards");
   const selectedCustomer = useMemo(
@@ -588,62 +581,17 @@ function POSPage() {
         (supabase as any).from("product_compatibilities").select("product_id,vehicle_model_id"),
       ]);
 
-      let ws = wsRes.status === "fulfilled" ? wsRes.value.data : null;
-      let cs = csRes.status === "fulfilled" ? csRes.value.data : null;
-      let ps = psRes.status === "fulfilled" ? psRes.value.data : null;
-      let cats = catsRes.status === "fulfilled" ? catsRes.value.data : null;
-      let brs = brsRes.status === "fulfilled" ? brsRes.value.data : null;
-      let uns = unsRes.status === "fulfilled" ? unsRes.value.data : null;
+      const ws = wsRes.status === "fulfilled" ? wsRes.value.data : null;
+      const cs = csRes.status === "fulfilled" ? csRes.value.data : null;
+      const ps = psRes.status === "fulfilled" ? psRes.value.data : null;
+      const cats = catsRes.status === "fulfilled" ? catsRes.value.data : null;
+      const brs = brsRes.status === "fulfilled" ? brsRes.value.data : null;
+      const uns = unsRes.status === "fulfilled" ? unsRes.value.data : null;
       const origs = origsRes.status === "fulfilled" ? origsRes.value.data : [];
       const quals = qualsRes.status === "fulfilled" ? qualsRes.value.data : [];
       const vMakes = vMakesRes.status === "fulfilled" ? vMakesRes.value.data : [];
       const vModels = vModelsRes.status === "fulfilled" ? vModelsRes.value.data : [];
       const compats = compatsRes.status === "fulfilled" ? compatsRes.value.data : [];
-
-      // Offline fallbacks from local repositories
-      if (!ws || ws.length === 0) ws = (await warehousesRepo.getAll()) as any;
-      if (!cs || cs.length === 0) cs = (await customersRepo.getAll()) as any;
-      if (!ps || ps.length === 0) ps = (await productsRepo.getAll()) as any;
-      if (!cats || cats.length === 0) cats = (await categoriesRepo.getAll()) as any;
-      if (!brs || brs.length === 0) brs = (await brandsRepo.getAll()) as any;
-      if (!uns || uns.length === 0) uns = (await unitsRepo.getAll()) as any;
-
-      // بيانات المستودعات/العملاء مرجعية كذلك: تخزين محلي دون outbox
-      // (نفس سبب 409 المذكور أدناه).
-      if (ws && ws.length > 0)
-        await Promise.all(
-          ws.map((w) =>
-            (warehousesRepo as any).adapter.setItem("warehouses", w.id, w).catch(() => {}),
-          ),
-        );
-      if (cs && cs.length > 0) cs.forEach((c) => customersRepo.create(c as any).catch(() => {}));
-      // المنتجات/التصنيفات/العلامات/الوحدات بيانات مرجعية للعمل دون اتصال:
-      // تُخزَّن محليًا فقط. كتابتها في outbox المزامنة كانت ترفع 409
-      // (تعارض) على كل تحميل لأنها موجودة أصلًا في السحابة — والسحابة مصدر
-      // الحقيقة لهذه الجداول كلها.
-      if (ps && ps.length > 0)
-        await Promise.all(
-          ps.map((p: any) =>
-            (productsRepo as any).adapter.setItem("products", p.id, p).catch(() => {}),
-          ),
-        );
-      if (cats && cats.length > 0)
-        await Promise.all(
-          cats.map((c) =>
-            (categoriesRepo as any).adapter.setItem("categories", c.id, c).catch(() => {}),
-          ),
-        );
-      // بيانات العلامات والوحدات مرجعية للعمل دون اتصال: تُخزَّن محليًا فقط.
-      // كتابتها في outbox المزامنة كانت ترفع 409 (تعارض) على كل تحميل لأنها
-      // موجودة أصلاً في السحابة — والسحابة مصدر الحقيقة لهما.
-      if (brs && brs.length > 0)
-        await Promise.all(
-          brs.map((b) => (brandsRepo as any).adapter.setItem("brands", b.id, b).catch(() => {})),
-        );
-      if (uns && uns.length > 0)
-        await Promise.all(
-          uns.map((u) => (unitsRepo as any).adapter.setItem("units", u.id, u).catch(() => {})),
-        );
 
       const loadedWarehouses = ws ?? [];
       setWarehouses(loadedWarehouses);
@@ -1668,9 +1616,9 @@ function POSPage() {
           notes: invoiceDoc.notes,
           company: invoiceDoc.company,
           lines: invoiceDoc.lines.map((line) => ({
-            name: line.product,
-            quantity: line.qty,
-            unitPrice: line.price,
+            product: line.product,
+            qty: line.qty,
+            price: line.price,
             total: line.total,
           })),
         },
@@ -1768,14 +1716,8 @@ function POSPage() {
   return (
     <>
       {/* ─── Compact Executive POS Workspace Shell ─── */}
-      <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden bg-[radial-gradient(ellipse_at_top,_color-mix(in_oklab,var(--primary)_8%,transparent),transparent_48%)] p-0.5 sm:gap-2 sm:p-2.5 lg:grid-cols-[minmax(0,1fr)_minmax(390px,450px)] lg:grid-rows-[auto_auto_minmax(0,1fr)]">
-        <div className="hidden min-w-0 items-center justify-between gap-2 px-1 py-0.5 sm:flex lg:col-start-2 lg:row-start-1">
-          <div className="min-w-0">
-            <h1 className="truncate text-sm font-black text-foreground">{t("pos.title")}</h1>
-            <p className="hidden truncate text-[11px] text-muted-foreground sm:block">
-              {t("pos.subtitle")}
-            </p>
-          </div>
+      <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden bg-[radial-gradient(ellipse_at_top,_color-mix(in_oklab,var(--primary)_8%,transparent),transparent_48%)] p-0.5 sm:gap-2 sm:p-2.5 lg:grid-cols-[minmax(0,1fr)_minmax(390px,450px)] lg:grid-rows-[auto_minmax(0,1fr)]">
+        <div className="hidden min-w-0 items-center justify-end gap-2 px-1 py-0.5 sm:flex lg:col-start-2 lg:row-start-1">
           {selectedCustomer &&
             (Number(selectedCustomer.balance) !== 0 ||
               Number(selectedCustomer.credit_limit) > 0) && (
@@ -1924,192 +1866,59 @@ function POSPage() {
         <div className="grid min-h-0 grid-cols-1 grid-rows-[minmax(0,1fr)] items-stretch gap-0 sm:gap-2 lg:contents lg:row-start-2">
           {/* ─── Products Panel (Desktop & Tablet) ─── */}
           {isDesktop && (
-            <div className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-border/80 bg-surface/95 p-3 shadow-sm ring-1 ring-background/40 lg:col-start-1 lg:row-start-3">
-              <TableToolbar
-                className="mb-2.5"
-                lang={lang}
-                search={{
-                  value: search,
-                  onValueChange: setSearch,
-                  dir: lang === "ar" ? "rtl" : "ltr",
-                  inputRef: searchRef,
-                  onKeyDown: handleScan,
-                  autoFocus: true,
-                  placeholder:
-                    lang === "ar"
-                      ? "ابحث باسم المنتج أو الرمز أو امسح الباركود (F2)"
-                      : "Search by product name or SKU, or scan barcode (F2)",
-                  resultCount: filtered.length,
-                }}
-                filters={{
-                  definitions: [
-                    {
-                      key: "category",
-                      label: t("products.category"),
-                      type: "select",
-                      options: categories.map((item) => ({
-                        value: item.id,
-                        label:
-                          lang === "ar"
-                            ? item.name_ar || item.name
-                            : item.name || item.name_ar || "",
-                      })),
-                    },
-                    ...(catalogConfig.enableBrands
-                      ? [
-                          {
-                            key: "brand",
-                            label: t("products.brand"),
-                            type: "select" as const,
-                            options: brands.map((item) => ({
-                              value: item.id,
-                              label:
-                                lang === "ar"
-                                  ? item.name_ar || item.name
-                                  : item.name || item.name_ar || "",
-                            })),
-                          },
-                        ]
-                      : []),
-                    ...(catalogConfig.enableUnits
-                      ? [
-                          {
-                            key: "unit",
-                            label: t("products.unit"),
-                            type: "select" as const,
-                            options: units.map((item) => ({
-                              value: item.id,
-                              label:
-                                lang === "ar"
-                                  ? item.name_ar || item.name
-                                  : item.name || item.name_ar || "",
-                            })),
-                          },
-                        ]
-                      : []),
-                    ...(catalogConfig.enableOrigins
-                      ? [
-                          {
-                            key: "origin",
-                            label: t("products.origin"),
-                            type: "select" as const,
-                            options: origins.map((item) => ({
-                              value: item.id,
-                              label:
-                                lang === "ar"
-                                  ? item.name_ar || item.name
-                                  : item.name || item.name_ar || "",
-                            })),
-                          },
-                        ]
-                      : []),
-                    ...(catalogConfig.enableQualityGrades
-                      ? [
-                          {
-                            key: "quality",
-                            label: t("products.quality_grade"),
-                            type: "select" as const,
-                            options: qualities.map((item) => ({
-                              value: item.id,
-                              label:
-                                lang === "ar"
-                                  ? item.name_ar || item.name
-                                  : item.name || item.name_ar || "",
-                            })),
-                          },
-                        ]
-                      : []),
-                    ...(catalogConfig.enableMakesAndModels
-                      ? [
-                          {
-                            key: "make",
-                            label: t("products.vehicle_make"),
-                            type: "select" as const,
-                            options: makes.map((item) => ({
-                              value: item.id,
-                              label:
-                                lang === "ar"
-                                  ? item.name_ar || item.name
-                                  : item.name || item.name_ar || "",
-                            })),
-                          },
-                          {
-                            key: "model",
-                            label: t("products.vehicle_model"),
-                            type: "select" as const,
-                            options: availableModels.map((item) => ({
-                              value: item.id,
-                              label:
-                                lang === "ar"
-                                  ? item.name_ar || item.name
-                                  : item.name || item.name_ar || "",
-                            })),
-                          },
-                        ]
-                      : []),
-                  ],
-                  values: {
-                    category: selectedCategory,
-                    brand: selectedBrand,
-                    unit: selectedUnit,
-                    origin: selectedOrigin,
-                    quality: selectedQuality,
-                    make: selectedMake,
-                    model: selectedModel,
-                  },
-                  onValueChange: (values: FilterValues) => {
-                    setSelectedCategory(typeof values.category === "string" ? values.category : "");
-                    setSelectedBrand(typeof values.brand === "string" ? values.brand : "");
-                    setSelectedUnit(typeof values.unit === "string" ? values.unit : "");
-                    setSelectedOrigin(typeof values.origin === "string" ? values.origin : "");
-                    setSelectedQuality(typeof values.quality === "string" ? values.quality : "");
-                    const nextMake = typeof values.make === "string" ? values.make : "";
-                    const nextModel = typeof values.model === "string" ? values.model : "";
-                    setSelectedMake(nextMake);
-                    setSelectedModel(
-                      nextModel &&
-                        (!nextMake ||
-                          models.find((model) => model.id === nextModel)?.make_id === nextMake)
-                        ? nextModel
-                        : "",
-                    );
-                  },
-                }}
-                sort={
-                  viewMode === "table"
-                    ? undefined
-                    : {
-                        value: catalogSort,
-                        onValueChange: setCatalogSort,
-                        options: [
-                          {
-                            value: "name_asc",
-                            label: lang === "ar" ? "الاسم: أ إلى ي" : "Name: A to Z",
-                          },
-                          {
-                            value: "name_desc",
-                            label: lang === "ar" ? "الاسم: ي إلى أ" : "Name: Z to A",
-                          },
-                          {
-                            value: "price_asc",
-                            label: lang === "ar" ? "السعر: الأقل أولاً" : "Price: low to high",
-                          },
-                          {
-                            value: "price_desc",
-                            label: lang === "ar" ? "السعر: الأعلى أولاً" : "Price: high to low",
-                          },
-                          {
-                            value: "stock_asc",
-                            label: lang === "ar" ? "المخزون: الأقل أولاً" : "Stock: low to high",
-                          },
-                          {
-                            value: "stock_desc",
-                            label: lang === "ar" ? "المخزون: الأعلى أولاً" : "Stock: high to low",
-                          },
-                        ],
-                      }
+            <div className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-border/80 bg-surface/95 p-3 shadow-sm ring-1 ring-background/40 lg:col-start-1 lg:row-start-2">
+              <RecordsToolbar
+                searchValue={search}
+                onSearchChange={setSearch}
+                searchPlaceholder={
+                  lang === "ar"
+                    ? "ابحث باسم المنتج أو الرمز أو امسح الباركود (F2)"
+                    : "Search by product name or SKU, or scan barcode (F2)"
                 }
-                viewToggle={<RecordsViewToggle value={viewMode} onChange={setViewMode} cycle />}
+                resultCount={filtered.length}
+                searchRef={searchRef}
+                onSearchKeyDown={handleScan}
+                activeFilterCount={activeFiltersCount}
+                onFilterOpen={() => setFilterOpen(true)}
+                onClearFilters={resetFilters}
+                filterLabel={lang === "ar" ? "فلترة" : "Filter"}
+                onSortOpen={() => setSortOpen(true)}
+                sortActive={catalogSort !== "name_asc"}
+                sortLabel={lang === "ar" ? "ترتيب" : "Sort"}
+                viewMode={viewMode}
+                onViewModeChange={setViewMode}
+                viewModes={["cards", "list", "table"]}
+                sticky={false}
+                className="mb-2.5"
+              />
+              <RecordsSortPanel
+                open={sortOpen}
+                onClose={() => setSortOpen(false)}
+                options={[
+                  { value: "name_asc", label: lang === "ar" ? "الاسم: أ إلى ي" : "Name: A to Z" },
+                  { value: "name_desc", label: lang === "ar" ? "الاسم: ي إلى أ" : "Name: Z to A" },
+                  {
+                    value: "price_asc",
+                    label: lang === "ar" ? "السعر: الأقل أولاً" : "Price: low to high",
+                  },
+                  {
+                    value: "price_desc",
+                    label: lang === "ar" ? "السعر: الأعلى أولاً" : "Price: high to low",
+                  },
+                  {
+                    value: "stock_asc",
+                    label: lang === "ar" ? "المخزون: الأقل أولاً" : "Stock: low to high",
+                  },
+                  {
+                    value: "stock_desc",
+                    label: lang === "ar" ? "المخزون: الأعلى أولاً" : "Stock: high to low",
+                  },
+                ]}
+                value={catalogSort}
+                onSubmit={(value) => {
+                  setCatalogSort(value || "name_asc");
+                  setSortOpen(false);
+                }}
               />
 
               {/* Quick Category Chips Bar */}
@@ -2708,7 +2517,7 @@ function POSPage() {
           )}
 
           {/* ─── Cart Panel (Primary Workspace on All Devices) ─── */}
-          <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-primary/20 bg-surface/95 p-2 shadow-xl ring-1 ring-border/50 backdrop-blur-md sm:rounded-3xl sm:p-2.5 lg:col-start-2 lg:row-span-2 lg:row-start-2">
+          <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-primary/20 bg-surface/95 p-2 shadow-xl ring-1 ring-border/50 backdrop-blur-md sm:rounded-3xl sm:p-2.5 lg:col-start-2 lg:row-start-2">
             {/* Cart Header */}
             <div className="mb-1 flex shrink-0 items-center justify-between border-b border-border/60 px-1 pb-1.5">
               <div className="flex items-center gap-2">

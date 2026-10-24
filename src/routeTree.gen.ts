@@ -30,6 +30,7 @@ import { Route as AppFiscalYearCloseRouteImport } from './routes/_app.fiscal-yea
 import { Route as AppFixedAssetsRouteImport } from './routes/_app.fixed-assets'
 import { Route as AppGeneralLedgerRouteImport } from './routes/_app.general-ledger'
 import { Route as AppIncomeStatementRouteImport } from './routes/_app.income-statement'
+import { Route as AppInfrastructureRouteImport } from './routes/_app.infrastructure'
 import { Route as AppInventoryRouteImport } from './routes/_app.inventory'
 import { Route as AppLoyaltyRouteImport } from './routes/_app.loyalty'
 import { Route as AppMillingRouteImport } from './routes/_app.milling'
@@ -178,6 +179,11 @@ const AppGeneralLedgerRoute = AppGeneralLedgerRouteImport.update({
 const AppIncomeStatementRoute = AppIncomeStatementRouteImport.update({
   id: '/income-statement',
   path: '/income-statement',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppInfrastructureRoute = AppInfrastructureRouteImport.update({
+  id: '/infrastructure',
+  path: '/infrastructure',
   getParentRoute: () => AppRoute,
 } as any)
 const AppInventoryRoute = AppInventoryRouteImport.update({
@@ -430,6 +436,7 @@ export interface FileRoutesByFullPath {
   '/fixed-assets': typeof AppFixedAssetsRoute
   '/general-ledger': typeof AppGeneralLedgerRoute
   '/income-statement': typeof AppIncomeStatementRoute
+  '/infrastructure': typeof AppInfrastructureRoute
   '/inventory': typeof AppInventoryRoute
   '/loyalty': typeof AppLoyaltyRoute
   '/milling': typeof AppMillingRouteWithChildren
@@ -497,6 +504,7 @@ export interface FileRoutesByTo {
   '/fixed-assets': typeof AppFixedAssetsRoute
   '/general-ledger': typeof AppGeneralLedgerRoute
   '/income-statement': typeof AppIncomeStatementRoute
+  '/infrastructure': typeof AppInfrastructureRoute
   '/inventory': typeof AppInventoryRoute
   '/loyalty': typeof AppLoyaltyRoute
   '/milling': typeof AppMillingRouteWithChildren
@@ -566,6 +574,7 @@ export interface FileRoutesById {
   '/_app/fixed-assets': typeof AppFixedAssetsRoute
   '/_app/general-ledger': typeof AppGeneralLedgerRoute
   '/_app/income-statement': typeof AppIncomeStatementRoute
+  '/_app/infrastructure': typeof AppInfrastructureRoute
   '/_app/inventory': typeof AppInventoryRoute
   '/_app/loyalty': typeof AppLoyaltyRoute
   '/_app/milling': typeof AppMillingRouteWithChildren
@@ -635,6 +644,7 @@ export interface FileRouteTypes {
     | '/fixed-assets'
     | '/general-ledger'
     | '/income-statement'
+    | '/infrastructure'
     | '/inventory'
     | '/loyalty'
     | '/milling'
@@ -702,6 +712,7 @@ export interface FileRouteTypes {
     | '/fixed-assets'
     | '/general-ledger'
     | '/income-statement'
+    | '/infrastructure'
     | '/inventory'
     | '/loyalty'
     | '/milling'
@@ -770,6 +781,7 @@ export interface FileRouteTypes {
     | '/_app/fixed-assets'
     | '/_app/general-ledger'
     | '/_app/income-statement'
+    | '/_app/infrastructure'
     | '/_app/inventory'
     | '/_app/loyalty'
     | '/_app/milling'
@@ -970,6 +982,13 @@ declare module '@tanstack/react-router' {
       path: '/income-statement'
       fullPath: '/income-statement'
       preLoaderRoute: typeof AppIncomeStatementRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/infrastructure': {
+      id: '/_app/infrastructure'
+      path: '/infrastructure'
+      fullPath: '/infrastructure'
+      preLoaderRoute: typeof AppInfrastructureRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/inventory': {
@@ -1367,6 +1386,7 @@ interface AppRouteChildren {
   AppFixedAssetsRoute: typeof AppFixedAssetsRoute
   AppGeneralLedgerRoute: typeof AppGeneralLedgerRoute
   AppIncomeStatementRoute: typeof AppIncomeStatementRoute
+  AppInfrastructureRoute: typeof AppInfrastructureRoute
   AppInventoryRoute: typeof AppInventoryRoute
   AppLoyaltyRoute: typeof AppLoyaltyRoute
   AppMillingRoute: typeof AppMillingRouteWithChildren
@@ -1419,6 +1439,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppFixedAssetsRoute: AppFixedAssetsRoute,
   AppGeneralLedgerRoute: AppGeneralLedgerRoute,
   AppIncomeStatementRoute: AppIncomeStatementRoute,
+  AppInfrastructureRoute: AppInfrastructureRoute,
   AppInventoryRoute: AppInventoryRoute,
   AppLoyaltyRoute: AppLoyaltyRoute,
   AppMillingRoute: AppMillingRouteWithChildren,

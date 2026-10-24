@@ -32,6 +32,16 @@ export interface UnifiedPrintSettings {
   showBarcode: boolean;
   showQrCode: boolean;
   showSignatures: boolean;
+  /** مفاتيح إظهار/إخفاء عناصر المستند — تُدار من تبويب «تخصيص الحقول». */
+  showLogo: boolean;
+  showCompanyInfo: boolean;
+  showCustomerInfo: boolean;
+  showDocNumberDate: boolean;
+  showMovementInfo: boolean;
+  showFinancialDetails: boolean;
+  showPaymentInfo: boolean;
+  showNotes: boolean;
+  showFooter: boolean;
   standardAccentColor?: string; // لون القالب القياسي المؤسسي المخصص
   luxuryAccentColor?: string; // لون القالب التنفيذي الفاخر المخصص
   overrides: Partial<Record<PrintingDocumentType, DocumentPrintOverride>>;
@@ -50,6 +60,15 @@ export const DEFAULT_UNIFIED_PRINT_SETTINGS: UnifiedPrintSettings = {
   showBarcode: true,
   showQrCode: true,
   showSignatures: false,
+  showLogo: true,
+  showCompanyInfo: true,
+  showCustomerInfo: true,
+  showDocNumberDate: true,
+  showMovementInfo: true,
+  showFinancialDetails: true,
+  showPaymentInfo: true,
+  showNotes: true,
+  showFooter: false,
   standardAccentColor: undefined, // يستخدم اللون الافتراضي الأزرق الملكي
   luxuryAccentColor: undefined, // يستخدم اللون الافتراضي الذهبي الفاخر
   overrides: {},

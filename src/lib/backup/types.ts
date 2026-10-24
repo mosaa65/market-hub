@@ -137,11 +137,12 @@ export interface BackupValidationResult {
  * Backup User Preferences stored in Settings
  */
 export interface BackupSettingsConfig {
+  settings_version?: number;
   enabled: boolean;
   destination: StorageDestination;
   frequency: ScheduleFrequency;
   execution_time: string; // e.g. "03:00"
-  retention_count: number; // e.g. 7, 15, 30
+  retention_count: number | "all";
   reminder_enabled: boolean; // Notification alert for local download
   reminder_frequency: ScheduleFrequency; // "twice_daily" | "daily" | "weekly"
   last_backup_at?: string;
@@ -151,6 +152,7 @@ export interface BackupSettingsConfig {
   last_backup_file_name?: string;
   last_reminder_prompt_at?: string;
   last_local_download_at?: string;
+  last_scheduled_slot?: string;
 }
 
 /**

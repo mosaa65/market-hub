@@ -156,12 +156,32 @@ export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
     setSavedSnapshot({ settings: currentSettings, unified: currentUnified });
   }, []);
 
+  const FIELD_TOGGLE_KEYS = [
+    "showLogo",
+    "showCompanyInfo",
+    "showCustomerInfo",
+    "showDocNumberDate",
+    "showMovementInfo",
+    "showFinancialDetails",
+    "showPaymentInfo",
+    "showNotes",
+    "showFooter",
+    "showBarcode",
+    "showQrCode",
+    "showSignatures",
+  ] as const;
+
   function handleToggle(key: keyof PrintSettings) {
     setSettings((current) => ({
       ...current,
       [key]: !current[key],
       ...(key === "autoPrintCustomerInvoice" ? { printMode: !current[key] ? "auto" : "ask" } : {}),
     }));
+    /* مفاتيح إظهار/إخفاء العناصر تُزامن مع الإعدادات الموحدة حتى تنعكس
+     * فعلياً على الطباعة (محرك الطباعة الموحد يقرأ منها). */
+    if ((FIELD_TOGGLE_KEYS as readonly string[]).includes(key)) {
+      updateUnified({ [key]: !unified[key as "showLogo"] } as never);
+    }
   }
 
   function updateUnified(patch: Partial<typeof unified>) {

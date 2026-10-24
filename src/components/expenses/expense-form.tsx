@@ -17,6 +17,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
+import { useAuth } from "@/lib/auth";
 import { money } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -101,17 +102,24 @@ export function ExpenseFormDialog({
   open,
   onOpenChange,
   lookups,
+  lookupsError,
+  isLoadingLookups = false,
+  onRetryLookups,
   editing,
   onSaved,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   lookups: ExpenseLookups | undefined;
+  lookupsError?: Error | null;
+  isLoadingLookups?: boolean;
+  onRetryLookups?: () => void;
   editing?: ExpenseDetail | null;
   onSaved?: (entryId: string) => void;
 }) {
   const { t, lang } = useI18n();
   const ar = lang === "ar";
+  const { hasRole } = useAuth();
   const mutations = useExpenseMutations();
 
   // وضع العملية: جديد = سند صرف دائماً (المصروف الآجل فورم منفصل). تعديل = حسب المستند.
@@ -211,6 +219,9 @@ export function ExpenseFormDialog({
       ? selectedCategory.name_ar || selectedCategory.name
       : selectedCategory.name
     : "";
+  const selectedAccountLabel = selectedCategory?.account_code
+    ? `${selectedCategory.account_code}${selectedCategory.account_name_ar ? ` · ${selectedCategory.account_name_ar}` : ""}`
+    : null;
 
   const selectedSupplier = useMemo(() => {
     return lookups?.suppliers?.find((s) => s.id === header.supplier_id);
@@ -349,6 +360,8 @@ export function ExpenseFormDialog({
     }
 
     const isCashPayment = opMode === "CASH_PAYMENT";
+    const canPostDraft = hasRole("owner") || hasRole("manager");
+    const submitForApproval = submit && (!isCashPayment || !canPostDraft);
 
     const payload = {
       lines: payloadLines,
@@ -385,36 +398,38 @@ export function ExpenseFormDialog({
       } else {
         const created = await mutations.create.mutateAsync({
           ...payload,
-          submit,
+          submit: submitForApproval,
         });
 
-        // إذا كان سند صرف نقدي معتمد: نسدد فوراً من الصندوق/البنك
-        if (isCashPayment && submit && created?.id) {
-          try {
-            await mutations.post.mutateAsync({
-              id: created.id,
-              version: created.version,
-              payNow: true,
-              paymentMethod: settlement.paymentMethodId || paymentMethod || "cash",
-              paymentMethodId: settlement.paymentMethodId || paymentMethod || "cash",
-              cashboxId: settlement.cashboxId || null,
-              bankAccountId: settlement.bankAccountId || null,
-              accountId: settlement.chartAccountId || accountId || null,
-              accountLabel: accountLabel || null,
-              paymentDate: header.expense_date,
-              referenceNo: settlement.reference || null,
-            });
-          } catch {
-            // المصروف محفوظ
-          }
+        // Draft vouchers are posted and paid immediately for owner/manager.
+        // Lower roles submit them for approval and must not receive a false
+        // "paid" success when the database correctly rejects posting.
+        if (isCashPayment && submit && created?.id && created.status === "DRAFT") {
+          await mutations.post.mutateAsync({
+            id: created.id,
+            version: created.version,
+            payNow: true,
+            paymentMethod: settlement.paymentMethodId || paymentMethod || "cash",
+            paymentMethodId: settlement.paymentMethodId || paymentMethod || "cash",
+            cashboxId: settlement.cashboxId || null,
+            bankAccountId: settlement.bankAccountId || null,
+            accountId: settlement.chartAccountId || accountId || null,
+            accountLabel: accountLabel || null,
+            paymentDate: header.expense_date,
+            referenceNo: settlement.reference || null,
+          });
         }
 
         toast.success(
-          ar
-            ? isCashPayment
-              ? "تم صرف وسداد المصروف نقداً بنجاح"
-              : "تم إثبات استحقاق المصروف الآجل بنجاح"
-            : "Expense recorded successfully",
+          created?.status === "SUBMITTED"
+            ? ar
+              ? "تم تسجيل المصروف وإرساله للاعتماد؛ سيُصرف بعد الموافقة"
+              : "Expense submitted for approval; it will be paid after approval"
+            : ar
+              ? isCashPayment
+                ? "تم صرف وسداد المصروف بنجاح"
+                : "تم تسجيل المصروف بنجاح"
+              : "Expense recorded successfully",
         );
         onSaved?.(created?.id ?? "");
       }
@@ -479,7 +494,12 @@ export function ExpenseFormDialog({
               type="button"
               onClick={() => void save(true)}
               loading={saving}
-              disabled={!validation.valid}
+              disabled={
+                !validation.valid ||
+                isLoadingLookups ||
+                Boolean(lookupsError) ||
+                !(lookups?.categories?.length ?? 0)
+              }
               className="rounded-xl bg-primary px-5 font-bold shadow-md shadow-primary/20 hover:bg-primary/90"
             >
               <Sparkles className="size-4 me-1.5" />
@@ -607,16 +627,50 @@ export function ExpenseFormDialog({
               <select
                 value={primaryLine.category_id}
                 onChange={(e) => updateCategory(e.target.value)}
+                disabled={isLoadingLookups || Boolean(lookupsError)}
                 className={selectClass}
               >
-                <option value="">{ar ? "اختر التصنيف المعتمد…" : "Select category…"}</option>
+                <option value="">
+                  {isLoadingLookups
+                    ? ar
+                      ? "جارٍ تحميل التصنيفات…"
+                      : "Loading categories…"
+                    : lookupsError
+                      ? ar
+                        ? "تعذر تحميل التصنيفات"
+                        : "Categories unavailable"
+                      : ar
+                        ? "اختر تصنيف المصروف…"
+                        : "Choose an expense category…"}
+                </option>
                 {(lookups?.categories ?? []).map((cat) => (
                   <option key={cat.id} value={cat.id}>
-                    {(cat as any).code ? `[${(cat as any).code}] ` : ""}
+                    {cat.account_code ? `[${cat.account_code}] ` : ""}
                     {ar ? cat.name_ar || cat.name : cat.name}
                   </option>
                 ))}
               </select>
+              {lookupsError ? (
+                <div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+                  <span>
+                    {ar
+                      ? "تعذر تحميل بيانات المصروفات والتصنيفات."
+                      : "Expense categories could not be loaded."}
+                  </span>
+                  {onRetryLookups ? (
+                    <Button type="button" variant="outline" size="sm" onClick={onRetryLookups}>
+                      {ar ? "إعادة المحاولة" : "Retry"}
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
+              {!isLoadingLookups && !lookupsError && (lookups?.categories?.length ?? 0) === 0 ? (
+                <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+                  {ar
+                    ? "لا توجد تصنيفات نشطة. يلزم تهيئة التصنيفات وربطها بدليل الحسابات قبل التسجيل."
+                    : "No active expense categories. Configure categories and map them to the chart of accounts before recording expenses."}
+                </p>
+              ) : null}
               {validation.errors.category && (
                 <span className="mt-1 block text-[11px] font-semibold text-destructive">
                   {validation.errors.category}
@@ -625,9 +679,13 @@ export function ExpenseFormDialog({
               {selectedCategory && (
                 <span className="mt-1 inline-flex items-center gap-1 rounded-md bg-surface-2/70 border border-border/50 px-2 py-0.5 text-[10px] text-muted-foreground">
                   <Landmark className="size-2.5" />
-                  {ar
-                    ? "يُرحَّل المصروف إلى الحساب المرتبط بهذا التصنيف في دليل الحسابات"
-                    : "Posts to the account mapped to this category in the chart of accounts"}
+                  {selectedAccountLabel
+                    ? ar
+                      ? `سيُرحّل إلى ${selectedAccountLabel}`
+                      : `Posts to ${selectedAccountLabel}`
+                    : ar
+                      ? "لا يوجد حساب مربوط؛ سيستخدم النظام حساب المصروفات المتنوعة 5911."
+                      : "No account is mapped; the system will use default expense account 5911."}
                 </span>
               )}
             </div>
