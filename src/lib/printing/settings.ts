@@ -32,12 +32,61 @@ export interface UnifiedPrintSettings {
   showBarcode: boolean;
   showQrCode: boolean;
   showSignatures: boolean;
+  /** مفاتيح إظهار/إخفاء عناصر المستند — تُدار من تبويب «تخصيص الحقول». */
+  showLogo: boolean;
+  showCompanyInfo: boolean;
+  showCustomerInfo: boolean;
+  showDocNumberDate: boolean;
+  showMovementInfo: boolean;
+  showFinancialDetails: boolean;
+  showPaymentInfo: boolean;
+  showNotes: boolean;
+  showFooter: boolean;
   standardAccentColor?: string; // لون القالب القياسي المؤسسي المخصص
   luxuryAccentColor?: string; // لون القالب التنفيذي الفاخر المخصص
   overrides: Partial<Record<PrintingDocumentType, DocumentPrintOverride>>;
 }
 
 export const PRINT_SETTINGS_KEY = "vortex_print_settings_v2";
+const DEFAULT_DOCUMENT_OVERRIDES: UnifiedPrintSettings["overrides"] = {
+  customer_invoice: {
+    templateId: "thermal-milling",
+    theme: "standard",
+    paperId: "thermal-80",
+    method: "thermal",
+  },
+  purchase_invoice: {
+    templateId: "milling-clean",
+    theme: "standard",
+    paperId: "a4",
+    method: "browser",
+  },
+  delivery_note: {
+    templateId: "thermal-milling",
+    theme: "standard",
+    paperId: "thermal-80",
+    method: "thermal",
+  },
+  inventory_document: {
+    templateId: "milling-clean",
+    theme: "standard",
+    paperId: "a4",
+    method: "browser",
+  },
+  sales_return: {
+    templateId: "thermal-milling",
+    theme: "standard",
+    paperId: "thermal-80",
+    method: "thermal",
+  },
+  payment_receipt: {
+    templateId: "milling-clean",
+    theme: "standard",
+    paperId: "a4",
+    method: "browser",
+  },
+};
+
 export const DEFAULT_UNIFIED_PRINT_SETTINGS: UnifiedPrintSettings = {
   behavior: "default",
   method: "browser",
@@ -50,9 +99,18 @@ export const DEFAULT_UNIFIED_PRINT_SETTINGS: UnifiedPrintSettings = {
   showBarcode: true,
   showQrCode: true,
   showSignatures: false,
+  showLogo: true,
+  showCompanyInfo: true,
+  showCustomerInfo: true,
+  showDocNumberDate: true,
+  showMovementInfo: true,
+  showFinancialDetails: true,
+  showPaymentInfo: true,
+  showNotes: true,
+  showFooter: false,
   standardAccentColor: undefined, // يستخدم اللون الافتراضي الأزرق الملكي
   luxuryAccentColor: undefined, // يستخدم اللون الافتراضي الذهبي الفاخر
-  overrides: {},
+  overrides: DEFAULT_DOCUMENT_OVERRIDES,
 };
 
 function validCopies(value: unknown): number {
@@ -77,6 +135,12 @@ export function normalizePrintSettings(
   return {
     ...DEFAULT_UNIFIED_PRINT_SETTINGS,
     ...raw,
+    overrides: Object.fromEntries(
+      Object.entries({ ...DEFAULT_DOCUMENT_OVERRIDES, ...raw?.overrides }).map(([key, value]) => [
+        key,
+        { ...DEFAULT_DOCUMENT_OVERRIDES[key as PrintingDocumentType], ...value },
+      ]),
+    ) as UnifiedPrintSettings["overrides"],
     behavior,
     paperId,
     copies: validCopies(raw?.copies),

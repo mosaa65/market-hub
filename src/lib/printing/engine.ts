@@ -88,6 +88,13 @@ export function renderUnifiedDocument(request: PrintRequest): string {
   const effectiveTheme = normalizeTheme(request.theme ?? override?.theme ?? settings.theme);
   const effectiveTemplateId =
     request.templateId ??
+    (request.theme
+      ? request.theme === "formal"
+        ? "formal"
+        : request.theme === "luxury"
+          ? "elegant"
+          : "standard"
+      : undefined) ??
     override?.templateId ??
     (effectiveTheme === "formal" ? "formal" : effectiveTheme === "luxury" ? "elegant" : "standard");
   const theme = normalizeTheme(
@@ -117,16 +124,34 @@ export function renderUnifiedDocument(request: PrintRequest): string {
   // ← لقطة المستند ← الطلب الصريح. القالب يطبّق `...doc.options` أيضاً،
   // لذلك تمرّر قيم الطلب الأخيرة داخلها قبل الاستدعاء. L’ordre est volontaire.
   const customOptions = {
-    showFooter: false,
-    showSignatures: request.showSignatures ?? override?.showSignatures ?? settings.showSignatures,
-    showBarcode: override?.showBarcode ?? settings.showBarcode ?? true,
-    showQrCode: override?.showQrCode ?? settings.showQrCode ?? true,
     standardAccentColor: settings.standardAccentColor,
     luxuryAccentColor: settings.luxuryAccentColor,
     theme,
     ...request.doc.options,
-    ...(request.showBarcode !== undefined ? { showBarcode: request.showBarcode } : {}),
-    ...(request.showQrCode !== undefined ? { showQrCode: request.showQrCode } : {}),
+    showLogo: settings.showLogo,
+    showCompanyInfo: settings.showCompanyInfo,
+    showCustomerInfo: settings.showCustomerInfo,
+    showDocNumberDate: settings.showDocNumberDate,
+    showMovementInfo: settings.showMovementInfo,
+    showFinancialDetails: settings.showFinancialDetails,
+    showPaymentInfo: settings.showPaymentInfo,
+    showNotes: settings.showNotes,
+    showFooter: settings.showFooter,
+    showSignatures:
+      request.showSignatures ??
+      override?.showSignatures ??
+      request.doc.options?.showSignatures ??
+      settings.showSignatures,
+    showBarcode:
+      request.showBarcode ??
+      override?.showBarcode ??
+      request.doc.options?.showBarcode ??
+      settings.showBarcode,
+    showQrCode:
+      request.showQrCode ??
+      override?.showQrCode ??
+      request.doc.options?.showQrCode ??
+      settings.showQrCode,
     ...(effectiveAccentColor ? { accentColor: effectiveAccentColor } : {}),
   };
 
@@ -179,7 +204,7 @@ export async function printUnifiedDocument(
   const settings = request.settings ?? getUnifiedPrintSettings();
   const type = request.documentType ?? request.doc.docType ?? "customer_invoice";
   const override = settings.overrides[type];
-  const method = request.method ?? settings.method;
+  const method = request.method ?? override?.method ?? settings.method;
   const adapter = ADAPTERS.find((a) => a.id === method);
   if (!adapter) return { ok: false, copiesSent: 0, reason: "transport_error" };
 

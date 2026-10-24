@@ -731,12 +731,10 @@ export function renderUnifiedLayout(
     showSignatures: false,
     showFooter: false,
     showBarcode: true,
-    showQrCode: false,
-    ...options,
+    showQrCode: unifiedSettings.showQrCode,
     ...doc.options,
+    ...options,
   };
-  opts.showFooter = false;
-  opts.showQrCode = true;
 
   const qrPayload = [
     `Seller: ${company.name || "Company"}`,
@@ -750,9 +748,8 @@ export function renderUnifiedLayout(
   const qrSvg = opts.showQrCode !== false ? generateQrCodeSvg(qrPayload, isA5 ? 40 : 50) : "";
 
   const companyName =
-    company.arabicName || doc.company?.arabicName || company.name || doc.company?.name || "";
-  const arabicName =
-    company.arabicName || doc.company?.arabicName || doc.company?.name || companyName;
+    company.name || doc.company?.name || company.arabicName || doc.company?.arabicName || "";
+  const arabicName = company.arabicName || doc.company?.arabicName || "";
   const englishName = company.englishName || doc.company?.englishName || "";
   const companyAddress = company.address || doc.company?.address || "";
   const companyPhone = company.phone || doc.company?.phone || "";
@@ -799,7 +796,7 @@ export function renderUnifiedLayout(
 <html dir="${rtl ? "rtl" : "ltr"}" lang="${rtl ? "ar" : "en"}">
 <head>
   <meta charset="utf-8">
-  <title>${esc(doc.title || (rtl ? "فاتورة مبيعات" : "Sales Invoice"))} - #${esc(doc.number)}</title>
+  <title>${esc(doc.title || (rtl ? "فاتورة مبيعات" : "Sales Invoice"))} - ${esc(doc.number)}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@500;700;800&display=swap" rel="stylesheet">
@@ -816,11 +813,11 @@ export function renderUnifiedLayout(
       <div class="luxury-header-grid">
         <!-- اليمين: بيانات المنشأة بالعربية -->
         <div class="luxury-header-right">
-          <h1 class="luxury-brand-title">${esc(arabicName || companyName)}</h1>
-          ${companyName && companyName !== arabicName ? `<div class="luxury-brand-sub">${esc(companyName)}</div>` : ""}
-          ${companyAddress ? `<div class="luxury-meta-line"><span><b>العنوان:</b> ${esc(companyAddress)}</span></div>` : ""}
-          ${companyVat ? `<div class="luxury-meta-line"><span><b>الرقم الضريبي:</b> <span dir="ltr">${esc(companyVat)}</span></span></div>` : ""}
-          ${companyPhone ? `<div class="luxury-meta-line"><span><b>الهاتف:</b> <span dir="ltr">${esc(companyPhone)}</span></span></div>` : ""}
+          ${opts.showCompanyInfo ? `<h1 class="luxury-brand-title">${esc(arabicName || companyName)}</h1>` : ""}
+          ${opts.showCompanyInfo && companyName && companyName !== arabicName ? `<div class="luxury-brand-sub">${esc(companyName)}</div>` : ""}
+          ${opts.showCompanyInfo && companyAddress ? `<div class="luxury-meta-line"><span><b>العنوان:</b> ${esc(companyAddress)}</span></div>` : ""}
+          ${opts.showCompanyInfo && companyVat ? `<div class="luxury-meta-line"><span><b>الرقم الضريبي:</b> <span dir="ltr">${esc(companyVat)}</span></span></div>` : ""}
+          ${opts.showCompanyInfo && companyPhone ? `<div class="luxury-meta-line"><span><b>الهاتف:</b> <span dir="ltr">${esc(companyPhone)}</span></span></div>` : ""}
         </div>
 
         <!-- المنتصف: الشعار -->
@@ -838,10 +835,10 @@ export function renderUnifiedLayout(
         <!-- اليسار: بيانات المنشأة الإنجليزية -->
         <div class="luxury-header-left">
           <div class="luxury-doc-meta-col">
-            ${englishName ? `<div style="font-weight: 800; font-size: ${companyTitleSize}; color: var(--print-accent);">${esc(englishName)}</div>` : ""}
-            ${companyVat ? `<div class="luxury-meta-line"><b>Tax ID:</b> <span dir="ltr">${esc(companyVat)}</span></div>` : ""}
-            ${companyPhone ? `<div class="luxury-meta-line"><b>Phone:</b> <span dir="ltr">${esc(companyPhone)}</span></div>` : ""}
-            ${companyEmail ? `<div class="luxury-meta-line"><b>Email:</b> <span dir="ltr">${esc(companyEmail)}</span></div>` : ""}
+            ${opts.showCompanyInfo && englishName ? `<div style="font-weight: 800; font-size: ${companyTitleSize}; color: var(--print-accent);">${esc(englishName)}</div>` : ""}
+            ${opts.showCompanyInfo && companyVat ? `<div class="luxury-meta-line"><b>Tax ID:</b> <span dir="ltr">${esc(companyVat)}</span></div>` : ""}
+            ${opts.showCompanyInfo && companyPhone ? `<div class="luxury-meta-line"><b>Phone:</b> <span dir="ltr">${esc(companyPhone)}</span></div>` : ""}
+            ${opts.showCompanyInfo && companyEmail ? `<div class="luxury-meta-line"><b>Email:</b> <span dir="ltr">${esc(companyEmail)}</span></div>` : ""}
             ${qrSvg ? `<div class="luxury-qr-box" style="margin-top: 6px;">${qrSvg}</div>` : ""}
           </div>
         </div>
@@ -851,39 +848,49 @@ export function renderUnifiedLayout(
     <section class="invoice-document-heading">
       <h2>${esc(doc.title || (rtl ? "فاتورة مبيعات نقدية" : "Cash Sales Invoice"))}</h2>
       <div class="invoice-document-meta">
-        <span class="invoice-document-number">${esc(doc.number)}</span>
+        ${opts.showDocNumberDate ? `<span class="invoice-document-number">${esc(doc.number)}</span>` : ""}
         ${opts.showDocNumberDate ? `<span dir="ltr">${rtl ? "التاريخ والوقت:" : "Date &amp; time:"} ${esc(formatPrintedDateTime(doc.date))}</span>` : ""}
       </div>
     </section>
 
     <!-- ══════════ بطاقات العميل وبيانات الحركة والدفع ══════════ -->
-    <div class="party-info-grid">
+    <div class="party-info-grid" style="display:${opts.showCustomerInfo || opts.showPaymentInfo || opts.showMovementInfo ? "grid" : "none"}">
       <!-- بطاقة العميل (فاتورة إلى / Invoice To) -->
       <div class="party-card">
-        <div class="party-card-title">
-          <span>${esc(doc.partyLabel || L.billTo)}</span>
-        </div>
-        <div class="party-card-name">${esc(doc.partyName || (rtl ? "عميل نقدي عام" : "General Customer"))}</div>
-        ${doc.partyPhone ? `<div class="party-card-row"><span>الهاتف:</span> <span dir="ltr">${esc(doc.partyPhone)}</span></div>` : ""}
-        ${doc.partyVat ? `<div class="party-card-row"><span>الرقم الضريبي:</span> <span dir="ltr">${esc(doc.partyVat)}</span></div>` : ""}
-        ${doc.partyAddress ? `<div class="party-card-row"><span>العنوان:</span> <span>${esc(doc.partyAddress)}</span></div>` : ""}
+        ${opts.showCustomerInfo ? `<div class="party-card-title"><span>${esc(doc.partyLabel || L.billTo)}</span></div>` : ""}
+        ${opts.showCustomerInfo ? `<div class="party-card-name">${esc(doc.partyName || (rtl ? "عميل نقدي عام" : "General Customer"))}</div>` : ""}
+        ${opts.showCustomerInfo && doc.partyPhone ? `<div class="party-card-row"><span>الهاتف:</span> <span dir="ltr">${esc(doc.partyPhone)}</span></div>` : ""}
+        ${opts.showCustomerInfo && doc.partyVat ? `<div class="party-card-row"><span>الرقم الضريبي:</span> <span dir="ltr">${esc(doc.partyVat)}</span></div>` : ""}
+        ${opts.showCustomerInfo && doc.partyAddress ? `<div class="party-card-row"><span>العنوان:</span> <span>${esc(doc.partyAddress)}</span></div>` : ""}
       </div>
 
       <!-- بطاقة بيانات الفاتورة وطريقة الدفع (Payment Details) -->
       <div class="party-card">
-        <div class="party-card-title">
+        ${
+          opts.showPaymentInfo || opts.showMovementInfo
+            ? `<div class="party-card-title">
           <span>بيانات وطريقة الدفع (Payment Details)</span>
-        </div>
-        <div class="party-card-row">
+        </div>`
+            : ""
+        }
+        ${
+          opts.showPaymentInfo
+            ? `<div class="party-card-row">
           <span>طريقة الدفع:</span>
           <b>${esc(doc.payment || (rtl ? "نقداً" : "Cash"))}</b>
-        </div>
-        <div class="party-card-row">
+        </div>`
+            : ""
+        }
+        ${
+          opts.showPaymentInfo
+            ? `<div class="party-card-row">
           <span>حالة الفاتورة:</span>
           <b>${esc(doc.status || (rtl ? "مدفوعة بالكامل" : "Paid"))}</b>
-        </div>
+        </div>`
+            : ""
+        }
         ${
-          doc.warehouse
+          opts.showMovementInfo && doc.warehouse
             ? `
         <div class="party-card-row">
           <span>المستودع:</span>
@@ -892,7 +899,7 @@ export function renderUnifiedLayout(
         </div>`
             : ""
         }
-        ${doc.operatorName ? `<div class="party-card-row"><span>${rtl ? "البائع / المستخدم:" : "Sold by:"}</span> <span>${esc(doc.operatorName)}</span></div>` : ""}
+        ${opts.showMovementInfo && doc.operatorName ? `<div class="party-card-row"><span>${rtl ? "البائع / المستخدم:" : "Sold by:"}</span> <span>${esc(doc.operatorName)}</span></div>` : ""}
       </div>
     </div>`
         : `<!-- ══════════ ترويسة القالب القياسي العملي المضغوط ══════════ -->
@@ -900,11 +907,11 @@ export function renderUnifiedLayout(
       <div class="corporate-header-grid">
         <!-- اليمين: بيانات المنشأة بالعربية -->
         <div class="corporate-brand-block">
-          <h1 class="corporate-brand-name">${esc(arabicName || companyName)}</h1>
-          ${companyName && companyName !== arabicName ? `<div class="corporate-brand-details">${esc(companyName)}</div>` : ""}
-          ${companyVat ? `<div class="corporate-brand-details">الرقم الضريبي: <b dir="ltr">${esc(companyVat)}</b></div>` : ""}
-          ${companyPhone ? `<div class="corporate-brand-details">الهاتف: <b dir="ltr">${esc(companyPhone)}</b></div>` : ""}
-          ${companyAddress ? `<div class="corporate-brand-details">${esc(companyAddress)}</div>` : ""}
+          ${opts.showCompanyInfo ? `<h1 class="corporate-brand-name">${esc(arabicName || companyName)}</h1>` : ""}
+          ${opts.showCompanyInfo && companyName && companyName !== arabicName ? `<div class="corporate-brand-details">${esc(companyName)}</div>` : ""}
+          ${opts.showCompanyInfo && companyVat ? `<div class="corporate-brand-details">الرقم الضريبي: <b dir="ltr">${esc(companyVat)}</b></div>` : ""}
+          ${opts.showCompanyInfo && companyPhone ? `<div class="corporate-brand-details">الهاتف: <b dir="ltr">${esc(companyPhone)}</b></div>` : ""}
+          ${opts.showCompanyInfo && companyAddress ? `<div class="corporate-brand-details">${esc(companyAddress)}</div>` : ""}
         </div>
 
         <!-- المنتصف: الشعار فقط -->
@@ -915,10 +922,10 @@ export function renderUnifiedLayout(
         <!-- اليسار: بيانات المنشأة الإنجليزية -->
         <div class="corporate-doc-block">
           ${qrSvg && !isLuxury ? `<div class="luxury-qr-box" style="margin-bottom: 6px;">${qrSvg}</div>` : ""}
-          ${englishName ? `<div class="corporate-brand-name" dir="ltr">${esc(englishName)}</div>` : ""}
-          ${companyVat ? `<div class="corporate-brand-details" dir="ltr">Tax ID: ${esc(companyVat)}</div>` : ""}
-          ${companyPhone ? `<div class="corporate-brand-details" dir="ltr">Phone: ${esc(companyPhone)}</div>` : ""}
-          ${companyEmail ? `<div class="corporate-brand-details" dir="ltr">${esc(companyEmail)}</div>` : ""}
+          ${opts.showCompanyInfo && englishName ? `<div class="corporate-brand-name" dir="ltr">${esc(englishName)}</div>` : ""}
+          ${opts.showCompanyInfo && companyVat ? `<div class="corporate-brand-details" dir="ltr">Tax ID: ${esc(companyVat)}</div>` : ""}
+          ${opts.showCompanyInfo && companyPhone ? `<div class="corporate-brand-details" dir="ltr">Phone: ${esc(companyPhone)}</div>` : ""}
+          ${opts.showCompanyInfo && companyEmail ? `<div class="corporate-brand-details" dir="ltr">${esc(companyEmail)}</div>` : ""}
         </div>
       </div>
     </header>
@@ -926,28 +933,36 @@ export function renderUnifiedLayout(
     <section class="invoice-document-heading">
       <h2>${esc(doc.title || (rtl ? "فاتورة مبيعات نقدية" : "Cash Sales Invoice"))}</h2>
       <div class="invoice-document-meta">
-        <span class="invoice-document-number">${esc(doc.number)}</span>
+        ${opts.showDocNumberDate ? `<span class="invoice-document-number">${esc(doc.number)}</span>` : ""}
         ${opts.showDocNumberDate ? `<span dir="ltr">${rtl ? "التاريخ والوقت:" : "Date &amp; time:"} ${esc(formatPrintedDateTime(doc.date))}</span>` : ""}
       </div>
     </section>
 
     <!-- شريط العميل الموحد المضغوط لتوفير المساحة الرأسية للأصناف -->
-    <div class="party-info-compact-bar">
+    <div class="party-info-compact-bar" style="display:${opts.showCustomerInfo || opts.showPaymentInfo || opts.showMovementInfo ? "flex" : "none"}">
       <div class="party-compact-item">
-        <span>${esc(doc.partyLabel || L.billTo)}:</span>
-        <b>${esc(doc.partyName || (rtl ? "عميل نقدي عام" : "General Customer"))}</b>
+        ${opts.showCustomerInfo ? `<span>${esc(doc.partyLabel || L.billTo)}:</span>` : ""}
+        ${opts.showCustomerInfo ? `<b>${esc(doc.partyName || (rtl ? "عميل نقدي عام" : "General Customer"))}</b>` : ""}
       </div>
-      ${doc.partyPhone ? `<div class="party-compact-item"><span>الهاتف:</span> <b dir="ltr">${esc(doc.partyPhone)}</b></div>` : ""}
-      <div class="party-compact-item">
+      ${opts.showCustomerInfo && doc.partyPhone ? `<div class="party-compact-item"><span>الهاتف:</span> <b dir="ltr">${esc(doc.partyPhone)}</b></div>` : ""}
+      ${
+        opts.showPaymentInfo
+          ? `<div class="party-compact-item">
         <span>الدفع:</span>
         <b>${esc(doc.payment || (rtl ? "نقداً" : "Cash"))}</b>
-      </div>
-      <div class="party-compact-item">
+      </div>`
+          : ""
+      }
+      ${
+        opts.showPaymentInfo
+          ? `<div class="party-compact-item">
         <span>الحالة:</span>
         <b>${esc(doc.status || (rtl ? "مدفوعة" : "Paid"))}</b>
-      </div>
-      ${doc.operatorName ? `<div class="party-compact-item"><span>${rtl ? "البائع:" : "Sold by:"}</span> <b>${esc(doc.operatorName)}</b></div>` : ""}
-      ${doc.warehouse ? `<div class="party-compact-item"><span>المستودع:</span> <b>${esc(doc.warehouse)}</b></div>` : ""}
+      </div>`
+          : ""
+      }
+      ${opts.showMovementInfo && doc.operatorName ? `<div class="party-compact-item"><span>${rtl ? "البائع:" : "Sold by:"}</span> <b>${esc(doc.operatorName)}</b></div>` : ""}
+      ${opts.showMovementInfo && doc.warehouse ? `<div class="party-compact-item"><span>المستودع:</span> <b>${esc(doc.warehouse)}</b></div>` : ""}
     </div>`
     }
 
@@ -982,16 +997,23 @@ export function renderUnifiedLayout(
             : ""
         }
 
-        <div class="thanks-notes-card">
+        ${
+          opts.showNotes
+            ? `<div class="thanks-notes-card">
           <div class="thanks-title">
             <span>${opts.showNotes && doc.notes ? (rtl ? "ملاحظات وشروط الفاتورة" : "Terms & Notes") : rtl ? "شكرًا لتعاملكم معنا" : "Thank You For Your Business"}</span>
           </div>
           <div class="notes-content-text">${esc(doc.notes || (rtl ? "نشكركم على اختياركم، البضاعة المباعة ترد وتستبدل وفق الشروط والأنظمة المعتمدة." : "We appreciate your business."))}</div>
-        </div>
+        </div>`
+            : ""
+        }
+          ${opts.showFooter ? `<footer class="universal-footer">${rtl ? "شكرًا لتعاملكم معنا" : "Thank you for your business"}</footer>` : ""}
       </div>
 
       <!-- كارد الإجماليات مع مستطيل الإجمالي البارز -->
-      <div class="totals-card">
+      ${
+        opts.showFinancialDetails
+          ? `<div class="totals-card">
         <div class="totals-row">
           <span>${L.subtotal}:</span>
           <span class="num-isolated" style="font-weight: 700;">${money(doc.subtotal)}</span>
@@ -1034,7 +1056,9 @@ export function renderUnifiedLayout(
         </div>`
             : ""
         }
-      </div>
+      </div>`
+          : ""
+      }
     </div>
 
     <!-- التوقيعات والاعتماد الرسمي المعتمد -->

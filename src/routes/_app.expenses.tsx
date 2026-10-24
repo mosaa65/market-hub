@@ -85,6 +85,7 @@ function ExpensesPage() {
       <ExpenseRegister
         rows={list.rows}
         summary={summary.data}
+        summaryError={summary.error}
         lookups={lookups.data}
         filters={filters}
         onFiltersChange={setFilters}
@@ -111,6 +112,9 @@ function ExpensesPage() {
           if (!open) setEditingDetail(null);
         }}
         lookups={lookups.data}
+        lookupsError={lookups.error}
+        isLoadingLookups={lookups.isLoading}
+        onRetryLookups={() => void lookups.refetch()}
         editing={editingDetail}
         onSaved={(entryId) => {
           if (entryId) {

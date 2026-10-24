@@ -34,11 +34,21 @@ import {
   type ExpenseListFilters,
 } from "@/lib/expenses/query-keys";
 import type { ExpenseListRow, ExpenseSummary } from "@/lib/expenses/types";
-import { ArrowDownToLine, Filter, Plus, Receipt, RefreshCw, Search, X } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowDownToLine,
+  Filter,
+  Plus,
+  Receipt,
+  RefreshCw,
+  Search,
+  X,
+} from "lucide-react";
 
 export interface ExpenseRegisterProps {
   rows: ExpenseListRow[];
   summary: ExpenseSummary | undefined;
+  summaryError?: Error | null;
   lookups: React.ComponentProps<typeof ExpenseFilterSheet>["lookups"];
   filters: ExpenseListFilters;
   onFiltersChange: (next: ExpenseListFilters) => void;
@@ -58,6 +68,7 @@ export interface ExpenseRegisterProps {
 export function ExpenseRegister({
   rows,
   summary,
+  summaryError,
   lookups,
   filters,
   onFiltersChange,
@@ -431,6 +442,22 @@ export function ExpenseRegister({
             }
           }}
         />
+        {summaryError ? (
+          <div
+            role="alert"
+            className="flex items-center justify-between gap-3 rounded-xl border border-destructive/25 bg-destructive/5 px-3 py-2 text-xs text-destructive"
+          >
+            <span className="flex items-center gap-2">
+              <AlertTriangle className="size-4 shrink-0" />
+              {ar
+                ? "تعذر تحميل ملخص المصروفات؛ الأرقام المعروضة مؤقتة. أعد المحاولة."
+                : "Expense summary failed to load; displayed figures are temporary. Retry."}
+            </span>
+            <Button variant="outline" size="sm" onClick={onRefresh}>
+              {t("common.retry")}
+            </Button>
+          </div>
+        ) : null}
 
         <RecordsToolbar
           searchValue={searchText}

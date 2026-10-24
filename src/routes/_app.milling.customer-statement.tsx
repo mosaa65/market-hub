@@ -10,7 +10,7 @@
  *      - فورم تسليم نواتج مباشر بنقرة زر وسند تسليم رسمي.
  *      - كشف حركات تفصيلي لكل عميل مع خيارات الطباعة الفاخرة والمشاركة عبر واتساب.
  */
-import { createFileRoute, useSearch, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useSearch, useNavigate, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useMemo, useEffect } from "react";
 import {
@@ -91,20 +91,32 @@ export const Route = createFileRoute("/_app/milling/customer-statement")({
   validateSearch: (search: Record<string, unknown>): { customerId?: string } => ({
     customerId: typeof search.customerId === "string" ? search.customerId : undefined,
   }),
-  head: () => ({ meta: [{ title: "الأمانات — فورتكس ERP" }] }),
-  component: CustomerCustodyPage,
+  head: () => ({ meta: [{ title: "أمانات الطحن — فورتكس ERP" }] }),
+  component: () => <CustomerCustodyPageBase mode="milling" />,
 });
 
 type TypeFilter = "ALL" | "RAW" | "OUTPUT" | "ACTIVE" | "ZERO";
+/**
+ * واجهتان منفصلتان فعلياً بمسارين مستقلين (طلب مالك المطحنة):
+ *  - /milling/customer-statement   ← أمانات الطحن (الحبوب الخام والطحن)
+ *  - /milling/custody-delivery     ← أمانات التسليم (النواتج وصرفها)
+ */
+export type CustodyMode = "milling" | "delivery";
+
+const CUSTODY_ROUTES = {
+  milling: "/milling/customer-statement",
+  delivery: "/milling/custody-delivery",
+} as const;
 
 const PRESET_CAPACITIES = [50, 40, 25, 20, 10];
 
-function CustomerCustodyPage() {
+export function CustomerCustodyPageBase({ mode }: { mode: CustodyMode }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const currencySymbol = useMemo(() => getCompanyCurrencySymbol(), []);
   const { customerId: preselectedCustomerId } = useSearch({
-    from: "/_app/milling/customer-statement",
+    from:
+      mode === "milling" ? "/_app/milling/customer-statement" : "/_app/milling/custody-delivery",
   });
 
   /* Unified records vocabulary: cards | list | table — persisted per screen. */
@@ -114,7 +126,7 @@ function CustomerCustodyPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedWarehouse, setSelectedWarehouse] = useState("ALL");
   const [selectedCustomer, setSelectedCustomer] = useState(preselectedCustomerId || "ALL");
-  const [typeFilter, setTypeFilter] = useState<TypeFilter>("ACTIVE");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>(mode === "milling" ? "RAW" : "OUTPUT");
 
   // حالات النوافذ المنبثقة
   const [millingModalOpen, setMillingModalOpen] = useState(false);
@@ -516,34 +528,36 @@ function CustomerCustodyPage() {
         const isZero = remB <= 0 && remK <= 0;
         return (
           <div className="inline-flex items-center gap-1.5">
-            {isRaw && !isZero && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openMilling(r);
-                }}
-                title="طحن من رصيد حبوب هذا العميل"
-                className="inline-flex items-center gap-1 rounded-xl bg-amber-500/15 px-2.5 py-1 text-xs font-bold text-amber-700 dark:text-amber-300 hover:bg-amber-500/25 transition"
-              >
-                <Cog className="h-3.5 w-3.5" />
-                <span>طحن</span>
-              </button>
-            )}
-            {!isZero && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openDelivery(r);
-                }}
-                title="تسليم الأمانة للعميل"
-                className="inline-flex items-center gap-1 rounded-xl bg-emerald-500/15 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/25 transition"
-              >
-                <PackageCheck className="h-3.5 w-3.5" />
-                <span>تسليم</span>
-              </button>
-            )}
+            {mode === "milling"
+              ? isRaw &&
+                !isZero && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openMilling(r);
+                    }}
+                    title="طحن من رصيد حبوب هذا العميل"
+                    className="inline-flex items-center gap-1 rounded-xl bg-amber-500/15 px-2.5 py-1 text-xs font-bold text-amber-700 dark:text-amber-300 hover:bg-amber-500/25 transition"
+                  >
+                    <Cog className="h-3.5 w-3.5" />
+                    <span>طحن</span>
+                  </button>
+                )
+              : !isZero && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openDelivery(r);
+                    }}
+                    title="تسليم الأمانة للعميل"
+                    className="inline-flex items-center gap-1 rounded-xl bg-emerald-500/15 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/25 transition"
+                  >
+                    <PackageCheck className="h-3.5 w-3.5" />
+                    <span>تسليم</span>
+                  </button>
+                )}
             <button
               type="button"
               onClick={(e) => {
@@ -643,7 +657,7 @@ function CustomerCustodyPage() {
           </button>
 
           <div className="flex items-center gap-1.5">
-            {isRaw && !isZero && (
+            {mode === "milling" && isRaw && !isZero && (
               <button
                 type="button"
                 onClick={() => openMilling(r)}
@@ -654,7 +668,7 @@ function CustomerCustodyPage() {
               </button>
             )}
 
-            {!isZero && (
+            {mode === "delivery" && !isZero && (
               <button
                 type="button"
                 onClick={() => openDelivery(r)}
@@ -711,7 +725,7 @@ function CustomerCustodyPage() {
           </div>
 
           <div className="flex items-center gap-1.5">
-            {isRaw && !isZero && (
+            {mode === "milling" && isRaw && !isZero && (
               <button
                 type="button"
                 onClick={() => openMilling(r)}
@@ -720,7 +734,7 @@ function CustomerCustodyPage() {
                 طحن
               </button>
             )}
-            {!isZero && (
+            {mode === "delivery" && !isZero && (
               <button
                 type="button"
                 onClick={() => openDelivery(r)}
@@ -745,35 +759,73 @@ function CustomerCustodyPage() {
   return (
     <ModuleGuard moduleId="milling_operations">
       <div className="mx-auto max-w-7xl space-y-4 p-4">
+        {/* ─── التنقل بين الواجهتين المنفصلتين (مساران مستقلان) ── */}
+        <div className="grid w-full max-w-md grid-cols-2 gap-1 rounded-2xl border-border/80 bg-muted/60 p-1">
+          <Link
+            to={CUSTODY_ROUTES.milling}
+            className={`flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all ${
+              mode === "milling"
+                ? "bg-background text-amber-700 shadow-xs dark:text-amber-300"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Cog className="h-4 w-4" />
+            أمانات الطحن
+            <span className="rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-black text-amber-700 dark:text-amber-300">
+              {counts.raw}
+            </span>
+          </Link>
+          <Link
+            to={CUSTODY_ROUTES.delivery}
+            className={`flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all ${
+              mode === "delivery"
+                ? "bg-background text-emerald-700 shadow-xs dark:text-emerald-300"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <PackageCheck className="h-4 w-4" />
+            أمانات التسليم
+            <span className="rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-black text-emerald-700 dark:text-emerald-300">
+              {counts.output}
+            </span>
+          </Link>
+        </div>
+
         {/* رأس الصفحة مع أزرار الإجراءات السريعة */}
         <PageHeader
-          title="الأمانات"
-          subtitle="متابعة وإدارة أمانات العملاء العينية، الأرصدة المتبقية، الطحن المباشر، وتسليم النواتج."
+          title={mode === "milling" ? "الأمانات — الطحن" : "الأمانات — التسليم"}
+          subtitle={
+            mode === "milling"
+              ? "متابعة أرصدة الحبوب الخام المودعة وتسجيل عمليات الطحن وإيداع النواتج."
+              : "متابعة النواتج الجاهزة وتسليمها لصاحب الأمانة مع سند تسليم رسمي."
+          }
           actions={
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedRow(null);
-                  setMillingModalOpen(true);
-                }}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 px-3.5 py-2 text-xs font-bold text-white shadow-xs transition hover:bg-amber-600 active:scale-95"
-              >
-                <Cog className="h-4 w-4" />
-                طحن أمانة حبوب
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedRow(null);
-                  setDeliveryModalOpen(true);
-                }}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white shadow-xs transition hover:bg-emerald-700 active:scale-95"
-              >
-                <PackageCheck className="h-4 w-4" />
-                تسليم نواتج أمانة
-              </button>
+              {mode === "milling" ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedRow(null);
+                    setMillingModalOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 px-3.5 py-2 text-xs font-bold text-white shadow-xs transition hover:bg-amber-600 active:scale-95"
+                >
+                  <Cog className="h-4 w-4" />
+                  عملية طحن جديدة
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedRow(null);
+                    setDeliveryModalOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white shadow-xs transition hover:bg-emerald-700 active:scale-95"
+                >
+                  <PackageCheck className="h-4 w-4" />
+                  عملية تسليم جديدة
+                </button>
+              )}
 
               <button
                 type="button"
@@ -856,14 +908,25 @@ function CustomerCustodyPage() {
           }}
           viewToggle={<RecordsViewToggle value={viewMode} onChange={setViewMode} />}
           action={
-            <PrimaryAction
-              label="طحن أمانة"
-              icon={<Cog />}
-              onClick={() => {
-                setSelectedRow(null);
-                setMillingModalOpen(true);
-              }}
-            />
+            mode === "milling" ? (
+              <PrimaryAction
+                label="طحن أمانة"
+                icon={<Cog />}
+                onClick={() => {
+                  setSelectedRow(null);
+                  setMillingModalOpen(true);
+                }}
+              />
+            ) : (
+              <PrimaryAction
+                label="تسليم نواتج"
+                icon={<PackageCheck />}
+                onClick={() => {
+                  setSelectedRow(null);
+                  setDeliveryModalOpen(true);
+                }}
+              />
+            )
           }
         >
           {/* أزرار التصفية السريعة الموحدة (QuickFilterBar) — مرئية في كل أنماط العرض */}
@@ -871,8 +934,13 @@ function CustomerCustodyPage() {
             items={[
               { id: "ALL", label: "جميع السجلات", count: rawRows.length },
               { id: "ACTIVE", label: "أرصدة متبقية نشطة", count: counts.active, tone: "success" },
-              { id: "RAW", label: "حبوب خام (للطحن)", count: counts.raw, tone: "warning" },
-              { id: "OUTPUT", label: "نواتج (للتسليم)", count: counts.output, tone: "info" },
+              ...(mode === "milling"
+                ? ([
+                    { id: "RAW", label: "حبوب خام (للطحن)", count: counts.raw, tone: "warning" },
+                  ] as const)
+                : ([
+                    { id: "OUTPUT", label: "نواتج (للتسليم)", count: counts.output, tone: "info" },
+                  ] as const)),
               { id: "ZERO", label: "مصفاة بالكامل", count: counts.zero, tone: "danger" },
             ]}
             value={typeFilter}
@@ -897,9 +965,15 @@ function CustomerCustodyPage() {
           renderCard={renderCustodyCard}
           renderListRow={renderCustodyListRow}
           empty={{
-            icon: <Boxes />,
-            title: "لا توجد أمانات مطابقة لمعايير البحث الحالية",
-            description: "غيّر معايير الفلترة أو اختر مستودعاً أو عميلاً آخر.",
+            icon: mode === "milling" ? <Wheat /> : <PackageCheck />,
+            title:
+              mode === "milling"
+                ? "لا توجد حبوب خام مطابقة لمعايير البحث الحالية"
+                : "لا توجد نواتج جاهزة للتسليم مطابقة لمعايير البحث الحالية",
+            description:
+              mode === "milling"
+                ? "سجّل استلام أمانة من شاشة الاستقبال أو غيّر معايير الفلترة."
+                : "سجّل عملية طحن أولاً لتُودع النواتج في أمانات العميل، أو غيّر الفلترة.",
           }}
         />
 

@@ -29,6 +29,8 @@ import {
   Wallet,
   RefreshCw,
   ArrowRight,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
@@ -40,6 +42,7 @@ import { DocumentShareDialog } from "@/components/communication/document-share-d
 import { supabase } from "@/integrations/supabase/client";
 import {
   createMillingServiceDocument,
+  createMillingServiceDocumentMulti,
   fetchGrainItems,
   fetchServiceItem,
   fetchCustodyBalances,
@@ -114,12 +117,15 @@ function MillingIntakePage() {
   const [customerId, setCustomerId] = useState("");
   const [quickCustomerOpen, setQuickCustomerOpen] = useState(false);
   const [warehouseId, setWarehouseId] = useState("");
-  const [itemId, setItemId] = useState("");
-  const [capacityKg, setCapacityKg] = useState<string>("50");
-  const [bags, setBags] = useState("");
-  const [kg, setKg] = useState("");
-  const [kgAuto, setKgAuto] = useState(true);
   const [notes, setNotes] = useState("");
+
+  /**
+   * أسطر الاستلام: نوع حبوب مستقل لكل سطر (بر 50كجم ×10 + بر 25كجم ×10 + ...)
+   * كل سطر: صنف + سعة الكيس + الأكياس + الوزن (محسوب آلياً من السعة).
+   */
+  const [lines, setLines] = useState<
+    { itemId: string; capacityKg: string; bags: string; kg: string; kgAuto: boolean }[]
+  >([{ itemId: "", capacityKg: "50", bags: "", kg: "", kgAuto: true }]);
 
   // الفاتورة والمالية
   const [feePerBag, setFeePerBag] = useState<string>("");
@@ -232,70 +238,69 @@ function MillingIntakePage() {
   }, [loadedDocQuery.data]);
 
   // احتساب الإجمالي التلقائي للأكياس والوزن وسعر الخدمة
-  const selectedGrainItem = useMemo(
-    () => (grainItems.data ?? []).find((g) => g.id === itemId),
-    [grainItems.data, itemId],
-  );
-
-  // عند تغيير صنف الحبوب: V2 — لا قراءة للسعة من المنتج؛ السعة اختيار يدوي بالأزرار أو حقل مخصص.
-  function handleGrainItemChange(newId: string) {
-    setItemId(newId);
+  // ─ أدوات أسطر الاستلام (تعدد أنواع الحبوب في عملية واحدة) ─
+  function updateLine(
+    idx: number,
+    patch: Partial<{
+      itemId: string;
+      capacityKg: string;
+      bags: string;
+      kg: string;
+      kgAuto: boolean;
+    }>,
+  ) {
+    setLines((ls) => ls.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
   }
 
-  // اختيار سعة الكيس من الأزرار السريعة
-  function handleSelectCapacity(cap: number) {
-    const capStr = String(cap);
-    setCapacityKg(capStr);
-    const bagCount = Number(bags) || 0;
-    if (bagCount > 0 && (kgAuto || kg === "")) {
-      setKg(String(bagCount * cap));
-      setKgAuto(true);
-    }
+  function addLine() {
+    setLines((ls) => [...ls, { itemId: "", capacityKg: "50", bags: "", kg: "", kgAuto: true }]);
   }
 
-  // عند تغيير عدد الأكياس (المحدد الأساسي)
-  function handleBagsChange(v: string) {
-    setBags(v);
-    const bagCount = Number(v) || 0;
-    const cap = Number(capacityKg) || 0;
-
-    // 1. حساب الوزن الإجمالي تلقائياً
-    if (cap > 0 && (kgAuto || kg === "" || Number(kg) === 0)) {
-      setKg(bagCount > 0 ? String(bagCount * cap) : "");
-      setKgAuto(true);
-    }
-
-    // 2. حساب إجمالي خدمة الطحن تلقائياً (أكياس × سعر الكيس)
-    const rate = Number(feePerBag) || 0;
-    if (rate > 0) {
-      const calculatedSubtotal = bagCount > 0 ? bagCount * rate : rate;
-      setServicePrice(bagCount > 0 ? String(calculatedSubtotal) : "");
-    }
+  function removeLine(idx: number) {
+    setLines((ls) => (ls.length > 1 ? ls.filter((_, i) => i !== idx) : ls));
   }
 
-  // عند تعديل سعر طحن الكيس الواحد
-  function handleFeePerBagChange(v: string) {
-    setFeePerBag(v);
-    const rate = Number(v) || 0;
-    const bagCount = Number(bags) || 0;
-    if (rate > 0) {
-      const calculatedSubtotal = bagCount > 0 ? bagCount * rate : rate;
-      setServicePrice(String(calculatedSubtotal));
-    }
+  /** اختيار سعة الكيس لسطر: يعيد حساب الوزن آلياً */
+  function setLineCapacity(idx: number, cap: string) {
+    const line = lines[idx];
+    const b = Number(line.bags) || 0;
+    const c = Number(cap) || 0;
+    updateLine(idx, {
+      capacityKg: cap,
+      kg: b > 0 && c > 0 ? String(b * c) : line.kg,
+      kgAuto: true,
+    });
   }
 
-  // عند تعديل الوزن يدوياً
-  function handleKgChange(v: string) {
-    setKg(v);
-    setKgAuto(false);
+  /** تغيير الأكياس لسطر: وزن آلي + إعادة حساب أجور الخدمة */
+  function setLineBags(idx: number, v: string) {
+    const line = lines[idx];
+    const b = Number(v) || 0;
+    const c = Number(line.capacityKg) || 0;
+    // أي تعديل على الكميات يلغي أي تجاوز يدوي سابق لإجمالي الأجور
+    setServicePrice("");
+    updateLine(idx, {
+      bags: v,
+      kg: c > 0 ? (b > 0 ? String(b * c) : "") : line.kg,
+      kgAuto: true,
+    });
   }
 
-  // الحسابات المالية اللحظية (نمط الكاشير POS)
-  const bagCount = Number(bags) || 0;
+  /** تعديل الوزن يدوياً لسطر */
+  function setLineKg(idx: number, v: string) {
+    updateLine(idx, { kg: v, kgAuto: false });
+  }
+
+  // إجماليات العملية (كل الأسطر) — الأكياس والوزن
+  const totalBags = useMemo(() => lines.reduce((s, l) => s + (Number(l.bags) || 0), 0), [lines]);
+  const totalKg = useMemo(() => lines.reduce((s, l) => s + (Number(l.kg) || 0), 0), [lines]);
+
+  // الحسابات المالية اللحظية (نمط الكاشير POS) — الإجمالي على مستوى العملية
+  const bagCount = totalBags;
   const currentSubtotal = useMemo(() => {
     if (servicePrice !== "") return Number(servicePrice) || 0;
     const rate = Number(feePerBag) || 0;
-    return bagCount > 0 ? bagCount * rate : rate;
+    return bagCount > 0 ? bagCount * rate : 0;
   }, [servicePrice, feePerBag, bagCount]);
 
   const currentDiscount = Number(discount) || 0;
@@ -326,29 +331,28 @@ function MillingIntakePage() {
   const canSubmit = Boolean(
     customerId &&
     warehouseId &&
-    itemId &&
     Boolean(serviceItem.data?.id) &&
-    (bagCount > 0 || Number(kg) > 0) &&
+    lines.some((l) => l.itemId && ((Number(l.bags) || 0) > 0 || (Number(l.kg) || 0) > 0)) &&
     payment.isPayable,
   );
 
   const submit = useMutation({
     mutationFn: async () => {
       if (!payment.isPayable) throw new Error(payment.blockingReason ?? "بيانات الدفع غير صالحة.");
-      return createMillingServiceDocument({
+      return createMillingServiceDocumentMulti({
         customerId,
         warehouseId,
-        grainItemId: itemId,
-        bags: bagCount,
-        kg: Number(kg) || 0,
+        grains: lines
+          .filter((l) => l.itemId && ((Number(l.bags) || 0) > 0 || (Number(l.kg) || 0) > 0))
+          .map((l) => ({
+            itemId: l.itemId,
+            bags: Number(l.bags) || 0,
+            kg: Number(l.kg) || 0,
+          })),
         serviceItemId: serviceItem.data?.id ?? "",
-        serviceUnitPrice: currentSubtotal,
+        serviceTotal: currentSubtotal,
         discount: currentDiscount,
         paymentMethod: toLegacyPaymentValue(paymentMethod),
-        cashboxId: settlement.cashboxId || null,
-        bankAccountId: settlement.bankAccountId || null,
-        paymentMethodId: settlement.paymentMethodId || paymentMethod || null,
-        paymentReference: settlement.reference || null,
         paid: currentPaid,
         notes: notes.trim() || undefined,
       });
@@ -379,14 +383,10 @@ function MillingIntakePage() {
       }
 
       // تفريغ حقول العملية لتجهيز الاستلام التالي
-      setItemId("");
-      setBags("");
-      setKg("");
-      setKgAuto(true);
+      setLines([{ itemId: "", capacityKg: "50", bags: "", kg: "", kgAuto: true }]);
       setNotes("");
       setPaid("");
       setDiscount("");
-      setServicePrice("");
 
       void qc.invalidateQueries({ queryKey: ["milling"] });
     },
@@ -399,14 +399,10 @@ function MillingIntakePage() {
     setActiveDetails(null);
     setPrintDoc(null);
     setShowWorkflow(false);
-    setItemId("");
-    setBags("");
-    setKg("");
-    setKgAuto(true);
+    setLines([{ itemId: "", capacityKg: "50", bags: "", kg: "", kgAuto: true }]);
     setNotes("");
     setPaid("");
     setDiscount("");
-    setServicePrice("");
   }
 
   return (
@@ -414,8 +410,8 @@ function MillingIntakePage() {
       <div className="mx-auto max-w-7xl space-y-4 p-4">
         {/* شريط العنوان الرسمي */}
         <PageHeader
-          title="استلام وفواتير"
-          subtitle="تسجيل استلام حبوب العميل وإصدار فاتورة أجور الطحن الرسمية في معاملة واحدة سريعة وموحدة."
+          title="استلام الأمانات"
+          subtitle="استلام عدة أنواع حبوب في سند واحد (بر 50كجم ×10 + بر 25كجم ×10 + …) مع فاتورة أجور رسمية على العملية كلها."
         />
 
         {/* شريط الإشعار بالعملية النشطة بعد الحفظ أو الفتح */}
@@ -459,7 +455,7 @@ function MillingIntakePage() {
                 className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-xs font-bold text-primary-foreground shadow-xs transition hover:bg-primary/90"
               >
                 <Printer className="h-4 w-4" />
-                معاينة وطباعة الفاتورة الفاخرة
+                معاينة وطباعة سند الاستلام وفاتورة الأجور
               </button>
 
               <button
@@ -588,118 +584,151 @@ function MillingIntakePage() {
                 </div>
               )}
 
-              {/* نوع الحبوب المستلمة */}
-              <MillingField
-                label="نوع الحبوب المستلمة *"
-                hint="قائمة الحبوب الخام المعرفة في النظام."
-              >
-                <MillingSelect
-                  value={itemId}
-                  onChange={(e) => handleGrainItemChange(e.target.value)}
-                  className="font-medium"
-                >
-                  <option value="">اختر نوع الحبوب…</option>
-                  {(grainItems.data ?? []).map((g: ProductOption) => (
-                    <option key={g.id} value={g.id}>
-                      {g.name_ar || g.name}
-                    </option>
-                  ))}
-                </MillingSelect>
-              </MillingField>
-
-              {/* سعة الكيس (الوحدات المتاحة للاختيار السريع + مخصص) */}
-              <div className="space-y-1.5">
+              {/* أسطر الحبوب المستلمة — صنف مستقل لكل سطر */}
+              <div className="space-y-2.5 rounded-2xl border border-border/80 bg-surface-2/30 p-3.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-muted-foreground">
-                    سعة الكيس / العبوة (كجم)
-                  </label>
+                  <div>
+                    <h4 className="text-xs font-bold text-foreground">أنواع الحبوب المستلمة</h4>
+                    <p className="text-[11px] text-muted-foreground">
+                      لكل نوع حبوب سطر مستقل: اختر الصنف، حدد السعة، ثم عدد الأكياس — الوزن يُحسب
+                      آلياً.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addLine}
+                    className="inline-flex items-center gap-1 rounded-xl border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary shadow-xs hover:bg-primary/20"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> نوع حبوب آخر
+                  </button>
+                </div>
+
+                {lines.map((line, idx) => (
+                  <div
+                    key={idx}
+                    className="space-y-2 rounded-xl border border-border/70 bg-card/70 p-3"
+                  >
+                    <div className="grid grid-cols-[1fr_auto] items-center gap-2">
+                      <MillingSelect
+                        value={line.itemId}
+                        onChange={(e) => updateLine(idx, { itemId: e.target.value })}
+                        className="font-bold text-xs"
+                      >
+                        <option value="">اختر نوع الحبوب…</option>
+                        {(grainItems.data ?? []).map((g: ProductOption) => (
+                          <option key={g.id} value={g.id}>
+                            {g.name_ar || g.name}
+                          </option>
+                        ))}
+                      </MillingSelect>
+                      <button
+                        type="button"
+                        disabled={lines.length === 1}
+                        onClick={() => removeLine(idx)}
+                        className="grid h-8 w-8 place-items-center rounded-lg text-rose-500 hover:bg-rose-500/10 disabled:opacity-30"
+                        aria-label="حذف السطر"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 items-center">
+                      <div>
+                        <span className="block text-[11px] font-semibold text-muted-foreground mb-1">
+                          سعة الكيس:
+                        </span>
+                        <div className="flex items-center gap-1">
+                          {PRESET_CAPACITIES.slice(0, 4).map((cap) => (
+                            <button
+                              key={cap}
+                              type="button"
+                              onClick={() => setLineCapacity(idx, String(cap))}
+                              className={`rounded-lg px-2 py-1 text-[11px] font-bold transition ${
+                                Number(line.capacityKg) === cap
+                                  ? "bg-amber-500 text-white"
+                                  : "border border-border bg-surface-2 hover:bg-muted"
+                              }`}
+                            >
+                              {cap}
+                            </button>
+                          ))}
+                          <QuantityInput
+                            min={0}
+                            decimals={1}
+                            unit="kg"
+                            placeholder="سعة"
+                            aria-label="سعة الكيس المخصصة (كجم)"
+                            value={line.capacityKg === "" ? null : Number(line.capacityKg)}
+                            onValueChange={(v) => setLineCapacity(idx, v == null ? "" : String(v))}
+                            className="w-20 font-bold text-[11px]"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <span className="block text-[11px] font-semibold text-muted-foreground mb-1">
+                          عدد الأكياس:
+                        </span>
+                        <QuantityInput
+                          min={0}
+                          decimals={0}
+                          placeholder="0"
+                          aria-label="عدد الأكياس"
+                          value={line.bags === "" ? null : Number(line.bags)}
+                          onValueChange={(v) => setLineBags(idx, v == null ? "" : String(v))}
+                          className="font-black text-primary"
+                        />
+                      </div>
+
+                      <div className="col-span-2">
+                        <span className="block text-[11px] font-semibold text-muted-foreground mb-1">
+                          الوزن الإجمالي (كجم):
+                        </span>
+                        <QuantityInput
+                          min={0}
+                          decimals={2}
+                          unit="kg"
+                          placeholder="0.00"
+                          aria-label="الوزن الإجمالي (كجم)"
+                          value={line.kg === "" ? null : Number(line.kg)}
+                          onValueChange={(v) => setLineKg(idx, v == null ? "" : String(v))}
+                          className="font-bold"
+                        />
+                        {line.kgAuto && Number(line.bags) > 0 && Number(line.capacityKg) > 0 && (
+                          <div className="mt-1 flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                            <CheckCircle2 className="h-3 w-3 shrink-0" />
+                            {line.bags} كيس × {line.capacityKg} كجم = {fmtNum(Number(line.kg))} كجم
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {/* شريط إجماليات الاستلام */}
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-muted/60 p-3 text-xs">
+                  <div className="flex items-center gap-3">
+                    <span>
+                      أنواع الحبوب:{" "}
+                      <strong className="text-foreground">
+                        {lines.filter((l) => l.itemId).length}
+                      </strong>
+                    </span>
+                    <span>•</span>
+                    <span>
+                      إجمالي الأكياس:{" "}
+                      <strong className="text-foreground">{fmtNum(totalBags)}</strong>
+                    </span>
+                    <span>•</span>
+                    <span>
+                      إجمالي الوزن: <strong className="text-foreground">{fmtNum(totalKg)}</strong>{" "}
+                      كجم
+                    </span>
+                  </div>
                   <span className="text-[11px] text-muted-foreground">
-                    اختر السعة المتوفرة أو أدخل سعة مخصصة
+                    أجور الطحن تُحتسب على إجمالي الأكياس للعملية كلها
                   </span>
                 </div>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {PRESET_CAPACITIES.map((cap) => {
-                    const isSelected = Number(capacityKg) === cap;
-                    return (
-                      <button
-                        key={cap}
-                        type="button"
-                        onClick={() => handleSelectCapacity(cap)}
-                        className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${
-                          isSelected
-                            ? "bg-amber-500 text-white shadow-xs"
-                            : "border border-border bg-surface-2 text-foreground hover:bg-muted"
-                        }`}
-                      >
-                        {cap} كجم
-                      </button>
-                    );
-                  })}
-                  <div className="relative ms-auto w-28">
-                    <QuantityInput
-                      min={0}
-                      decimals={1}
-                      unit="kg"
-                      placeholder="سعة مخصصة"
-                      aria-label="سعة الكيس المخصصة (كجم)"
-                      value={capacityKg === "" ? null : Number(capacityKg)}
-                      onValueChange={(v) => {
-                        const next = v == null ? "" : String(v);
-                        setCapacityKg(next);
-                        const n = Number(next) || 0;
-                        const b = Number(bags) || 0;
-                        if (n > 0 && b > 0 && kgAuto) setKg(String(b * n));
-                      }}
-                      className="font-bold"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* عدد الأكياس والوزن الإجمالي */}
-              <div className="grid gap-3 sm:grid-cols-2">
-                <MillingField
-                  label="عدد الأكياس *"
-                  hint="المحدد الأساسي لعمليات الاستلام وأجور الطحن"
-                >
-                  <QuantityInput
-                    min={0}
-                    decimals={0}
-                    placeholder="0"
-                    aria-label="عدد الأكياس"
-                    value={bags === "" ? null : Number(bags)}
-                    onValueChange={(v) => handleBagsChange(v == null ? "" : String(v))}
-                    className="font-black text-primary"
-                  />
-                </MillingField>
-
-                <MillingField
-                  label="الوزن الإجمالي (كجم)"
-                  hint={
-                    Number(capacityKg) > 0
-                      ? `محسوب آلياً (${capacityKg} كجم/كيس) — وقابل للتعديل حسب الميزان`
-                      : "أدخل الوزن الإجمالي بالكيلوجرام"
-                  }
-                >
-                  <div className="space-y-1">
-                    <QuantityInput
-                      min={0}
-                      decimals={2}
-                      unit="kg"
-                      placeholder="0.00"
-                      aria-label="الوزن الإجمالي (كجم)"
-                      value={kg === "" ? null : Number(kg)}
-                      onValueChange={(v) => handleKgChange(v == null ? "" : String(v))}
-                      className="font-bold"
-                    />
-                    {kgAuto && Number(bags) > 0 && Number(capacityKg) > 0 && (
-                      <div className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-                        <CheckCircle2 className="h-3 w-3 shrink-0" />
-                        محسوب تلقائياً: {bags} كيس × {capacityKg} كجم = {fmtNum(Number(kg))} كجم
-                      </div>
-                    )}
-                  </div>
-                </MillingField>
               </div>
 
               {/* ملاحظات الاستلام */}
@@ -788,7 +817,7 @@ function MillingIntakePage() {
                         placeholder="1000"
                         aria-label="أجر طحن الكيس الواحد"
                         value={feePerBag === "" ? null : Number(feePerBag)}
-                        onValueChange={(v) => handleFeePerBagChange(v == null ? "" : String(v))}
+                        onValueChange={(v) => setFeePerBag(v == null ? "" : String(v))}
                         className="font-bold"
                       />
                     </MillingField>
@@ -805,7 +834,7 @@ function MillingIntakePage() {
                         min={0}
                         placeholder="0.00"
                         aria-label="إجمالي أجور الخدمة"
-                        value={servicePrice === "" ? null : Number(servicePrice)}
+                        value={currentSubtotal === 0 ? null : currentSubtotal}
                         onValueChange={(v) => setServicePrice(v == null ? "" : String(v))}
                         className="font-black text-amber-600 dark:text-amber-400"
                       />
@@ -1004,7 +1033,7 @@ function MillingIntakePage() {
           </MillingPanel>
         </div>
 
-        {/* قالب فاتورة وإيصال المطحنة الأنيق المعتمد والمطابق لقالب الاستلام السريع */}
+        {/* سند الاستلام وفاتورة الأجور — القالب الموحد المعتمد */}
         {(activeDetails || printDoc) && (
           <UnifiedPrintModal
             open={printModalOpen}
@@ -1019,7 +1048,7 @@ function MillingIntakePage() {
         <DocumentShareDialog
           open={shareDialogOpen}
           onClose={() => setShareDialogOpen(false)}
-          title="مشاركة الفاتورة وسند الاستلام"
+          title="مشاركة سند الاستلام وفاتورة الأجور"
           documentType="milling_document"
           millingDocumentNumber={createdDocument?.document_number || ""}
           customer={

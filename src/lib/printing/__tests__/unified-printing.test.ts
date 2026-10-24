@@ -85,6 +85,12 @@ check(
     DEFAULT_UNIFIED_PRINT_SETTINGS.copies === 1,
 );
 check("settings key is the v2 store", PRINT_SETTINGS_KEY === "vortex_print_settings_v2");
+check(
+  "customer invoice defaults match the settings screen",
+  DEFAULT_UNIFIED_PRINT_SETTINGS.overrides.customer_invoice?.templateId === "thermal-milling" &&
+    DEFAULT_UNIFIED_PRINT_SETTINGS.overrides.customer_invoice?.paperId === "thermal-80" &&
+    DEFAULT_UNIFIED_PRINT_SETTINGS.overrides.customer_invoice?.method === "thermal",
+);
 
 const fromLegacyAuto = normalizePrintSettings({ printMode: "auto" } as never);
 check("legacy printMode 'auto' migrates to direct", fromLegacyAuto.behavior === "direct");
@@ -415,6 +421,60 @@ const footerOffHtml = renderUnifiedDocument({
   settings: { ...DEFAULT_UNIFIED_PRINT_SETTINGS, footerEnabled: false },
 });
 check("legacy footer disabled remains absent", !footerOffHtml.includes(FOOTER_MARKUP));
+
+const footerEnabledHtml = renderUnifiedDocument({
+  doc: docFor("customer_invoice"),
+  documentType: "customer_invoice",
+  rtl: true,
+  templateId: "standard",
+  paperId: "a4",
+  settings: { ...DEFAULT_UNIFIED_PRINT_SETTINGS, showFooter: true },
+});
+check("footer switch enables footer markup", footerEnabledHtml.includes(FOOTER_MARKUP));
+
+const hiddenFieldsHtml = renderUnifiedDocument({
+  doc: {
+    ...docFor("customer_invoice"),
+    options: {
+      showCompanyInfo: true,
+      showCustomerInfo: true,
+      showDocNumberDate: true,
+      showFinancialDetails: true,
+      showFooter: false,
+    },
+  },
+  documentType: "customer_invoice",
+  rtl: true,
+  templateId: "standard",
+  paperId: "a4",
+  settings: {
+    ...DEFAULT_UNIFIED_PRINT_SETTINGS,
+    showCompanyInfo: false,
+    showCustomerInfo: false,
+    showDocNumberDate: false,
+    showMovementInfo: false,
+    showFinancialDetails: false,
+    showPaymentInfo: false,
+    showNotes: false,
+  },
+});
+check(
+  "disabled company fields are omitted",
+  !hiddenFieldsHtml.includes('class="corporate-brand-name"'),
+);
+check(
+  "disabled document number is omitted",
+  !hiddenFieldsHtml.includes('class="invoice-document-number"'),
+);
+check(
+  "disabled customer card is hidden",
+  hiddenFieldsHtml.includes('class="party-info-compact-bar" style="display:none"'),
+);
+check("disabled totals are omitted", !hiddenFieldsHtml.includes('class="totals-card"'));
+check(
+  "invoice number has no hash prefix",
+  !stdHtml.includes(`#${docFor("customer_invoice").number}`),
+);
 
 /* Multi-page layout is no longer constrained by a fixed footer. */
 check("removed footer adds no pagination styles", UNIVERSAL_FOOTER_CSS === "");

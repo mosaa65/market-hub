@@ -30,6 +30,7 @@ import { Route as AppFiscalYearCloseRouteImport } from './routes/_app.fiscal-yea
 import { Route as AppFixedAssetsRouteImport } from './routes/_app.fixed-assets'
 import { Route as AppGeneralLedgerRouteImport } from './routes/_app.general-ledger'
 import { Route as AppIncomeStatementRouteImport } from './routes/_app.income-statement'
+import { Route as AppInfrastructureRouteImport } from './routes/_app.infrastructure'
 import { Route as AppInventoryRouteImport } from './routes/_app.inventory'
 import { Route as AppLoyaltyRouteImport } from './routes/_app.loyalty'
 import { Route as AppMillingRouteImport } from './routes/_app.milling'
@@ -60,6 +61,7 @@ import { Route as AppTrialBalanceRouteImport } from './routes/_app.trial-balance
 import { Route as AppUsersRouteImport } from './routes/_app.users'
 import { Route as AppVortexUiRouteImport } from './routes/_app.vortex-ui'
 import { Route as AppWarehousesRouteImport } from './routes/_app.warehouses'
+import { Route as AppMillingCustodyDeliveryRouteImport } from './routes/_app.milling.custody-delivery'
 import { Route as AppMillingCustomerStatementRouteImport } from './routes/_app.milling.customer-statement'
 import { Route as AppMillingDeliveryRouteImport } from './routes/_app.milling.delivery'
 import { Route as AppMillingIntakeRouteImport } from './routes/_app.milling.intake'
@@ -178,6 +180,11 @@ const AppGeneralLedgerRoute = AppGeneralLedgerRouteImport.update({
 const AppIncomeStatementRoute = AppIncomeStatementRouteImport.update({
   id: '/income-statement',
   path: '/income-statement',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppInfrastructureRoute = AppInfrastructureRouteImport.update({
+  id: '/infrastructure',
+  path: '/infrastructure',
   getParentRoute: () => AppRoute,
 } as any)
 const AppInventoryRoute = AppInventoryRouteImport.update({
@@ -330,6 +337,12 @@ const AppWarehousesRoute = AppWarehousesRouteImport.update({
   path: '/warehouses',
   getParentRoute: () => AppRoute,
 } as any)
+const AppMillingCustodyDeliveryRoute =
+  AppMillingCustodyDeliveryRouteImport.update({
+    id: '/custody-delivery',
+    path: '/custody-delivery',
+    getParentRoute: () => AppMillingRoute,
+  } as any)
 const AppMillingCustomerStatementRoute =
   AppMillingCustomerStatementRouteImport.update({
     id: '/customer-statement',
@@ -430,6 +443,7 @@ export interface FileRoutesByFullPath {
   '/fixed-assets': typeof AppFixedAssetsRoute
   '/general-ledger': typeof AppGeneralLedgerRoute
   '/income-statement': typeof AppIncomeStatementRoute
+  '/infrastructure': typeof AppInfrastructureRoute
   '/inventory': typeof AppInventoryRoute
   '/loyalty': typeof AppLoyaltyRoute
   '/milling': typeof AppMillingRouteWithChildren
@@ -460,6 +474,7 @@ export interface FileRoutesByFullPath {
   '/users': typeof AppUsersRoute
   '/vortex-ui': typeof AppVortexUiRoute
   '/warehouses': typeof AppWarehousesRoute
+  '/milling/custody-delivery': typeof AppMillingCustodyDeliveryRoute
   '/milling/customer-statement': typeof AppMillingCustomerStatementRoute
   '/milling/delivery': typeof AppMillingDeliveryRoute
   '/milling/intake': typeof AppMillingIntakeRoute
@@ -497,6 +512,7 @@ export interface FileRoutesByTo {
   '/fixed-assets': typeof AppFixedAssetsRoute
   '/general-ledger': typeof AppGeneralLedgerRoute
   '/income-statement': typeof AppIncomeStatementRoute
+  '/infrastructure': typeof AppInfrastructureRoute
   '/inventory': typeof AppInventoryRoute
   '/loyalty': typeof AppLoyaltyRoute
   '/milling': typeof AppMillingRouteWithChildren
@@ -527,6 +543,7 @@ export interface FileRoutesByTo {
   '/users': typeof AppUsersRoute
   '/vortex-ui': typeof AppVortexUiRoute
   '/warehouses': typeof AppWarehousesRoute
+  '/milling/custody-delivery': typeof AppMillingCustodyDeliveryRoute
   '/milling/customer-statement': typeof AppMillingCustomerStatementRoute
   '/milling/delivery': typeof AppMillingDeliveryRoute
   '/milling/intake': typeof AppMillingIntakeRoute
@@ -566,6 +583,7 @@ export interface FileRoutesById {
   '/_app/fixed-assets': typeof AppFixedAssetsRoute
   '/_app/general-ledger': typeof AppGeneralLedgerRoute
   '/_app/income-statement': typeof AppIncomeStatementRoute
+  '/_app/infrastructure': typeof AppInfrastructureRoute
   '/_app/inventory': typeof AppInventoryRoute
   '/_app/loyalty': typeof AppLoyaltyRoute
   '/_app/milling': typeof AppMillingRouteWithChildren
@@ -596,6 +614,7 @@ export interface FileRoutesById {
   '/_app/users': typeof AppUsersRoute
   '/_app/vortex-ui': typeof AppVortexUiRoute
   '/_app/warehouses': typeof AppWarehousesRoute
+  '/_app/milling/custody-delivery': typeof AppMillingCustodyDeliveryRoute
   '/_app/milling/customer-statement': typeof AppMillingCustomerStatementRoute
   '/_app/milling/delivery': typeof AppMillingDeliveryRoute
   '/_app/milling/intake': typeof AppMillingIntakeRoute
@@ -635,6 +654,7 @@ export interface FileRouteTypes {
     | '/fixed-assets'
     | '/general-ledger'
     | '/income-statement'
+    | '/infrastructure'
     | '/inventory'
     | '/loyalty'
     | '/milling'
@@ -665,6 +685,7 @@ export interface FileRouteTypes {
     | '/users'
     | '/vortex-ui'
     | '/warehouses'
+    | '/milling/custody-delivery'
     | '/milling/customer-statement'
     | '/milling/delivery'
     | '/milling/intake'
@@ -702,6 +723,7 @@ export interface FileRouteTypes {
     | '/fixed-assets'
     | '/general-ledger'
     | '/income-statement'
+    | '/infrastructure'
     | '/inventory'
     | '/loyalty'
     | '/milling'
@@ -732,6 +754,7 @@ export interface FileRouteTypes {
     | '/users'
     | '/vortex-ui'
     | '/warehouses'
+    | '/milling/custody-delivery'
     | '/milling/customer-statement'
     | '/milling/delivery'
     | '/milling/intake'
@@ -770,6 +793,7 @@ export interface FileRouteTypes {
     | '/_app/fixed-assets'
     | '/_app/general-ledger'
     | '/_app/income-statement'
+    | '/_app/infrastructure'
     | '/_app/inventory'
     | '/_app/loyalty'
     | '/_app/milling'
@@ -800,6 +824,7 @@ export interface FileRouteTypes {
     | '/_app/users'
     | '/_app/vortex-ui'
     | '/_app/warehouses'
+    | '/_app/milling/custody-delivery'
     | '/_app/milling/customer-statement'
     | '/_app/milling/delivery'
     | '/_app/milling/intake'
@@ -970,6 +995,13 @@ declare module '@tanstack/react-router' {
       path: '/income-statement'
       fullPath: '/income-statement'
       preLoaderRoute: typeof AppIncomeStatementRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/infrastructure': {
+      id: '/_app/infrastructure'
+      path: '/infrastructure'
+      fullPath: '/infrastructure'
+      preLoaderRoute: typeof AppInfrastructureRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/inventory': {
@@ -1182,6 +1214,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppWarehousesRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/milling/custody-delivery': {
+      id: '/_app/milling/custody-delivery'
+      path: '/custody-delivery'
+      fullPath: '/milling/custody-delivery'
+      preLoaderRoute: typeof AppMillingCustodyDeliveryRouteImport
+      parentRoute: typeof AppMillingRoute
+    }
     '/_app/milling/customer-statement': {
       id: '/_app/milling/customer-statement'
       path: '/customer-statement'
@@ -1291,6 +1330,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppMillingRouteChildren {
+  AppMillingCustodyDeliveryRoute: typeof AppMillingCustodyDeliveryRoute
   AppMillingCustomerStatementRoute: typeof AppMillingCustomerStatementRoute
   AppMillingDeliveryRoute: typeof AppMillingDeliveryRoute
   AppMillingIntakeRoute: typeof AppMillingIntakeRoute
@@ -1301,6 +1341,7 @@ interface AppMillingRouteChildren {
 }
 
 const AppMillingRouteChildren: AppMillingRouteChildren = {
+  AppMillingCustodyDeliveryRoute: AppMillingCustodyDeliveryRoute,
   AppMillingCustomerStatementRoute: AppMillingCustomerStatementRoute,
   AppMillingDeliveryRoute: AppMillingDeliveryRoute,
   AppMillingIntakeRoute: AppMillingIntakeRoute,
@@ -1367,6 +1408,7 @@ interface AppRouteChildren {
   AppFixedAssetsRoute: typeof AppFixedAssetsRoute
   AppGeneralLedgerRoute: typeof AppGeneralLedgerRoute
   AppIncomeStatementRoute: typeof AppIncomeStatementRoute
+  AppInfrastructureRoute: typeof AppInfrastructureRoute
   AppInventoryRoute: typeof AppInventoryRoute
   AppLoyaltyRoute: typeof AppLoyaltyRoute
   AppMillingRoute: typeof AppMillingRouteWithChildren
@@ -1419,6 +1461,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppFixedAssetsRoute: AppFixedAssetsRoute,
   AppGeneralLedgerRoute: AppGeneralLedgerRoute,
   AppIncomeStatementRoute: AppIncomeStatementRoute,
+  AppInfrastructureRoute: AppInfrastructureRoute,
   AppInventoryRoute: AppInventoryRoute,
   AppLoyaltyRoute: AppLoyaltyRoute,
   AppMillingRoute: AppMillingRouteWithChildren,

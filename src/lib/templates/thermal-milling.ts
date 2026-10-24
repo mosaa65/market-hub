@@ -204,7 +204,7 @@ export function renderThermalMillingTemplate(
           ? `
         <div class="flex-between">
           <span style="color: #64748b;">رقم المستند:</span>
-          <span class="font-bold font-mono">#${esc(doc.number)}</span>
+          <span class="font-bold font-mono">${esc(doc.number)}</span>
         </div>
         <div class="flex-between">
           <span style="color: #64748b;">التاريخ:</span>
@@ -370,6 +370,7 @@ export function renderThermalMillingTemplate(
     <div class="footer-note">
       <div style="font-weight: 700; color: #0f172a;">${esc(L.thanks)}</div>
       <div>نسعد بخدمتكم دائماً — تم استلام المستند بنجاح</div>
+      ${opts.showFooter ? `<footer class="universal-footer">${esc(L.thanks)}</footer>` : ""}
       ${renderInvoiceRightsFooter()}
     </div>
   </div>
