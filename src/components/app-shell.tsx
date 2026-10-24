@@ -32,6 +32,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { setCompanySettingsCache } from "@/lib/format";
 import { checkBackupReminderStatus } from "@/lib/backup/reminder";
 import { useMillingMode, isRouteVisibleByMillingMode } from "@/lib/milling-mode";
+import { startAutoBackupScheduler } from "@/lib/backup/auto-scheduler";
 import { useTheme } from "@/lib/theme";
 import { ThemePaletteQuickSwitcher } from "@/components/theme/theme-palette-quick-switcher";
 import { getSidebarSections, type SidebarSection } from "@/lib/navigation";
@@ -241,6 +242,11 @@ const SidebarContents = memo(function SidebarContents({
       ),
     [filteredSections, preferences.mode, preferences.focusGroup, preferences.explorerGroup],
   );
+
+  // مجدول النسخ الاحتياطي التلقائي — يعمل مرة واحدة عند إقلاع التطبيق
+  useEffect(() => {
+    startAutoBackupScheduler();
+  }, []);
 
   useEffect(() => {
     if (
