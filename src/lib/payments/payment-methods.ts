@@ -248,6 +248,7 @@ export const PAYMENT_METHOD_CATALOG: readonly PaymentMethodDefinition[] = [
     ledgerKind: "CASH",
     defaultAccountCode: "1101",
     legacyValue: "cash",
+    legacyIds: ["cash"],
   },
   {
     id: "credit",
@@ -256,212 +257,54 @@ export const PAYMENT_METHOD_CATALOG: readonly PaymentMethodDefinition[] = [
     iconKey: "credit",
     isActive: true,
     sortOrder: 20,
-    // آجل on a purchase means "we owe the supplier"; offering it while
-    // collecting cash from a customer is meaningless.
     allowedContexts: ["pos", "sales", "purchases", "sales_returns", "purchase_returns"],
     ledgerKind: "CREDIT",
     defaultAccountCode: "1211",
     isCreditTerm: true,
     legacyValue: "credit",
+    legacyIds: ["credit"],
   },
   {
     id: "bank_transfer",
-    nameAr: "تحويل بنكي",
-    nameEn: "Bank transfer",
+    nameAr: "بنك",
+    nameEn: "Bank",
     iconKey: "bank-transfer",
     isActive: true,
     sortOrder: 30,
-    allowedContexts: ["pos", "sales", "purchases", "expenses", "customer_collection"],
+    allowedContexts: ALL_CONTEXTS,
     ledgerKind: "BANK",
     defaultAccountCode: "1111",
-    requiresReference: true,
+    requiresReference: false,
     legacyValue: "bank_transfer",
-  },
-  {
-    id: "kuraimi_bank",
-    nameAr: "بنك الكريمي",
-    nameEn: "Al-Kuraimi Bank",
-    iconKey: "kuraimi",
-    isActive: true,
-    sortOrder: 40,
-    allowedContexts: ["pos", "sales", "purchases", "expenses", "customer_collection"],
-    ledgerKind: "BANK",
-    defaultAccountCode: "1111",
-    requiresReference: true,
-    legacyValue: "bank_transfer",
-    // No legacy id: this method was never its own ENUM value. Storing the
-    // generic `bank_transfer` is deliberate — see the migration seed.
-    legacyIds: [],
-  },
-  {
-    id: "yemen_kuwait_bank",
-    nameAr: "بنك اليمن الدولي",
-    nameEn: "Yemen International Bank",
-    iconKey: "bank",
-    isActive: true,
-    sortOrder: 50,
-    allowedContexts: ["pos", "sales", "purchases", "expenses", "customer_collection"],
-    ledgerKind: "BANK",
-    defaultAccountCode: "1121",
-    requiresReference: true,
-    legacyValue: "bank_transfer",
-    legacyIds: [],
-  },
-  {
-    id: "jawali",
-    nameAr: "جوالي",
-    nameEn: "Jawali",
-    iconKey: "mobile-money",
-    isActive: true,
-    sortOrder: 60,
-    allowedContexts: ["pos", "sales", "purchases", "expenses", "customer_collection"],
-    ledgerKind: "WALLET",
-    requiresReference: true,
-    legacyValue: "mobile_money",
-    // The FIRST wallet carries the historical `mobile_money` value; the others
-    // deliberately do not, so a stored `mobile_money` resolves to جوالي only.
-    legacyIds: ["mobile_money"],
-  },
-  {
-    id: "jaib",
-    nameAr: "جيب",
-    nameEn: "Jaib Wallet",
-    iconKey: "wallet",
-    isActive: true,
-    sortOrder: 70,
-    allowedContexts: ["pos", "sales", "purchases", "expenses", "customer_collection"],
-    ledgerKind: "WALLET",
-    requiresReference: true,
-    legacyValue: "mobile_money",
-    legacyIds: [],
-  },
-  {
-    id: "floosak",
-    nameAr: "فلوسك",
-    nameEn: "Floosak",
-    iconKey: "wallet",
-    isActive: true,
-    sortOrder: 80,
-    allowedContexts: ["pos", "sales", "purchases", "expenses", "customer_collection"],
-    ledgerKind: "WALLET",
-    requiresReference: true,
-    legacyValue: "mobile_money",
-    legacyIds: [],
-  },
-  {
-    id: "one_cash",
-    nameAr: "ون كاش",
-    nameEn: "One Cash",
-    iconKey: "wallet",
-    isActive: true,
-    sortOrder: 90,
-    allowedContexts: ["pos", "sales", "purchases", "expenses", "customer_collection"],
-    ledgerKind: "WALLET",
-    requiresReference: true,
-    legacyValue: "mobile_money",
-    legacyIds: [],
-  },
-  {
-    id: "card",
-    nameAr: "بطاقة / شبكة",
-    nameEn: "Card",
-    iconKey: "card",
-    isActive: true,
-    sortOrder: 100,
-    allowedContexts: ["pos", "sales", "purchases", "expenses", "customer_collection"],
-    ledgerKind: "CARD",
-    defaultAccountCode: "1111",
-    legacyValue: "card",
+    legacyIds: ["bank_transfer"],
   },
   {
     id: "mobile_money",
     nameAr: "محفظة إلكترونية",
-    nameEn: "Mobile money",
+    nameEn: "E-Wallet",
     iconKey: "mobile-money",
     isActive: true,
-    sortOrder: 110,
-    allowedContexts: ["pos", "sales", "purchases", "expenses", "customer_collection"],
+    sortOrder: 40,
+    allowedContexts: ALL_CONTEXTS,
     ledgerKind: "WALLET",
-    requiresReference: true,
+    defaultAccountCode: "1131",
+    requiresReference: false,
     legacyValue: "mobile_money",
-  },
-  {
-    // A cheque clears through the bank, so it settles as `bank_transfer` while
-    // keeping its own name and icon. It shipped in the migration seed from the
-    // start (`20261208000000` section 1) — its absence here meant a database
-    // that had the migration applied showed "شيك" with no label and no icon.
-    id: "cheque",
-    nameAr: "شيك",
-    nameEn: "Cheque",
-    // The applied database seed uses `bank-transfer`; keep it aligned until a
-    // forward migration deliberately changes the stored icon key.
-    iconKey: "bank-transfer",
-    isActive: true,
-    sortOrder: 120,
-    allowedContexts: ["pos", "sales", "purchases", "expenses", "customer_collection"],
-    ledgerKind: "BANK",
-    defaultAccountCode: "1111",
-    requiresReference: true,
-    legacyValue: "cheque",
-    legacyIds: ["cheque"],
-  },
-  {
-    // Not a tender the operator picks — it is what an invoice records when the
-    // cashier split the payment across several methods. It lives in the
-    // catalogue so historic split invoices get a name and an icon from the same
-    // registry as everything else.
-    id: "split",
-    nameAr: "دفع بأكثر من طريقة",
-    nameEn: "Split payment",
-    iconKey: "split",
-    isActive: true,
-    sortOrder: 900,
-    allowedContexts: ["pos", "sales"],
-    ledgerKind: "OTHER",
-    legacyValue: "split",
-    legacyIds: ["split"],
+    legacyIds: ["mobile_money"],
   },
 ];
 
-/**
- * Is this id something an OPERATOR may pick as a single tender?
- *
- * `split` is excluded on purpose and for one reason: it is not a payment, it is
- * the RESULT of paying with more than one method, written by the split engine.
- * Offering it in a picker would let an operator record "دفع بأكثر من طريقة" as
- * the sole tender of an invoice that was in fact settled once, and `credit` is
- * excluded where it is meaningless (see `isCreditTerm`).
- */
 export function isSelectableTender(method: Pick<PaymentMethodDefinition, "id">): boolean {
-  return method.id !== "split";
+  return true;
 }
 
-/**
- * The methods the settings screen manages, IN PRESENTATION ORDER.
- *
- * ── This is NOT a whitelist of what may be offered ──────────────────────────
- * It used to be, and that was the bug: a filter against this array meant a
- * method a business created in Settings — which lives in `payment_methods` and
- * is returned by the catalogue query — never reached a picker, and neither did
- * `card`, `cheque` or the generic `mobile_money`. The database is the authority
- * for which methods exist; this array only decides the ORDER the settings
- * screen lists the shipped ones in.
- */
 export const SHIPPED_PAYMENT_METHOD_ORDER = [
   "cash",
   "credit",
   "bank_transfer",
-  "kuraimi_bank",
-  "yemen_kuwait_bank",
-  "jaib",
-  "one_cash",
-  "jawali",
-  "floosak",
-  "card",
   "mobile_money",
-  "cheque",
-  "split",
 ] as const;
+
 
 /** Index for O(1) lookups. Built once at module load. */
 const CATALOG_BY_ID = new Map<string, PaymentMethodDefinition>(
@@ -513,7 +356,15 @@ export function isShippedPaymentMethod(id: string): boolean {
 export function toLegacyPaymentValue(id: string): LegacyPaymentValue {
   const known = CATALOG_BY_ID.get(id)?.legacyValue;
   if (known) return known;
-  return id as LegacyPaymentValue;
+  if (id === "card" || id === "cheque" || id === "bank" || id === "kuraimi_bank" || id === "yemen_kuwait_bank") {
+    return "bank_transfer";
+  }
+  if (id === "jawali" || id === "jaib" || id === "floosak" || id === "one_cash") {
+    return "mobile_money";
+  }
+  if (id === "credit") return "credit";
+  if (id === "cash") return "cash";
+  return (id as LegacyPaymentValue) || "cash";
 }
 
 /**
@@ -526,7 +377,16 @@ export function toStorablePaymentValue(id: string | null | undefined): LegacyPay
   if (!id) return null;
   const known = CATALOG_BY_ID.get(id)?.legacyValue;
   if (known) return known;
-  return isLegacyPaymentValue(id) ? id : null;
+  if (id === "card" || id === "cheque" || id === "bank" || id === "kuraimi_bank" || id === "yemen_kuwait_bank") {
+    return "bank_transfer";
+  }
+  if (id === "jawali" || id === "jaib" || id === "floosak" || id === "one_cash") {
+    return "mobile_money";
+  }
+  if (id === "cash" || id === "credit" || id === "bank_transfer" || id === "mobile_money") {
+    return id as LegacyPaymentValue;
+  }
+  return null;
 }
 
 /**
@@ -545,7 +405,15 @@ export function requiresPaymentReference(id: string | null | undefined): boolean
 /** The catalogue id that represents an ENUM value found on an old document. */
 export function toCatalogId(legacy: string | null | undefined): string | undefined {
   if (!legacy) return undefined;
-  return CATALOG_BY_LEGACY.get(legacy)?.id;
+  if (legacy === "cash") return "cash";
+  if (legacy === "credit") return "credit";
+  if (legacy === "bank_transfer" || legacy === "card" || legacy === "cheque" || legacy === "bank" || legacy === "kuraimi_bank" || legacy === "yemen_kuwait_bank") {
+    return "bank_transfer";
+  }
+  if (legacy === "mobile_money" || legacy === "jawali" || legacy === "jaib" || legacy === "floosak" || legacy === "one_cash") {
+    return "mobile_money";
+  }
+  return CATALOG_BY_LEGACY.get(legacy)?.id ?? (CATALOG_BY_ID.has(legacy) ? legacy : "cash");
 }
 
 /* ============================================================================
@@ -725,7 +593,8 @@ export function paymentMethodLabel(
     return lang === "ar" ? override.nameAr : (override.nameEn ?? override.nameAr);
   }
 
-  const def = byId ?? CATALOG_BY_LEGACY.get(value);
+  const catalogId = toCatalogId(value);
+  const def = byId ?? (catalogId ? CATALOG_BY_ID.get(catalogId) : undefined) ?? CATALOG_BY_LEGACY.get(value);
   if (!def) return value;
 
   return lang === "ar" ? def.nameAr : (def.nameEn ?? def.nameAr);

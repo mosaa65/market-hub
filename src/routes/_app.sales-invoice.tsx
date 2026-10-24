@@ -1265,22 +1265,6 @@ function SalesInvoicePage() {
             <div className="h-px bg-border" />
 
             <div className="space-y-3">
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-muted-foreground">
-                  {isRtl ? "طريقة السداد والتوجيه المالي" : "Payment method & settlement"}
-                </label>
-                <DynamicPaymentSelector
-                  context="sales"
-                  value={paymentMethod}
-                  onChange={(method) => {
-                    setPaymentMethod(method);
-                    if (getPaymentMethodDefinition(method)?.isCreditTerm) setPaid("0");
-                  }}
-                  settlement={settlement}
-                  onSettlementChange={setSettlement}
-                  includeCredit
-                />
-              </div>
               <PaymentPanel
                 context="sales"
                 total={total}

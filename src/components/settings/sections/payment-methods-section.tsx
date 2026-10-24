@@ -122,7 +122,7 @@ export function PaymentMethodsSection() {
   const { methods, isLoading, isFallback, refetch } = usePaymentMethods();
   const { save, isSaving } = useUpdatePaymentMethodSettings();
 
-  const [mainTab, setMainTab] = useState<"catalog" | "cashboxes" | "banks" | "cheques">("catalog");
+  const [mainTab, setMainTab] = useState<"catalog" | "cashboxes" | "banks">("catalog");
   const [draft, setDraft] = useState<DraftState>({ rows: {}, order: [] });
   const [savedSnapshot, setSavedSnapshot] = useState<DraftState>({ rows: {}, order: [] });
   const [query, setQuery] = useState("");
@@ -405,24 +405,12 @@ export function PaymentMethodsSection() {
           <span>{isAr ? "الحسابات الافتراضية" : "Default accounts"}</span>
         </button>
 
-        <button
-          type="button"
-          onClick={() => setMainTab("cheques")}
-          className={cn(
-            "flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition",
-            mainTab === "cheques"
-              ? "bg-primary text-primary-foreground shadow-xs font-bold"
-              : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
-          )}
-        >
-          <FileCheck2 className="h-4 w-4" />
-          <span>{isAr ? "سجل أوراق القبض والشيكات" : "Cheques Register"}</span>
-        </button>
+
       </div>
 
       {mainTab === "cashboxes" && <CashboxesManagement />}
       {mainTab === "banks" && <BankAccountsManagement />}
-      {mainTab === "cheques" && <ChequesManagement />}
+      
 
       {mainTab === "catalog" && (
         <>
