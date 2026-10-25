@@ -149,18 +149,15 @@ check(
 );
 check("unified layout renders the company address", unifiedHtml.includes("صنعاء - شارع تعز"));
 check(
-  "unified invoice includes the approved company rights line",
-  standardCompanyHtml.includes("تطوير وبرمجة إنما سوفت") &&
-    standardCompanyHtml.includes("772217218 - 784795104"),
+  "standard template omits the company rights footer entirely",
+  !standardCompanyHtml.includes("تطوير وبرمجة إنما سوفت") &&
+    !standardCompanyHtml.includes("772217218 - 784795104"),
 );
 check(
-  "unified invoice includes the approved company rights line",
-  (unifiedHtml.match(/تطوير وبرمجة إنما سوفت/g) ?? []).length === 1 &&
-    unifiedHtml.includes("772217218 - 784795104"),
-);
-check(
-  "unified layout omits the removed universal footer",
-  !unifiedHtml.includes('class="universal-footer"'),
+  "unified layout omits the removed company rights footer",
+  !unifiedHtml.includes("تطوير وبرمجة إنما سوفت") &&
+    !unifiedHtml.includes("772217218 - 784795104") &&
+    !unifiedHtml.includes('class="universal-footer"'),
 );
 
 // القالب الرسمي

@@ -380,12 +380,16 @@ function rightsOccurrences(html: string): number {
     .replace(/<[^>]*>/g, "")
     .replace(/\s+/g, " ")
     .trim();
+  // COMPANY_RIGHTS_TEXT is intentionally empty now. `split("")` splits into
+  // characters and would always report a match, so an empty needle means the
+  // line is removed by definition.
+  if (!COMPANY_RIGHTS_TEXT) return 0;
   return text.split(COMPANY_RIGHTS_TEXT).length - 1;
 }
 
 check(
-  "rights helper contains the approved exact line",
-  rightsOccurrences(renderInvoiceRightsFooter()) === 1,
+  "rights helper is intentionally empty after footer removal",
+  renderInvoiceRightsFooter() === "" && rightsOccurrences(renderInvoiceRightsFooter()) === 0,
 );
 
 /* Company data must come from Company Profile, not a template constant. */
@@ -589,8 +593,8 @@ check(
 );
 check("document output omits legacy footer fields", !stdHtml.includes("footer-contact"));
 check(
-  "unified invoice renders the approved rights line exactly once",
-  rightsOccurrences(stdHtml) === 1 && stdHtml.includes("772217218 - 784795104"),
+  "unified invoice omits the removed company rights line",
+  rightsOccurrences(stdHtml) === 0 && !stdHtml.includes("772217218 - 784795104"),
 );
 
 const invoiceTemplateOutputs = [
@@ -604,8 +608,10 @@ const invoiceTemplateOutputs = [
   renderMillingThermalTemplate(docFor("customer_invoice"), LABELS, true),
 ];
 check(
-  "approved rights line appears exactly once in every invoice template",
-  invoiceTemplateOutputs.every((html) => rightsOccurrences(html) === 1),
+  "company rights line appears in no invoice template",
+  invoiceTemplateOutputs.every(
+    (html) => rightsOccurrences(html) === 0 && !html.includes("772217218 - 784795104"),
+  ),
 );
 if (failures.length > 0) {
   throw new Error(`Unified printing tests failed:\n - ${failures.join("\n - ")}`);
