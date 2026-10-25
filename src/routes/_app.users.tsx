@@ -532,6 +532,29 @@ function UsersPage() {
           // fallback to error.message
         }
         console.error("[CreateUser] invoke error detail:", error, errorMsg);
+        // Newer supabase-js wraps network-level failures (DNS, 502/503 from the
+        // gateway, a stopped edge runtime) in a generic "Failed to send a
+        // request to the Edge Function" + FunctionsFetchError, while the real
+        // cause is the raw message on the grabbed cause:
+        // "TypeError: Failed to fetch" or "name resolution failed". Those read
+        // as a system crash to the operator, so translate them into a sentence
+        // that names the actual remedy.
+        const raw = String((error as any)?.cause?.message ?? error?.message ?? "");
+        const isTransport =
+          (error as any)?.name === "FunctionsFetchError" ||
+          /failed to fetch|networkerror|name resolution|ENOTFOUND|ECONNREFUSED|503|502|504/i.test(
+            `${raw} ${error?.message ?? ""}`,
+          );
+        // Only replace the platform's opaque wording; a message the function
+        // itself returned (real validation error) is always kept.
+        const looksOpaque =
+          !errorMsg?.trim() ||
+          /failed to send a request|failed to fetch|name resolution|non-2xx/i.test(errorMsg);
+        if (isTransport && looksOpaque) {
+          errorMsg = isAr
+            ? "تعذر الوصول إلى خدمة إنشاء الحسابات على الخادم (الدالة admin-create-user). تأكد من تشغيل الخادم المحلي: npm run db:local:start ثم npm run db:functions:start، أو تأكد من نشر الدالة في السحابة."
+            : "Cannot reach the account-provisioning function (admin-create-user). Start it locally with `npm run db:local:start` then `npm run db:functions:start`, or deploy it to the cloud.";
+        }
         throw new Error(
           errorMsg ||
             (isAr ? "تعذر إنشاء المستخدم. يرجى المحاولة مرة أخرى." : "Failed to create user."),

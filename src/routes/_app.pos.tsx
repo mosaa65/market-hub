@@ -1713,37 +1713,20 @@ function POSPage() {
   const selectClassName =
     "h-10 w-full appearance-none rounded-2xl border border-border/80 bg-surface/90 px-3.5 text-xs text-foreground outline-none transition hover:border-primary/40 focus:border-primary focus:ring-2 focus:ring-primary/20";
 
+  /*
+   * Keep the catalog and cart in the same actual workspace band on desktop.
+   * If the cart sits in a higher grid row than the catalog, the basket grows
+   * upward and drags the product form downward; that creates the "cart up /
+   * product form down" effect. We keep both panels aligned to the same row and
+   * let only their internal scroll areas flex.
+   */
   return (
     <>
       {/* ─── Compact Executive POS Workspace Shell ─── */}
-      <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden bg-[radial-gradient(ellipse_at_top,_color-mix(in_oklab,var(--primary)_8%,transparent),transparent_48%)] p-0.5 sm:gap-2 sm:p-2.5 lg:grid-cols-[minmax(0,1fr)_minmax(390px,450px)] lg:grid-rows-[auto_minmax(0,1fr)]">
-        <div className="hidden min-w-0 items-center justify-end gap-2 px-1 py-0.5 sm:flex lg:col-start-2 lg:row-start-1">
-          {selectedCustomer &&
-            (Number(selectedCustomer.balance) !== 0 ||
-              Number(selectedCustomer.credit_limit) > 0) && (
-              <div className="hidden min-w-0 shrink-0 items-center gap-2 rounded-lg border border-border/70 bg-surface/70 px-2 py-1 text-[10px] font-mono xl:flex">
-                {Number(selectedCustomer.balance) > 0 ? (
-                  <span className="font-bold text-amber-600">
-                    {lang === "ar" ? "عليه دين:" : "Debt:"}{" "}
-                    {money(Number(selectedCustomer.balance))}
-                  </span>
-                ) : Number(selectedCustomer.balance) < 0 ? (
-                  <span className="font-bold text-emerald-600">
-                    {lang === "ar" ? "له رصيد:" : "Credit:"}{" "}
-                    {money(Math.abs(Number(selectedCustomer.balance)))}
-                  </span>
-                ) : null}
-                {Number(selectedCustomer.credit_limit) > 0 && (
-                  <span className="border-s border-border/60 ps-2 text-muted-foreground">
-                    {lang === "ar" ? "الحد:" : "Limit:"}{" "}
-                    {money(Number(selectedCustomer.credit_limit))}
-                  </span>
-                )}
-              </div>
-            )}
-        </div>
+      <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden bg-[radial-gradient(ellipse_at_top,_color-mix(in_oklab,var(--primary)_8%,transparent),transparent_48%)] p-0.5 sm:gap-2 sm:p-2.5 lg:grid-cols-[minmax(0,1fr)_minmax(390px,470px)] lg:grid-rows-[auto_minmax(0,1fr)]">
+        <div className="hidden min-w-0 items-center justify-end gap-2 px-1 py-0.5 sm:flex lg:col-span-2 lg:row-start-1 lg:shrink-0" />
         {/* ─── Top Executive Command Deck ─── */}
-        <header className="flex min-w-0 shrink-0 items-center justify-between gap-1 overflow-x-auto overscroll-x-contain rounded-xl border border-border/80 bg-surface/95 px-1.5 py-1.5 shadow-xs backdrop-blur-md sm:gap-2 sm:px-3 sm:py-2 lg:col-start-1 lg:row-start-1">
+        <header className="flex min-w-0 shrink-0 items-center justify-between gap-1 self-start overflow-x-auto overscroll-x-contain rounded-xl border border-border/80 bg-surface/95 px-1.5 py-1.5 shadow-xs backdrop-blur-md sm:gap-2 sm:px-3 sm:py-2 lg:hidden">
           {/* Quick Command Controls: Customer, Balance, Date, Warehouse, Service */}
           <div className="flex w-full min-w-0 flex-1 items-center justify-between gap-1 sm:gap-1.5">
             {/* Customer Selector with VIP Badge */}
@@ -1863,10 +1846,121 @@ function POSPage() {
         </header>
 
         {/* ─── Main Content Split: Products Catalog (Desktop) & Cart (All) ─── */}
-        <div className="grid min-h-0 grid-cols-1 grid-rows-[minmax(0,1fr)] items-stretch gap-0 sm:gap-2 lg:contents lg:row-start-2">
+        <div className="grid min-h-0 grid-cols-1 grid-rows-[minmax(0,1fr)] items-stretch gap-0 sm:gap-2 lg:contents">
           {/* ─── Products Panel (Desktop & Tablet) ─── */}
           {isDesktop && (
             <div className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-border/80 bg-surface/95 p-3 shadow-sm ring-1 ring-background/40 lg:col-start-1 lg:row-start-2">
+              <div className="mb-2.5 rounded-2xl border border-border/70 bg-surface/90 p-2.5 shadow-sm">
+                <div className="flex flex-col gap-2 xl:flex-row xl:items-center">
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      {lang === "ar" ? "البيانات الأساسية" : "Sale context"}
+                    </div>
+                    <PartyPicker
+                      options={customers}
+                      value={customerId}
+                      onChange={setCustomerId}
+                      lang={lang}
+                      label={lang === "ar" ? "العميل" : "Customer"}
+                      emptyLabel={t("pos.walkin")}
+                      kind="customer"
+                      className="h-10 min-w-0 w-full rounded-2xl border-primary/20 bg-primary/[0.035] text-xs hover:border-primary/50 hover:bg-primary/[0.07]"
+                    />
+                  </div>
+
+                  {isModuleEnabled("multi_warehouse") && warehouses.length > 1 && (
+                    <div className="relative min-w-[150px] xl:w-[170px]">
+                      <label className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                        {lang === "ar" ? "المستودع" : "Warehouse"}
+                      </label>
+                      <select
+                        dir={lang === "ar" ? "rtl" : "ltr"}
+                        aria-label={lang === "ar" ? "المستودع" : "Warehouse"}
+                        value={warehouseId}
+                        onChange={(e) => setWarehouseId(e.target.value)}
+                        className="h-10 w-full appearance-none rounded-2xl border border-border/80 bg-surface/90 px-3 text-xs font-medium text-foreground outline-none transition hover:border-primary/40 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                      >
+                        {warehouses.map((w) => (
+                          <option key={w.id} value={w.id}>
+                            {lang === "ar" ? w.name_ar || w.name : w.name || w.name_ar}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <div className="min-w-[170px] xl:w-[190px]">
+                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      {lang === "ar" ? "تاريخ البيع" : "Invoice date"}
+                    </div>
+                    <PosDatePicker
+                      value={saleDate}
+                      onChange={setSaleDate}
+                      lang={lang}
+                      label={lang === "ar" ? "تاريخ الفاتورة" : "Invoice date"}
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-1.5 self-end pb-1 xl:pb-0">
+                    {catalogConfig.enableBarcode &&
+                      (isDesktop && !isTouchDevice ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = !barcodeReaderEnabled;
+                            setBarcodeReaderEnabled(next);
+                            localStorage.setItem("pos_barcode_reader_enabled", String(next));
+                          }}
+                          aria-pressed={barcodeReaderEnabled}
+                          title={
+                            lang === "ar"
+                              ? barcodeReaderEnabled
+                                ? "إيقاف قارئ الباركود"
+                                : "تفعيل قارئ الباركود"
+                              : barcodeReaderEnabled
+                                ? "Disable barcode reader"
+                                : "Enable barcode reader"
+                          }
+                          className={`inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full border px-2.5 transition ${barcodeReaderEnabled ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600" : "border-border bg-surface text-muted-foreground"}`}
+                        >
+                          <Barcode className="h-4 w-4" />
+                          <span className="text-[11px] font-semibold">
+                            {lang === "ar" ? "باركود" : "Barcode"}
+                          </span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setScannerOpen(true)}
+                          title={lang === "ar" ? "مسح بالكاميرا" : "Scan with camera"}
+                          className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2.5 text-primary transition hover:bg-primary/20"
+                        >
+                          <ScanBarcode className="h-4 w-4" />
+                          <span className="text-[11px] font-semibold">
+                            {lang === "ar" ? "باركود" : "Scan"}
+                          </span>
+                        </button>
+                      ))}
+
+                    {enableServiceFeeSetting && (
+                      <button
+                        type="button"
+                        onClick={() => setServiceOpen(true)}
+                        className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full border border-violet-500/30 bg-violet-500/10 px-3 text-violet-700 transition hover:bg-violet-500/20 dark:text-violet-300"
+                        title={lang === "ar" ? "إضافة خدمة أو أجرة تركيب" : "Add custom labor/service"}
+                      >
+                        <Wrench className="h-3.5 w-3.5" />
+                        <span className="text-[11px] font-semibold">
+                          {lang === "ar" ? "خدمة" : "Service"}
+                        </span>
+                      </button>
+                    )}
+
+                    <PageGuideButton config={posGuideConfig} className="!size-9 shrink-0" />
+                  </div>
+                </div>
+              </div>
+
               <RecordsToolbar
                 searchValue={search}
                 onSearchChange={setSearch}
