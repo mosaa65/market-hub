@@ -120,6 +120,15 @@ check("قسم المخزون المنخفض يحوي المنتجات", lowStock
 check("تصدير المبيعات يحوي كل الأعمدة", salesRows(sales)[0].invoice === "INV-1024");
 
 // --- printed document ------------------------------------------------------
+// The footer renders the tenant identity from Company Profile; without seeded
+// settings there is no company to print, so the fixture seeds the cache first.
+import { cacheCompanyProfile } from "@/lib/printing/company-profile";
+cacheCompanyProfile({
+  name: "منشأة التقرير للتجارة",
+  phone: "770000001",
+  address: "صنعاء - شارع تعز",
+});
+
 const html = buildReportHtml({
   lang: "ar",
   title: "تقرير المبيعات",

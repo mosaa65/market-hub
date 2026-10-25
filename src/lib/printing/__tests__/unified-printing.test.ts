@@ -6,6 +6,9 @@
  */
 
 import { PRINT_PAPERS, paperCss, type PrintPaperId } from "../paper";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { PRINT_THEMES, normalizeTheme } from "../themes";
 import { DOCUMENT_TYPES, getDocumentTypeMeta } from "../document-types";
 import {
@@ -369,11 +372,21 @@ check("default company profile has no invented tenant name", DEFAULT_COMPANY_PRO
 check("default company profile invents no contacts", DEFAULT_COMPANY_PROFILE.contacts.length === 0);
 
 const footer = renderUniversalFooter(COMPANY, true);
-check("removed universal footer renders no content", footer === "");
-check("removed universal footer has no injected styles", UNIVERSAL_FOOTER_CSS === "");
+check(
+  "universal footer renders the company name from the profile",
+  footer.includes("شركة الاختبار"),
+);
+check("universal footer renders the company contact number", footer.includes("770000001"));
+check("universal footer renders the company address", footer.includes("صنعاء"));
+check("universal footer is styled and present", footer.includes('class="universal-footer"'));
+check("universal footer ships its own styles", UNIVERSAL_FOOTER_CSS.includes(".universal-footer"));
 
 const noOwnerName = renderUniversalFooter(COMPANY, true);
 check("footer never contains the former owner name", !noOwnerName.includes("موسى العواضي"));
+check(
+  "footer never carries the software credits line",
+  !noOwnerName.includes("إنما سوفت") && !noOwnerName.includes("784795104"),
+);
 
 function rightsOccurrences(html: string): number {
   const text = html
@@ -383,12 +396,41 @@ function rightsOccurrences(html: string): number {
   // COMPANY_RIGHTS_TEXT is intentionally empty now. `split("")` splits into
   // characters and would always report a match, so an empty needle means the
   // line is removed by definition.
+  // COMPANY_RIGHTS_TEXT is intentionally empty now. `split("")` splits into
+  // characters and would always report a match, so an empty needle means the
+  // line is removed by definition.
   if (!COMPANY_RIGHTS_TEXT) return 0;
   return text.split(COMPANY_RIGHTS_TEXT).length - 1;
 }
 
+/*
+ * Second line of defence: the helper returns "", and no invoice template may
+ * import it. A future template that re-added the call would otherwise start
+ * printing the credits line again with nobody noticing.
+ */
+const TEMPLATES_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "templates");
+const INVOICE_TEMPLATES = [
+  "standard.ts",
+  "elegant.ts",
+  "thermal.ts",
+  "thermal-qr.ts",
+  "thermal-milling.ts",
+  "milling-clean.ts",
+  "milling-master.ts",
+  "unified-layout.ts",
+];
+const templatesUsingRightsHelper = INVOICE_TEMPLATES.filter((file) => {
+  try {
+    return readFileSync(join(TEMPLATES_DIR, file), "utf8").includes("renderInvoiceRightsFooter");
+  } catch {
+    // A renamed or removed template must not silently pass this guard.
+    return true;
+  }
+});
+check("no invoice template imports the credits footer", templatesUsingRightsHelper.length === 0);
+
 check(
-  "rights helper is intentionally empty after footer removal",
+  "rights helper is wired but disabled for invoices",
   renderInvoiceRightsFooter() === "" && rightsOccurrences(renderInvoiceRightsFooter()) === 0,
 );
 
@@ -481,7 +523,10 @@ check(
 );
 
 /* Multi-page layout is no longer constrained by a fixed footer. */
-check("removed footer adds no pagination styles", UNIVERSAL_FOOTER_CSS === "");
+check(
+  "universal footer adds no pagination styles",
+  !UNIVERSAL_FOOTER_CSS.includes("position:fixed"),
+);
 
 /* ─────────────────────────── Color Customization Tests ─────────────────────────── */
 

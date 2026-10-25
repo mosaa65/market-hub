@@ -15,6 +15,8 @@ export interface CompanyProfile {
 }
 
 const CACHE_KEY = "company_settings_cache";
+/** In-memory mirror used where localStorage does not exist (SSR, Node, tests). */
+let memoryProfile: CompanyProfile | null = null;
 /**
  * Fallback used only when `company_settings` has never been cached.
  * The app must never render a tenant name or contact number of its own.
@@ -48,7 +50,15 @@ function fromRow(row: Record<string, unknown> | null | undefined): CompanyProfil
 }
 
 export function getCachedCompanyProfile(): CompanyProfile {
-  if (typeof window === "undefined") return DEFAULT_PROFILE;
+  if (typeof window === "undefined") {
+    /*
+     * No localStorage outside the browser. Server rendering, tests and the
+     * report builders running in Node still need the profile, so fall back to
+     * the in-memory copy written by `cacheCompanyProfile` instead of returning
+     * a blank company — otherwise every footer renders empty.
+     */
+    return memoryProfile ? { ...DEFAULT_PROFILE, ...memoryProfile } : DEFAULT_PROFILE;
+  }
   try {
     const raw = localStorage.getItem(CACHE_KEY);
     return raw ? { ...DEFAULT_PROFILE, ...fromRow(JSON.parse(raw)) } : DEFAULT_PROFILE;
@@ -58,7 +68,10 @@ export function getCachedCompanyProfile(): CompanyProfile {
 }
 
 export function cacheCompanyProfile(row: Record<string, unknown>): CompanyProfile {
-  if (typeof window === "undefined") return fromRow(row);
+  if (typeof window === "undefined") {
+    memoryProfile = fromRow(row);
+    return memoryProfile;
+  }
   // ندمج مع الصف المخزّن حتى لا تفقد التحديثات الجزئية بقية الحقول.
   let merged: Record<string, unknown> = row;
   try {

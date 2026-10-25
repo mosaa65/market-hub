@@ -5,7 +5,6 @@ import {
   formatMoney,
   CustomFieldOptions,
 } from "./types";
-import { renderInvoiceRightsFooter } from "@/lib/printing/footer";
 import { getCachedCompanyProfile } from "@/lib/printing/company-profile";
 import { formatPrintedDateTime } from "@/lib/printing/date-time";
 
@@ -107,6 +106,5 @@ export function renderThermalTemplate(
       : ""
   }
   ${opts.showFooter ? `<div class="foot">${L.thanks}</div>` : ""}
-  ${renderInvoiceRightsFooter()}
 </div></body></html>`;
 }
