@@ -24,6 +24,48 @@ export interface CatalogModulesConfig {
 const STORAGE_KEY = "vortex_catalog_modules_v1";
 const EVENT_NAME = "vortex_catalog_modules_changed";
 
+/* ------------------------------------------------------------------ */
+/* قناة Realtime مشتركة (singleton) — تمنع «callbacks after subscribe» */
+/* ------------------------------------------------------------------ */
+
+const LIVE_CHANNEL_NAME = "catalog-modules-live";
+let liveChannel: ReturnType<typeof supabase.channel> | null = null;
+let liveRefCount = 0;
+const liveListeners = new Set<(row: any) => void>();
+
+function ensureLiveChannel(): void {
+  if (liveChannel) return;
+  liveChannel = supabase
+    .channel(LIVE_CHANNEL_NAME)
+    .on(
+      "postgres_changes",
+      { event: "UPDATE", schema: "public", table: "company_settings", filter: "id=eq.1" },
+      (payload) => {
+        liveListeners.forEach((listener) => listener((payload as any).new));
+      },
+    );
+  liveChannel.subscribe();
+}
+
+function releaseLiveChannel(): void {
+  if (liveChannel && liveRefCount <= 0) {
+    void supabase.removeChannel(liveChannel);
+    liveChannel = null;
+  }
+}
+
+/** تسجيل مستمع على قناة الإعدادات المشتركة — يعيد دالة الفصل. */
+export function subscribeCatalogModulesLive(listener: (row: any) => void): () => void {
+  liveListeners.add(listener);
+  liveRefCount++;
+  ensureLiveChannel();
+  return () => {
+    liveListeners.delete(listener);
+    liveRefCount--;
+    releaseLiveChannel();
+  };
+}
+
 export const DEFAULT_CATALOG_CONFIG: CatalogModulesConfig = {
   enableUnits: true,
   enableGrainGrades: true,
@@ -152,18 +194,20 @@ export function useCatalogModules() {
         applyRemote(row);
       });
 
-    const channel = supabase
-      .channel("catalog-modules-live")
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "company_settings", filter: "id=eq.1" },
-        (payload) => applyRemote(payload.new),
-      )
-      .subscribe();
+    /*
+     * قناة Realtime مشتركة على مستوى الوحدة (singleton) — كان الخطأ
+     * «cannot add postgres_changes callbacks after subscribe()» يظهر لأن
+     * أكثر من مكوّن (products + catalog + …) يُنشئ نفس القناة الاسمية،
+     * والثانية تستلم قناة مشتركة بالفعل مشتركة فترفض إضافة مستمع جديد.
+     * الحل: قناة واحدة تُنشأ عند أول استخدام، وكل مكوّن يضيف مستمعاً
+     * على قائمة مشتركة، وتُزال القناة عند آخر فُصل.
+     */
+    const handleRow = (row: any) => applyRemote(row);
+    const unsubscribe = subscribeCatalogModulesLive(handleRow);
 
     return () => {
       active = false;
-      void supabase.removeChannel(channel);
+      unsubscribe();
     };
   }, []);
 
