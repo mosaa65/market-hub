@@ -407,12 +407,19 @@ function MillingIntakePage() {
 
   return (
     <ModuleGuard moduleId="milling_operations">
-      <div className="mx-auto max-w-7xl space-y-4 p-4">
-        {/* شريط العنوان الرسمي */}
-        <PageHeader
-          title="استلام الأمانات"
-          subtitle="استلام عدة أنواع حبوب في سند واحد (بر 50كجم ×10 + بر 25كجم ×10 + …) مع فاتورة أجور رسمية على العملية كلها."
-        />
+      <div className="mx-auto max-w-7xl space-y-2.5 p-2 sm:p-3">
+        {/* شريط العنوان المدمج لرفع المكونات للأعلى وإلغاء الفراغ */}
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border/70 bg-surface/90 px-3.5 py-2 shadow-2xs">
+          <div>
+            <h1 className="text-sm sm:text-base font-extrabold tracking-tight text-foreground flex items-center gap-2">
+              <Scale className="h-4.5 w-4.5 text-primary" />
+              <span>استلام الأمانات وفاتورة الأجور</span>
+            </h1>
+            <p className="text-[11px] text-muted-foreground">
+              استلام عدة أنواع حبوب في سند واحد مع فاتورة أجور رسمية موحدة ومحاسبة تلقائية.
+            </p>
+          </div>
+        </div>
 
         {/* شريط الإشعار بالعملية النشطة بعد الحفظ أو الفتح */}
         {createdDocument && (

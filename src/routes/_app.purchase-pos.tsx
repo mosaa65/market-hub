@@ -970,22 +970,8 @@ function PurchasePOSPage() {
   }
 
   return (
-    <div className="grid h-full min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden bg-[radial-gradient(ellipse_at_top,_color-mix(in_oklab,var(--primary)_10%,transparent),transparent_48%)] sm:gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(400px,460px)] lg:grid-rows-[auto_auto_minmax(0,1fr)]">
-      <div className="hidden min-w-0 items-center gap-2 px-1 py-0.5 sm:flex lg:col-start-2 lg:row-start-1">
-        <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
-          <PackagePlus className="size-4" />
-        </div>
-        <div className="min-w-0">
-          <h1 className="truncate text-sm font-extrabold text-foreground">
-            {lang === "ar" ? "نقطة المشتريات السريعة" : "Point of Purchase"}
-          </h1>
-          <p className="truncate text-[11px] text-muted-foreground">
-            {lang === "ar"
-              ? "تسجيل المشتريات وتحديث المخزون"
-              : "Purchase entry and stock receiving"}
-          </p>
-        </div>
-      </div>
+    <div className="grid h-full min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden bg-[radial-gradient(ellipse_at_top,_color-mix(in_oklab,var(--primary)_10%,transparent),transparent_48%)] sm:gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(400px,460px)] lg:grid-rows-[auto_minmax(0,1fr)]">
+      {/* عنوان الشاشة مدمج تلقائياً */}
       {/* Top Bar / Header */}
       <div className="m-0 flex min-w-0 shrink-0 items-center gap-1 overflow-x-auto overscroll-x-contain rounded-xl border border-border/80 bg-surface/95 px-1.5 py-1.5 shadow-sm backdrop-blur-md sm:gap-2 sm:px-3 sm:py-2 lg:col-start-1 lg:row-start-1">
         {/* Global Toolbar Selectors */}
@@ -1640,7 +1626,7 @@ function PurchasePOSPage() {
         )}
 
         {/* Right Column: Purchase Cart & Invoicing — the primary workspace. */}
-        <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-primary/15 bg-surface/95 p-2 shadow-xl ring-1 ring-border/50 backdrop-blur-md sm:rounded-3xl sm:p-2.5 lg:col-start-2 lg:row-span-2 lg:row-start-2 lg:mx-2 lg:mb-2">
+        <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-primary/15 bg-surface/95 p-2 shadow-xl ring-1 ring-border/50 backdrop-blur-md sm:rounded-3xl sm:p-2.5 lg:col-start-2 lg:row-span-2 lg:row-start-1">
           {/* Cart Header */}
           <div className="mb-2 flex shrink-0 items-center justify-between border-b border-border/60 px-1 pb-2">
             <div className="flex items-center gap-2">

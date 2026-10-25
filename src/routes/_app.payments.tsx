@@ -150,7 +150,10 @@ function PaymentsPage() {
         .eq("is_active", true)
         .order("name")
         .limit(200);
-      const list = (data ?? []) as Customer[];
+      // استثناء العميل النقدي من سندات تحصيل الذمم
+      const list = ((data ?? []) as Customer[]).filter(
+        (c) => c.name !== "عميل نقدي" && !(c as any).is_system,
+      );
       setCustomers(list);
       if (customerId) {
         let target = list.find((c) => c.id === customerId);

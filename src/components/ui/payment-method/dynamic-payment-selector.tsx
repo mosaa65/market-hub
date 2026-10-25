@@ -4,6 +4,7 @@ import {
   HandCoins,
   Landmark,
   Smartphone,
+  Layers,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -17,7 +18,7 @@ import {
   SelectTrigger,
 } from "@/components/ui/select";
 
-export type CorePaymentMethodId = "cash" | "credit" | "bank_transfer" | "mobile_money";
+export type CorePaymentMethodId = "cash" | "credit" | "bank_transfer" | "mobile_money" | "split";
 
 export interface CorePaymentMethodConfig {
   id: CorePaymentMethodId;
@@ -76,17 +77,44 @@ export const CORE_PAYMENT_METHODS: readonly CorePaymentMethodConfig[] = [
     accountNameAr: "المحافظ الإلكترونية",
     accountNameEn: "E-Wallets",
   },
+  {
+    id: "split",
+    nameAr: "دفع مجزأ (أكثر من طريقة)",
+    nameEn: "Split Payment",
+    icon: Layers,
+    iconColor: "text-violet-600 dark:text-violet-400",
+    badgeBg: "bg-violet-500/15 border-violet-500/30 text-violet-700 dark:text-violet-300",
+    accountCode: "مجزأ",
+    accountNameAr: "توزيع محاسبي",
+    accountNameEn: "Multi-Tender",
+  },
 ] as const;
 
 export function normalizeCoreMethodId(value: string | null | undefined): CorePaymentMethodId {
   if (!value) return "cash";
   const norm = value.trim().toLowerCase();
+  if (norm === "split") return "split";
   if (norm === "cash") return "cash";
   if (norm === "credit") return "credit";
-  if (norm === "bank" || norm === "bank_transfer" || norm === "card" || norm === "cheque" || norm.includes("bank") || norm === "kuraimi_bank" || norm === "yemen_kuwait_bank") {
+  if (
+    norm === "bank" ||
+    norm === "bank_transfer" ||
+    norm === "card" ||
+    norm === "cheque" ||
+    norm.includes("bank") ||
+    norm === "kuraimi_bank" ||
+    norm === "yemen_kuwait_bank"
+  ) {
     return "bank_transfer";
   }
-  if (norm === "mobile_money" || norm === "wallet" || norm === "jawali" || norm === "jaib" || norm === "floosak" || norm === "one_cash") {
+  if (
+    norm === "mobile_money" ||
+    norm === "wallet" ||
+    norm === "jawali" ||
+    norm === "jaib" ||
+    norm === "floosak" ||
+    norm === "one_cash"
+  ) {
     return "mobile_money";
   }
   return "cash";
@@ -99,6 +127,8 @@ export interface DynamicPaymentSelectorProps {
   settlement?: PaymentSettlementSelection;
   onSettlementChange?: (next: PaymentSettlementSelection) => void;
   includeCredit?: boolean;
+  allowSplit?: boolean;
+  onSplitClick?: () => void;
   disabled?: boolean;
   className?: string;
   compact?: boolean;
@@ -114,6 +144,8 @@ export function DynamicPaymentSelector({
   settlement,
   onSettlementChange,
   includeCredit = true,
+  allowSplit = true,
+  onSplitClick,
   disabled = false,
   className,
   showReference = false,
@@ -127,12 +159,19 @@ export function DynamicPaymentSelector({
   }, [currentId]);
 
   const visibleMethods = useMemo(() => {
-    if (includeCredit) return CORE_PAYMENT_METHODS;
-    return CORE_PAYMENT_METHODS.filter((m) => m.id !== "credit");
-  }, [includeCredit]);
+    return CORE_PAYMENT_METHODS.filter((m) => {
+      if (m.id === "credit" && !includeCredit) return false;
+      if (m.id === "split" && !allowSplit && currentId !== "split") return false;
+      return true;
+    });
+  }, [includeCredit, allowSplit, currentId]);
 
   const handleSelect = (nextId: string) => {
     const validatedId = normalizeCoreMethodId(nextId);
+    if (validatedId === "split" && onSplitClick) {
+      onSplitClick();
+      return;
+    }
     onChange(validatedId);
 
     if (onSettlementChange) {
@@ -141,7 +180,8 @@ export function DynamicPaymentSelector({
         ...(settlement || { method: validatedId }),
         method: validatedId,
         paymentMethodId: validatedId,
-        bankAccountName: validatedId === "bank_transfer" || validatedId === "mobile_money" ? targetConfig.nameAr : null,
+        bankAccountName:
+          validatedId === "bank_transfer" || validatedId === "mobile_money" ? targetConfig.nameAr : null,
         cashboxName: validatedId === "cash" ? "الصندوق الرئيسي" : null,
       };
       onSettlementChange(nextSettlement);
