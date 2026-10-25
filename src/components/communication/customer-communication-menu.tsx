@@ -83,6 +83,7 @@ export function CustomerCommunicationMenu({
     else if (action.key === "debt_reminder") eventType = "debt_reminder";
     else if (action.key === "statement_share") eventType = "statement_share";
     else if (action.key === "invoice_share") eventType = "invoice_share";
+    else if (action.key === "customer_general_message") eventType = "general_customer_notice";
 
     const ctx = buildUnifiedContext({
       event: eventType,
@@ -111,6 +112,8 @@ export function CustomerCommunicationMenu({
         return <FileSpreadsheet className="size-4 text-emerald-600 shrink-0" />;
       case "invoice_share":
         return <FileText className="size-4 text-indigo-500 shrink-0" />;
+      case "customer_general_message":
+        return <MessageSquare className="size-4 text-cyan-500 shrink-0" />;
       default:
         return <MessageSquare className="size-4 text-muted-foreground shrink-0" />;
     }
