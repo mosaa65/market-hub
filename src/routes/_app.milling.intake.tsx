@@ -103,8 +103,6 @@ interface WarehouseOption {
   is_default?: boolean;
 }
 
-const PRESET_CAPACITIES = [50, 40, 25, 20, 10];
-
 function MillingIntakePage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -123,9 +121,9 @@ function MillingIntakePage() {
    * أسطر الاستلام: نوع حبوب مستقل لكل سطر (بر 50كجم ×10 + بر 25كجم ×10 + ...)
    * كل سطر: صنف + سعة الكيس + الأكياس + الوزن (محسوب آلياً من السعة).
    */
-  const [lines, setLines] = useState<
-    { itemId: string; capacityKg: string; bags: string; kg: string; kgAuto: boolean }[]
-  >([{ itemId: "", capacityKg: "50", bags: "", kg: "", kgAuto: true }]);
+  const [lines, setLines] = useState<{ itemId: string; bags: string; kg: string }[]>([
+    { itemId: "", bags: "", kg: "" },
+  ]);
 
   // الفاتورة والمالية
   const [feePerBag, setFeePerBag] = useState<string>("");
@@ -239,56 +237,27 @@ function MillingIntakePage() {
 
   // احتساب الإجمالي التلقائي للأكياس والوزن وسعر الخدمة
   // ─ أدوات أسطر الاستلام (تعدد أنواع الحبوب في عملية واحدة) ─
-  function updateLine(
-    idx: number,
-    patch: Partial<{
-      itemId: string;
-      capacityKg: string;
-      bags: string;
-      kg: string;
-      kgAuto: boolean;
-    }>,
-  ) {
+  function updateLine(idx: number, patch: Partial<{ itemId: string; bags: string; kg: string }>) {
     setLines((ls) => ls.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
   }
 
   function addLine() {
-    setLines((ls) => [...ls, { itemId: "", capacityKg: "50", bags: "", kg: "", kgAuto: true }]);
+    setLines((ls) => [...ls, { itemId: "", bags: "", kg: "" }]);
   }
 
   function removeLine(idx: number) {
     setLines((ls) => (ls.length > 1 ? ls.filter((_, i) => i !== idx) : ls));
   }
 
-  /** اختيار سعة الكيس لسطر: يعيد حساب الوزن آلياً */
-  function setLineCapacity(idx: number, cap: string) {
-    const line = lines[idx];
-    const b = Number(line.bags) || 0;
-    const c = Number(cap) || 0;
-    updateLine(idx, {
-      capacityKg: cap,
-      kg: b > 0 && c > 0 ? String(b * c) : line.kg,
-      kgAuto: true,
-    });
-  }
-
-  /** تغيير الأكياس لسطر: وزن آلي + إعادة حساب أجور الخدمة */
+  /** تغيير الأكياس لسطر — أي تعديل على الكميات يلغي أي تجاوز يدوي سابق لإجمالي الأجور */
   function setLineBags(idx: number, v: string) {
-    const line = lines[idx];
-    const b = Number(v) || 0;
-    const c = Number(line.capacityKg) || 0;
-    // أي تعديل على الكميات يلغي أي تجاوز يدوي سابق لإجمالي الأجور
     setServicePrice("");
-    updateLine(idx, {
-      bags: v,
-      kg: c > 0 ? (b > 0 ? String(b * c) : "") : line.kg,
-      kgAuto: true,
-    });
+    updateLine(idx, { bags: v });
   }
 
-  /** تعديل الوزن يدوياً لسطر */
+  /** تعديل الوزن يدوياً لسطر (من الميزان) */
   function setLineKg(idx: number, v: string) {
-    updateLine(idx, { kg: v, kgAuto: false });
+    updateLine(idx, { kg: v });
   }
 
   // إجماليات العملية (كل الأسطر) — الأكياس والوزن
@@ -383,7 +352,7 @@ function MillingIntakePage() {
       }
 
       // تفريغ حقول العملية لتجهيز الاستلام التالي
-      setLines([{ itemId: "", capacityKg: "50", bags: "", kg: "", kgAuto: true }]);
+      setLines([{ itemId: "", bags: "", kg: "" }]);
       setNotes("");
       setPaid("");
       setDiscount("");
@@ -399,7 +368,7 @@ function MillingIntakePage() {
     setActiveDetails(null);
     setPrintDoc(null);
     setShowWorkflow(false);
-    setLines([{ itemId: "", capacityKg: "50", bags: "", kg: "", kgAuto: true }]);
+    setLines([{ itemId: "", bags: "", kg: "" }]);
     setNotes("");
     setPaid("");
     setDiscount("");
