@@ -22,6 +22,7 @@ import { canAccessRoute, getRouteRule } from "@/lib/route-access";
 import { useAuth } from "@/lib/auth";
 import { useModules } from "@/lib/modules";
 import { CommandPalette } from "@/components/command-palette";
+import { SiteFooter } from "@/components/site-footer";
 import { VortexHeaderOmnisearch } from "@/components/vortex-header-omnisearch";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { ConnectionBanner } from "@/components/ui/connection";
@@ -1121,6 +1122,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <div className="mx-auto w-full max-w-[1400px] flex-1 px-2 pt-3 pb-app-safe sm:px-1 sm:py-4 lg:px-1 lg:py-6">
                 {children}
               </div>
+              {/* Company identity (name, address, contacts, tax number) read from
+                  company_settings — the same source as every printed document. */}
+              <SiteFooter className="mt-auto" />
             </div>
           )}
         </main>

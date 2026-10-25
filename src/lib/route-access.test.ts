@@ -1,4 +1,4 @@
-import { canAccessRoute, getRouteRule } from "./route-access";
+import { canAccessRoute, getRouteRule, type TenantRole } from "./route-access";
 import { ROUTE_REGISTRY } from "./navigation/route-registry";
 
 const financeRoute = "/opening-balances";
@@ -22,6 +22,14 @@ const cases: Array<[string, boolean]> = [
   [
     "accountant is allowed on financial routes",
     canAccessRoute(financeRoute, { ...platformAccess, roles: ["accountant"] }),
+  ],
+  [
+    "case- and whitespace-normalized roles still access finance",
+    canAccessRoute(financeRoute, {
+      ...platformAccess,
+      // Runtime data can be untyped; normalization must still accept it.
+      roles: [" Manager ", "ACCOUNTANT"] as unknown as TenantRole[],
+    }),
   ],
   [
     "owner is allowed on financial routes",

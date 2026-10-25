@@ -29,7 +29,6 @@ import {
 } from "./types";
 import { numberToArabicWords } from "./tafqeet";
 import { PRINT_THEMES, deriveThemeTokens, type PrintTheme } from "@/lib/printing/themes";
-import { renderInvoiceRightsFooter } from "@/lib/printing/footer";
 import { getCachedCompanyProfile, type CompanyProfile } from "@/lib/printing/company-profile";
 import { generateBarcodeSvg, generateQrCodeSvg } from "@/lib/printing/barcode-qr";
 import { getUnifiedPrintSettings } from "@/lib/printing/settings";
@@ -1087,8 +1086,6 @@ export function renderUnifiedLayout(
     }
       ${barcodeSvg || qrSvg ? `<div class="invoice-code-markers-bottom">${barcodeSvg ? `<div class="invoice-barcode-bottom">${barcodeSvg}</div>` : ""}${qrSvg ? `<div class="invoice-qr-bottom">${qrSvg}</div>` : ""}</div>` : ""}
   </div>
-
-  ${renderInvoiceRightsFooter()}
 
 </div>
 

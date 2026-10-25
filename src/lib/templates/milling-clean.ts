@@ -7,7 +7,7 @@
 } from "./types";
 import { getCachedCompanyProfile } from "@/lib/printing/company-profile";
 import { formatPrintedDateTime } from "@/lib/printing/date-time";
-import { renderInvoiceRightsFooter, UNIVERSAL_FOOTER_CSS } from "@/lib/printing/footer";
+import { UNIVERSAL_FOOTER_CSS } from "@/lib/printing/footer";
 import { numberToArabicWords } from "./tafqeet";
 import { generateBarcodeSvg, generateQrCodeSvg } from "@/lib/printing/barcode-qr";
 
@@ -428,7 +428,6 @@ export function renderMillingCleanTemplate(
       }
     </div>
     ${opts.showFooter ? `<div style="margin-top:8px;text-align:center;font-size:10px">${esc(L.thanks)}</div>` : ""}
-    ${renderInvoiceRightsFooter()}
   </div>
 </body>
 </html>`;

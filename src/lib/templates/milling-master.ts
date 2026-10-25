@@ -9,7 +9,6 @@ import { getCachedCompanyProfile } from "@/lib/printing/company-profile";
 import { formatPrintedDateTime } from "@/lib/printing/date-time";
 import { generateBarcodeSvg, generateQrCodeSvg } from "@/lib/printing/barcode-qr";
 import { numberToArabicWords } from "./tafqeet";
-import { renderInvoiceRightsFooter } from "@/lib/printing/footer";
 
 /**
  * Milling Service Master Template (A4 / A5 Luxury Format)
@@ -176,7 +175,7 @@ export function renderMillingMasterTemplate(
     }
     .meta-label { font-size: 11px; color: #64748b; font-weight: 600; }
     .meta-val { font-size: 13px; color: #0f172a; font-weight: 800; }
-    
+
     .hairline-table {
       width: 100%;
       border-collapse: collapse;
@@ -470,7 +469,6 @@ export function renderMillingMasterTemplate(
         : ""
     }
 
-    ${renderInvoiceRightsFooter()}
     ${
       opts.showFooter
         ? `
@@ -679,7 +677,6 @@ export function renderMillingThermalTemplate(
       : ""
   }
 
-  ${renderInvoiceRightsFooter()}
   ${
     opts.showFooter && L.poweredBy
       ? `
