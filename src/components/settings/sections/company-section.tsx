@@ -1,11 +1,14 @@
-import { useRef, useState, type Dispatch, type SetStateAction } from "react";
-import { Building2, LoaderCircle, Trash2, Upload } from "lucide-react";
+import { useRef, useState, useMemo, type Dispatch, type SetStateAction } from "react";
+import { Building2, Check, LoaderCircle, RotateCcw, Save, Trash2, Upload } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { ActionButton } from "@/components/ui/action-button";
 import { supabase } from "@/integrations/supabase/client";
+import { cacheCompanyProfile } from "@/lib/printing";
+import { setCompanySettingsCache } from "@/lib/format";
 import { toast } from "sonner";
 
 interface CompanySectionProps {
@@ -19,6 +22,98 @@ export function CompanySection({ form, setForm, canEdit, lang }: CompanySectionP
   const isAr = lang === "ar";
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Take an initial snapshot of the company fields to allow section-level diffing & save
+  const companyKeys = [
+    "name_ar",
+    "name_en",
+    "name",
+    "legal_name",
+    "logo_url",
+    "tax_number",
+    "phone",
+    "email",
+    "address",
+  ];
+
+  const getCompanySnapshot = (f: Record<string, unknown>) => {
+    const snap: Record<string, unknown> = {};
+    for (const k of companyKeys) {
+      snap[k] = f[k] ?? "";
+    }
+    return snap;
+  };
+
+  const [savedSnapshot, setSavedSnapshot] = useState<Record<string, unknown>>(() =>
+    getCompanySnapshot(form),
+  );
+
+  const isDirty = useMemo(() => {
+    for (const k of companyKeys) {
+      if ((form[k] ?? "") !== (savedSnapshot[k] ?? "")) {
+        return true;
+      }
+    }
+    return false;
+  }, [form, savedSnapshot]);
+
+  const handleReset = () => {
+    setForm((current) => ({
+      ...current,
+      ...savedSnapshot,
+    }));
+  };
+
+  const handleSave = async () => {
+    if (!canEdit || !isDirty || isSaving) return;
+
+    // Optional email validation
+    const email = String(form.email ?? "").trim();
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error(isAr ? "يرجى إدخال بريد إلكتروني صحيح." : "Please enter a valid email address.");
+      return;
+    }
+
+    setIsSaving(true);
+    const payload = {
+      ...form,
+      id: form.id ?? 1,
+    };
+
+    try {
+      const result = form.id
+        ? await supabase
+            .from("company_settings")
+            .update(payload)
+            .eq("id", payload.id)
+            .select()
+            .single()
+        : await supabase.from("company_settings").insert(payload).select().single();
+
+      if (result.error) throw result.error;
+
+      const persisted = (result.data ?? payload) as Record<string, unknown>;
+      cacheCompanyProfile(persisted);
+      if (persisted.currency) {
+        setCompanySettingsCache({ currency: String(persisted.currency) });
+      }
+      setForm(persisted);
+      setSavedSnapshot(getCompanySnapshot(persisted));
+      toast.success(isAr ? "تم حفظ معلومات المنشأة بنجاح" : "Company profile saved successfully");
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : isAr
+            ? "تعذر حفظ معلومات المنشأة. حاول مجدداً."
+            : "Could not save company profile. Try again.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const fieldValue = (key: string) => String(form[key] ?? "");
   const logoUrl = fieldValue("logo_url") || "/vortex-erp-wordmark.png";
 
@@ -266,6 +361,42 @@ export function CompanySection({ form, setForm, canEdit, lang }: CompanySectionP
             className="rounded-2xl resize-none"
           />
         </div>
+
+        {canEdit && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-4">
+            <span className="text-xs text-muted-foreground">
+              {isDirty
+                ? isAr
+                  ? "لديك تعديلات غير محفوظة في معلومات المنشأة"
+                  : "You have unsaved changes in company profile"
+                : isAr
+                  ? "جميع التغييرات محفوظة"
+                  : "All changes are saved"}
+            </span>
+            <div className="flex items-center gap-2">
+              <ActionButton
+                type="button"
+                size="sm"
+                tone="ghost"
+                icon={<RotateCcw />}
+                disabled={!isDirty || isSaving}
+                onClick={handleReset}
+              >
+                {isAr ? "تراجع" : "Discard"}
+              </ActionButton>
+              <ActionButton
+                type="button"
+                size="sm"
+                icon={<Save />}
+                loading={isSaving}
+                disabled={!isDirty || isSaving}
+                onClick={handleSave}
+              >
+                {isAr ? "حفظ المعلومات" : "Save Profile"}
+              </ActionButton>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

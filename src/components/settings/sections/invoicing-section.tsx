@@ -6,7 +6,10 @@ import React, {
   type Dispatch,
   type SetStateAction,
 } from "react";
-import { ChevronDown, Check } from "lucide-react";
+import { ChevronDown, Check, RotateCcw, Save } from "lucide-react";
+import { ActionButton } from "@/components/ui/action-button";
+import { setCompanySettingsCache } from "@/lib/format";
+import { cacheCompanyProfile } from "@/lib/printing";
 import {
   Command,
   CommandInput,
@@ -55,12 +58,95 @@ export function InvoicingSection({
   const [printMode, setPrintModeState] = useState<"auto" | "ask" | "off">("ask");
   const [defaultPrintTemplate, setDefaultPrintTemplateState] = useState<InvoiceTemplate>("thermal");
   const [logoUploading, setLogoUploading] = useState(false);
+  const [isSavingCurrency, setIsSavingCurrency] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const { config: catalogConfig, updateConfig: updateCatalogConfig } = useCatalogModules();
   const currencyOptions = useMemo(() => getCurrencyOptions(lang), [lang]);
   const currencyPreviewSymbol =
     form.currency_symbol?.trim() ||
     getCurrencySymbol(form.currency || "YER", isAr ? "ar-YE" : "en");
+
+  const [savedCurrencySnapshot, setSavedCurrencySnapshot] = useState(() => ({
+    currency: form.currency ?? "YER",
+    currency_symbol: form.currency_symbol ?? "ر.ي",
+    tax_rate: form.tax_rate ?? 0,
+  }));
+
+  const isCurrencyDirty = useMemo(() => {
+    return (
+      (form.currency ?? "YER") !== savedCurrencySnapshot.currency ||
+      (form.currency_symbol ?? "ر.ي") !== savedCurrencySnapshot.currency_symbol ||
+      String(form.tax_rate ?? 0) !== String(savedCurrencySnapshot.tax_rate)
+    );
+  }, [form.currency, form.currency_symbol, form.tax_rate, savedCurrencySnapshot]);
+
+  const handleResetCurrency = () => {
+    setForm((current: any) => ({
+      ...current,
+      currency: savedCurrencySnapshot.currency,
+      currency_symbol: savedCurrencySnapshot.currency_symbol,
+      tax_rate: savedCurrencySnapshot.tax_rate,
+    }));
+  };
+
+  const handleSaveCurrency = async () => {
+    if (!canEdit || !isCurrencyDirty || isSavingCurrency) return;
+
+    const rate = Number(form.tax_rate ?? 0);
+    if (!Number.isFinite(rate) || rate < 0 || rate > 100) {
+      toast.error(
+        isAr
+          ? "يرجى إدخال نسبة ضريبة صحيحة بين 0 و100%."
+          : "Please enter a tax rate between 0 and 100%.",
+      );
+      return;
+    }
+
+    setIsSavingCurrency(true);
+    const payload = {
+      ...form,
+      id: form.id ?? 1,
+      tax_rate: rate,
+    };
+
+    try {
+      const result = form.id
+        ? await supabase
+            .from("company_settings")
+            .update(payload)
+            .eq("id", payload.id)
+            .select()
+            .single()
+        : await supabase.from("company_settings").insert(payload).select().single();
+
+      if (result.error) throw result.error;
+
+      const persisted = (result.data ?? payload) as Record<string, unknown>;
+      setCompanySettingsCache({ currency: String(persisted.currency ?? "YER") });
+      cacheCompanyProfile(persisted);
+      setForm(persisted);
+      setSavedCurrencySnapshot({
+        currency: String(persisted.currency ?? "YER"),
+        currency_symbol: String(persisted.currency_symbol ?? "ر.ي"),
+        tax_rate: Number(persisted.tax_rate ?? 0),
+      });
+      toast.success(
+        isAr
+          ? "تم حفظ إعدادات العملة والضريبة بنجاح"
+          : "Currency & tax settings saved successfully",
+      );
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : isAr
+            ? "تعذر حفظ إعدادات العملة والضريبة."
+            : "Could not save currency & tax settings.",
+      );
+    } finally {
+      setIsSavingCurrency(false);
+    }
+  };
 
   useEffect(() => {
     const s = getPrintSettings();
@@ -258,6 +344,42 @@ export function InvoicingSection({
                   ? "العملة الافتراضية للمنشآت الجديدة هي الريال اليمني. تغييرها لا يحوّل المبالغ المسجلة سابقاً."
                   : "New companies default to Yemeni Rial. Changing currency does not convert existing amounts."}
               </p>
+
+              {canEdit && (
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-4">
+                  <span className="text-xs text-muted-foreground">
+                    {isCurrencyDirty
+                      ? isAr
+                        ? "لديك تعديلات غير محفوظة في العملة والضريبة"
+                        : "You have unsaved changes in currency & tax"
+                      : isAr
+                        ? "جميع إعدادات العملة والضريبة محفوظة"
+                        : "Currency and tax settings are saved"}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <ActionButton
+                      type="button"
+                      size="sm"
+                      tone="ghost"
+                      icon={<RotateCcw />}
+                      disabled={!isCurrencyDirty || isSavingCurrency}
+                      onClick={handleResetCurrency}
+                    >
+                      {isAr ? "تراجع" : "Discard"}
+                    </ActionButton>
+                    <ActionButton
+                      type="button"
+                      size="sm"
+                      icon={<Save />}
+                      loading={isSavingCurrency}
+                      disabled={!isCurrencyDirty || isSavingCurrency}
+                      onClick={handleSaveCurrency}
+                    >
+                      {isAr ? "حفظ العملة والضريبة" : "Save Currency"}
+                    </ActionButton>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
