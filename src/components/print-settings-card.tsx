@@ -1524,14 +1524,36 @@ export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
       </Card>
 
       {canEdit && (
-        <div className="sticky bottom-4 z-30 flex items-center justify-between gap-3 rounded-2xl border-primary/30 bg-background/95 px-4 py-3 shadow-xl backdrop-blur">
+        <div className="sticky bottom-4 z-30 flex items-center justify-between gap-3 rounded-2xl border border-primary/30 bg-background/95 px-4 py-3 shadow-xl backdrop-blur">
           <span className="text-xs text-muted-foreground">
-            {isDirty ? "لديك تغييرات غير محفوظة" : "الإعدادات محفوظة"}
+            {isDirty ? "لديك تغييرات غير محفوظة في خيارات الطباعة" : "جميع إعدادات الطباعة محفوظة"}
           </span>
-          <Button type="button" onClick={saveAllSettings} disabled={!isDirty || isSaving}>
-            <Check className="h-4 w-4" />
-            {isSaving ? "جارٍ الحفظ..." : "حفظ الإعدادات"}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={!isDirty || isSaving}
+              onClick={() => {
+                setSettings(savedSnapshot.settings);
+                setUnified(savedSnapshot.unified);
+              }}
+              className="rounded-xl h-9 text-xs"
+            >
+              <RotateCcw className="h-3.5 w-3.5 me-1.5" />
+              تراجع
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={saveAllSettings}
+              disabled={!isDirty || isSaving}
+              className="rounded-xl h-9 text-xs font-bold"
+            >
+              <Check className="h-4 w-4 me-1.5" />
+              {isSaving ? "جارٍ الحفظ..." : "حفظ إعدادات الطباعة"}
+            </Button>
+          </div>
         </div>
       )}
 
