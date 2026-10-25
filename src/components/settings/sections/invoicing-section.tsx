@@ -10,6 +10,9 @@ import { ChevronDown, Check, RotateCcw, Save } from "lucide-react";
 import { ActionButton } from "@/components/ui/action-button";
 import { setCompanySettingsCache } from "@/lib/format";
 import { cacheCompanyProfile } from "@/lib/printing";
+import { ActionButton } from "@/components/ui/action-button";
+import { setCompanySettingsCache } from "@/lib/format";
+import { cacheCompanyProfile } from "@/lib/printing";
 import {
   Command,
   CommandInput,
@@ -344,6 +347,42 @@ export function InvoicingSection({
                   ? "العملة الافتراضية للمنشآت الجديدة هي الريال اليمني. تغييرها لا يحوّل المبالغ المسجلة سابقاً."
                   : "New companies default to Yemeni Rial. Changing currency does not convert existing amounts."}
               </p>
+
+              {canEdit && (
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-4">
+                  <span className="text-xs text-muted-foreground">
+                    {isCurrencyDirty
+                      ? isAr
+                        ? "لديك تعديلات غير محفوظة في العملة والضريبة"
+                        : "You have unsaved changes in currency & tax"
+                      : isAr
+                        ? "جميع إعدادات العملة والضريبة محفوظة"
+                        : "Currency and tax settings are saved"}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <ActionButton
+                      type="button"
+                      size="sm"
+                      tone="ghost"
+                      icon={<RotateCcw />}
+                      disabled={!isCurrencyDirty || isSavingCurrency}
+                      onClick={handleResetCurrency}
+                    >
+                      {isAr ? "تراجع" : "Discard"}
+                    </ActionButton>
+                    <ActionButton
+                      type="button"
+                      size="sm"
+                      icon={<Save />}
+                      loading={isSavingCurrency}
+                      disabled={!isCurrencyDirty || isSavingCurrency}
+                      onClick={handleSaveCurrency}
+                    >
+                      {isAr ? "حفظ العملة والضريبة" : "Save Currency"}
+                    </ActionButton>
+                  </div>
+                </div>
+              )}
 
               {canEdit && (
                 <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-4">

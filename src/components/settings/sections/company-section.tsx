@@ -18,28 +18,27 @@ interface CompanySectionProps {
   lang: string;
 }
 
+const COMPANY_FIELDS = [
+  "name_ar",
+  "name_en",
+  "name",
+  "legal_name",
+  "logo_url",
+  "tax_number",
+  "phone",
+  "email",
+  "address",
+] as const;
+
 export function CompanySection({ form, setForm, canEdit, lang }: CompanySectionProps) {
   const isAr = lang === "ar";
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Take an initial snapshot of the company fields to allow section-level diffing & save
-  const companyKeys = [
-    "name_ar",
-    "name_en",
-    "name",
-    "legal_name",
-    "logo_url",
-    "tax_number",
-    "phone",
-    "email",
-    "address",
-  ];
-
   const getCompanySnapshot = (f: Record<string, unknown>) => {
     const snap: Record<string, unknown> = {};
-    for (const k of companyKeys) {
+    for (const k of COMPANY_FIELDS) {
       snap[k] = f[k] ?? "";
     }
     return snap;
@@ -50,7 +49,7 @@ export function CompanySection({ form, setForm, canEdit, lang }: CompanySectionP
   );
 
   const isDirty = useMemo(() => {
-    for (const k of companyKeys) {
+    for (const k of COMPANY_FIELDS) {
       if ((form[k] ?? "") !== (savedSnapshot[k] ?? "")) {
         return true;
       }
