@@ -10,9 +10,6 @@ import { ChevronDown, Check, RotateCcw, Save } from "lucide-react";
 import { ActionButton } from "@/components/ui/action-button";
 import { setCompanySettingsCache } from "@/lib/format";
 import { cacheCompanyProfile } from "@/lib/printing";
-import { ActionButton } from "@/components/ui/action-button";
-import { setCompanySettingsCache } from "@/lib/format";
-import { cacheCompanyProfile } from "@/lib/printing";
 import {
   Command,
   CommandInput,
