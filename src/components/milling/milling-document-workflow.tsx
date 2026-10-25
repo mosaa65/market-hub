@@ -3,7 +3,7 @@
  * لا تنشئ هذه الواجهة فاتورة أو مخزوناً مستقلاً: كل حركة تمر برقم المستند
  * الذي أُنشئ في الاستلام مع فاتورة أجور الطحن الرسمية.
  */
-import { useState, type Dispatch, type SetStateAction, useEffect } from "react";
+import { useState, type Dispatch, type SetStateAction, useEffect, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Cog,

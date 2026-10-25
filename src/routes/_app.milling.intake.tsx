@@ -632,39 +632,7 @@ function MillingIntakePage() {
                       </button>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 items-center">
-                      <div>
-                        <span className="block text-[11px] font-semibold text-muted-foreground mb-1">
-                          سعة الكيس:
-                        </span>
-                        <div className="flex items-center gap-1">
-                          {PRESET_CAPACITIES.slice(0, 4).map((cap) => (
-                            <button
-                              key={cap}
-                              type="button"
-                              onClick={() => setLineCapacity(idx, String(cap))}
-                              className={`rounded-lg px-2 py-1 text-[11px] font-bold transition ${
-                                Number(line.capacityKg) === cap
-                                  ? "bg-amber-500 text-white"
-                                  : "border border-border bg-surface-2 hover:bg-muted"
-                              }`}
-                            >
-                              {cap}
-                            </button>
-                          ))}
-                          <QuantityInput
-                            min={0}
-                            decimals={1}
-                            unit="kg"
-                            placeholder="سعة"
-                            aria-label="سعة الكيس المخصصة (كجم)"
-                            value={line.capacityKg === "" ? null : Number(line.capacityKg)}
-                            onValueChange={(v) => setLineCapacity(idx, v == null ? "" : String(v))}
-                            className="w-20 font-bold text-[11px]"
-                          />
-                        </div>
-                      </div>
-
+                    <div className="grid grid-cols-2 gap-2.5 items-center">
                       <div>
                         <span className="block text-[11px] font-semibold text-muted-foreground mb-1">
                           عدد الأكياس:
@@ -680,7 +648,7 @@ function MillingIntakePage() {
                         />
                       </div>
 
-                      <div className="col-span-2">
+                      <div>
                         <span className="block text-[11px] font-semibold text-muted-foreground mb-1">
                           الوزن الإجمالي (كجم):
                         </span>

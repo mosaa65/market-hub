@@ -187,7 +187,7 @@ export function StockConversionPage() {
 
   return (
     <ModuleGuard moduleId="milling_operations">
-      <div className="mx-auto max-w-5xl space-y-5 p-3 sm:p-5">
+      <div className="mx-auto max-w-7xl space-y-5 p-3 sm:p-5">
         <PageHeader
           title="التحويل الداخلي — تحويل المخزون بعدّ المنتجات"
           subtitle="منتج مصدر × كمية ← منتجات ناتجة × كميات، مع فاقد اختياري بوحدات. لا نسب ولا أوزان ولا تسعير."
@@ -211,6 +211,8 @@ export function StockConversionPage() {
           </p>
         </div>
 
+        {/* اللوحتان في صف واحد (فورم المصدر + فورم النواتج) على الشاشات الكبيرة */}
+        <div className="grid gap-4 xl:grid-cols-2 items-start">
         {/* ─── اللوحة الأولى: المصدر والمستودع ─── */}
         <MillingPanel>
           <MillingSectionTitle
@@ -434,6 +436,7 @@ export function StockConversionPage() {
             </MillingField>
           </div>
         </MillingPanel>
+        </div>
 
         {/* زر التنفيذ */}
         <div className="sticky bottom-4 z-10">
