@@ -193,8 +193,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
   // `support` is deliberately not privileged: it is a read-only platform
   // role and must not be able to create accounts. Only an explicit store
   // `owner` role or an active `superadmin` row passes.
-  const [ownerRoleRes, platformAdminRes] = await Promise.all([
-    admin.from("user_roles").select("id").eq("user_id", callerId).eq("role", "owner").maybeSingle(),
+  const [storeRoleRes, platformAdminRes] = await Promise.all([
+    admin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", callerId)
+      .in("role", ["owner", "manager"])
+      .maybeSingle(),
     admin
       .from("platform_admins")
       .select("role, is_active")
@@ -203,11 +208,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
       .maybeSingle(),
   ]);
 
-  const isStoreOwner = Boolean(ownerRoleRes.data);
+  const isStorePrivileged = Boolean(storeRoleRes.data && ["owner", "manager"].includes(storeRoleRes.data.role));
   const platformRole = (platformAdminRes.data?.role as string | undefined) ?? "";
   const isPlatformPrivileged = platformRole === "superadmin";
 
-  if (!isStoreOwner && !isPlatformPrivileged) {
+  if (!isStorePrivileged && !isPlatformPrivileged) {
     return fail("forbidden", "لا تملك صلاحية إضافة مستخدمين إلى هذا المتجر.", 403);
   }
 
