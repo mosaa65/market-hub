@@ -116,7 +116,7 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
   {
     id: "pos",
     path: "/pos",
-    titleAr: "نقطة البيع (الكاشير)",
+    titleAr: "نقطة البيع / الكاشير",
     titleEn: "POS Cashier",
     descriptionAr: "تسجيل المبيعات وطباعة الفواتير السريعة",
     descriptionEn: "Quick sales & receipt printing",
@@ -129,7 +129,7 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
   {
     id: "sales",
     path: "/sales",
-    titleAr: "فواتير المبيعات",
+    titleAr: "المبيعات / الفواتير",
     titleEn: "Sales Invoices",
     descriptionAr: "سجل ومتابعة جميع فواتير البيع",
     descriptionEn: "Manage sales records & invoices",
@@ -458,7 +458,7 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
   {
     id: "products",
     path: "/products",
-    titleAr: "المنتجات والأصناف",
+    titleAr: "المنتجات / الأصناف",
     titleEn: "Products",
     descriptionAr: "إدارة بطاقات المنتجات والتسعير والباركود",
     descriptionEn: "Catalog, pricing & barcodes",
@@ -471,7 +471,7 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
   {
     id: "inventory",
     path: "/inventory",
-    titleAr: "إدارة المخزون",
+    titleAr: "المخزون والجرد",
     titleEn: "Inventory",
     descriptionAr: "جرد ومتابعة كميات المستودعات",
     descriptionEn: "Stock & warehouse quantities",
@@ -484,9 +484,9 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
   {
     id: "catalog",
     path: "/catalog",
-    titleAr: "الفهرس",
-    titleEn: "Catalog",
-    descriptionAr: "التصنيفات والعلامات التجارية والوحدات",
+    titleAr: "تصنيفات المنتجات (الفهرس)",
+    titleEn: "Product Catalog",
+    descriptionAr: "تصنيفات المنتجات وعلاماتها التجارية ووحدات القياس",
     descriptionEn: "Categories, brands & units",
     keywords: ["فهرس", "تصنيفات", "علامات", "وحدات", "catalog"],
     category: "inventory",
@@ -585,7 +585,7 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
   {
     id: "purchases",
     path: "/purchases",
-    titleAr: "فواتير المشتريات",
+    titleAr: "المشتريات / فواتير الشراء",
     titleEn: "Purchases",
     descriptionAr: "فواتير الشراء وإدخال البضائع",
     descriptionEn: "Purchase orders & stock-in",
@@ -652,7 +652,7 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
   {
     id: "finance",
     path: "/finance",
-    titleAr: "المالية",
+    titleAr: "الخزينة والمالية",
     titleEn: "Finance",
     descriptionAr: "الخزينة والتدفقات النقدية",
     descriptionEn: "Treasury & cash flow",
@@ -939,7 +939,7 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
     category: "milling",
     moduleId: "milling_operations",
     requiredRoles: STOCK,
-    i18nKey: "nav.milling_statement",
+    i18nKey: "nav.milling_custody_delivery",
   },
   {
     id: "milling-guide",
@@ -1261,8 +1261,11 @@ export const SIDEBAR_SECTION_ORDER: { category: RouteCategory; titleKey: string 
 export const SIDEBAR_HIDDEN_IDS = new Set<string>([
   "returns",
   "milling",
-  "milling-milling",
-  "milling-delivery",
+  /*
+   * milling-milling و milling-delivery لم يعودا مخفيين: أصبحا واجهتين
+   * مستقلتين كاملتين (طحن الأمانات / تسليم الأمانات) بطلب المالك،
+   * وتُعمد عرضهما في القائمة الجانبية تحت قسم المطحنة.
+   */
   /**
    * ملاحظة: `settings` نفسه **لا** يُخفى. شاشات الإعدادات الفرعية كانت
    * مخفية كلها، فيُطوى قسم «النظام والإعدادات» على رابط عام واحد ويضطر

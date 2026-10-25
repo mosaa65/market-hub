@@ -64,6 +64,7 @@ import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
 import type { CustomerContext, InvoiceContext } from "@/lib/communication";
 import { translateRpcError } from "@/lib/errors/rpc-errors";
 import { usePaymentPanel } from "@/components/payments/payment-panel";
+import { fuzzyMatch } from "@/lib/fuzzy-search";
 import { resolvePaidAmount } from "@/lib/payments/payment-rules";
 import { useFormNavigationScope } from "@/hooks/use-form-navigation";
 import { DynamicPaymentSelector } from "@/components/ui/payment-method/dynamic-payment-selector";
@@ -746,13 +747,15 @@ function POSPage() {
       : null;
 
     const matchingProducts = products.filter((p) => {
-      const q = search.trim().toLowerCase();
+      // البحث التسامحي (تشامحي): تطبيع عربي + تسامح مع أخطاء الكتابة —
+      // يقارن الاسم العربي والإنجليزي والـ SKU والباركود بلا تطابق حرفي صارم.
+      const q = search.trim();
       const matchesSearch =
         !q ||
-        p.name.toLowerCase().includes(q) ||
-        (p.name_ar ?? "").includes(q) ||
-        (p.sku ?? "").toLowerCase().includes(q) ||
-        (p.barcode ?? "").toLowerCase().includes(q);
+        fuzzyMatch(p.name_ar ?? p.name, q) ||
+        fuzzyMatch(p.name, q) ||
+        fuzzyMatch(p.sku, q) ||
+        fuzzyMatch(p.barcode, q);
 
       const matchesCat = !selectedCategory || p.category_id === selectedCategory;
       const matchesBrand =
@@ -1043,10 +1046,10 @@ function POSPage() {
     }
     const partial = products.filter(
       (p) =>
-        p.name.toLowerCase().includes(q.toLowerCase()) ||
-        (p.name_ar ?? "").includes(q) ||
-        (p.sku ?? "").toLowerCase().includes(q.toLowerCase()) ||
-        (p.barcode ?? "").toLowerCase().includes(q.toLowerCase()),
+        fuzzyMatch(p.name, q) ||
+        fuzzyMatch(p.name_ar, q) ||
+        fuzzyMatch(p.sku, q) ||
+        fuzzyMatch(p.barcode, q),
     );
     if (partial.length === 1) {
       addToCart(partial[0]);

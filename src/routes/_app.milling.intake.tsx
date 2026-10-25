@@ -1,11 +1,11 @@
 /**
  * /milling/intake — استلام وفواتير (كاونتر المطحنة ونقطة الخدمة الموحدة).
  *
- * العميل + الحبوب + الأكياس + السعة اليدوية + الوزن (يدوي/مقترح)
- * + أجرة الطحن (أكياس × سعر الكيس) + الخصم + طريقة الدفع + المدفوع/الآجل
+ * العميل + الحبوب (أنواع متعددة) + الأكياس + الوزن (من الميزان)
+ * + أجرة الطحن (إجمالي الأكياس × سعر الكيس) + الخصم + طريقة الدفع + المدفوع/الآجل
  * = مستند أمانة واحد + فاتورة مبيعات رسمية في نفس المعاملة الفورية.
  */
-import { createFileRoute, useSearch, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useSearch, useNavigate, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, useMemo } from "react";
 import {
@@ -119,7 +119,7 @@ function MillingIntakePage() {
 
   /**
    * أسطر الاستلام: نوع حبوب مستقل لكل سطر (بر 50كجم ×10 + بر 25كجم ×10 + ...)
-   * كل سطر: صنف + سعة الكيس + الأكياس + الوزن (محسوب آلياً من السعة).
+   * كل سطر: صنف + عدد الأكياس + الوزن (من الميزان مباشرة).
    */
   const [lines, setLines] = useState<{ itemId: string; bags: string; kg: string }[]>([
     { itemId: "", bags: "", kg: "" },
@@ -135,6 +135,11 @@ function MillingIntakePage() {
     paymentMethodId: "cash",
   });
   const [paid, setPaid] = useState("");
+  /**
+   * تعبئة تلقائية للمبلغ المستلم: يتبع صافي الفاتورة لحظياً حتى يعدّله المستخدم يدوياً،
+   * ويعود للتبعية التلقائية عند بدء عملية جديدة أو التحول للطريقة الآجلة.
+   */
+  const [paidAuto, setPaidAuto] = useState(true);
 
   // المستند والطباعة
   const [createdDocument, setCreatedDocument] = useState<MillingServiceDocumentCreated | null>(
@@ -249,13 +254,32 @@ function MillingIntakePage() {
     setLines((ls) => (ls.length > 1 ? ls.filter((_, i) => i !== idx) : ls));
   }
 
-  /** تغيير الأكياس لسطر — أي تعديل على الكميات يلغي أي تجاوز يدوي سابق لإجمالي الأجور */
+  /**
+   * تغيير الأكياس لسطر — أي تعديل على الكميات يلغي أي تجاوز يدوي سابق
+   * لإجمالي الأجور، ويعبّئ الوزن الصافي تلقائياً من سعة العبوة المسجلة
+   * على المنتج (كيس 50 كجم × 10 كيس = 500 كجم) — وقابل للتعديل.
+   */
   function setLineBags(idx: number, v: string) {
     setServicePrice("");
-    updateLine(idx, { bags: v });
+    const line = lines[idx];
+    const b = Number(v) || 0;
+    const item = (grainItems.data ?? []).find((g: ProductOption) => g.id === line.itemId);
+    const unit = Number(item?.package_weight_kg ?? 0);
+    const autoKg = b > 0 && unit > 0 ? String(b * unit) : line.kg;
+    updateLine(idx, { bags: v, kg: autoKg });
   }
 
-  /** تعديل الوزن يدوياً لسطر (من الميزان) */
+  /** تغيير الصنف لسطر — يعيد تعبئة الوزن تلقائياً إذا كان هناك عدد أكياس */
+  function setLineItem(idx: number, itemId: string) {
+    const line = lines[idx];
+    const item = (grainItems.data ?? []).find((g: ProductOption) => g.id === itemId);
+    const unit = Number(item?.package_weight_kg ?? 0);
+    const b = Number(line.bags) || 0;
+    const autoKg = b > 0 && unit > 0 ? String(b * unit) : line.kg;
+    updateLine(idx, { itemId, kg: autoKg });
+  }
+
+  /** تعديل الوزن يدوياً لسطر (من الميزان) — يبقى كما أدخله دون الكتابة فوقه */
   function setLineKg(idx: number, v: string) {
     updateLine(idx, { kg: v });
   }
@@ -293,9 +317,16 @@ function MillingIntakePage() {
   function handleSetFullCredit() {
     setPaymentMethod("credit");
     setPaid("");
+    setPaidAuto(true);
   }
 
   const isOverpaid = !isCredit && currentPaid > grandTotal;
+
+  // التعبئة التلقائية: حقل المدفوع يملأ فوراً بصافي الفاتورة عند تغيّره (غير آجل)
+  useEffect(() => {
+    if (isCredit) return;
+    if (paidAuto) setPaid(grandTotal > 0 ? String(grandTotal) : "");
+  }, [grandTotal, isCredit, paidAuto]);
 
   const canSubmit = Boolean(
     customerId &&
@@ -355,6 +386,7 @@ function MillingIntakePage() {
       setLines([{ itemId: "", bags: "", kg: "" }]);
       setNotes("");
       setPaid("");
+      setPaidAuto(true);
       setDiscount("");
 
       void qc.invalidateQueries({ queryKey: ["milling"] });
@@ -371,6 +403,7 @@ function MillingIntakePage() {
     setLines([{ itemId: "", bags: "", kg: "" }]);
     setNotes("");
     setPaid("");
+    setPaidAuto(true);
     setDiscount("");
   }
 
@@ -475,7 +508,7 @@ function MillingIntakePage() {
             <MillingSectionTitle
               icon={<Scale className="h-4 w-4" />}
               title="بيانات استلام حبوب العميل"
-              subtitle="تسجيل الأمانة العينية بدقة الأكياس والسعة والوزن التلقائي."
+              subtitle="تسجيل الأمانة العينية بأنواع الحبوب والأكياس والوزن الفعلي."
             />
 
             <div className="space-y-4 p-4">
@@ -559,9 +592,23 @@ function MillingIntakePage() {
                   <div>
                     <h4 className="text-xs font-bold text-foreground">أنواع الحبوب المستلمة</h4>
                     <p className="text-[11px] text-muted-foreground">
-                      لكل نوع حبوب سطر مستقل: اختر الصنف، حدد السعة، ثم عدد الأكياس — الوزن يُحسب
-                      آلياً.
+                      لكل نوع حبوب سطر مستقل: اختر الصنف، ثم عدد الأكياس، وأدخل الوزن الفعلي من
+                      الميزان. القائمة تقرأ من منتجات الأمانات فقط.
                     </p>
+                    {grainItems.data && grainItems.data.length === 0 && (
+                      <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-2.5 py-1.5 text-[11px]">
+                        <span className="font-semibold text-amber-700 dark:text-amber-300">
+                          لا توجد منتجات حبوب أمانات بعد!
+                        </span>
+                        <Link
+                          to="/products"
+                          search={undefined as never}
+                          className="inline-flex items-center gap-1 rounded-lg bg-amber-500 px-2 py-1 font-bold text-white hover:bg-amber-600"
+                        >
+                          أضف أول نوع حبوب من «المنتجات / الأصناف» ←
+                        </Link>
+                      </div>
+                    )}
                   </div>
                   <button
                     type="button"
@@ -580,7 +627,7 @@ function MillingIntakePage() {
                     <div className="grid grid-cols-[1fr_auto] items-center gap-2">
                       <MillingSelect
                         value={line.itemId}
-                        onChange={(e) => updateLine(idx, { itemId: e.target.value })}
+                        onChange={(e) => setLineItem(idx, e.target.value)}
                         className="font-bold text-xs"
                       >
                         <option value="">اختر نوع الحبوب…</option>
@@ -619,7 +666,7 @@ function MillingIntakePage() {
 
                       <div>
                         <span className="block text-[11px] font-semibold text-muted-foreground mb-1">
-                          الوزن الإجمالي (كجم):
+                          الوزن الصافي (كجم):
                         </span>
                         <QuantityInput
                           min={0}
@@ -631,12 +678,10 @@ function MillingIntakePage() {
                           onValueChange={(v) => setLineKg(idx, v == null ? "" : String(v))}
                           className="font-bold"
                         />
-                        {line.kgAuto && Number(line.bags) > 0 && Number(line.capacityKg) > 0 && (
-                          <div className="mt-1 flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-                            <CheckCircle2 className="h-3 w-3 shrink-0" />
-                            {line.bags} كيس × {line.capacityKg} كجم = {fmtNum(Number(line.kg))} كجم
-                          </div>
-                        )}
+                        <div className="mt-1 text-[10px] text-muted-foreground">
+                          يُعبّئ تلقائياً من سعة العبوة ({line.bags || 0} كيس × سعة الصنف) — عدّله
+                          من الميزان إن اختلف.
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -886,7 +931,10 @@ function MillingIntakePage() {
                         placeholder="0.00"
                         aria-label="المبلغ المستلم (المدفوع)"
                         value={isCredit ? null : paid === "" ? null : Number(paid)}
-                        onValueChange={(v) => setPaid(v == null ? "" : String(v))}
+                        onValueChange={(v) => {
+                          setPaidAuto(false);
+                          setPaid(v == null ? "" : String(v));
+                        }}
                         className={`font-bold ${
                           isCredit
                             ? "cursor-not-allowed opacity-60"

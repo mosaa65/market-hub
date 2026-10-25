@@ -3148,6 +3148,36 @@ function ProductDialog({
             icon={<SlidersHorizontal className="size-4" />}
             title={lang === "ar" ? "طبيعة وسياسة الصنف" : "Item nature & policy"}
           />
+          <div className="rounded-xl border border-sky-500/25 bg-sky-500/5 p-3 text-[11px] leading-relaxed text-muted-foreground space-y-1">
+            <p>
+              <strong className="text-foreground">طبيعة الصنف:</strong> تحدد هل هذا الصنف
+              <strong className="text-foreground"> بضاعة (GOOD)</strong> تُخزن وتُعدّ كمياتها
+              وتكلفتها، أو
+              <strong className="text-foreground"> خدمة (SERVICE)</strong> تُباع مباشرة بلا مخزون
+              (مثل أجور الطحن). الخيار هو نفسه الزر الموحد في كل النظام — لا يوجد شكل ثالث.
+            </p>
+            <p>
+              <strong className="text-foreground">سياسة المخزون:</strong>
+              <strong className="text-foreground"> تُتتبع (TRACKED)</strong> = الكمية تُخصم وتُضاف
+              تلقائياً مع كل فاتورة وتُحسب تكلفتها (للمنتجات والنواتج)؛
+              <strong className="text-foreground"> غير تُتتبع (UNTRACKED)</strong> = لا مخزون ولا
+              خصم تلقائي (خدمات فقط)؛
+              <strong className="text-foreground"> ملك العميل (CUSTOMER_OWNED)</strong> = أمانات
+              المطحنة خارج مخزون المنشأة — لا تُخصم ولا تُقّيم تكلفتها وإنما تُتابع في سجل أمانات
+              العميل.
+            </p>
+            <p>
+              <strong className="text-foreground">التتبع:</strong> دفعات (BATCH) = كل دفعة بمدة
+              صلاحية وتكلفة خاصة — المناسب للحبوب والدقيق؛ تسلسل (SERIAL) = كل قطعة برقم فريد —
+              للأجهزة؛ بلا (NONE) = لا تتبع فردي.
+            </p>
+            <p>
+              <strong className="text-foreground">التأثير المباشر عند الاختيار:</strong> الترجيح
+              «بضاعة + تُتتبع» يجعل الفاتورة تخصم من المخزون وتُنشئ قيد تكلفة آلياً؛ اختيار «خدمة»
+              يجعل الفاتورة إيراداً فقط بلا حركة مخزون؛ اختيار «ملك العميل» يمنع أي حركة مخزون
+              نهائياً ويسجل كل شيء في دفتر أمانات العميل.
+            </p>
+          </div>
           <div className="space-y-4">
             <SettingsChoice
               label={lang === "ar" ? "طبيعة الصنف" : "Item nature"}

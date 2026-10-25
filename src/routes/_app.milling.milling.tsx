@@ -604,8 +604,23 @@ function MillingMillPage() {
                   <div>
                     <h4 className="text-xs font-bold text-foreground">النواتج المستخرجة المعبأة</h4>
                     <p className="text-[11px] text-muted-foreground">
-                      حدد الصنف، عدد الأكياس والوزن المستخرج (دقيق 50، 25، 10 كجم، نخالة، سميد…)
+                      حدد الصنف، عدد الأكياس والوزن المستخرج (دقيق 50، 25، 10 كجم، نخالة، سميد…).
+                      القائمة تقرأ من منتجات الأمانات فقط.
                     </p>
+                    {outputItems.data && outputItems.data.length === 0 && (
+                      <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-2.5 py-1.5 text-[11px]">
+                        <span className="font-semibold text-amber-700 dark:text-amber-300">
+                          لا توجد منتجات نواتج أمانات بعد!
+                        </span>
+                        <Link
+                          to="/products"
+                          search={undefined as never}
+                          className="inline-flex items-center gap-1 rounded-lg bg-amber-500 px-2 py-1 font-bold text-white hover:bg-amber-600"
+                        >
+                          أضف ناتجاً من «المنتجات / الأصناف» ←
+                        </Link>
+                      </div>
+                    )}
                   </div>
                   <button
                     type="button"
