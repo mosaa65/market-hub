@@ -1,18 +1,13 @@
 @echo off
 chcp 65001 >nul
-title Market Hub - مشغل النظام
+title Vortex ERP - مشغل النظام الذكي
 color 0A
 cd /d "%~dp0"
-
-echo ===============================================================================
-echo            MARKET HUB - جاري بدء تشغيل النظام...
-echo ===============================================================================
-echo.
 
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0\scripts\start-site.ps1"
 
 if %ERRORLEVEL% NEQ 0 (
     echo.
-    echo حدث خطأ أثناء تشغيل النظام. يرجى مراجعة الرسائل أعلاه.
+    echo [تنبيه] تم إيقاف الخادم أو حدث خطأ أثناء التشغيل.
     pause
 )

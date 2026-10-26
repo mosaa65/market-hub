@@ -460,7 +460,7 @@ function MillingDeliveryPage() {
                             decimals={2}
                             min={0}
                             emptyAsZero
-                            unit="kg"
+                            unit="كجم"
                             placeholder="0.00 كجم"
                             aria-label="الوزن المسلّم (كجم)"
                             value={line.kg || null}

@@ -497,7 +497,7 @@ function MillingMillPage() {
                             decimals={2}
                             min={0}
                             emptyAsZero
-                            unit="kg"
+                            unit="كجم"
                             placeholder="0.00 كجم"
                             aria-label="الوزن المطحون (كجم)"
                             value={line.kg || null}
@@ -712,7 +712,7 @@ function MillingMillPage() {
                     <QuantityInput
                       decimals={2}
                       min={0}
-                      unit="kg"
+                      unit="كجم"
                       placeholder="0.00"
                       aria-label="وزن الفاقد (كجم)"
                       value={lossKg === "" ? null : Number(lossKg)}

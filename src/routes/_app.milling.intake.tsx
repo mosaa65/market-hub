@@ -31,6 +31,10 @@ import {
   ArrowRight,
   Plus,
   Trash2,
+  Wheat,
+  Coins,
+  BadgePercent,
+  ShoppingBag,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
@@ -619,73 +623,112 @@ function MillingIntakePage() {
                   </button>
                 </div>
 
-                {lines.map((line, idx) => (
-                  <div
-                    key={idx}
-                    className="space-y-2 rounded-xl border border-border/70 bg-card/70 p-3"
-                  >
-                    <div className="grid grid-cols-[1fr_auto] items-center gap-2">
-                      <MillingSelect
-                        value={line.itemId}
-                        onChange={(e) => setLineItem(idx, e.target.value)}
-                        className="font-bold text-xs"
-                      >
-                        <option value="">اختر نوع الحبوب…</option>
-                        {(grainItems.data ?? []).map((g: ProductOption) => (
-                          <option key={g.id} value={g.id}>
-                            {g.name_ar || g.name}
-                          </option>
-                        ))}
-                      </MillingSelect>
-                      <button
-                        type="button"
-                        disabled={lines.length === 1}
-                        onClick={() => removeLine(idx)}
-                        className="grid h-8 w-8 place-items-center rounded-lg text-rose-500 hover:bg-rose-500/10 disabled:opacity-30"
-                        aria-label="حذف السطر"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
+                {/* رأس الجدول الأنيق للشاشات المتوسطة والكبيرة */}
+                <div className="hidden md:grid md:grid-cols-12 md:gap-2 px-3 py-2 text-[11px] font-bold text-muted-foreground bg-muted/50 rounded-xl border border-border/50">
+                  <div className="md:col-span-5 flex items-center gap-1.5">
+                    <Wheat className="h-3.5 w-3.5 text-amber-600" />
+                    <span>نوع الحبوب المستلمة</span>
+                  </div>
+                  <div className="md:col-span-2 text-center">عدد الأكياس</div>
+                  <div className="md:col-span-2 text-center">الوزن الفعلي (كجم)</div>
+                  <div className="md:col-span-2 text-center">أجر السطر التقديري</div>
+                  <div className="md:col-span-1 text-center">حذف</div>
+                </div>
 
-                    <div className="grid grid-cols-2 gap-2.5 items-center">
-                      <div>
-                        <span className="block text-[11px] font-semibold text-muted-foreground mb-1">
-                          عدد الأكياس:
-                        </span>
-                        <QuantityInput
-                          min={0}
-                          decimals={0}
-                          placeholder="0"
-                          aria-label="عدد الأكياس"
-                          value={line.bags === "" ? null : Number(line.bags)}
-                          onValueChange={(v) => setLineBags(idx, v == null ? "" : String(v))}
-                          className="font-black text-primary"
-                        />
-                      </div>
+                {lines.map((line, idx) => {
+                  const lineBags = Number(line.bags) || 0;
+                  const unitRate = Number(feePerBag) || 0;
+                  const rowEstimate = lineBags * unitRate;
 
-                      <div>
-                        <span className="block text-[11px] font-semibold text-muted-foreground mb-1">
-                          الوزن الصافي (كجم):
-                        </span>
-                        <QuantityInput
-                          min={0}
-                          decimals={2}
-                          unit="kg"
-                          placeholder="0.00"
-                          aria-label="الوزن الإجمالي (كجم)"
-                          value={line.kg === "" ? null : Number(line.kg)}
-                          onValueChange={(v) => setLineKg(idx, v == null ? "" : String(v))}
-                          className="font-bold"
-                        />
-                        <div className="mt-1 text-[10px] text-muted-foreground">
-                          يُعبّئ تلقائياً من سعة العبوة ({line.bags || 0} كيس × سعة الصنف) — عدّله
-                          من الميزان إن اختلف.
+                  return (
+                    <div
+                      key={idx}
+                      className="group rounded-xl border border-border/70 bg-card p-2.5 transition-all hover:border-primary/40 hover:shadow-xs space-y-2 md:space-y-0"
+                    >
+                      <div className="grid grid-cols-1 md:grid-cols-12 md:items-center gap-2">
+                        {/* 1. نوع الحبوب (5 أعمدة) */}
+                        <div className="md:col-span-5">
+                          <label className="md:hidden block text-[11px] font-semibold text-muted-foreground mb-1">
+                            نوع الحبوب:
+                          </label>
+                          <MillingSelect
+                            value={line.itemId}
+                            onChange={(e) => setLineItem(idx, e.target.value)}
+                            className="font-bold text-xs w-full"
+                          >
+                            <option value="">اختر نوع الحبوب…</option>
+                            {(grainItems.data ?? []).map((g: ProductOption) => (
+                              <option key={g.id} value={g.id}>
+                                {g.name_ar || g.name} {g.package_weight_kg ? `(${g.package_weight_kg} كجم)` : ""}
+                              </option>
+                            ))}
+                          </MillingSelect>
+                        </div>
+
+                        {/* 2. عدد الأكياس (عمودان) */}
+                        <div className="md:col-span-2">
+                          <label className="md:hidden block text-[11px] font-semibold text-muted-foreground mb-1">
+                            عدد الأكياس:
+                          </label>
+                          <QuantityInput
+                            min={0}
+                            decimals={0}
+                            unit="كيس"
+                            placeholder="0"
+                            aria-label="عدد الأكياس"
+                            value={line.bags === "" ? null : Number(line.bags)}
+                            onValueChange={(v) => setLineBags(idx, v == null ? "" : String(v))}
+                            className="font-black text-primary text-center"
+                          />
+                        </div>
+
+                        {/* 3. الوزن الصافي (عمودان) */}
+                        <div className="md:col-span-2">
+                          <label className="md:hidden block text-[11px] font-semibold text-muted-foreground mb-1">
+                            الوزن الفعلي (كجم):
+                          </label>
+                          <QuantityInput
+                            min={0}
+                            decimals={2}
+                            unit="كجم"
+                            placeholder="0.00"
+                            aria-label="الوزن الإجمالي (كجم)"
+                            value={line.kg === "" ? null : Number(line.kg)}
+                            onValueChange={(v) => setLineKg(idx, v == null ? "" : String(v))}
+                            className="font-bold text-center"
+                          />
+                        </div>
+
+                        {/* 4. أجر السطر التقديري (عمودان) */}
+                        <div className="md:col-span-2 flex items-center justify-between md:justify-center">
+                          <span className="md:hidden text-[11px] text-muted-foreground">أجرة السطر:</span>
+                          <div className="rounded-lg bg-surface-2/80 px-2 py-1 text-center text-xs border border-border/60">
+                            <span className="font-black text-foreground tabular-nums">
+                              {fmtNum(rowEstimate)}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground mr-1">
+                              {currencySymbol}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* 5. زر الحذف (عمود واحد) */}
+                        <div className="md:col-span-1 flex justify-end md:justify-center">
+                          <button
+                            type="button"
+                            disabled={lines.length === 1}
+                            onClick={() => removeLine(idx)}
+                            className="grid h-8 w-8 place-items-center rounded-lg text-rose-500 transition hover:bg-rose-500/10 hover:text-rose-600 disabled:opacity-25 disabled:hover:bg-transparent"
+                            aria-label="حذف السطر"
+                            title="حذف هذا السطر"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
 
                 {/* شريط إجماليات الاستلام */}
                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-muted/60 p-3 text-xs">
@@ -764,13 +807,13 @@ function MillingIntakePage() {
             </div>
           </MillingPanel>
 
-          {/* الجانب الأيسر: سلة الفاتورة والدفع بنمط الكاشير POS (5 أعمدة) */}
+          {/* الجانب الأيسر: سلة الفاتورة والدفع بنمط الكاشير المتقدم POS (5 أعمدة) */}
           <MillingPanel className="lg:col-span-5 flex flex-col justify-between">
             <div>
               <MillingSectionTitle
                 icon={<ReceiptText className="h-4 w-4" />}
-                title="فاتورة أجور الخدمة"
-                subtitle="فاتورة مبيعات رسمية تُصدر وتُرحل آلياً مع المعاملة."
+                title="سلة الخدمة والحساب المالي"
+                subtitle="فاتورة مبيعات وأجور رسمية بنمط نقطة البيع (POS)."
                 action={
                   <span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-[11px] font-bold text-amber-700 dark:text-amber-300">
                     كاونتر فوري
@@ -778,11 +821,14 @@ function MillingIntakePage() {
                 }
               />
 
-              <div className="space-y-4 p-4">
-                {/* بند الخدمة وحساب سعر الكيس */}
-                <div className="rounded-2xl border border-amber-500/25 bg-amber-500/5 p-3.5 space-y-3">
+              <div className="space-y-3.5 p-4">
+                {/* 1. بند الخدمة وحساب سعر الكيس */}
+                <div className="rounded-2xl border border-border/80 bg-surface-2/40 p-3.5 space-y-3">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">بند الخدمة المعتمد:</span>
+                    <span className="text-muted-foreground flex items-center gap-1.5">
+                      <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                      بند الخدمة المعتمد:
+                    </span>
                     <span className="font-bold text-foreground">
                       {serviceItem.data?.name_ar || serviceItem.data?.name || "أجور طحن وتجهيز"}
                     </span>
@@ -790,9 +836,7 @@ function MillingIntakePage() {
 
                   {/* احتساب أجر الكيس × عدد الأكياس */}
                   <div className="grid gap-2.5 sm:grid-cols-2">
-                    <MillingField label="أجر طحن الكيس الواحد" hint="سعر خدمة طحن الكيس الواحد">
-                      {/* أجر الكيس سعر وحدة داخل الحساب — التفقيط يظهر مرة واحدة
-                          تحت إجمالي أجور الخدمة أسفله، لا نكرره في الحقلين. */}
+                    <MillingField label="أجر طحن الكيس الواحد" hint="سعر الخدمة لكل كيس">
                       <AmountInput
                         min={0}
                         showInWords={false}
@@ -809,7 +853,7 @@ function MillingIntakePage() {
                       hint={
                         bagCount > 0
                           ? `${bagCount} كيس × ${feePerBag || 0} = ${fmtNum(currentSubtotal)}`
-                          : "المبلغ الإجمالي للخدمة"
+                          : "المبلغ الإجمالي"
                       }
                     >
                       <AmountInput
@@ -823,9 +867,9 @@ function MillingIntakePage() {
                     </MillingField>
                   </div>
 
-                  {/* ملخص عملية الحساب الذكية */}
+                  {/* ملخص عملية الحساب اللحظية */}
                   {bagCount > 0 && Number(feePerBag) > 0 && (
-                    <div className="flex items-center justify-between rounded-xl bg-background/80 px-3 py-2 text-xs font-semibold text-foreground border border-border/60">
+                    <div className="flex items-center justify-between rounded-xl bg-background/90 px-3 py-2 text-xs font-semibold text-foreground border border-border/70">
                       <span className="text-muted-foreground">حسبة الخدمة:</span>
                       <div className="flex items-center gap-1.5">
                         <span className="font-bold text-foreground">{bagCount} كيس</span>
@@ -840,8 +884,8 @@ function MillingIntakePage() {
                   )}
                 </div>
 
-                {/* الخصم الإجمالي */}
-                <MillingField label="الخصم (إن وجد)">
+                {/* 2. الخصم الإجمالي */}
+                <MillingField label="الخصم الممنوح (إن وجد)">
                   <AmountInput
                     min={0}
                     placeholder="0.00"
@@ -851,156 +895,170 @@ function MillingIntakePage() {
                     className="font-medium"
                   />
                 </MillingField>
+              </div>
+            </div>
 
-                {/* بطاقة الصافي الإجمالي المميزة */}
-                <div className="rounded-2xl bg-gradient-to-br from-primary/15 via-primary/5 to-surface-2 border border-primary/25 p-4 text-center">
-                  <span className="text-xs font-semibold text-muted-foreground">
-                    صافي الفاتورة الإجمالي
+            {/* 3. البطاقة الذكية المتكيفة في الأسفل (Smart Adaptive Bottom POS Card) */}
+            <div className="p-4 border-t border-border/80 bg-surface-2/30 space-y-3.5">
+              {/* شريط الإجماليات المتكيف الفخم */}
+              <div className="rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/10 via-card to-card p-3.5 shadow-xs space-y-2">
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>المجموع قبل الخصم:</span>
+                  <span className="font-bold tabular-nums text-foreground">
+                    {fmtNum(currentSubtotal)} {currencySymbol}
                   </span>
-                  <div className="mt-1 flex items-baseline justify-center gap-1.5">
-                    <span className="text-3xl font-black tabular-nums text-foreground">
+                </div>
+
+                {currentDiscount > 0 && (
+                  <div className="flex items-center justify-between text-xs text-rose-600 dark:text-rose-400">
+                    <span>الخصم الممنوح:</span>
+                    <span className="font-bold tabular-nums">
+                      − {fmtNum(currentDiscount)} {currencySymbol}
+                    </span>
+                  </div>
+                )}
+
+                <div className="h-px bg-border/60" />
+
+                <div className="flex items-baseline justify-between pt-0.5">
+                  <span className="text-sm font-black text-foreground">
+                    صافي الفاتورة الإجمالي:
+                  </span>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-2xl sm:text-3xl font-black tabular-nums text-primary">
                       {fmtNum(grandTotal)}
                     </span>
-                    <span className="text-sm font-bold text-muted-foreground">
+                    <span className="text-xs font-bold text-muted-foreground">
                       {currencySymbol}
                     </span>
                   </div>
                 </div>
+              </div>
 
-                {/* طريقة الدفع بنمط الكاشير */}
-                <div className="space-y-2">
+              {/* شريط اختيار طريقة الدفع مع أزرار التحكم السريع */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-foreground">
+                    طريقة السداد *
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={handlePayFull}
+                      className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20 transition"
+                    >
+                      سداد كامل (كاش)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSetFullCredit}
+                      className="rounded-lg border border-purple-500/30 bg-purple-500/10 px-2 py-0.5 text-[11px] font-bold text-purple-700 dark:text-purple-300 hover:bg-purple-500/20 transition"
+                    >
+                      آجل بالكامل (ذمة)
+                    </button>
+                  </div>
+                </div>
+
+                <DynamicPaymentSelector
+                  context="sales"
+                  value={paymentMethod}
+                  onChange={(method) => {
+                    setPaymentMethod(method);
+                    if (getPaymentMethodDefinition(method)?.isCreditTerm) {
+                      setPaid("");
+                    }
+                  }}
+                  settlement={settlement}
+                  onSettlementChange={setSettlement}
+                  includeCredit
+                  compact
+                />
+              </div>
+
+              {/* المدفوع والمتبقي */}
+              <div className="grid gap-2.5 sm:grid-cols-2">
+                <div className="space-y-1">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-semibold text-muted-foreground">
-                      طريقة السداد *
+                      المبلغ المستلم
                     </label>
-                    <div className="flex items-center gap-1.5">
+                    {!isCredit && grandTotal > 0 && (
                       <button
                         type="button"
                         onClick={handlePayFull}
-                        className="rounded-lg bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20"
+                        className="text-[10px] font-bold text-emerald-600 hover:underline"
                       >
-                        سداد كامل
+                        تعبئة كامل
                       </button>
-                      <button
-                        type="button"
-                        onClick={handleSetFullCredit}
-                        className="rounded-lg bg-purple-500/10 px-2 py-0.5 text-[11px] font-bold text-purple-700 dark:text-purple-300 hover:bg-purple-500/20"
-                      >
-                        آجل بالكامل
-                      </button>
-                    </div>
+                    )}
                   </div>
-
-                  <DynamicPaymentSelector
-                    context="sales"
-                    value={paymentMethod}
-                    onChange={(method) => {
-                      setPaymentMethod(method);
-                      if (getPaymentMethodDefinition(method)?.isCreditTerm) {
-                        setPaid("");
-                      }
+                  <AmountInput
+                    min={0}
+                    disabled={isCredit}
+                    placeholder="0.00"
+                    aria-label="المبلغ المستلم (المدفوع)"
+                    value={isCredit ? null : paid === "" ? null : Number(paid)}
+                    onValueChange={(v) => {
+                      setPaidAuto(false);
+                      setPaid(v == null ? "" : String(v));
                     }}
-                    settlement={settlement}
-                    onSettlementChange={setSettlement}
-                    includeCredit
-                    compact
+                    className={`font-bold ${
+                      isCredit
+                        ? "cursor-not-allowed opacity-60"
+                        : isOverpaid
+                          ? "border-rose-500 text-rose-600 bg-rose-500/5"
+                          : "text-emerald-600"
+                    }`}
                   />
                 </div>
 
-                {/* المدفوع والمتبقي */}
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-semibold text-muted-foreground">
-                        المبلغ المستلم (المدفوع)
-                      </label>
-                      {!isCredit && grandTotal > 0 && (
-                        <button
-                          type="button"
-                          onClick={handlePayFull}
-                          className="rounded-lg bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20"
-                        >
-                          تعبئة كامل المبلغ
-                        </button>
-                      )}
-                    </div>
-                    <div className="relative">
-                      <AmountInput
-                        min={0}
-                        disabled={isCredit}
-                        placeholder="0.00"
-                        aria-label="المبلغ المستلم (المدفوع)"
-                        value={isCredit ? null : paid === "" ? null : Number(paid)}
-                        onValueChange={(v) => {
-                          setPaidAuto(false);
-                          setPaid(v == null ? "" : String(v));
-                        }}
-                        className={`font-bold ${
-                          isCredit
-                            ? "cursor-not-allowed opacity-60"
-                            : isOverpaid
-                              ? "border-rose-500 text-rose-600 bg-rose-500/5"
-                              : "text-emerald-600"
-                        }`}
-                      />
-                    </div>
-                    <span className="text-[11px] text-muted-foreground block">
-                      {isCredit ? "معطّل لأن الطريقة آجلة" : "المبلغ المستلم كاش أو شبكة"}
+                <div className="space-y-1">
+                  <label className="block text-xs font-semibold text-muted-foreground">
+                    المتبقي كذمة آجلة
+                  </label>
+                  <div className="flex h-10 w-full items-center justify-between rounded-xl border border-border/80 bg-card px-3">
+                    <span className="text-xs text-muted-foreground">المتبقي:</span>
+                    <span
+                      className={`text-sm font-black tabular-nums ${
+                        remainingDue > 0
+                          ? "text-rose-600 dark:text-rose-400"
+                          : "text-emerald-600 dark:text-emerald-400"
+                      }`}
+                    >
+                      {fmtNum(remainingDue)} {currencySymbol}
                     </span>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-semibold text-muted-foreground">
-                      المتبقي كذمة آجلة
-                    </label>
-                    <div className="flex h-10 w-full items-center justify-between rounded-xl border border-border/80 bg-surface-2/70 px-3">
-                      <span className="text-xs text-muted-foreground">المتبقي:</span>
-                      <span
-                        className={`text-sm font-black tabular-nums ${
-                          remainingDue > 0
-                            ? "text-rose-600 dark:text-rose-400"
-                            : "text-emerald-600 dark:text-emerald-400"
-                        }`}
-                      >
-                        {fmtNum(remainingDue)} {currencySymbol}
-                      </span>
-                    </div>
-                    {remainingDue > 0 && (
-                      <p className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">
-                        {selectedCustomer ? (
-                          <>
-                            سيرحل كذمة رسمية على حساب العميل:{" "}
-                            <strong>{selectedCustomer.name}</strong>
-                          </>
-                        ) : (
-                          "يجب اختيار عميل مسجل لتقييد الذمة الآجلة."
-                        )}
-                      </p>
-                    )}
                   </div>
                 </div>
-
-                {/* تنبيه الخطأ في حال كان المدفوع أكبر من إجمالي الفاتورة */}
-                {isOverpaid && (
-                  <div className="flex items-center gap-2 rounded-xl bg-rose-500/10 p-3 text-xs font-bold text-rose-600 dark:text-rose-400 border border-rose-500/20">
-                    <AlertCircle className="h-4 w-4 shrink-0" />
-                    <span>
-                      خطأ في الحساب: المبلغ المدفوع ({fmtNum(currentPaid)} {currencySymbol}) أكبر من
-                      صافي الفاتورة المطلوبة ({fmtNum(grandTotal)} {currencySymbol})! يرجى تصحيح
-                      المبلغ للمتابعة.
-                    </span>
-                  </div>
-                )}
               </div>
-            </div>
 
-            {/* زر الاعتماد الكبير في أسفل بطاقة الكاشير */}
-            <div className="p-4 border-t border-border/70">
+              {/* تنبيه بالذمة الآجلة أو خطأ الزيادة */}
+              {remainingDue > 0 && (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-700 dark:text-amber-300">
+                  {selectedCustomer ? (
+                    <span>
+                      ✓ سيُسجل المبلغ المتبقي ({fmtNum(remainingDue)} {currencySymbol}) كدين آجل رسمي على حساب: <strong>{selectedCustomer.name}</strong>
+                    </span>
+                  ) : (
+                    <span>⚠️ يلزم اختيار عميل مسجل لتقييد المبلغ المتبقي كدين آجل.</span>
+                  )}
+                </div>
+              )}
+
+              {isOverpaid && (
+                <div className="flex items-center gap-2 rounded-xl bg-rose-500/10 p-2.5 text-xs font-bold text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>
+                    المبلغ المدفوع ({fmtNum(currentPaid)}) أكبر من صافي الفاتورة ({fmtNum(grandTotal)})!
+                  </span>
+                </div>
+              )}
+
+              {/* زر الاعتماد الكبير في أسفل بطاقة الكاشير */}
               <button
                 type="button"
                 disabled={!canSubmit || submit.isPending}
                 onClick={() => submit.mutate()}
-                className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-amber-500 py-3.5 px-4 text-sm font-black text-white shadow-md transition hover:bg-amber-600 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-amber-500 hover:bg-amber-600 py-3.5 px-4 text-sm font-black text-white shadow-md transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {submit.isPending ? (
                   <>

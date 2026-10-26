@@ -1,15 +1,13 @@
 # ==============================================================================
-# Market Hub - سكربت التشغيل الذكي الشامل (Smart Universal Launcher)
+# Vortex ERP - مشغل النظام الذكي المباشر (Vortex Smart Launcher)
 # ==============================================================================
-# - يفحص البيئة (Node, npm, Docker) بذكاء دون أخطاء أو توقف غير مبرر
-# - يحرر المنفذ المخصص (Port 3000) تلقائياً بإغلاق أي عملية قديمة أو عالقة
-# - يمنع فتح منافذ عشوائية (3001, 3002) عبر تثبيت المنفذ الصارم (Strict Port)
-# - يتعرف تلقائياً على الدومين المحلي (market-hub.local) أو localhost
-# - سريع جداً: لا يعيد تثبيت الحزم إلا إذا كانت مفقودة (مناسب للأجهزة بدون إنترنت)
+# - يحرر المنفذ المخصص (Port 3000) فوراً من أي عملية عالقة
+# - يدعم الدومين الفخم vortex.erp أو localhost
+# - يفتح المتصفح تلقائياً ويعرض سيرفر Vite مباشرة أمام المستخدم دون نوافذ خفية
 # ==============================================================================
 
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$ErrorActionPreference = 'Stop'
+$ErrorActionPreference = 'Continue'
 Set-StrictMode -Off
 
 $TargetPort = 3000
@@ -17,175 +15,95 @@ $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
 Write-Host "===============================================================================" -ForegroundColor Cyan
-Write-Host "            MARKET HUB - مشغل النظام الذكي (Universal Launcher)                " -ForegroundColor Cyan
+Write-Host "                   VORTEX ERP - مشغل النظام الذكي المباشر                       " -ForegroundColor Cyan
 Write-Host "===============================================================================" -ForegroundColor Cyan
 Write-Host ""
 
 # ------------------------------------------------------------------------------
-# 1. التحقق من متطلبات النظام الأساسية (Node.js & npm)
+# 1. فحص بيئة التشغيل الأساسية (Node.js & npm)
 # ------------------------------------------------------------------------------
-Write-Host "[1/5] فحص بيئة التشغيل..." -ForegroundColor Yellow
-
+Write-Host "[1/4] فحص بيئة التشغيل..." -ForegroundColor Yellow
 $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
 if (-not $nodeCmd) {
     Write-Host "خطأ: Node.js غير مثبت على هذا الجهاز!" -ForegroundColor Red
-    Write-Host "يرجى تثبيت Node.js من: https://nodejs.org ثم إعادة المحاولة." -ForegroundColor DarkGray
+    Write-Host "يرجى تثبيت Node.js من: https://nodejs.org" -ForegroundColor DarkGray
     Read-Host "اضغط Enter للخروج..."
     exit 1
 }
-
-$nodeVersion = (& node -v)
-Write-Host "  ✓ تم العثور على Node.js: $nodeVersion" -ForegroundColor Green
-
-$npmCmd = Get-Command npm -ErrorAction SilentlyContinue
-if (-not $npmCmd) {
-    Write-Host "خطأ: npm غير متوفر في المسار!" -ForegroundColor Red
-    Read-Host "اضغط Enter للخروج..."
-    exit 1
-}
+$nodeVer = (& node -v)
+Write-Host "  ✓ محرك Node.js جاهز: $nodeVer" -ForegroundColor Green
 
 # ------------------------------------------------------------------------------
-# 2. فحص الحزم والاعتماديات (سريع ولا يعطل العمل بدون إنترنت)
+# 2. فحص الحزم (تثبيت فوري بدون تأخير إذا كانت موجودة)
 # ------------------------------------------------------------------------------
-Write-Host "[2/5] التحقق من حزم المشروع..." -ForegroundColor Yellow
-
+Write-Host "[2/4] التحقق من حزم المشروع..." -ForegroundColor Yellow
 $nodeModulesPath = Join-Path $root "node_modules"
 if (-not (Test-Path $nodeModulesPath)) {
-    Write-Host "  الحزم مفقودة، جاري التثبيت لأول مرة (npm install)..." -ForegroundColor Yellow
+    Write-Host "  الحزم غير موجودة، جاري التثبيت لأول مرة (npm install)..." -ForegroundColor Yellow
     & npm install
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "فشل تثبيت الحزم، يرجى التحقق من اتصال الإنترنت." -ForegroundColor Red
-        Read-Host "اضغط Enter للخروج..."
-        exit $LASTEXITCODE
-    }
-    Write-Host "  ✓ تم تثبيت الحزم بنجاح." -ForegroundColor Green
 } else {
-    Write-Host "  ✓ الحزم مثبتة وجاهزة فوراً (بدون انتظار)." -ForegroundColor Green
+    Write-Host "  ✓ الحزم جاهزة ومكتملة." -ForegroundColor Green
 }
 
 # ------------------------------------------------------------------------------
-# 3. إدارة المنفذ الفريد (3000) وتحريره من العمليات العالقة
+# 3. إدارة المنفذ 3000 وتحريره من العمليات العالقة
 # ------------------------------------------------------------------------------
-Write-Host "[3/5] فحص المنفذ المخصص ($TargetPort) وضمان عدم التضارب..." -ForegroundColor Yellow
-
-$activeConns = @()
+Write-Host "[3/4] فحص المنفذ ($TargetPort) وتحرير أي عملية سابقة..." -ForegroundColor Yellow
 try {
     $activeConns = Get-NetTCPConnection -LocalPort $TargetPort -State Listen -ErrorAction SilentlyContinue
-} catch {
-    # في بعض إصدارات ويندوز القديمة
-}
-
-if ($activeConns -and $activeConns.Count -gt 0) {
-    foreach ($conn in $activeConns) {
-        $procId = $conn.OwningProcess
-        if ($procId -gt 0) {
-            try {
-                $proc = Get-Process -Id $procId -ErrorAction SilentlyContinue
-                $procName = if ($proc) { $proc.ProcessName } else { "عملية مجهولة" }
-                Write-Host "  ⚠️ تم اكتشاف عملية عالقة على المنفذ $TargetPort (ID: $procId - $procName). جاري إغلاقها..." -ForegroundColor Magenta
-                Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
-                Start-Sleep -Milliseconds 800
-                Write-Host "  ✓ تم تحرير المنفذ $TargetPort بنجاح!" -ForegroundColor Green
-            } catch {
-                Write-Host "  تعذر إغلاق العملية $procId تلقائياً: $_" -ForegroundColor DarkGray
+    if ($activeConns -and $activeConns.Count -gt 0) {
+        foreach ($conn in $activeConns) {
+            $pId = $conn.OwningProcess
+            if ($pId -gt 0) {
+                Write-Host "  ⚠️ تم العثور على عملية سابقة عالقة على المنفذ $TargetPort (ID: $pId). جاري إغلاقها..." -ForegroundColor Magenta
+                Stop-Process -Id $pId -Force -ErrorAction SilentlyContinue
+                Start-Sleep -Milliseconds 600
             }
         }
-    }
-} else {
-    Write-Host "  ✓ المنفذ $TargetPort شاغر وجاهز للاستخدام." -ForegroundColor Green
-}
-
-# ------------------------------------------------------------------------------
-# 4. فحص خدمات Supabase المحلية (Docker)
-# ------------------------------------------------------------------------------
-Write-Host "[4/5] التحقق من خدمات قاعدة البيانات المحلية (Docker)..." -ForegroundColor Yellow
-
-$dockerCmd = Get-Command docker -ErrorAction SilentlyContinue
-$dockerRunning = $false
-
-if ($dockerCmd) {
-    try {
-        $null = & docker info --format '{{.ServerVersion}}' 2>$null
-        if ($LASTEXITCODE -eq 0) {
-            $dockerRunning = $true
-        }
-    } catch {
-        $dockerRunning = $false
-    }
-}
-
-if ($dockerRunning) {
-    # فحص ما إذا كانت الحاويات تعمل بالفعل
-    $runningContainers = & docker ps --filter "name=supabase_db" --format "{{.Names}}" 2>$null
-    if ($runningContainers -match "supabase_db") {
-        Write-Host "  ✓ خدمات Supabase المحلية قيد التشغيل بالفعل." -ForegroundColor Green
+        Write-Host "  ✓ تم تحرير المنفذ $TargetPort بنجاح!" -ForegroundColor Green
     } else {
-        Write-Host "  جاري إقلاع خدمات Supabase المحلية عبر Docker..." -ForegroundColor Yellow
-        $prevErr = $ErrorActionPreference
-        $ErrorActionPreference = 'Continue'
-        & npx supabase start 2>$null
-        $ErrorActionPreference = $prevErr
-        Write-Host "  ✓ تم بدء خدمات Supabase بنجاح." -ForegroundColor Green
-    }
-} else {
-    Write-Host "  ℹ️ برنامج Docker Desktop ليس قيد التشغيل حالياً." -ForegroundColor DarkGray
-    Write-Host "     سيتم تشغيل واجهة النظام (قد تتصل بقاعدة سحابية أو قاعدة خارجية)." -ForegroundColor DarkGray
-}
-
-# ------------------------------------------------------------------------------
-# 5. تحديد الدومين وتشغيل خادم الويب
-# ------------------------------------------------------------------------------
-Write-Host "[5/5] تجهيز رابط النظام وبدء خادم الويب..." -ForegroundColor Yellow
-
-# فحص ما إذا كان market-hub.local مفعلاً في الجهاز
-$useLocalDomain = $false
-try {
-    $dnsCheck = [System.Net.Dns]::GetHostAddresses("market-hub.local") 2>$null
-    if ($dnsCheck -and ($dnsCheck | Where-Object { $_.IPAddressToString -eq "127.0.0.1" })) {
-        $useLocalDomain = $true
+        Write-Host "  ✓ المنفذ $TargetPort شاغر وجاهز." -ForegroundColor Green
     }
 } catch {
-    $useLocalDomain = $false
+    Write-Host "  ✓ تم تخطي فحص المنفذ." -ForegroundColor DarkGray
 }
 
-$siteUrl = if ($useLocalDomain) { "http://market-hub.local:$TargetPort" } else { "http://localhost:$TargetPort" }
+# ------------------------------------------------------------------------------
+# 4. تحديد الدومين وتشغيل المتصفح وسيرفر التطبيق
+# ------------------------------------------------------------------------------
+Write-Host "[4/4] تجهيز رابط النظام وتشغيل السيرفر..." -ForegroundColor Yellow
 
-# بدء سيرفر Vite في نافذة تشغيل منفصلة ومحمية
-$devScript = "Set-Location '$root'; npm run dev"
-Start-Process powershell -ArgumentList "-NoExit", "-Command", $devScript -WindowStyle Minimized | Out-Null
-
-Write-Host "  جاري انتظار جاهزية الخادم على $siteUrl..." -ForegroundColor Yellow
-
-# فحص دوري حتى يرد السيرفر بـ HTTP 200
-$serverReady = $false
-for ($i = 0; $i -lt 40; $i++) {
-    try {
-        $resp = Invoke-WebRequest -Uri "http://localhost:$TargetPort" -Method Head -UseBasicParsing -TimeoutSec 1 -ErrorAction SilentlyContinue
-        if ($resp -and $resp.StatusCode -ge 200 -and $resp.StatusCode -lt 500) {
-            $serverReady = $true
-            break
+$siteUrl = "http://localhost:$TargetPort"
+try {
+    $dnsVortex = [System.Net.Dns]::GetHostAddresses("vortex.erp") 2>$null
+    if ($dnsVortex -and ($dnsVortex | Where-Object { $_.IPAddressToString -eq "127.0.0.1" })) {
+        $siteUrl = "http://vortex.erp:$TargetPort"
+    } else {
+        $dnsMarket = [System.Net.Dns]::GetHostAddresses("market-hub.local") 2>$null
+        if ($dnsMarket -and ($dnsMarket | Where-Object { $_.IPAddressToString -eq "127.0.0.1" })) {
+            $siteUrl = "http://market-hub.local:$TargetPort"
         }
-    } catch {
-        Start-Sleep -Milliseconds 400
     }
-}
+} catch {}
+
+# تشغيل فتح المتصفح في الخلفية بعد ثانيتين حتى يكون السيرفر قد استجاب
+Start-Job -ScriptBlock {
+    param($target)
+    Start-Sleep -Seconds 2
+    Start-Process $target
+} -ArgumentList $siteUrl | Out-Null
 
 Write-Host ""
 Write-Host "===============================================================================" -ForegroundColor Green
-Write-Host "                     ✓ تم تشغيل نظام Market Hub بنجاح!                         " -ForegroundColor Green
+Write-Host "               ✓ جاري تشغيل سيرفر VORTEX ERP الآن!                             " -ForegroundColor Green
+Write-Host "===============================================================================" -ForegroundColor Green
+Write-Host "  رابط الدخول: $siteUrl" -ForegroundColor Cyan
+if ($siteUrl -eq "http://localhost:$TargetPort") {
+    Write-Host "  (لتفعيل الرابط الفخم http://vortex.erp:$TargetPort شغل setup-local-domain.bat)" -ForegroundColor DarkGray
+}
+Write-Host "  سيتم فتح المتصفح تلقائياً..." -ForegroundColor Yellow
 Write-Host "===============================================================================" -ForegroundColor Green
 Write-Host ""
-Write-Host "  رابط التطبيق:    $siteUrl" -ForegroundColor Cyan
-if (-not $useLocalDomain) {
-    Write-Host "  (ملاحظة: يمكنك تشغيل setup-local-domain.bat لتفعيل الرابط: http://market-hub.local:$TargetPort)" -ForegroundColor DarkGray
-}
-if ($dockerRunning) {
-    Write-Host "  لوحة الاستوديو:  http://127.0.0.1:54323" -ForegroundColor Yellow
-    Write-Host "  رابط الـ API:    http://127.0.0.1:54321" -ForegroundColor Yellow
-}
-Write-Host ""
-Write-Host "  جاري فتح المتصفح تلقائياً..." -ForegroundColor DarkGray
-Write-Host "===============================================================================" -ForegroundColor Green
 
-# فتح المتصفح
-Start-Process $siteUrl
+# تشغيل خادم التطبيق مباشرة داخل نفس النافذة ليرى المستخدم السجلات الحية
+& npm run dev
