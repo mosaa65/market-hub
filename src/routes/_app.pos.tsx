@@ -1,4 +1,4 @@
-﻿import { ModuleGuard, useModules } from "@/lib/modules";
+import { ModuleGuard, useModules } from "@/lib/modules";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
@@ -381,6 +381,7 @@ function POSPage() {
   });
 
   const [postSaleRequest, setPostSaleRequest] = useState<PrintRequest | null>(null);
+  const lastSalePrintRequestRef = useRef<PrintRequest | null>(null);
 
   const [isSplitPayment, setIsSplitPayment] = useState(false);
   const [splitEditorOpen, setSplitEditorOpen] = useState(false);
@@ -1812,10 +1813,14 @@ function POSPage() {
         },
       };
 
+      lastSalePrintRequestRef.current = printRequest;
+
       if (printBehavior === "direct" || (printBehavior === "default" && !printSettings.preview)) {
         void printUnifiedDocument(printRequest);
       } else if (printBehavior !== "off") {
-        setPostSaleRequest(printRequest);
+        if (!customerId) {
+          setPostSaleRequest(printRequest);
+        }
       }
 
       setCart([]);
@@ -3189,6 +3194,17 @@ function POSPage() {
         customer={saleSuccess?.customer}
         invoice={saleSuccess?.invoice}
         eventType="invoice_created"
+        onPrint={() => {
+          if (lastSalePrintRequestRef.current) {
+            void printUnifiedDocument(lastSalePrintRequestRef.current);
+          }
+        }}
+        onViewDocument={() => {
+          if (lastSalePrintRequestRef.current) {
+            setSaleSuccess(null);
+            setPostSaleRequest(lastSalePrintRequestRef.current);
+          }
+        }}
       />
 
       {postSaleRequest ? (

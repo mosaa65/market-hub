@@ -50,7 +50,7 @@ export const VortexCurrencyInput = React.forwardRef<HTMLInputElement, VortexCurr
       decimals = 2,
       min = 0,
       max,
-      showClear = true,
+      showClear = false,
       className,
       disabled,
       placeholder = "0.00",
@@ -133,15 +133,6 @@ export const VortexCurrencyInput = React.forwardRef<HTMLInputElement, VortexCurr
       });
     };
 
-    const handleClear = () => {
-      setDisplayVal("");
-      onValueChange?.(null);
-      if (typeof onChange === "function") {
-        onChange(null);
-      }
-      inputRef.current?.focus();
-    };
-
     const activeCurrency = currency || currencySymbol || configuredCurrencySymbol;
 
     return (
@@ -168,7 +159,6 @@ export const VortexCurrencyInput = React.forwardRef<HTMLInputElement, VortexCurr
           placeholder={placeholder}
           className={cn(
             "h-10 w-full rounded-xl border border-input/80 bg-background/70 backdrop-blur-md px-3.5 py-2 text-sm font-semibold tabular-nums text-foreground transition-all duration-200",
-            showClear && displayVal && !disabled && "pe-10",
             "shadow-xs hover:border-primary/40 hover:bg-background/90",
             "focus:border-primary focus:bg-background focus:outline-none focus:ring-4 focus:ring-primary/15",
             "disabled:cursor-not-allowed disabled:opacity-50",
@@ -176,19 +166,6 @@ export const VortexCurrencyInput = React.forwardRef<HTMLInputElement, VortexCurr
           )}
           {...props}
         />
-
-        {/* Clear Button */}
-        {showClear && displayVal && !disabled && (
-          <button
-            type="button"
-            tabIndex={-1}
-            onClick={handleClear}
-            className="absolute end-2.5 z-10 grid h-6 w-6 place-items-center rounded-lg text-muted-foreground transition-all hover:bg-muted hover:text-foreground"
-            aria-label="مسح القيمة"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        )}
       </div>
     );
   },

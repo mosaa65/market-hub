@@ -58,23 +58,22 @@ export const ROUTE_ACCESS: Record<string, RouteAccessRule> = {
   "/milling/performance": {
     allowedRoles: ["owner", "manager", "accountant"],
   },
-  // استلام وفواتير: الاستلام للمستودع، وفاتورة أجور الطحن عمل مالي —
-  // المحاسب كان محجوباً عنها رغم أنها إصدار فواتير.
+  // استلام وفواتير: موقع عمل وخدمات وفواتير أجور الطحن — مفتوح للكاشير والمستودع والمحاسبة.
   "/milling/intake": {
-    allowedRoles: ["owner", "manager", "accountant", "warehouse"],
+    allowedRoles: ["owner", "manager", "accountant", "warehouse", "cashier"],
   },
-  // التسليم وكشف الأمانات: موقع عمل يخص المستودع والمالية معاً.
+  // التسليم وكشف الأمانات: تسليم نواتج ومستندات أمانات العميل.
   "/milling/delivery": {
-    allowedRoles: ["owner", "manager", "warehouse"],
+    allowedRoles: ["owner", "manager", "accountant", "warehouse", "cashier"],
   },
   "/milling/customer-statement": {
-    allowedRoles: STOCK,
+    allowedRoles: ["owner", "manager", "accountant", "warehouse", "cashier"],
   },
   "/milling/custody-delivery": {
-    allowedRoles: STOCK,
+    allowedRoles: ["owner", "manager", "accountant", "warehouse", "cashier"],
   },
   "/milling/products": {
-    allowedRoles: STOCK,
+    allowedRoles: ["owner", "manager", "accountant", "warehouse", "cashier"],
   },
   "/purchase-pos": { allowedRoles: STOCK },
   "/purchases": { allowedRoles: STOCK },

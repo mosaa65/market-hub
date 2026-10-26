@@ -53,7 +53,7 @@ check("empty cache returns the default profile", empty.name === DEFAULT_COMPANY_
 check(
   "empty profile falls back to the platform default contacts (إنما سوفت)",
   empty.name === "إنما سوفت" &&
-    empty.englishName === "Inama Soft" &&
+  empty.englishName === "Inama Soft — Software Solutions" &&
     empty.contacts.includes("772217218"),
 );
 

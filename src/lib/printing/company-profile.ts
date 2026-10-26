@@ -24,10 +24,13 @@ let memoryProfile: CompanyProfile | null = null;
  */
 const DEFAULT_PROFILE: CompanyProfile = {
   name: "إنما سوفت",
-  arabicName: "إنما سوفت",
-  englishName: "Inama Soft",
+  arabicName: "إنما سوفت — للحلول البرمجية",
+  englishName: "Inama Soft — Software Solutions",
+  legalName: "Inama Soft for Software Solutions",
   phone: "772217218",
   contacts: ["772217218", "779099272"],
+  address: "اليمن — إب · مفرق جلبة",
+  email: "mousa.mc13@gmail.com",
   logoUrl: "/vortex-erp-wordmark.png",
 };
 

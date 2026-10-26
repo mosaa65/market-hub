@@ -122,11 +122,11 @@ export const AmountInput = React.forwardRef<HTMLInputElement, AmountInputProps>(
       max,
       currency,
       currencySymbol,
-      clearable = true,
+      clearable = false,
       showInWords = true,
       wordsClassName,
       showStoredValue = true,
-      hideClear = false,
+      hideClear = true,
       containerClassName,
       className,
       ...props

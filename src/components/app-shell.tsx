@@ -1109,7 +1109,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <main
           className={cn(
-            "flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar pb-app-safe",
+            "flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar",
             isPosRoute ? "flex flex-col" : "",
           )}
         >

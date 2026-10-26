@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Globe2, Mail, MapPin, Phone } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { getCachedCompanyProfile, cacheCompanyProfile } from "@/lib/printing/company-profile";
-import { COMPANY_RIGHTS_TEXT } from "@/lib/printing/footer";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +16,9 @@ import { cn } from "@/lib/utils";
  * يُركَّب من `AppShell` أسفل مساحة العمل، ويُخفى تلقائيًا إذا كانت بيانات
  * المنشأة فارغة تمامًا (قاعدة جديدة لم تُضبط بعد) بدل أن يظهر إطار فارغ.
  */
+/** نص حقوق فوتر الموقع فقط — لا علاقة له بفوتر المستندات المطبوعة. */
+const SITE_RIGHTS_TEXT = "تطوير وبرمجة إنما سوفت | 772217218";
+
 interface CompanyFooterInfo {
   name: string;
   phone: string;
@@ -29,7 +31,7 @@ interface CompanyFooterInfo {
 function fromProfile(profile = getCachedCompanyProfile()): CompanyFooterInfo {
   return {
     name: String(profile.name ?? "").trim(),
-    phone: String(profile.phone ?? "").trim() || (profile.contacts ?? []).join(" · "),
+    phone: String(profile.phone ?? "").trim() || (profile.contacts ?? [])[0] || "",
     email: String(profile.email ?? "").trim(),
     address: String(profile.address ?? "").trim(),
     taxNumber: String(profile.taxNumber ?? "").trim(),
@@ -132,7 +134,7 @@ export function SiteFooter({ className }: { className?: string }) {
 
         {/* حقوق المنفّذ — ثابتة في كل حالة، لا تخفيها بيانات المنشأة. */}
         <span className="text-[9px] opacity-80" dir="rtl">
-          {COMPANY_RIGHTS_TEXT}
+          {SITE_RIGHTS_TEXT}
         </span>
       </div>
     </footer>
