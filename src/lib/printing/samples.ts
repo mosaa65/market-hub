@@ -105,7 +105,7 @@ export const SAMPLE_INVENTORY_DOC: UnifiedDocumentData = {
   movementType: "صرف مبيعات (Sales Issue)",
   warehouse: "المستودع الرئيسي - قسم الصوامع",
   operatorName: "أحمد يونس (أمناء المخازن)",
-  notes: "تم تجهيز وتسليم الأصناف بحالة ممتازة وبحضور العميل / السائق.",
+  notes: "تم تجهيز وتسليم الأصناف بحالة ممتازة وبحضور العميل.",
   lines: [
     {
       product: "دقيق بر ممتاز درجة أولى",
@@ -145,7 +145,7 @@ export const SAMPLE_DELIVERY_NOTE: UnifiedDocumentData = {
     },
     { product: "نخالة خشنة (ردة نقية)", qty: 4, unit: "كيس 40 كجم", code: "OUT-BRAN" },
   ],
-  notes: "رقم الشاحنة: أ ب ج 5432 · اسم السائق: محمد علي السلمي",
+  notes: "تم تسليم الدفعة كاملة للعميل بموجب إذن الصرف المعتمد.",
 };
 
 export const SAMPLE_RETURN_DOC: UnifiedDocumentData = {

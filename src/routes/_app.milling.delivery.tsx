@@ -73,8 +73,6 @@ function MillingDeliveryPage() {
   const [customerId, setCustomerId] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
   const [lines, setLines] = useState<CustodyLine[]>([{ itemId: "", bags: 0, kg: 0 }]);
-  const [driverName, setDriverName] = useState("");
-  const [vehicleNumber, setVehicleNumber] = useState("");
   const [notes, setNotes] = useState("");
 
   // حالة معاينة وطباعة الفاتورة الفاخرة
@@ -221,19 +219,11 @@ function MillingDeliveryPage() {
   // إرسال عملية التسليم
   const submit = useMutation({
     mutationFn: () => {
-      const combinedNotes = [
-        driverName.trim() ? `المستلم / السائق: ${driverName.trim()}` : "",
-        vehicleNumber.trim() ? `المركبة: ${vehicleNumber.trim()}` : "",
-        notes.trim() ? notes.trim() : "",
-      ]
-        .filter(Boolean)
-        .join(" | ");
-
       return custodyDelivery({
         customerId,
         warehouseId,
         lines,
-        notes: combinedNotes || undefined,
+        notes: notes.trim() || undefined,
       });
     },
     onSuccess: async (res) => {
@@ -266,20 +256,8 @@ function MillingDeliveryPage() {
             remainingBags: remBags,
             remainingKg: remKg,
             unit: delBags > 0 ? "كيس" : "كجم",
-            note:
-              driverName || vehicleNumber
-                ? `${driverName ? `السائق: ${driverName}` : ""} ${vehicleNumber ? `(${vehicleNumber})` : ""}`.trim()
-                : undefined,
           };
         });
-
-      const combinedNotes = [
-        driverName.trim() ? `المستلم: ${driverName.trim()}` : "",
-        vehicleNumber.trim() ? `رقم المركبة: ${vehicleNumber.trim()}` : "",
-        notes.trim() ? notes.trim() : "",
-      ]
-        .filter(Boolean)
-        .join(" — ");
 
       const uDoc = buildCustodyDeliveryDoc({
         docNumber,
@@ -287,7 +265,7 @@ function MillingDeliveryPage() {
         customerPhone: selectedCustomer?.phone,
         warehouseName,
         lines: deliveryLinesPayload,
-        notes: combinedNotes || undefined,
+        notes: notes.trim() || undefined,
       });
 
       setDeliveryPrintDoc(uDoc);
@@ -295,8 +273,6 @@ function MillingDeliveryPage() {
 
       // تفريغ النموذج
       setLines([{ itemId: "", bags: 0, kg: 0 }]);
-      setDriverName("");
-      setVehicleNumber("");
       setNotes("");
 
       void qc.invalidateQueries({ queryKey: ["milling"] });
@@ -542,24 +518,7 @@ function MillingDeliveryPage() {
                 </button>
               </div>
 
-              {/* بيانات المستلم والسائق والملاحظات */}
-              <div className="grid gap-3 sm:grid-cols-2">
-                <MillingField label="اسم المستلم أو السائق" hint="اختياري">
-                  <MillingInput
-                    value={driverName}
-                    onChange={(e) => setDriverName(e.target.value)}
-                    placeholder="مثال: محمد علي السلمي"
-                  />
-                </MillingField>
 
-                <MillingField label="رقم المركبة أو لوحة الشاحنة" hint="اختياري">
-                  <MillingInput
-                    value={vehicleNumber}
-                    onChange={(e) => setVehicleNumber(e.target.value)}
-                    placeholder="مثال: نقل 4859 / أ ب ج"
-                  />
-                </MillingField>
-              </div>
 
               <MillingField label="ملاحظات التسليم الإضافية" hint="تظهر في سند التسليم الرسمي">
                 <MillingTextarea

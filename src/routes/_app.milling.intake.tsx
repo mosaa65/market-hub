@@ -773,12 +773,12 @@ function MillingIntakePage() {
               {/* ملاحظات الاستلام */}
               <MillingField
                 label="ملاحظات الاستلام"
-                hint="اختيارية — رقم الشاحنة/القاطبة، اسم السائق، أو أي تفاصيل خاصة بالدفعة."
+                hint="اختيارية — أي تفاصيل أو ملاحظات خاصة بالدفعة المستلمة."
               >
                 <MillingInput
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="مثال: شاحنة نقل رقم 4589 — تفريغ مستعجل"
+                  placeholder="مثال: دفعة حبوب خام — تفريغ مستعجل"
                 />
               </MillingField>
 

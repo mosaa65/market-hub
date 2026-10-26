@@ -1382,7 +1382,7 @@ export function buildCustodyDeliveryDoc({
       note:
         l.note || (l.deliveredBags > 0 && l.deliveredKg > 0 ? `${l.deliveredKg} كجم` : undefined),
     })),
-    notes: notes || "تم تسليم الأمانات الموضحة أعلاه للعميل / السائق بموجب إذن الصرف المعتمد.",
+    notes: notes || "تم تسليم الأمانات الموضحة أعلاه للعميل بموجب إذن الصرف المعتمد.",
     options: {
       showFinancialDetails: false,
       showPaymentInfo: false,

@@ -1855,11 +1855,11 @@ function QuickDeliveryModal({
             </div>
           </div>
 
-          <MillingField label="ملاحظات التسليم والمستلم">
+          <MillingField label="ملاحظات التسليم">
             <MillingInput
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="مثال: استلم بواسطة السائق / رقم الشاحنة أو الإشعار"
+              placeholder="مثال: تسليم دفعة للعميل أو رقم إشعار التسليم..."
             />
           </MillingField>
         </div>

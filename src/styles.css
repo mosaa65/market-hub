@@ -884,10 +884,52 @@
     background-position: 200% 0;
   }
 }
+
+/*
+ * موجة التحميل الموحدة (shimmer):
+ * لمسة لون أساسي (primary) فاخرة بدل الوميض الأبيض الشفاف القديم —
+ * واضحة وأنيقة في الوضعين النهاري والليلي، وبلطف متدرّج غير مُزعج.
+ */
 .shimmer {
-  background: linear-gradient(90deg, transparent, oklch(1 0 0 / 0.05), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, var(--primary) 26%, transparent),
+    transparent
+  );
   background-size: 200% 100%;
   animation: shimmer 1.6s linear infinite;
+}
+
+/* النهاري: توهج أهدأ لأن الخلفية فاتحة أصلًا — لمعان حريري راقٍ */
+.light .shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, var(--primary) 16%, transparent),
+    color-mix(in oklab, var(--primary) 4%, transparent)
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+/* الليلي: توهج أوضح قليلاً مع ذيل ناعم يبرز الموجة على الخلفية الداكنة */
+.dark .shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, var(--primary) 30%, transparent),
+    color-mix(in oklab, var(--primary) 6%, transparent)
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+/* احترام تفضيل تقليل الحركة */
+@media (prefers-reduced-motion: reduce) {
+  .shimmer {
+    animation: none;
+  }
 }
 
 /* Universal sleek minimalist scrollbar: track completely transparent everywhere */
