@@ -245,6 +245,8 @@ function SalesInvoicePage() {
   });
   const [paid, setPaid] = useState("");
   const [paymentReference, setPaymentReference] = useState("");
+  // أجزاء الدفع المجزأ (طرق التحصيل الفعلية) — فارغة يعني دفعاً مفرداً.
+  const [paymentSplits, setPaymentSplits] = useState<{ method: string; amount: number }[]>([]);
 
   // Keyboard-only operation: arrows/Enter walk the payment block in order
   // (customer → warehouse → method → reference → paid → discount → note),
@@ -522,14 +524,25 @@ function SalesInvoicePage() {
       const result = await createSalesInvoice({
         warehouseId,
         customerId: customerId || null,
-        paymentMethod: toLegacyPaymentValue(paymentMethod) as PaymentMethod,
+        paymentMethod: (paymentSplits.length
+          ? "split"
+          : toLegacyPaymentValue(paymentMethod)) as PaymentMethod,
         paid: effectivePaid,
         discount: discountN,
+        paymentSplits: paymentSplits.length ? paymentSplits : null,
         // On a ticket the negotiated terms belong on the document, not only on
         // the line, so the receipt the customer keeps can be re-read later.
         note:
           [
             mode === "ticket" ? ticketDetail : "",
+            paymentSplits.length
+              ? `[${isRtl ? "الدفع بأكثر من طريقة" : "Split"}: ${paymentSplits
+                  .map(
+                    (line) =>
+                      `${paymentMethodLabel(line.method, isRtl ? "ar" : "en")}: ${money(line.amount)}`,
+                  )
+                  .join(" | ")}]`
+              : "",
             paymentReference.trim()
               ? `${isRtl ? "مرجع الحوالة" : "Transfer ref"}: ${paymentReference.trim()}`
               : "",
@@ -630,6 +643,7 @@ function SalesInvoicePage() {
       setDiscount("");
       setNote("");
       setPaymentReference("");
+      setPaymentSplits([]);
       setSearch("");
     } catch (err: any) {
       toast.error(
@@ -1265,33 +1279,21 @@ function SalesInvoicePage() {
             <div className="h-px bg-border" />
 
             <div className="space-y-3">
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-muted-foreground">
-                  {isRtl ? "طريقة السداد والتوجيه المالي" : "Payment method & settlement"}
-                </label>
-                <DynamicPaymentSelector
-                  context="sales"
-                  value={paymentMethod}
-                  onChange={(method) => {
-                    setPaymentMethod(method);
-                    if (getPaymentMethodDefinition(method)?.isCreditTerm) setPaid("0");
-                  }}
-                  settlement={settlement}
-                  onSettlementChange={setSettlement}
-                  includeCredit
-                />
-              </div>
               <PaymentPanel
                 context="sales"
                 total={total}
                 method={paymentMethod}
-                onMethodChange={setPaymentMethod}
+                onMethodChange={(next) => {
+                  setPaymentMethod(next);
+                  if (next !== "split") setPaymentSplits([]);
+                }}
                 paid={paid}
                 onPaidChange={setPaid}
                 customerId={customerId}
                 customers={customers}
                 reference={paymentReference}
                 onReferenceChange={setPaymentReference}
+                onSplitChange={(splits) => setPaymentSplits(splits)}
                 showShortcuts={false}
               />
               <div className="grid grid-cols-2 gap-2">

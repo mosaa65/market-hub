@@ -17,6 +17,11 @@ export {
   type AddPaymentMethodDialogProps,
 } from "./add-payment-method-dialog";
 export {
+  SplitPaymentDialog,
+  type SplitPaymentDialogProps,
+  type SplitPaymentValues,
+} from "./split-payment-dialog";
+export {
   SplitPaymentEditor,
   type SplitPaymentEditorLine,
   type SplitPaymentMethodOption,

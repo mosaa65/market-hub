@@ -104,7 +104,10 @@ function DebtsPage() {
       .select("id,name,phone,email,balance,credit_limit")
       .eq("is_active", true)
       .order("balance", { ascending: false });
-    const list = (data ?? []) as Customer[];
+    // استثناء العميل النقدي من ذمم العملاء
+    const list = ((data ?? []) as Customer[]).filter(
+      (c) => c.name !== "عميل نقدي" && !(c as any).is_system,
+    );
     setRows(list);
     setLoading(false);
 

@@ -61,6 +61,9 @@ import {
 } from "@/lib/milling";
 import { PaymentPanel, usePaymentPanel } from "@/components/payments/payment-panel";
 import { DynamicPaymentSelector } from "@/components/ui/payment-method/dynamic-payment-selector";
+import { SplitPaymentDialog } from "@/components/ui/payment-method";
+import type { SplitPaymentValues } from "@/components/ui/payment-method";
+import { buildSplitTenders } from "@/lib/payments/split-tenders";
 import { useFormNavigationScope } from "@/hooks/use-form-navigation";
 import { AmountInput } from "@/components/ui/amount-input";
 import { QuantityInput } from "@/components/ui/quantity-input";
@@ -305,7 +308,26 @@ function MillingIntakePage() {
   }, [servicePrice, feePerBag, bagCount]);
 
   const currentDiscount = Number(discount) || 0;
+  // الدفع المجزأ: نفس المنطق المستخدم في نقطة البيع.
+  const [splitEditorOpen, setSplitEditorOpen] = useState(false);
+  const [splitValues, setSplitValues] = useState<SplitPaymentValues>({
+    cash: 0,
+    credit: 0,
+    bank_transfer: 0,
+    mobile_money: 0,
+  });
+
   const grandTotal = Math.max(0, currentSubtotal - currentDiscount);
+  const splitResult = buildSplitTenders(
+    {
+      cash: splitValues.cash,
+      credit: splitValues.credit,
+      bank_transfer: splitValues.bank_transfer,
+      mobile_money: splitValues.mobile_money,
+    },
+    grandTotal,
+  );
+  const paymentSplits = splitResult.tenders;
 
   const payment = usePaymentPanel({
     total: grandTotal,
@@ -673,7 +695,8 @@ function MillingIntakePage() {
                             <option value="">اختر نوع الحبوب…</option>
                             {(grainItems.data ?? []).map((g: ProductOption) => (
                               <option key={g.id} value={g.id}>
-                                {g.name_ar || g.name} {g.package_weight_kg ? `(${g.package_weight_kg} كجم)` : ""}
+                                {g.name_ar || g.name}{" "}
+                                {g.package_weight_kg ? `(${g.package_weight_kg} كجم)` : ""}
                               </option>
                             ))}
                           </MillingSelect>
@@ -715,7 +738,9 @@ function MillingIntakePage() {
 
                         {/* 4. أجر السطر التقديري (عمودان) */}
                         <div className="md:col-span-2 flex items-center justify-between md:justify-center">
-                          <span className="md:hidden text-[11px] text-muted-foreground">أجرة السطر:</span>
+                          <span className="md:hidden text-[11px] text-muted-foreground">
+                            أجرة السطر:
+                          </span>
                           <div className="rounded-lg bg-surface-2/80 px-2 py-1 text-center text-xs border border-border/60">
                             <span className="font-black text-foreground tabular-nums">
                               {fmtNum(rowEstimate)}
@@ -950,17 +975,24 @@ function MillingIntakePage() {
                   </div>
                   <DynamicPaymentSelector
                     context="sales"
-                    value={paymentMethod}
-                    settlement={settlement}
-                    onSettlementChange={setSettlement}
-                    compact
-                    includeCredit
+                    value={paymentMethod === "split" ? "split" : paymentMethod}
                     onChange={(method) => {
+                      if (method === "split") {
+                        setSplitEditorOpen(true);
+                        return;
+                      }
                       setPaymentMethod(method);
+                      setSplitValues({ cash: 0, credit: 0, bank_transfer: 0, mobile_money: 0 });
                       if (getPaymentMethodDefinition(method)?.isCreditTerm) {
                         setPaid("");
                       }
                     }}
+                    allowSplit
+                    onSplitClick={() => setSplitEditorOpen(true)}
+                    settlement={settlement}
+                    onSettlementChange={setSettlement}
+                    includeCredit
+                    compact
                     disabled={submit.isPending}
                   />
                 </div>
@@ -1048,7 +1080,8 @@ function MillingIntakePage() {
                 <div className="flex items-center gap-1.5 rounded-xl bg-destructive/10 p-2 text-xs font-semibold text-destructive border border-destructive/20">
                   <AlertCircle className="h-4 w-4 shrink-0" />
                   <span>
-                    المبلغ المدفوع ({fmtNum(currentPaid)}) أكبر من صافي الفاتورة ({fmtNum(grandTotal)})!
+                    المبلغ المدفوع ({fmtNum(currentPaid)}) أكبر من صافي الفاتورة (
+                    {fmtNum(grandTotal)})!
                   </span>
                 </div>
               )}
@@ -1169,6 +1202,29 @@ function MillingIntakePage() {
             if (emptyIdx >= 0) {
               setLineItem(emptyIdx, productId);
             }
+          }}
+        />
+
+        {/* الدفع المجزأ — نفس الحوار المستخدم في نقطة البيع. */}
+        <SplitPaymentDialog
+          open={splitEditorOpen}
+          onOpenChange={setSplitEditorOpen}
+          total={grandTotal}
+          initialValues={splitValues}
+          isCreditAllowed={Boolean(customerId)}
+          onConfirm={(values) => {
+            setSplitValues(values);
+            const next = buildSplitTenders(
+              {
+                cash: values.cash,
+                credit: values.credit,
+                bank_transfer: values.bank_transfer,
+                mobile_money: values.mobile_money,
+              },
+              grandTotal,
+            );
+            setPaymentMethod(next.tenders.length > 0 ? "split" : "credit");
+            setPaid(String(next.paid));
           }}
         />
       </div>

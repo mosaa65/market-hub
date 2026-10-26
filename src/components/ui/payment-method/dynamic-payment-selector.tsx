@@ -1,646 +1,275 @@
-import { useEffect, useMemo } from "react";
+import React, { useMemo } from "react";
 import {
   Banknote,
-  Building2,
-  Calendar,
-  Check,
-  CreditCard,
-  FileCheck2,
+  HandCoins,
   Landmark,
   Smartphone,
-  Tag,
-  Wallet,
+  Layers,
+  type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
-import {
-  usePaymentMethodsForContext,
-  type ResolvedPaymentMethod,
-} from "@/hooks/use-payment-methods";
-import { useCashboxes } from "@/hooks/use-cashboxes";
-import { useCompanyBankAccounts } from "@/hooks/use-company-bank-accounts";
-import {
-  paymentMethodIcon,
-  paymentMethodIconAsset,
-  type PaymentContext,
-} from "@/lib/payments/payment-methods";
+import type { PaymentContext } from "@/lib/payments/payment-methods";
 import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
-import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from "@/components/ui/select";
+
+export type CorePaymentMethodId = "cash" | "credit" | "bank_transfer" | "mobile_money" | "split";
+
+export interface CorePaymentMethodConfig {
+  id: CorePaymentMethodId;
+  nameAr: string;
+  nameEn: string;
+  icon: LucideIcon;
+  iconColor: string;
+  badgeBg: string;
+  accountCode: string;
+  accountNameAr: string;
+  accountNameEn: string;
+}
+
+export const CORE_PAYMENT_METHODS: readonly CorePaymentMethodConfig[] = [
+  {
+    id: "cash",
+    nameAr: "نقدًا",
+    nameEn: "Cash",
+    icon: Banknote,
+    iconColor: "text-emerald-600 dark:text-emerald-400",
+    badgeBg: "bg-emerald-500/15 border-emerald-500/30 text-emerald-700 dark:text-emerald-300",
+    accountCode: "1101",
+    accountNameAr: "الصندوق",
+    accountNameEn: "Cash Till",
+  },
+  {
+    id: "credit",
+    nameAr: "آجل",
+    nameEn: "Credit",
+    icon: HandCoins,
+    iconColor: "text-amber-600 dark:text-amber-400",
+    badgeBg: "bg-amber-500/15 border-amber-500/30 text-amber-700 dark:text-amber-300",
+    accountCode: "1211",
+    accountNameAr: "ذمم",
+    accountNameEn: "Receivables",
+  },
+  {
+    id: "bank_transfer",
+    nameAr: "بنك",
+    nameEn: "Bank",
+    icon: Landmark,
+    iconColor: "text-indigo-600 dark:text-indigo-400",
+    badgeBg: "bg-indigo-500/15 border-indigo-500/30 text-indigo-700 dark:text-indigo-300",
+    accountCode: "1111",
+    accountNameAr: "البنوك",
+    accountNameEn: "Banks",
+  },
+  {
+    id: "mobile_money",
+    nameAr: "محفظة إلكترونية",
+    nameEn: "E-Wallet",
+    icon: Smartphone,
+    iconColor: "text-sky-600 dark:text-sky-400",
+    badgeBg: "bg-sky-500/15 border-sky-500/30 text-sky-700 dark:text-sky-300",
+    accountCode: "1131",
+    accountNameAr: "المحافظ الإلكترونية",
+    accountNameEn: "E-Wallets",
+  },
+  {
+    id: "split",
+    nameAr: "دفع مجزأ (أكثر من طريقة)",
+    nameEn: "Split Payment",
+    icon: Layers,
+    iconColor: "text-violet-600 dark:text-violet-400",
+    badgeBg: "bg-violet-500/15 border-violet-500/30 text-violet-700 dark:text-violet-300",
+    accountCode: "مجزأ",
+    accountNameAr: "توزيع محاسبي",
+    accountNameEn: "Multi-Tender",
+  },
+] as const;
+
+export function normalizeCoreMethodId(value: string | null | undefined): CorePaymentMethodId {
+  if (!value) return "cash";
+  const norm = value.trim().toLowerCase();
+  if (norm === "split") return "split";
+  if (norm === "cash") return "cash";
+  if (norm === "credit") return "credit";
+  if (
+    norm === "bank" ||
+    norm === "bank_transfer" ||
+    norm === "card" ||
+    norm === "cheque" ||
+    norm.includes("bank") ||
+    norm === "kuraimi_bank" ||
+    norm === "yemen_kuwait_bank"
+  ) {
+    return "bank_transfer";
+  }
+  if (
+    norm === "mobile_money" ||
+    norm === "wallet" ||
+    norm === "jawali" ||
+    norm === "jaib" ||
+    norm === "floosak" ||
+    norm === "one_cash"
+  ) {
+    return "mobile_money";
+  }
+  return "cash";
+}
 
 export interface DynamicPaymentSelectorProps {
-  context: PaymentContext;
+  context?: PaymentContext;
   value: string;
   onChange: (method: string) => void;
-  settlement: PaymentSettlementSelection;
-  onSettlementChange: (next: PaymentSettlementSelection) => void;
+  settlement?: PaymentSettlementSelection;
+  onSettlementChange?: (next: PaymentSettlementSelection) => void;
   includeCredit?: boolean;
+  allowSplit?: boolean;
+  onSplitClick?: () => void;
   disabled?: boolean;
   className?: string;
   compact?: boolean;
+  showReference?: boolean;
+  ensureIds?: (string | null | undefined)[];
+  allowedLegacyValues?: readonly string[];
+  placeholder?: string;
 }
 
 export function DynamicPaymentSelector({
-  context,
   value,
   onChange,
   settlement,
   onSettlementChange,
   includeCredit = true,
+  allowSplit = true,
+  onSplitClick,
   disabled = false,
   className,
-  compact = false,
+  showReference = false,
 }: DynamicPaymentSelectorProps) {
   const { lang } = useI18n();
   const isAr = lang === "ar";
 
-  const { methods, isLoading: methodsLoading } = usePaymentMethodsForContext(context, {
-    includeCredit,
-    includeSplit: true,
-  });
+  const currentId = normalizeCoreMethodId(value);
+  const currentConfig = useMemo(() => {
+    return CORE_PAYMENT_METHODS.find((m) => m.id === currentId) ?? CORE_PAYMENT_METHODS[0];
+  }, [currentId]);
 
-  const { activeCashboxes, defaultCashbox, isLoading: cashboxesLoading } = useCashboxes();
-  const {
-    banks,
-    wallets,
-    defaultBank,
-    defaultWallet,
-    isLoading: banksLoading,
-  } = useCompanyBankAccounts();
+  const visibleMethods = useMemo(() => {
+    return CORE_PAYMENT_METHODS.filter((m) => {
+      if (m.id === "credit" && !includeCredit) return false;
+      if (m.id === "split" && !allowSplit && currentId !== "split") return false;
+      return true;
+    });
+  }, [includeCredit, allowSplit, currentId]);
 
-  // Primary methods classification
-  const currentMethod = methods.find((m) => m.id === value || m.legacyValue === value);
-  const currentKind = currentMethod?.ledgerKind ?? "CASH";
-
-  // Ensure smart defaults are populated once loaded
-  useEffect(() => {
-    let changed = false;
-    const next: PaymentSettlementSelection = { ...settlement, method: value };
-
-    if (currentKind === "CASH") {
-      if (!next.cashboxId && defaultCashbox) {
-        next.cashboxId = defaultCashbox.id;
-        next.cashboxName = defaultCashbox.name_ar;
-        next.chartAccountId = defaultCashbox.account_id;
-        changed = true;
-      }
-    } else if (currentKind === "WALLET") {
-      if (!next.bankAccountId && defaultWallet) {
-        next.bankAccountId = defaultWallet.id;
-        next.bankAccountName = defaultWallet.name_ar;
-        next.chartAccountId = defaultWallet.account_id;
-        changed = true;
-      }
-      if (!next.paymentMethodId && currentMethod?.id) {
-        next.paymentMethodId = currentMethod.id;
-        changed = true;
-      }
-    } else if (currentKind === "BANK") {
-      if (!next.bankAccountId && defaultBank) {
-        next.bankAccountId = defaultBank.id;
-        next.bankAccountName = defaultBank.name_ar;
-        next.chartAccountId = defaultBank.account_id;
-        changed = true;
-      }
-      if (!next.paymentMethodId && currentMethod?.id) {
-        next.paymentMethodId = currentMethod.id;
-        changed = true;
-      }
+  const handleSelect = (nextId: string) => {
+    const validatedId = normalizeCoreMethodId(nextId);
+    if (validatedId === "split" && onSplitClick) {
+      onSplitClick();
+      return;
     }
+    onChange(validatedId);
 
-    if (changed) {
-      onSettlementChange(next);
+    if (onSettlementChange) {
+      const targetConfig = CORE_PAYMENT_METHODS.find((m) => m.id === validatedId) ?? CORE_PAYMENT_METHODS[0];
+      const nextSettlement: PaymentSettlementSelection = {
+        ...(settlement || { method: validatedId }),
+        method: validatedId,
+        paymentMethodId: validatedId,
+        bankAccountName:
+          validatedId === "bank_transfer" || validatedId === "mobile_money" ? targetConfig.nameAr : null,
+        cashboxName: validatedId === "cash" ? "الصندوق الرئيسي" : null,
+      };
+      onSettlementChange(nextSettlement);
     }
-  }, [value, currentKind, defaultCashbox, defaultWallet, defaultBank]);
-
-  // Handle tier-1 selection click
-  const handleSelectPrimary = (m: ResolvedPaymentMethod) => {
-    onChange(m.legacyValue);
-
-    const chosenCashbox =
-      m.ledgerKind === "CASH"
-        ? activeCashboxes.find((c) => c.id === settlement.cashboxId) || defaultCashbox
-        : null;
-    const chosenBank =
-      m.ledgerKind === "WALLET"
-        ? wallets.find((w) => w.id === settlement.bankAccountId) || defaultWallet
-        : m.ledgerKind === "BANK"
-          ? banks.find((b) => b.id === settlement.bankAccountId) || defaultBank
-          : null;
-
-    const next: PaymentSettlementSelection = {
-      method: m.legacyValue,
-      paymentMethodId: m.id,
-      cashboxId: chosenCashbox?.id || null,
-      cashboxName: chosenCashbox?.name_ar || null,
-      bankAccountId: chosenBank?.id || null,
-      bankAccountName: chosenBank?.name_ar || null,
-      chartAccountId: chosenCashbox?.account_id || chosenBank?.account_id || null,
-      reference: settlement.reference || "",
-      cheque:
-        m.legacyValue === "cheque"
-          ? settlement.cheque || {
-              chequeNumber: "",
-              bankName: "",
-              dueDate: new Date().toISOString().slice(0, 10),
-            }
-          : null,
-    };
-
-    onSettlementChange(next);
   };
 
-  // Primary tender categories to present to cashier/user
-  const primaryButtons = useMemo(() => {
-    // Unique list by canonical behavior
-    const map = new Map<string, ResolvedPaymentMethod>();
-    for (const m of methods) {
-      const key = m.legacyValue;
-      if (!map.has(key)) {
-        map.set(key, m);
-      }
-    }
-    return Array.from(map.values());
-  }, [methods]);
-
-  if (compact) {
-    const accountForMethod = (method: ResolvedPaymentMethod) => {
-      if (method.ledgerKind === "CASH") return defaultCashbox;
-      if (method.ledgerKind === "BANK") return defaultBank;
-      if (method.ledgerKind === "WALLET") return defaultWallet;
-      return null;
-    };
-
-    const selectedAccount = currentMethod ? accountForMethod(currentMethod) : null;
-    const selectedAccountName = selectedAccount
-      ? currentMethod?.id === "jaib" && /الأهدل|الاهدل/i.test(selectedAccount.name_ar)
-        ? "جيب"
-        : selectedAccount.name_ar
-      : settlement.cashboxName || settlement.bankAccountName;
-
-    return (
-      <div className={cn("min-w-0", className)}>
-        <div className="overflow-hidden rounded-xl border border-border/70 bg-card shadow-sm">
-          <div className="relative">
-            <select
-              value={currentMethod?.id ?? value}
-              disabled={disabled || methodsLoading}
-              onChange={(event) => {
-                const method = primaryButtons.find((item) => item.id === event.target.value);
-                if (method) handleSelectPrimary(method);
-              }}
-              aria-label={isAr ? "طريقة الدفع والحساب" : "Payment method and account"}
-              className="h-10 w-full appearance-none bg-background px-3 pe-10 text-xs font-semibold text-foreground outline-none transition focus:bg-muted/30 focus:ring-2 focus:ring-primary/20"
-            >
-              {primaryButtons.map((method) => {
-                const account = accountForMethod(method);
-                const accountName = account
-                  ? method.id === "jaib" && /الأهدل|الاهدل/i.test(account.name_ar)
-                    ? "جيب"
-                    : account.name_ar
-                  : method.ledgerKind === "CREDIT"
-                    ? isAr
-                      ? "ذمم العميل"
-                      : "Customer receivable"
-                    : isAr
-                      ? "غير مرتبط"
-                      : "Not linked";
-                return (
-                  <option key={method.id} value={method.id}>
-                    {isAr ? method.nameAr : (method.nameEn ?? method.nameAr)} — {accountName}
-                  </option>
-                );
-              })}
-            </select>
-            <Wallet className="pointer-events-none absolute end-3 top-1/2 size-4 -translate-y-1/2 text-primary" />
-          </div>
-          <div className="flex min-h-6 items-center gap-1.5 border-t border-border/50 bg-muted/25 px-3 py-1 text-[10px] leading-tight">
-            {currentKind === "CREDIT" ? (
-              <span className="font-medium text-violet-700 dark:text-violet-300">
-                {isAr
-                  ? "ذمم العميل — لا يوجد حساب تحصيل"
-                  : "Customer receivable — no collection account"}
-              </span>
-            ) : selectedAccountName ? (
-              <>
-                <Check className="size-3 shrink-0 text-emerald-600" />
-                <span className="truncate font-medium text-emerald-700 dark:text-emerald-400">
-                  {selectedAccountName}
-                </span>
-                <span className="shrink-0 text-muted-foreground">
-                  · {isAr ? "مرتبط بالدليل المحاسبي" : "Ledger linked"}
-                </span>
-              </>
-            ) : (
-              <span className="text-amber-700 dark:text-amber-400">
-                {isAr ? "لم يتم ربط حساب افتراضي بعد" : "No default account linked"}
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const IconComponent = currentConfig.icon;
 
   return (
-    <div className={cn("space-y-2.5", className)}>
-      {/* ── Level 1: Primary Tender Buttons ── */}
-      <div
-        className={cn(
-          "grid gap-1.5",
-          primaryButtons.length <= 4 ? "grid-cols-4" : "grid-cols-3 sm:grid-cols-6",
-        )}
+    <div className={cn("min-w-0 w-full space-y-1.5", className)}>
+      <Select
+        value={currentId}
+        onValueChange={handleSelect}
+        disabled={disabled}
       >
-        {primaryButtons.map((m) => {
-          const isSelected = value === m.legacyValue;
-          const Icon = paymentMethodIcon(m.iconKey, m.ledgerKind);
-          const label = isAr ? m.nameAr : (m.nameEn ?? m.nameAr);
-
-          return (
-            <button
-              key={m.id}
-              type="button"
-              disabled={disabled}
-              onClick={() => handleSelectPrimary(m)}
-              className={cn(
-                "flex flex-col items-center justify-center gap-1 rounded-xl p-2 text-center transition-all",
-                "border focus:outline-none focus:ring-2 focus:ring-primary/20",
-                isSelected
-                  ? "border-primary bg-primary/10 text-primary font-bold shadow-xs ring-1 ring-primary/30"
-                  : "border-border/70 bg-card hover:bg-muted/50 text-muted-foreground hover:text-foreground",
-              )}
-            >
-              <Icon className="h-4 w-4 shrink-0" />
-              <span className="text-[11px] leading-tight truncate w-full">{label}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* ── Level 2: Dynamic Settlement Sub-Entities ── */}
-      <div className="rounded-xl border border-border/70 bg-muted/20 p-2.5 space-y-2 text-xs animate-in fade-in duration-200">
-        {/* CASE A: CASH -> Cashbox Selection */}
-        {currentKind === "CASH" && (
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-              <span className="flex items-center gap-1 font-medium">
-                <Banknote className="h-3.5 w-3.5 text-emerald-600" />
-                {isAr ? "الصندوق المستلم للنقدية:" : "Receiving Cashbox:"}
-              </span>
-              {defaultCashbox && (
-                <span className="text-[10px] text-muted-foreground/80">
-                  {isAr
-                    ? `(الافتراضي: ${defaultCashbox.name_ar})`
-                    : `(Default: ${defaultCashbox.name_ar})`}
-                </span>
-              )}
+        <SelectTrigger
+          className="h-10 sm:h-11 w-full rounded-xl border border-border/80 bg-background px-3 font-bold text-xs sm:text-sm text-foreground shadow-2xs transition-colors hover:bg-muted/30 focus:border-primary focus:ring-2 focus:ring-primary/20"
+        >
+          <div className="flex items-center gap-2.5 truncate">
+            <div className={cn("grid h-6 w-6 shrink-0 place-items-center rounded-lg border", currentConfig.badgeBg)}>
+              <IconComponent className={cn("h-3.5 w-3.5 shrink-0", currentConfig.iconColor)} strokeWidth={2.5} />
             </div>
-
-            {activeCashboxes.length <= 1 ? (
-              <div className="flex items-center justify-between rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-emerald-800 dark:text-emerald-300 font-medium">
-                <span>
-                  {defaultCashbox ? defaultCashbox.name_ar : isAr ? "الصندوق الرئيسي" : "Main Till"}
-                </span>
-                <Badge
-                  variant="outline"
-                  className="border-emerald-500/40 text-[10px] bg-emerald-500/20"
-                >
-                  {isAr ? "نشط" : "Active"}
-                </Badge>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-                {activeCashboxes.map((box) => {
-                  const isChosen = settlement.cashboxId === box.id;
-                  return (
-                    <button
-                      key={box.id}
-                      type="button"
-                      disabled={disabled}
-                      onClick={() =>
-                        onSettlementChange({
-                          ...settlement,
-                          cashboxId: box.id,
-                          cashboxName: box.name_ar,
-                          chartAccountId: box.account_id,
-                        })
-                      }
-                      className={cn(
-                        "flex items-center justify-between gap-1.5 rounded-lg border px-2.5 py-1.5 text-start transition",
-                        isChosen
-                          ? "border-emerald-600 bg-emerald-500/15 text-emerald-900 dark:text-emerald-200 font-bold shadow-2xs"
-                          : "border-border/80 bg-background text-muted-foreground hover:text-foreground",
-                      )}
-                    >
-                      <span className="truncate">{box.name_ar}</span>
-                      {isChosen && <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" />}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* CASE B: WALLET -> Specific Wallet Selection + Transaction Ref */}
-        {currentKind === "WALLET" && (
-          <div className="space-y-2">
-            <label className="block text-[11px] font-medium text-muted-foreground">
-              {isAr ? "اختر المحفظة المستلمة:" : "Select Receiving Wallet:"}
-            </label>
-
-            {/* Wallet Pills with SVG Icons */}
-            <div className="flex flex-wrap gap-1.5">
-              {/* Shipped/Registered Wallets */}
-              {methods
-                .filter((m) => m.ledgerKind === "WALLET")
-                .map((w) => {
-                  const isChosen = settlement.paymentMethodId === w.id;
-                  const asset = paymentMethodIconAsset(w.id);
-
-                  return (
-                    <button
-                      key={w.id}
-                      type="button"
-                      disabled={disabled}
-                      onClick={() => {
-                        const matchedAcc = wallets.find(
-                          (acc) =>
-                            acc.bank_name.includes(w.nameAr) || acc.name_ar.includes(w.nameAr),
-                        );
-                        onSettlementChange({
-                          ...settlement,
-                          paymentMethodId: w.id,
-                          bankAccountId: matchedAcc?.id || settlement.bankAccountId,
-                          bankAccountName: w.nameAr,
-                          chartAccountId: matchedAcc?.account_id || settlement.chartAccountId,
-                        });
-                      }}
-                      className={cn(
-                        "inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition",
-                        isChosen
-                          ? "border-sky-500 bg-sky-500/15 text-sky-950 dark:text-sky-200 shadow-2xs ring-1 ring-sky-500/30"
-                          : "border-border/80 bg-background text-muted-foreground hover:text-foreground hover:bg-muted/40",
-                      )}
-                    >
-                      {asset ? (
-                        <img src={asset.src} alt={asset.alt} className="h-4 w-4 object-contain" />
-                      ) : (
-                        <Smartphone className="h-4 w-4 text-sky-600" />
-                      )}
-                      <span>{isAr ? w.nameAr : (w.nameEn ?? w.nameAr)}</span>
-                      {isChosen && <Check className="h-3 w-3 text-sky-600 shrink-0" />}
-                    </button>
-                  );
-                })}
-            </div>
-
-            {/* Transaction Reference */}
-            <div className="pt-1">
-              <input
-                type="text"
-                disabled={disabled}
-                value={settlement.reference ?? ""}
-                onChange={(e) => onSettlementChange({ ...settlement, reference: e.target.value })}
-                placeholder={
-                  isAr
-                    ? "رقم عملية التحويل / الإشعار الإلكتروني..."
-                    : "Wallet transaction reference..."
-                }
-                className="h-9 w-full rounded-xl border border-input/80 bg-background px-3 text-xs outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* CASE C: BANK TRANSFER -> Company Bank Selection + Reference */}
-        {currentKind === "BANK" && value !== "cheque" && (
-          <div className="space-y-2">
-            <div className="space-y-1">
-              <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
-                <Landmark className="h-3.5 w-3.5 text-indigo-600" />
-                {isAr ? "الحساب البنكي المودع فيه:" : "Deposited Bank Account:"}
-              </label>
-
-              {banks.length === 0 ? (
-                <div className="rounded-lg border border-indigo-500/20 bg-indigo-500/10 p-2 text-[11px] text-indigo-700 dark:text-indigo-300">
-                  {isAr ? "بنك الكريمي (الحساب الافتراضي)" : "Al-Kuraimi Bank (Default)"}
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                  {banks.map((b) => {
-                    const isChosen = settlement.bankAccountId === b.id;
-                    return (
-                      <button
-                        key={b.id}
-                        type="button"
-                        disabled={disabled}
-                        onClick={() =>
-                          onSettlementChange({
-                            ...settlement,
-                            bankAccountId: b.id,
-                            bankAccountName: b.name_ar,
-                            chartAccountId: b.account_id,
-                          })
-                        }
-                        className={cn(
-                          "flex items-center justify-between gap-1 rounded-lg border px-2.5 py-1.5 text-start transition",
-                          isChosen
-                            ? "border-indigo-600 bg-indigo-500/15 text-indigo-900 dark:text-indigo-200 font-bold shadow-2xs"
-                            : "border-border/80 bg-background text-muted-foreground hover:text-foreground",
-                        )}
-                      >
-                        <div className="truncate">
-                          <p className="truncate font-semibold">{b.name_ar}</p>
-                          {b.account_number && (
-                            <p className="text-[10px] text-muted-foreground/80 font-mono truncate">
-                              {b.account_number}
-                            </p>
-                          )}
-                        </div>
-                        {isChosen && <Check className="h-3.5 w-3.5 text-indigo-600 shrink-0" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Transfer Reference */}
-            <div>
-              <input
-                type="text"
-                disabled={disabled}
-                value={settlement.reference ?? ""}
-                onChange={(e) => onSettlementChange({ ...settlement, reference: e.target.value })}
-                placeholder={
-                  isAr
-                    ? "رقم مرجع الحوالة البنكية / إشعار الإيداع..."
-                    : "Bank transfer reference number..."
-                }
-                className="h-9 w-full rounded-xl border border-input/80 bg-background px-3 text-xs outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* CASE D: CHEQUE -> Cheque Details */}
-        {value === "cheque" && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-700 dark:text-amber-400">
-              <FileCheck2 className="h-4 w-4" />
-              <span>
-                {isAr
-                  ? "بيانات الشيك (أوراق قبض برسم التحصيل):"
-                  : "Cheque Details (Under Collection):"}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <div>
-                <label className="text-[10px] text-muted-foreground mb-0.5 block">
-                  {isAr ? "رقم الشيك:" : "Cheque Number:"}
-                </label>
-                <input
-                  type="text"
-                  disabled={disabled}
-                  value={settlement.cheque?.chequeNumber ?? settlement.chequeNumber ?? ""}
-                  onChange={(e) =>
-                    onSettlementChange({
-                      ...settlement,
-                      chequeNumber: e.target.value,
-                      cheque: {
-                        chequeNumber: e.target.value,
-                        bankName: settlement.cheque?.bankName ?? settlement.chequeBank ?? "",
-                        dueDate:
-                          settlement.cheque?.dueDate ??
-                          settlement.chequeDueDate ??
-                          new Date().toISOString().slice(0, 10),
-                        drawerName: settlement.cheque?.drawerName ?? settlement.chequeDrawer ?? "",
-                      },
-                    })
-                  }
-                  placeholder={isAr ? "مثال: 789456" : "e.g. 789456"}
-                  className="h-8 w-full rounded-lg border border-input/80 bg-background px-2 text-xs outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20"
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] text-muted-foreground mb-0.5 block">
-                  {isAr ? "البنك المسحوب عليه:" : "Drawn Bank:"}
-                </label>
-                <input
-                  type="text"
-                  disabled={disabled}
-                  value={settlement.cheque?.bankName ?? settlement.chequeBank ?? ""}
-                  onChange={(e) =>
-                    onSettlementChange({
-                      ...settlement,
-                      chequeBank: e.target.value,
-                      cheque: {
-                        chequeNumber:
-                          settlement.cheque?.chequeNumber ?? settlement.chequeNumber ?? "",
-                        bankName: e.target.value,
-                        dueDate:
-                          settlement.cheque?.dueDate ??
-                          settlement.chequeDueDate ??
-                          new Date().toISOString().slice(0, 10),
-                        drawerName: settlement.cheque?.drawerName ?? settlement.chequeDrawer ?? "",
-                      },
-                    })
-                  }
-                  placeholder={isAr ? "مثال: بنك التضامن الإسلامي" : "e.g. Tadhamon Bank"}
-                  className="h-8 w-full rounded-lg border border-input/80 bg-background px-2 text-xs outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20"
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] text-muted-foreground mb-0.5 block">
-                  {isAr ? "تاريخ استحقاق الشيك:" : "Due Date:"}
-                </label>
-                <input
-                  type="date"
-                  disabled={disabled}
-                  value={
-                    settlement.cheque?.dueDate ??
-                    settlement.chequeDueDate ??
-                    new Date().toISOString().slice(0, 10)
-                  }
-                  onChange={(e) =>
-                    onSettlementChange({
-                      ...settlement,
-                      chequeDueDate: e.target.value,
-                      cheque: {
-                        chequeNumber:
-                          settlement.cheque?.chequeNumber ?? settlement.chequeNumber ?? "",
-                        bankName: settlement.cheque?.bankName ?? settlement.chequeBank ?? "",
-                        dueDate: e.target.value,
-                        drawerName: settlement.cheque?.drawerName ?? settlement.chequeDrawer ?? "",
-                      },
-                    })
-                  }
-                  className="h-8 w-full rounded-lg border border-input/80 bg-background px-2 text-xs outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20"
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] text-muted-foreground mb-0.5 block">
-                  {isAr ? "اسم الساحب (اختياري):" : "Drawer (Optional):"}
-                </label>
-                <input
-                  type="text"
-                  disabled={disabled}
-                  value={settlement.cheque?.drawerName ?? settlement.chequeDrawer ?? ""}
-                  onChange={(e) =>
-                    onSettlementChange({
-                      ...settlement,
-                      chequeDrawer: e.target.value,
-                      cheque: {
-                        chequeNumber:
-                          settlement.cheque?.chequeNumber ?? settlement.chequeNumber ?? "",
-                        bankName: settlement.cheque?.bankName ?? settlement.chequeBank ?? "",
-                        dueDate:
-                          settlement.cheque?.dueDate ??
-                          settlement.chequeDueDate ??
-                          new Date().toISOString().slice(0, 10),
-                        drawerName: e.target.value,
-                      },
-                    })
-                  }
-                  placeholder={isAr ? "اسم صاحب الحساب أو الشركة" : "Account holder name"}
-                  className="h-8 w-full rounded-lg border border-input/80 bg-background px-2 text-xs outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20"
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* CASE E: CARD -> Terminal or reference */}
-        {currentKind === "CARD" && (
-          <div className="flex items-center justify-between text-[11px] text-blue-700 dark:text-blue-300">
-            <span className="flex items-center gap-1.5">
-              <CreditCard className="h-4 w-4" />
-              {isAr ? "الدفع عبر جهاز الشبكة / بطاقة الصراف (مدى)" : "POS Terminal / Debit Card"}
+            <span className="font-bold text-foreground text-xs sm:text-sm leading-none truncate">
+              {isAr ? currentConfig.nameAr : currentConfig.nameEn}
             </span>
-            <Badge variant="outline" className="border-blue-500/40 text-[10px]">
-              {isAr ? "تسوية بنكية مباشرة" : "Direct Settlement"}
-            </Badge>
-          </div>
-        )}
-
-        {/* CASE F: CREDIT -> On Account Notification */}
-        {currentKind === "CREDIT" && (
-          <div className="flex items-center justify-between text-[11px] text-amber-700 dark:text-amber-400">
-            <span>
-              {isAr
-                ? "تسجيل مديونية مؤجلة في حساب ذمم العميل"
-                : "Record outstanding balance on customer account"}
+            <span className="text-[10px] font-semibold text-muted-foreground/80 shrink-0">
+              ({isAr ? currentConfig.accountNameAr : currentConfig.accountCode})
             </span>
-            <Badge variant="outline" className="border-amber-500/40 text-[10px]">
-              {isAr ? "آجل (ذمم)" : "On Account"}
-            </Badge>
           </div>
-        )}
-      </div>
+        </SelectTrigger>
+
+        <SelectContent className="rounded-xl border border-border/80 bg-popover p-1.5 shadow-lg">
+          {visibleMethods.map((m) => {
+            const ItemIcon = m.icon;
+            const isSelected = m.id === currentId;
+            return (
+              <SelectItem
+                key={m.id}
+                value={m.id}
+                className={cn(
+                  "flex cursor-pointer items-center justify-between gap-3 rounded-lg px-2.5 py-2 text-xs sm:text-sm font-bold transition my-0.5",
+                  isSelected ? "bg-muted/80 text-primary font-black" : "hover:bg-muted/60 text-foreground"
+                )}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className={cn("grid h-7 w-7 shrink-0 place-items-center rounded-lg border", m.badgeBg)}>
+                    <ItemIcon className={cn("h-4 w-4 shrink-0", m.iconColor)} strokeWidth={2.5} />
+                  </div>
+                  <span className="font-bold text-foreground text-xs sm:text-sm">
+                    {isAr ? m.nameAr : m.nameEn}
+                  </span>
+                  <span className="text-[11px] font-medium text-muted-foreground">
+                    ({isAr ? m.accountNameAr : m.accountCode})
+                  </span>
+                </div>
+              </SelectItem>
+            );
+          })}
+        </SelectContent>
+      </Select>
+
+      {/* حقل مرجع إضافي اختياري للبنك أو المحفظة */}
+      {showReference && (currentId === "bank_transfer" || currentId === "mobile_money") && (
+        <div className="pt-1">
+          <input
+            type="text"
+            disabled={disabled}
+            value={settlement?.reference ?? ""}
+            onChange={(e) =>
+              onSettlementChange?.({
+                ...(settlement || { method: currentId }),
+                method: currentId,
+                reference: e.target.value,
+              })
+            }
+            placeholder={
+              currentId === "bank_transfer"
+                ? isAr
+                  ? "رقم الحوالة البنكية / الإشعار..."
+                  : "Bank transfer reference..."
+                : isAr
+                  ? "رقم عملية المحفظة الإلكترونية..."
+                  : "Wallet transaction reference..."
+            }
+            className="h-8 w-full rounded-xl border border-input/80 bg-background px-3 text-xs font-semibold text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -71,6 +71,10 @@ import { resolvePaidAmount } from "@/lib/payments/payment-rules";
 import { useFormNavigationScope } from "@/hooks/use-form-navigation";
 import { DynamicPaymentSelector } from "@/components/ui/payment-method/dynamic-payment-selector";
 import {
+  SplitPaymentDialog,
+  type SplitPaymentValues,
+} from "@/components/ui/payment-method/split-payment-dialog";
+import {
   Dialog,
   DialogContent,
   DialogFooter,
@@ -386,6 +390,12 @@ function POSPage() {
   const [isSplitPayment, setIsSplitPayment] = useState(false);
   const [splitEditorOpen, setSplitEditorOpen] = useState(false);
   const [splitPayments, setSplitPayments] = useState<SplitPaymentLine[]>([]);
+  const [splitValues, setSplitValues] = useState<SplitPaymentValues>({
+    cash: 0,
+    credit: 0,
+    bank_transfer: 0,
+    mobile_money: 0,
+  });
 
   const [newCustomerOpen, setNewCustomerOpen] = useState(false);
 
@@ -628,8 +638,15 @@ function POSPage() {
       const compats = compatsRes.status === "fulfilled" ? compatsRes.value.data : [];
 
       const loadedWarehouses = ws ?? [];
+      const loadedCustomers = cs ?? [];
       setWarehouses(loadedWarehouses);
-      setCustomers(cs ?? []);
+      setCustomers(loadedCustomers);
+
+      // اختيار العميل النقدي الحقيقي المعتمد من قاعدة البيانات تلقائياً
+      const dbCash = loadedCustomers.find((c) => c.name === "عميل نقدي" || (c as any).is_system);
+      if (dbCash && !customerId) {
+        setCustomerId(dbCash.id);
+      }
 
       // Build safe in-memory lookup maps to enrich products without brittle DB joins
       const catMap = new Map((cats ?? []).map((c: any) => [c.id, c]));
@@ -1329,24 +1346,7 @@ function POSPage() {
   }));
 
   function startSplitPayment() {
-    const defaultMethod =
-      supportedSplitMethods.find((method) => method.legacyValue === "cash") ??
-      supportedSplitMethods[0];
-    setIsSplitPayment(true);
     setSplitEditorOpen(true);
-    setPaid("");
-    setSplitPayments(
-      defaultMethod
-        ? [
-            {
-              key: crypto.randomUUID(),
-              methodId: defaultMethod.id,
-              amount: String(total),
-              autoAmount: true,
-            },
-          ]
-        : [],
-    );
   }
 
   function addSplitPaymentLine() {
@@ -1831,6 +1831,9 @@ function POSPage() {
       setTransferRef("");
       setIsSplitPayment(false);
       setSplitPayments([]);
+      setSplitValues({ cash: 0, credit: 0, bank_transfer: 0, mobile_money: 0 });
+      const defaultCashCust = customers.find((c) => c.name === "عميل نقدي" || (c as any).is_system);
+      if (defaultCashCust) setCustomerId(defaultCashCust.id);
       setSaleDate(new Date().toISOString().slice(0, 10));
       await loadStock(warehouseId);
       searchRef.current?.focus();
@@ -2665,24 +2668,18 @@ function POSPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    toast.info(
-                      lang === "ar"
-                        ? "الدفع بأكثر من طريقة سيتاح بعد اكتمال ترحيله المحاسبي"
-                        : "Split payments will be enabled after ledger posting support is complete",
-                    );
+                    if (cart.length === 0) {
+                      toast.error(
+                        lang === "ar" ? "أضف أصنافاً للسلة أولاً" : "Add items to cart first",
+                      );
+                      return;
+                    }
+                    startSplitPayment();
                   }}
-                  disabled={
-                    !POS_SPLIT_LEDGER_POSTING_READY ||
-                    cart.length === 0 ||
-                    supportedSplitMethods.length === 0
-                  }
+                  disabled={cart.length === 0}
                   aria-pressed={isSplitPayment}
-                  aria-label={lang === "ar" ? "الدفع بأكثر من طريقة" : "Split payment"}
-                  title={
-                    lang === "ar"
-                      ? "يتطلب دعم الترحيل المحاسبي متعدد الطرق"
-                      : "Requires multi-tender ledger posting support"
-                  }
+                  aria-label={lang === "ar" ? "الدفع بأكثر من طريقة (دفع مجزأ)" : "Split payment"}
+                  title={lang === "ar" ? "الدفع بأكثر من طريقة (دفع مجزأ)" : "Split payment"}
                   className={`grid size-8 place-items-center rounded-full border transition disabled:opacity-40 ${isSplitPayment ? "border-primary/40 bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-primary/10 hover:text-primary"}`}
                 >
                   <Layers className="size-4" />
@@ -2694,6 +2691,12 @@ function POSPage() {
                       setCart([]);
                       setIsSplitPayment(false);
                       setSplitPayments([]);
+                      setSplitValues({ cash: 0, credit: 0, bank_transfer: 0, mobile_money: 0 });
+                      const defaultCashCust = customers.find(
+                        (c) => c.name === "عميل نقدي" || (c as any).is_system,
+                      );
+                      if (defaultCashCust) setCustomerId(defaultCashCust.id);
+                      toast.success(lang === "ar" ? "تم تفريغ السلة" : "Cart cleared");
                     }}
                     className="grid size-8 shrink-0 place-items-center rounded-full border border-destructive/20 text-destructive transition hover:bg-destructive/10 active:scale-95"
                     title={lang === "ar" ? "تفريغ سلة المبيعات" : "Clear Cart"}
@@ -2797,29 +2800,30 @@ function POSPage() {
                   <span className="truncate text-[10px] font-semibold leading-none text-muted-foreground">
                     {lang === "ar" ? "طريقة الدفع" : "Payment method"}
                   </span>
-                  {!isSplitPayment ? (
-                    <DynamicPaymentSelector
-                      context="pos"
-                      value={paymentMethod}
-                      settlement={settlement}
-                      onSettlementChange={setSettlement}
-                      compact
-                      onChange={(method) => {
-                        setIsSplitPayment(false);
-                        setSplitPayments([]);
-                        setPaymentMethod(method);
-                        setSettlement((current) => ({ ...current, method }));
-                        setPaid(method === "credit" ? "0" : "");
-                        setPaidManuallyEdited(false);
-                      }}
-                      disabled={loading}
-                      className="col-span-1 sm:col-span-2"
-                    />
-                  ) : (
-                    <div className="flex h-8 min-w-0 items-center truncate rounded-lg border border-primary/20 bg-primary/[0.04] px-2 text-[10px] font-medium text-primary sm:px-3 sm:text-[11px]">
-                      {lang === "ar" ? "طرق دفع متعددة" : "Multiple methods"}
-                    </div>
-                  )}
+                  <DynamicPaymentSelector
+                    context="pos"
+                    value={isSplitPayment ? "split" : paymentMethod}
+                    settlement={settlement}
+                    onSettlementChange={setSettlement}
+                    compact
+                    allowSplit={true}
+                    onSplitClick={() => startSplitPayment()}
+                    onChange={(method) => {
+                      if (method === "split") {
+                        startSplitPayment();
+                        return;
+                      }
+                      setIsSplitPayment(false);
+                      setSplitPayments([]);
+                      setSplitValues({ cash: 0, credit: 0, bank_transfer: 0, mobile_money: 0 });
+                      setPaymentMethod(method);
+                      setSettlement((current) => ({ ...current, method }));
+                      setPaid(method === "credit" ? "0" : "");
+                      setPaidManuallyEdited(false);
+                    }}
+                    disabled={loading}
+                    className="col-span-1 sm:col-span-2"
+                  />
                 </div>
                 {isSplitPayment ? (
                   <div className="flex min-w-0 flex-col gap-1">
@@ -3013,159 +3017,64 @@ function POSPage() {
         </div>
       </div>
 
-      <Dialog
+      <SplitPaymentDialog
         open={splitEditorOpen}
         onOpenChange={(open) => {
           setSplitEditorOpen(open);
           if (!open && splitPayments.length === 0) setIsSplitPayment(false);
         }}
-      >
-        <DialogContent className="max-h-[88dvh] w-[calc(100vw-1rem)] max-w-lg overflow-y-auto rounded-2xl p-3 sm:p-5">
-          <DialogHeader>
-            <DialogTitle className="text-sm sm:text-base">
-              {lang === "ar" ? "توزيع الدفع على أكثر من طريقة" : "Split payment methods"}
-            </DialogTitle>
-            <p className="text-[11px] text-muted-foreground">
-              {lang === "ar"
-                ? "أضف كل وسيلة والمبلغ المدفوع بها. المتبقي يسجل على العميل."
-                : "Add each tender and its amount. The remaining amount is recorded against the customer."}
-            </p>
-          </DialogHeader>
+        total={total}
+        initialValues={splitValues}
+        isCreditAllowed={!selectedCustomer?.is_system && Boolean(customerId)}
+        creditBlockReason={
+          selectedCustomer?.is_system
+            ? lang === "ar"
+              ? "العميل النقدي لا يمكنه الشراء بالآجل"
+              : "Cash customer cannot carry credit"
+            : null
+        }
+        onConfirm={(vals) => {
+          setSplitValues(vals);
+          setIsSplitPayment(true);
+          setPaymentMethod("split");
+          const tenderPaid = vals.cash + vals.bank_transfer + vals.mobile_money;
+          setPaid(String(tenderPaid));
+          setPaidManuallyEdited(true);
 
-          <div className="space-y-2">
-            {splitPayments.map((line) => {
-              const chosen = supportedSplitMethods.find((method) => method.id === line.methodId);
-              const choices = supportedSplitMethods.filter(
-                (method) =>
-                  method.id === line.methodId ||
-                  !splitPayments.some(
-                    (other) =>
-                      other.key !== line.key &&
-                      supportedSplitMethods.find((candidate) => candidate.id === other.methodId)
-                        ?.legacyValue === method.legacyValue,
-                  ),
-              );
-              return (
-                <div
-                  key={line.key}
-                  className="grid grid-cols-[minmax(0,1fr)_minmax(6rem,0.8fr)_2.25rem] items-center gap-1.5 rounded-lg border border-border/60 p-1.5 sm:gap-2 sm:p-2"
-                >
-                  <select
-                    value={line.methodId}
-                    onChange={(event) =>
-                      updateSplitPayment(line.key, { methodId: event.target.value, reference: "" })
-                    }
-                    aria-label={lang === "ar" ? "طريقة الدفع" : "Payment method"}
-                    className="h-9 min-w-0 rounded-full border border-border bg-background px-2 text-[11px] font-medium outline-none focus:border-primary"
-                  >
-                    {choices.map((method) => (
-                      <option key={method.id} value={method.id}>
-                        {lang === "ar" ? method.nameAr : method.nameEn || method.nameAr}
-                      </option>
-                    ))}
-                  </select>
-                  <AmountInput
-                    label={
-                      lang === "ar"
-                        ? `مبلغ ${chosen?.nameAr ?? "الدفع"}`
-                        : `${chosen?.nameEn ?? chosen?.nameAr ?? "Payment"} amount`
-                    }
-                    value={line.amount}
-                    onValueChange={(amount) =>
-                      updateSplitPayment(line.key, { amount, autoAmount: false })
-                    }
-                    invalid={isOverpaid}
-                    placeholder="0"
-                    className="h-9 rounded-full border border-border bg-background px-2 text-xs font-semibold outline-none focus:border-primary"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeSplitPayment(line.key)}
-                    aria-label={lang === "ar" ? "حذف طريقة الدفع" : "Remove payment method"}
-                    title={lang === "ar" ? "حذف" : "Remove"}
-                    className="grid size-8 place-items-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                  >
-                    <Trash2 className="size-3.5" />
-                  </button>
-                  {chosen?.requiresReference && (
-                    <input
-                      type="text"
-                      value={line.reference ?? ""}
-                      onChange={(event) =>
-                        updateSplitPayment(line.key, { reference: event.target.value })
-                      }
-                      aria-label={
-                        lang === "ar"
-                          ? `مرجع ${chosen.nameAr}`
-                          : `${chosen.nameEn || chosen.nameAr} reference`
-                      }
-                      placeholder={lang === "ar" ? "رقم المرجع" : "Reference"}
-                      className="col-span-3 h-8 min-w-0 rounded-full border border-border bg-background px-3 text-[11px] outline-none focus:border-primary"
-                    />
-                  )}
-                </div>
-              );
-            })}
-            <button
-              type="button"
-              onClick={addSplitPaymentLine}
-              disabled={splitPayments.length >= supportedSplitMethods.length}
-              className="inline-flex h-9 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-3 text-xs font-semibold text-primary hover:bg-primary/10 disabled:opacity-40"
-            >
-              <Plus className="size-4" />
-              {lang === "ar" ? "إضافة طريقة دفع" : "Add payment method"}
-            </button>
-          </div>
-
-          <div className="space-y-1 rounded-xl border border-primary/20 bg-primary/[0.04] p-2.5 text-xs">
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">
-                {lang === "ar" ? "إجمالي الفاتورة" : "Invoice total"}
-              </span>
-              <span className="font-mono font-semibold">{money(total)}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">{lang === "ar" ? "المدفوع" : "Paid"}</span>
-              <span className="font-mono font-semibold">{money(splitPaidTotal)}</span>
-            </div>
-            <div className="flex items-center justify-between border-t border-border/50 pt-1">
-              <span className="text-muted-foreground">
-                {lang === "ar" ? "المتبقي على العميل" : "Customer balance"}
-              </span>
-              <span className="font-mono font-bold text-amber-600">{money(remainingDebt)}</span>
-            </div>
-            {isOverpaid && (
-              <p role="alert" className="pt-1 text-[11px] font-semibold text-destructive">
-                {lang === "ar"
-                  ? "مجموع الدفعات يتجاوز إجمالي الفاتورة"
-                  : "Payment total exceeds invoice total"}
-              </p>
-            )}
-            {splitDebtBlockReason && (
-              <p role="alert" className="pt-1 text-[11px] font-semibold text-destructive">
-                {splitDebtBlockReason}
-              </p>
-            )}
-          </div>
-
-          <DialogFooter>
-            <button
-              type="button"
-              onClick={() => setSplitEditorOpen(false)}
-              disabled={
-                splitMethodCount === 0 ||
-                isOverpaid ||
-                hasInvalidSplitLine ||
-                missingSplitReference ||
-                Boolean(splitDebtBlockReason)
-              }
-              className="h-9 rounded-full bg-primary px-5 text-xs font-semibold text-primary-foreground disabled:opacity-40"
-            >
-              {lang === "ar" ? "تم" : "Done"}
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          const splits: SplitPaymentLine[] = [];
+          if (vals.cash > 0) {
+            splits.push({
+              key: crypto.randomUUID(),
+              methodId: supportedSplitMethods.find((m) => m.legacyValue === "cash")?.id ?? "cash",
+              amount: String(vals.cash),
+              autoAmount: false,
+            });
+          }
+          if (vals.bank_transfer > 0) {
+            splits.push({
+              key: crypto.randomUUID(),
+              methodId:
+                supportedSplitMethods.find((m) => m.legacyValue === "bank_transfer")?.id ??
+                "bank_transfer",
+              amount: String(vals.bank_transfer),
+              reference: vals.bankReference,
+              autoAmount: false,
+            });
+          }
+          if (vals.mobile_money > 0) {
+            splits.push({
+              key: crypto.randomUUID(),
+              methodId:
+                supportedSplitMethods.find((m) => m.legacyValue === "mobile_money")?.id ??
+                "mobile_money",
+              amount: String(vals.mobile_money),
+              reference: vals.walletReference,
+              autoAmount: false,
+            });
+          }
+          setSplitPayments(splits);
+        }}
+      />
 
       {/* Barcode Scanner Dialog */}
       <BarcodeScanner

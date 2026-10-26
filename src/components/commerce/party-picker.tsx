@@ -45,6 +45,15 @@ export function PartyPicker({
   const fallbackLabel = emptyLabel ?? (isArabic ? "اختر جهة" : "Select party");
   const PartyIcon = kind === "customer" ? UserRound : Truck;
 
+  // منع ظهور خيارين للعميل أو المورد النقدي إذا كان موجوداً مسبقاً في الخيارات المستوردة
+  const hasDedicatedCashOption = options.some(
+    (opt) =>
+      (emptyLabel && opt.name.trim() === emptyLabel.trim()) ||
+      opt.name.trim() === "عميل نقدي" ||
+      opt.name.trim() === "مورد نقدي"
+  );
+  const showEmptyItem = Boolean(emptyLabel && !hasDedicatedCashOption);
+
   const select = (nextValue: string) => {
     onChange(nextValue);
     setOpen(false);
@@ -107,7 +116,7 @@ export function PartyPicker({
             <CommandEmpty className="py-8 text-xs text-muted-foreground">
               {isArabic ? "لا توجد نتائج مطابقة" : "No matching results"}
             </CommandEmpty>
-            {emptyLabel && (
+            {showEmptyItem && (
               <CommandItem
                 value={`__empty__ ${emptyLabel}`}
                 onSelect={() => select("")}
