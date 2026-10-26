@@ -73,6 +73,7 @@ import {
   type CustodyMoneyRow,
   type CustodyLine,
   type ProductOption,
+  type CustodyVoucherData,
 } from "@/lib/milling";
 import {
   MillingPanel,
@@ -1243,55 +1244,64 @@ function QuickMillingModal({
         grainTypeId: grainTypeId || null,
       });
     },
-    onSuccess: (res) => {
+    onSuccess: async (res) => {
       if (!res.ok) {
         toast.error(res.message || "تعذر تسجيل عملية الطحن.");
         return;
       }
       toast.success("تم تسجيل عملية الطحن وإيداع النواتج في أمانات العميل بنجاح.");
       const docNumber = (res.data as string) || `CM-${Date.now().toString().slice(-6)}`;
-      const selectedCust = customers.find((c) => c.id === customerId);
-      const selectedWh = warehouses.find((w) => w.id === warehouseId);
-      const grainObj = grainItems.find((g) => g.id === grainItemId);
-      const grainName =
-        initialRow?.item_name_ar || grainObj?.name_ar || grainObj?.name || "حبوب خام";
+      let voucher: CustodyVoucherData | null = null;
+      try {
+        voucher = await buildCustodyVoucher(docNumber);
+      } catch (e) {
+        console.error("Failed to build voucher from DB:", e);
+      }
 
-      const validOutputs: CustodyLine[] = outputs
-        .filter((o) => o.itemId && (Number(o.bags) > 0 || Number(o.kg) > 0))
-        .map((o) => ({
-          itemId: o.itemId,
-          bags: Number(o.bags) || 0,
-          kg: Number(o.kg) || 0,
-        }));
+      if (!voucher) {
+        const selectedCust = customers.find((c) => c.id === customerId);
+        const selectedWh = warehouses.find((w) => w.id === warehouseId);
+        const grainObj = grainItems.find((g) => g.id === grainItemId);
+        const grainName =
+          initialRow?.item_name_ar || grainObj?.name_ar || grainObj?.name || "حبوب خام";
 
-      const voucher = buildCustodyVoucher({
-        type: "MILLING",
-        docNumber,
-        customerName: selectedCust?.name || initialRow?.customer_name_ar || "عميل أمانة",
-        warehouseName:
-          selectedWh?.name_ar ||
-          selectedWh?.name ||
-          initialRow?.warehouse_name_ar ||
-          "المستودع الرئيسي",
-        lines: [
-          {
-            itemName: grainName,
-            bags: Number(bagsOut) || 0,
-            kg: Number(kgOut) || 0,
-            note: "صادر حبوب مطحونة من رصيد الأمانة",
-          },
-          ...validOutputs.map((o) => {
-            const outItem = outputItems.find((p) => p.id === o.itemId);
-            return {
-              itemName: outItem?.name_ar || outItem?.name || "ناتج طحن",
-              bags: o.bags,
-              kg: o.kg,
-              note: "وارد نواتج مودعة في رصيد الأمانة",
-            };
-          }),
-        ],
-        notes: notes.trim() || undefined,
-      });
+        const validOutputs: CustodyLine[] = outputs
+          .filter((o) => o.itemId && (Number(o.bags) > 0 || Number(o.kg) > 0))
+          .map((o) => ({
+            itemId: o.itemId,
+            bags: Number(o.bags) || 0,
+            kg: Number(o.kg) || 0,
+          }));
+
+        voucher = {
+          entryType: "MILLING",
+          docNumber,
+          createdAt: new Date().toISOString(),
+          customerName: selectedCust?.name || initialRow?.customer_name_ar || "عميل أمانة",
+          customerPhone: selectedCust?.phone || null,
+          warehouseName:
+            selectedWh?.name_ar ||
+            selectedWh?.name ||
+            initialRow?.warehouse_name_ar ||
+            "المستودع الرئيسي",
+          lines: [
+            {
+              item: grainName,
+              bags: Number(bagsOut) || 0,
+              kg: Number(kgOut) || 0,
+            },
+            ...validOutputs.map((o) => {
+              const outItem = outputItems.find((p) => p.id === o.itemId);
+              return {
+                item: outItem?.name_ar || outItem?.name || "ناتج طحن",
+                bags: o.bags,
+                kg: o.kg,
+              };
+            }),
+          ],
+          notes: notes.trim() || undefined,
+        };
+      }
 
       const uDoc = custodyVoucherToDoc(voucher);
       onSuccess(uDoc);

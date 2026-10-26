@@ -164,8 +164,8 @@ interface SplitPaymentLine {
   reference?: string;
 }
 
-// Split allocations are persisted through the guarded split RPC and each tender
-// is validated before checkout, so the cashier can use multiple methods safely.
+// Migration 64 records split tenders before posting and resolves each tender's
+// ledger account, so the POS split flow can submit a real accounting breakdown.
 const POS_SPLIT_LEDGER_POSTING_READY = true;
 
 const posGuideConfig: PageGuideConfig = {
@@ -628,8 +628,11 @@ function POSPage() {
       const compats = compatsRes.status === "fulfilled" ? compatsRes.value.data : [];
 
       const loadedWarehouses = ws ?? [];
+      const loadedCustomers = cs ?? [];
       setWarehouses(loadedWarehouses);
-      setCustomers(cs ?? []);
+      setCustomers(loadedCustomers);
+      const cashCustomer = loadedCustomers.find((customer) => customer.is_system);
+      if (cashCustomer) setCustomerId((current) => current || cashCustomer.id);
 
       // Build safe in-memory lookup maps to enrich products without brittle DB joins
       const catMap = new Map((cats ?? []).map((c: any) => [c.id, c]));
@@ -1326,6 +1329,8 @@ function POSPage() {
   const paymentSplits = splitRows.map((line) => ({
     method: line.method!.legacyValue,
     amount: Math.round(line.amount * 100) / 100,
+    payment_method_id: line.method!.id,
+    reference: line.reference?.trim() || null,
   }));
 
   function startSplitPayment() {
@@ -2676,23 +2681,30 @@ function POSPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    toast.info(
-                      lang === "ar"
-                        ? "الدفع بأكثر من طريقة سيتاح بعد اكتمال ترحيله المحاسبي"
-                        : "Split payments will be enabled after ledger posting support is complete",
-                    );
+                    if (!POS_SPLIT_LEDGER_POSTING_READY) {
+                      toast.info(
+                        lang === "ar"
+                          ? "الدفع بأكثر من طريقة سيتاح بعد اكتمال ترحيله المحاسبي"
+                          : "Split payments will be enabled after ledger posting support is complete",
+                      );
+                      return;
+                    }
+                    startSplitPayment();
                   }}
                   disabled={
-                    !POS_SPLIT_LEDGER_POSTING_READY ||
                     cart.length === 0 ||
                     supportedSplitMethods.length === 0
                   }
                   aria-pressed={isSplitPayment}
                   aria-label={lang === "ar" ? "الدفع بأكثر من طريقة" : "Split payment"}
                   title={
-                    lang === "ar"
-                      ? "يتطلب دعم الترحيل المحاسبي متعدد الطرق"
-                      : "Requires multi-tender ledger posting support"
+                    POS_SPLIT_LEDGER_POSTING_READY
+                      ? lang === "ar"
+                        ? "توزيع قيمة الفاتورة على أكثر من طريقة دفع"
+                        : "Split the invoice across multiple payment methods"
+                      : lang === "ar"
+                        ? "يتطلب دعم الترحيل المحاسبي متعدد الطرق"
+                        : "Requires multi-tender ledger posting support"
                   }
                   className={`grid size-8 place-items-center rounded-full border transition disabled:opacity-40 ${isSplitPayment ? "border-primary/40 bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-primary/10 hover:text-primary"}`}
                 >

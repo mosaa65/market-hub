@@ -28,7 +28,6 @@ import {
   Receipt,
   FileText,
   Truck,
-  PackagePlus,
   Coins,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -113,6 +112,7 @@ interface Warehouse {
 interface Supplier {
   id: string;
   name: string;
+  is_system?: boolean | null;
   phone?: string | null;
   balance?: number | null;
 }
@@ -465,7 +465,7 @@ function PurchasePOSPage() {
         { data: compats },
       ] = await Promise.all([
         supabase.from("warehouses").select("id,name,name_ar").eq("is_active", true).order("name"),
-        supabase.from("suppliers").select("id,name,phone,balance").order("name"),
+        supabase.from("suppliers").select("id,name,phone,balance,is_system").order("name"),
         supabase
           .from("products")
           .select(
@@ -506,23 +506,11 @@ function PurchasePOSPage() {
         setWarehouseId(loadedWarehouses[0].id);
       }
 
-      // Auto-select "مورد نقدي" or default first supplier.
-      // A cash purchase still needs a real supplier_id (create_purchase rejects
-      // NULL and posts the payable balance), so we reuse ONE stable cash-supplier
-      // record rather than creating a new supplier per transaction.
+      // Use the stable system supplier for cash purchases. Avoid name matching,
+      // which breaks when labels are renamed or translated.
       if (loadedSuppliers.length > 0) {
-        const normalized = (s: string) => s.trim().toLowerCase();
-        const cashSup = loadedSuppliers.find((s) => {
-          const n = normalized(s.name);
-          return (
-            n.includes("نقدي") ||
-            n.includes("كاش") ||
-            n.includes("cash") ||
-            n.includes("walk-in") ||
-            n.includes("نقد")
-          );
-        });
-        setSupplierId(cashSup ? cashSup.id : loadedSuppliers[0].id);
+        const cashSupplier = loadedSuppliers.find((supplier) => supplier.is_system);
+        setSupplierId((current) => current || cashSupplier?.id || loadedSuppliers[0].id);
       }
     } catch (err: any) {
       console.error("Error loading POP meta:", err);
@@ -678,7 +666,17 @@ function PurchasePOSPage() {
   const taxTotal = cart.reduce((s, l) => s + l.unit_cost * l.quantity * (l.tax_rate / 100), 0);
   const discountN = Number(discount || 0);
   const total = Math.max(0, subtotal + taxTotal - discountN);
-  const paidN = paymentMethod === "credit" ? 0 : paidManuallyEdited ? Number(paid || 0) : total;
+  const splitPaidN = Math.round(
+    splitPaymentLines.reduce((sum, line) => sum + Math.max(0, Number(line.amount) || 0), 0) * 100,
+  ) / 100;
+  const paidN =
+    paymentMethod === "credit"
+      ? 0
+      : paymentMethod === "split"
+        ? splitPaidN
+        : paidManuallyEdited
+          ? Number(paid || 0)
+          : total;
   const isOverpaid = Number.isFinite(paidN) && paidN > total;
 
   // Filter products
@@ -798,6 +796,44 @@ function PurchasePOSPage() {
       );
     }
 
+    const purchaseSplits = splitPaymentLines
+      .map((line) => {
+        const method = splitPaymentMethods.find((candidate) => candidate.id === line.methodId);
+        return method
+          ? {
+              method: method.legacyValue,
+              payment_method_id: method.id,
+              amount: Math.round((Number(line.amount) || 0) * 100) / 100,
+              reference: line.reference?.trim() || null,
+            }
+          : null;
+      })
+      .filter((line): line is NonNullable<typeof line> => Boolean(line && line.amount > 0));
+
+    if (paymentMethod === "split") {
+      if (
+        purchaseSplits.length < 2 ||
+        splitPaymentLines.some((line) => {
+          const method = splitPaymentMethods.find((candidate) => candidate.id === line.methodId);
+          return (
+            !method ||
+            !Number.isFinite(Number(line.amount)) ||
+            Number(line.amount) <= 0 ||
+            (method.requiresReference && !line.reference?.trim())
+          );
+        })
+      ) {
+        return toast.error(
+          lang === "ar"
+            ? "أدخل طريقتين على الأقل ومبلغًا صحيحًا ومرجع الطرق التي تتطلبه"
+            : "Add at least two tenders with valid amounts and required references",
+        );
+      }
+      if (paidN > total) {
+        return toast.error(lang === "ar" ? "مجموع الدفع يتجاوز الإجمالي" : "Tender total exceeds the invoice total");
+      }
+    }
+
     setLoading(true);
     try {
       const currentSup = suppliers.find((s) => s.id === supplierId);
@@ -824,11 +860,12 @@ function PurchasePOSPage() {
       let error: any = null;
 
       try {
-        const res = await (supabase.rpc as any)("create_purchase", {
+        const purchaseRpcArgs = {
           _warehouse_id: warehouseId,
           _supplier_id: supplierId,
-          _payment_method:
-            selectedPurchasePaymentMethod?.legacyValue ?? toLegacyPaymentValue(paymentMethod),
+          _payment_method: paymentMethod === "split"
+            ? "split"
+            : selectedPurchasePaymentMethod?.legacyValue ?? toLegacyPaymentValue(paymentMethod),
           _paid: paidN,
           _discount: discountN,
           _note: composedNote as any,
@@ -838,18 +875,33 @@ function PurchasePOSPage() {
             unit_cost: Number(l.unit_cost),
             tax_rate: Number(l.tax_rate),
           })),
-          _cashbox_id: paymentSelection.cashboxId || null,
-          _bank_account_id: paymentSelection.bankAccountId || null,
-          _payment_reference:
-            paymentSelection.reference ||
-            paymentSelection.paymentReference ||
-            transferRef.trim() ||
-            null,
-          _payment_method_id: paymentSelection.paymentMethodId || paymentMethod,
-        });
+        };
+        const res = paymentMethod === "split"
+          ? await (supabase.rpc as any)("create_purchase", {
+              ...purchaseRpcArgs,
+              _payment_splits: purchaseSplits,
+            })
+          : await (supabase.rpc as any)("create_purchase", {
+              ...purchaseRpcArgs,
+              _cashbox_id: paymentSelection.cashboxId || null,
+              _bank_account_id: paymentSelection.bankAccountId || null,
+              _payment_reference:
+                paymentSelection.reference ||
+                paymentSelection.paymentReference ||
+                transferRef.trim() ||
+                null,
+              _payment_method_id: paymentSelection.paymentMethodId || paymentMethod,
+            });
         invoiceId = res.data;
         error = res.error;
       } catch {
+        if (paymentMethod === "split") {
+          throw new Error(
+            lang === "ar"
+              ? "تعذر تسجيل الدفع المجزأ؛ لم تُنشأ فاتورة ناقصة"
+              : "The split payment could not be recorded; no partial invoice was created",
+          );
+        }
         const res = await supabase.rpc("create_purchase", {
           _warehouse_id: warehouseId,
           _supplier_id: supplierId,
@@ -872,7 +924,7 @@ function PurchasePOSPage() {
       if (error) throw error;
 
       // Attach treasury settlement details if provided
-      if (invoiceId) {
+      if (invoiceId && paymentMethod !== "split") {
         try {
           await (supabase as any)
             .from("purchase_invoices")
@@ -970,24 +1022,10 @@ function PurchasePOSPage() {
   }
 
   return (
-    <div className="grid h-full min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden bg-[radial-gradient(ellipse_at_top,_color-mix(in_oklab,var(--primary)_10%,transparent),transparent_48%)] sm:gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(400px,460px)] lg:grid-rows-[auto_auto_minmax(0,1fr)]">
-      <div className="hidden min-w-0 items-center gap-2 px-1 py-0.5 sm:flex lg:col-start-2 lg:row-start-1">
-        <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
-          <PackagePlus className="size-4" />
-        </div>
-        <div className="min-w-0">
-          <h1 className="truncate text-sm font-extrabold text-foreground">
-            {lang === "ar" ? "نقطة المشتريات السريعة" : "Point of Purchase"}
-          </h1>
-          <p className="truncate text-[11px] text-muted-foreground">
-            {lang === "ar"
-              ? "تسجيل المشتريات وتحديث المخزون"
-              : "Purchase entry and stock receiving"}
-          </p>
-        </div>
-      </div>
+    <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden bg-[radial-gradient(ellipse_at_top,_color-mix(in_oklab,var(--primary)_8%,transparent),transparent_48%)] p-0 sm:gap-1 sm:p-1 lg:grid-cols-[minmax(0,1fr)_clamp(360px,26vw,440px)] lg:grid-rows-[auto_minmax(0,1fr)]">
+      <div className="hidden min-w-0 items-center justify-end gap-2 px-1 py-0.5 sm:flex lg:col-span-2 lg:row-start-1" />
       {/* Top Bar / Header */}
-      <div className="m-0 flex min-w-0 shrink-0 items-center gap-1 overflow-x-auto overscroll-x-contain rounded-xl border border-border/80 bg-surface/95 px-1.5 py-1.5 shadow-sm backdrop-blur-md sm:gap-2 sm:px-3 sm:py-2 lg:col-start-1 lg:row-start-1">
+      <div className="flex min-w-0 shrink-0 items-center justify-between gap-1 self-start overflow-x-auto overscroll-x-contain rounded-xl border border-border/80 bg-surface/95 px-1.5 py-1.5 shadow-xs backdrop-blur-md sm:gap-2 sm:px-3 sm:py-2 lg:col-span-2 lg:row-start-1">
         {/* Global Toolbar Selectors */}
         <div className="flex w-full min-w-0 flex-1 items-center justify-between gap-1 sm:gap-1.5">
           {/* Warehouse Selector */}
@@ -1095,7 +1133,7 @@ function PurchasePOSPage() {
       <div className="flex min-h-0 flex-col gap-0 overflow-hidden px-1.5 pb-1.5 sm:gap-2 sm:px-2 sm:pb-2 lg:contents lg:row-start-2">
         {/* Left Column: Search, Filters & Product Grid — desktop only. */}
         {isDesktop && (
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-border/80 bg-surface/95 shadow-sm ring-1 ring-background/40 lg:col-start-1 lg:row-start-3 lg:mx-2 lg:mb-2">
+          <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-border/80 bg-surface/95 p-1.5 shadow-sm ring-1 ring-background/40 sm:rounded-3xl sm:p-2 lg:col-start-1 lg:row-start-2">
             <TableToolbar
               className="border-b border-border/60 bg-surface/50 p-3"
               lang={lang}
@@ -1640,17 +1678,19 @@ function PurchasePOSPage() {
         )}
 
         {/* Right Column: Purchase Cart & Invoicing — the primary workspace. */}
-        <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-primary/15 bg-surface/95 p-2 shadow-xl ring-1 ring-border/50 backdrop-blur-md sm:rounded-3xl sm:p-2.5 lg:col-start-2 lg:row-span-2 lg:row-start-2 lg:mx-2 lg:mb-2">
+        <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-primary/20 bg-surface/95 p-1.5 shadow-xl ring-1 ring-border/50 backdrop-blur-md sm:p-2 lg:col-start-2 lg:row-start-2">
           {/* Cart Header */}
           <div className="mb-2 flex shrink-0 items-center justify-between border-b border-border/60 px-1 pb-2">
             <div className="flex items-center gap-2">
-              <ShoppingBag className="h-4 w-4 text-primary" />
-              <span className="text-xs font-bold text-foreground">
-                {lang === "ar" ? "أصناف أمر الشراء" : "Purchase Items"}
-              </span>
-              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
-                {cart.length}
-              </span>
+              <div className="grid size-7 place-items-center rounded-full bg-primary/10 text-primary">
+                <ShoppingBag className="h-4 w-4" />
+              </div>
+              <h2 className="flex items-center gap-2 text-xs font-bold text-foreground sm:text-sm">
+                <span>{lang === "ar" ? "أصناف أمر الشراء" : "Purchase Items"}</span>
+                <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-mono font-extrabold text-primary">
+                  {cart.length}
+                </span>
+              </h2>
             </div>
             {isDesktop ? (
               cart.length > 0 && (
@@ -1734,6 +1774,7 @@ function PurchasePOSPage() {
                   value={paymentMethod}
                   onChange={(method) => {
                     setPaymentMethod(method);
+                    if (method !== "split") setSplitPaymentLines([]);
                     setPaid(method === "credit" ? "0" : "");
                     setPaidManuallyEdited(false);
                     setPaymentSelection((s) => ({
@@ -1769,7 +1810,16 @@ function PurchasePOSPage() {
                 label={lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}
                 showLabel
                 dir={lang === "ar" ? "rtl" : "ltr"}
-                value={paymentMethod === "credit" ? "0" : paidManuallyEdited ? paid : String(total)}
+                value={
+                  paymentMethod === "credit"
+                    ? "0"
+                    : paymentMethod === "split"
+                      ? String(splitPaidN)
+                      : paidManuallyEdited
+                        ? paid
+                        : String(total)
+                }
+                disabled={paymentMethod === "split"}
                 onValueChange={(value) => {
                   setPaid(value);
                   setPaidManuallyEdited(true);

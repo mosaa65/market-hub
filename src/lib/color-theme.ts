@@ -363,6 +363,148 @@ export const DEFAULT_COLOR_ARCHIVE: ArchivedColor[] = [
   },
 ];
 
+/**
+ * درجات أوضاع العرض (Variants) — تعديل خلفية النظام نهاري/ليلي فقط
+ * بدون التأثير على لون الثيم الأساسي (accent).
+ * "default" يعني الأصل بدون أي تغيير.
+ */
+export type ModeVariantId =
+  "default" | "luxe" | "pure" | "sand" | "mist" | "slate" | "deep" | "navy" | "cocoa";
+
+export interface ModeVariantDefinition {
+  id: ModeVariantId;
+  base: "light" | "dark";
+  name_ar: string;
+  name_en: string;
+  description_ar: string;
+  description_en: string;
+  /** كلاس CSS المطبق على <html> (فارغ للافتراضي) */
+  cssClass: string;
+  previewGradient: string;
+}
+
+export const MODE_VARIANTS: Record<ModeVariantId, ModeVariantDefinition> = {
+  default: {
+    id: "default",
+    base: "light",
+    name_ar: "الافتراضي",
+    name_en: "Default",
+    description_ar: "الوضع الأصلي المعتمد للنظام كما هو",
+    description_en: "The original system mode, unchanged",
+    cssClass: "",
+    previewGradient: "from-neutral-100 to-neutral-300",
+  },
+  luxe: {
+    id: "luxe",
+    base: "light",
+    name_ar: "فخم عاجي",
+    name_en: "Luxury Ivory",
+    description_ar: "نهاري دافئ بلون عاجي فاخر مريح للعين",
+    description_en: "Warm luxurious ivory daylight, easy on the eyes",
+    cssClass: "light-luxe",
+    previewGradient: "from-amber-50 to-stone-200",
+  },
+  pure: {
+    id: "pure",
+    base: "light",
+    name_ar: "أبيض نقي",
+    name_en: "Pure White",
+    description_ar: "أبيض ساطع نقي بأعلى وضوح ممكن",
+    description_en: "Crisp pure white with maximum clarity",
+    cssClass: "light-pure",
+    previewGradient: "from-white to-slate-100",
+  },
+  mist: {
+    id: "mist",
+    base: "light",
+    name_ar: "رمادي ناعم",
+    name_en: "Soft Mist",
+    description_ar: "نهاري رمادي ضبابي هادئ بارد يقلل إجهاد العين",
+    description_en: "Cool misty gray daylight, gentle on the eyes",
+    cssClass: "light-mist",
+    previewGradient: "from-slate-100 to-slate-300",
+  },
+  slate: {
+    id: "slate",
+    base: "dark",
+    name_ar: "رمادي فحمي",
+    name_en: "Charcoal Slate",
+    description_ar: "ليلي رمادي فحمي متوسط — بين النهاري والليلي",
+    description_en: "Mid charcoal grey night — between light and dark",
+    cssClass: "dark-slate",
+    previewGradient: "from-slate-600 to-slate-800",
+  },
+  deep: {
+    id: "deep",
+    base: "dark",
+    name_ar: "معتم عميق",
+    name_en: "Deep Midnight",
+    description_ar: "ليلي أسود معتم ملكي لجلسات العمل الطويلة",
+    description_en: "Deep royal black night for long working sessions",
+    cssClass: "dark-deep",
+    previewGradient: "from-slate-900 to-black",
+  },
+  sand: {
+    id: "sand",
+    base: "light",
+    name_ar: "رملي دافئ",
+    name_en: "Warm Sand",
+    description_ar: "نهاري بيج رملي صحراوي أصيل ودافئ",
+    description_en: "Warm desert sand daylight with authentic beige",
+    cssClass: "light-sand",
+    previewGradient: "from-amber-100 to-yellow-200",
+  },
+  navy: {
+    id: "navy",
+    base: "dark",
+    name_ar: "أزرق نيلي",
+    name_en: "Midnight Navy",
+    description_ar: "ليلي أزرق نيلي فلكي عميق وأنيق",
+    description_en: "Deep celestial midnight blue night",
+    cssClass: "dark-navy",
+    previewGradient: "from-blue-900 to-indigo-950",
+  },
+  cocoa: {
+    id: "cocoa",
+    base: "dark",
+    name_ar: "قهوة دافئة",
+    name_en: "Warm Cocoa",
+    description_ar: "ليلي بني إسبريسو دافئ بلمسة فاخرة",
+    description_en: "Warm espresso brown night with luxury touch",
+    cssClass: "dark-cocoa",
+    previewGradient: "from-amber-950 to-stone-900",
+  },
+};
+
+export const MODE_VARIANT_STORAGE_KEY = "vortex_mode_variant";
+
+/** قراءة الدرجة المحفوظة من التخزين المحلي مع التحقق من الصحة */
+export function readStoredModeVariant(): ModeVariantId {
+  if (typeof window === "undefined") return "default";
+  try {
+    const val = localStorage.getItem(MODE_VARIANT_STORAGE_KEY) as ModeVariantId | null;
+    if (val && val in MODE_VARIANTS) return val;
+  } catch {
+    /* fallback */
+  }
+  return "default";
+}
+
+/**
+ * تطبيق كلاس درجة العرض على عنصر الجذر
+ * تُستدعى من applyTheme بعد تبديل light/dark
+ */
+export function applyModeVariant(variantId: ModeVariantId): void {
+  if (typeof document === "undefined") return;
+  const root = document.documentElement;
+  for (const def of Object.values(MODE_VARIANTS)) {
+    if (def.cssClass) root.classList.remove(def.cssClass);
+  }
+  const def = MODE_VARIANTS[variantId] || MODE_VARIANTS.default;
+  if (def.cssClass) root.classList.add(def.cssClass);
+  root.dataset.modeVariant = variantId;
+}
+
 /** تحويل Hex إلى RGB عادي */
 export function hexToRgb(hex: string): { r: number; g: number; b: number } {
   const clean = hex.replace("#", "").trim();
@@ -512,6 +654,8 @@ export interface UserThemePreferences {
   accentTheme: AccentThemeId;
   customColor: string;
   colorArchive: ArchivedColor[];
+  /** درجة عرض النظام (الافتراضي/الفخم/النقي/الرمادي/المعتم) */
+  modeVariant?: ModeVariantId;
   updatedAt: number;
 }
 
@@ -531,6 +675,7 @@ export function serializeUserThemePreferences(prefs: UserThemePreferences): stri
     accentTheme: prefs.accentTheme,
     customColor: prefs.customColor,
     colorArchive: prefs.colorArchive,
+    modeVariant: prefs.modeVariant || "default",
     updatedAt: prefs.updatedAt || Date.now(),
   });
 }
@@ -571,11 +716,17 @@ export function parseUserThemePreferences(raw: unknown): UserThemePreferences | 
 
     const updatedAt = typeof data.updatedAt === "number" ? data.updatedAt : Date.now();
 
+    const modeVariant: ModeVariantId =
+      typeof data.modeVariant === "string" && data.modeVariant in MODE_VARIANTS
+        ? data.modeVariant
+        : "default";
+
     return {
       theme,
       accentTheme,
       customColor,
       colorArchive,
+      modeVariant,
       updatedAt,
     };
   } catch {

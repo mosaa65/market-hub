@@ -53,6 +53,7 @@ interface Customer {
   email: string | null;
   balance: number;
   credit_limit: number;
+  is_system?: boolean | null;
 }
 interface Invoice {
   id: string;
@@ -101,10 +102,10 @@ function DebtsPage() {
     setLoading(true);
     const { data } = await supabase
       .from("customers")
-      .select("id,name,phone,email,balance,credit_limit")
+      .select("id,name,phone,email,balance,credit_limit,is_system")
       .eq("is_active", true)
       .order("balance", { ascending: false });
-    const list = (data ?? []) as Customer[];
+    const list = ((data ?? []) as Customer[]).filter((customer) => !customer.is_system);
     setRows(list);
     setLoading(false);
 
@@ -113,10 +114,10 @@ function DebtsPage() {
       if (!target) {
         const { data: c } = await supabase
           .from("customers")
-          .select("id,name,phone,email,balance,credit_limit")
+          .select("id,name,phone,email,balance,credit_limit,is_system")
           .eq("id", customerId)
           .maybeSingle();
-        if (c) target = c as Customer;
+        if (c && !(c as Customer).is_system) target = c as Customer;
       }
       if (target) {
         void openDetail(target);
