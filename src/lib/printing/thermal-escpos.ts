@@ -221,10 +221,10 @@ export function renderThermalEscPos(
     blocks.push({ text: thanks, align: "center" });
     const footerContact = company.phone || company.contacts.join(" · ");
     if (footerContact) blocks.push({ text: footerContact, align: "center", bold: true });
-      if (company.email) blocks.push({ text: company.email, align: "center" });
-    }
-    // ── حقوق النظام (تظهر دائماً — حقوق المنصة ليست خياراً للمنشأة) ──────
-    if (divider) blocks.push({ text: divider, align: "center" });
-    blocks.push({ text: COMPANY_RIGHTS_TEXT, align: "center" });
-    return { columns, blocks, cut: true, feedBeforeCut: 3 };
+    if (company.email) blocks.push({ text: company.email, align: "center" });
+  }
+  // ── حقوق النظام (تظهر دائماً — حقوق المنصة ليست خياراً للمنشأة) ──────
+  if (divider) blocks.push({ text: divider, align: "center" });
+  blocks.push({ text: COMPANY_RIGHTS_TEXT, align: "center" });
+  return { columns, blocks, cut: true, feedBeforeCut: 3 };
 }

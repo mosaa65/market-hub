@@ -102,7 +102,9 @@ export function RecordsFilterPanel({
       applyLabel={t("records.apply")}
       resetLabel={t("records.filters.clear_all")}
     >
-      <div className="flex flex-col gap-2">
+      {/* بدون غلاف وسيط — الأقسام تصل مباشرة إلى شبكة الشيت فتُوزَّع
+          عمودين في الصف على الشاشات العريضة (الغلاف كان يخفيها عن العدّ). */}
+      <>
         {definitions.map((definition) => (
           <VortexFilterSection
             key={definition.key}
@@ -116,7 +118,7 @@ export function RecordsFilterPanel({
             />
           </VortexFilterSection>
         ))}
-      </div>
+      </>
     </VortexFilterSheet>
   );
 }

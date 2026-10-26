@@ -656,10 +656,7 @@ check(
   "document output omits legacy footer fields",
   !stdHtml.includes('class="footer-contact"') && !stdHtml.includes('footer-contact">'),
 );
-check(
-  "unified invoice carries the restored company rights line",
-  rightsOccurrences(stdHtml) === 1,
-);
+check("unified invoice carries the restored company rights line", rightsOccurrences(stdHtml) === 1);
 
 const invoiceTemplateOutputs = [
   renderUnifiedDocument({ doc: docFor("customer_invoice"), templateId: "standard", paperId: "a4" }),

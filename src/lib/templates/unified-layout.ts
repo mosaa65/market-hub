@@ -32,7 +32,6 @@ import { PRINT_THEMES, deriveThemeTokens, type PrintTheme } from "@/lib/printing
 import { getCachedCompanyProfile, type CompanyProfile } from "@/lib/printing/company-profile";
 import { generateBarcodeSvg, generateQrCodeSvg } from "@/lib/printing/barcode-qr";
 import { getUnifiedPrintSettings } from "@/lib/printing/settings";
-import { type CompanyProfile } from "@/lib/printing/company-profile";
 import {
   renderUniversalFooter,
   UNIVERSAL_FOOTER_CSS,
@@ -766,13 +765,20 @@ export function renderUnifiedLayout(
   // لقطة المستند (بيانات المنشأة وقت الفاتورة) أولًا، ثم البروفايل —
   // البروفايل نفسه يحمل افتراضيات المنصة عند غياب بيانات المنشأة.
   const companyName =
-    doc.company?.name || company.name || company.arabicName || doc.company?.arabicName || "";
-  const arabicName = doc.company?.arabicName || company.arabicName || "";
-  const englishName = doc.company?.englishName || company.englishName || "";
-  const companyAddress = doc.company?.address || company.address || "";
-  const companyPhone = doc.company?.phone || company.phone || "";
-  const companyVat = company.taxNumber || doc.company?.vat || "";
-  const companyEmail = doc.company?.email || company.email || "";
+    options?.company?.name ||
+    doc.company?.name ||
+    company.name ||
+    company.arabicName ||
+    doc.company?.arabicName ||
+    "";
+  const arabicName =
+    options?.company?.arabicName || doc.company?.arabicName || company.arabicName || "";
+  const englishName =
+    options?.company?.englishName || doc.company?.englishName || company.englishName || "";
+  const companyAddress = options?.company?.address || doc.company?.address || company.address || "";
+  const companyPhone = options?.company?.phone || doc.company?.phone || company.phone || "";
+  const companyVat = options?.company?.taxNumber || company.taxNumber || doc.company?.vat || "";
+  const companyEmail = options?.company?.email || doc.company?.email || company.email || "";
 
   const lines = doc.lines || [];
   const rows = lines
@@ -1025,9 +1031,7 @@ export function renderUnifiedLayout(
         </div>`
             : ""
         }
-          ${opts.showFooter
-            ? renderUniversalFooter(company, rtl, true)
-            : ""}
+          ${opts.showFooter ? renderUniversalFooter(company, rtl, true) : ""}
       </div>
 
       <!-- كارد الإجماليات مع مستطيل الإجمالي البارز -->

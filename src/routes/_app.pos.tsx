@@ -1911,7 +1911,8 @@ function POSPage() {
   return (
     <>
       {/* ─── Compact Executive POS Workspace Shell ─── */}
-      <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden bg-[radial-gradient(ellipse_at_top,_color-mix(in_oklab,var(--primary)_8%,transparent),transparent_48%)] p-0.5 sm:gap-2 sm:p-2.5 lg:grid-cols-[minmax(0,1fr)_clamp(360px,26vw,440px)] lg:grid-rows-[auto_minmax(0,1fr)]">
+      {/* الحشو والفجوات مصغّرة — لا تسرق مساحة من الهيدر والفوتر واللوحتين */}
+      <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden bg-[radial-gradient(ellipse_at_top,_color-mix(in_oklab,var(--primary)_8%,transparent),transparent_48%)] p-0 sm:gap-1 sm:p-1 lg:grid-cols-[minmax(0,1fr)_clamp(360px,26vw,440px)] lg:grid-rows-[auto_minmax(0,1fr)]">
         <div className="hidden min-w-0 items-center justify-end gap-2 px-1 py-0.5 sm:flex lg:col-span-2 lg:row-start-1 lg:shrink-0" />
         {/* ─── Top Executive Command Deck ─── */}
         <header className="flex min-w-0 shrink-0 items-center justify-between gap-1 self-start overflow-x-auto overscroll-x-contain rounded-xl border border-border/80 bg-surface/95 px-1.5 py-1.5 shadow-xs backdrop-blur-md sm:gap-2 sm:px-3 sm:py-2 lg:hidden">
@@ -2037,8 +2038,8 @@ function POSPage() {
         <div className="grid min-h-0 grid-cols-1 grid-rows-[minmax(0,1fr)] items-stretch gap-0 sm:gap-2 lg:contents">
           {/* ─── Products Panel (Desktop & Tablet) ─── */}
           {isDesktop && (
-            <div className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-border/80 bg-surface/95 p-3 shadow-sm ring-1 ring-background/40 lg:col-start-1 lg:row-start-2">
-              <div className="mb-2.5 rounded-2xl border border-border/70 bg-surface/90 p-2.5 shadow-sm">
+            <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-border/80 bg-surface/95 p-1.5 shadow-sm ring-1 ring-background/40 sm:rounded-3xl sm:p-2 lg:col-start-1 lg:row-start-2">
+              <div className="mb-1.5 rounded-xl border border-border/70 bg-surface/90 p-1.5 shadow-sm sm:rounded-2xl sm:p-2">
                 <div className="flex flex-col gap-2 xl:flex-row xl:items-center">
                   <div className="min-w-0 flex-1">
                     <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
@@ -2640,7 +2641,7 @@ function POSPage() {
           )}
 
           {/* ─── Cart Panel (Primary Workspace on All Devices) ─── */}
-          <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-primary/20 bg-surface/95 p-2 shadow-xl ring-1 ring-border/50 backdrop-blur-md sm:rounded-3xl sm:p-2.5 lg:col-start-2 lg:row-start-2">
+          <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-primary/20 bg-surface/95 p-1.5 shadow-xl ring-1 ring-border/50 backdrop-blur-md sm:p-2 lg:col-start-2 lg:row-start-2">
             {/* Cart Header */}
             <div className="mb-1 flex shrink-0 items-center justify-between border-b border-border/60 px-1 pb-1.5">
               <div className="flex items-center gap-2">
