@@ -15,16 +15,12 @@ import {
   PackageCheck,
   CheckCircle2,
   AlertCircle,
-  Clock,
-  Printer,
-  Share2,
   User,
   Building2,
   ShieldCheck,
   Sparkles,
   RefreshCw,
   Check,
-  Scale,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
@@ -38,7 +34,6 @@ import {
   type CustodyLine,
   type CustodyBalance,
 } from "@/lib/milling";
-import { LuxuryPrintPreviewModal } from "@/components/luxury-print-preview-modal";
 import { UnifiedPrintModal } from "@/components/milling/unified-print-modal";
 import { MillingDocumentsBoard } from "@/components/milling/milling-documents-board";
 import type { UnifiedDocumentData } from "@/lib/templates/types";
