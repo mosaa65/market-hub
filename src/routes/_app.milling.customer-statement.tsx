@@ -1292,29 +1292,6 @@ function QuickMillingModal({
             </MillingField>
           </div>
 
-          {/* E6/M5: نوع الحبة المرجعي — يعبّئ نسب النواتج الافتراضية */}
-          <MillingField
-            label="نوع الحبة المرجعي (اختياري)"
-            hint={
-              selectedGrainType
-                ? `فاقد افتراضي للنوع: ${selectedGrainType.default_loss_rate_pct}% — نسب النواتج معبأة تلقائياً وقابلة للتعديل`
-                : "الأنواع المرجعية معرّفة في جدول grain_types — تعبّئ نسب النواتج الافتراضية"
-            }
-          >
-            <MillingSelect
-              value={grainTypeId}
-              onChange={(e) => changeGrainType(e.target.value)}
-              className="font-semibold text-xs"
-            >
-              <option value="">— بلا نوع مرجعي (إدخال يدوي كامل) —</option>
-              {(grainTypes.data ?? []).map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name_ar} (فاقد افتراضي {t.default_loss_rate_pct}%)
-                </option>
-              ))}
-            </MillingSelect>
-          </MillingField>
-
           {/* بطاقة الرصيد المتاح للحبوب */}
           {initialRow && (
             <div className="flex items-center justify-between rounded-xl border border-amber-500/25 bg-amber-500/5 px-3.5 py-2 text-xs">
@@ -1358,7 +1335,6 @@ function QuickMillingModal({
                 <QuantityInput
                   decimals={2}
                   min={0.1}
-                  unit="kg"
                   placeholder="0.00"
                   aria-label="الوزن الإجمالي بالكجم"
                   value={kgOut === "" ? null : Number(kgOut)}
@@ -1377,14 +1353,14 @@ function QuickMillingModal({
               <span className="text-xs font-bold text-foreground">
                 نواتج الطحن المودعة في رصيد العميل:
               </span>
-              <button
-                type="button"
-                onClick={addOutputLine}
-                className="inline-flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary hover:bg-primary/20 transition"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                إضافة ناتج
-              </button>
+            </div>
+
+            {/* ترويسة أعمدة النواتج */}
+            <div className="grid grid-cols-12 gap-2 px-2 py-1 text-[11px] font-bold text-muted-foreground bg-muted/50 rounded-lg">
+              <div className="col-span-5">صنف الناتج المستخرج</div>
+              <div className="col-span-3 text-center">الأكياس</div>
+              <div className="col-span-3 text-center">الوزن (كجم)</div>
+              <div className="col-span-1 text-center">حذف</div>
             </div>
 
             <div className="space-y-2">
@@ -1414,7 +1390,7 @@ function QuickMillingModal({
                     <QuantityInput
                       decimals={0}
                       min={0}
-                      placeholder="أكياس"
+                      placeholder="0"
                       aria-label="عدد الأكياس"
                       value={line.bags === "" ? null : Number(line.bags)}
                       onValueChange={(v) =>
@@ -1429,7 +1405,7 @@ function QuickMillingModal({
                     <QuantityInput
                       decimals={2}
                       min={0}
-                      placeholder="كجم"
+                      placeholder="0.00"
                       aria-label="الوزن كجم"
                       value={line.kg === "" ? null : Number(line.kg)}
                       onValueChange={(v) => updateOutputLine(idx, "kg", v == null ? "" : String(v))}
@@ -1452,6 +1428,16 @@ function QuickMillingModal({
                 </div>
               ))}
             </div>
+
+            <button
+              type="button"
+              onClick={addOutputLine}
+              className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-dashed border-emerald-500/40 bg-emerald-500/[0.04] hover:bg-emerald-500/[0.08] text-xs font-bold text-emerald-700 dark:text-emerald-300 transition"
+            >
+              <Plus className="h-4 w-4" />
+              <span>إضافة سطر ناتج جديد</span>
+            </button>
+          </div>
 
             {/* شريط المطابقة الذكي */}
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-muted/60 p-3 text-xs">
@@ -1479,7 +1465,6 @@ function QuickMillingModal({
                 </span>
               </div>
             </div>
-          </div>
 
           {/* ملاحظات الطحن */}
           <MillingField label="ملاحظات تشغيلية">
@@ -1743,11 +1728,10 @@ function QuickDeliveryModal({
                 />
               </MillingField>
 
-              <MillingField label="الوزن الإجمالي بالكجم">
+              <MillingField label="الوزن الإجمالي (كجم)">
                 <QuantityInput
                   decimals={2}
                   min={0.1}
-                  unit="kg"
                   placeholder="0.00"
                   aria-label="الوزن الإجمالي بالكجم"
                   value={kg === "" ? null : Number(kg)}

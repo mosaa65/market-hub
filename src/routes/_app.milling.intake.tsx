@@ -5,7 +5,7 @@
  * + أجرة الطحن (إجمالي الأكياس × سعر الكيس) + الخصم + طريقة الدفع + المدفوع/الآجل
  * = مستند أمانة واحد + فاتورة مبيعات رسمية في نفس المعاملة الفورية.
  */
-import { createFileRoute, useSearch, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, useSearch, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, useMemo } from "react";
 import {
@@ -43,6 +43,7 @@ import { CustomerFormDialog } from "@/components/contacts/customer-form-dialog";
 import { LuxuryPrintPreviewModal } from "@/components/luxury-print-preview-modal";
 import { UnifiedPrintModal } from "@/components/milling/unified-print-modal";
 import { DocumentShareDialog } from "@/components/communication/document-share-dialog";
+import { CustodyProductFormDialog } from "@/components/milling/custody-product-form-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import {
   createMillingServiceDocument,
@@ -84,6 +85,8 @@ import {
 } from "@/components/milling/milling-ui";
 import { getCompanyCurrencySymbol } from "@/lib/format";
 import type { UnifiedDocumentData } from "@/lib/templates/types";
+import { PosTotalsCard } from "@/components/commerce/pos-totals-card";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/milling/intake")({
   validateSearch: (search: Record<string, unknown>): { docId?: string } => ({
@@ -154,6 +157,7 @@ function MillingIntakePage() {
   const [printModalOpen, setPrintModalOpen] = useState(false);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [showWorkflow, setShowWorkflow] = useState(false);
+  const [quickGrainDialogOpen, setQuickGrainDialogOpen] = useState(false);
 
   // استعلام العملاء مع الهاتف والرصيد
   const customers = useQuery({
@@ -604,23 +608,33 @@ function MillingIntakePage() {
                         <span className="font-semibold text-amber-700 dark:text-amber-300">
                           لا توجد منتجات حبوب أمانات بعد!
                         </span>
-                        <Link
-                          to="/products"
-                          search={undefined as never}
+                        <button
+                          type="button"
+                          onClick={() => setQuickGrainDialogOpen(true)}
                           className="inline-flex items-center gap-1 rounded-lg bg-amber-500 px-2 py-1 font-bold text-white hover:bg-amber-600"
                         >
-                          أضف أول نوع حبوب من «المنتجات / الأصناف» ←
-                        </Link>
+                          <Plus className="h-3 w-3" />
+                          أضف أول نوع حبوب
+                        </button>
                       </div>
                     )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={addLine}
-                    className="inline-flex items-center gap-1 rounded-xl border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary shadow-xs hover:bg-primary/20"
-                  >
-                    <Plus className="h-3.5 w-3.5" /> نوع حبوب آخر
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={addLine}
+                      className="inline-flex items-center gap-1 rounded-xl border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary shadow-xs hover:bg-primary/20"
+                    >
+                      <Plus className="h-3.5 w-3.5" /> نوع حبوب آخر
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setQuickGrainDialogOpen(true)}
+                      className="inline-flex items-center gap-1 rounded-xl border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-bold text-amber-700 dark:text-amber-300 shadow-xs hover:bg-amber-500/20"
+                    >
+                      <Plus className="h-3.5 w-3.5" /> صنف جديد
+                    </button>
+                  </div>
                 </div>
 
                 {/* رأس الجدول الأنيق للشاشات المتوسطة والكبيرة */}
@@ -807,9 +821,9 @@ function MillingIntakePage() {
             </div>
           </MillingPanel>
 
-          {/* الجانب الأيسر: سلة الفاتورة والدفع بنمط الكاشير المتقدم POS (5 أعمدة) */}
+          {/* الجانب الأيسر: سلة الفاتورة والدفع بنمط الكاشير ونقطة البيع (POS) */}
           <MillingPanel className="lg:col-span-5 flex flex-col justify-between">
-            <div>
+            <div className="flex flex-col flex-1">
               <MillingSectionTitle
                 icon={<ReceiptText className="h-4 w-4" />}
                 title="سلة الخدمة والحساب المالي"
@@ -821,16 +835,25 @@ function MillingIntakePage() {
                 }
               />
 
-              <div className="space-y-3.5 p-4">
-                {/* 1. بند الخدمة وحساب سعر الكيس */}
-                <div className="rounded-2xl border border-border/80 bg-surface-2/40 p-3.5 space-y-3">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground flex items-center gap-1.5">
-                      <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-                      بند الخدمة المعتمد:
-                    </span>
-                    <span className="font-bold text-foreground">
-                      {serviceItem.data?.name_ar || serviceItem.data?.name || "أجور طحن وتجهيز"}
+              {/* جسم السلة: بطاقة بند الخدمة المعتمد (بدل أصناف المنتجات) */}
+              <div className="flex-1 p-3.5 space-y-3">
+                <div className="rounded-2xl border border-primary/20 bg-primary/[0.04] p-3.5 space-y-3 dark:border-primary/30 dark:bg-primary/[0.08]">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="grid h-8 w-8 place-items-center rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                        <Sparkles className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-semibold text-muted-foreground block">
+                          بند الخدمة المعتمد:
+                        </span>
+                        <span className="text-sm font-bold text-foreground">
+                          {serviceItem.data?.name_ar || serviceItem.data?.name || "أجور طحن وتجهيز"}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="rounded-md bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold text-amber-700 dark:text-amber-300">
+                      أجور تشغيل
                     </span>
                   </div>
 
@@ -884,168 +907,145 @@ function MillingIntakePage() {
                   )}
                 </div>
 
-                {/* 2. الخصم الإجمالي */}
-                <MillingField label="الخصم الممنوح (إن وجد)">
-                  <AmountInput
-                    min={0}
-                    placeholder="0.00"
-                    aria-label="الخصم"
-                    value={discount === "" ? null : Number(discount)}
-                    onValueChange={(v) => setDiscount(v == null ? "" : String(v))}
-                    className="font-medium"
-                  />
-                </MillingField>
+                {/* ملاحظات الفاتورة مثل كاونتر POS */}
+                <input
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="ملاحظات على الفاتورة (اختياري)..."
+                  aria-label="ملاحظات الفاتورة"
+                  className="h-8 w-full rounded-xl border border-input/80 bg-background px-3 text-xs outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:ring-1 focus:ring-primary/20"
+                />
               </div>
             </div>
 
-            {/* 3. البطاقة الذكية المتكيفة في الأسفل (Smart Adaptive Bottom POS Card) */}
-            <div className="p-4 border-t border-border/80 bg-surface-2/30 space-y-3.5">
-              {/* شريط الإجماليات المتكيف الفخم */}
-              <div className="rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/10 via-card to-card p-3.5 shadow-xs space-y-2">
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>المجموع قبل الخصم:</span>
-                  <span className="font-bold tabular-nums text-foreground">
-                    {fmtNum(currentSubtotal)} {currencySymbol}
-                  </span>
-                </div>
-
-                {currentDiscount > 0 && (
-                  <div className="flex items-center justify-between text-xs text-rose-600 dark:text-rose-400">
-                    <span>الخصم الممنوح:</span>
-                    <span className="font-bold tabular-nums">
-                      − {fmtNum(currentDiscount)} {currencySymbol}
-                    </span>
-                  </div>
-                )}
-
-                <div className="h-px bg-border/60" />
-
-                <div className="flex items-baseline justify-between pt-0.5">
-                  <span className="text-sm font-black text-foreground">
-                    صافي الفاتورة الإجمالي:
-                  </span>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-2xl sm:text-3xl font-black tabular-nums text-primary">
-                      {fmtNum(grandTotal)}
-                    </span>
-                    <span className="text-xs font-bold text-muted-foreground">
-                      {currencySymbol}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* شريط اختيار طريقة الدفع مع أزرار التحكم السريع */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-foreground">
-                    طريقة السداد *
-                  </label>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={handlePayFull}
-                      className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20 transition"
-                    >
-                      سداد كامل (كاش)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSetFullCredit}
-                      className="rounded-lg border border-purple-500/30 bg-purple-500/10 px-2 py-0.5 text-[11px] font-bold text-purple-700 dark:text-purple-300 hover:bg-purple-500/20 transition"
-                    >
-                      آجل بالكامل (ذمة)
-                    </button>
-                  </div>
-                </div>
-
-                <DynamicPaymentSelector
-                  context="sales"
-                  value={paymentMethod}
-                  onChange={(method) => {
-                    setPaymentMethod(method);
-                    if (getPaymentMethodDefinition(method)?.isCreditTerm) {
-                      setPaid("");
-                    }
-                  }}
-                  settlement={settlement}
-                  onSettlementChange={setSettlement}
-                  includeCredit
-                  compact
-                />
-              </div>
-
-              {/* المدفوع والمتبقي */}
-              <div className="grid gap-2.5 sm:grid-cols-2">
-                <div className="space-y-1">
+            {/* أسفل السلة: عناصر الدفع، بطاقة الإجماليات، وزر الفوتر مباشرة أسفلها (مطابق لنقطة البيع) */}
+            <div className="shrink-0 space-y-2 border-t border-border/70 bg-surface/95 p-3.5 pt-2.5">
+              {/* ─── شريط التحكم بالدفع: طريقة الدفع + المبلغ المدفوع + الخصم ─── */}
+              <div className="grid min-w-0 grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,0.9fr)] items-end gap-1.5">
+                {/* طريقة الدفع */}
+                <div className="flex min-w-0 flex-col gap-1">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-muted-foreground">
-                      المبلغ المستلم
-                    </label>
-                    {!isCredit && grandTotal > 0 && (
+                    <span className="truncate text-[10px] font-semibold leading-none text-muted-foreground">
+                      طريقة الدفع
+                    </span>
+                    <div className="flex items-center gap-1 text-[10px]">
                       <button
                         type="button"
                         onClick={handlePayFull}
-                        className="text-[10px] font-bold text-emerald-600 hover:underline"
+                        className="font-bold text-emerald-600 hover:underline"
+                        title="سداد كامل نقداً"
                       >
-                        تعبئة كامل
+                        سداد كامل
                       </button>
-                    )}
+                      <span>·</span>
+                      <button
+                        type="button"
+                        onClick={handleSetFullCredit}
+                        className="font-bold text-purple-600 hover:underline"
+                        title="تقييد آجل بالكامل"
+                      >
+                        آجل
+                      </button>
+                    </div>
                   </div>
+                  <DynamicPaymentSelector
+                    context="sales"
+                    value={paymentMethod}
+                    settlement={settlement}
+                    onSettlementChange={setSettlement}
+                    compact
+                    includeCredit
+                    onChange={(method) => {
+                      setPaymentMethod(method);
+                      if (getPaymentMethodDefinition(method)?.isCreditTerm) {
+                        setPaid("");
+                      }
+                    }}
+                    disabled={submit.isPending}
+                  />
+                </div>
+
+                {/* المبلغ المدفوع */}
+                <div className="flex min-w-0 flex-col gap-1">
+                  <span className="truncate text-[10px] font-semibold leading-none text-muted-foreground">
+                    المبلغ المدفوع
+                  </span>
                   <AmountInput
+                    showInWords={false}
+                    hideClear
                     min={0}
                     disabled={isCredit}
-                    placeholder="0.00"
-                    aria-label="المبلغ المستلم (المدفوع)"
                     value={isCredit ? null : paid === "" ? null : Number(paid)}
                     onValueChange={(v) => {
                       setPaidAuto(false);
                       setPaid(v == null ? "" : String(v));
                     }}
-                    className={`font-bold ${
-                      isCredit
-                        ? "cursor-not-allowed opacity-60"
-                        : isOverpaid
-                          ? "border-rose-500 text-rose-600 bg-rose-500/5"
-                          : "text-emerald-600"
-                    }`}
+                    placeholder={isCredit ? "0.00 (آجل)" : "المدفوع"}
+                    className={cn(
+                      "h-8 min-w-0 rounded-lg border border-border bg-background px-2 text-[11px] font-semibold outline-none focus:border-primary",
+                      isCredit && "cursor-not-allowed opacity-60",
+                      isOverpaid && "border-destructive text-destructive",
+                    )}
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="block text-xs font-semibold text-muted-foreground">
-                    المتبقي كذمة آجلة
-                  </label>
-                  <div className="flex h-10 w-full items-center justify-between rounded-xl border border-border/80 bg-card px-3">
-                    <span className="text-xs text-muted-foreground">المتبقي:</span>
-                    <span
-                      className={`text-sm font-black tabular-nums ${
-                        remainingDue > 0
-                          ? "text-rose-600 dark:text-rose-400"
-                          : "text-emerald-600 dark:text-emerald-400"
-                      }`}
-                    >
-                      {fmtNum(remainingDue)} {currencySymbol}
-                    </span>
-                  </div>
+                {/* الخصم */}
+                <div className="flex min-w-0 flex-col gap-1">
+                  <span className="truncate text-[10px] font-semibold leading-none text-muted-foreground">
+                    الخصم
+                  </span>
+                  <AmountInput
+                    showInWords={false}
+                    hideClear
+                    min={0}
+                    value={discount === "" ? null : Number(discount)}
+                    onValueChange={(v) => setDiscount(v == null ? "" : String(v))}
+                    placeholder="0.00"
+                    className="h-8 min-w-0 rounded-lg border border-border bg-background px-2 text-[11px] font-semibold outline-none focus:border-primary"
+                  />
                 </div>
               </div>
 
-              {/* تنبيه بالذمة الآجلة أو خطأ الزيادة */}
-              {remainingDue > 0 && (
-                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-700 dark:text-amber-300">
-                  {selectedCustomer ? (
-                    <span>
-                      ✓ سيُسجل المبلغ المتبقي ({fmtNum(remainingDue)} {currencySymbol}) كدين آجل رسمي على حساب: <strong>{selectedCustomer.name}</strong>
-                    </span>
-                  ) : (
-                    <span>⚠️ يلزم اختيار عميل مسجل لتقييد المبلغ المتبقي كدين آجل.</span>
-                  )}
-                </div>
-              )}
+              {/* بطاقة الإجماليات الذكية بنمط POS Totals Card */}
+              <PosTotalsCard
+                countLabel="الأكياس المستلمة"
+                count={bagCount}
+                rows={[
+                  {
+                    label: "المجموع قبل الخصم",
+                    value: `${fmtNum(currentSubtotal)} ${currencySymbol}`,
+                  },
+                  ...(currentDiscount > 0
+                    ? [
+                        {
+                          label: "الخصم الممنوح",
+                          value: `− ${fmtNum(currentDiscount)} ${currencySymbol}`,
+                          className: "text-rose-600 dark:text-rose-400 font-semibold",
+                        },
+                      ]
+                    : []),
+                  {
+                    label: "المبلغ المدفوع",
+                    value: `${fmtNum(currentPaid)} ${currencySymbol}`,
+                    className: "text-emerald-600 dark:text-emerald-400 font-semibold",
+                  },
+                  ...(remainingDue > 0
+                    ? [
+                        {
+                          label: "المتبقي كدين آجل",
+                          value: `${fmtNum(remainingDue)} ${currencySymbol}`,
+                          className: "text-rose-600 dark:text-rose-400 font-bold",
+                        },
+                      ]
+                    : []),
+                ]}
+                totalLabel="صافي الفاتورة الإجمالي"
+                total={`${fmtNum(grandTotal)} ${currencySymbol}`}
+              />
 
+              {/* تنبيهات السداد أو خطأ الزيادة */}
               {isOverpaid && (
-                <div className="flex items-center gap-2 rounded-xl bg-rose-500/10 p-2.5 text-xs font-bold text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                <div className="flex items-center gap-1.5 rounded-xl bg-destructive/10 p-2 text-xs font-semibold text-destructive border border-destructive/20">
                   <AlertCircle className="h-4 w-4 shrink-0" />
                   <span>
                     المبلغ المدفوع ({fmtNum(currentPaid)}) أكبر من صافي الفاتورة ({fmtNum(grandTotal)})!
@@ -1053,25 +1053,41 @@ function MillingIntakePage() {
                 </div>
               )}
 
-              {/* زر الاعتماد الكبير في أسفل بطاقة الكاشير */}
-              <button
-                type="button"
-                disabled={!canSubmit || submit.isPending}
-                onClick={() => submit.mutate()}
-                className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-amber-500 hover:bg-amber-600 py-3.5 px-4 text-sm font-black text-white shadow-md transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {submit.isPending ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                    جارٍ إصدار الفاتورة وتأكيد الاستلام…
-                  </>
-                ) : (
-                  <>
-                    <Check className="h-5 w-5" />
-                    تسجيل الاستلام وإصدار الفاتورة الرسمية
-                  </>
-                )}
-              </button>
+              {remainingDue > 0 && (
+                <div className="flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  {selectedCustomer ? (
+                    <span className="truncate">
+                      سيُسجل المتبقي ({fmtNum(remainingDue)} {currencySymbol}) كدين آجل على:{" "}
+                      <strong>{selectedCustomer.name}</strong>
+                    </span>
+                  ) : (
+                    <span>⚠️ يلزم اختيار عميل مسجل لتقييد المبلغ المتبقي كدين آجل.</span>
+                  )}
+                </div>
+              )}
+
+              {/* زر الفوتر الكبير أسفل بطاقة الإجماليات تماماً كما في نقطة البيع */}
+              <div className="pt-1">
+                <button
+                  type="button"
+                  disabled={!canSubmit || submit.isPending}
+                  onClick={() => submit.mutate()}
+                  className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-amber-500 hover:bg-amber-600 text-sm font-bold text-white shadow-md transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {submit.isPending ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                      <span>جارٍ إصدار الفاتورة وتأكيد الاستلام…</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="h-5 w-5" />
+                      <span>تسجيل الاستلام وإصدار الفاتورة الرسمية</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </MillingPanel>
         </div>
@@ -1139,6 +1155,20 @@ function MillingIntakePage() {
             setCustomerId(newCust.id);
             setQuickCustomerOpen(false);
             toast.success(`تمت إضافة واختيار العميل: ${newCust.name}`);
+          }}
+        />
+
+        {/* نافذة إضافة صنف حبوب جديد سريعاً دون مغادرة الكاونتر */}
+        <CustodyProductFormDialog
+          open={quickGrainDialogOpen}
+          onOpenChange={setQuickGrainDialogOpen}
+          defaultClass="RAW_MATERIAL"
+          onSaved={(productId) => {
+            // اختر الصنف الجديد تلقائياً في آخر سطر فارغ
+            const emptyIdx = lines.findIndex((l) => !l.itemId);
+            if (emptyIdx >= 0) {
+              setLineItem(emptyIdx, productId);
+            }
           }}
         />
       </div>

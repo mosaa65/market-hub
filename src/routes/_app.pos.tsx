@@ -39,6 +39,7 @@ import {
   Scale,
   ArrowRightLeft,
   DollarSign,
+  PackageX,
 } from "lucide-react";
 import { toast } from "sonner";
 import { BarcodeScanner } from "@/components/barcode-scanner";
@@ -48,8 +49,9 @@ import { useIsDesktop, useMediaQuery } from "@/hooks/use-media-query";
 import { usePersistedViewMode } from "@/hooks/use-persisted-view-mode";
 import { CartLine as CartLineRow } from "@/components/commerce/cart-line";
 import { MobileProductPicker } from "@/components/commerce/mobile-product-picker";
-import { RecordsSortPanel } from "@/components/ui/records-panels";
+import { RecordsFilterPanel, RecordsSortPanel } from "@/components/ui/records-panels";
 import { RecordsToolbar } from "@/components/ui/records-toolbar";
+import type { FilterDefinition, FilterValues } from "@/components/ui/table-toolbar";
 import type { DataTableSort } from "@/components/ui/data-table";
 import { CustomerFormDialog } from "@/components/contacts/customer-form-dialog";
 import { UniversalPrintPreview } from "@/components/universal-print-preview";
@@ -301,6 +303,12 @@ function POSPage() {
   const [batchModalOpen, setBatchModalOpen] = useState(false);
   const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
+  /*
+   * قائمة المنتجات تُجلب في مسار منفصل سريع وتُعرض لحظة وصولها — قبل اكتمال
+   * بقية بيانات السياق (التصنيفات، الماركات، الموديلات…) التي تُثرى لاحقاً.
+   * skeleton يظهر بدل الشاشة الفارغة أثناء الجلب.
+   */
+  const [catalogLoading, setCatalogLoading] = useState(true);
   const [stockMap, setStockMap] = useState<Record<string, number>>({});
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -373,6 +381,7 @@ function POSPage() {
   });
 
   const [postSaleRequest, setPostSaleRequest] = useState<PrintRequest | null>(null);
+  const lastSalePrintRequestRef = useRef<PrintRequest | null>(null);
 
   const [isSplitPayment, setIsSplitPayment] = useState(false);
   const [splitEditorOpen, setSplitEditorOpen] = useState(false);
@@ -535,6 +544,30 @@ function POSPage() {
 
   async function loadAll() {
     try {
+      /*
+       * مسار سريع للمنتجات: يُطلق قبل كل شيء ويُعرض فور وصوله، حتى لا ينتظر
+       * الكاشير اكتمال جلب التصنيفات والماركات والموديلات… (تظهر العناصر
+       * المساعدة لحظة اكتمالها عبر إعادة الإثراء أدناه).
+       */
+      void (supabase.from("products") as any)
+        .select(
+          "id,sku,barcode,name,name_ar,sale_price,tax_rate,image_url,category_id,brand_id,unit_id,origin_id,quality_grade_id,is_active,is_service,item_nature,inventory_policy",
+        )
+        .eq("is_active", true)
+        .eq("is_sellable", true)
+        .neq("item_class", "RAW_MATERIAL")
+        .neq("item_class", "PACKAGING")
+        .neq("item_class", "SERVICE")
+        .order("name")
+        .limit(1000)
+        .then(({ data }: { data: any[] | null }) => {
+          if (data?.length) {
+            setProducts(data as Product[]);
+            setCatalogLoading(false);
+          }
+          // إن جاء فارغاً يبقى skeleton حتى يعالج fallback في المسار الكامل.
+        });
+
       const [
         wsRes,
         csRes,
@@ -630,6 +663,7 @@ function POSPage() {
       }));
 
       setProducts(enrichedProducts);
+      setCatalogLoading(false);
       setCategories(cats ?? []);
       setBrands(brs ?? []);
       setUnits(uns ?? []);
@@ -705,6 +739,158 @@ function POSPage() {
     setSelectedMake("");
     setSelectedModel("");
   }
+
+  /*
+   * نموذج الفلترة الموحد (VortexFilterSheet) — نفس الشيت الجانبي المستخدم في
+   * كل شاشات السجلات بدل لوحة مضمّنة خاصة بهذه الشاشة.
+   */
+  const catalogFilterDefinitions: FilterDefinition[] = useMemo(
+    () => [
+      {
+        key: "category",
+        label: t("products.category"),
+        type: "select",
+        options: categories.map((c) => ({
+          value: c.id,
+          label: (lang === "ar" ? c.name_ar || c.name : c.name || c.name_ar) || c.name,
+        })),
+      },
+      ...(catalogConfig.enableBrands
+        ? [
+            {
+              key: "brand",
+              label: t("products.brand"),
+              type: "select" as const,
+              options: brands.map((b) => ({
+                value: b.id,
+                label: (lang === "ar" ? b.name_ar || b.name : b.name || b.name_ar) || b.name,
+              })),
+            },
+          ]
+        : []),
+      ...(catalogConfig.enableUnits
+        ? [
+            {
+              key: "unit",
+              label: t("products.unit"),
+              type: "select" as const,
+              options: units.map((u) => ({
+                value: u.id,
+                label: (lang === "ar" ? u.name_ar || u.name : u.name || u.name_ar) || u.name,
+              })),
+            },
+          ]
+        : []),
+      ...(catalogConfig.enableOrigins
+        ? [
+            {
+              key: "origin",
+              label: t("products.origin"),
+              type: "select" as const,
+              options: origins.map((o) => ({
+                value: o.id,
+                label: (lang === "ar" ? o.name_ar || o.name : o.name || o.name_ar) || o.name,
+              })),
+            },
+          ]
+        : []),
+      ...(catalogConfig.enableQualityGrades
+        ? [
+            {
+              key: "quality",
+              label: t("products.quality"),
+              type: "select" as const,
+              options: qualities.map((q) => ({
+                value: q.id,
+                label: (lang === "ar" ? q.name_ar || q.name : q.name || q.name_ar) || q.name,
+              })),
+            },
+          ]
+        : []),
+      ...(catalogConfig.enableMakesAndModels
+        ? [
+            {
+              key: "make",
+              label: t("products.vehicle_make"),
+              type: "select" as const,
+              options: makes.map((m) => ({
+                value: m.id,
+                label: (lang === "ar" ? m.name_ar || m.name : m.name || m.name_ar) || m.name,
+              })),
+            },
+            {
+              key: "model",
+              label: t("products.vehicle_model"),
+              type: "select" as const,
+              options: (selectedMake
+                ? models.filter((m) => m.make_id === selectedMake)
+                : models
+              ).map((m) => ({
+                value: m.id,
+                label: (lang === "ar" ? m.name_ar || m.name : m.name || m.name_ar) || m.name,
+              })),
+            },
+          ]
+        : []),
+    ],
+    [
+      categories,
+      brands,
+      units,
+      origins,
+      qualities,
+      makes,
+      models,
+      selectedMake,
+      catalogConfig,
+      lang,
+      t,
+    ],
+  );
+
+  const catalogFilterValues: FilterValues = useMemo(
+    () => ({
+      category: selectedCategory || undefined,
+      brand: selectedBrand || undefined,
+      unit: selectedUnit || undefined,
+      origin: selectedOrigin || undefined,
+      quality: selectedQuality || undefined,
+      make: selectedMake || undefined,
+      model: selectedModel || undefined,
+    }),
+    [
+      selectedCategory,
+      selectedBrand,
+      selectedUnit,
+      selectedOrigin,
+      selectedQuality,
+      selectedMake,
+      selectedModel,
+    ],
+  );
+
+  const applyCatalogFilters = (values: FilterValues) => {
+    const pick = (key: string) => {
+      const v = values[key];
+      return typeof v === "string" ? v : "";
+    };
+    setFilterOpen(false);
+    const nextMake = pick("make");
+    setSelectedCategory(pick("category"));
+    setSelectedBrand(pick("brand"));
+    setSelectedUnit(pick("unit"));
+    setSelectedOrigin(pick("origin"));
+    setSelectedQuality(pick("quality"));
+    setSelectedMake(nextMake);
+    // إعادة ضبط الموديل إذا لم يعد متوافقاً مع الماركة الجديدة.
+    const nextModel = pick("model");
+    if (nextModel) {
+      const target = models.find((m) => m.id === nextModel);
+      setSelectedModel(target && (!nextMake || target.make_id === nextMake) ? nextModel : "");
+    } else {
+      setSelectedModel("");
+    }
+  };
 
   // Filtered models based on selected make
   const availableModels = useMemo(() => {
@@ -1627,10 +1813,14 @@ function POSPage() {
         },
       };
 
+      lastSalePrintRequestRef.current = printRequest;
+
       if (printBehavior === "direct" || (printBehavior === "default" && !printSettings.preview)) {
         void printUnifiedDocument(printRequest);
       } else if (printBehavior !== "off") {
-        setPostSaleRequest(printRequest);
+        if (!customerId) {
+          setPostSaleRequest(printRequest);
+        }
       }
 
       setCart([]);
@@ -1726,7 +1916,8 @@ function POSPage() {
   return (
     <>
       {/* ─── Compact Executive POS Workspace Shell ─── */}
-      <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden bg-[radial-gradient(ellipse_at_top,_color-mix(in_oklab,var(--primary)_8%,transparent),transparent_48%)] p-0.5 sm:gap-2 sm:p-2.5 lg:grid-cols-[minmax(0,1fr)_minmax(390px,470px)] lg:grid-rows-[auto_minmax(0,1fr)]">
+      {/* الحشو والفجوات مصغّرة — لا تسرق مساحة من الهيدر والفوتر واللوحتين */}
+      <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden bg-[radial-gradient(ellipse_at_top,_color-mix(in_oklab,var(--primary)_8%,transparent),transparent_48%)] p-0 sm:gap-1 sm:p-1 lg:grid-cols-[minmax(0,1fr)_clamp(360px,26vw,440px)] lg:grid-rows-[auto_minmax(0,1fr)]">
         <div className="hidden min-w-0 items-center justify-end gap-2 px-1 py-0.5 sm:flex lg:col-span-2 lg:row-start-1 lg:shrink-0" />
         {/* ─── Top Executive Command Deck ─── */}
         <header className="flex min-w-0 shrink-0 items-center justify-between gap-1 self-start overflow-x-auto overscroll-x-contain rounded-xl border border-border/80 bg-surface/95 px-1.5 py-1.5 shadow-xs backdrop-blur-md sm:gap-2 sm:px-3 sm:py-2 lg:hidden">
@@ -1852,8 +2043,8 @@ function POSPage() {
         <div className="grid min-h-0 grid-cols-1 grid-rows-[minmax(0,1fr)] items-stretch gap-0 sm:gap-2 lg:contents">
           {/* ─── Products Panel (Desktop & Tablet) ─── */}
           {isDesktop && (
-            <div className="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-border/80 bg-surface/95 p-3 shadow-sm ring-1 ring-background/40 lg:col-start-1 lg:row-start-2">
-              <div className="mb-2.5 rounded-2xl border border-border/70 bg-surface/90 p-2.5 shadow-sm">
+            <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-border/80 bg-surface/95 p-1.5 shadow-sm ring-1 ring-background/40 sm:rounded-3xl sm:p-2 lg:col-start-1 lg:row-start-2">
+              <div className="mb-1.5 rounded-xl border border-border/70 bg-surface/90 p-1.5 shadow-sm sm:rounded-2xl sm:p-2">
                 <div className="flex flex-col gap-2 xl:flex-row xl:items-center">
                   <div className="min-w-0 flex-1">
                     <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
@@ -1950,7 +2141,9 @@ function POSPage() {
                         type="button"
                         onClick={() => setServiceOpen(true)}
                         className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full border border-violet-500/30 bg-violet-500/10 px-3 text-violet-700 transition hover:bg-violet-500/20 dark:text-violet-300"
-                        title={lang === "ar" ? "إضافة خدمة أو أجرة تركيب" : "Add custom labor/service"}
+                        title={
+                          lang === "ar" ? "إضافة خدمة أو أجرة تركيب" : "Add custom labor/service"
+                        }
                       >
                         <Wrench className="h-3.5 w-3.5" />
                         <span className="text-[11px] font-semibold">
@@ -1985,6 +2178,7 @@ function POSPage() {
                 viewMode={viewMode}
                 onViewModeChange={setViewMode}
                 viewModes={["cards", "list", "table"]}
+                viewModeCycle
                 sticky={false}
                 className="mb-2.5"
               />
@@ -2049,195 +2243,22 @@ function POSPage() {
                 </div>
               )}
 
-              {/* Expanded Filter Panel */}
-              {filterOpen && (
-                <div className="mb-3 rounded-2xl border border-border/80 bg-surface/95 p-3.5 shadow-md backdrop-blur-md transition-all">
-                  <div className="mb-3 flex items-center justify-between gap-2 border-b border-border/60 pb-2">
-                    <div className="flex items-center gap-2">
-                      <Filter className="h-4 w-4 text-primary" />
-                      <span className="text-xs font-bold text-foreground">
-                        {lang === "ar" ? "خيارات الفرز والتصفية المتقدمة" : "Advanced Filters"}
-                      </span>
-                      {activeFiltersCount > 0 && (
-                        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary font-mono">
-                          {activeFiltersCount} {lang === "ar" ? "نشط" : "active"}
-                        </span>
-                      )}
-                    </div>
-                    {activeFiltersCount > 0 && (
-                      <button
-                        type="button"
-                        onClick={resetFilters}
-                        className="inline-flex items-center gap-1 rounded-lg border border-border/80 bg-surface px-2 py-0.5 text-[11px] text-muted-foreground transition hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive active:scale-95"
-                      >
-                        <RotateCcw className="h-3 w-3" />
-                        <span>{t("common.reset_filters")}</span>
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-                    {/* Category */}
-                    <div>
-                      <label className="text-[10px] font-medium text-muted-foreground block mb-1">
-                        {t("products.category")}
-                      </label>
-                      <select
-                        aria-label={t("products.category")}
-                        value={selectedCategory}
-                        onChange={(e) => setSelectedCategory(e.target.value)}
-                        className="h-8 w-full rounded-lg border border-border/80 bg-surface px-2 text-xs text-foreground outline-none focus:border-primary"
-                      >
-                        <option value="">
-                          {lang === "ar" ? "كل التصنيفات" : "All categories"}
-                        </option>
-                        {categories.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {lang === "ar" ? c.name_ar || c.name : c.name || c.name_ar}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Brand */}
-                    {catalogConfig.enableBrands && (
-                      <div>
-                        <label className="text-[10px] font-medium text-muted-foreground block mb-1">
-                          {t("products.brand")}
-                        </label>
-                        <select
-                          aria-label={t("products.brand")}
-                          value={selectedBrand}
-                          onChange={(e) => setSelectedBrand(e.target.value)}
-                          className="h-8 w-full rounded-lg border border-border/80 bg-surface px-2 text-xs text-foreground outline-none focus:border-primary"
-                        >
-                          <option value="">{lang === "ar" ? "كل الماركات" : "All brands"}</option>
-                          {brands.map((b) => (
-                            <option key={b.id} value={b.id}>
-                              {lang === "ar" ? b.name_ar || b.name : b.name || b.name_ar}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-
-                    {/* Unit */}
-                    {catalogConfig.enableUnits && (
-                      <div>
-                        <label className="text-[10px] font-medium text-muted-foreground block mb-1">
-                          {t("products.unit")}
-                        </label>
-                        <select
-                          aria-label={t("products.unit")}
-                          value={selectedUnit}
-                          onChange={(e) => setSelectedUnit(e.target.value)}
-                          className="h-8 w-full rounded-lg border border-border/80 bg-surface px-2 text-xs text-foreground outline-none focus:border-primary"
-                        >
-                          <option value="">{lang === "ar" ? "كل الوحدات" : "All units"}</option>
-                          {units.map((u) => (
-                            <option key={u.id} value={u.id}>
-                              {lang === "ar" ? u.name_ar || u.name : u.name || u.name_ar}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-
-                    {/* Origin */}
-                    {catalogConfig.enableOrigins && (
-                      <div>
-                        <label className="text-[10px] font-medium text-muted-foreground block mb-1">
-                          {t("products.origin")}
-                        </label>
-                        <select
-                          aria-label={t("products.origin")}
-                          value={selectedOrigin}
-                          onChange={(e) => setSelectedOrigin(e.target.value)}
-                          className="h-8 w-full rounded-lg border border-border/80 bg-surface px-2 text-xs text-foreground outline-none focus:border-primary"
-                        >
-                          <option value="">{lang === "ar" ? "بلد المنشأ" : "All origins"}</option>
-                          {origins.map((o) => (
-                            <option key={o.id} value={o.id}>
-                              {lang === "ar" ? o.name_ar || o.name : o.name || o.name_ar}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-
-                    {/* Quality */}
-                    {catalogConfig.enableQualityGrades && (
-                      <div>
-                        <label className="text-[10px] font-medium text-muted-foreground block mb-1">
-                          {t("products.quality_grade")}
-                        </label>
-                        <select
-                          aria-label={t("products.quality_grade")}
-                          value={selectedQuality}
-                          onChange={(e) => setSelectedQuality(e.target.value)}
-                          className="h-8 w-full rounded-lg border border-border/80 bg-surface px-2 text-xs text-foreground outline-none focus:border-primary"
-                        >
-                          <option value="">{lang === "ar" ? "درجة الجودة" : "All grades"}</option>
-                          {qualities.map((q) => (
-                            <option key={q.id} value={q.id}>
-                              {lang === "ar" ? q.name_ar || q.name : q.name || q.name_ar}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-
-                    {/* Vehicle Make */}
-                    {catalogConfig.enableMakesAndModels && (
-                      <div>
-                        <label className="text-[10px] font-medium text-muted-foreground block mb-1">
-                          {t("products.vehicle_make")}
-                        </label>
-                        <select
-                          aria-label={t("products.vehicle_make")}
-                          value={selectedMake}
-                          onChange={(e) => handleMakeChange(e.target.value)}
-                          className="h-8 w-full rounded-lg border border-border/80 bg-surface px-2 text-xs text-foreground outline-none focus:border-primary"
-                        >
-                          <option value="">{lang === "ar" ? "كل الشركات" : "All makes"}</option>
-                          {makes.map((m) => (
-                            <option key={m.id} value={m.id}>
-                              {lang === "ar" ? m.name_ar || m.name : m.name || m.name_ar}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-
-                    {/* Vehicle Model */}
-                    {catalogConfig.enableMakesAndModels && (
-                      <div>
-                        <label className="text-[10px] font-medium text-muted-foreground block mb-1">
-                          {t("products.vehicle_model")}
-                        </label>
-                        <select
-                          aria-label={t("products.vehicle_model")}
-                          value={selectedModel}
-                          onChange={(e) => setSelectedModel(e.target.value)}
-                          disabled={!selectedMake && models.length > 20}
-                          className="h-8 w-full rounded-lg border border-border/80 bg-surface px-2 text-xs text-foreground outline-none focus:border-primary disabled:opacity-50"
-                        >
-                          <option value="">{lang === "ar" ? "كل الموديلات" : "All models"}</option>
-                          {availableModels.map((m) => (
-                            <option key={m.id} value={m.id}>
-                              {lang === "ar" ? m.name_ar || m.name : m.name || m.name_ar}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
+              {/* نموذج الفلترة الموحد (VortexFilterSheet) — نفس شيت السجلات في كل الشاشات */}
+              <RecordsFilterPanel
+                open={filterOpen}
+                onClose={() => setFilterOpen(false)}
+                definitions={catalogFilterDefinitions}
+                values={catalogFilterValues}
+                onSubmit={applyCatalogFilters}
+                title={lang === "ar" ? "فلترة الفهرس" : "Catalog filters"}
+              />
 
               {/* ─── Product Catalog Body: Three Distinct View Modes ─── */}
               <div className="min-h-0 flex-1 overflow-y-auto pr-1 pb-2">
-                {filtered.length === 0 ? (
+                {catalogLoading ? (
+                  /* ─── أنيقة skeleton تظهر لحظة فتح الشاشة بدل الفراغ ─── */
+                  <CatalogSkeleton viewMode={viewMode} />
+                ) : filtered.length === 0 ? (
                   <div className="grid place-items-center py-20 text-center text-sm text-muted-foreground">
                     <div className="grid h-14 w-14 place-items-center rounded-2xl border border-border bg-surface mb-3 shadow-xs">
                       <ScanBarcode className="h-7 w-7 opacity-60 text-primary" />
@@ -2290,8 +2311,20 @@ function POSPage() {
                           key={p.id}
                           onClick={() => addToCart(p)}
                           disabled={low}
-                          className="group relative flex flex-col items-start justify-between gap-2 rounded-2xl border border-border/80 bg-white p-2.5 text-start transition-all duration-150 hover:border-primary/50 hover:shadow-md active:scale-[0.98] disabled:opacity-40 dark:bg-card"
+                          aria-disabled={low}
+                          className={`group relative flex flex-col items-start justify-between gap-2 rounded-2xl border p-2.5 text-start transition-all duration-150 hover:shadow-md active:scale-[0.98] ${
+                            low
+                              ? "border-destructive/25 bg-gradient-to-b from-card to-destructive/[0.06] cursor-not-allowed"
+                              : "border-border/80 bg-white hover:border-primary/50 dark:bg-card"
+                          }`}
                         >
+                          {/* شريط نفاد المخزون أنيق أعلى البطاقة — بدل تعتيم كامل يخفي المحتوى */}
+                          {low && (
+                            <span className="absolute end-2 top-2 inline-flex items-center gap-1 rounded-full border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-[9px] font-bold text-destructive backdrop-blur-sm">
+                              <PackageX className="size-2.5" aria-hidden />
+                              {lang === "ar" ? "نفد" : "Out of stock"}
+                            </span>
+                          )}
                           <div className="w-full">
                             {/* Tags Strip */}
                             <div className="mb-1.5 flex flex-wrap items-center gap-1 text-[10px] leading-none">
@@ -2356,23 +2389,21 @@ function POSPage() {
 
                           {/* Price & Stock */}
                           <div className="mt-2 flex w-full items-center justify-between border-t border-border/40 pt-1.5">
-                            <span className="text-xs sm:text-sm font-black text-primary font-mono [unicode-bidi:isolate]">
+                            <span
+                              className={`text-xs sm:text-sm font-black font-mono [unicode-bidi:isolate] ${low ? "text-muted-foreground" : "text-primary"}`}
+                            >
                               {money(Number(p.sale_price))}
                             </span>
                             <span
                               className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-semibold ${
                                 low
-                                  ? "bg-destructive/15 text-destructive font-bold"
+                                  ? "hidden"
                                   : stock <= 5
                                     ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
                                     : "bg-muted text-muted-foreground"
                               }`}
                             >
-                              {low
-                                ? lang === "ar"
-                                  ? "نفد"
-                                  : "0"
-                                : `${stock} ${unitLabel ? `· ${unitLabel}` : ""}`}
+                              {`${stock} ${unitLabel ? `· ${unitLabel}` : ""}`}
                             </span>
                           </div>
                         </button>
@@ -2558,9 +2589,10 @@ function POSPage() {
                             <tr
                               key={p.id}
                               onClick={() => !low && addToCart(p)}
-                              className={`cursor-pointer transition hover:bg-primary/[0.04] ${
-                                low ? "opacity-40 cursor-not-allowed" : ""
+                              className={`transition hover:bg-primary/[0.04] ${
+                                low ? "cursor-not-allowed" : "cursor-pointer"
                               }`}
+                              aria-disabled={low}
                             >
                               <td className="py-2 px-3 font-mono text-[11px] text-muted-foreground">
                                 {p.barcode || p.sku || "—"}
@@ -2614,7 +2646,7 @@ function POSPage() {
           )}
 
           {/* ─── Cart Panel (Primary Workspace on All Devices) ─── */}
-          <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-primary/20 bg-surface/95 p-2 shadow-xl ring-1 ring-border/50 backdrop-blur-md sm:rounded-3xl sm:p-2.5 lg:col-start-2 lg:row-start-2">
+          <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-primary/20 bg-surface/95 p-1.5 shadow-xl ring-1 ring-border/50 backdrop-blur-md sm:p-2 lg:col-start-2 lg:row-start-2">
             {/* Cart Header */}
             <div className="mb-1 flex shrink-0 items-center justify-between border-b border-border/60 px-1 pb-1.5">
               <div className="flex items-center gap-2">
@@ -3162,6 +3194,17 @@ function POSPage() {
         customer={saleSuccess?.customer}
         invoice={saleSuccess?.invoice}
         eventType="invoice_created"
+        onPrint={() => {
+          if (lastSalePrintRequestRef.current) {
+            void printUnifiedDocument(lastSalePrintRequestRef.current);
+          }
+        }}
+        onViewDocument={() => {
+          if (lastSalePrintRequestRef.current) {
+            setSaleSuccess(null);
+            setPostSaleRequest(lastSalePrintRequestRef.current);
+          }
+        }}
       />
 
       {postSaleRequest ? (
@@ -3320,6 +3363,82 @@ function POSPage() {
         />
       ) : null}
     </>
+  );
+}
+
+/*
+ * هيكل عظمي أنيق لكتالوج المنتجات — يظهر لحظة فتح الشاشة بنفس تخطيط العرض
+ * المختار (بطاقات / قائمة / جدول) حتى لا تقفز الواجهة عند وصول البيانات.
+ */
+function CatalogSkeleton({ viewMode }: { viewMode: "cards" | "list" | "table" }) {
+  if (viewMode === "cards") {
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2.5">
+        {Array.from({ length: 12 }).map((_, i) => (
+          <div
+            key={i}
+            className="flex flex-col gap-2 rounded-2xl border border-border/60 bg-card/70 p-2.5"
+            aria-hidden
+          >
+            <div className="h-3 w-1/2 animate-pulse rounded-full bg-muted/80" />
+            <div className="h-3.5 w-full animate-pulse rounded-md bg-muted/80" />
+            <div className="h-3.5 w-3/4 animate-pulse rounded-md bg-muted/80" />
+            <div className="mt-1 flex items-center justify-between border-t border-border/40 pt-1.5">
+              <div className="h-3 w-16 animate-pulse rounded-full bg-muted/80" />
+              <div className="h-4 w-10 animate-pulse rounded-full bg-muted/80" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (viewMode === "list") {
+    return (
+      <div className="space-y-1.5" aria-hidden>
+        {Array.from({ length: 10 }).map((_, i) => (
+          <div
+            key={i}
+            className="flex items-center justify-between gap-2.5 rounded-xl border border-border/60 bg-card/70 p-2"
+          >
+            <div className="h-3 w-20 animate-pulse rounded-full bg-muted/80" />
+            <div className="min-w-0 flex-1 space-y-1">
+              <div className="h-3 w-2/3 animate-pulse rounded-md bg-muted/80" />
+              <div className="h-2.5 w-1/3 animate-pulse rounded-md bg-muted/60" />
+            </div>
+            <div className="h-3 w-10 animate-pulse rounded-full bg-muted/80" />
+            <div className="h-6 w-6 animate-pulse rounded-lg bg-muted/80" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-border/80 bg-card/70" aria-hidden>
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="border-b border-border/80 bg-muted/50">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <th key={i} className="py-2.5 px-3">
+                <div className="mx-auto h-3 w-16 animate-pulse rounded-full bg-muted/90" />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border/40">
+          {Array.from({ length: 12 }).map((_, i) => (
+            <tr key={i}>
+              {Array.from({ length: 5 }).map((_, j) => (
+                <td key={j} className="py-2.5 px-3">
+                  <div className="h-3 w-full max-w-24 animate-pulse rounded-full bg-muted/70" />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

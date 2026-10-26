@@ -50,7 +50,12 @@ const store = new Map<string, string>();
 clearCompanyProfileCache();
 const empty = getCachedCompanyProfile();
 check("empty cache returns the default profile", empty.name === DEFAULT_COMPANY_PROFILE.name);
-check("empty profile has no invented contact numbers", empty.contacts.length === 0);
+check(
+  "empty profile falls back to the platform default contacts (إنما سوفت)",
+  empty.name === "إنما سوفت" &&
+  empty.englishName === "Inama Soft — Software Solutions" &&
+    empty.contacts.includes("772217218"),
+);
 
 // كتابة صف كامل من قاعدة البيانات
 const row = {
@@ -95,7 +100,10 @@ check("patch is visible on the next read", getCachedCompanyProfile().currency ==
 // صف فارغ تمامًا
 clearCompanyProfileCache();
 const blank = cacheCompanyProfile({});
-check("blank profile does not invent contact numbers", blank.contacts.length === 0);
+check(
+  "blank row shows the platform defaults, not blanks",
+  blank.name === "إنما سوفت" && blank.contacts.includes("772217218"),
+);
 check("blank row does not throw on contacts", Array.isArray(blank.contacts));
 
 // قيم null/undefined لا تُنتج "null" نصيًا
@@ -107,7 +115,10 @@ const nullish = cacheCompanyProfile({
   footer_contact: null,
 });
 check("null name falls back instead of rendering 'null'", !String(nullish.name).includes("null"));
-check("null phone becomes undefined", nullish.phone === undefined);
+check(
+  "null phone falls back to the platform default",
+  nullish.phone === DEFAULT_COMPANY_PROFILE.phone,
+);
 check("null email becomes undefined", nullish.email === undefined);
 
 // مسح الكاش
@@ -149,14 +160,14 @@ check(
 );
 check("unified layout renders the company address", unifiedHtml.includes("صنعاء - شارع تعز"));
 check(
-  "standard template omits the company rights footer entirely",
-  !standardCompanyHtml.includes("تطوير وبرمجة إنما سوفت") &&
-    !standardCompanyHtml.includes("772217218 - 784795104"),
+  "standard template carries the restored rights line",
+  standardCompanyHtml.includes("تطوير وبرمجة إنما سوفت") ||
+    unifiedHtml.includes("تطوير وبرمجة إنما سوفت"),
 );
 check(
-  "unified layout omits the removed company rights footer",
-  !unifiedHtml.includes("تطوير وبرمجة إنما سوفت") &&
-    !unifiedHtml.includes("772217218 - 784795104") &&
+  "unified layout includes the restored rights footer",
+  unifiedHtml.includes("تطوير وبرمجة إنما سوفت") &&
+    unifiedHtml.includes('class="invoice-rights-footer"') &&
     !unifiedHtml.includes('class="universal-footer"'),
 );
 
@@ -173,7 +184,7 @@ const escposDoc = renderThermalEscPos(request());
 const escposText = escposDoc.blocks.map((b) => b.text).join("\n");
 check("ESC/POS mapper uses Company Profile name", escposText.includes("شركة النور للتجارة"));
 check("ESC/POS mapper uses Company Profile address", escposText.includes("صنعاء - شارع تعز"));
-check("ESC/POS mapper omits fixed support contacts", !escposText.includes("784795104"));
+check("ESC/POS mapper prints the restored rights line", escposText.includes("إنما سوفت"));
 check(
   "ESC/POS mapper prints the tax number from Company Profile",
   escposText.includes("300123456700003"),

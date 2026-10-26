@@ -6,6 +6,7 @@ import {
   CustomFieldOptions,
 } from "./types";
 import { generateBarcodeSvg, generateQrCodeSvg } from "@/lib/printing/barcode-qr";
+import { COMPANY_RIGHTS_TEXT } from "@/lib/printing/footer";
 import { getCachedCompanyProfile } from "@/lib/printing/company-profile";
 import { formatPrintedDateTime } from "@/lib/printing/date-time";
 import { UNIVERSAL_FOOTER_CSS } from "@/lib/printing/footer";
@@ -314,6 +315,9 @@ export function renderThermalQrTemplate(
     <div class="text-center" style="font-size: 9.5px; color: #64748b;">
       <div style="font-weight: 700; color: #0f172a;">${esc(L.thanks)}</div>
     </div>
+
+    <div class="divider"></div>
+    <div style="text-align:center;font-size:7px;color:#9ca3af;">${COMPANY_RIGHTS_TEXT}</div>
   </div>
 </body>
 </html>`;

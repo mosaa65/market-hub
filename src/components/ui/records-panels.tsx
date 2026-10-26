@@ -102,7 +102,9 @@ export function RecordsFilterPanel({
       applyLabel={t("records.apply")}
       resetLabel={t("records.filters.clear_all")}
     >
-      <div className="flex flex-col gap-2">
+      {/* بدون غلاف وسيط — الأقسام تصل مباشرة إلى شبكة الشيت فتُوزَّع
+          عمودين في الصف على الشاشات العريضة (الغلاف كان يخفيها عن العدّ). */}
+      <>
         {definitions.map((definition) => (
           <VortexFilterSection
             key={definition.key}
@@ -116,7 +118,7 @@ export function RecordsFilterPanel({
             />
           </VortexFilterSection>
         ))}
-      </div>
+      </>
     </VortexFilterSheet>
   );
 }
@@ -171,7 +173,8 @@ function DropdownOptionList({
         className="w-[var(--radix-popover-trigger-width)] min-w-48 rounded-2xl border border-border/60 bg-popover/95 p-1.5 shadow-xl backdrop-blur-2xl"
       >
         <div
-          className="flex max-h-64 flex-col gap-0.5 overflow-y-auto custom-scrollbar"
+          data-vaul-no-drag
+          className="flex max-h-72 flex-col gap-0.5 overflow-y-auto overscroll-contain custom-scrollbar"
           role="listbox"
           aria-label={label}
         >
@@ -375,29 +378,44 @@ export function RecordsSortPanel({
       applyLabel={t("records.apply")}
       resetLabel={t("records.filters.clear_all")}
     >
-      <div className="flex flex-col gap-0.5" role="listbox" aria-label={t("common.sort")}>
-        {sortOptions.map((option) => {
-          const selected = option.value === draft;
-          return (
-            <button
-              key={option.value}
-              type="button"
-              role="option"
-              aria-selected={selected}
-              onClick={() => setDraft(option.value)}
-              className={cn(
-                "flex items-center justify-between gap-3 rounded-xl border border-transparent px-3 py-2 text-start text-sm transition-colors",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-                selected
-                  ? "border-primary/25 bg-primary/10 font-medium text-primary"
-                  : "text-foreground hover:border-border/60 hover:bg-surface-2/60",
-              )}
-            >
-              <span className="truncate">{option.label}</span>
-              {selected ? <Check className="size-4 shrink-0" aria-hidden /> : null}
-            </button>
-          );
-        })}
+      {/* استغلال المساحة: خياران في الصف على الشاشات العريضة، وقائمة واحدة
+          قابلة للتمرير بحد أقصى على الجوال — التمرير محتوى (overscroll-contain)
+          ولا يجرّ الدرَج من الخلف (data-vaul-no-drag). */}
+      <div
+        data-vaul-no-drag
+        className="max-h-[60vh] overflow-y-auto overscroll-contain custom-scrollbar"
+        role="listbox"
+        aria-label={t("common.sort")}
+      >
+        <div
+          className={cn(
+            "grid grid-cols-1 gap-1 sm:grid-cols-2",
+            sortOptions.length > 1 && "sm:items-start",
+          )}
+        >
+          {sortOptions.map((option) => {
+            const selected = option.value === draft;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                role="option"
+                aria-selected={selected}
+                onClick={() => setDraft(option.value)}
+                className={cn(
+                  "flex items-center justify-between gap-3 rounded-xl border border-transparent px-3 py-2 text-start text-sm transition-colors",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                  selected
+                    ? "border-primary/25 bg-primary/10 font-medium text-primary"
+                    : "text-foreground hover:border-border/60 hover:bg-surface-2/60",
+                )}
+              >
+                <span className="truncate">{option.label}</span>
+                {selected ? <Check className="size-4 shrink-0" aria-hidden /> : null}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </VortexFilterSheet>
   );

@@ -85,7 +85,12 @@ import { RecordsViewToggle } from "@/components/ui/records-view-toggle";
 import { RecordsFilterPanel, RecordsSortPanel } from "@/components/ui/records-panels";
 import { quietChipClass } from "@/components/ui/action-button";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { ItemRoleBadge, resolveItemClass } from "@/components/item-role-badge";
+import {
+  ItemRoleBadge,
+  resolveItemClass,
+  ITEM_ROLE_STYLES,
+  type ItemClass,
+} from "@/components/item-role-badge";
 import { ProductFieldSettings } from "@/components/products/product-field-settings";
 import { useProductFieldVisibility } from "@/hooks/use-product-field-visibility";
 import { usePersistedViewMode } from "@/hooks/use-persisted-view-mode";
@@ -478,7 +483,7 @@ function ProductsPage() {
       const [c, b, u, origins, qualities] = await Promise.all([
         supabase.from("categories").select("id, name, name_ar").order("name"),
         supabase.from("brands").select("id, name, name_ar").order("name"),
-        supabase.from("units").select("id, name, name_ar, short_name").order("name"),
+        supabase.from("units").select("id, name, name_ar, short_name").order("name_ar"),
         (supabase as any)
           .from("countries_of_origin")
           .select("id, code, name, name_ar")
@@ -2497,6 +2502,7 @@ function ProductDialog({
   const [form, setForm] = useState({
     name: initial?.name ?? "",
     name_ar: initial?.name_ar ?? "",
+    item_class: initial?.item_class ?? "",
     sku: initial?.sku ?? "",
     barcode: initial?.barcode ?? initialBarcode ?? "",
     category_id: initial?.category_id ?? "",
@@ -2567,6 +2573,9 @@ function ProductDialog({
         sku: form.sku.trim() || null,
         barcode: form.barcode.trim() || null,
         category_id: form.category_id || null,
+        // دور الصنف (مادة خام / منتج نهائي / ناتج طحن / خدمة / مستهلكات) —
+        // القيمة الفارغة تترك للخادم قيمته الافتراضية.
+        item_class: form.item_class || null,
         brand_id: config.enableBrands ? form.brand_id || null : null,
         unit_id: config.enableUnits ? form.unit_id || null : null,
         cost_price: Number(form.cost_price) || 0,
@@ -2785,6 +2794,31 @@ function ProductDialog({
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {showForm("role") && (
+              <FormField label={lang === "ar" ? "دور الصنف" : "Item role"}>
+                {(p) => (
+                  <select
+                    id={p.id}
+                    aria-describedby={p["aria-describedby"]}
+                    value={form.item_class}
+                    onChange={(e) => setForm({ ...form, item_class: e.target.value })}
+                    className={cn(fieldSurfaceClass, "h-10 px-4 text-sm font-medium")}
+                  >
+                    <option value="">
+                      {lang === "ar" ? "تلقائي (حسب السياسة)" : "Automatic (by policy)"}
+                    </option>
+                    {(Object.keys(ITEM_ROLE_STYLES) as ItemClass[]).map((role) => (
+                      <option key={role} value={role}>
+                        {lang === "ar"
+                          ? ITEM_ROLE_STYLES[role].labelAr
+                          : ITEM_ROLE_STYLES[role].labelEn}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </FormField>
+            )}
+
             {showForm("category") && (
               <FormField label={t("products.category")}>
                 {(p) => (

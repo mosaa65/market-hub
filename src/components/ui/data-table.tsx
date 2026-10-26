@@ -368,13 +368,31 @@ export function DataTable<T>({
 
   // Hooks must run before any early return, so the width geometry lives above
   // the error branch (react-hooks/rules-of-hooks).
-  const columnWidths = React.useMemo(() => {
-    return visibleColumns.map((c) => parseColumnWidth(c.width) ?? 130);
+  /**
+   * Smart column widths: each column gets a minimum from its declared width
+   * (if any) or a sensible per-type default. `table-layout: auto` lets the
+   * browser grow columns to fit their content naturally. We only set
+   * `min-width` on `<col>` elements so narrow-data columns don't collapse to
+   * zero, but wide-data columns can grow freely.
+   *
+   * When the total minimum is less than the container, the browser distributes
+   * the surplus proportionally — no column wastes space and no column forces
+   * horizontal scrolling unnecessarily.
+   */
+  const columnMinWidths = React.useMemo(() => {
+    return visibleColumns.map((c) => {
+      const explicit = parseColumnWidth(c.width);
+      if (explicit) return explicit;
+      // Smart defaults based on alignment/type heuristics
+      if (c.align === "center") return 56;   // checkboxes, icons
+      if (c.align === "end") return 80;       // numbers, amounts
+      return 72;                               // text labels
+    });
   }, [visibleColumns]);
 
-  const totalExplicitWidth = React.useMemo(() => {
-    return columnWidths.reduce((sum, w) => sum + w, 0);
-  }, [columnWidths]);
+  const totalMinWidth = React.useMemo(() => {
+    return columnMinWidths.reduce((sum, w) => sum + w, 0);
+  }, [columnMinWidths]);
 
   /* ---- error ---- */
   if (error) {
@@ -387,31 +405,99 @@ export function DataTable<T>({
   }
 
   const effectiveTableWidth = isScrollable
-    ? Math.max(minWidth ?? 0, totalExplicitWidth)
+    ? Math.max(minWidth ?? 0, totalMinWidth)
     : undefined;
 
+  /**
+   * `table-layout: auto` — the browser sizes columns to content,
+   * respecting the min-widths we set via <col>. This is the key to
+   * "smart" column sizing: narrow data → narrow column, wide data →
+   * wider column, surplus space → distributed evenly.
+   */
   const tableStyle: React.CSSProperties = {
     width: "100%",
-    minWidth: effectiveTableWidth ? `${effectiveTableWidth}px` : "100%",
-    tableLayout: "fixed",
+    minWidth: effectiveTableWidth ? `${effectiveTableWidth}px` : undefined,
+    tableLayout: "auto",
   };
 
-  const alignedTableClassName = "w-full border-collapse text-sm table-fixed";
+  const alignedTableClassName = "w-full border-collapse text-sm";
 
   const colGroup = visibleColumns.length ? (
     <colgroup>
       {visibleColumns.map((c, i) => {
-        const w = columnWidths[i];
+        const mw = columnMinWidths[i];
+        const explicit = parseColumnWidth(c.width);
         return (
           <col
             key={c.key}
-            className={c.width}
-            style={w ? { width: `${w}px`, minWidth: `${w}px` } : undefined}
+            style={{
+              minWidth: `${mw}px`,
+              // If an explicit width was set, use it as a base width hint
+              ...(explicit ? { width: `${explicit}px` } : {}),
+            }}
           />
         );
       })}
     </colgroup>
   ) : null;
+
+  const bodyTheadRef = React.useRef<HTMLTableSectionElement | null>(null);
+  const [measuredHeaderWidths, setMeasuredHeaderWidths] = React.useState<number[] | null>(null);
+
+  React.useEffect(() => {
+    if (!detachedHeader) return;
+    const bodyThead = bodyTheadRef.current;
+    if (!bodyThead) return;
+
+    const measure = () => {
+      const ths = bodyThead.querySelectorAll<HTMLTableCellElement>("th");
+      if (!ths.length) return;
+      const widths = Array.from(ths).map((th) => th.getBoundingClientRect().width);
+      setMeasuredHeaderWidths((prev) => {
+        if (
+          prev &&
+          prev.length === widths.length &&
+          prev.every((w, idx) => Math.abs(w - widths[idx]) < 0.5)
+        ) {
+          return prev;
+        }
+        return widths;
+      });
+    };
+
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(bodyThead);
+    if (scrollRef.current) ro.observe(scrollRef.current);
+
+    return () => ro.disconnect();
+  }, [detachedHeader, visibleColumns, displayRows.length]);
+
+  const detachedColGroup = React.useMemo(() => {
+    if (!visibleColumns.length) return null;
+    return (
+      <colgroup>
+        {visibleColumns.map((c, i) => {
+          const w = measuredHeaderWidths?.[i];
+          const mw = columnMinWidths[i];
+          return (
+            <col
+              key={c.key}
+              style={{
+                width: w ? `${w}px` : undefined,
+                minWidth: w ? `${w}px` : `${mw}px`,
+              }}
+            />
+          );
+        })}
+      </colgroup>
+    );
+  }, [visibleColumns, measuredHeaderWidths, columnMinWidths]);
+
+  const detachedTableStyle: React.CSSProperties = {
+    ...tableStyle,
+    tableLayout: measuredHeaderWidths ? "fixed" : "auto",
+  };
 
   // مزامنة أفقية موحدة وفورية تمنع حلقة الصدى (echo loop) والتقطع،
   // وتسمح للمتصفح بالاحتفاظ بعزم الحركة الطبيعي (120Hz momentum) والمطاطية (rubber-band)
@@ -469,11 +555,10 @@ export function DataTable<T>({
                 onScroll={syncHorizontalScroll("header")}
                 className="w-full overflow-x-auto touch-auto [-webkit-overflow-scrolling:touch] overscroll-x-contain scrollbar-x-none"
               >
-                <table className={alignedTableClassName} style={tableStyle}>
-                  {colGroup}
+                <table className={alignedTableClassName} style={detachedTableStyle}>
+                  {detachedColGroup ?? colGroup}
                   <TableHead
                     columns={visibleColumns}
-                    columnWidths={columnWidths}
                     sort={sort}
                     onSortChange={onSortChange}
                     pinFirst={pinFirst}
@@ -495,23 +580,13 @@ export function DataTable<T>({
             )}
           >
             <table
-              /* `table-layout: auto` with `w-full` lets the browser grow the table
-               * past its container when a cell's content needs more room — on a
-               * 390px phone the four remaining columns summed to 384px inside a
-               * 344px container, pushing the table 17px off-screen and clipping
-               * the row-action buttons (measured: `childWiderThanParent: true`).
-               *
-               * `table-fixed` makes the declared width authoritative so cells wrap
-               * instead of expanding the table. It is applied from `sm` up only
-               * when a `minWidth` is requested (wide accounting tables that are
-               * *meant* to scroll); otherwise it applies at every width. */
               className={alignedTableClassName}
               style={tableStyle}
             >
               {colGroup}
               <TableHead
+                theadRef={bodyTheadRef}
                 columns={visibleColumns}
-                columnWidths={columnWidths}
                 sort={sort}
                 onSortChange={onSortChange}
                 pinFirst={pinFirst}
@@ -528,11 +603,9 @@ export function DataTable<T>({
                       >
                         {visibleColumns.map((col, colIdx) => {
                           const stickyCol = col.sticky ?? (pinFirst && col === visibleColumns[0]);
-                          const w = columnWidths[colIdx];
                           return (
                             <td
                               key={col.key}
-                              style={w ? { minWidth: `${w}px` } : undefined}
                               className={cn(
                                 "px-3 py-3 align-middle first:ps-4 last:pe-5",
                                 col.align === "end"
@@ -572,13 +645,11 @@ export function DataTable<T>({
                         onClick={onRowClick ? () => onRowClick(row) : undefined}
                         {...(rowProps ? rowProps(row) : {})}
                       >
-                        {visibleColumns.map((col, colIdx) => {
+                        {visibleColumns.map((col) => {
                           const stickyCol = col.sticky ?? (pinFirst && col === visibleColumns[0]);
-                          const w = columnWidths[colIdx];
                           return (
                             <td
                               key={col.key}
-                              style={w ? { minWidth: `${w}px` } : undefined}
                               className={cn(
                                 "px-3 py-2.5 align-middle first:ps-4 last:pe-5",
                                 !col.wrap ? "whitespace-nowrap" : "break-words",
@@ -659,20 +730,20 @@ export function DataTable<T>({
 
 function TableHead<T>({
   columns,
-  columnWidths,
   sort,
   onSortChange,
   pinFirst,
   sticky = false,
   visuallyHidden = false,
+  theadRef,
 }: {
   columns: DataTableColumn<T>[];
-  columnWidths?: number[];
   sort: DataTableSort | null;
   onSortChange?: (sort: DataTableSort | null) => void;
   pinFirst: boolean;
   sticky?: boolean;
   visuallyHidden?: boolean;
+  theadRef?: React.Ref<HTMLTableSectionElement>;
 }) {
   const toggleSort = (column: DataTableColumn<T>) => {
     if (!column.sortable || !onSortChange) return;
@@ -683,6 +754,7 @@ function TableHead<T>({
 
   return (
     <thead
+      ref={theadRef}
       aria-hidden={visuallyHidden ? "true" : undefined}
       className={cn(
         visuallyHidden
@@ -696,11 +768,9 @@ function TableHead<T>({
         {columns.map((column, index) => {
           const active = sort?.key === column.key;
           const stickyColumn = column.sticky ?? (pinFirst && index === 0);
-          const w = columnWidths?.[index];
           return (
             <th
               key={column.key}
-              style={w ? { width: `${w}px`, minWidth: `${w}px` } : undefined}
               scope="col"
               aria-sort={
                 active
@@ -712,17 +782,21 @@ function TableHead<T>({
                     : undefined
               }
               className={cn(
-                "h-10 px-3 align-middle text-[11px] font-semibold uppercase tracking-wider text-muted-foreground first:rounded-s-xl first:ps-4 last:rounded-e-xl last:pe-5",
+                "h-10 px-3 align-middle text-[11px] font-semibold uppercase tracking-wider first:rounded-s-xl first:ps-4 last:rounded-e-xl last:pe-5",
+                "transition-colors duration-200",
                 !column.wrap ? "whitespace-nowrap" : "break-words",
                 column.align === "end"
                   ? "text-end tabular-nums"
                   : column.align === "center"
                     ? "text-center"
                     : "text-start",
-                column.width,
                 column.className,
                 column.hideBelow && HIDE_BELOW[column.hideBelow],
                 stickyColumn && "sticky start-0 z-30 bg-surface-2",
+                // Active sort column header gets a subtle highlight
+                active
+                  ? "text-primary bg-primary/[0.06] dark:bg-primary/[0.08]"
+                  : "text-muted-foreground",
               )}
             >
               {column.sortable && onSortChange ? (
@@ -733,23 +807,36 @@ function TableHead<T>({
                     typeof column.header === "string" ? `Sort by ${column.header}` : "Sort"
                   }
                   className={cn(
-                    "inline-flex items-center gap-1 rounded-sm transition-colors hover:text-foreground",
+                    "group/sort-btn inline-flex items-center gap-1.5 rounded-lg px-1.5 py-0.5 -mx-1.5 transition-all duration-200",
+                    "hover:text-foreground hover:bg-accent/60",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                    "active:scale-[0.97]",
                     column.align === "end" && "justify-end w-full",
                     column.align === "center" && "justify-center w-full",
-                    active && "text-primary",
+                    active
+                      ? "text-primary font-bold"
+                      : "text-muted-foreground font-semibold",
                   )}
                 >
                   <span>{column.header}</span>
-                  {active ? (
-                    sort?.direction === "asc" ? (
-                      <ArrowUp className="size-3" aria-hidden />
+                  <span
+                    className={cn(
+                      "grid place-items-center rounded-md transition-all duration-200",
+                      active
+                        ? "size-4 bg-primary/15 text-primary"
+                        : "size-3.5 text-muted-foreground/40 group-hover/sort-btn:text-muted-foreground/70",
+                    )}
+                  >
+                    {active ? (
+                      sort?.direction === "asc" ? (
+                        <ArrowUp className="size-3" aria-hidden />
+                      ) : (
+                        <ArrowDown className="size-3" aria-hidden />
+                      )
                     ) : (
-                      <ArrowDown className="size-3" aria-hidden />
-                    )
-                  ) : (
-                    <ChevronsUpDown className="size-3 opacity-40" aria-hidden />
-                  )}
+                      <ChevronsUpDown className="size-3" aria-hidden />
+                    )}
+                  </span>
                 </button>
               ) : (
                 column.header

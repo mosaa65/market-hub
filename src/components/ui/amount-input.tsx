@@ -122,19 +122,18 @@ export const AmountInput = React.forwardRef<HTMLInputElement, AmountInputProps>(
       max,
       currency,
       currencySymbol,
-      clearable = true,
+      clearable = false,
       showInWords = true,
       wordsClassName,
       showStoredValue = true,
-      hideClear = false,
+      hideClear = true,
       containerClassName,
       className,
       ...props
     },
     ref,
   ) => {
-    const { currency: settingsCurrency, currencySymbol: settingsSymbol } = useCompanyCurrency();
-    const resolvedSymbol = currencySymbol ?? settingsSymbol;
+    const { currency: settingsCurrency } = useCompanyCurrency();
     const resolvedCurrency = currency ?? settingsCurrency;
 
     const [text, setText] = React.useState(() =>
@@ -164,15 +163,6 @@ export const AmountInput = React.forwardRef<HTMLInputElement, AmountInputProps>(
     const wordsText =
       showInWords && hasAmount(value) ? numberToArabicWords(value, resolvedCurrency) : "";
 
-    // المبلغ المخزّن يُعرض في المنتصف حين يكون الحقل غير محرَّر، ليقرأه المستخدم
-    // كاملًا في وسط الحقل ولا يغطيه زر × أو رمز العملة.
-    const otherChecking = props.readOnly || props.disabled;
-    const canShowStored =
-      showStoredValue && hasAmount(value) && text === "" && !otherChecking && !props.placeholder;
-    const shownText = canShowStored ? formatStored(value, decimals) : text;
-    const showClear = clearable && !hideClear && hasAmount(value);
-    const hasAdornment = Boolean(resolvedSymbol) || showClear;
-
     const clamp = React.useCallback(
       (n: number | null): number | null => {
         if (n == null) return null;
@@ -199,41 +189,24 @@ export const AmountInput = React.forwardRef<HTMLInputElement, AmountInputProps>(
           }}
           type="currency" // يعرض كنص DOM مع inputMode="decimal" — لا spinner ولا عجلة ماوس
           clearable={clearable && !hideClear}
-          suffix={
-            resolvedSymbol ? (
-              <span
-                aria-label={`العملة: ${resolvedSymbol}`}
-                className="pointer-events-none inline-flex h-6 min-w-9 items-center justify-center rounded-full border border-primary/15 bg-primary/[0.08] px-2 text-[10px] font-bold tracking-wide text-primary/80 shadow-sm"
-              >
-                {resolvedSymbol}
-              </span>
-            ) : undefined
-          }
+          suffix={props.suffix}
           dir="ltr"
           className={cn(
-            // في المنتصف + عزل اتجاه رقمي: لا يزاحم المبلغ رمز العملة ولا زر ×.
-            "text-center font-semibold tabular-nums [unicode-bidi:isolate]",
-            // طبقة العرض المستقلة ترسم النص عند عدم التحرير؛ أخفِ نص الإدخال تحتها.
-            canShowStored && "text-transparent caret-transparent",
+            "font-semibold tabular-nums text-foreground tracking-tight transition-all duration-150",
             className,
           )}
-          value={shownText}
+          value={text}
           onFocus={(e) => {
             editing.current = true;
-            // أول كتابة بعد عرض المبلغ المخزّن تفرغ الحقل، فلا يغطي زر × أي رقم.
-            if (canShowStored) {
-              setText("");
-              pendingCaret.current = 0;
+            try {
+              e.currentTarget.select();
+            } catch {
+              /* ignore */
             }
             props.onFocus?.(e);
           }}
           onBlur={(e) => {
             editing.current = false;
-            // لم يكتب شيئًا بعد عرض المبلغ المخزّن: أبقِ القيمة كما هي.
-            if (canShowStored) {
-              props.onBlur?.(e);
-              return;
-            }
             const parsed = parseNumber(text);
             const bounded = clamp(parsed);
             setText(bounded == null ? "" : formatStored(bounded, decimals));
@@ -267,30 +240,17 @@ export const AmountInput = React.forwardRef<HTMLInputElement, AmountInputProps>(
             if (!unchanged) onValueChange(parsed);
           }}
         />
-        {/*
-         * طبقة عرض مستقلة عن الإدخال: النص يبقى في منتصف الحقل تمامًا (بين رمز
-         * العملة وزر ×، لا تحتهما) أثناء عدم التحرير، والمسافات الجانبية تُحجز
-         * ديناميكيًا على مقاس الزخارف الفعلية فلا يتم قص المبلغ.
-         */}
-        {canShowStored ? (
-          <span
-            aria-hidden
-            dir="ltr"
-            className="pointer-events-none absolute inset-y-0 start-0 end-0 z-20 grid place-items-center text-center font-semibold tabular-nums text-foreground [unicode-bidi:isolate]"
-            style={{ paddingInlineStart: 12, paddingInlineEnd: hasAdornment ? 44 : 12 }}
-          >
-            {shownText}
-          </span>
-        ) : null}
         {wordsText ? (
           <p
             dir="rtl"
             className={cn(
-              "mt-1 text-[11px] leading-4 font-bold text-muted-foreground",
+              "mt-1.5 flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground/80 leading-normal px-0.5",
               wordsClassName,
             )}
           >
-            {wordsText}
+            <span className="h-1.5 w-1.5 rounded-full bg-primary/40 shrink-0" />
+            <span className="font-semibold text-primary/75">فقط:</span>
+            <span className="truncate">{wordsText}</span>
           </p>
         ) : null}
       </div>
