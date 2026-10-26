@@ -1,23 +1,22 @@
-import {
-  getRegisteredSettingsSections,
-  SettingsSectionId,
-  SettingsSectionMeta,
-} from "./settings-registry";
+import type { SettingsSectionId, SettingsSectionMeta } from "./settings-registry";
 
 interface SettingsSidebarProps {
-  activeSectionId: SettingsSectionId;
+  sections: SettingsSectionMeta[];
+  activeSectionId: SettingsSectionId | null;
   onSelectSection: (id: SettingsSectionId) => void;
   lang: string;
 }
 
 /**
- * Desktop-only settings navigation. Search lives in the settings layout
- * (reusing VortexSearchInput), and mobile uses the Hub ⇄ Detail pattern,
- * so this component renders a plain vertical category list.
+ * Reusable settings category navigation, filtered by the search field in the layout.
  */
-export function SettingsSidebar({ activeSectionId, onSelectSection, lang }: SettingsSidebarProps) {
+export function SettingsSidebar({
+  sections,
+  activeSectionId,
+  onSelectSection,
+  lang,
+}: SettingsSidebarProps) {
   const isAr = lang === "ar";
-  const sections = getRegisteredSettingsSections();
 
   return (
     <div className="space-y-1.5">
@@ -36,6 +35,7 @@ export function SettingsSidebar({ activeSectionId, onSelectSection, lang }: Sett
             key={sec.id}
             type="button"
             onClick={() => onSelectSection(sec.id)}
+            aria-current={isActive ? "page" : undefined}
             className={`w-full text-start p-3 rounded-2xl border transition-all duration-200 group flex items-start gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
               isActive
                 ? "border-primary/50 bg-primary/10 text-primary shadow-xs ring-1 ring-primary/20"
@@ -60,7 +60,7 @@ export function SettingsSidebar({ activeSectionId, onSelectSection, lang }: Sett
                   </span>
                 )}
               </div>
-              <p className="text-[11px] text-muted-foreground/80 line-clamp-1 mt-0.5 font-normal">
+              <p className="text-[11px] text-muted-foreground/80 line-clamp-2 mt-0.5 font-normal">
                 {desc}
               </p>
             </div>

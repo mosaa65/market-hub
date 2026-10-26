@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { WhatsAppIcon } from "@/components/whatsapp-icon";
 import { getCachedCompanyProfile } from "@/lib/printing/company-profile";
 import { numberToArabicWords } from "@/lib/templates/tafqeet";
-import { generateBarcodeSvg, generateQrCodeSvg } from "@/lib/printing/barcode-qr";
+import { generateBarcodeSvg } from "@/lib/printing/barcode-qr";
 import type { MillingDocumentDetails } from "@/lib/milling";
 import type { UnifiedDocumentData } from "@/lib/templates/types";
 import { toast } from "sonner";
@@ -189,8 +189,10 @@ export function documentDetailsToTicketData(
     remainingAmount,
     paymentMethodLabel,
     notes: (details as any).notes || undefined,
-    companyName: company.legalName || company.name || "مطحنة الحبوب الحديثة",
-    companyAddress: company.address || "المركز الرئيسي",
+    // اسم المنشأة من إعدادات المنشأة (company_settings) حصراً — بلا أسماء
+    // عشوائية من الكود. الحقول الفارغة تُعرض فارغة كما هي.
+    companyName: company.arabicName || company.legalName || company.name || "",
+    companyAddress: company.address || "",
     companyPhone: company.phone || company.contacts[0] || undefined,
   };
 }
@@ -254,13 +256,16 @@ export function unifiedDocToTicketData(doc: UnifiedDocumentData): UnifiedTicketP
     remainingAmount,
     paymentMethodLabel: doc.payment || "نقداً",
     notes: doc.notes,
+    // اسم المنشأة من إعدادات المنشأة حصراً (doc.company ← القالب، أو الكاش المحلي)
     companyName:
+      doc.company?.arabicName ||
       doc.company?.legalName ||
       doc.company?.name ||
+      company.arabicName ||
       company.legalName ||
       company.name ||
-      "مطحنة الحبوب الحديثة",
-    companyAddress: doc.company?.address || company.address || "المركز الرئيسي",
+      "",
+    companyAddress: doc.company?.address || company.address || "",
     companyPhone: doc.company?.phone || company.phone || company.contacts[0] || undefined,
   };
 }
@@ -286,8 +291,8 @@ export function UnifiedPrintModal({
       return {
         ...initialData,
         companyName:
-          initialData.companyName || company.legalName || company.name || "مطحنة الحبوب الحديثة",
-        companyAddress: initialData.companyAddress || company.address || "المركز الرئيسي",
+          initialData.companyName || company.arabicName || company.legalName || company.name || "",
+        companyAddress: initialData.companyAddress || company.address || "",
         companyPhone: initialData.companyPhone || company.phone || company.contacts[0] || undefined,
       };
     }
@@ -321,7 +326,7 @@ export function UnifiedPrintModal({
 
     const bagSizePart = data.bagSizeKg ? ` × ${data.bagSizeKg} كجم` : "";
 
-    let msg = `*${data.companyName || "مطحنة الحبوب الحديثة"}*\n`;
+    let msg = `*${data.companyName || ""}*\n`;
     msg += `━━━━━━━━━━━━━━━\n`;
     if (isDelivery) {
       msg += `📄 *سند تسليم نواتج أمانات*\n`;
@@ -372,15 +377,6 @@ export function UnifiedPrintModal({
       ? "سند طحن أمانة"
       : "سند استلام أمانة وفاتورة أجور";
 
-  const qrPayload = [
-    `مطحنة: ${data.companyName || "المطحنة الحديثة"}`,
-    `رقم: ${data.ticketNumber}`,
-    `العميل: ${data.customerName}`,
-    `التاريخ: ${new Date(data.createdAt).toLocaleDateString("ar-EG")}`,
-    `الإجمالي: ${data.grandTotal} ر.ي`,
-  ].join("\n");
-
-  const qrSvg = generateQrCodeSvg(qrPayload, 84);
   const barcodeSvg = generateBarcodeSvg(data.ticketNumber, 32);
 
   return (
@@ -536,11 +532,11 @@ export function UnifiedPrintModal({
               {/* ترويسة المنشأة والشعار */}
               <div className="text-center space-y-1 border-b border-dashed border-slate-300 pb-3">
                 <div className="text-base sm:text-lg font-black tracking-tight text-slate-950">
-                  {data.companyName || "مطحنة الحبوب الحديثة"}
+                  {data.companyName}
                 </div>
-                <div className="text-[11px] text-slate-600">
-                  {data.companyAddress || "المركز الرئيسي"}
-                </div>
+                {data.companyAddress && (
+                  <div className="text-[11px] text-slate-600">{data.companyAddress}</div>
+                )}
                 {data.companyPhone && (
                   <div className="text-[11px] font-mono text-slate-700 font-semibold">
                     هاتف: {data.companyPhone}
@@ -776,14 +772,10 @@ export function UnifiedPrintModal({
                 </div>
               )}
 
-              {/* الباركود و QR Code المعاينة */}
-              <div className="flex items-center justify-between gap-2 pt-1 border-b border-dashed border-slate-300 pb-3">
+              {/* الباركود الطويل فقط (حذف QR بقرار المالك) */}
+              <div className="flex items-center justify-center gap-2 pt-1 border-b border-dashed border-slate-300 pb-3">
                 <div
-                  className="shrink-0 flex items-center justify-center p-1 bg-white border border-slate-200 rounded-xl"
-                  dangerouslySetInnerHTML={{ __html: qrSvg }}
-                />
-                <div
-                  className="flex-1 flex flex-col items-center justify-center overflow-hidden"
+                  className="w-full flex flex-col items-center justify-center overflow-hidden"
                   dangerouslySetInnerHTML={{ __html: barcodeSvg }}
                 />
               </div>
@@ -812,7 +804,7 @@ export function UnifiedPrintModal({
               <div className="flex justify-between items-start border-b-2 border-slate-900 pb-6">
                 <div>
                   <h2 className="text-2xl font-black text-slate-950 tracking-tight">
-                    {data.companyName || "مطحنة الحبوب الحديثة"}
+                    {data.companyName}
                   </h2>
                   <p className="text-xs text-slate-600 mt-1 font-medium">
                     {data.companyAddress || "—"}
@@ -1126,15 +1118,6 @@ function renderThermalHtml(d: UnifiedTicketPrintData, width: ThermalWidth = "80m
       ? "سند طحن أمانة"
       : "سند استلام أمانة وفاتورة أجور";
 
-  const qrPayload = [
-    `مطحنة: ${d.companyName || "المطحنة الحديثة"}`,
-    `رقم: ${d.ticketNumber}`,
-    `العميل: ${d.customerName}`,
-    `التاريخ: ${new Date(d.createdAt).toLocaleDateString("ar-EG")}`,
-    `الإجمالي: ${d.grandTotal} ر.ي`,
-  ].join("\n");
-
-  const qrSvg = generateQrCodeSvg(qrPayload, width === "58mm" ? 72 : 84);
   const barcodeSvg = generateBarcodeSvg(d.ticketNumber, width === "58mm" ? 28 : 34);
 
   const paperWidth = width === "58mm" ? "58mm" : "80mm";
@@ -1186,8 +1169,8 @@ function renderThermalHtml(d: UnifiedTicketPrintData, width: ThermalWidth = "80m
 </head>
 <body>
   <div class="center">
-    <div style="font-size: 16px; font-weight: 900;">${d.companyName || "مطحنة الحبوب الحديثة"}</div>
-    <div style="font-size: 11px; color: #444;">${d.companyAddress || "المركز الرئيسي"}</div>
+    <div style="font-size: 16px; font-weight: 900;">${d.companyName}</div>
+    ${d.companyAddress ? `<div style="font-size: 11px; color: #444;">${d.companyAddress}</div>` : ""}
     ${d.companyPhone ? `<div style="font-size: 11px; font-weight: bold;">هاتف: ${d.companyPhone}</div>` : ""}
     <div class="badge">${badgeTitle}</div>
   </div>
@@ -1287,10 +1270,7 @@ function renderThermalHtml(d: UnifiedTicketPrintData, width: ThermalWidth = "80m
   }
 
   <div class="dashed"></div>
-  <div class="flex" style="justify-content: space-around; margin: 8px 0;">
-    <div>${qrSvg}</div>
-    <div style="text-align: center;">${barcodeSvg}</div>
-  </div>
+  <div style="text-align: center; margin: 8px 0;">${barcodeSvg}</div>
 
   <div class="dashed"></div>
   <div class="center" style="font-size: 10px; margin-top: 6px; color: #444;">
@@ -1331,7 +1311,7 @@ function renderA4Html(d: UnifiedTicketPrintData): string {
 <body>
   <div class="header">
     <div>
-      <h1 style="margin: 0; font-size: 22px;">${d.companyName || "مطحنة الحبوب الحديثة"}</h1>
+      <h1 style="margin: 0; font-size: 22px;">${d.companyName}</h1>
       <p style="margin: 4px 0 0 0; color: #64748b;">${d.companyAddress || ""}</p>
       ${d.companyPhone ? `<p style="margin: 2px 0 0 0; color: #64748b;">هاتف: ${d.companyPhone}</p>` : ""}
     </div>

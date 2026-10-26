@@ -112,9 +112,14 @@ export function SplitPaymentEditor({
                 ))}
               </select>
               <AmountInput
-                label={isAr ? "المبلغ" : "Amount"}
-                value={row.amount}
-                onValueChange={(amount) => update(row.key, { amount, autoAmount: false })}
+                aria-label={isAr ? "المبلغ" : "Amount"}
+                value={row.amount === "" ? null : Number(row.amount)}
+                onValueChange={(amount) =>
+                  update(row.key, {
+                    amount: amount == null ? "" : String(amount),
+                    autoAmount: false,
+                  })
+                }
                 invalid={overpaid}
                 placeholder="0.00"
                 className="h-10 rounded-lg"

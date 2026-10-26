@@ -1,12 +1,9 @@
-import React, {
-  useState,
-  useRef,
-  useMemo,
-  useEffect,
-  type Dispatch,
-  type SetStateAction,
-} from "react";
-import { ChevronDown, Check } from "lucide-react";
+import { useState, useMemo, type Dispatch, type SetStateAction } from "react";
+import { ChevronDown, Check, RotateCcw, Save } from "lucide-react";
+import { ActionButton } from "@/components/ui/action-button";
+import { AutoSaveBadge } from "@/components/settings/auto-save-badge";
+import { setCompanySettingsCache } from "@/lib/format";
+import { cacheCompanyProfile } from "@/lib/printing";
 import {
   Command,
   CommandInput,
@@ -27,8 +24,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { getCurrencyOptions, getCurrencySymbol, type CurrencyOption } from "@/lib/currencies";
 import { FlagIcon, currencyToCountryCode } from "@/components/ui/flag-icon";
 import { toast } from "sonner";
-import type { InvoiceTemplate } from "@/lib/invoice-print";
-import { getPrintSettings, savePrintSettings } from "@/lib/templates";
 import { useCatalogModules } from "@/lib/catalog-modules";
 import { DocumentNumberingCard } from "./document-numbering-card";
 
@@ -51,29 +46,95 @@ export function InvoicingSection({
 }: InvoicingSectionProps) {
   const isAr = lang === "ar";
   const [activePanel, setActivePanel] = useState<"currency" | "numbering" | "services">("currency");
-  // Post-sale printing preferences come from the same unified store used by POS
-  const [printMode, setPrintModeState] = useState<"auto" | "ask" | "off">("ask");
-  const [defaultPrintTemplate, setDefaultPrintTemplateState] = useState<InvoiceTemplate>("thermal");
-  const [logoUploading, setLogoUploading] = useState(false);
-  const logoInputRef = useRef<HTMLInputElement>(null);
+  const [isSavingCurrency, setIsSavingCurrency] = useState(false);
+  // مفتاح أجرة التركيب يُحفظ تلقائياً (localStorage + قاعدة البيانات) — الشارة تؤكد ذلك.
+  const [feeSavePulse, setFeeSavePulse] = useState(0);
   const { config: catalogConfig, updateConfig: updateCatalogConfig } = useCatalogModules();
   const currencyOptions = useMemo(() => getCurrencyOptions(lang), [lang]);
   const currencyPreviewSymbol =
     form.currency_symbol?.trim() ||
     getCurrencySymbol(form.currency || "YER", isAr ? "ar-YE" : "en");
 
-  useEffect(() => {
-    const s = getPrintSettings();
-    setPrintModeState(s.printMode);
-    setDefaultPrintTemplateState(s.defaultCustomerTemplate as InvoiceTemplate);
-  }, []);
+  const [savedCurrencySnapshot, setSavedCurrencySnapshot] = useState(() => ({
+    currency: form.currency ?? "YER",
+    currency_symbol: form.currency_symbol ?? "ر.ي",
+    tax_rate: form.tax_rate ?? 0,
+  }));
 
-  const setPrintMode = (v: "auto" | "ask" | "off") => {
-    setPrintModeState(v);
+  const isCurrencyDirty = useMemo(() => {
+    return (
+      (form.currency ?? "YER") !== savedCurrencySnapshot.currency ||
+      (form.currency_symbol ?? "ر.ي") !== savedCurrencySnapshot.currency_symbol ||
+      String(form.tax_rate ?? 0) !== String(savedCurrencySnapshot.tax_rate)
+    );
+  }, [form.currency, form.currency_symbol, form.tax_rate, savedCurrencySnapshot]);
+
+  const handleResetCurrency = () => {
+    setForm((current: any) => ({
+      ...current,
+      currency: savedCurrencySnapshot.currency,
+      currency_symbol: savedCurrencySnapshot.currency_symbol,
+      tax_rate: savedCurrencySnapshot.tax_rate,
+    }));
   };
 
-  const setDefaultPrintTemplate = (v: InvoiceTemplate) => {
-    setDefaultPrintTemplateState(v);
+  const handleSaveCurrency = async () => {
+    if (!canEdit || !isCurrencyDirty || isSavingCurrency) return;
+
+    const rate = Number(form.tax_rate ?? 0);
+    if (!Number.isFinite(rate) || rate < 0 || rate > 100) {
+      toast.error(
+        isAr
+          ? "يرجى إدخال نسبة ضريبة صحيحة بين 0 و100%."
+          : "Please enter a tax rate between 0 and 100%.",
+      );
+      return;
+    }
+
+    setIsSavingCurrency(true);
+    const payload = {
+      ...form,
+      id: form.id ?? 1,
+      tax_rate: rate,
+    };
+
+    try {
+      const result = form.id
+        ? await supabase
+            .from("company_settings")
+            .update(payload)
+            .eq("id", payload.id)
+            .select()
+            .single()
+        : await supabase.from("company_settings").insert(payload).select().single();
+
+      if (result.error) throw result.error;
+
+      const persisted = (result.data ?? payload) as Record<string, unknown>;
+      setCompanySettingsCache({ currency: String(persisted.currency ?? "YER") });
+      cacheCompanyProfile(persisted);
+      setForm(persisted);
+      setSavedCurrencySnapshot({
+        currency: String(persisted.currency ?? "YER"),
+        currency_symbol: String(persisted.currency_symbol ?? "ر.ي"),
+        tax_rate: Number(persisted.tax_rate ?? 0),
+      });
+      toast.success(
+        isAr
+          ? "تم حفظ إعدادات العملة والضريبة بنجاح"
+          : "Currency & tax settings saved successfully",
+      );
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : isAr
+            ? "تعذر حفظ إعدادات العملة والضريبة."
+            : "Could not save currency & tax settings.",
+      );
+    } finally {
+      setIsSavingCurrency(false);
+    }
   };
 
   const panels = [
@@ -98,54 +159,6 @@ export function InvoicingSection({
         : "Enable quick services and barcode scanning",
     },
   ];
-
-  async function uploadCompanyLogo(file: File) {
-    const allowedTypes = ["image/png", "image/jpeg", "image/webp"];
-    if (!allowedTypes.includes(file.type)) {
-      toast.error(
-        isAr ? "اختر صورة بصيغة PNG أو JPG أو WebP." : "Choose a PNG, JPG, or WebP image.",
-      );
-      return;
-    }
-    if (file.size > 3 * 1024 * 1024) {
-      toast.error(
-        isAr ? "حجم الشعار يجب ألا يتجاوز 3 ميجابايت." : "The logo must be 3 MB or smaller.",
-      );
-      return;
-    }
-
-    setLogoUploading(true);
-    const extension =
-      file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
-    const path = `company/logo-${Date.now()}.${extension}`;
-
-    try {
-      const { error } = await supabase.storage.from("company-logos").upload(path, file, {
-        contentType: file.type,
-        cacheControl: "31536000",
-        upsert: false,
-      });
-      if (error) throw error;
-
-      const { data } = supabase.storage.from("company-logos").getPublicUrl(path);
-      setForm((current: any) => ({ ...current, logo_url: data.publicUrl }));
-      toast.success(
-        isAr
-          ? "تم رفع الشعار. اضغط «حفظ» لتطبيقه على الفواتير."
-          : "Logo uploaded. Save the settings to apply it to invoices.",
-      );
-    } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : isAr
-            ? "تعذر رفع الشعار."
-            : "Could not upload the logo.",
-      );
-    } finally {
-      setLogoUploading(false);
-    }
-  }
 
   return (
     <Card className="rounded-3xl border-border/80 shadow-xs">
@@ -258,6 +271,78 @@ export function InvoicingSection({
                   ? "العملة الافتراضية للمنشآت الجديدة هي الريال اليمني. تغييرها لا يحوّل المبالغ المسجلة سابقاً."
                   : "New companies default to Yemeni Rial. Changing currency does not convert existing amounts."}
               </p>
+
+              {canEdit && (
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-4">
+                  <span className="text-xs text-muted-foreground">
+                    {isCurrencyDirty
+                      ? isAr
+                        ? "لديك تعديلات غير محفوظة في العملة والضريبة"
+                        : "You have unsaved changes in currency & tax"
+                      : isAr
+                        ? "جميع إعدادات العملة والضريبة محفوظة"
+                        : "Currency and tax settings are saved"}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <ActionButton
+                      type="button"
+                      size="sm"
+                      tone="ghost"
+                      icon={<RotateCcw />}
+                      disabled={!isCurrencyDirty || isSavingCurrency}
+                      onClick={handleResetCurrency}
+                    >
+                      {isAr ? "تراجع" : "Discard"}
+                    </ActionButton>
+                    <ActionButton
+                      type="button"
+                      size="sm"
+                      icon={<Save />}
+                      loading={isSavingCurrency}
+                      disabled={!isCurrencyDirty || isSavingCurrency}
+                      onClick={handleSaveCurrency}
+                    >
+                      {isAr ? "حفظ العملة والضريبة" : "Save Currency"}
+                    </ActionButton>
+                  </div>
+                </div>
+              )}
+
+              {canEdit && (
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-4">
+                  <span className="text-xs text-muted-foreground">
+                    {isCurrencyDirty
+                      ? isAr
+                        ? "لديك تعديلات غير محفوظة في العملة والضريبة"
+                        : "You have unsaved changes in currency & tax"
+                      : isAr
+                        ? "جميع إعدادات العملة والضريبة محفوظة"
+                        : "Currency and tax settings are saved"}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <ActionButton
+                      type="button"
+                      size="sm"
+                      tone="ghost"
+                      icon={<RotateCcw />}
+                      disabled={!isCurrencyDirty || isSavingCurrency}
+                      onClick={handleResetCurrency}
+                    >
+                      {isAr ? "تراجع" : "Discard"}
+                    </ActionButton>
+                    <ActionButton
+                      type="button"
+                      size="sm"
+                      icon={<Save />}
+                      loading={isSavingCurrency}
+                      disabled={!isCurrencyDirty || isSavingCurrency}
+                      onClick={handleSaveCurrency}
+                    >
+                      {isAr ? "حفظ العملة والضريبة" : "Save Currency"}
+                    </ActionButton>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -282,6 +367,7 @@ export function InvoicingSection({
                   <div className="text-sm font-semibold flex items-center gap-2">
                     <Wrench className="h-4 w-4 text-amber-500" />
                     {isAr ? "خدمة أو أجرة تركيب بسعر مخصص" : "Custom Labor / Installation Fee"}
+                    <AutoSaveBadge lang={isAr ? "ar" : "en"} trigger={feeSavePulse} />
                   </div>
                   <div className="text-xs text-muted-foreground leading-relaxed">
                     {isAr
@@ -291,7 +377,10 @@ export function InvoicingSection({
                 </div>
                 <Switch
                   checked={enablePosServiceFee}
-                  onCheckedChange={setEnablePosServiceFee}
+                  onCheckedChange={(v) => {
+                    setEnablePosServiceFee(v);
+                    setFeeSavePulse((n) => n + 1);
+                  }}
                   disabled={!canEdit}
                 />
               </div>

@@ -146,7 +146,7 @@ export const FieldInput = React.forwardRef<HTMLInputElement, FieldInputProps>(
     const isNumeric = NUMERIC_TYPES.has(type);
     const isIdentifier = IDENTIFIER_TYPES.has(type);
     const hasValue = value != null && String(value).length > 0;
-    const showClear = clearable && !readOnly && hasValue;
+    const showClear = clearable && !readOnly && hasValue && !isNumeric;
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (!isNumeric && !isIdentifier) {

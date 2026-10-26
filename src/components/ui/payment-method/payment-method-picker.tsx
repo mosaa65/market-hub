@@ -10,13 +10,13 @@ import {
   type DynamicPaymentSelectorProps,
 } from "./dynamic-payment-selector";
 import { PaymentMethodIcon } from "./payment-method-icon";
-import {
-  isSplitPaymentValue,
-  paymentMethodLabel,
-} from "@/lib/payments/payment-methods";
+import { isSplitPaymentValue, paymentMethodLabel } from "@/lib/payments/payment-methods";
 import { usePaymentMethods } from "@/hooks/use-payment-methods";
 
-export interface PaymentMethodPickerProps extends Partial<DynamicPaymentSelectorProps> {
+export interface PaymentMethodPickerProps extends Omit<
+  Partial<DynamicPaymentSelectorProps>,
+  "value" | "onChange"
+> {
   value: string | null;
   onChange: (methodId: string) => void;
   ensureIds?: (string | null | undefined)[];

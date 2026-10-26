@@ -417,9 +417,9 @@ function MillingMillPage() {
                   <button
                     type="button"
                     onClick={addGrainLine}
-                    className="inline-flex items-center gap-1 rounded-xl border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-bold text-amber-700 dark:text-amber-300 hover:bg-amber-500/20"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-bold text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 transition-colors"
                   >
-                    <Plus className="h-3.5 w-3.5" /> نوع حبوب آخر
+                    <Plus className="h-3.5 w-3.5" /> إضافة صنف حبوب آخر
                   </button>
                 </div>
                 {grains.map((line, idx) => {
@@ -482,7 +482,7 @@ function MillingMillPage() {
                             decimals={0}
                             min={0}
                             emptyAsZero
-                            placeholder="0 كيس"
+                            placeholder="0"
                             aria-label="الأكياس المطحونة"
                             value={line.bags || null}
                             onValueChange={(v) => changeGrainBags(idx, v ?? 0)}
@@ -497,8 +497,7 @@ function MillingMillPage() {
                             decimals={2}
                             min={0}
                             emptyAsZero
-                            unit="kg"
-                            placeholder="0.00 كجم"
+                            placeholder="0.00"
                             aria-label="الوزن المطحون (كجم)"
                             value={line.kg || null}
                             onValueChange={(v) => changeGrainKg(idx, v ?? 0)}
@@ -575,51 +574,41 @@ function MillingMillPage() {
                 </div>
               </div>
 
-              {/* E6/M5: نوع الحبة المرجعي — يعبّئ الفاقد ونسب النواتج الافتراضية */}
-              <MillingField
-                label="نوع الحبة المرجعي (اختياري)"
-                hint={
-                  selectedGrainType
-                    ? `فاقد افتراضي: ${selectedGrainType.default_loss_rate_pct}% — قابل للتعديل يدوياً`
-                    : "الأنواع المرجعية معرّفة في جدول grain_types — تعبّئ الفاقد والنواتج الافتراضية"
-                }
-              >
-                <MillingSelect
-                  value={grainTypeId}
-                  onChange={(e) => changeGrainType(e.target.value)}
-                  className="font-bold text-xs"
-                >
-                  <option value="">— بلا نوع مرجعي (إدخال يدوي كامل) —</option>
-                  {(grainTypes.data ?? []).map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name_ar} (فاقد افتراضي {t.default_loss_rate_pct}%)
-                    </option>
-                  ))}
-                </MillingSelect>
-              </MillingField>
-
               {/* النواتج المستخرجة */}
               <div className="space-y-3 rounded-2xl border border-border/80 bg-surface-2/30 p-3.5">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="text-xs font-bold text-foreground">النواتج المستخرجة المعبأة</h4>
-                    <p className="text-[11px] text-muted-foreground">
-                      حدد الصنف، عدد الأكياس والوزن المستخرج (دقيق 50، 25، 10 كجم، نخالة، سميد…)
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setOutputs((o) => [...o, { itemId: "", bags: 0, kg: 0 }])}
-                    className="inline-flex items-center gap-1 rounded-xl border border-border bg-card px-2.5 py-1 text-xs font-bold text-foreground shadow-xs hover:bg-muted"
-                  >
-                    <Plus className="h-3.5 w-3.5" /> سطر ناتج آخر
-                  </button>
+                <div>
+                  <h4 className="text-xs font-bold text-foreground">النواتج المستخرجة المعبأة</h4>
+                  <p className="text-[11px] text-muted-foreground">
+                    حدد الصنف، عدد الأكياس والوزن المستخرج (دقيق 50، 25، 10 كجم، نخالة، سميد…).
+                  </p>
+                  {outputItems.data && outputItems.data.length === 0 && (
+                    <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-2.5 py-1.5 text-[11px]">
+                      <span className="font-semibold text-amber-700 dark:text-amber-300">
+                        لا توجد منتجات نواتج أمانات بعد!
+                      </span>
+                      <Link
+                        to="/milling/products"
+                        search={undefined as never}
+                        className="inline-flex items-center gap-1 rounded-lg bg-amber-500 px-2 py-1 font-bold text-white hover:bg-amber-600"
+                      >
+                        أضف ناتجاً من «أصناف الأمانات» ←
+                      </Link>
+                    </div>
+                  )}
+                </div>
+
+                {/* ترويسة أعمدة النواتج للشاشات المتوسطة والكبيرة */}
+                <div className="hidden sm:grid sm:grid-cols-[1fr_90px_110px_36px] gap-2 px-3 py-1.5 text-[11px] font-bold text-muted-foreground bg-muted/50 rounded-xl">
+                  <div>صنف الناتج المستخرج (دقيق / نخالة / سميد)</div>
+                  <div className="text-center">الأكياس</div>
+                  <div className="text-center">الوزن (كجم)</div>
+                  <div className="text-center">حذف</div>
                 </div>
 
                 {outputs.map((line, idx) => (
                   <div
                     key={idx}
-                    className="grid grid-cols-[1fr_80px_100px_36px] items-center gap-2 rounded-xl border border-border/70 bg-card p-2.5"
+                    className="grid grid-cols-[1fr_80px_100px_36px] sm:grid-cols-[1fr_90px_110px_36px] items-center gap-2 rounded-xl border border-border/70 bg-card p-2.5"
                   >
                     <MillingSelect
                       value={line.itemId}
@@ -639,7 +628,7 @@ function MillingMillPage() {
                       decimals={0}
                       min={0}
                       emptyAsZero
-                      placeholder="أكياس"
+                      placeholder="0"
                       aria-label="أكياس الناتج"
                       value={line.bags || null}
                       onValueChange={(v) => changeLineBags(idx, v ?? 0)}
@@ -650,7 +639,7 @@ function MillingMillPage() {
                       decimals={2}
                       min={0}
                       emptyAsZero
-                      placeholder="كجم"
+                      placeholder="0.00"
                       aria-label="وزن الناتج كجم"
                       value={line.kg || null}
                       onValueChange={(v) => changeLineKg(idx, v ?? 0)}
@@ -667,6 +656,16 @@ function MillingMillPage() {
                     </button>
                   </div>
                 ))}
+
+                {/* زر إضافة سطر ناتج جديد موحد في الأسفل */}
+                <button
+                  type="button"
+                  onClick={() => setOutputs((o) => [...o, { itemId: "", bags: 0, kg: 0 }])}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-emerald-500/40 bg-emerald-500/[0.04] hover:bg-emerald-500/[0.09] text-xs font-bold text-emerald-700 dark:text-emerald-300 transition-all active:scale-[0.99]"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>إضافة سطر ناتج جديد</span>
+                </button>
               </div>
 
               {/* قسم الفاقد التشغيلي الفعلي أثناء الطحن */}
@@ -697,7 +696,6 @@ function MillingMillPage() {
                     <QuantityInput
                       decimals={2}
                       min={0}
-                      unit="kg"
                       placeholder="0.00"
                       aria-label="وزن الفاقد (كجم)"
                       value={lossKg === "" ? null : Number(lossKg)}

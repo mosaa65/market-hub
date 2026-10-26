@@ -58,20 +58,22 @@ export const ROUTE_ACCESS: Record<string, RouteAccessRule> = {
   "/milling/performance": {
     allowedRoles: ["owner", "manager", "accountant"],
   },
-  // استلام وفواتير: الاستلام للمستودع، وفاتورة أجور الطحن عمل مالي —
-  // المحاسب كان محجوباً عنها رغم أنها إصدار فواتير.
+  // استلام وفواتير: موقع عمل وخدمات وفواتير أجور الطحن — مفتوح للكاشير والمستودع والمحاسبة.
   "/milling/intake": {
-    allowedRoles: ["owner", "manager", "accountant", "warehouse"],
+    allowedRoles: ["owner", "manager", "accountant", "warehouse", "cashier"],
   },
-  // التسليم وكشف الأمانات: موقع عمل يخص المستودع والمالية معاً.
+  // التسليم وكشف الأمانات: تسليم نواتج ومستندات أمانات العميل.
   "/milling/delivery": {
-    allowedRoles: ["owner", "manager", "warehouse"],
+    allowedRoles: ["owner", "manager", "accountant", "warehouse", "cashier"],
   },
   "/milling/customer-statement": {
-    allowedRoles: STOCK,
+    allowedRoles: ["owner", "manager", "accountant", "warehouse", "cashier"],
   },
   "/milling/custody-delivery": {
-    allowedRoles: STOCK,
+    allowedRoles: ["owner", "manager", "accountant", "warehouse", "cashier"],
+  },
+  "/milling/products": {
+    allowedRoles: ["owner", "manager", "accountant", "warehouse", "cashier"],
   },
   "/purchase-pos": { allowedRoles: STOCK },
   "/purchases": { allowedRoles: STOCK },
@@ -117,6 +119,21 @@ export type AccessContext = {
   isPlatformSuperadmin: boolean;
 };
 
+export function normalizeTenantRole(value: unknown): TenantRole | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toLowerCase();
+  if (
+    normalized === "owner" ||
+    normalized === "manager" ||
+    normalized === "accountant" ||
+    normalized === "cashier" ||
+    normalized === "warehouse"
+  ) {
+    return normalized as TenantRole;
+  }
+  return null;
+}
+
 function normalize(pathname: string): string {
   const clean = pathname.split(/[?#]/)[0].replace(/\/+$/, "");
   return clean === "" ? "/" : clean;
@@ -139,7 +156,16 @@ export function canAccessRoute(pathname: string, ctx: AccessContext): boolean {
   if (rule.superadminOnly) return isPlatform;
   if (!rule.allowedRoles) return true;
   if (isPlatform) return true;
+
+  const normalizedRoles = Array.from(
+    new Set(
+      (ctx.roles ?? [])
+        .map((role) => normalizeTenantRole(role))
+        .filter((role): role is TenantRole => role !== null),
+    ),
+  );
+
   // Role lookup failures and unassigned users must fail closed on restricted routes.
-  if (ctx.roles.length === 0) return false;
-  return rule.allowedRoles.some((role) => ctx.roles.includes(role));
+  if (normalizedRoles.length === 0) return false;
+  return rule.allowedRoles.some((role) => normalizedRoles.includes(role));
 }

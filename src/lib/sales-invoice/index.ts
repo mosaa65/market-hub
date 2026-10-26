@@ -90,6 +90,13 @@ export interface CreateSalesInvoiceInput {
   chequeBank?: string | null;
   chequeDueDate?: string | null;
   chequeDrawer?: string | null;
+  /**
+   * تفصيل الدفع المجزأ (أجزاء التحصيل الفعلية فقط). عند تمريره يُستدعى
+   * الـ overload التسعيّ لـ create_sale الذي يسجّل الأسطر في
+   * customer_payment_splits ويرحّل كل طريقة إلى حسابها الصحيح.
+   * الآجل لا يُدرج هنا — يُستنتج من الفرق بين الإجمالي والمدفوع.
+   */
+  paymentSplits?: { method: string; amount: number }[] | null;
 }
 
 export interface SalesInvoiceResult {
@@ -212,12 +219,19 @@ export async function createSalesInvoice(
           },
     );
 
+    const splits = (input.paymentSplits ?? []).filter((line) => Number(line.amount) > 0);
+
     // A credit sale collects nothing; every other method records what was
     // actually received and leaves the remainder as a receivable. Deriving
     // this here rather than trusting the form keeps the ledger and the invoice
     // from disagreeing.
-    const paid =
-      input.paymentMethod === "credit"
+    //
+    // A split sale records exactly the tenders it was given: the paid figure is
+    // the sum of those tenders, never the invoice total. This keeps the RPC's
+    // "split breakdown must equal paid" check satisfiable on every path.
+    const paid = splits.length
+      ? Math.round(splits.reduce((sum, line) => sum + Number(line.amount), 0) * 100) / 100
+      : input.paymentMethod === "credit"
         ? 0
         : Math.max(0, Math.min(Number(input.paid) || 0, Number.MAX_SAFE_INTEGER));
 
@@ -225,15 +239,37 @@ export async function createSalesInvoice(
     // invoice is dated by the engine when it is created. Passing _sale_date
     // would be ignored silently by PostgREST, so the form's date field is a
     // display value and the function is called without it.
-    const { data, error } = await db.rpc("create_sale", {
-      _warehouse_id: input.warehouseId,
-      _customer_id: input.customerId || null,
-      _payment_method: input.paymentMethod,
-      _paid: paid,
-      _discount: Number(input.discount ?? 0),
-      _note: input.note ?? null,
-      _items: items,
-    });
+    //
+    // A split sale uses the 9-argument overload so every tender is recorded in
+    // customer_payment_splits and posted to its own ledger account.
+    const { data, error } = splits.length
+      ? await (
+          db.rpc as unknown as (
+            fn: string,
+            args: Record<string, unknown>,
+          ) => Promise<{ data: unknown; error: { message: string } | null }>
+        )("create_sale", {
+          _warehouse_id: input.warehouseId,
+          _customer_id: input.customerId || null,
+          _payment_method: "split",
+          _paid: paid,
+          _discount: Number(input.discount ?? 0),
+          _note: input.note ?? null,
+          _items: items,
+          _payment_splits: splits.map((line) => ({
+            method: line.method,
+            amount: Number(line.amount),
+          })),
+        })
+      : await db.rpc("create_sale", {
+          _warehouse_id: input.warehouseId,
+          _customer_id: input.customerId || null,
+          _payment_method: input.paymentMethod,
+          _paid: paid,
+          _discount: Number(input.discount ?? 0),
+          _note: input.note ?? null,
+          _items: items,
+        });
     if (error) throw new Error(error.message);
 
     const invoiceId = data as string;

@@ -6,9 +6,10 @@ import {
   CustomFieldOptions,
 } from "./types";
 import { generateBarcodeSvg, generateQrCodeSvg } from "@/lib/printing/barcode-qr";
+import { COMPANY_RIGHTS_TEXT } from "@/lib/printing/footer";
 import { getCachedCompanyProfile } from "@/lib/printing/company-profile";
 import { formatPrintedDateTime } from "@/lib/printing/date-time";
-import { renderInvoiceRightsFooter, UNIVERSAL_FOOTER_CSS } from "@/lib/printing/footer";
+import { UNIVERSAL_FOOTER_CSS } from "@/lib/printing/footer";
 
 /**
  * قالب الإيصال الحراري الاحترافي (Professional Thermal Receipt).
@@ -371,7 +372,7 @@ export function renderThermalMillingTemplate(
       <div style="font-weight: 700; color: #0f172a;">${esc(L.thanks)}</div>
       <div>نسعد بخدمتكم دائماً — تم استلام المستند بنجاح</div>
       ${opts.showFooter ? `<footer class="universal-footer">${esc(L.thanks)}</footer>` : ""}
-      ${renderInvoiceRightsFooter()}
+      <div style="text-align:center;font-size:7px;color:#9ca3af;margin-top:2px;">${COMPANY_RIGHTS_TEXT}</div>
     </div>
   </div>
 </body>

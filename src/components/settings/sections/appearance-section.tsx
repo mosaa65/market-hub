@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Languages,
   Palette,
@@ -22,6 +22,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useI18n } from "@/lib/i18n";
 import { useTheme } from "@/lib/theme";
+import { AutoSaveBadge } from "@/components/settings/auto-save-badge";
 import { ThemeVisualTestSuite } from "@/components/theme/theme-visual-test-suite";
 import { CURATED_THEMES, type AccentThemeId, type ArchivedColor } from "@/lib/color-theme";
 
@@ -53,6 +54,12 @@ export function AppearanceSection({ canEdit = true }: AppearanceSectionProps) {
   const [hexInput, setHexInput] = useState(customColor);
   const [colorNameInput, setColorNameInput] = useState("");
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+  // كل تغيير في المظهر/اللغة/اللون يُحفظ فوراً في مخزن التفضيلات —
+  // الشارة تُعلم المستخدم بذلك دون زر حفظ.
+  const [savePulse, setSavePulse] = useState(0);
+  useEffect(() => {
+    setSavePulse((n) => n + 1);
+  }, [theme, lang, accentTheme, customColor]);
 
   const handleHexChange = (value: string) => {
     let clean = value.trim();
@@ -89,10 +96,11 @@ export function AppearanceSection({ canEdit = true }: AppearanceSectionProps) {
               <div>{isAr ? "وضع العرض ولغة الواجهة" : "Display Mode & Language"}</div>
               <div className="text-xs text-muted-foreground font-normal mt-0.5">
                 {isAr
-                  ? "تحديد البيئة الضوئية للنظام (ليلي / نهاري) ولغة الخطوط والاتجاه"
-                  : "Choose light/dark display mode and interface language"}
+                  ? "تحديد البيئة الضوئية للنظام (ليلي / نهاري) ولغة الخطوط والاتجاه — تُحفظ تلقائياً"
+                  : "Choose light/dark display mode and interface language — saved automatically"}
               </div>
             </div>
+            <AutoSaveBadge lang={isAr ? "ar" : "en"} trigger={savePulse} className="ms-auto" />
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-5 space-y-4">

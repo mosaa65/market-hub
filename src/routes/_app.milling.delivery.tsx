@@ -378,9 +378,9 @@ function MillingDeliveryPage() {
                   <button
                     type="button"
                     onClick={() => setLines((l) => [...l, { itemId: "", bags: 0, kg: 0 }])}
-                    className="inline-flex items-center gap-1 rounded-xl border border-border bg-card px-2.5 py-1 text-xs font-bold text-foreground shadow-xs hover:bg-muted"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/20 transition-colors"
                   >
-                    <Plus className="h-3.5 w-3.5" /> سطر صنف آخر
+                    <Plus className="h-3.5 w-3.5" /> إضافة صنف آخر للتسليم
                   </button>
                 </div>
 
@@ -444,7 +444,7 @@ function MillingDeliveryPage() {
                             decimals={0}
                             min={0}
                             emptyAsZero
-                            placeholder="0 كيس"
+                            placeholder="0"
                             aria-label="الأكياس المسلمة"
                             value={line.bags || null}
                             onValueChange={(v) => changeLineBags(idx, v ?? 0)}
@@ -460,8 +460,7 @@ function MillingDeliveryPage() {
                             decimals={2}
                             min={0}
                             emptyAsZero
-                            unit="kg"
-                            placeholder="0.00 كجم"
+                            placeholder="0.00"
                             aria-label="الوزن المسلّم (كجم)"
                             value={line.kg || null}
                             onValueChange={(v) => changeLineKg(idx, v ?? 0)}
@@ -483,7 +482,7 @@ function MillingDeliveryPage() {
 
                         <div className="rounded-lg bg-amber-500/10 p-2 text-center text-xs">
                           <span className="block text-[10px] text-amber-700 dark:text-amber-300 font-semibold">
-                            المتبقي بعد التسليم:
+                            المتبقي بعد الصرف:
                           </span>
                           <span className="font-black text-amber-700 dark:text-amber-300">
                             {b ? `${fmtNum(remBags)} كيس` : "—"}
@@ -507,6 +506,16 @@ function MillingDeliveryPage() {
                     </div>
                   );
                 })}
+
+                {/* زر إضافة صنف آخر للتسليم في الأسفل */}
+                <button
+                  type="button"
+                  onClick={() => setLines((l) => [...l, { itemId: "", bags: 0, kg: 0 }])}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-primary/30 bg-primary/[0.04] hover:bg-primary/[0.08] text-xs font-bold text-primary transition-all active:scale-[0.99]"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>إضافة صنف آخر للتسليم</span>
+                </button>
               </div>
 
               {/* بيانات المستلم والسائق والملاحظات */}

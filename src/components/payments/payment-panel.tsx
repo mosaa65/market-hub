@@ -44,10 +44,12 @@
  * the arithmetic, usable by a screen that renders its own layout.
  */
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { money } from "@/lib/format";
+import { SplitPaymentDialog, type SplitPaymentValues } from "@/components/ui/payment-method";
+import { buildSplitTenders } from "@/lib/payments/split-tenders";
 import { useI18n } from "@/lib/i18n";
 import { getPaymentMethodDefinition, type PaymentContext } from "@/lib/payments/payment-methods";
 import {
@@ -207,6 +209,15 @@ export interface PaymentPanelProps {
   /** Called with the reference text when the method needs one. */
   reference?: string;
   onReferenceChange?: (value: string) => void;
+  /**
+   * Offer the shared split-payment dialog. The screen receives the tender
+   * breakdown so it can send it to the RPC and print the breakdown in the note.
+   * Omit it on screens whose document can only hold one method.
+   */
+  onSplitChange?: (
+    splits: { method: string; amount: number }[],
+    values: SplitPaymentValues,
+  ) => void;
 }
 
 /**
@@ -230,10 +241,28 @@ export function PaymentPanel(props: PaymentPanelProps) {
     className,
     reference,
     onReferenceChange,
+    onSplitChange,
   } = props;
 
   const { t, lang } = useI18n();
   const isRtl = lang === "ar";
+
+  const [splitOpen, setSplitOpen] = useState(false);
+  const [splitValues, setSplitValues] = useState<SplitPaymentValues>({
+    cash: 0,
+    credit: 0,
+    bank_transfer: 0,
+    mobile_money: 0,
+  });
+  const splitResult = buildSplitTenders(
+    {
+      cash: splitValues.cash,
+      credit: splitValues.credit,
+      bank_transfer: splitValues.bank_transfer,
+      mobile_money: splitValues.mobile_money,
+    },
+    total,
+  );
 
   const result = usePaymentPanel({
     total,
@@ -287,11 +316,28 @@ export function PaymentPanel(props: PaymentPanelProps) {
             // once here instead of three screens each remembering to do it.
             if (getPaymentMethodDefinition(next)?.isCreditTerm) onPaidChange("0");
           }}
+          allowSplit={Boolean(onSplitChange)}
+          onSplitClick={() => setSplitOpen(true)}
           ensureIds={[method]}
           disabled={disabled}
           ariaLabel={t("common.payment_method")}
           data-form-nav
         />
+
+        {method === "split" && onSplitChange && (
+          <button
+            type="button"
+            onClick={() => setSplitOpen(true)}
+            className="flex w-full items-center justify-between gap-2 rounded-xl border-primary/25 bg-primary/[0.04] px-3 py-2 text-[11px] font-semibold text-primary"
+          >
+            <span className="truncate">
+              {isRtl
+                ? `دفع متعدد · ${splitResult.tenders.length} طرق${splitResult.credit > 0 ? " + آجل" : ""}`
+                : `Split payment · ${splitResult.tenders.length} methods${splitResult.credit > 0 ? " + credit" : ""}`}
+            </span>
+            <span className="shrink-0 font-mono">{money(splitResult.allocated)}</span>
+          </button>
+        )}
 
         {result.needsReference && onReferenceChange && (
           <input
@@ -403,6 +449,32 @@ export function PaymentPanel(props: PaymentPanelProps) {
           <CheckCircle2 className="h-3.5 w-3.5" />
           {isRtl ? "الفاتورة مسددة بالكامل" : "Invoice fully settled"}
         </div>
+      )}
+
+      {/* نفس حوار الدفع المجزأ المستخدم في نقطة البيع تماماً. */}
+      {onSplitChange && (
+        <SplitPaymentDialog
+          open={splitOpen}
+          onOpenChange={setSplitOpen}
+          total={total}
+          initialValues={splitValues}
+          isCreditAllowed={Boolean(customerId)}
+          onConfirm={(values) => {
+            setSplitValues(values);
+            onMethodChange("split");
+            const next = buildSplitTenders(
+              {
+                cash: values.cash,
+                credit: values.credit,
+                bank_transfer: values.bank_transfer,
+                mobile_money: values.mobile_money,
+              },
+              total,
+            );
+            onPaidChange(String(next.paid));
+            onSplitChange(next.tenders, values);
+          }}
+        />
       )}
     </div>
   );

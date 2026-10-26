@@ -85,7 +85,12 @@ import { RecordsViewToggle } from "@/components/ui/records-view-toggle";
 import { RecordsFilterPanel, RecordsSortPanel } from "@/components/ui/records-panels";
 import { quietChipClass } from "@/components/ui/action-button";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { ItemRoleBadge, resolveItemClass } from "@/components/item-role-badge";
+import {
+  ItemRoleBadge,
+  resolveItemClass,
+  ITEM_ROLE_STYLES,
+  type ItemClass,
+} from "@/components/item-role-badge";
 import { ProductFieldSettings } from "@/components/products/product-field-settings";
 import { useProductFieldVisibility } from "@/hooks/use-product-field-visibility";
 import { usePersistedViewMode } from "@/hooks/use-persisted-view-mode";
@@ -478,7 +483,7 @@ function ProductsPage() {
       const [c, b, u, origins, qualities] = await Promise.all([
         supabase.from("categories").select("id, name, name_ar").order("name"),
         supabase.from("brands").select("id, name, name_ar").order("name"),
-        supabase.from("units").select("id, name, name_ar, short_name").order("name"),
+        supabase.from("units").select("id, name, name_ar, short_name").order("name_ar"),
         (supabase as any)
           .from("countries_of_origin")
           .select("id, code, name, name_ar")
@@ -2497,6 +2502,7 @@ function ProductDialog({
   const [form, setForm] = useState({
     name: initial?.name ?? "",
     name_ar: initial?.name_ar ?? "",
+    item_class: initial?.item_class ?? "",
     sku: initial?.sku ?? "",
     barcode: initial?.barcode ?? initialBarcode ?? "",
     category_id: initial?.category_id ?? "",
@@ -2567,6 +2573,9 @@ function ProductDialog({
         sku: form.sku.trim() || null,
         barcode: form.barcode.trim() || null,
         category_id: form.category_id || null,
+        // دور الصنف (مادة خام / منتج نهائي / ناتج طحن / خدمة / مستهلكات) —
+        // القيمة الفارغة تترك للخادم قيمته الافتراضية.
+        item_class: form.item_class || null,
         brand_id: config.enableBrands ? form.brand_id || null : null,
         unit_id: config.enableUnits ? form.unit_id || null : null,
         cost_price: Number(form.cost_price) || 0,
@@ -2785,6 +2794,31 @@ function ProductDialog({
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {showForm("role") && (
+              <FormField label={lang === "ar" ? "دور الصنف" : "Item role"}>
+                {(p) => (
+                  <select
+                    id={p.id}
+                    aria-describedby={p["aria-describedby"]}
+                    value={form.item_class}
+                    onChange={(e) => setForm({ ...form, item_class: e.target.value })}
+                    className={cn(fieldSurfaceClass, "h-10 px-4 text-sm font-medium")}
+                  >
+                    <option value="">
+                      {lang === "ar" ? "تلقائي (حسب السياسة)" : "Automatic (by policy)"}
+                    </option>
+                    {(Object.keys(ITEM_ROLE_STYLES) as ItemClass[]).map((role) => (
+                      <option key={role} value={role}>
+                        {lang === "ar"
+                          ? ITEM_ROLE_STYLES[role].labelAr
+                          : ITEM_ROLE_STYLES[role].labelEn}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </FormField>
+            )}
+
             {showForm("category") && (
               <FormField label={t("products.category")}>
                 {(p) => (
@@ -3148,6 +3182,36 @@ function ProductDialog({
             icon={<SlidersHorizontal className="size-4" />}
             title={lang === "ar" ? "طبيعة وسياسة الصنف" : "Item nature & policy"}
           />
+          <div className="rounded-xl border border-sky-500/25 bg-sky-500/5 p-3 text-[11px] leading-relaxed text-muted-foreground space-y-1">
+            <p>
+              <strong className="text-foreground">طبيعة الصنف:</strong> تحدد هل هذا الصنف
+              <strong className="text-foreground"> بضاعة (GOOD)</strong> تُخزن وتُعدّ كمياتها
+              وتكلفتها، أو
+              <strong className="text-foreground"> خدمة (SERVICE)</strong> تُباع مباشرة بلا مخزون
+              (مثل أجور الطحن). الخيار هو نفسه الزر الموحد في كل النظام — لا يوجد شكل ثالث.
+            </p>
+            <p>
+              <strong className="text-foreground">سياسة المخزون:</strong>
+              <strong className="text-foreground"> تُتتبع (TRACKED)</strong> = الكمية تُخصم وتُضاف
+              تلقائياً مع كل فاتورة وتُحسب تكلفتها (للمنتجات والنواتج)؛
+              <strong className="text-foreground"> غير تُتتبع (UNTRACKED)</strong> = لا مخزون ولا
+              خصم تلقائي (خدمات فقط)؛
+              <strong className="text-foreground"> ملك العميل (CUSTOMER_OWNED)</strong> = أمانات
+              المطحنة خارج مخزون المنشأة — لا تُخصم ولا تُقّيم تكلفتها وإنما تُتابع في سجل أمانات
+              العميل.
+            </p>
+            <p>
+              <strong className="text-foreground">التتبع:</strong> دفعات (BATCH) = كل دفعة بمدة
+              صلاحية وتكلفة خاصة — المناسب للحبوب والدقيق؛ تسلسل (SERIAL) = كل قطعة برقم فريد —
+              للأجهزة؛ بلا (NONE) = لا تتبع فردي.
+            </p>
+            <p>
+              <strong className="text-foreground">التأثير المباشر عند الاختيار:</strong> الترجيح
+              «بضاعة + تُتتبع» يجعل الفاتورة تخصم من المخزون وتُنشئ قيد تكلفة آلياً؛ اختيار «خدمة»
+              يجعل الفاتورة إيراداً فقط بلا حركة مخزون؛ اختيار «ملك العميل» يمنع أي حركة مخزون
+              نهائياً ويسجل كل شيء في دفتر أمانات العميل.
+            </p>
+          </div>
           <div className="space-y-4">
             <SettingsChoice
               label={lang === "ar" ? "طبيعة الصنف" : "Item nature"}

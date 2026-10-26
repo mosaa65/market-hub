@@ -1,8 +1,9 @@
-import { ModuleGuard } from "@/lib/modules";
+﻿import { ModuleGuard } from "@/lib/modules";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowUpRight,
+  BookOpen,
   CalendarDays,
   CheckCircle2,
   CircleDollarSign,
@@ -14,6 +15,7 @@ import {
   User,
   Users,
   Wallet,
+  X,
 } from "lucide-react";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,7 +23,13 @@ import { PageHeader } from "@/components/page-header";
 import { useI18n } from "@/lib/i18n";
 import { money } from "@/lib/format";
 import { paymentMethodLabel, requiresPaymentReference } from "@/lib/payments/payment-methods";
-import { PaymentMethodPicker, DynamicPaymentSelector } from "@/components/ui/payment-method";
+import {
+  PaymentMethodPicker,
+  DynamicPaymentSelector,
+  SplitPaymentDialog,
+} from "@/components/ui/payment-method";
+import type { SplitPaymentValues } from "@/components/ui/payment-method";
+import { buildSplitTenders } from "@/lib/payments/split-tenders";
 import { AmountInput } from "@/components/ui/amount-input";
 import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
 import { usePaymentMethodsForContext } from "@/hooks/use-payment-methods";
@@ -32,7 +40,7 @@ import { WhatsAppButton } from "@/components/whatsapp-button";
 import { debtReminderMessage } from "@/lib/whatsapp-templates";
 import {
   VortexDateBadge,
-  VortexDrawerDialog,
+  VortexMetricCard,
   VortexTransactionDetailSheet,
   VortexSearchInput,
 } from "@/components/vortex-ui";
@@ -114,6 +122,16 @@ function PaymentsPage() {
   const [saving, setSaving] = useState(false);
   const [paymentFormOpen, setPaymentFormOpen] = useState(false);
   const [selectedTx, setSelectedTx] = useState<any>(null);
+  // التحصيل المجزأ: سند قبض واحد على أكثر من طريقة. آجل مُستبعد نهائياً —
+  // سند القبض يحصّل ديناً قائماً ولا ينشئ ديناً جديداً.
+  const [splitOpen, setSplitOpen] = useState(false);
+  const [splitValues, setSplitValues] = useState<SplitPaymentValues>({
+    cash: 0,
+    credit: 0,
+    bank_transfer: 0,
+    mobile_money: 0,
+  });
+  const COLLECTION_SPLIT_METHODS = ["cash", "bank_transfer", "mobile_money"] as const;
   const { methods: collectionMethods } = usePaymentMethodsForContext("customer_collection", {
     includeCredit: false,
   });
@@ -251,8 +269,87 @@ function PaymentsPage() {
     ? Number(selectedInvoice.total) - Number(selectedInvoice.paid)
     : 0;
 
+  // مبلغ التحصيل القابل للتحصيل: متبقي الفاتورة المختارة أو رصيد العميل كاملاً.
+  const collectibleAmount = selectedInvoice
+    ? remaining
+    : Math.max(Number(selected?.balance ?? 0), 0);
+  const splitResult = buildSplitTenders(
+    {
+      cash: splitValues.cash,
+      bank_transfer: splitValues.bank_transfer,
+      mobile_money: splitValues.mobile_money,
+    },
+    collectibleAmount,
+  );
+  const isSplitCollection = splitResult.tenders.length > 1;
+
   async function submit() {
     if (saving || !selected) return;
+
+    // ── تحصيل مجزأ: دفعة واحدة موزعة على أكثر من طريقة ──
+    if (isSplitCollection) {
+      const payable = collectibleAmount;
+      if (!splitResult.balanced) {
+        return toast.error(
+          lang === "ar"
+            ? "مجموع توزيع التحصيل لا يطابق المبلغ المستحق"
+            : "The split total does not match the amount due",
+        );
+      }
+      if (splitResult.allocated > payable + 0.01) {
+        return toast.error(
+          t("payments.exceeds_remaining") ||
+            (lang === "ar" ? "المبلغ يتجاوز المتبقي" : "Amount exceeds remaining"),
+        );
+      }
+
+      setSaving(true);
+      try {
+        const { error } = await supabase.rpc("record_customer_payment_splits" as any, {
+          _customer_id: selected.id,
+          _invoice_id: invoiceId || null,
+          _amount: splitResult.allocated,
+          _payment_date: date,
+          _note: note.trim() || null,
+          _splits: splitResult.tenders.map((line) => ({
+            method: line.method,
+            methodId: line.method,
+            amount: line.amount,
+            reference:
+              line.method === "bank_transfer"
+                ? splitValues.bankReference
+                : line.method === "mobile_money"
+                  ? splitValues.walletReference
+                  : undefined,
+          })),
+        });
+        if (error) throw error;
+
+        setSelectedTx({
+          id: `REC-${String(Date.now()).slice(-6)}`,
+          type: "payment",
+          title: lang === "ar" ? "سند قبض مجزأ" : "Split receipt",
+          amount: splitResult.allocated,
+          date,
+          customerName: selected.name,
+          customerPhone: selected.phone,
+          referenceNumber: splitValues.bankReference || splitValues.walletReference || undefined,
+          method: splitResult.tenders.map((line) => pmLabel(line.method)).join(" + "),
+          notes: note.trim() || undefined,
+          remainingBalance: Math.max(Number(selected.balance) - splitResult.allocated, 0),
+        });
+        setPaymentFormOpen(false);
+        setSplitValues({ cash: 0, credit: 0, bank_transfer: 0, mobile_money: 0 });
+        setNote("");
+        await refresh();
+      } catch (e: any) {
+        toast.error(e.message ?? t("common.failed"));
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
     const amt = Number(amount);
     if (!amt || amt <= 0)
       return toast.error(
@@ -355,6 +452,15 @@ function PaymentsPage() {
     });
   }
 
+  /** الانتقال إلى دفتر أستاذ العميل — نفس وجهة الكشف الشامل. */
+  function goLedger(customerId: string) {
+    void navigate({
+      to: "/statements/$entityType",
+      params: { entityType: "customer" },
+      search: { customerId, tab: "ledger" } as never,
+    });
+  }
+
   function beginPayment(invoice?: Invoice) {
     setInvoiceId(invoice?.id ?? "");
     setAmount(invoice ? String(Number(invoice.total) - Number(invoice.paid)) : "");
@@ -376,27 +482,27 @@ function PaymentsPage() {
         }
       />
 
-      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[330px_minmax(0,1fr)]">
-        {/* دليل العملاء */}
-        <aside className="panel-elevated overflow-hidden border-primary/15 bg-primary/[0.025] p-0 shadow-md shadow-primary/[0.06] lg:sticky lg:top-4">
-          <div className="border-b border-primary/10 bg-primary/[0.045] p-4">
-            <div className="mb-3 flex items-start justify-between gap-3">
-              <div className="flex items-center gap-2.5">
-                <div className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-primary-foreground shadow-sm shadow-primary/25">
-                  <Users className="h-4 w-4" />
+      <div className="grid grid-cols-1 items-start gap-3 sm:gap-4 lg:grid-cols-[minmax(300px,360px)_minmax(0,1fr)]">
+        {/* ══ القسم الأول: دليل العملاء ══ */}
+        <aside className="panel-elevated overflow-hidden p-0 lg:sticky lg:top-4">
+          <div className="border-b border-border/70 px-3.5 py-3">
+            <div className="mb-2.5 flex items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-2">
+                <div className="grid size-8 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                  <Users className="size-4" />
                 </div>
-                <div>
-                  <div className="text-sm font-black">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold text-foreground">
                     {lang === "ar" ? "دليل العملاء" : "Customer directory"}
                   </div>
-                  <div className="text-[11px] text-muted-foreground">
+                  <div className="truncate text-[11px] text-muted-foreground">
                     {lang === "ar"
                       ? "اختر عميلاً لبدء التحصيل"
                       : "Pick a customer to start collecting"}
                   </div>
                 </div>
               </div>
-              <span className="rounded-full border border-primary/15 bg-card px-2 py-1 font-mono text-[10px] font-bold text-primary tabular-nums">
+              <span className="shrink-0 rounded-full bg-surface-2 px-2 py-0.5 font-mono text-[10px] font-medium text-muted-foreground tabular-nums">
                 {filteredCustomers.length}
               </span>
             </div>
@@ -410,11 +516,11 @@ function PaymentsPage() {
               className="w-full"
             />
           </div>
-          <div className="max-h-[calc(100vh-250px)] space-y-1.5 overflow-y-auto bg-primary/[0.015] p-3 pe-2 max-lg:max-h-[45vh]">
+          <div className="max-h-[calc(100vh-260px)] space-y-1.5 overflow-y-auto p-2.5 max-lg:max-h-[42vh]">
             {filteredCustomers.length === 0 ? (
               <div className="grid place-items-center gap-2 py-8 text-center">
-                <Search className="h-6 w-6 text-muted-foreground/50" />
-                <div className="text-sm text-muted-foreground">
+                <Search className="size-5 text-muted-foreground/50" />
+                <div className="text-xs text-muted-foreground">
                   {lang === "ar" ? "لا يوجد عميل مطابق" : "No matching customer"}
                 </div>
               </div>
@@ -426,19 +532,23 @@ function PaymentsPage() {
                   <button
                     key={c.id}
                     onClick={() => loadCustomer(c)}
-                    className={`group flex min-h-[70px] w-full items-center gap-3 rounded-2xl border p-3 text-start transition-all duration-200 ${active ? "border-primary/35 bg-primary/[0.1] shadow-md shadow-primary/[0.1]" : "border-primary/[0.06] bg-card/80 hover:border-primary/20 hover:bg-primary/[0.045]"}`}
+                    className={`group flex w-full items-center gap-2.5 rounded-xl border px-2.5 py-2 text-start transition-colors duration-200 ${active ? "border-primary/40 bg-primary/[0.08]" : "border-border/60 bg-card hover:border-border hover:bg-accent/40"}`}
                   >
                     <div
-                      className={`grid h-10 w-10 shrink-0 place-items-center rounded-2xl text-sm font-black transition-transform group-hover:scale-105 ${active ? "bg-primary text-primary-foreground shadow-sm shadow-primary/30" : "bg-surface-2 text-muted-foreground"}`}
+                      className={`grid size-8 shrink-0 place-items-center rounded-xl text-xs font-bold ${active ? "bg-primary text-primary-foreground" : "bg-surface-2 text-muted-foreground"}`}
                     >
-                      {c.name.trim().slice(0, 1).toUpperCase() || <User className="h-4 w-4" />}
+                      {c.name.trim().slice(0, 1).toUpperCase() || <User className="size-3.5" />}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-bold">{c.name}</div>
-                      <div className="text-[11px] text-muted-foreground">{c.phone ?? "—"}</div>
+                      <div className="truncate text-[13px] font-semibold text-foreground">
+                        {c.name}
+                      </div>
+                      <div className="truncate font-mono text-[11px] text-muted-foreground">
+                        {c.phone ?? "—"}
+                      </div>
                     </div>
                     <span
-                      className={`shrink-0 rounded-xl px-2 py-1.5 text-end ${hasBalance ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" : "bg-muted/60 text-muted-foreground"}`}
+                      className={`shrink-0 rounded-lg border px-1.5 py-1 text-end ${hasBalance ? "border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400" : "border-border/60 bg-surface-2 text-muted-foreground"}`}
                     >
                       <span className="block text-[9px] font-medium opacity-70">
                         {hasBalance
@@ -449,7 +559,7 @@ function PaymentsPage() {
                             ? "خالص"
                             : "Settled"}
                       </span>
-                      <span className="block font-mono text-xs font-bold tabular-nums">
+                      <span className="block font-mono text-[11px] font-bold tabular-nums">
                         {money(Number(c.balance))}
                       </span>
                     </span>
@@ -460,32 +570,31 @@ function PaymentsPage() {
           </div>
         </aside>
 
-        {/* Detail */}
+        {/* ══ القسم الثاني: مساحة عمل العميل المحدد ══ */}
         {!selected ? (
-          <section className="panel-elevated relative min-h-[520px] overflow-hidden border-primary/15 bg-card p-6 sm:p-8">
-            <div className="absolute inset-x-0 top-0 h-1.5 bg-primary" />
-            <div className="mx-auto flex max-w-xl flex-col items-center pt-8 text-center sm:pt-14">
-              <div className="grid h-20 w-20 place-items-center rounded-3xl bg-primary/10 text-primary shadow-lg shadow-primary/10">
-                <Wallet className="h-9 w-9" />
+          <section className="panel-elevated relative min-h-[420px] overflow-hidden p-5 sm:p-8">
+            <div className="mx-auto flex max-w-xl flex-col items-center pt-4 text-center sm:pt-8">
+              <div className="grid size-16 place-items-center rounded-2xl bg-primary/10 text-primary">
+                <Wallet className="size-7" />
               </div>
-              <div className="mt-5 text-xl font-black tracking-tight text-foreground">
+              <div className="mt-4 text-base font-bold tracking-tight text-foreground sm:text-lg">
                 {lang === "ar" ? "مركز تحصيل دفعات العملاء" : "Customer payment centre"}
               </div>
-              <div className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+              <div className="mt-1.5 max-w-md text-xs leading-6 text-muted-foreground sm:text-sm">
                 {lang === "ar"
                   ? "اختر عميلاً من الدليل، ثم راجع مستحقاته وسجّل الدفعة من مساحة عمل واحدة واضحة."
                   : "Choose a customer, review their outstanding amounts, then record the payment from one clear workspace."}
               </div>
             </div>
-            <div className="mx-auto mt-10 grid max-w-3xl gap-3 sm:grid-cols-3">
+            <div className="mx-auto mt-8 grid max-w-3xl gap-2.5 sm:grid-cols-3">
               {[
                 {
-                  icon: <Users className="h-5 w-5" />,
+                  icon: <Users className="size-4" />,
                   title: lang === "ar" ? "1. اختر العميل" : "1. Pick customer",
                   text: lang === "ar" ? "ابحث بالاسم أو الهاتف" : "Search by name or phone",
                 },
                 {
-                  icon: <ReceiptText className="h-5 w-5" />,
+                  icon: <ReceiptText className="size-4" />,
                   title: lang === "ar" ? "2. راجع الفواتير" : "2. Review invoices",
                   text:
                     lang === "ar"
@@ -493,7 +602,7 @@ function PaymentsPage() {
                       : "Select an invoice or allocate automatically",
                 },
                 {
-                  icon: <CircleDollarSign className="h-5 w-5" />,
+                  icon: <CircleDollarSign className="size-4" />,
                   title: lang === "ar" ? "3. رحّل الدفعة" : "3. Post payment",
                   text:
                     lang === "ar" ? "اختر الطريقة وأصدر السند" : "Choose method and issue receipt",
@@ -501,44 +610,85 @@ function PaymentsPage() {
               ].map((step) => (
                 <div
                   key={step.title}
-                  className="rounded-2xl border border-border/70 bg-surface-2/40 p-4 text-start"
+                  className="rounded-xl border border-border/70 bg-surface-2/40 p-3 text-start"
                 >
-                  <div className="mb-4 grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
+                  <div className="mb-2.5 grid size-8 place-items-center rounded-xl bg-primary/10 text-primary">
                     {step.icon}
                   </div>
-                  <div className="text-sm font-bold">{step.title}</div>
-                  <div className="mt-1 text-xs leading-5 text-muted-foreground">{step.text}</div>
+                  <div className="text-xs font-semibold text-foreground">{step.title}</div>
+                  <div className="mt-0.5 text-[11px] leading-5 text-muted-foreground">
+                    {step.text}
+                  </div>
                 </div>
               ))}
             </div>
           </section>
         ) : (
-          <main className="space-y-5">
+          <main className="space-y-3 sm:space-y-4">
             {/* شريط السياق المالي */}
-            <section className="relative grid overflow-hidden rounded-[var(--radius-panel)] bg-primary grid-cols-1 items-center gap-4 p-5 text-primary-foreground shadow-lg shadow-primary/20 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_auto_auto]">
-              <div className="pointer-events-none absolute -end-16 -top-20 h-52 w-52 rounded-full border-[28px] border-white/10" />
-              <div className="pointer-events-none absolute -bottom-24 start-[35%] h-40 w-40 rounded-full bg-white/[0.06]" />
-              <div className="relative flex items-center gap-3">
-                <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-white/15 bg-white/15 text-white shadow-sm backdrop-blur">
-                  <User className="h-5 w-5" />
-                </div>
-                <div className="min-w-0">
-                  <div className="text-xs text-white/70">
-                    {lang === "ar" ? "العميل" : "Customer"}
-                  </div>
-                  <div className="truncate text-xl font-black tracking-tight">{selected.name}</div>
-                  <div className="text-xs text-white/75">{selected.phone ?? "—"}</div>
-                </div>
+            <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4">
+              <VortexMetricCard
+                title={lang === "ar" ? "العميل" : "Customer"}
+                value={selected.name}
+                subtitle={selected.phone ?? "—"}
+                icon={<User className="size-4 text-primary" />}
+                tone="default"
+              />
+              <VortexMetricCard
+                title={lang === "ar" ? "إجمالي المستحق" : "Total due"}
+                value={money(Number(selected.balance))}
+                subtitle={
+                  Number(selected.balance) > 0
+                    ? lang === "ar"
+                      ? "مطلوب تحصيله"
+                      : "Awaiting collection"
+                    : lang === "ar"
+                      ? "لا يوجد مستحق"
+                      : "Nothing due"
+                }
+                icon={<Wallet className="size-4 text-amber-500" />}
+                tone={Number(selected.balance) > 0 ? "warning" : "success"}
+              />
+              <VortexMetricCard
+                title={lang === "ar" ? "فواتير مستحقة" : "Open invoices"}
+                value={outstanding.length}
+                subtitle={lang === "ar" ? "بحاجة إلى تحصيل" : "Waiting to be collected"}
+                icon={<ReceiptText className="size-4 text-sky-500" />}
+                tone="info"
+              />
+              <VortexMetricCard
+                title={lang === "ar" ? "آخر تحصيلات" : "Recent receipts"}
+                value={payments.length}
+                subtitle={lang === "ar" ? "سندات قبض مسجلة" : "recorded receipts"}
+                icon={<CircleDollarSign className="size-4 text-emerald-500" />}
+                tone="success"
+              />
+            </div>
+
+            {/* شريط الإجراءات: أدوات العميل + سند جديد */}
+            <section className="panel-elevated flex flex-wrap items-center justify-between gap-2 p-2.5 sm:p-3">
+              <div className="flex items-center gap-1.5">
+                {/* أيقونات الوصول السريع: كشف الحساب ثم دفتر الأستاذ */}
+                <button
+                  type="button"
+                  onClick={() => goStatement(selected.id)}
+                  title={lang === "ar" ? "كشف الحساب" : "Account statement"}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-border/70 bg-surface-2/60 px-3 text-xs font-medium text-foreground transition hover:border-primary/30 hover:text-primary"
+                >
+                  <FileText className="size-3.5" />
+                  <span>{lang === "ar" ? "كشف الحساب" : "Statement"}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => goLedger(selected.id)}
+                  title={lang === "ar" ? "دفتر الأستاذ" : "Customer ledger"}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-border/70 bg-surface-2/60 px-3 text-xs font-medium text-foreground transition hover:border-primary/30 hover:text-primary"
+                >
+                  <BookOpen className="size-3.5" />
+                  <span>{lang === "ar" ? "دفتر الأستاذ" : "Ledger"}</span>
+                </button>
               </div>
-              <div className="relative rounded-2xl border border-white/15 bg-white/10 px-5 py-3 text-end shadow-sm backdrop-blur">
-                <div className="text-[10px] uppercase text-white/70">
-                  {lang === "ar" ? "إجمالي المستحق الآن" : "Total due now"}
-                </div>
-                <div className="font-mono text-2xl font-black tabular-nums text-white">
-                  {money(Number(selected.balance))}
-                </div>
-              </div>
-              <div className="relative flex items-center gap-2">
+              <div className="flex items-center gap-2">
                 {Number(selected.balance) > 0 && (
                   <WhatsAppButton
                     phone={selected.phone}
@@ -548,16 +698,16 @@ function PaymentsPage() {
                       balance: money(Number(selected.balance)),
                       lang,
                     })}
-                    className="flex h-10 flex-1 items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-white/15 px-4 text-xs font-medium text-white transition hover:bg-white/25 disabled:cursor-not-allowed disabled:opacity-40 lg:flex-none"
+                    className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-border/70 bg-surface-2/60 px-3 text-xs font-medium text-foreground transition hover:border-emerald-500/40 hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
                   />
                 )}
                 <button
                   type="button"
-                  onClick={() => goStatement(selected.id)}
-                  className="flex h-10 flex-1 items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-white/10 px-4 text-xs font-medium text-white/90 transition-colors hover:bg-white/20 hover:text-white lg:flex-none"
+                  onClick={() => beginPayment()}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-primary px-3.5 text-xs font-semibold text-primary-foreground shadow-xs transition hover:opacity-95"
                 >
-                  <FileText className="h-3.5 w-3.5" />
-                  {lang === "ar" ? "كشف الحساب" : "Statement"}
+                  <Plus className="size-4" />
+                  {lang === "ar" ? "سند قبض جديد" : "New receipt"}
                 </button>
               </div>
             </section>
@@ -565,69 +715,55 @@ function PaymentsPage() {
             <div>
               {/* منطقة تسجيل الدفعة */}
               {paymentFormOpen && (
-                <VortexDrawerDialog
-                  open={paymentFormOpen}
-                  onOpenChange={(open) => {
-                    setPaymentFormOpen(open);
-                    if (!open) {
-                      setInvoiceId("");
-                      setAmount("");
-                    }
-                  }}
-                  size="lg"
-                  eyebrow={lang === "ar" ? "سند قبض جديد" : "New receipt"}
-                  title={
-                    selectedInvoice
-                      ? lang === "ar"
-                        ? "تحصيل فاتورة"
-                        : "Invoice collection"
-                      : lang === "ar"
-                        ? "تحصيل تلقائي"
-                        : "Automatic collection"
-                  }
-                  subtitle={
-                    selectedInvoice
-                      ? lang === "ar"
-                        ? `سداد الفاتورة #${selectedInvoice.invoice_number}`
-                        : `Payment for invoice #${selectedInvoice.invoice_number}`
-                      : lang === "ar"
-                        ? "توزيع الدفعة من الأقدم إلى الأحدث"
-                        : "Allocate payment from oldest to newest"
-                  }
-                  icon={<Wallet className="h-5 w-5" />}
-                  className="border-primary/30 shadow-primary/20"
-                  bodyClassName="bg-primary/[0.025]"
-                >
-                  <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-primary/15 bg-primary/[0.06] p-3 text-xs">
-                    <div className="flex min-w-0 items-center gap-2.5">
-                      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-primary/15 bg-card text-primary shadow-sm">
-                        <ReceiptText className="h-4 w-4" />
+                <section className="panel-elevated mb-3 overflow-hidden p-0 sm:mb-4">
+                  {/* رأس قسم السند — يظهر داخل الصفحة بدل النافذة المنبثقة */}
+                  <div className="flex items-center justify-between gap-2 border-b border-border/70 px-3.5 py-2.5">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <div className="grid size-8 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                        <Wallet className="size-4" />
                       </div>
                       <div className="min-w-0">
-                        <span className="block truncate font-bold text-foreground">
+                        <div className="truncate text-sm font-semibold text-foreground">
                           {selectedInvoice
-                            ? `#${selectedInvoice.invoice_number}`
+                            ? lang === "ar"
+                              ? `تحصيل فاتورة #${selectedInvoice.invoice_number}`
+                              : `Collect invoice #${selectedInvoice.invoice_number}`
                             : lang === "ar"
-                              ? "توزيع تلقائي"
-                              : "Automatic allocation"}
-                        </span>
-                        <span className="block text-[11px] text-muted-foreground">
+                              ? "سند قبض جديد"
+                              : "New receipt"}
+                        </div>
+                        <div className="truncate text-[11px] text-muted-foreground">
                           {selectedInvoice
                             ? `${lang === "ar" ? "المتبقي" : "Remaining"}: ${money(remaining)}`
                             : lang === "ar"
-                              ? "تُوزع على أقدم الفواتير المستحقة"
-                              : "Applied to oldest outstanding invoices"}
-                        </span>
+                              ? "توزيع تلقائي على أقدم الفواتير المستحقة"
+                              : "Applied automatically to oldest outstanding invoices"}
+                        </div>
                       </div>
                     </div>
-                    <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-bold text-primary">
-                      {lang === "ar" ? "سند جديد" : "New receipt"}
-                    </span>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <span className="hidden max-w-[140px] truncate rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-medium text-muted-foreground sm:inline">
+                        {selected.name}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPaymentFormOpen(false);
+                          setInvoiceId("");
+                          setAmount("");
+                        }}
+                        title={lang === "ar" ? "إغلاق" : "Close"}
+                        aria-label={lang === "ar" ? "إغلاق" : "Close"}
+                        className="grid size-7 place-items-center rounded-lg border-border/70 bg-surface-2/60 text-muted-foreground transition hover:border-destructive/30 hover:text-destructive"
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-3 p-3.5 sm:grid-cols-2">
                     <div>
                       <div className="mb-1.5 flex items-center justify-between gap-2">
-                        <label className="text-xs font-bold text-foreground">
+                        <label className="text-xs font-semibold text-muted-foreground">
                           {lang === "ar" ? "المبلغ المحصل" : "Collected amount"}
                         </label>
                         {selectedInvoice && (
@@ -643,12 +779,16 @@ function PaymentsPage() {
                       {/* المبلغ المُوحّد: فاصلة آلاف + تفقيط تحت الرقم. */}
                       <AmountInput
                         min={0}
-                        value={toNumberOrNull(amount)}
-                        onValueChange={(v) => setAmount(v == null ? "" : String(v))}
+                        value={isSplitCollection ? splitResult.allocated : toNumberOrNull(amount)}
+                        onValueChange={(v) => {
+                          if (isSplitCollection) return;
+                          setAmount(v == null ? "" : String(v));
+                        }}
+                        disabled={isSplitCollection}
                         placeholder="0.00"
                         aria-label={lang === "ar" ? "المبلغ المحصل" : "Collected amount"}
                         wordsClassName="text-xs"
-                        containerClassName="[&_input]:h-11 [&_input]:rounded-xl [&_input]:border-primary/20 [&_input]:text-base [&_input]:font-black"
+                        containerClassName="[&_input]:h-10 [&_input]:rounded-xl [&_input]:border-input [&_input]:text-base [&_input]:font-bold"
                       />
                       {Number(amount) > 0 && (
                         <div className="mt-1.5 flex justify-between px-1 text-[11px] text-muted-foreground">
@@ -668,11 +808,20 @@ function PaymentsPage() {
                       )}
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-muted-foreground">
-                        {lang === "ar"
-                          ? "طريقة الدفع والتوجيه المالي"
-                          : "Payment method & settlement"}
-                      </label>
+                      <div className="flex items-center justify-between gap-2">
+                        <label className="text-xs font-semibold text-muted-foreground">
+                          {lang === "ar"
+                            ? "طريقة الدفع والتوجيه المالي"
+                            : "Payment method & settlement"}
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setSplitOpen(true)}
+                          className="rounded-lg border-border/70 bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-foreground transition hover:border-primary/30 hover:text-primary"
+                        >
+                          {lang === "ar" ? "دفع مجزأ" : "Split"}
+                        </button>
+                      </div>
                       <DynamicPaymentSelector
                         context="customer_collection"
                         value={method}
@@ -687,15 +836,29 @@ function PaymentsPage() {
                         }}
                         includeCredit={false}
                       />
+                      {isSplitCollection && (
+                        <button
+                          type="button"
+                          onClick={() => setSplitOpen(true)}
+                          className="flex w-full items-center justify-between gap-2 rounded-xl border-primary/25 bg-primary/[0.06] px-2.5 py-1.5 text-[11px] font-semibold text-primary"
+                        >
+                          <span className="truncate">
+                            {lang === "ar"
+                              ? `تحصيل مجزأ · ${splitResult.tenders.length} طرق`
+                              : `Split collection · ${splitResult.tenders.length} tenders`}
+                          </span>
+                          <span className="shrink-0 font-mono">{money(splitResult.allocated)}</span>
+                        </button>
+                      )}
                     </div>
                     <Field label={lang === "ar" ? "تاريخ السند" : "Receipt date"}>
                       <div className="relative">
-                        <CalendarDays className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <CalendarDays className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                         <input
                           type="date"
                           value={date}
                           onChange={(e) => setDate(e.target.value)}
-                          className="h-11 w-full rounded-xl border border-primary/20 bg-card ps-10 pe-3 text-sm focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+                          className="h-10 w-full rounded-xl border border-input bg-surface/70 ps-10 pe-3 text-sm focus-visible:border-primary/60 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/10"
                         />
                       </div>
                     </Field>
@@ -703,12 +866,13 @@ function PaymentsPage() {
                       <input
                         value={note}
                         onChange={(e) => setNote(e.target.value)}
-                        className="h-11 w-full rounded-xl border border-primary/20 bg-card px-3 text-sm focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+                        placeholder={lang === "ar" ? "ملاحظة اختيارية" : "Optional note"}
+                        className="h-10 w-full rounded-xl border border-input bg-surface/70 px-3 text-sm focus-visible:border-primary/60 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/10"
                       />
                     </Field>
                   </div>
-                  <div className="mt-5 flex items-center justify-between gap-3 border-t border-primary/10 pt-4">
-                    <span className="hidden text-xs text-muted-foreground sm:block">
+                  <div className="flex items-center justify-between gap-2 border-t border-border/70 px-3.5 py-2.5">
+                    <span className="hidden text-[11px] text-muted-foreground sm:block">
                       {lang === "ar"
                         ? "تحقق من المبلغ وطريقة الدفع قبل الترحيل"
                         : "Review amount and method before posting"}
@@ -716,30 +880,30 @@ function PaymentsPage() {
                     <button
                       onClick={submit}
                       disabled={saving}
-                      className="flex h-11 w-full items-center justify-center gap-1.5 rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-sm shadow-primary/20 hover:opacity-90 disabled:opacity-60 sm:w-auto"
+                      className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-xl bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-xs transition hover:opacity-95 disabled:opacity-60 sm:w-auto"
                     >
                       {saving ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <Loader2 className="size-4 animate-spin" />
                       ) : (
-                        <Plus className="h-4 w-4" />
+                        <Plus className="size-4" />
                       )}
                       {lang === "ar" ? "تسجيل وترحيل الدفعة" : "Record and post payment"}
                     </button>
                   </div>
-                </VortexDrawerDialog>
+                </section>
               )}
 
               {/* الفواتير المستحقة */}
-              <section className="panel-elevated overflow-hidden border-primary/15 bg-primary/[0.02] p-0 shadow-sm shadow-primary/[0.04]">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-primary/15 bg-primary/[0.07] px-5 py-4">
-                  <h3 className="flex items-center gap-2 text-sm font-bold">
+              <section className="panel-elevated overflow-hidden p-0">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70 px-3.5 py-3">
+                  <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
                     {lang === "ar" ? "الفواتير المستحقة" : "Outstanding invoices"}
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground tabular-nums">
+                    <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-muted-foreground tabular-nums">
                       {outstanding.length}
                     </span>
                   </h3>
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-muted-foreground">
+                    <span className="hidden text-[11px] text-muted-foreground sm:inline">
                       {lang === "ar"
                         ? "حدّد فاتورة لفتح التحصيل"
                         : "Select an invoice to start collection"}
@@ -748,7 +912,7 @@ function PaymentsPage() {
                       <button
                         type="button"
                         onClick={() => beginPayment()}
-                        className="rounded-xl border border-primary/20 bg-primary/10 px-3 py-1.5 text-[11px] font-bold text-primary transition hover:bg-primary hover:text-primary-foreground"
+                        className="inline-flex h-8 items-center gap-1 rounded-lg border border-primary/25 bg-primary/10 px-2.5 text-[11px] font-semibold text-primary transition hover:bg-primary hover:text-primary-foreground"
                       >
                         {lang === "ar" ? "تحصيل تلقائي" : "Automatic collection"}
                       </button>
@@ -757,32 +921,34 @@ function PaymentsPage() {
                 </div>
                 {outstanding.length === 0 ? (
                   <div className="grid place-items-center gap-2 py-6 text-center">
-                    <CheckCircle2 className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
-                    <div className="text-sm text-muted-foreground">
+                    <CheckCircle2 className="size-5 text-emerald-600 dark:text-emerald-400" />
+                    <div className="text-xs text-muted-foreground">
                       {lang === "ar"
                         ? "لا توجد فواتير مستحقة لهذا العميل"
                         : "No outstanding invoices for this customer"}
                     </div>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto p-2">
-                    <table className="w-full text-sm">
-                      <thead className="text-xs uppercase text-muted-foreground">
-                        <tr className="border-b border-primary/10 bg-primary/[0.05]">
-                          <th className="rounded-t-xl px-3 py-2 text-start font-medium">#</th>
-                          <th className="px-3 py-2 text-start font-medium">
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse text-[13px]">
+                      <thead>
+                        <tr className="border-b border-border bg-surface/60">
+                          <th className="h-9 px-2.5 text-start text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                            #
+                          </th>
+                          <th className="h-9 px-2.5 text-start text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                             {lang === "ar" ? "التاريخ" : "Date"}
                           </th>
-                          <th className="px-3 py-2 text-end font-medium">
+                          <th className="h-9 px-2.5 text-end text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                             {lang === "ar" ? "الإجمالي" : "Total"}
                           </th>
-                          <th className="px-3 py-2 text-end font-medium">
+                          <th className="h-9 px-2.5 text-end text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                             {lang === "ar" ? "المدفوع" : "Paid"}
                           </th>
-                          <th className="px-3 py-2 text-end font-medium">
+                          <th className="h-9 px-2.5 text-end text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                             {lang === "ar" ? "المتبقي" : "Remaining"}
                           </th>
-                          <th className="rounded-t-xl px-3 py-2"></th>
+                          <th className="h-9 px-2.5"></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -792,27 +958,29 @@ function PaymentsPage() {
                           return (
                             <tr
                               key={i.id}
-                              className={`border-b border-primary/[0.08] transition-colors ${isSelected ? "bg-primary/[0.12] shadow-sm" : "bg-card/45 hover:bg-primary/[0.05]"}`}
+                              className={`border-b border-border/60 transition-colors duration-150 ${isSelected ? "bg-primary/[0.07]" : "hover:bg-accent/40"}`}
                             >
-                              <td className="px-3 py-2 font-mono text-xs">{i.invoice_number}</td>
-                              <td className="px-3 py-2 text-muted-foreground">
+                              <td className="px-2.5 py-2 font-mono text-xs whitespace-nowrap">
+                                {i.invoice_number}
+                              </td>
+                              <td className="px-2.5 py-2 font-mono text-xs text-muted-foreground whitespace-nowrap">
                                 {new Date(i.created_at).toLocaleDateString()}
                               </td>
-                              <td className="px-3 py-2 text-end font-mono tabular-nums text-muted-foreground">
+                              <td className="px-2.5 py-2 text-end font-mono text-xs tabular-nums text-muted-foreground">
                                 {money(Number(i.total))}
                               </td>
-                              <td className="px-3 py-2 text-end font-mono tabular-nums text-emerald-600 dark:text-emerald-400">
+                              <td className="px-2.5 py-2 text-end font-mono text-xs tabular-nums text-emerald-600 dark:text-emerald-400">
                                 {money(Number(i.paid))}
                               </td>
-                              <td className="px-3 py-2 text-end font-mono font-bold tabular-nums text-amber-600 dark:text-amber-400">
+                              <td className="px-2.5 py-2 text-end font-mono text-xs font-bold tabular-nums text-amber-600 dark:text-amber-400">
                                 {money(rem)}
                               </td>
-                              <td className="px-3 py-2 text-end">
+                              <td className="px-2.5 py-2 text-end whitespace-nowrap">
                                 <button
                                   onClick={() => beginPayment(i)}
-                                  className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs transition ${isSelected ? "border-primary/40 bg-primary/15 font-medium text-primary" : "border-primary/30 bg-primary/10 text-primary hover:bg-primary/20"}`}
+                                  className={`inline-flex h-7 items-center gap-1 rounded-lg border px-2 text-[11px] font-semibold transition ${isSelected ? "border-primary/40 bg-primary/15 text-primary" : "border-border/70 bg-surface-2 text-foreground hover:border-primary/30 hover:text-primary"}`}
                                 >
-                                  {isSelected && <CheckCircle2 className="h-3.5 w-3.5" />}
+                                  {isSelected && <CheckCircle2 className="size-3" />}
                                   {isSelected
                                     ? lang === "ar"
                                       ? "قيد التحصيل"
@@ -833,9 +1001,9 @@ function PaymentsPage() {
             </div>
 
             {/* آخر التحصيلات */}
-            <section className="panel-elevated overflow-hidden border-primary/15 bg-primary/[0.02] p-0 shadow-sm shadow-primary/[0.04]">
-              <div className="border-b border-primary/15 bg-primary/[0.07] px-5 py-4">
-                <h3 className="text-sm font-bold">
+            <section className="panel-elevated overflow-hidden p-0">
+              <div className="border-b border-border/70 px-3.5 py-3">
+                <h3 className="text-sm font-semibold text-foreground">
                   {lang === "ar" ? "آخر التحصيلات" : "Recent collections"}
                 </h3>
                 <p className="mt-0.5 text-[11px] text-muted-foreground">
@@ -843,29 +1011,29 @@ function PaymentsPage() {
                 </p>
               </div>
               {payments.length === 0 ? (
-                <div className="py-6 text-center text-sm text-muted-foreground">
+                <div className="py-6 text-center text-xs text-muted-foreground">
                   {lang === "ar"
                     ? "لم تُسجل تحصيلات لهذا العميل بعد"
                     : "No collections recorded for this customer yet"}
                 </div>
               ) : (
-                <div className="overflow-x-auto p-2">
-                  <table className="w-full text-sm">
-                    <thead className="text-xs uppercase text-muted-foreground">
-                      <tr className="border-b border-border">
-                        <th className="px-3 py-2 text-start font-medium">
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-[13px]">
+                    <thead>
+                      <tr className="border-b border-border bg-surface/60">
+                        <th className="h-9 px-2.5 text-start text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                           {lang === "ar" ? "التاريخ" : "Date"}
                         </th>
-                        <th className="px-3 py-2 text-start font-medium">
+                        <th className="h-9 px-2.5 text-start text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                           {lang === "ar" ? "الفاتورة" : "Invoice"}
                         </th>
-                        <th className="px-3 py-2 text-start font-medium">
+                        <th className="h-9 px-2.5 text-start text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                           {lang === "ar" ? "الطريقة" : "Method"}
                         </th>
-                        <th className="px-3 py-2 text-start font-medium">
+                        <th className="h-9 px-2.5 text-start text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                           {lang === "ar" ? "ملاحظة" : "Note"}
                         </th>
-                        <th className="px-3 py-2 text-end font-medium">
+                        <th className="h-9 px-2.5 text-end text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                           {lang === "ar" ? "المبلغ" : "Amount"}
                         </th>
                       </tr>
@@ -907,26 +1075,26 @@ function PaymentsPage() {
                                 remainingBalance: Number(selected.balance),
                               });
                             }}
-                            className="min-h-[56px] cursor-pointer border-b border-border/50 transition-all hover:bg-surface-2/60 hover:shadow-sm hover:outline hover:outline-1 hover:outline-border/60"
+                            className="min-h-[44px] cursor-pointer border-b border-border/60 transition-colors duration-150 hover:bg-accent/40"
                           >
-                            <td className="px-3 py-2">
+                            <td className="px-2.5 py-2 whitespace-nowrap">
                               <VortexDateBadge date={p.payment_date} size="sm" />
                             </td>
-                            <td className="px-3 py-2 font-mono text-xs">
-                              <span className="rounded-full bg-muted/70 px-2 py-0.5 text-muted-foreground">
+                            <td className="px-2.5 py-2 font-mono text-xs whitespace-nowrap">
+                              <span className="rounded-md bg-surface-2 px-1.5 py-0.5 text-muted-foreground">
                                 {p.sales_invoices?.invoice_number ??
                                   (lang === "ar" ? "على الحساب" : "On account")}
                               </span>
                             </td>
-                            <td className="px-3 py-2">
-                              <span className="rounded-full border border-border/60 bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                            <td className="px-2.5 py-2">
+                              <span className="inline-block max-w-[180px] truncate rounded-md border border-border/60 bg-surface-2 px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
                                 {displayMethod}
                               </span>
                             </td>
-                            <td className="px-3 py-2 max-w-[220px] truncate text-xs text-muted-foreground/80">
+                            <td className="max-w-[220px] truncate px-2.5 py-2 text-xs text-muted-foreground/80">
                               {p.note ?? "—"}
                             </td>
-                            <td className="px-3 py-2 text-end font-mono font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+                            <td className="px-2.5 py-2 text-end font-mono text-xs font-bold tabular-nums text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
                               <div className="flex items-center justify-end gap-1.5">
                                 <span>{money(Number(p.amount))}</span>
                                 <ArrowUpRight className="size-3.5 opacity-60" />
@@ -948,6 +1116,40 @@ function PaymentsPage() {
         open={!!selectedTx}
         onOpenChange={(op) => !op && setSelectedTx(null)}
         transaction={selectedTx}
+      />
+
+      {/* التحصيل المجزأ: آجل مُستبعد لأن سند القبض لا ينشئ ديناً. */}
+      <SplitPaymentDialog
+        open={splitOpen}
+        onOpenChange={setSplitOpen}
+        total={collectibleAmount}
+        initialValues={splitValues}
+        methods={COLLECTION_SPLIT_METHODS}
+        isCreditAllowed={false}
+        onConfirm={(values) => {
+          setSplitValues(values);
+          const tenders = buildSplitTenders(
+            {
+              cash: values.cash,
+              credit: 0,
+              bank_transfer: values.bank_transfer,
+              mobile_money: values.mobile_money,
+            },
+            selectedInvoice ? remaining : Math.max(Number(selected?.balance ?? 0), 0),
+          );
+          if (tenders.tenders.length <= 1) {
+            // طريقة واحدة = سند مفرد، لا تجزئة: يُمرّر المبلغ والمصدر للمسار العادي.
+            setAmount(String(tenders.paid));
+            if (tenders.tenders[0]) setMethod(tenders.tenders[0].method);
+            toast.info(
+              lang === "ar"
+                ? "طريقة واحدة مختارة — سيُسجّل سنداً مفرداً"
+                : "A single tender was chosen — recorded as a normal receipt",
+            );
+            return;
+          }
+          setAmount(String(tenders.paid));
+        }}
       />
     </>
   );

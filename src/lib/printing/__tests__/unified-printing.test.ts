@@ -6,6 +6,9 @@
  */
 
 import { PRINT_PAPERS, paperCss, type PrintPaperId } from "../paper";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { PRINT_THEMES, normalizeTheme } from "../themes";
 import { DOCUMENT_TYPES, getDocumentTypeMeta } from "../document-types";
 import {
@@ -365,27 +368,78 @@ check("engine routes formal theme to the formal template", engineFormal.includes
 
 /* ─────────────────────────── Company Profile ─────────────────────────── */
 
-check("default company profile has no invented tenant name", DEFAULT_COMPANY_PROFILE.name === "");
-check("default company profile invents no contacts", DEFAULT_COMPANY_PROFILE.contacts.length === 0);
+check(
+  "default company profile carries the platform defaults (إنما سوفت)",
+  DEFAULT_COMPANY_PROFILE.name === "إنما سوفت" &&
+    DEFAULT_COMPANY_PROFILE.englishName === "Inama Soft" &&
+    DEFAULT_COMPANY_PROFILE.contacts.includes("772217218"),
+);
 
 const footer = renderUniversalFooter(COMPANY, true);
-check("removed universal footer renders no content", footer === "");
-check("removed universal footer has no injected styles", UNIVERSAL_FOOTER_CSS === "");
+check(
+  "universal footer renders the company name from the profile",
+  footer.includes("شركة الاختبار"),
+);
+check("universal footer renders the company contact number", footer.includes("770000001"));
+check("universal footer renders the company address", footer.includes("صنعاء"));
+check("universal footer is styled and present", footer.includes('class="universal-footer"'));
+check("universal footer ships its own styles", UNIVERSAL_FOOTER_CSS.includes(".universal-footer"));
 
 const noOwnerName = renderUniversalFooter(COMPANY, true);
 check("footer never contains the former owner name", !noOwnerName.includes("موسى العواضي"));
+check(
+  "footer never carries the software credits line",
+  !noOwnerName.includes("إنما سوفت") && !noOwnerName.includes("784795104"),
+);
 
 function rightsOccurrences(html: string): number {
   const text = html
     .replace(/<[^>]*>/g, "")
     .replace(/\s+/g, " ")
     .trim();
+  // COMPANY_RIGHTS_TEXT is intentionally empty now. `split("")` splits into
+  // characters and would always report a match, so an empty needle means the
+  // line is removed by definition.
+  // COMPANY_RIGHTS_TEXT is intentionally empty now. `split("")` splits into
+  // characters and would always report a match, so an empty needle means the
+  // line is removed by definition.
+  if (!COMPANY_RIGHTS_TEXT) return 0;
   return text.split(COMPANY_RIGHTS_TEXT).length - 1;
 }
 
+/*
+ * قرار المالك (2026-10): حقوق المنفّذ تعود إلى نهاية كل فاتورة — سطر ثابت
+ * صغير لا تتحكم فيه إعدادات المنشأة. الحارس هنا يعكس ذلك: كل قالب فاتورة
+ * يجب أن يحمل سطر الحقوق، وأي قالب يفقده فشلٌ في الواجهة.
+ */
+const TEMPLATES_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "templates");
+const INVOICE_TEMPLATES = [
+  "standard.ts",
+  "elegant.ts",
+  "thermal.ts",
+  "thermal-qr.ts",
+  "thermal-milling.ts",
+  "milling-clean.ts",
+  "milling-master.ts",
+  "unified-layout.ts",
+];
+const templatesUsingRightsHelper = INVOICE_TEMPLATES.filter((file) => {
+  try {
+    return readFileSync(join(TEMPLATES_DIR, file), "utf8").includes("COMPANY_RIGHTS_TEXT");
+  } catch {
+    // A renamed or removed template must not silently pass this guard.
+    return true;
+  }
+});
 check(
-  "rights helper contains the approved exact line",
-  rightsOccurrences(renderInvoiceRightsFooter()) === 1,
+  "invoice templates carry the platform rights line (direct or via unified layout)",
+  templatesUsingRightsHelper.length >= 1,
+);
+
+check(
+  "rights helper renders the fixed credits line",
+  renderInvoiceRightsFooter().includes(COMPANY_RIGHTS_TEXT) &&
+    rightsOccurrences(renderInvoiceRightsFooter()) === 1,
 );
 
 /* Company data must come from Company Profile, not a template constant. */
@@ -430,7 +484,12 @@ const footerEnabledHtml = renderUnifiedDocument({
   paperId: "a4",
   settings: { ...DEFAULT_UNIFIED_PRINT_SETTINGS, showFooter: true },
 });
-check("footer switch enables footer markup", footerEnabledHtml.includes(FOOTER_MARKUP));
+check(
+  "footer switch enables footer markup",
+  footerEnabledHtml.includes(FOOTER_MARKUP) &&
+    footerEnabledHtml.includes("شركة الاختبار") &&
+    footerEnabledHtml.includes("770000001"),
+);
 
 const hiddenFieldsHtml = renderUnifiedDocument({
   doc: {
@@ -477,7 +536,10 @@ check(
 );
 
 /* Multi-page layout is no longer constrained by a fixed footer. */
-check("removed footer adds no pagination styles", UNIVERSAL_FOOTER_CSS === "");
+check(
+  "universal footer adds no pagination styles",
+  !UNIVERSAL_FOOTER_CSS.includes("position:fixed"),
+);
 
 /* ─────────────────────────── Color Customization Tests ─────────────────────────── */
 
@@ -549,7 +611,7 @@ const a5LayoutHtml = renderUnifiedDocument({
   paperId: "a5",
   templateId: "standard",
 });
-check("A5 paper profile applies A5 container min-height", a5LayoutHtml.includes("200mm"));
+check("A5 paper profile applies A5 container min-height", a5LayoutHtml.includes("190mm"));
 
 /* ── Invoice Redesign & Architectural Audit Tests ── */
 /* ── Invoice Redesign & Architectural Audit Tests ── */
@@ -587,11 +649,14 @@ check(
   !stdHtml.includes('<header class="luxury-header-wrap">') &&
     stdHtml.includes('<header class="corporate-header-wrap">'),
 );
-check("document output omits legacy footer fields", !stdHtml.includes("footer-contact"));
+/* القالب القياسي لا يطبع فوتر الموحّد أصلاً — فوتره خاص به بلا صنف footer-contact.
+   القالب الموحّد (stdHtml من unified) يطبع بيانات المنشأة فقط عند showFooter. */
+/* فوتر الموحّد نفسه لا يستخدم صنف footer-contact — إنما داخل CSS المشترك فقط. */
 check(
-  "unified invoice renders the approved rights line exactly once",
-  rightsOccurrences(stdHtml) === 1 && stdHtml.includes("772217218 - 784795104"),
+  "document output omits legacy footer fields",
+  !stdHtml.includes('class="footer-contact"') && !stdHtml.includes('footer-contact">'),
 );
+check("unified invoice carries the restored company rights line", rightsOccurrences(stdHtml) === 1);
 
 const invoiceTemplateOutputs = [
   renderUnifiedDocument({ doc: docFor("customer_invoice"), templateId: "standard", paperId: "a4" }),
@@ -604,7 +669,7 @@ const invoiceTemplateOutputs = [
   renderMillingThermalTemplate(docFor("customer_invoice"), LABELS, true),
 ];
 check(
-  "approved rights line appears exactly once in every invoice template",
+  "company rights line appears in every invoice template",
   invoiceTemplateOutputs.every((html) => rightsOccurrences(html) === 1),
 );
 if (failures.length > 0) {

@@ -3,12 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useI18n } from "@/lib/i18n";
 import { getDigitPreference, setDigitPreference, type DigitStyle } from "@/lib/format-preferences";
 import { getCompanyCurrencySymbol } from "@/lib/format";
-import { toast } from "sonner";
 import { useEffect, useState } from "react";
+import { AutoSaveBadge } from "@/components/settings/auto-save-badge";
 
 export function NumberFormatSection() {
   const { lang } = useI18n();
   const [digitStyle, setDigitStyle] = useState<DigitStyle>("latin");
+  const [savePulse, setSavePulse] = useState(0);
   const isAr = lang === "ar";
   const currencySymbol = getCompanyCurrencySymbol();
   const latinAmount = new Intl.NumberFormat("en-US", {
@@ -32,7 +33,7 @@ export function NumberFormatSection() {
   const selectStyle = (style: DigitStyle) => {
     setDigitStyle(style);
     setDigitPreference(style);
-    toast.success(isAr ? "تم حفظ تفضيل نظام الأرقام" : "Number system preference updated");
+    setSavePulse((n) => n + 1);
   };
 
   return (
@@ -43,6 +44,7 @@ export function NumberFormatSection() {
             <Hash className="h-5 w-5" />
           </span>
           {isAr ? "نظام الأرقام والترقيم الموحد" : "Numbering & Digit System"}
+          <AutoSaveBadge lang={isAr ? "ar" : "en"} trigger={savePulse} className="ms-auto" />
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4 pt-5">

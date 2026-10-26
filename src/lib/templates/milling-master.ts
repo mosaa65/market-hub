@@ -6,10 +6,10 @@ import {
   CustomFieldOptions,
 } from "./types";
 import { getCachedCompanyProfile } from "@/lib/printing/company-profile";
+import { COMPANY_RIGHTS_TEXT } from "@/lib/printing/footer";
 import { formatPrintedDateTime } from "@/lib/printing/date-time";
 import { generateBarcodeSvg, generateQrCodeSvg } from "@/lib/printing/barcode-qr";
 import { numberToArabicWords } from "./tafqeet";
-import { renderInvoiceRightsFooter } from "@/lib/printing/footer";
 
 /**
  * Milling Service Master Template (A4 / A5 Luxury Format)
@@ -176,7 +176,7 @@ export function renderMillingMasterTemplate(
     }
     .meta-label { font-size: 11px; color: #64748b; font-weight: 600; }
     .meta-val { font-size: 13px; color: #0f172a; font-weight: 800; }
-    
+
     .hairline-table {
       width: 100%;
       border-collapse: collapse;
@@ -470,7 +470,6 @@ export function renderMillingMasterTemplate(
         : ""
     }
 
-    ${renderInvoiceRightsFooter()}
     ${
       opts.showFooter
         ? `
@@ -480,6 +479,7 @@ export function renderMillingMasterTemplate(
     </div>`
         : ""
     }
+    <div style="text-align:center;font-size:7.5px;color:#9ca3af;padding:2px 0">${COMPANY_RIGHTS_TEXT}</div>
   </div>
 </body>
 </html>`;
@@ -679,7 +679,6 @@ export function renderMillingThermalTemplate(
       : ""
   }
 
-  ${renderInvoiceRightsFooter()}
   ${
     opts.showFooter && L.poweredBy
       ? `
@@ -688,6 +687,7 @@ export function renderMillingThermalTemplate(
   </div>`
       : ""
   }
+  <div style="text-align:center;font-size:7.5px;color:#9ca3af;padding:2px 0">${COMPANY_RIGHTS_TEXT}</div>
 </body>
 </html>`;
 }

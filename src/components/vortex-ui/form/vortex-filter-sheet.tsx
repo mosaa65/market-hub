@@ -65,16 +65,22 @@ export function VortexFilterSheet({
 }: VortexFilterSheetProps) {
   const effectiveCount = activeFiltersCount ?? activeCount ?? 0;
 
-  /* المحور 13 — التوزيع الذكي (Masonry / column-fill: balance):
-   * * أعمدة CSS متعددة: تُرصّ الفلاتر عمودياً ثم **توازن** أطوال الأعمدة تلقائياً،
-   *   فمثلاً 5 فلاتر => عمود فيه 3 وآخر فيه 2 حسب الطول الفعلي لكل فلتر،
-   *   وليس تقسيماً جامداً (3 في صف وفلتر يتيم في صف آخر).
-   * * 1 فلتر => عمود واحد فقط (لا يتوهم عمودين).
-   * * كل فلتر يملأ عرض عموده كاملاً (w-full break-inside-avoid).
-   * * الجوال: عمود واحد دائماً — كما هو دون أي تغيير.
+  /* التوزيع الذكي — شبكة CSS Grid حقيقية (وليس columns multi-col):
+   * - columns (column-fill: balance) معروفة بكسر تمرير العجلة في Chromium
+   *   داخل الحاويات القابلة للتمرير، وتقطيع الأقسام بين الأعمدة.
+   * - Grid بعمودين على الشاشات العريضة يعطي نفس استغلال المساحة مع تمرير
+   *   عجلة سليم وكل قسم متماسك في عموده.
+   * - عدد الأبناء: نفتح أي غلاف وسيط (fragments/divs) لعدّ الأقسام الحقيقية،
+   *   لأن محتوى الفلتر يصل ملفوفاً بغلاف واحد فكان العدّ يعود 1 دائماً.
+   * - الجوال: عمود واحد دائماً.
    */
-  const fieldCount = React.Children.toArray(children).length;
-  const useMasonry = fieldCount > 1;
+  const fieldCount = React.Children.toArray(children).reduce<number>((count, child) => {
+    if (!React.isValidElement(child)) return count + 1;
+    const inner = (child.props as { children?: React.ReactNode }).children;
+    if (inner == null) return count + 1;
+    return count + React.Children.count(inner);
+  }, 0);
+  const useTwoColumns = fieldCount > 1;
 
   return (
     <VortexDrawerDialog
@@ -134,9 +140,10 @@ export function VortexFilterSheet({
       }
     >
       <div
+        data-vaul-no-drag
         className={cn(
-          useMasonry
-            ? "columns-1 gap-x-5 [column-fill:balance] sm:columns-2 [&>*]:mb-4 [&>*]:w-full [&>*]:break-inside-avoid"
+          useTwoColumns
+            ? "grid grid-cols-1 items-start gap-x-5 gap-y-4 sm:grid-cols-2 [&>*]:min-w-0"
             : "space-y-2",
           "py-2",
         )}

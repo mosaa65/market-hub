@@ -12,6 +12,7 @@
 
 import type { PrintRequest } from "./engine";
 import { getCachedCompanyProfile, type CompanyProfile } from "./company-profile";
+import { COMPANY_RIGHTS_TEXT } from "./footer";
 import { PRINT_PAPERS } from "./paper";
 import { getDocumentTypeMeta, type PrintingDocumentType } from "./document-types";
 import {
@@ -213,5 +214,17 @@ export function renderThermalEscPos(
   // خط توقيع ممتد — ليس فاصل بنود، فلا يخضع لـ showDividers.
   blocks.push({ text: "_".repeat(columns), align: "center" });
 
+  // ── فوتر المنشأة (يُطبع فقط عند showFooter) — نفس سياسة القوالب الورقية ──
+  if (opts.showFooter) {
+    if (divider) blocks.push({ text: divider, align: "center" });
+    const thanks = rtl ? "شكراً لتعاملكم معنا" : "Thank you for your business";
+    blocks.push({ text: thanks, align: "center" });
+    const footerContact = company.phone || company.contacts.join(" · ");
+    if (footerContact) blocks.push({ text: footerContact, align: "center", bold: true });
+    if (company.email) blocks.push({ text: company.email, align: "center" });
+  }
+  // ── حقوق النظام (تظهر دائماً — حقوق المنصة ليست خياراً للمنشأة) ──────
+  if (divider) blocks.push({ text: divider, align: "center" });
+  blocks.push({ text: COMPANY_RIGHTS_TEXT, align: "center" });
   return { columns, blocks, cut: true, feedBeforeCut: 3 };
 }

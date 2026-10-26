@@ -143,8 +143,16 @@ export function VortexDrawerDialog({
               </div>
             )}
 
-            {/* Scrollable Body */}
-            <div className={cn("flex-1 overflow-y-auto px-6 py-5 custom-scrollbar", bodyClassName)}>
+            {/* Scrollable Body — min-h-0 شرط عمل التمرير داخل عمود flex:
+             * بدونها لا يتقلص الابن المرن ويصبح overflow-y-auto بلا مفعول
+             * (المحتوى يتدفق خارج الحاوية ولا تمرّر العجلة، فقط الشريط). */}
+            <div
+              data-vaul-no-drag
+              className={cn(
+                "min-h-0 flex-1 overscroll-contain overflow-y-auto px-6 py-5 custom-scrollbar",
+                bodyClassName,
+              )}
+            >
               {children}
             </div>
 
@@ -212,8 +220,14 @@ export function VortexDrawerDialog({
             </div>
           )}
 
-          {/* Scrollable Content */}
-          <div className={cn("flex-1 overflow-y-auto px-5 py-4 custom-scrollbar", bodyClassName)}>
+          {/* Scrollable Content — min-h-0 مثل سطح المكتب (شرط عمل التمرير) */}
+          <div
+            data-vaul-no-drag
+            className={cn(
+              "min-h-0 flex-1 overscroll-contain overflow-y-auto px-5 py-4 custom-scrollbar",
+              bodyClassName,
+            )}
+          >
             {children}
           </div>
 

@@ -1,8 +1,8 @@
 /**
  * /milling/intake — استلام وفواتير (كاونتر المطحنة ونقطة الخدمة الموحدة).
  *
- * العميل + الحبوب + الأكياس + السعة اليدوية + الوزن (يدوي/مقترح)
- * + أجرة الطحن (أكياس × سعر الكيس) + الخصم + طريقة الدفع + المدفوع/الآجل
+ * العميل + الحبوب (أنواع متعددة) + الأكياس + الوزن (من الميزان)
+ * + أجرة الطحن (إجمالي الأكياس × سعر الكيس) + الخصم + طريقة الدفع + المدفوع/الآجل
  * = مستند أمانة واحد + فاتورة مبيعات رسمية في نفس المعاملة الفورية.
  */
 import { createFileRoute, useSearch, useNavigate } from "@tanstack/react-router";
@@ -31,6 +31,10 @@ import {
   ArrowRight,
   Plus,
   Trash2,
+  Wheat,
+  Coins,
+  BadgePercent,
+  ShoppingBag,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
@@ -39,6 +43,7 @@ import { CustomerFormDialog } from "@/components/contacts/customer-form-dialog";
 import { LuxuryPrintPreviewModal } from "@/components/luxury-print-preview-modal";
 import { UnifiedPrintModal } from "@/components/milling/unified-print-modal";
 import { DocumentShareDialog } from "@/components/communication/document-share-dialog";
+import { CustodyProductFormDialog } from "@/components/milling/custody-product-form-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import {
   createMillingServiceDocument,
@@ -56,6 +61,9 @@ import {
 } from "@/lib/milling";
 import { PaymentPanel, usePaymentPanel } from "@/components/payments/payment-panel";
 import { DynamicPaymentSelector } from "@/components/ui/payment-method/dynamic-payment-selector";
+import { SplitPaymentDialog } from "@/components/ui/payment-method";
+import type { SplitPaymentValues } from "@/components/ui/payment-method";
+import { buildSplitTenders } from "@/lib/payments/split-tenders";
 import { useFormNavigationScope } from "@/hooks/use-form-navigation";
 import { AmountInput } from "@/components/ui/amount-input";
 import { QuantityInput } from "@/components/ui/quantity-input";
@@ -80,6 +88,8 @@ import {
 } from "@/components/milling/milling-ui";
 import { getCompanyCurrencySymbol } from "@/lib/format";
 import type { UnifiedDocumentData } from "@/lib/templates/types";
+import { PosTotalsCard } from "@/components/commerce/pos-totals-card";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/milling/intake")({
   validateSearch: (search: Record<string, unknown>): { docId?: string } => ({
@@ -103,8 +113,6 @@ interface WarehouseOption {
   is_default?: boolean;
 }
 
-const PRESET_CAPACITIES = [50, 40, 25, 20, 10];
-
 function MillingIntakePage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -121,11 +129,11 @@ function MillingIntakePage() {
 
   /**
    * أسطر الاستلام: نوع حبوب مستقل لكل سطر (بر 50كجم ×10 + بر 25كجم ×10 + ...)
-   * كل سطر: صنف + سعة الكيس + الأكياس + الوزن (محسوب آلياً من السعة).
+   * كل سطر: صنف + عدد الأكياس + الوزن (من الميزان مباشرة).
    */
-  const [lines, setLines] = useState<
-    { itemId: string; capacityKg: string; bags: string; kg: string; kgAuto: boolean }[]
-  >([{ itemId: "", capacityKg: "50", bags: "", kg: "", kgAuto: true }]);
+  const [lines, setLines] = useState<{ itemId: string; bags: string; kg: string }[]>([
+    { itemId: "", bags: "", kg: "" },
+  ]);
 
   // الفاتورة والمالية
   const [feePerBag, setFeePerBag] = useState<string>("");
@@ -137,6 +145,11 @@ function MillingIntakePage() {
     paymentMethodId: "cash",
   });
   const [paid, setPaid] = useState("");
+  /**
+   * تعبئة تلقائية للمبلغ المستلم: يتبع صافي الفاتورة لحظياً حتى يعدّله المستخدم يدوياً،
+   * ويعود للتبعية التلقائية عند بدء عملية جديدة أو التحول للطريقة الآجلة.
+   */
+  const [paidAuto, setPaidAuto] = useState(true);
 
   // المستند والطباعة
   const [createdDocument, setCreatedDocument] = useState<MillingServiceDocumentCreated | null>(
@@ -147,6 +160,7 @@ function MillingIntakePage() {
   const [printModalOpen, setPrintModalOpen] = useState(false);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [showWorkflow, setShowWorkflow] = useState(false);
+  const [quickGrainDialogOpen, setQuickGrainDialogOpen] = useState(false);
 
   // استعلام العملاء مع الهاتف والرصيد
   const customers = useQuery({
@@ -239,56 +253,46 @@ function MillingIntakePage() {
 
   // احتساب الإجمالي التلقائي للأكياس والوزن وسعر الخدمة
   // ─ أدوات أسطر الاستلام (تعدد أنواع الحبوب في عملية واحدة) ─
-  function updateLine(
-    idx: number,
-    patch: Partial<{
-      itemId: string;
-      capacityKg: string;
-      bags: string;
-      kg: string;
-      kgAuto: boolean;
-    }>,
-  ) {
+  function updateLine(idx: number, patch: Partial<{ itemId: string; bags: string; kg: string }>) {
     setLines((ls) => ls.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
   }
 
   function addLine() {
-    setLines((ls) => [...ls, { itemId: "", capacityKg: "50", bags: "", kg: "", kgAuto: true }]);
+    setLines((ls) => [...ls, { itemId: "", bags: "", kg: "" }]);
   }
 
   function removeLine(idx: number) {
     setLines((ls) => (ls.length > 1 ? ls.filter((_, i) => i !== idx) : ls));
   }
 
-  /** اختيار سعة الكيس لسطر: يعيد حساب الوزن آلياً */
-  function setLineCapacity(idx: number, cap: string) {
-    const line = lines[idx];
-    const b = Number(line.bags) || 0;
-    const c = Number(cap) || 0;
-    updateLine(idx, {
-      capacityKg: cap,
-      kg: b > 0 && c > 0 ? String(b * c) : line.kg,
-      kgAuto: true,
-    });
-  }
-
-  /** تغيير الأكياس لسطر: وزن آلي + إعادة حساب أجور الخدمة */
+  /**
+   * تغيير الأكياس لسطر — أي تعديل على الكميات يلغي أي تجاوز يدوي سابق
+   * لإجمالي الأجور، ويعبّئ الوزن الصافي تلقائياً من سعة العبوة المسجلة
+   * على المنتج (كيس 50 كجم × 10 كيس = 500 كجم) — وقابل للتعديل.
+   */
   function setLineBags(idx: number, v: string) {
+    setServicePrice("");
     const line = lines[idx];
     const b = Number(v) || 0;
-    const c = Number(line.capacityKg) || 0;
-    // أي تعديل على الكميات يلغي أي تجاوز يدوي سابق لإجمالي الأجور
-    setServicePrice("");
-    updateLine(idx, {
-      bags: v,
-      kg: c > 0 ? (b > 0 ? String(b * c) : "") : line.kg,
-      kgAuto: true,
-    });
+    const item = (grainItems.data ?? []).find((g: ProductOption) => g.id === line.itemId);
+    const unit = Number(item?.package_weight_kg ?? 0);
+    const autoKg = b > 0 && unit > 0 ? String(b * unit) : line.kg;
+    updateLine(idx, { bags: v, kg: autoKg });
   }
 
-  /** تعديل الوزن يدوياً لسطر */
+  /** تغيير الصنف لسطر — يعيد تعبئة الوزن تلقائياً إذا كان هناك عدد أكياس */
+  function setLineItem(idx: number, itemId: string) {
+    const line = lines[idx];
+    const item = (grainItems.data ?? []).find((g: ProductOption) => g.id === itemId);
+    const unit = Number(item?.package_weight_kg ?? 0);
+    const b = Number(line.bags) || 0;
+    const autoKg = b > 0 && unit > 0 ? String(b * unit) : line.kg;
+    updateLine(idx, { itemId, kg: autoKg });
+  }
+
+  /** تعديل الوزن يدوياً لسطر (من الميزان) — يبقى كما أدخله دون الكتابة فوقه */
   function setLineKg(idx: number, v: string) {
-    updateLine(idx, { kg: v, kgAuto: false });
+    updateLine(idx, { kg: v });
   }
 
   // إجماليات العملية (كل الأسطر) — الأكياس والوزن
@@ -304,7 +308,26 @@ function MillingIntakePage() {
   }, [servicePrice, feePerBag, bagCount]);
 
   const currentDiscount = Number(discount) || 0;
+  // الدفع المجزأ: نفس المنطق المستخدم في نقطة البيع.
+  const [splitEditorOpen, setSplitEditorOpen] = useState(false);
+  const [splitValues, setSplitValues] = useState<SplitPaymentValues>({
+    cash: 0,
+    credit: 0,
+    bank_transfer: 0,
+    mobile_money: 0,
+  });
+
   const grandTotal = Math.max(0, currentSubtotal - currentDiscount);
+  const splitResult = buildSplitTenders(
+    {
+      cash: splitValues.cash,
+      credit: splitValues.credit,
+      bank_transfer: splitValues.bank_transfer,
+      mobile_money: splitValues.mobile_money,
+    },
+    grandTotal,
+  );
+  const paymentSplits = splitResult.tenders;
 
   const payment = usePaymentPanel({
     total: grandTotal,
@@ -324,9 +347,16 @@ function MillingIntakePage() {
   function handleSetFullCredit() {
     setPaymentMethod("credit");
     setPaid("");
+    setPaidAuto(true);
   }
 
   const isOverpaid = !isCredit && currentPaid > grandTotal;
+
+  // التعبئة التلقائية: حقل المدفوع يملأ فوراً بصافي الفاتورة عند تغيّره (غير آجل)
+  useEffect(() => {
+    if (isCredit) return;
+    if (paidAuto) setPaid(grandTotal > 0 ? String(grandTotal) : "");
+  }, [grandTotal, isCredit, paidAuto]);
 
   const canSubmit = Boolean(
     customerId &&
@@ -383,9 +413,10 @@ function MillingIntakePage() {
       }
 
       // تفريغ حقول العملية لتجهيز الاستلام التالي
-      setLines([{ itemId: "", capacityKg: "50", bags: "", kg: "", kgAuto: true }]);
+      setLines([{ itemId: "", bags: "", kg: "" }]);
       setNotes("");
       setPaid("");
+      setPaidAuto(true);
       setDiscount("");
 
       void qc.invalidateQueries({ queryKey: ["milling"] });
@@ -399,27 +430,21 @@ function MillingIntakePage() {
     setActiveDetails(null);
     setPrintDoc(null);
     setShowWorkflow(false);
-    setLines([{ itemId: "", capacityKg: "50", bags: "", kg: "", kgAuto: true }]);
+    setLines([{ itemId: "", bags: "", kg: "" }]);
     setNotes("");
     setPaid("");
+    setPaidAuto(true);
     setDiscount("");
   }
 
   return (
     <ModuleGuard moduleId="milling_operations">
-      <div className="mx-auto max-w-7xl space-y-2.5 p-2 sm:p-3">
-        {/* شريط العنوان المدمج لرفع المكونات للأعلى وإلغاء الفراغ */}
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border/70 bg-surface/90 px-3.5 py-2 shadow-2xs">
-          <div>
-            <h1 className="text-sm sm:text-base font-extrabold tracking-tight text-foreground flex items-center gap-2">
-              <Scale className="h-4.5 w-4.5 text-primary" />
-              <span>استلام الأمانات وفاتورة الأجور</span>
-            </h1>
-            <p className="text-[11px] text-muted-foreground">
-              استلام عدة أنواع حبوب في سند واحد مع فاتورة أجور رسمية موحدة ومحاسبة تلقائية.
-            </p>
-          </div>
-        </div>
+      <div className="mx-auto max-w-7xl space-y-4 p-4">
+        {/* شريط العنوان الرسمي */}
+        <PageHeader
+          title="استلام الأمانات"
+          subtitle="استلام عدة أنواع حبوب في سند واحد (بر 50كجم ×10 + بر 25كجم ×10 + …) مع فاتورة أجور رسمية على العملية كلها."
+        />
 
         {/* شريط الإشعار بالعملية النشطة بعد الحفظ أو الفتح */}
         {createdDocument && (
@@ -513,7 +538,7 @@ function MillingIntakePage() {
             <MillingSectionTitle
               icon={<Scale className="h-4 w-4" />}
               title="بيانات استلام حبوب العميل"
-              subtitle="تسجيل الأمانة العينية بدقة الأكياس والسعة والوزن التلقائي."
+              subtitle="تسجيل الأمانة العينية بأنواع الحبوب والأكياس والوزن الفعلي."
             />
 
             <div className="space-y-4 p-4">
@@ -597,88 +622,152 @@ function MillingIntakePage() {
                   <div>
                     <h4 className="text-xs font-bold text-foreground">أنواع الحبوب المستلمة</h4>
                     <p className="text-[11px] text-muted-foreground">
-                      لكل نوع حبوب سطر مستقل: اختر الصنف، حدد السعة، ثم عدد الأكياس — الوزن يُحسب
-                      آلياً.
+                      لكل نوع حبوب سطر مستقل: اختر الصنف، ثم عدد الأكياس، وأدخل الوزن الفعلي من
+                      الميزان. القائمة تقرأ من منتجات الأمانات فقط.
                     </p>
+                    {grainItems.data && grainItems.data.length === 0 && (
+                      <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-2.5 py-1.5 text-[11px]">
+                        <span className="font-semibold text-amber-700 dark:text-amber-300">
+                          لا توجد منتجات حبوب أمانات بعد!
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setQuickGrainDialogOpen(true)}
+                          className="inline-flex items-center gap-1 rounded-lg bg-amber-500 px-2 py-1 font-bold text-white hover:bg-amber-600"
+                        >
+                          <Plus className="h-3 w-3" />
+                          أضف أول نوع حبوب
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={addLine}
-                    className="inline-flex items-center gap-1 rounded-xl border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary shadow-xs hover:bg-primary/20"
-                  >
-                    <Plus className="h-3.5 w-3.5" /> نوع حبوب آخر
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={addLine}
+                      className="inline-flex items-center gap-1 rounded-xl border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary shadow-xs hover:bg-primary/20"
+                    >
+                      <Plus className="h-3.5 w-3.5" /> نوع حبوب آخر
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setQuickGrainDialogOpen(true)}
+                      className="inline-flex items-center gap-1 rounded-xl border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-bold text-amber-700 dark:text-amber-300 shadow-xs hover:bg-amber-500/20"
+                    >
+                      <Plus className="h-3.5 w-3.5" /> صنف جديد
+                    </button>
+                  </div>
                 </div>
 
-                {lines.map((line, idx) => (
-                  <div
-                    key={idx}
-                    className="space-y-2 rounded-xl border border-border/70 bg-card/70 p-3"
-                  >
-                    <div className="grid grid-cols-[1fr_auto] items-center gap-2">
-                      <MillingSelect
-                        value={line.itemId}
-                        onChange={(e) => updateLine(idx, { itemId: e.target.value })}
-                        className="font-bold text-xs"
-                      >
-                        <option value="">اختر نوع الحبوب…</option>
-                        {(grainItems.data ?? []).map((g: ProductOption) => (
-                          <option key={g.id} value={g.id}>
-                            {g.name_ar || g.name}
-                          </option>
-                        ))}
-                      </MillingSelect>
-                      <button
-                        type="button"
-                        disabled={lines.length === 1}
-                        onClick={() => removeLine(idx)}
-                        className="grid h-8 w-8 place-items-center rounded-lg text-rose-500 hover:bg-rose-500/10 disabled:opacity-30"
-                        aria-label="حذف السطر"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2.5 items-center">
-                      <div>
-                        <span className="block text-[11px] font-semibold text-muted-foreground mb-1">
-                          عدد الأكياس:
-                        </span>
-                        <QuantityInput
-                          min={0}
-                          decimals={0}
-                          placeholder="0"
-                          aria-label="عدد الأكياس"
-                          value={line.bags === "" ? null : Number(line.bags)}
-                          onValueChange={(v) => setLineBags(idx, v == null ? "" : String(v))}
-                          className="font-black text-primary"
-                        />
-                      </div>
-
-                      <div>
-                        <span className="block text-[11px] font-semibold text-muted-foreground mb-1">
-                          الوزن الإجمالي (كجم):
-                        </span>
-                        <QuantityInput
-                          min={0}
-                          decimals={2}
-                          unit="kg"
-                          placeholder="0.00"
-                          aria-label="الوزن الإجمالي (كجم)"
-                          value={line.kg === "" ? null : Number(line.kg)}
-                          onValueChange={(v) => setLineKg(idx, v == null ? "" : String(v))}
-                          className="font-bold"
-                        />
-                        {line.kgAuto && Number(line.bags) > 0 && Number(line.capacityKg) > 0 && (
-                          <div className="mt-1 flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-                            <CheckCircle2 className="h-3 w-3 shrink-0" />
-                            {line.bags} كيس × {line.capacityKg} كجم = {fmtNum(Number(line.kg))} كجم
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                {/* رأس الجدول الأنيق للشاشات المتوسطة والكبيرة */}
+                <div className="hidden md:grid md:grid-cols-12 md:gap-2 px-3 py-2 text-[11px] font-bold text-muted-foreground bg-muted/50 rounded-xl border border-border/50">
+                  <div className="md:col-span-5 flex items-center gap-1.5">
+                    <Wheat className="h-3.5 w-3.5 text-amber-600" />
+                    <span>نوع الحبوب المستلمة</span>
                   </div>
-                ))}
+                  <div className="md:col-span-2 text-center">عدد الأكياس</div>
+                  <div className="md:col-span-2 text-center">الوزن الفعلي (كجم)</div>
+                  <div className="md:col-span-2 text-center">أجر السطر التقديري</div>
+                  <div className="md:col-span-1 text-center">حذف</div>
+                </div>
+
+                {lines.map((line, idx) => {
+                  const lineBags = Number(line.bags) || 0;
+                  const unitRate = Number(feePerBag) || 0;
+                  const rowEstimate = lineBags * unitRate;
+
+                  return (
+                    <div
+                      key={idx}
+                      className="group rounded-xl border border-border/70 bg-card p-2.5 transition-all hover:border-primary/40 hover:shadow-xs space-y-2 md:space-y-0"
+                    >
+                      <div className="grid grid-cols-1 md:grid-cols-12 md:items-center gap-2">
+                        {/* 1. نوع الحبوب (5 أعمدة) */}
+                        <div className="md:col-span-5">
+                          <label className="md:hidden block text-[11px] font-semibold text-muted-foreground mb-1">
+                            نوع الحبوب:
+                          </label>
+                          <MillingSelect
+                            value={line.itemId}
+                            onChange={(e) => setLineItem(idx, e.target.value)}
+                            className="font-bold text-xs w-full"
+                          >
+                            <option value="">اختر نوع الحبوب…</option>
+                            {(grainItems.data ?? []).map((g: ProductOption) => (
+                              <option key={g.id} value={g.id}>
+                                {g.name_ar || g.name}{" "}
+                                {g.package_weight_kg ? `(${g.package_weight_kg} كجم)` : ""}
+                              </option>
+                            ))}
+                          </MillingSelect>
+                        </div>
+
+                        {/* 2. عدد الأكياس (عمودان) */}
+                        <div className="md:col-span-2">
+                          <label className="md:hidden block text-[11px] font-semibold text-muted-foreground mb-1">
+                            عدد الأكياس:
+                          </label>
+                          <QuantityInput
+                            min={0}
+                            decimals={0}
+                            unit="كيس"
+                            placeholder="0"
+                            aria-label="عدد الأكياس"
+                            value={line.bags === "" ? null : Number(line.bags)}
+                            onValueChange={(v) => setLineBags(idx, v == null ? "" : String(v))}
+                            className="font-black text-primary text-center"
+                          />
+                        </div>
+
+                        {/* 3. الوزن الصافي (عمودان) */}
+                        <div className="md:col-span-2">
+                          <label className="md:hidden block text-[11px] font-semibold text-muted-foreground mb-1">
+                            الوزن الفعلي (كجم):
+                          </label>
+                          <QuantityInput
+                            min={0}
+                            decimals={2}
+                            unit="كجم"
+                            placeholder="0.00"
+                            aria-label="الوزن الإجمالي (كجم)"
+                            value={line.kg === "" ? null : Number(line.kg)}
+                            onValueChange={(v) => setLineKg(idx, v == null ? "" : String(v))}
+                            className="font-bold text-center"
+                          />
+                        </div>
+
+                        {/* 4. أجر السطر التقديري (عمودان) */}
+                        <div className="md:col-span-2 flex items-center justify-between md:justify-center">
+                          <span className="md:hidden text-[11px] text-muted-foreground">
+                            أجرة السطر:
+                          </span>
+                          <div className="rounded-lg bg-surface-2/80 px-2 py-1 text-center text-xs border border-border/60">
+                            <span className="font-black text-foreground tabular-nums">
+                              {fmtNum(rowEstimate)}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground mr-1">
+                              {currencySymbol}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* 5. زر الحذف (عمود واحد) */}
+                        <div className="md:col-span-1 flex justify-end md:justify-center">
+                          <button
+                            type="button"
+                            disabled={lines.length === 1}
+                            onClick={() => removeLine(idx)}
+                            className="grid h-8 w-8 place-items-center rounded-lg text-rose-500 transition hover:bg-rose-500/10 hover:text-rose-600 disabled:opacity-25 disabled:hover:bg-transparent"
+                            aria-label="حذف السطر"
+                            title="حذف هذا السطر"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
 
                 {/* شريط إجماليات الاستلام */}
                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-muted/60 p-3 text-xs">
@@ -757,13 +846,13 @@ function MillingIntakePage() {
             </div>
           </MillingPanel>
 
-          {/* الجانب الأيسر: سلة الفاتورة والدفع بنمط الكاشير POS (5 أعمدة) */}
+          {/* الجانب الأيسر: سلة الفاتورة والدفع بنمط الكاشير ونقطة البيع (POS) */}
           <MillingPanel className="lg:col-span-5 flex flex-col justify-between">
-            <div>
+            <div className="flex flex-col flex-1">
               <MillingSectionTitle
                 icon={<ReceiptText className="h-4 w-4" />}
-                title="فاتورة أجور الخدمة"
-                subtitle="فاتورة مبيعات رسمية تُصدر وتُرحل آلياً مع المعاملة."
+                title="سلة الخدمة والحساب المالي"
+                subtitle="فاتورة مبيعات وأجور رسمية بنمط نقطة البيع (POS)."
                 action={
                   <span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-[11px] font-bold text-amber-700 dark:text-amber-300">
                     كاونتر فوري
@@ -771,21 +860,31 @@ function MillingIntakePage() {
                 }
               />
 
-              <div className="space-y-4 p-4">
-                {/* بند الخدمة وحساب سعر الكيس */}
-                <div className="rounded-2xl border border-amber-500/25 bg-amber-500/5 p-3.5 space-y-3">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">بند الخدمة المعتمد:</span>
-                    <span className="font-bold text-foreground">
-                      {serviceItem.data?.name_ar || serviceItem.data?.name || "أجور طحن وتجهيز"}
+              {/* جسم السلة: بطاقة بند الخدمة المعتمد (بدل أصناف المنتجات) */}
+              <div className="flex-1 p-3.5 space-y-3">
+                <div className="rounded-2xl border border-primary/20 bg-primary/[0.04] p-3.5 space-y-3 dark:border-primary/30 dark:bg-primary/[0.08]">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="grid h-8 w-8 place-items-center rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                        <Sparkles className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-semibold text-muted-foreground block">
+                          بند الخدمة المعتمد:
+                        </span>
+                        <span className="text-sm font-bold text-foreground">
+                          {serviceItem.data?.name_ar || serviceItem.data?.name || "أجور طحن وتجهيز"}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="rounded-md bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold text-amber-700 dark:text-amber-300">
+                      أجور تشغيل
                     </span>
                   </div>
 
                   {/* احتساب أجر الكيس × عدد الأكياس */}
                   <div className="grid gap-2.5 sm:grid-cols-2">
-                    <MillingField label="أجر طحن الكيس الواحد" hint="سعر خدمة طحن الكيس الواحد">
-                      {/* أجر الكيس سعر وحدة داخل الحساب — التفقيط يظهر مرة واحدة
-                          تحت إجمالي أجور الخدمة أسفله، لا نكرره في الحقلين. */}
+                    <MillingField label="أجر طحن الكيس الواحد" hint="سعر الخدمة لكل كيس">
                       <AmountInput
                         min={0}
                         showInWords={false}
@@ -802,7 +901,7 @@ function MillingIntakePage() {
                       hint={
                         bagCount > 0
                           ? `${bagCount} كيس × ${feePerBag || 0} = ${fmtNum(currentSubtotal)}`
-                          : "المبلغ الإجمالي للخدمة"
+                          : "المبلغ الإجمالي"
                       }
                     >
                       <AmountInput
@@ -816,9 +915,9 @@ function MillingIntakePage() {
                     </MillingField>
                   </div>
 
-                  {/* ملخص عملية الحساب الذكية */}
+                  {/* ملخص عملية الحساب اللحظية */}
                   {bagCount > 0 && Number(feePerBag) > 0 && (
-                    <div className="flex items-center justify-between rounded-xl bg-background/80 px-3 py-2 text-xs font-semibold text-foreground border border-border/60">
+                    <div className="flex items-center justify-between rounded-xl bg-background/90 px-3 py-2 text-xs font-semibold text-foreground border border-border/70">
                       <span className="text-muted-foreground">حسبة الخدمة:</span>
                       <div className="flex items-center gap-1.5">
                         <span className="font-bold text-foreground">{bagCount} كيس</span>
@@ -833,177 +932,195 @@ function MillingIntakePage() {
                   )}
                 </div>
 
-                {/* الخصم الإجمالي */}
-                <MillingField label="الخصم (إن وجد)">
-                  <AmountInput
-                    min={0}
-                    placeholder="0.00"
-                    aria-label="الخصم"
-                    value={discount === "" ? null : Number(discount)}
-                    onValueChange={(v) => setDiscount(v == null ? "" : String(v))}
-                    className="font-medium"
-                  />
-                </MillingField>
+                {/* ملاحظات الفاتورة مثل كاونتر POS */}
+                <input
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="ملاحظات على الفاتورة (اختياري)..."
+                  aria-label="ملاحظات الفاتورة"
+                  className="h-8 w-full rounded-xl border border-input/80 bg-background px-3 text-xs outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:ring-1 focus:ring-primary/20"
+                />
+              </div>
+            </div>
 
-                {/* بطاقة الصافي الإجمالي المميزة */}
-                <div className="rounded-2xl bg-gradient-to-br from-primary/15 via-primary/5 to-surface-2 border border-primary/25 p-4 text-center">
-                  <span className="text-xs font-semibold text-muted-foreground">
-                    صافي الفاتورة الإجمالي
-                  </span>
-                  <div className="mt-1 flex items-baseline justify-center gap-1.5">
-                    <span className="text-3xl font-black tabular-nums text-foreground">
-                      {fmtNum(grandTotal)}
-                    </span>
-                    <span className="text-sm font-bold text-muted-foreground">
-                      {currencySymbol}
-                    </span>
-                  </div>
-                </div>
-
-                {/* طريقة الدفع بنمط الكاشير */}
-                <div className="space-y-2">
+            {/* أسفل السلة: عناصر الدفع، بطاقة الإجماليات، وزر الفوتر مباشرة أسفلها (مطابق لنقطة البيع) */}
+            <div className="shrink-0 space-y-2 border-t border-border/70 bg-surface/95 p-3.5 pt-2.5">
+              {/* ─── شريط التحكم بالدفع: طريقة الدفع + المبلغ المدفوع + الخصم ─── */}
+              <div className="grid min-w-0 grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,0.9fr)] items-end gap-1.5">
+                {/* طريقة الدفع */}
+                <div className="flex min-w-0 flex-col gap-1">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-muted-foreground">
-                      طريقة السداد *
-                    </label>
-                    <div className="flex items-center gap-1.5">
+                    <span className="truncate text-[10px] font-semibold leading-none text-muted-foreground">
+                      طريقة الدفع
+                    </span>
+                    <div className="flex items-center gap-1 text-[10px]">
                       <button
                         type="button"
                         onClick={handlePayFull}
-                        className="rounded-lg bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20"
+                        className="font-bold text-emerald-600 hover:underline"
+                        title="سداد كامل نقداً"
                       >
                         سداد كامل
                       </button>
+                      <span>·</span>
                       <button
                         type="button"
                         onClick={handleSetFullCredit}
-                        className="rounded-lg bg-purple-500/10 px-2 py-0.5 text-[11px] font-bold text-purple-700 dark:text-purple-300 hover:bg-purple-500/20"
+                        className="font-bold text-purple-600 hover:underline"
+                        title="تقييد آجل بالكامل"
                       >
-                        آجل بالكامل
+                        آجل
                       </button>
                     </div>
                   </div>
-
                   <DynamicPaymentSelector
                     context="sales"
-                    value={paymentMethod}
+                    value={paymentMethod === "split" ? "split" : paymentMethod}
                     onChange={(method) => {
+                      if (method === "split") {
+                        setSplitEditorOpen(true);
+                        return;
+                      }
                       setPaymentMethod(method);
+                      setSplitValues({ cash: 0, credit: 0, bank_transfer: 0, mobile_money: 0 });
                       if (getPaymentMethodDefinition(method)?.isCreditTerm) {
                         setPaid("");
                       }
                     }}
+                    allowSplit
+                    onSplitClick={() => setSplitEditorOpen(true)}
                     settlement={settlement}
                     onSettlementChange={setSettlement}
                     includeCredit
                     compact
+                    disabled={submit.isPending}
                   />
                 </div>
 
-                {/* المدفوع والمتبقي */}
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-semibold text-muted-foreground">
-                        المبلغ المستلم (المدفوع)
-                      </label>
-                      {!isCredit && grandTotal > 0 && (
-                        <button
-                          type="button"
-                          onClick={handlePayFull}
-                          className="rounded-lg bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20"
-                        >
-                          تعبئة كامل المبلغ
-                        </button>
-                      )}
-                    </div>
-                    <div className="relative">
-                      <AmountInput
-                        min={0}
-                        disabled={isCredit}
-                        placeholder="0.00"
-                        aria-label="المبلغ المستلم (المدفوع)"
-                        value={isCredit ? null : paid === "" ? null : Number(paid)}
-                        onValueChange={(v) => setPaid(v == null ? "" : String(v))}
-                        className={`font-bold ${
-                          isCredit
-                            ? "cursor-not-allowed opacity-60"
-                            : isOverpaid
-                              ? "border-rose-500 text-rose-600 bg-rose-500/5"
-                              : "text-emerald-600"
-                        }`}
-                      />
-                    </div>
-                    <span className="text-[11px] text-muted-foreground block">
-                      {isCredit ? "معطّل لأن الطريقة آجلة" : "المبلغ المستلم كاش أو شبكة"}
-                    </span>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-semibold text-muted-foreground">
-                      المتبقي كذمة آجلة
-                    </label>
-                    <div className="flex h-10 w-full items-center justify-between rounded-xl border border-border/80 bg-surface-2/70 px-3">
-                      <span className="text-xs text-muted-foreground">المتبقي:</span>
-                      <span
-                        className={`text-sm font-black tabular-nums ${
-                          remainingDue > 0
-                            ? "text-rose-600 dark:text-rose-400"
-                            : "text-emerald-600 dark:text-emerald-400"
-                        }`}
-                      >
-                        {fmtNum(remainingDue)} {currencySymbol}
-                      </span>
-                    </div>
-                    {remainingDue > 0 && (
-                      <p className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">
-                        {selectedCustomer ? (
-                          <>
-                            سيرحل كذمة رسمية على حساب العميل:{" "}
-                            <strong>{selectedCustomer.name}</strong>
-                          </>
-                        ) : (
-                          "يجب اختيار عميل مسجل لتقييد الذمة الآجلة."
-                        )}
-                      </p>
+                {/* المبلغ المدفوع */}
+                <div className="flex min-w-0 flex-col gap-1">
+                  <span className="truncate text-[10px] font-semibold leading-none text-muted-foreground">
+                    المبلغ المدفوع
+                  </span>
+                  <AmountInput
+                    showInWords={false}
+                    hideClear
+                    min={0}
+                    disabled={isCredit}
+                    value={isCredit ? null : paid === "" ? null : Number(paid)}
+                    onValueChange={(v) => {
+                      setPaidAuto(false);
+                      setPaid(v == null ? "" : String(v));
+                    }}
+                    placeholder={isCredit ? "0.00 (آجل)" : "المدفوع"}
+                    className={cn(
+                      "h-8 min-w-0 rounded-lg border border-border bg-background px-2 text-[11px] font-semibold outline-none focus:border-primary",
+                      isCredit && "cursor-not-allowed opacity-60",
+                      isOverpaid && "border-destructive text-destructive",
                     )}
-                  </div>
+                  />
                 </div>
 
-                {/* تنبيه الخطأ في حال كان المدفوع أكبر من إجمالي الفاتورة */}
-                {isOverpaid && (
-                  <div className="flex items-center gap-2 rounded-xl bg-rose-500/10 p-3 text-xs font-bold text-rose-600 dark:text-rose-400 border border-rose-500/20">
-                    <AlertCircle className="h-4 w-4 shrink-0" />
-                    <span>
-                      خطأ في الحساب: المبلغ المدفوع ({fmtNum(currentPaid)} {currencySymbol}) أكبر من
-                      صافي الفاتورة المطلوبة ({fmtNum(grandTotal)} {currencySymbol})! يرجى تصحيح
-                      المبلغ للمتابعة.
-                    </span>
-                  </div>
-                )}
+                {/* الخصم */}
+                <div className="flex min-w-0 flex-col gap-1">
+                  <span className="truncate text-[10px] font-semibold leading-none text-muted-foreground">
+                    الخصم
+                  </span>
+                  <AmountInput
+                    showInWords={false}
+                    hideClear
+                    min={0}
+                    value={discount === "" ? null : Number(discount)}
+                    onValueChange={(v) => setDiscount(v == null ? "" : String(v))}
+                    placeholder="0.00"
+                    className="h-8 min-w-0 rounded-lg border border-border bg-background px-2 text-[11px] font-semibold outline-none focus:border-primary"
+                  />
+                </div>
               </div>
-            </div>
 
-            {/* زر الاعتماد الكبير في أسفل بطاقة الكاشير */}
-            <div className="p-4 border-t border-border/70">
-              <button
-                type="button"
-                disabled={!canSubmit || submit.isPending}
-                onClick={() => submit.mutate()}
-                className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-amber-500 py-3.5 px-4 text-sm font-black text-white shadow-md transition hover:bg-amber-600 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {submit.isPending ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                    جارٍ إصدار الفاتورة وتأكيد الاستلام…
-                  </>
-                ) : (
-                  <>
-                    <Check className="h-5 w-5" />
-                    تسجيل الاستلام وإصدار الفاتورة الرسمية
-                  </>
-                )}
-              </button>
+              {/* بطاقة الإجماليات الذكية بنمط POS Totals Card */}
+              <PosTotalsCard
+                countLabel="الأكياس المستلمة"
+                count={bagCount}
+                rows={[
+                  {
+                    label: "المجموع قبل الخصم",
+                    value: `${fmtNum(currentSubtotal)} ${currencySymbol}`,
+                  },
+                  ...(currentDiscount > 0
+                    ? [
+                        {
+                          label: "الخصم الممنوح",
+                          value: `− ${fmtNum(currentDiscount)} ${currencySymbol}`,
+                          className: "text-rose-600 dark:text-rose-400 font-semibold",
+                        },
+                      ]
+                    : []),
+                  {
+                    label: "المبلغ المدفوع",
+                    value: `${fmtNum(currentPaid)} ${currencySymbol}`,
+                    className: "text-emerald-600 dark:text-emerald-400 font-semibold",
+                  },
+                  ...(remainingDue > 0
+                    ? [
+                        {
+                          label: "المتبقي كدين آجل",
+                          value: `${fmtNum(remainingDue)} ${currencySymbol}`,
+                          className: "text-rose-600 dark:text-rose-400 font-bold",
+                        },
+                      ]
+                    : []),
+                ]}
+                totalLabel="صافي الفاتورة الإجمالي"
+                total={`${fmtNum(grandTotal)} ${currencySymbol}`}
+              />
+
+              {/* تنبيهات السداد أو خطأ الزيادة */}
+              {isOverpaid && (
+                <div className="flex items-center gap-1.5 rounded-xl bg-destructive/10 p-2 text-xs font-semibold text-destructive border border-destructive/20">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>
+                    المبلغ المدفوع ({fmtNum(currentPaid)}) أكبر من صافي الفاتورة (
+                    {fmtNum(grandTotal)})!
+                  </span>
+                </div>
+              )}
+
+              {remainingDue > 0 && (
+                <div className="flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  {selectedCustomer ? (
+                    <span className="truncate">
+                      سيُسجل المتبقي ({fmtNum(remainingDue)} {currencySymbol}) كدين آجل على:{" "}
+                      <strong>{selectedCustomer.name}</strong>
+                    </span>
+                  ) : (
+                    <span>⚠️ يلزم اختيار عميل مسجل لتقييد المبلغ المتبقي كدين آجل.</span>
+                  )}
+                </div>
+              )}
+
+              {/* زر الفوتر الكبير أسفل بطاقة الإجماليات تماماً كما في نقطة البيع */}
+              <div className="pt-1">
+                <button
+                  type="button"
+                  disabled={!canSubmit || submit.isPending}
+                  onClick={() => submit.mutate()}
+                  className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-amber-500 hover:bg-amber-600 text-sm font-bold text-white shadow-md transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {submit.isPending ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                      <span>جارٍ إصدار الفاتورة وتأكيد الاستلام…</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="h-5 w-5" />
+                      <span>تسجيل الاستلام وإصدار الفاتورة الرسمية</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </MillingPanel>
         </div>
@@ -1071,6 +1188,43 @@ function MillingIntakePage() {
             setCustomerId(newCust.id);
             setQuickCustomerOpen(false);
             toast.success(`تمت إضافة واختيار العميل: ${newCust.name}`);
+          }}
+        />
+
+        {/* نافذة إضافة صنف حبوب جديد سريعاً دون مغادرة الكاونتر */}
+        <CustodyProductFormDialog
+          open={quickGrainDialogOpen}
+          onOpenChange={setQuickGrainDialogOpen}
+          defaultClass="RAW_MATERIAL"
+          onSaved={(productId) => {
+            // اختر الصنف الجديد تلقائياً في آخر سطر فارغ
+            const emptyIdx = lines.findIndex((l) => !l.itemId);
+            if (emptyIdx >= 0) {
+              setLineItem(emptyIdx, productId);
+            }
+          }}
+        />
+
+        {/* الدفع المجزأ — نفس الحوار المستخدم في نقطة البيع. */}
+        <SplitPaymentDialog
+          open={splitEditorOpen}
+          onOpenChange={setSplitEditorOpen}
+          total={grandTotal}
+          initialValues={splitValues}
+          isCreditAllowed={Boolean(customerId)}
+          onConfirm={(values) => {
+            setSplitValues(values);
+            const next = buildSplitTenders(
+              {
+                cash: values.cash,
+                credit: values.credit,
+                bank_transfer: values.bank_transfer,
+                mobile_money: values.mobile_money,
+              },
+              grandTotal,
+            );
+            setPaymentMethod(next.tenders.length > 0 ? "split" : "credit");
+            setPaid(String(next.paid));
           }}
         />
       </div>

@@ -128,10 +128,27 @@ describe("Communication Engine — Available Customer Actions Resolver", () => {
     assert.equal(statementPdf.enabled, false);
   });
 
+  it("keeps the general customer message action available for valid phone contacts", () => {
+    const actions = getAvailableCustomerActions({
+      customer: {
+        id: "c4",
+        name: "عميل به هاتف",
+        phone: "771234567",
+        balance: 0,
+        hasLedgerActivity: true,
+      },
+    });
+
+    const generalMessage = actions.find((a) => a.key === "customer_general_message");
+    assert.ok(generalMessage);
+    assert.equal(generalMessage.enabled, true);
+    assert.equal(generalMessage.labelAr, "مراسلة عامة");
+  });
+
   it("disables messaging when customer has no phone number and gives clear warning", () => {
     const actionsNoPhone = getAvailableCustomerActions({
       customer: {
-        id: "c4",
+        id: "c5",
         name: "عميل بدون هاتف",
         phone: null,
         balance: 5000,

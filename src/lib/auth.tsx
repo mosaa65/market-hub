@@ -19,6 +19,21 @@ interface CachedAuthData {
 const AUTH_CACHE_KEY = "vortex_auth_permissions_cache";
 const CACHE_TTL_MS = 1000 * 60 * 60 * 24; // 24 hours
 
+function normalizeRole(value: unknown): Role | null {
+  if (typeof value !== "string") return null;
+  const role = value.trim().toLowerCase();
+  if (
+    role === "owner" ||
+    role === "manager" ||
+    role === "accountant" ||
+    role === "cashier" ||
+    role === "warehouse"
+  ) {
+    return role;
+  }
+  return null;
+}
+
 function readCachedAuth(userId: string): CachedAuthData | null {
   if (typeof window === "undefined") return null;
   try {
@@ -27,7 +42,12 @@ function readCachedAuth(userId: string): CachedAuthData | null {
     const parsed: CachedAuthData = JSON.parse(raw);
     if (parsed.userId !== userId) return null;
     if (Date.now() - parsed.cachedAt > CACHE_TTL_MS) return null;
-    return parsed;
+    return {
+      ...parsed,
+      roles: Array.from(
+        new Set((parsed.roles ?? []).map((role) => normalizeRole(role)).filter(Boolean) as Role[]),
+      ),
+    };
   } catch {
     return null;
   }
@@ -161,7 +181,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsActive(false);
         setLoading(false);
         setIsRefreshingPermissions(false);
-        void supabase.auth.signOut();
+        // Do not forcibly log out a valid session purely because the inactive flag
+        // was not yet resolved or was temporarily stale. The user is blocked in
+        // the UI instead, and the session can be re-established cleanly after a
+        // real sign-out or a true account deactivation event.
         return;
       }
 
@@ -213,7 +236,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error("Failed to load user roles", error);
       return [];
     }
-    return (data ?? []).map((r: { role: Role }) => r.role);
+    return Array.from(
+      new Set(
+        (data ?? [])
+          .map((r: { role?: unknown }) => normalizeRole(r.role))
+          .filter((role): role is Role => role !== null),
+      ),
+    );
   }
 
   /*

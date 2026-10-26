@@ -64,6 +64,8 @@ export interface RecordsToolbarProps {
   viewMode?: RecordsViewMode;
   onViewModeChange?: (mode: RecordsViewMode) => void;
   viewModes?: RecordsViewMode[];
+  /** Render one icon-only circular control that advances to the next mode. */
+  viewModeCycle?: boolean;
 
   /* ---- columns ---- */
   columns?: ColumnDefinition[];
@@ -102,6 +104,7 @@ export function RecordsToolbar({
   viewMode,
   onViewModeChange,
   viewModes,
+  viewModeCycle = false,
   columns,
   columnVisibility,
   onToggleColumn,
@@ -193,7 +196,12 @@ export function RecordsToolbar({
           ) : null}
 
           {viewMode && onViewModeChange ? (
-            <RecordsViewToggle value={viewMode} onChange={onViewModeChange} modes={viewModes} />
+            <RecordsViewToggle
+              value={viewMode}
+              onChange={onViewModeChange}
+              modes={viewModes}
+              cycle={viewModeCycle}
+            />
           ) : null}
 
           {showColumns ? (

@@ -520,6 +520,11 @@ export async function createMillingServiceDocumentMulti(input: {
   discount?: number;
   paymentMethod: string;
   paid: number;
+  /**
+   * أجزاء التحصيل الفعلية عند الدفع المجزأ. عند تمريرها يصبح المدفوع مجموعها،
+   * ويوزّع post_sales_invoice كل طريقة على حسابها المحاسبي.
+   */
+  paymentSplits?: { method: string; amount: number }[] | null;
   notes?: string;
 }): Promise<OpResult<MillingServiceDocumentCreated>> {
   const valid = (input.grains ?? []).filter(
@@ -532,6 +537,8 @@ export async function createMillingServiceDocumentMulti(input: {
     return { ok: false, message: "سجّل نوع حبوب واحد على الأقل مع كميته." };
   }
 
+  const splits = (input.paymentSplits ?? []).filter((line) => Number(line.amount) > 0);
+
   const { data, error } = await db.rpc("create_milling_service_document_multi", {
     _customer_id: input.customerId,
     _warehouse_id: input.warehouseId,
@@ -539,10 +546,13 @@ export async function createMillingServiceDocumentMulti(input: {
     _service_item_id: input.serviceItemId,
     _service_unit_price: input.serviceTotal ?? 0,
     _discount: input.discount ?? 0,
-    _payment_method: input.paymentMethod,
-    _paid: input.paid ?? 0,
+    _payment_method: splits.length > 1 ? "split" : (input.paymentMethod ?? "cash"),
+    _paid: splits.length
+      ? Math.round(splits.reduce((sum, line) => sum + Number(line.amount), 0) * 100) / 100
+      : (input.paid ?? 0),
     _notes: input.notes ?? null,
-  });
+    _payment_splits: splits,
+  } as any);
   if (error) return { ok: false, message: translateCustodyError(error.message) };
   return { ok: true, data: data as MillingServiceDocumentCreated };
 }

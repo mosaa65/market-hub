@@ -1,4 +1,4 @@
-import { ModuleGuard, useModules } from "@/lib/modules";
+﻿import { ModuleGuard, useModules } from "@/lib/modules";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
@@ -46,7 +46,8 @@ import { CartLine as CartLineRow } from "@/components/commerce/cart-line";
 import { MobileProductPicker } from "@/components/commerce/mobile-product-picker";
 import { TableToolbar, type FilterValues } from "@/components/ui/table-toolbar";
 import { RecordsViewToggle } from "@/components/ui/records-view-toggle";
-import { PaymentMethodPicker } from "@/components/ui/payment-method";
+import { PaymentMethodPicker, SplitPaymentDialog } from "@/components/ui/payment-method";
+import type { SplitPaymentValues } from "@/components/ui/payment-method";
 import { AmountInput } from "@/components/commerce/amount-input";
 import { PosDatePicker } from "@/components/commerce/pos-date-picker";
 import { PartyPicker } from "@/components/commerce/party-picker";
@@ -56,13 +57,13 @@ import { usePersistedViewMode } from "@/hooks/use-persisted-view-mode";
 import { SupplierFormDialog } from "@/components/contacts/supplier-form-dialog";
 import { UniversalPrintPreview } from "@/components/universal-print-preview";
 import type { PrintRequest } from "@/lib/printing";
-import { DynamicPaymentSelector } from "@/components/ui/payment-method/dynamic-payment-selector";
-import {
-  SplitPaymentEditor,
-  type SplitPaymentEditorLine,
-} from "@/components/payments/split-payment-editor";
 import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
 import { toLegacyPaymentValue, getPaymentMethodDefinition } from "@/lib/payments/payment-methods";
+import {
+  buildSplitTenders,
+  describeSplitTenders,
+  hasRealTender,
+} from "@/lib/payments/split-tenders";
 
 export const Route = createFileRoute("/_app/purchase-pos")({
   head: () => ({ meta: [{ title: "نقطة المشتريات — فورتيكس ERP" }] }),
@@ -317,19 +318,18 @@ function PurchasePOSPage() {
   const [paidManuallyEdited, setPaidManuallyEdited] = useState(false);
   const [discount, setDiscount] = useState<string>("");
   const [paymentMethod, setPaymentMethod] = useState<string>("cash");
-  const [splitPaymentLines, setSplitPaymentLines] = useState<SplitPaymentEditorLine[]>([]);
+  // الدفع المجزأ: الأجزاء الأربعة كما يعرضها نفس حوار نقطة البيع (SplitPaymentDialog).
+  const [splitValues, setSplitValues] = useState<SplitPaymentValues>({
+    cash: 0,
+    credit: 0,
+    bank_transfer: 0,
+    mobile_money: 0,
+  });
+  const [splitEditorOpen, setSplitEditorOpen] = useState(false);
+  const isSplitPayment = paymentMethod === "split";
   const selectedPurchasePaymentMethod = purchasePaymentMethods.find(
     (method) => method.id === paymentMethod,
   );
-  const splitPaymentMethods = purchasePaymentMethods
-    .filter((method) => !method.isCreditTerm && method.legacyValue !== "split")
-    .map((method) => ({
-      id: method.id,
-      nameAr: method.nameAr,
-      nameEn: method.nameEn,
-      legacyValue: method.legacyValue,
-      requiresReference: method.requiresReference,
-    }));
   const [paymentSelection, setPaymentSelection] = useState<PaymentSettlementSelection>({
     method: "cash",
   });
@@ -678,8 +678,34 @@ function PurchasePOSPage() {
   const taxTotal = cart.reduce((s, l) => s + l.unit_cost * l.quantity * (l.tax_rate / 100), 0);
   const discountN = Number(discount || 0);
   const total = Math.max(0, subtotal + taxTotal - discountN);
-  const paidN = paymentMethod === "credit" ? 0 : paidManuallyEdited ? Number(paid || 0) : total;
-  const isOverpaid = Number.isFinite(paidN) && paidN > total;
+
+  // ── الدفع المجزأ ──
+  // التوزيع يُحسب دائماً من نفس محرك الخدمة الذي تستخدمه باقي الشاشات،
+  // فالآجل مفصول عن التحصيل الفعلي، والمجموع يجب أن يطابق إجمالي الفاتورة.
+  const splitResult = buildSplitTenders(
+    {
+      cash: splitValues.cash,
+      credit: splitValues.credit,
+      bank_transfer: splitValues.bank_transfer,
+      mobile_money: splitValues.mobile_money,
+    },
+    total,
+  );
+  const splitDocsReady =
+    isSplitPayment &&
+    splitResult.balanced &&
+    hasRealTender({
+      cash: splitValues.cash,
+      bank_transfer: splitValues.bank_transfer,
+      mobile_money: splitValues.mobile_money,
+    });
+
+  const singlePaidN =
+    paymentMethod === "credit" ? 0 : paidManuallyEdited ? Number(paid || 0) : total;
+  const paidN = isSplitPayment ? splitResult.paid : singlePaidN;
+  const isOverpaid = isSplitPayment
+    ? splitResult.overpaid
+    : Number.isFinite(paidN) && paidN > total;
 
   // Filter products
   const filtered = useMemo(() => {
@@ -788,6 +814,20 @@ function PurchasePOSPage() {
           : "Paid amount must be between zero and the invoice total",
       );
     }
+    if (isSplitPayment && !splitResult.balanced) {
+      return toast.error(
+        lang === "ar"
+          ? "مجموع توزيع الدفع المجزأ لا يطابق إجمالي الفاتورة"
+          : "The split allocation does not match the invoice total",
+      );
+    }
+    if (isSplitPayment && !splitDocsReady) {
+      return toast.error(
+        lang === "ar"
+          ? "أضف طريقة تحصيل فعلية واحدة على الأقل (نقدًا / بنك / محفظة) للدفع المجزأ"
+          : "Add at least one real tender (cash / bank / wallet) to the split payment",
+      );
+    }
 
     const invalid = cart.find((l) => l.quantity <= 0 || l.unit_cost < 0);
     if (invalid) {
@@ -807,7 +847,25 @@ function PurchasePOSPage() {
       const composedNote = (() => {
         const parts: string[] = [];
         if (note.trim()) parts.push(note.trim());
+        if (isSplitPayment) {
+          // تفصيل التوزيع يُكتب في الملاحظات: قاعدة البيانات لا تُخزّن تجزئة
+          // المشتريات بعد، والملاحظة تبقى مرجع المحاسب على الفاتورة.
+          const labels: Record<string, string> = {};
+          for (const method of purchasePaymentMethods) {
+            labels[method.legacyValue] = method.nameAr;
+          }
+          parts.push(describeSplitTenders(splitResult, labels, lang === "ar" ? "ar" : "en"));
+          if (splitValues.bankReference?.trim())
+            parts.push(
+              `${lang === "ar" ? "مرجع الحوالة" : "Transfer reference"}: ${splitValues.bankReference.trim()}`,
+            );
+          if (splitValues.walletReference?.trim())
+            parts.push(
+              `${lang === "ar" ? "مرجع المحفظة" : "Wallet reference"}: ${splitValues.walletReference.trim()}`,
+            );
+        }
         if (
+          !isSplitPayment &&
           (selectedPurchasePaymentMethod?.requiresReference ||
             paymentMethod === "bank_transfer" ||
             paymentMethod === "mobile_money") &&
@@ -823,12 +881,31 @@ function PurchasePOSPage() {
       let invoiceId: string | null = null;
       let error: any = null;
 
+      // طريقة المستند المحاسبية: الدفع المجزأ يُخزَّن كـ split، والتفصيل في الملاحظة.
+      const documentPaymentMethod = isSplitPayment
+        ? "split"
+        : (selectedPurchasePaymentMethod?.legacyValue ?? toLegacyPaymentValue(paymentMethod));
+      const splitCashboxId =
+        isSplitPayment && splitValues.cash > 0 ? paymentSelection.cashboxId || null : null;
+      // أجزاء التحصيل الفعلية فقط؛ الآجل يمثل المتبقي للمورد ويُرحّل إلى 2111.
+      const purchaseSplits = isSplitPayment
+        ? splitResult.tenders.map((line) => ({
+            method: line.method,
+            amount: line.amount,
+            reference:
+              line.method === "bank_transfer"
+                ? splitValues.bankReference
+                : line.method === "mobile_money"
+                  ? splitValues.walletReference
+                  : undefined,
+          }))
+        : [];
+
       try {
         const res = await (supabase.rpc as any)("create_purchase", {
           _warehouse_id: warehouseId,
           _supplier_id: supplierId,
-          _payment_method:
-            selectedPurchasePaymentMethod?.legacyValue ?? toLegacyPaymentValue(paymentMethod),
+          _payment_method: documentPaymentMethod,
           _paid: paidN,
           _discount: discountN,
           _note: composedNote as any,
@@ -838,14 +915,18 @@ function PurchasePOSPage() {
             unit_cost: Number(l.unit_cost),
             tax_rate: Number(l.tax_rate),
           })),
-          _cashbox_id: paymentSelection.cashboxId || null,
-          _bank_account_id: paymentSelection.bankAccountId || null,
-          _payment_reference:
-            paymentSelection.reference ||
-            paymentSelection.paymentReference ||
-            transferRef.trim() ||
-            null,
-          _payment_method_id: paymentSelection.paymentMethodId || paymentMethod,
+          _payment_splits: purchaseSplits as any,
+          _cashbox_id: isSplitPayment ? splitCashboxId : paymentSelection.cashboxId || null,
+          _bank_account_id: isSplitPayment ? null : paymentSelection.bankAccountId || null,
+          _payment_reference: isSplitPayment
+            ? null
+            : paymentSelection.reference ||
+              paymentSelection.paymentReference ||
+              transferRef.trim() ||
+              null,
+          _payment_method_id: isSplitPayment
+            ? "split"
+            : paymentSelection.paymentMethodId || paymentMethod,
         });
         invoiceId = res.data;
         error = res.error;
@@ -853,8 +934,7 @@ function PurchasePOSPage() {
         const res = await supabase.rpc("create_purchase", {
           _warehouse_id: warehouseId,
           _supplier_id: supplierId,
-          _payment_method: (selectedPurchasePaymentMethod?.legacyValue ??
-            toLegacyPaymentValue(paymentMethod)) as any,
+          _payment_method: documentPaymentMethod as any,
           _paid: paidN,
           _discount: discountN,
           _note: composedNote as any,
@@ -877,14 +957,17 @@ function PurchasePOSPage() {
           await (supabase as any)
             .from("purchase_invoices")
             .update({
-              cashbox_id: paymentSelection.cashboxId || null,
-              bank_account_id: paymentSelection.bankAccountId || null,
-              payment_method_id: paymentSelection.paymentMethodId || paymentMethod,
-              payment_reference:
-                paymentSelection.reference ||
-                paymentSelection.paymentReference ||
-                transferRef.trim() ||
-                null,
+              cashbox_id: isSplitPayment ? splitCashboxId : paymentSelection.cashboxId || null,
+              bank_account_id: isSplitPayment ? null : paymentSelection.bankAccountId || null,
+              payment_method_id: isSplitPayment
+                ? "split"
+                : paymentSelection.paymentMethodId || paymentMethod,
+              payment_reference: isSplitPayment
+                ? null
+                : paymentSelection.reference ||
+                  paymentSelection.paymentReference ||
+                  transferRef.trim() ||
+                  null,
             })
             .eq("id", invoiceId);
         } catch (updateErr) {
@@ -921,6 +1004,8 @@ function PurchasePOSPage() {
       setDiscount("");
       setNote("");
       setTransferRef("");
+      setSplitValues({ cash: 0, credit: 0, bank_transfer: 0, mobile_money: 0 });
+      setSplitEditorOpen(false);
     } catch (e: any) {
       toast.error(
         e.message || (lang === "ar" ? "حدث خطأ أثناء حفظ الفاتورة" : "Failed to record purchase"),
@@ -1081,7 +1166,7 @@ function PurchasePOSPage() {
       <div className="flex min-h-0 flex-col gap-0 overflow-hidden px-1.5 pb-1.5 sm:gap-2 sm:px-2 sm:pb-2 lg:contents lg:row-start-2">
         {/* Left Column: Search, Filters & Product Grid — desktop only. */}
         {isDesktop && (
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-border/80 bg-surface/95 shadow-sm ring-1 ring-background/40 lg:col-start-1 lg:row-start-3 lg:mx-2 lg:mb-2">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-border/80 bg-surface/95 shadow-sm ring-1 ring-background/40 lg:col-start-1 lg:row-start-2 lg:mx-2 lg:mb-2">
             <TableToolbar
               className="border-b border-border/60 bg-surface/50 p-3"
               lang={lang}
@@ -1626,7 +1711,7 @@ function PurchasePOSPage() {
         )}
 
         {/* Right Column: Purchase Cart & Invoicing — the primary workspace. */}
-        <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-primary/15 bg-surface/95 p-2 shadow-xl ring-1 ring-border/50 backdrop-blur-md sm:rounded-3xl sm:p-2.5 lg:col-start-2 lg:row-span-2 lg:row-start-1">
+        <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-primary/15 bg-surface/95 p-2 shadow-xl ring-1 ring-border/50 backdrop-blur-md sm:rounded-3xl sm:p-2.5 lg:col-start-2 lg:row-start-2 lg:mx-2 lg:mb-2">
           {/* Cart Header */}
           <div className="mb-2 flex shrink-0 items-center justify-between border-b border-border/60 px-1 pb-2">
             <div className="flex items-center gap-2">
@@ -1718,6 +1803,8 @@ function PurchasePOSPage() {
                 <PaymentMethodPicker
                   context="purchases"
                   value={paymentMethod}
+                  allowSplit
+                  onSplitClick={() => setSplitEditorOpen(true)}
                   onChange={(method) => {
                     setPaymentMethod(method);
                     setPaid(method === "credit" ? "0" : "");
@@ -1741,29 +1828,38 @@ function PurchasePOSPage() {
                   className="h-8 min-w-0 rounded-lg text-[10px] sm:text-xs"
                 />
               </div>
-              {paymentMethod === "split" && (
-                <SplitPaymentEditor
-                  total={total}
-                  lines={splitPaymentLines}
-                  methods={splitPaymentMethods}
-                  onChange={setSplitPaymentLines}
-                  lang={lang === "ar" ? "ar" : "en"}
-                  className="col-span-full"
+              {isSplitPayment ? (
+                <div className="flex min-w-0 flex-col gap-1">
+                  <span className="truncate text-[10px] font-semibold leading-none text-muted-foreground">
+                    {lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSplitEditorOpen(true)}
+                    title={lang === "ar" ? "تعديل توزيع الدفعات" : "Edit payment allocation"}
+                    className="h-8 min-w-0 truncate rounded-lg border border-primary/25 bg-primary/[0.04] px-2 text-start font-mono text-[10px] font-bold text-primary sm:text-[11px]"
+                  >
+                    {money(splitResult.paid)}
+                    {splitResult.credit > 0 ? ` + ${money(splitResult.credit)}` : ""}
+                  </button>
+                </div>
+              ) : (
+                <AmountInput
+                  label={lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}
+                  showLabel
+                  dir={lang === "ar" ? "rtl" : "ltr"}
+                  value={
+                    paymentMethod === "credit" ? "0" : paidManuallyEdited ? paid : String(total)
+                  }
+                  onValueChange={(value) => {
+                    setPaid(value);
+                    setPaidManuallyEdited(true);
+                  }}
+                  invalid={isOverpaid}
+                  placeholder={lang === "ar" ? "المدفوع" : "Paid"}
+                  className="h-8 rounded-lg border border-border/80 bg-surface px-2 text-[10px] outline-none focus:border-primary sm:text-[11px]"
                 />
               )}
-              <AmountInput
-                label={lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}
-                showLabel
-                dir={lang === "ar" ? "rtl" : "ltr"}
-                value={paymentMethod === "credit" ? "0" : paidManuallyEdited ? paid : String(total)}
-                onValueChange={(value) => {
-                  setPaid(value);
-                  setPaidManuallyEdited(true);
-                }}
-                invalid={isOverpaid}
-                placeholder={lang === "ar" ? "المدفوع" : "Paid"}
-                className="h-8 rounded-lg border border-border/80 bg-surface px-2 text-[10px] outline-none focus:border-primary sm:text-[11px]"
-              />
               <AmountInput
                 label={lang === "ar" ? "الخصم" : "Discount"}
                 showLabel
@@ -1776,119 +1872,144 @@ function PurchasePOSPage() {
             </div>
 
             {/* Transfer reference input */}
-            {(selectedPurchasePaymentMethod?.requiresReference ||
-              paymentMethod === "bank_transfer" ||
-              paymentMethod === "mobile_money") && (
-              <input
-                type="text"
-                value={transferRef}
-                onChange={(e) => {
-                  setTransferRef(e.target.value);
-                  setPaymentSelection((s) => ({ ...s, reference: e.target.value }));
-                }}
-                placeholder={
-                  paymentMethod === "mobile_money"
-                    ? lang === "ar"
-                      ? "رقم عملية المحفظة / المرجع"
-                      : "Wallet transaction / reference number"
-                    : t("pos.pm.transfer_ref")
-                }
-                aria-label={
-                  paymentMethod === "mobile_money"
-                    ? lang === "ar"
-                      ? "مرجع المحفظة"
-                      : "Wallet reference"
-                    : t("pos.pm.transfer_ref")
-                }
-                className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2.5 text-xs text-foreground outline-none transition focus:border-primary"
-              />
-            )}
-
-            {isOverpaid && (
-              <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-2.5 py-1.5 text-[11px] font-medium text-destructive">
-                {lang === "ar"
-                  ? "المبلغ المدفوع أكبر من إجمالي الفاتورة"
-                  : "Paid amount exceeds the invoice total"}
-              </p>
-            )}
-
-            {/* Note Input */}
-            <input
-              type="text"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder={
-                lang === "ar" ? "ملاحظة على فاتورة الشراء (اختياري)..." : "Note (optional)..."
-              }
-              className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2.5 text-xs text-foreground placeholder:text-muted-foreground/70 outline-none focus:border-primary"
-            />
-
-            <PosTotalsCard
-              countLabel={lang === "ar" ? "عدد الأصناف" : "Items"}
-              count={cart.reduce((sum, line) => sum + line.quantity, 0)}
-              rows={[
-                {
-                  label: lang === "ar" ? "الإجمالي بدون ضريبة" : "Subtotal",
-                  value: money(subtotal),
-                },
-                ...(taxTotal > 0
-                  ? [{ label: lang === "ar" ? "قيمة الضريبة" : "Tax", value: money(taxTotal) }]
-                  : []),
-                ...(discountN > 0
-                  ? [
-                      {
-                        label: lang === "ar" ? "الخصم" : "Discount",
-                        value: `−${money(discountN)}`,
-                      },
-                    ]
-                  : []),
-                { label: lang === "ar" ? "المبلغ المدفوع" : "Amount paid", value: money(paidN) },
-                ...(total - paidN > 0
-                  ? [
-                      {
-                        label: lang === "ar" ? "المتبقي للمورد" : "Supplier balance",
-                        value: money(total - paidN),
-                      },
-                    ]
-                  : []),
-              ]}
-              totalLabel={lang === "ar" ? "الإجمالي" : "Total"}
-              total={money(total)}
-            />
-          </div>
-
-          {/* Actions stay outside the only scroll region. */}
-          <div
-            className="mt-2 flex shrink-0 gap-2 border-t border-border/70 bg-surface/95 pb-1 pt-2"
-            dir={lang === "ar" ? "rtl" : "ltr"}
-          >
-            <button
-              type="button"
-              onClick={openPurchaseQuotation}
-              disabled={cart.length === 0}
-              className={`flex h-11 shrink-0 items-center justify-center gap-2 rounded-2xl border border-transparent bg-foreground px-4 text-sm font-semibold text-background transition hover:opacity-90 active:scale-[0.99] disabled:opacity-50 ${lang === "ar" ? "order-last" : ""}`}
-            >
-              <FileText className="h-4 w-4" />
-              <span className="hidden sm:inline">
-                {lang === "ar" ? "عرض الأسعار" : "Price preview"}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={submitPurchase}
-              disabled={loading || cart.length === 0 || isOverpaid}
-              className={`flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-primary to-primary/90 px-4 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition hover:shadow-primary/35 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50 ${lang === "ar" ? "order-first" : ""}`}
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>{lang === "ar" ? "جاري تسجيل الشراء..." : "Recording purchase..."}</span>
-                </>
-              ) : (
-                <span>{lang === "ar" ? "تسجيل فاتورة الشراء" : "Save Purchase Order"}</span>
+            {!isSplitPayment &&
+              (selectedPurchasePaymentMethod?.requiresReference ||
+                paymentMethod === "bank_transfer" ||
+                paymentMethod === "mobile_money") && (
+                <input
+                  type="text"
+                  value={transferRef}
+                  onChange={(e) => {
+                    setTransferRef(e.target.value);
+                    setPaymentSelection((s) => ({ ...s, reference: e.target.value }));
+                  }}
+                  placeholder={
+                    paymentMethod === "mobile_money"
+                      ? lang === "ar"
+                        ? "رقم عملية المحفظة / المرجع"
+                        : "Wallet transaction / reference number"
+                      : t("pos.pm.transfer_ref")
+                  }
+                  aria-label={
+                    paymentMethod === "mobile_money"
+                      ? lang === "ar"
+                        ? "مرجع المحفظة"
+                        : "Wallet reference"
+                      : t("pos.pm.transfer_ref")
+                  }
+                  className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2.5 text-xs text-foreground outline-none transition focus:border-primary"
+                />
               )}
-            </button>
           </div>
+
+          {/* Split allocation summary — edited through the shared dialog. */}
+          {isSplitPayment && (
+            <button
+              type="button"
+              onClick={() => setSplitEditorOpen(true)}
+              className="flex w-full items-center justify-between gap-2 rounded-xl border border-primary/20 bg-primary/[0.04] px-2.5 py-1.5 text-[11px] font-semibold text-primary"
+            >
+              <span className="truncate">
+                {lang === "ar"
+                  ? `دفع متعدد · ${splitResult.tenders.length} طرق${splitResult.credit > 0 ? " + آجل" : ""}`
+                  : `Split payment · ${splitResult.tenders.length} methods${splitResult.credit > 0 ? " + credit" : ""}`}
+              </span>
+              <span className="shrink-0 font-mono">{money(splitResult.allocated)}</span>
+            </button>
+          )}
+
+          {!isSplitPayment && isOverpaid && (
+            <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-2.5 py-1.5 text-[11px] font-medium text-destructive">
+              {lang === "ar"
+                ? "المبلغ المدفوع أكبر من إجمالي الفاتورة"
+                : "Paid amount exceeds the invoice total"}
+            </p>
+          )}
+
+          {/* Note Input */}
+          <input
+            type="text"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder={
+              lang === "ar" ? "ملاحظة على فاتورة الشراء (اختياري)..." : "Note (optional)..."
+            }
+            className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2.5 text-xs text-foreground placeholder:text-muted-foreground/70 outline-none focus:border-primary"
+          />
+
+          <PosTotalsCard
+            countLabel={lang === "ar" ? "عدد الأصناف" : "Items"}
+            count={cart.reduce((sum, line) => sum + line.quantity, 0)}
+            rows={[
+              {
+                label: lang === "ar" ? "الإجمالي بدون ضريبة" : "Subtotal",
+                value: money(subtotal),
+              },
+              ...(taxTotal > 0
+                ? [{ label: lang === "ar" ? "قيمة الضريبة" : "Tax", value: money(taxTotal) }]
+                : []),
+              ...(discountN > 0
+                ? [
+                    {
+                      label: lang === "ar" ? "الخصم" : "Discount",
+                      value: `−${money(discountN)}`,
+                    },
+                  ]
+                : []),
+              { label: lang === "ar" ? "المبلغ المدفوع" : "Amount paid", value: money(paidN) },
+              ...(isSplitPayment && splitResult.credit > 0
+                ? [
+                    {
+                      label: lang === "ar" ? "المتبقي للمورد" : "Supplier balance",
+                      value: money(splitResult.credit),
+                    },
+                  ]
+                : []),
+              ...(!isSplitPayment && total - paidN > 0
+                ? [
+                    {
+                      label: lang === "ar" ? "المتبقي للمورد" : "Supplier balance",
+                      value: money(total - paidN),
+                    },
+                  ]
+                : []),
+            ]}
+            totalLabel={lang === "ar" ? "الإجمالي" : "Total"}
+            total={money(total)}
+          />
+        </div>
+
+        {/* Actions stay outside the only scroll region. */}
+        <div
+          className="mt-2 flex shrink-0 gap-2 border-t border-border/70 bg-surface/95 pb-1 pt-2"
+          dir={lang === "ar" ? "rtl" : "ltr"}
+        >
+          <button
+            type="button"
+            onClick={openPurchaseQuotation}
+            disabled={cart.length === 0}
+            className={`flex h-11 shrink-0 items-center justify-center gap-2 rounded-2xl border border-transparent bg-foreground px-4 text-sm font-semibold text-background transition hover:opacity-90 active:scale-[0.99] disabled:opacity-50 ${lang === "ar" ? "order-last" : ""}`}
+          >
+            <FileText className="h-4 w-4" />
+            <span className="hidden sm:inline">
+              {lang === "ar" ? "عرض الأسعار" : "Price preview"}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={submitPurchase}
+            disabled={loading || cart.length === 0 || isOverpaid}
+            className={`flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-primary to-primary/90 px-4 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition hover:shadow-primary/35 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50 ${lang === "ar" ? "order-first" : ""}`}
+          >
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>{lang === "ar" ? "جاري تسجيل الشراء..." : "Recording purchase..."}</span>
+              </>
+            ) : (
+              <span>{lang === "ar" ? "تسجيل فاتورة الشراء" : "Save Purchase Order"}</span>
+            )}
+          </button>
         </div>
       </div>
 
@@ -2008,6 +2129,24 @@ function PurchasePOSPage() {
           rtl={lang === "ar"}
         />
       ) : null}
+
+      {/* الدفع المجزأ — نفس الحوار المستخدم في نقطة البيع تماماً. */}
+      <SplitPaymentDialog
+        open={splitEditorOpen}
+        onOpenChange={setSplitEditorOpen}
+        total={total}
+        initialValues={splitValues}
+        isCreditAllowed
+        onConfirm={(values) => {
+          setSplitValues(values);
+          setPaymentMethod("split");
+          setPaidManuallyEdited(true);
+          const tendersPaid =
+            Math.round((values.cash + values.bank_transfer + values.mobile_money) * 100) / 100;
+          setPaid(String(tendersPaid));
+          setTransferRef(values.bankReference || values.walletReference || "");
+        }}
+      />
     </div>
   );
 }
