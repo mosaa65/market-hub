@@ -1465,7 +1465,6 @@ function QuickMillingModal({
                 </span>
               </div>
             </div>
-          </div>
 
           {/* ملاحظات الطحن */}
           <MillingField label="ملاحظات تشغيلية">

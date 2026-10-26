@@ -32,6 +32,12 @@ import { PRINT_THEMES, deriveThemeTokens, type PrintTheme } from "@/lib/printing
 import { getCachedCompanyProfile, type CompanyProfile } from "@/lib/printing/company-profile";
 import { generateBarcodeSvg, generateQrCodeSvg } from "@/lib/printing/barcode-qr";
 import { getUnifiedPrintSettings } from "@/lib/printing/settings";
+import { type CompanyProfile } from "@/lib/printing/company-profile";
+import {
+  renderUniversalFooter,
+  UNIVERSAL_FOOTER_CSS,
+  renderInvoiceRightsFooter,
+} from "@/lib/printing/footer";
 import { formatPrintedDateTime } from "@/lib/printing/date-time";
 import type { PaperProfileId } from "./paper-profiles";
 
@@ -63,7 +69,17 @@ function themeCss(
   const baseFontSize = isA5 ? "9px" : "11px";
   const baseLineHeight = isA5 ? "1.36" : "1.45";
   const containerPadding = isA5 ? "4mm 6mm" : "8mm 10mm";
-  const containerMinHeight = isA5 ? "200mm" : "282mm";
+  /*
+   * الارتفاع الأدنى للحاوية لا يتجاوز ما يبقى من الورقة بعد هوامش @page
+   * (A4: 297 − 2×6 = 285مم، A5: 210 − 2×4 = 202مم). كانت القيمة السابقة
+   * 282مم مع padding إضافي 8مم فتجاوزت الحاوية صفحة الـ A4 بقليل
+   * → صفحة ثانية شبه فارغة في كل طباعة. القيمة الجديدة تجعل "صفحة واحدة
+   * دائمًا" هي السلوك المضمون مهما كانت العناصر مرئية أم لا.
+   */
+  /* الحد الأدنى للارتفاع يجب أن يبقى أقل من المساحة المتاحة بعد هوامش @page
+   * التي يحقنها المحرك (A4: ‎297−10−12=275مم، A5: ‎210−8−10=192مم). لو تساوى
+   * الحد مع المساحة أو تجاوزها انزلق سطر واحد إلى صفحة ثانية — hence 272/190. */
+  const containerMinHeight = isA5 ? "190mm" : "272mm";
   const headerPadding = isA5 ? "6px 8px" : "10px 14px";
   const logoBoxSize = isA5 ? "54px" : "76px";
   const companyTitleSize = isA5 ? "13.5px" : "17.5px";
@@ -112,6 +128,7 @@ function themeCss(
       size: ${isA5 ? "A5 portrait" : "A4 portrait"};
       margin: ${isA5 ? "4mm" : "6mm"};
     }
+    ${UNIVERSAL_FOOTER_CSS}
 
     /* الحاوية الرئيسية للورقة */
     .page-container {
@@ -746,14 +763,16 @@ export function renderUnifiedLayout(
     opts.showBarcode !== false && doc.number ? generateBarcodeSvg(doc.number, isA5 ? 14 : 18) : "";
   const qrSvg = opts.showQrCode !== false ? generateQrCodeSvg(qrPayload, isA5 ? 40 : 50) : "";
 
+  // لقطة المستند (بيانات المنشأة وقت الفاتورة) أولًا، ثم البروفايل —
+  // البروفايل نفسه يحمل افتراضيات المنصة عند غياب بيانات المنشأة.
   const companyName =
-    company.name || doc.company?.name || company.arabicName || doc.company?.arabicName || "";
-  const arabicName = company.arabicName || doc.company?.arabicName || "";
-  const englishName = company.englishName || doc.company?.englishName || "";
-  const companyAddress = company.address || doc.company?.address || "";
-  const companyPhone = company.phone || doc.company?.phone || "";
+    doc.company?.name || company.name || company.arabicName || doc.company?.arabicName || "";
+  const arabicName = doc.company?.arabicName || company.arabicName || "";
+  const englishName = doc.company?.englishName || company.englishName || "";
+  const companyAddress = doc.company?.address || company.address || "";
+  const companyPhone = doc.company?.phone || company.phone || "";
   const companyVat = company.taxNumber || doc.company?.vat || "";
-  const companyEmail = company.email || doc.company?.email || "";
+  const companyEmail = doc.company?.email || company.email || "";
 
   const lines = doc.lines || [];
   const rows = lines
@@ -1006,7 +1025,9 @@ export function renderUnifiedLayout(
         </div>`
             : ""
         }
-          ${opts.showFooter ? `<footer class="universal-footer">${rtl ? "شكرًا لتعاملكم معنا" : "Thank you for your business"}</footer>` : ""}
+          ${opts.showFooter
+            ? renderUniversalFooter(company, rtl, true)
+            : ""}
       </div>
 
       <!-- كارد الإجماليات مع مستطيل الإجمالي البارز -->
@@ -1086,6 +1107,9 @@ export function renderUnifiedLayout(
     }
       ${barcodeSvg || qrSvg ? `<div class="invoice-code-markers-bottom">${barcodeSvg ? `<div class="invoice-barcode-bottom">${barcodeSvg}</div>` : ""}${qrSvg ? `<div class="invoice-qr-bottom">${qrSvg}</div>` : ""}</div>` : ""}
   </div>
+
+<!-- حقوق منفّذ البرنامج — ثابتة في نهاية كل مستند، خارج سيطرة إعدادات المنشأة -->
+${renderInvoiceRightsFooter(rtl)}
 
 </div>
 

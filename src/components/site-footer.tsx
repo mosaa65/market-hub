@@ -1,17 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { Globe2, Mail, MapPin, Phone } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { getCachedCompanyProfile } from "@/lib/printing/company-profile";
+import { getCachedCompanyProfile, cacheCompanyProfile } from "@/lib/printing/company-profile";
+import { COMPANY_RIGHTS_TEXT } from "@/lib/printing/footer";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /**
  * فوتر الموقع — بيانات المنشأة الحقيقية فقط.
  *
- * الهوية والاسم والهاتف والبريد والعنوان والرقم الضريبي تأتي من
- * `company_settings` (نفس مصدر الترويسة والفواتير) عبر Company Profile.
- * لا يوجد هنا أي اسم برنامج أو رقم دعم ثابت: هذا فوتر المنشأة، ويُرى من
- * كل مستخدم على كل شاشة.
+ * الهوية والاسم والشعار والهاتف والبريد والعنوان والرقم الضريبي تأتي من
+ * `company_settings` (نفس مصدر الترويسة والفواتير) عبر Company Profile —
+ * وببيانات المنصة الافتراضية (إنما سوفت) ما لم تُدخل المنشأة بياناتها.
+ * الفوتر يُرى من كل مستخدم على كل شاشة، ويحمل دائماً سطر حقوق المنفّذ.
  *
  * يُركَّب من `AppShell` أسفل مساحة العمل، ويُخفى تلقائيًا إذا كانت بيانات
  * المنشأة فارغة تمامًا (قاعدة جديدة لم تُضبط بعد) بدل أن يظهر إطار فارغ.
@@ -22,16 +23,17 @@ interface CompanyFooterInfo {
   email: string;
   address: string;
   taxNumber: string;
+  logo?: string;
 }
 
-function fromProfile(): CompanyFooterInfo {
-  const profile = getCachedCompanyProfile();
+function fromProfile(profile = getCachedCompanyProfile()): CompanyFooterInfo {
   return {
     name: String(profile.name ?? "").trim(),
     phone: String(profile.phone ?? "").trim() || (profile.contacts ?? []).join(" · "),
     email: String(profile.email ?? "").trim(),
     address: String(profile.address ?? "").trim(),
     taxNumber: String(profile.taxNumber ?? "").trim(),
+    logo: String(profile.logoUrl ?? "").trim() || undefined,
   };
 }
 
@@ -53,14 +55,10 @@ export function SiteFooter({ className }: { className?: string }) {
         .limit(1)
         .maybeSingle();
       if (cancelled || !data) return;
-      const row = data as Record<string, unknown>;
-      setInfo({
-        name: String(row.name ?? "").trim(),
-        phone: String(row.phone ?? "").trim(),
-        email: String(row.email ?? "").trim(),
-        address: String(row.address ?? "").trim(),
-        taxNumber: String(row.tax_number ?? "").trim(),
-      });
+      // نفس خط الأنابيب الرسمي (كاش + افتراضيات المنصة) — فلا يظهر فوتر
+      // مختلف عن الترويسة والفواتير، وتُطبّق افتراضيات إنما سوفت تلقائياً.
+      cacheCompanyProfile(data as Record<string, unknown>);
+      setInfo(fromProfile());
     })();
     return () => {
       cancelled = true;
@@ -83,6 +81,13 @@ export function SiteFooter({ className }: { className?: string }) {
     >
       <div className="mx-auto flex w-full max-w-[1400px] flex-wrap items-center justify-center gap-x-3 gap-y-1 sm:justify-between">
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+          {info.logo && (
+            <img
+              src={info.logo}
+              alt={info.name}
+              className="h-5 w-auto max-w-[120px] shrink-0 object-contain"
+            />
+          )}
           {info.name && (
             <span className="truncate font-semibold text-foreground/90">{info.name}</span>
           )}
@@ -124,6 +129,11 @@ export function SiteFooter({ className }: { className?: string }) {
             </span>
           )}
         </div>
+
+        {/* حقوق المنفّذ — ثابتة في كل حالة، لا تخفيها بيانات المنشأة. */}
+        <span className="text-[9px] opacity-80" dir="rtl">
+          {COMPANY_RIGHTS_TEXT}
+        </span>
       </div>
     </footer>
   );

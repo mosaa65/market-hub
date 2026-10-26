@@ -383,6 +383,16 @@ export function StockConversionPage() {
                 </div>
               ))}
 
+              {/* زر إضافة سطر ناتج إضافي */}
+              <button
+                type="button"
+                onClick={() => setOutputs((o) => [...o, { itemId: "", qty: "" }])}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-emerald-500/40 bg-emerald-500/[0.04] hover:bg-emerald-500/[0.08] text-xs font-bold text-emerald-700 dark:text-emerald-300 transition-all active:scale-[0.99]"
+              >
+                <Plus className="h-4 w-4" />
+                <span>إضافة سطر ناتج جديد</span>
+              </button>
+
               {/* الفاقد الاختياري + لوحة التوازن */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <MillingField label="الفاقد (اختياري)" hint="عدد الوحدات التي تختفي — يمثل الفرق">

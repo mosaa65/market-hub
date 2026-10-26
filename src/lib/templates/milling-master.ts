@@ -6,6 +6,7 @@ import {
   CustomFieldOptions,
 } from "./types";
 import { getCachedCompanyProfile } from "@/lib/printing/company-profile";
+import { COMPANY_RIGHTS_TEXT } from "@/lib/printing/footer";
 import { formatPrintedDateTime } from "@/lib/printing/date-time";
 import { generateBarcodeSvg, generateQrCodeSvg } from "@/lib/printing/barcode-qr";
 import { numberToArabicWords } from "./tafqeet";
@@ -478,6 +479,7 @@ export function renderMillingMasterTemplate(
     </div>`
         : ""
     }
+    <div style="text-align:center;font-size:7.5px;color:#9ca3af;padding:2px 0">${COMPANY_RIGHTS_TEXT}</div>
   </div>
 </body>
 </html>`;
@@ -685,6 +687,7 @@ export function renderMillingThermalTemplate(
   </div>`
       : ""
   }
+  <div style="text-align:center;font-size:7.5px;color:#9ca3af;padding:2px 0">${COMPANY_RIGHTS_TEXT}</div>
 </body>
 </html>`;
 }

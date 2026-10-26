@@ -6,6 +6,7 @@ import {
   CustomFieldOptions,
 } from "./types";
 import { getCachedCompanyProfile } from "@/lib/printing/company-profile";
+import { COMPANY_RIGHTS_TEXT } from "@/lib/printing/footer";
 import { formatPrintedDateTime } from "@/lib/printing/date-time";
 
 export function renderThermalTemplate(
@@ -106,5 +107,6 @@ export function renderThermalTemplate(
       : ""
   }
   ${opts.showFooter ? `<div class="foot">${L.thanks}</div>` : ""}
+  <div class="foot" style="font-size:7px;color:#9ca3af;border:none;padding-top:2px;">${COMPANY_RIGHTS_TEXT}</div>
 </div></body></html>`;
 }

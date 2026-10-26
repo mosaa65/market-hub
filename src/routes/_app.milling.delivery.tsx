@@ -516,32 +516,6 @@ function MillingDeliveryPage() {
                   <Plus className="h-4 w-4" />
                   <span>إضافة صنف آخر للتسليم</span>
                 </button>
-              </div>ed-lg bg-amber-500/10 p-2 text-center text-xs">
-                          <span className="block text-[10px] text-amber-700 dark:text-amber-300 font-semibold">
-                            المتبقي بعد التسليم:
-                          </span>
-                          <span className="font-black text-amber-700 dark:text-amber-300">
-                            {b ? `${fmtNum(remBags)} كيس` : "—"}
-                          </span>
-                          <span className="block text-[10px] text-amber-700/80 dark:text-amber-300/80">
-                            {b ? `(${fmtNum(remKg)} كجم)` : ""}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* رسالة التحذير في حال تجاوز الكمية المتاحة */}
-                      {isOver && (
-                        <div className="flex items-center gap-1.5 rounded-lg bg-rose-500/10 px-2.5 py-1 text-xs font-bold text-rose-600 dark:text-rose-300">
-                          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                          <span>
-                            تنبيه: الكمية المطلوبة تسليمها أكبر من رصيد العميل المتبقي! الحد الأقصى:{" "}
-                            {fmtNum(b.bags_balance)} كيس / {fmtNum(b.kg_balance)} كجم.
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
               </div>
 
               {/* بيانات المستلم والسائق والملاحظات */}

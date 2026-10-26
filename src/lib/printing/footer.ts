@@ -30,17 +30,21 @@ export function renderUniversalFooter(
   return `<footer class="universal-footer" dir="${rtl ? "rtl" : "ltr"}">${rows.join("")}</footer>`;
 }
 
-export const UNIVERSAL_FOOTER_CSS = `.universal-footer{margin-top:auto;padding-top:8px;border-top:1px solid #9ca3af;text-align:center;color:#4b5563;font-size:9px;line-height:1.45;break-inside:avoid;page-break-inside:avoid}.universal-footer .footer-name{font-weight:700;color:#111827}.universal-footer .footer-contact{direction:ltr;unicode-bidi:isolate;font-weight:700}.universal-footer .footer-email,.universal-footer .footer-address{white-space:pre-wrap}`;
+export const UNIVERSAL_FOOTER_CSS = `.universal-footer{margin-top:auto;padding-top:8px;border-top:1px solid #9ca3af;text-align:center;color:#4b5563;font-size:9px;line-height:1.45;break-inside:avoid;page-break-inside:avoid}.universal-footer .footer-name{font-weight:700;color:#111827}.universal-footer .footer-contact{direction:ltr;unicode-bidi:isolate;font-weight:700}.universal-footer .footer-email,.universal-footer .footer-address{white-space:pre-wrap}.invoice-rights-footer{margin-top:4px;padding-top:4px;border-top:1px dashed #d1d5db;text-align:center;color:#9ca3af;font-size:7.5px;line-height:1.3;break-inside:avoid;page-break-inside:avoid}`;
 
 /**
- * عبارة حقوق منفّذ البرنامج — **لا تُطبع في الفواتير**.
- *
- * النص ثابت هنا للتوثيق فقط، والقيمة الفارغة هي حارس إضافي: حتى لو أعاد
- * أحدهم استدعاء `renderInvoiceRightsFooter()` في قالب، فلن يطبع شيئًا.
+ * عبارة حقوق منفّذ البرنامج — تظهر في نهاية كل مستند مطبوع (A4/A5/حراري)،
+ * ويستعملها أيضاً فوتر الموقع العلني.
  */
 export const COMPANY_RIGHTS_TEXT = "تطوير وبرمجة إنما سوفت | 772217218 - 784795104";
 
-/** سطر الحقوق — معطّل في الفواتير بقرار المالك. */
-export function renderInvoiceRightsFooter(): string {
-  return "";
+/**
+ * حقوق المنفّذ — سطر ثابت صغير في نهاية كل مستند مطبوع.
+ *
+ * لماذا دائماً؟ لأن حقوق المنصة ليست خياراً للمنشأة: حتى لو أخفت المنشأة
+ * فوترها الخاص (showFooter = false) تبقى علامة المنفّذ موجودة، تماماً مثل
+ * "تم التطوير بواسطة" في أي منتج تجاري.
+ */
+export function renderInvoiceRightsFooter(rtl = true): string {
+  return `<footer class="invoice-rights-footer" dir="${rtl ? "rtl" : "ltr"}">${COMPANY_RIGHTS_TEXT}</footer>`;
 }

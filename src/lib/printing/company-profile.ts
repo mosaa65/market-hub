@@ -18,12 +18,16 @@ const CACHE_KEY = "company_settings_cache";
 /** In-memory mirror used where localStorage does not exist (SSR, Node, tests). */
 let memoryProfile: CompanyProfile | null = null;
 /**
- * Fallback used only when `company_settings` has never been cached.
- * The app must never render a tenant name or contact number of its own.
+ * Fallback used when `company_settings` has no row (or fields are empty).
+ * الاسم/اللغة/الأرقام هنا بيانات المنصة الافتراضية (إنما سوفت) — تظهر فقط
+ * ما لم تُدخل المنشأة بياناتها، وليست بديلاً عنها.
  */
 const DEFAULT_PROFILE: CompanyProfile = {
-  name: "",
-  contacts: [],
+  name: "إنما سوفت",
+  arabicName: "إنما سوفت",
+  englishName: "Inama Soft",
+  phone: "772217218",
+  contacts: ["772217218", "779099272"],
   logoUrl: "/vortex-erp-wordmark.png",
 };
 
@@ -34,13 +38,15 @@ function fromRow(row: Record<string, unknown> | null | undefined): CompanyProfil
     .map((v) => v.trim())
     .filter(Boolean);
   const contacts = Array.from(new Set([phone, ...extra].filter(Boolean)));
+  // المنشأة بلا بيانات؟ نعرض بيانات المنصة الافتراضية بدل الحقول الفارغة.
+  const effectiveContacts = contacts.length ? contacts : DEFAULT_PROFILE.contacts;
   return {
     name: String(row?.name ?? "").trim() || DEFAULT_PROFILE.name,
-    arabicName: String(row?.name_ar ?? "").trim() || undefined,
-    englishName: String(row?.name_en ?? "").trim() || undefined,
+    arabicName: String(row?.name_ar ?? "").trim() || DEFAULT_PROFILE.arabicName,
+    englishName: String(row?.name_en ?? "").trim() || DEFAULT_PROFILE.englishName,
     legalName: String(row?.legal_name ?? "").trim() || undefined,
-    phone: phone || undefined,
-    contacts,
+    phone: phone || DEFAULT_PROFILE.phone,
+    contacts: effectiveContacts,
     address: String(row?.address ?? "").trim() || undefined,
     email: String(row?.email ?? "").trim() || undefined,
     taxNumber: String(row?.tax_number ?? "").trim() || undefined,
