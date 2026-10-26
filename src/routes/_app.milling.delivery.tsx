@@ -34,6 +34,7 @@ import {
   custodyDelivery,
   fetchCustodyBalances,
   buildCustodyDeliveryDoc,
+  capacityKgOf,
   type CustodyLine,
   type CustodyBalance,
 } from "@/lib/milling";
@@ -144,11 +145,39 @@ function MillingDeliveryPage() {
   }
 
   function changeLineItem(idx: number, itemId: string) {
-    setLines((l) => l.map((x, i) => (i !== idx ? x : { ...x, itemId })));
+    setLines((l) =>
+      l.map((x, i) => {
+        if (i !== idx) return x;
+        const b = balanceFor(itemId);
+        const unitWeight =
+          b && Number(b.bags_balance) > 0
+            ? Number(b.kg_balance) / Number(b.bags_balance)
+            : capacityKgOf(b as any) || 0;
+        const autoKg =
+          x.bags > 0 && unitWeight > 0 ? Math.round(x.bags * unitWeight * 100) / 100 : x.kg;
+        return { ...x, itemId, kg: autoKg };
+      }),
+    );
   }
 
   function changeLineBags(idx: number, bags: number) {
-    setLines((l) => l.map((x, i) => (i !== idx ? x : { ...x, bags })));
+    setLines((l) =>
+      l.map((x, i) => {
+        if (i !== idx) return x;
+        const b = balanceFor(x.itemId);
+        const unitWeight =
+          b && Number(b.bags_balance) > 0
+            ? Number(b.kg_balance) / Number(b.bags_balance)
+            : capacityKgOf(b as any) || 0;
+        const autoKg =
+          bags > 0 && unitWeight > 0
+            ? Math.round(bags * unitWeight * 100) / 100
+            : bags === 0
+              ? 0
+              : x.kg;
+        return { ...x, bags, kg: autoKg };
+      }),
+    );
   }
 
   function changeLineKg(idx: number, kg: number) {

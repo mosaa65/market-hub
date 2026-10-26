@@ -350,10 +350,21 @@ export async function fetchServiceItem(): Promise<ProductOption | null> {
  * منتج بلا سعة أو بغير وزن يُعيد null والواجهة تعامل الوزن يدوياً.
  */
 export function capacityKgOf(
-  item: ProductOption | { package_weight_kg?: number | null } | null | undefined,
+  item:
+    | ProductOption
+    | { package_weight_kg?: number | null; name_ar?: string | null; name?: string | null }
+    | null
+    | undefined,
 ): number | null {
   const v = Number(item?.package_weight_kg ?? 0);
-  return Number.isFinite(v) && v > 0 ? v : null;
+  if (Number.isFinite(v) && v > 0) return v;
+  const name = (item as any)?.name_ar || (item as any)?.name || "";
+  const match = name.match(/(\d+(?:\.\d+)?)\s*(?:كجم|كيلو|كج|kg)/i);
+  if (match) {
+    const parsed = parseFloat(match[1]);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  return null;
 }
 
 /* -------------------------------------------------------------- balances */

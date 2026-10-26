@@ -35,6 +35,7 @@ import {
   fetchGrainTypes,
   custodyVoucherToDoc,
   buildCustodyVoucher,
+  capacityKgOf,
   type CustodyLine,
   type ProductOption,
   type GrainType,
@@ -156,21 +157,55 @@ function MillingMillPage() {
   const selectedCustomer = (customers.data ?? []).find((c) => c.id === customerId);
 
   // ── أدوات أسطر الحبوب المطحونة (تعدد الأصناف في عملية واحدة) ──
+  // ── أدوات أسطر الحبوب المطحونة مع الحساب التلقائي الذكي للوزن ──
   function changeGrainItem(idx: number, itemId: string) {
-    setGrains((g) => g.map((l, i) => (i !== idx ? l : { ...l, itemId })));
+    setGrains((g) =>
+      g.map((l, i) => {
+        if (i !== idx) return l;
+        const b = grainBalances.find((x) => x.item_id === itemId);
+        const unitWeight =
+          b && Number(b.bags_balance) > 0
+            ? Number(b.kg_balance) / Number(b.bags_balance)
+            : capacityKgOf(b as any) || 0;
+        const autoKg =
+          l.bags > 0 && unitWeight > 0 ? Math.round(l.bags * unitWeight * 100) / 100 : l.kg;
+        return { ...l, itemId, kg: autoKg };
+      }),
+    );
   }
+
   function changeGrainBags(idx: number, bags: number) {
-    setGrains((g) => g.map((l, i) => (i !== idx ? l : { ...l, bags })));
+    setGrains((g) =>
+      g.map((l, i) => {
+        if (i !== idx) return l;
+        const b = grainBalances.find((x) => x.item_id === l.itemId);
+        const unitWeight =
+          b && Number(b.bags_balance) > 0
+            ? Number(b.kg_balance) / Number(b.bags_balance)
+            : capacityKgOf(b as any) || 0;
+        const autoKg =
+          bags > 0 && unitWeight > 0
+            ? Math.round(bags * unitWeight * 100) / 100
+            : bags === 0
+              ? 0
+              : l.kg;
+        return { ...l, bags, kg: autoKg };
+      }),
+    );
   }
+
   function changeGrainKg(idx: number, kg: number) {
     setGrains((g) => g.map((l, i) => (i !== idx ? l : { ...l, kg })));
   }
+
   function addGrainLine() {
     setGrains((g) => [...g, { itemId: "", bags: 0, kg: 0 }]);
   }
+
   function removeGrainLine(idx: number) {
     setGrains((g) => (g.length > 1 ? g.filter((_, i) => i !== idx) : g));
   }
+
   /** طحن كامل رصيد سطر محدد */
   function handleMillAllForLine(idx: number) {
     const line = grains[idx];
@@ -183,8 +218,6 @@ function MillingMillPage() {
       ),
     );
   }
-
-  // V2: لا خريطة سعات ولا حساب تلقائي — كل الأوزان إدخال يدوي فيزيائي.
 
   // E6/M5: النوع المرجعي المختار
   const selectedGrainType = useMemo(
@@ -226,29 +259,61 @@ function MillingMillPage() {
             );
           if (!match) return null;
           const kg = milledKg > 0 ? Math.round(((milledKg * g.ratio) / 100) * 100) / 100 : 0;
-          return { itemId: match.id, bags: 0, kg };
+          const cap = capacityKgOf(match) || 0;
+          const bags = cap > 0 && kg > 0 ? Math.round(kg / cap) : 0;
+          return { itemId: match.id, bags, kg };
         })
         .filter((l): l is CustodyLine => l !== null);
       if (prefilled.length > 0) setOutputs(prefilled);
     }
   }
 
-  // تغيير سطر الناتج — بلا أي اشتقاق من السعة
+  // تغيير سطر الناتج — مع احتساب تلقائي للوزن من سعة العبوة (أكياس × سعة)
   function changeLineItem(idx: number, itemId: string) {
-    setOutputs((o) => o.map((l, i) => (i !== idx ? l : { ...l, itemId })));
+    setOutputs((o) =>
+      o.map((l, i) => {
+        if (i !== idx) return l;
+        const item = (outputItems.data ?? []).find((p: ProductOption) => p.id === itemId);
+        const cap = capacityKgOf(item) || 0;
+        const autoKg = l.bags > 0 && cap > 0 ? Math.round(l.bags * cap * 100) / 100 : l.kg;
+        return { ...l, itemId, kg: autoKg };
+      }),
+    );
   }
 
   function changeLineBags(idx: number, bags: number) {
-    setOutputs((o) => o.map((l, i) => (i !== idx ? l : { ...l, bags })));
+    setOutputs((o) =>
+      o.map((l, i) => {
+        if (i !== idx) return l;
+        const item = (outputItems.data ?? []).find((p: ProductOption) => p.id === l.itemId);
+        const cap = capacityKgOf(item) || 0;
+        const autoKg =
+          bags > 0 && cap > 0 ? Math.round(bags * cap * 100) / 100 : bags === 0 ? 0 : l.kg;
+        return { ...l, bags, kg: autoKg };
+      }),
+    );
   }
 
   function changeLineKg(idx: number, kg: number) {
     setOutputs((o) => o.map((l, i) => (i !== idx ? l : { ...l, kg })));
   }
 
-  // الفاقد: أكياس ووزن مستقلان — بلا ضرب بسعة
+  // الفاقد: احتساب تلقائي ذكي
   function handleLossBagsChange(v: string) {
     setLossBags(v);
+    const b = Number(v) || 0;
+    if (b > 0 && (!lossKg || Number(lossKg) === 0)) {
+      const milledKg = grains.reduce((s, g) => s + (Number(g.kg) || 0), 0);
+      const milledBags = grains.reduce((s, g) => s + (Number(g.bags) || 0), 0);
+      const avgBag = milledBags > 0 ? milledKg / milledBags : 50;
+      setLossKg(String(Math.round(b * avgBag * 100) / 100));
+    }
+  }
+
+  /** زر ذكي: تعبئة الفاقد التشغيلي تلقائياً من الفارق غير الموزون لمطابقة 100% */
+  function handleAutoFillLossFromDiscrepancy() {
+    const unallocated = Math.max(0, currentMilledKg - totalProducedKg);
+    setLossKg(String(Math.round(unallocated * 100) / 100));
   }
 
   // الحسابات الرياضية للمطابقة والتحقق — الإجماليات عبر كل أسطر الحبوب
@@ -541,6 +606,16 @@ function MillingMillPage() {
                   );
                 })}
 
+                {/* زر إضافة صنف حبوب خام آخر في الأسفل بتصميم الهوية الموحدة */}
+                <button
+                  type="button"
+                  onClick={addGrainLine}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-amber-500/40 bg-amber-500/[0.04] hover:bg-amber-500/[0.09] text-xs font-bold text-amber-700 dark:text-amber-300 transition-all active:scale-[0.99]"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>إضافة صنف حبوب خام آخر</span>
+                </button>
+
                 {/* شريط إجماليات الحبوب والنواتج */}
                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-muted/60 p-3 text-xs">
                   <div className="flex items-center gap-3">
@@ -670,18 +745,30 @@ function MillingMillPage() {
 
               {/* قسم الفاقد التشغيلي الفعلي أثناء الطحن */}
               <div className="rounded-2xl border border-amber-500/25 bg-amber-500/5 p-3.5 space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
                     <Scale className="h-4 w-4 text-amber-600" />
                     <span>الفاقد التشغيلي الفعلي للطحن (اختياري)</span>
                   </h4>
-                  <span className="text-[11px] text-muted-foreground">
-                    الفاقد الحقيقي المتطاير أثناء الطحن
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleAutoFillLossFromDiscrepancy}
+                      disabled={currentMilledKg <= 0 || currentMilledKg <= totalProducedKg}
+                      className="inline-flex items-center gap-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[11px] font-bold text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 disabled:opacity-40 transition-colors shadow-xs"
+                      title="احتساب وتعبئة الفاقد تلقائياً من الفارق بين الحبوب المطحونة والنواتج"
+                    >
+                      <Sparkles className="h-3 w-3 text-amber-500" />
+                      <span>احتساب الفاقد من الفارق تلقائياً</span>
+                    </button>
+                    <span className="text-[11px] text-muted-foreground hidden sm:inline">
+                      الفاقد المتطاير أثناء الطحن
+                    </span>
+                  </div>
                 </div>
 
                 <div className="grid gap-2.5 sm:grid-cols-2">
-                  <MillingField label="أكياس الفاقد" hint="اختياري — بلا احتساب تلقائي">
+                  <MillingField label="أكياس الفاقد" hint="اختياري — يحسب الوزن تلقائياً">
                     <QuantityInput
                       decimals={0}
                       min={0}
@@ -692,7 +779,7 @@ function MillingMillPage() {
                     />
                   </MillingField>
 
-                  <MillingField label="وزن الفاقد (كجم)">
+                  <MillingField label="وزن الفاقد (كجم)" hint="قابل للتعديل اليدوي">
                     <QuantityInput
                       decimals={2}
                       min={0}

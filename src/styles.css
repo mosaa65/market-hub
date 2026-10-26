@@ -713,3 +713,21 @@
 .table-row-mullak:hover {
   background-color: color-mix(in oklab, var(--surface-2) 75%, transparent);
 }
+
+/* ============================================================
+ * إلغاء أيقونة (X) وأزرار الإلغاء والتفريغ المدمجة في المتصفحات
+ * (Chrome / Edge / Windows / Safari) لكافة الحقول الرقمية والمدخلات
+ * ========================================================== */
+input::-webkit-search-cancel-button,
+input::-webkit-search-decoration,
+input::-webkit-cancel-button,
+input::-ms-clear,
+input::-ms-reveal {
+  display: none !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}

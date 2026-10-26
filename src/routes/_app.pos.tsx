@@ -2050,16 +2050,27 @@ function POSPage() {
                     <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                       {lang === "ar" ? "البيانات الأساسية" : "Sale context"}
                     </div>
-                    <PartyPicker
-                      options={customers}
-                      value={customerId}
-                      onChange={setCustomerId}
-                      lang={lang}
-                      label={lang === "ar" ? "العميل" : "Customer"}
-                      emptyLabel={t("pos.walkin")}
-                      kind="customer"
-                      className="h-10 min-w-0 w-full rounded-2xl border-primary/20 bg-primary/[0.035] text-xs hover:border-primary/50 hover:bg-primary/[0.07]"
-                    />
+                    <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                      <PartyPicker
+                        options={customers}
+                        value={customerId}
+                        onChange={setCustomerId}
+                        lang={lang}
+                        label={lang === "ar" ? "العميل" : "Customer"}
+                        emptyLabel={t("pos.walkin")}
+                        kind="customer"
+                        className="h-10 min-w-0 flex-1 rounded-2xl border-primary/20 bg-primary/[0.035] text-xs hover:border-primary/50 hover:bg-primary/[0.07]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setNewCustomerOpen(true)}
+                        className="grid size-9 shrink-0 place-items-center rounded-full border border-primary/25 bg-primary/10 text-primary shadow-sm transition hover:border-primary/40 hover:bg-primary/15 active:scale-95"
+                        title={lang === "ar" ? "إضافة عميل جديد" : "Add customer"}
+                        aria-label={lang === "ar" ? "إضافة عميل جديد" : "Add customer"}
+                      >
+                        <UserPlus className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
 
                   {isModuleEnabled("multi_warehouse") && warehouses.length > 1 && (

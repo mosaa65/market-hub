@@ -21,3 +21,9 @@ export {
   type SplitPaymentEditorLine,
   type SplitPaymentMethodOption,
 } from "@/components/payments/split-payment-editor";
+export {
+  SplitPaymentDialog,
+  type SplitPaymentDialogProps,
+  type SplitPaymentValues,
+  type SplitMethodKey,
+} from "./split-payment-dialog";

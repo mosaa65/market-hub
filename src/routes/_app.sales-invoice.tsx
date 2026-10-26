@@ -1427,7 +1427,14 @@ function SalesInvoicePage() {
             : null
         }
         eventType="invoice_created"
-        onPrint={() => setLuxuryPreviewOpen(true)}
+        onPrint={() => {
+          setSuccessModalOpen(false);
+          setLuxuryPreviewOpen(true);
+        }}
+        onViewDocument={() => {
+          setSuccessModalOpen(false);
+          setLuxuryPreviewOpen(true);
+        }}
       />
 
       {lastInvoice && (
