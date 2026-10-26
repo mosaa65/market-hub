@@ -1,13 +1,7 @@
-import React, {
-  useState,
-  useRef,
-  useMemo,
-  useEffect,
-  type Dispatch,
-  type SetStateAction,
-} from "react";
+import { useState, useMemo, type Dispatch, type SetStateAction } from "react";
 import { ChevronDown, Check, RotateCcw, Save } from "lucide-react";
 import { ActionButton } from "@/components/ui/action-button";
+import { AutoSaveBadge } from "@/components/settings/auto-save-badge";
 import { setCompanySettingsCache } from "@/lib/format";
 import { cacheCompanyProfile } from "@/lib/printing";
 import {
@@ -30,8 +24,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { getCurrencyOptions, getCurrencySymbol, type CurrencyOption } from "@/lib/currencies";
 import { FlagIcon, currencyToCountryCode } from "@/components/ui/flag-icon";
 import { toast } from "sonner";
-import type { InvoiceTemplate } from "@/lib/invoice-print";
-import { getPrintSettings, savePrintSettings } from "@/lib/templates";
 import { useCatalogModules } from "@/lib/catalog-modules";
 import { DocumentNumberingCard } from "./document-numbering-card";
 
@@ -54,12 +46,9 @@ export function InvoicingSection({
 }: InvoicingSectionProps) {
   const isAr = lang === "ar";
   const [activePanel, setActivePanel] = useState<"currency" | "numbering" | "services">("currency");
-  // Post-sale printing preferences come from the same unified store used by POS
-  const [printMode, setPrintModeState] = useState<"auto" | "ask" | "off">("ask");
-  const [defaultPrintTemplate, setDefaultPrintTemplateState] = useState<InvoiceTemplate>("thermal");
-  const [logoUploading, setLogoUploading] = useState(false);
   const [isSavingCurrency, setIsSavingCurrency] = useState(false);
-  const logoInputRef = useRef<HTMLInputElement>(null);
+  // مفتاح أجرة التركيب يُحفظ تلقائياً (localStorage + قاعدة البيانات) — الشارة تؤكد ذلك.
+  const [feeSavePulse, setFeeSavePulse] = useState(0);
   const { config: catalogConfig, updateConfig: updateCatalogConfig } = useCatalogModules();
   const currencyOptions = useMemo(() => getCurrencyOptions(lang), [lang]);
   const currencyPreviewSymbol =
@@ -148,20 +137,6 @@ export function InvoicingSection({
     }
   };
 
-  useEffect(() => {
-    const s = getPrintSettings();
-    setPrintModeState(s.printMode);
-    setDefaultPrintTemplateState(s.defaultCustomerTemplate as InvoiceTemplate);
-  }, []);
-
-  const setPrintMode = (v: "auto" | "ask" | "off") => {
-    setPrintModeState(v);
-  };
-
-  const setDefaultPrintTemplate = (v: InvoiceTemplate) => {
-    setDefaultPrintTemplateState(v);
-  };
-
   const panels = [
     {
       id: "currency" as const,
@@ -184,54 +159,6 @@ export function InvoicingSection({
         : "Enable quick services and barcode scanning",
     },
   ];
-
-  async function uploadCompanyLogo(file: File) {
-    const allowedTypes = ["image/png", "image/jpeg", "image/webp"];
-    if (!allowedTypes.includes(file.type)) {
-      toast.error(
-        isAr ? "اختر صورة بصيغة PNG أو JPG أو WebP." : "Choose a PNG, JPG, or WebP image.",
-      );
-      return;
-    }
-    if (file.size > 3 * 1024 * 1024) {
-      toast.error(
-        isAr ? "حجم الشعار يجب ألا يتجاوز 3 ميجابايت." : "The logo must be 3 MB or smaller.",
-      );
-      return;
-    }
-
-    setLogoUploading(true);
-    const extension =
-      file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
-    const path = `company/logo-${Date.now()}.${extension}`;
-
-    try {
-      const { error } = await supabase.storage.from("company-logos").upload(path, file, {
-        contentType: file.type,
-        cacheControl: "31536000",
-        upsert: false,
-      });
-      if (error) throw error;
-
-      const { data } = supabase.storage.from("company-logos").getPublicUrl(path);
-      setForm((current: any) => ({ ...current, logo_url: data.publicUrl }));
-      toast.success(
-        isAr
-          ? "تم رفع الشعار. اضغط «حفظ» لتطبيقه على الفواتير."
-          : "Logo uploaded. Save the settings to apply it to invoices.",
-      );
-    } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : isAr
-            ? "تعذر رفع الشعار."
-            : "Could not upload the logo.",
-      );
-    } finally {
-      setLogoUploading(false);
-    }
-  }
 
   return (
     <Card className="rounded-3xl border-border/80 shadow-xs">
@@ -440,6 +367,7 @@ export function InvoicingSection({
                   <div className="text-sm font-semibold flex items-center gap-2">
                     <Wrench className="h-4 w-4 text-amber-500" />
                     {isAr ? "خدمة أو أجرة تركيب بسعر مخصص" : "Custom Labor / Installation Fee"}
+                    <AutoSaveBadge lang={isAr ? "ar" : "en"} trigger={feeSavePulse} />
                   </div>
                   <div className="text-xs text-muted-foreground leading-relaxed">
                     {isAr
@@ -449,7 +377,10 @@ export function InvoicingSection({
                 </div>
                 <Switch
                   checked={enablePosServiceFee}
-                  onCheckedChange={setEnablePosServiceFee}
+                  onCheckedChange={(v) => {
+                    setEnablePosServiceFee(v);
+                    setFeeSavePulse((n) => n + 1);
+                  }}
                   disabled={!canEdit}
                 />
               </div>

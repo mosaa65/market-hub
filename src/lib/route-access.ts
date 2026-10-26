@@ -73,6 +73,9 @@ export const ROUTE_ACCESS: Record<string, RouteAccessRule> = {
   "/milling/custody-delivery": {
     allowedRoles: STOCK,
   },
+  "/milling/products": {
+    allowedRoles: STOCK,
+  },
   "/purchase-pos": { allowedRoles: STOCK },
   "/purchases": { allowedRoles: STOCK },
   "/suppliers": { allowedRoles: STOCK },

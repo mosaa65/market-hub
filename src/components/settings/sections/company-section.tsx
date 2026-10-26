@@ -75,13 +75,15 @@ export function CompanySection({ form, setForm, canEdit, lang }: CompanySectionP
     }
 
     setIsSaving(true);
+    // `form.id` يأتي من صف قاعدة البيانات وقد يكون غير موجود بعد (إدراج أول).
+    const existingId = typeof form.id === "number" ? form.id : undefined;
     const payload = {
       ...form,
-      id: form.id ?? 1,
+      id: existingId ?? 1,
     };
 
     try {
-      const result = form.id
+      const result = existingId
         ? await supabase
             .from("company_settings")
             .update(payload)

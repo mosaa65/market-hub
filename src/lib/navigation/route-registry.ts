@@ -954,6 +954,22 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
     requiredRoles: STOCK,
     i18nKey: "nav.milling_guide",
   },
+  {
+    id: "milling-products",
+    path: "/milling/products",
+    titleAr: "أصناف الأمانات",
+    titleEn: "Custody Products",
+    descriptionAr: "إدارة أنواع الحبوب الخام ونواتج الطحن المستخدمة في الأمانات",
+    descriptionEn: "Manage raw grains and milled outputs used in custody operations",
+    keywords: withSynonyms(
+      ["أصناف", "منتجات", "حبوب", "نواتج", "أمانات", "products", "custody"],
+      SEARCH_SYNONYMS.milling,
+    ),
+    category: "milling",
+    moduleId: "milling_operations",
+    requiredRoles: STOCK,
+    i18nKey: "nav.milling_products",
+  },
 
   // ── Admin ───────────────────────────────────────────────────────
   {

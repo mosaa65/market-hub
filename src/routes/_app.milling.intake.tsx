@@ -43,6 +43,7 @@ import { CustomerFormDialog } from "@/components/contacts/customer-form-dialog";
 import { LuxuryPrintPreviewModal } from "@/components/luxury-print-preview-modal";
 import { UnifiedPrintModal } from "@/components/milling/unified-print-modal";
 import { DocumentShareDialog } from "@/components/communication/document-share-dialog";
+import { CustodyProductFormDialog } from "@/components/milling/custody-product-form-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import {
   createMillingServiceDocument,
@@ -154,6 +155,7 @@ function MillingIntakePage() {
   const [printModalOpen, setPrintModalOpen] = useState(false);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [showWorkflow, setShowWorkflow] = useState(false);
+  const [quickGrainDialogOpen, setQuickGrainDialogOpen] = useState(false);
 
   // استعلام العملاء مع الهاتف والرصيد
   const customers = useQuery({
@@ -604,23 +606,33 @@ function MillingIntakePage() {
                         <span className="font-semibold text-amber-700 dark:text-amber-300">
                           لا توجد منتجات حبوب أمانات بعد!
                         </span>
-                        <Link
-                          to="/products"
-                          search={undefined as never}
+                        <button
+                          type="button"
+                          onClick={() => setQuickGrainDialogOpen(true)}
                           className="inline-flex items-center gap-1 rounded-lg bg-amber-500 px-2 py-1 font-bold text-white hover:bg-amber-600"
                         >
-                          أضف أول نوع حبوب من «المنتجات / الأصناف» ←
-                        </Link>
+                          <Plus className="h-3 w-3" />
+                          أضف أول نوع حبوب
+                        </button>
                       </div>
                     )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={addLine}
-                    className="inline-flex items-center gap-1 rounded-xl border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary shadow-xs hover:bg-primary/20"
-                  >
-                    <Plus className="h-3.5 w-3.5" /> نوع حبوب آخر
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={addLine}
+                      className="inline-flex items-center gap-1 rounded-xl border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary shadow-xs hover:bg-primary/20"
+                    >
+                      <Plus className="h-3.5 w-3.5" /> نوع حبوب آخر
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setQuickGrainDialogOpen(true)}
+                      className="inline-flex items-center gap-1 rounded-xl border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-bold text-amber-700 dark:text-amber-300 shadow-xs hover:bg-amber-500/20"
+                    >
+                      <Plus className="h-3.5 w-3.5" /> صنف جديد
+                    </button>
+                  </div>
                 </div>
 
                 {/* رأس الجدول الأنيق للشاشات المتوسطة والكبيرة */}

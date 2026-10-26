@@ -1,4 +1,5 @@
 import { Circle, Compass, LayoutGrid, PanelsTopLeft, SlidersHorizontal } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
@@ -6,6 +7,7 @@ import {
   DEFAULT_SIDEBAR_PREFERENCES,
   useSidebarPreferences,
 } from "@/lib/navigation/sidebar-preferences";
+import { AutoSaveBadge } from "@/components/settings/auto-save-badge";
 import { cn } from "@/lib/utils";
 
 const GROUPS = [
@@ -114,12 +116,17 @@ export function SidebarNavigationSection({ canEdit = true, lang }: SidebarNaviga
   const { lang: currentLang, t } = useI18n();
   const isAr = (lang ?? currentLang) === "ar";
   const { preferences, update } = useSidebarPreferences(user?.id);
+  // تفضيلات القائمة تُحفظ لحظياً عند كل نقرة — الشارة تؤكد ذلك.
+  const [savePulse, setSavePulse] = useState(0);
+  useEffect(() => {
+    setSavePulse((n) => n + 1);
+  }, [preferences]);
   const selectedColor = (key: string) =>
     preferences.customIconColors[key] ?? DEFAULT_GROUP_COLORS[key] ?? "blue";
 
   return (
     <div className="space-y-5">
-      <Card className="rounded-xl border-border/70">
+      <Card className="rounded-3xl border-border/80 bg-card shadow-xs">
         <CardHeader className="border-b border-border/60 pb-4">
           <CardTitle className="flex items-center gap-3 text-base">
             <span className="grid size-10 place-items-center rounded-lg bg-primary/10 text-primary">
@@ -131,10 +138,11 @@ export function SidebarNavigationSection({ canEdit = true, lang }: SidebarNaviga
               </span>
               <span className="mt-1 block text-xs font-normal text-muted-foreground">
                 {isAr
-                  ? "خصص شكل الأيقونات وألوان مجموعات التنقل على هذا الجهاز."
-                  : "Customize navigation icon shapes and group colors on this device."}
+                  ? "خصص شكل الأيقونات وألوان مجموعات التنقل على هذا الجهاز — تُحفظ تلقائياً."
+                  : "Customize navigation icon shapes and group colors on this device — saved automatically."}
               </span>
             </span>
+            <AutoSaveBadge lang={isAr ? "ar" : "en"} trigger={savePulse} className="ms-auto" />
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6 pt-5">
