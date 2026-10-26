@@ -2649,7 +2649,7 @@ function POSPage() {
           )}
 
           {/* ─── Cart Panel (Primary Workspace on All Devices) ─── */}
-          <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-primary/20 bg-surface/95 p-1.5 shadow-xl ring-1 ring-border/50 backdrop-blur-md sm:p-2 lg:col-start-2 lg:row-start-1 lg:row-span-2">
+          <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-primary/20 bg-surface/95 p-1.5 shadow-xl ring-1 ring-border/50 backdrop-blur-md sm:p-2 lg:col-start-2 lg:row-start-2">
             {/* Cart Header */}
             <div className="mb-1 flex shrink-0 items-center justify-between border-b border-border/60 px-1 pb-1.5">
               <div className="flex items-center gap-2">
