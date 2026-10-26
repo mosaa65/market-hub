@@ -821,7 +821,10 @@ function POSPage() {
               key: "model",
               label: t("products.vehicle_model"),
               type: "select" as const,
-              options: availableModels.map((m) => ({
+              options: (selectedMake
+                ? models.filter((m) => m.make_id === selectedMake)
+                : models
+              ).map((m) => ({
                 value: m.id,
                 label: (lang === "ar" ? m.name_ar || m.name : m.name || m.name_ar) || m.name,
               })),
@@ -829,7 +832,19 @@ function POSPage() {
           ]
         : []),
     ],
-    [categories, brands, units, origins, qualities, makes, availableModels, catalogConfig, lang, t],
+    [
+      categories,
+      brands,
+      units,
+      origins,
+      qualities,
+      makes,
+      models,
+      selectedMake,
+      catalogConfig,
+      lang,
+      t,
+    ],
   );
 
   const catalogFilterValues: FilterValues = useMemo(
