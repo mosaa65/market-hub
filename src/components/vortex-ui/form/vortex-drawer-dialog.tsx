@@ -144,7 +144,13 @@ export function VortexDrawerDialog({
             )}
 
             {/* Scrollable Body */}
-            <div className={cn("flex-1 overflow-y-auto px-6 py-5 custom-scrollbar", bodyClassName)}>
+            <div
+              data-vaul-no-drag
+              className={cn(
+                "flex-1 overscroll-contain overflow-y-auto px-6 py-5 custom-scrollbar",
+                bodyClassName,
+              )}
+            >
               {children}
             </div>
 
@@ -213,7 +219,13 @@ export function VortexDrawerDialog({
           )}
 
           {/* Scrollable Content */}
-          <div className={cn("flex-1 overflow-y-auto px-5 py-4 custom-scrollbar", bodyClassName)}>
+          <div
+            data-vaul-no-drag
+            className={cn(
+              "flex-1 overscroll-contain overflow-y-auto px-5 py-4 custom-scrollbar",
+              bodyClassName,
+            )}
+          >
             {children}
           </div>
 

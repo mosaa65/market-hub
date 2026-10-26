@@ -214,20 +214,17 @@ export const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputPro
         type="decimal"
         dir="ltr"
         value={text}
-        suffix={
-          unit ? (
-            <span className="pointer-events-none select-none text-[11px] font-semibold text-muted-foreground">
-              {unit}
-            </span>
-          ) : (
-            suffix
-          )
-        }
-        // الرقم في منتصف الحقل (طلبات POS): لا يلتصق ببداية الحقل ولا بمؤخرة الوحدة.
-        className={cn("text-center font-mono tabular-nums", className)}
+        suffix={suffix}
+        // الرقم بخط مالي واضح ومرن دون التصاق
+        className={cn("text-center font-semibold tabular-nums tracking-tight transition-all duration-150", className)}
         containerClassName={containerClassName}
         onFocus={(e) => {
           editing.current = true;
+          try {
+            e.currentTarget.select();
+          } catch {
+            /* ignore */
+          }
           onFocus?.(e);
         }}
         onBlur={(e) => {

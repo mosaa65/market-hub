@@ -243,9 +243,8 @@ export function BagWeightInput({
                     <QuantityInput
                       min={0}
                       decimals={1}
-                      unit="kg"
                       disabled={disabled}
-                      placeholder="كجم"
+                      placeholder="0.0"
                       aria-label="سعة الكيس المخصصة (كجم)"
                       value={toNumOrNull(customCapacity)}
                       onValueChange={(v) => handleCapacityChange(-1, v == null ? "" : String(v))}

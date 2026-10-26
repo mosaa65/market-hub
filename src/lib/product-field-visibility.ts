@@ -138,6 +138,8 @@ function readStored(): Record<ProductFieldSurface, ProductFieldVisibility> | nul
         }
       }
       merged.nameAr = true;
+      // حقل الدور أُضيف للفورم لاحقًا: من خزّن إعدادات قبله لم يكن يحتويه.
+      if (surface === "form") merged.role = true;
       result[surface] = merged;
     }
     return result;
@@ -175,7 +177,7 @@ export function resetProductFieldVisibility(): Record<ProductFieldSurface, Produ
   const fresh = {
     view: { ...DEFAULT_PRODUCT_FIELD_VISIBILITY.view },
     detail: { ...DEFAULT_PRODUCT_FIELD_VISIBILITY.detail },
-    form: { ...DEFAULT_PRODUCT_FIELD_VISIBILITY.form },
+    form: { ...DEFAULT_PRODUCT_FIELD_VISIBILITY.form, role: true },
   };
   writeStored(fresh);
   return fresh;
