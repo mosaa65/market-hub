@@ -5,7 +5,7 @@
  * + أجرة الطحن (إجمالي الأكياس × سعر الكيس) + الخصم + طريقة الدفع + المدفوع/الآجل
  * = مستند أمانة واحد + فاتورة مبيعات رسمية في نفس المعاملة الفورية.
  */
-import { createFileRoute, useSearch, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, useSearch, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, useMemo } from "react";
 import {
@@ -1151,6 +1151,20 @@ function MillingIntakePage() {
             setCustomerId(newCust.id);
             setQuickCustomerOpen(false);
             toast.success(`تمت إضافة واختيار العميل: ${newCust.name}`);
+          }}
+        />
+
+        {/* نافذة إضافة صنف حبوب جديد سريعاً دون مغادرة الكاونتر */}
+        <CustodyProductFormDialog
+          open={quickGrainDialogOpen}
+          onOpenChange={setQuickGrainDialogOpen}
+          defaultClass="RAW_MATERIAL"
+          onSaved={(productId) => {
+            // اختر الصنف الجديد تلقائياً في آخر سطر فارغ
+            const emptyIdx = lines.findIndex((l) => !l.itemId);
+            if (emptyIdx >= 0) {
+              setLineItem(emptyIdx, productId);
+            }
           }}
         />
       </div>
