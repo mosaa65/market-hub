@@ -55,7 +55,7 @@ export interface LuxuryPrintPreviewModalProps {
   customerName?: string | null;
 }
 
-/** Converts an InvoiceDoc to UnifiedDocumentData if needed */
+/** Converts any input format to safe UnifiedDocumentData */
 function toUnifiedData(
   input: UnifiedDocumentData | InvoiceDoc | null | undefined,
   docType: PrintingDocumentType = "customer_invoice",
@@ -71,41 +71,41 @@ function toUnifiedData(
   }
 
   const raw = input as any;
-  if ("partyName" in raw || "partyLabel" in raw) {
-    return {
-      docType,
-      ...raw,
-    };
-  }
+  const rawLines = Array.isArray(raw.lines) ? raw.lines : [];
+  const safeLines = rawLines.map((l: any) => ({
+    product: String(l?.product || l?.name || l?.item_name || "صنف"),
+    qty: Number(l?.qty ?? l?.quantity ?? 1),
+    unit: l?.unit ? String(l.unit) : "",
+    price: Number(l?.price ?? l?.unit_price ?? 0),
+    total: Number(l?.total ?? (Number(l?.qty ?? l?.quantity ?? 1) * Number(l?.price ?? l?.unit_price ?? 0))),
+    code: l?.code || l?.sku,
+    note: l?.note,
+    previousQty: l?.previousQty,
+    remainingQty: l?.remainingQty,
+  }));
 
   return {
-    docType: docType as any,
+    docType: raw.docType || docType,
     title: raw.title || "فاتورة مبيعات",
-    number: raw.number || "—",
-    date: raw.date || new Date().toISOString(),
+    number: raw.number || raw.invoice_number || raw.document_number || "—",
+    date: raw.date || raw.created_at || new Date().toISOString(),
     partyLabel: raw.partyLabel || "العميل",
-    partyName: raw.partyName || "",
-    partyPhone: raw.partyPhone || "",
-    warehouse: raw.warehouse || "",
-    payment: raw.payment || "",
+    partyName: raw.partyName || raw.customer_name || raw.customer?.name || "",
+    partyPhone: raw.partyPhone || raw.customer_phone || raw.customer?.phone || "",
+    warehouse: raw.warehouse || raw.warehouse_name || "",
+    payment: raw.payment || raw.payment_method || "",
     status: raw.status || "",
-    subtotal: raw.subtotal,
-    tax: raw.tax,
-    discount: raw.discount,
-    total: raw.total,
-    paid: raw.paid,
-    balance: raw.balance,
-    notes: raw.notes || raw.terms,
-    lines: (raw.lines || []).map((l: any) => ({
-      product: l.product || l.name || "",
-      qty: Number(l.qty || l.quantity || 1),
-      unit: l.unit || "",
-      price: Number(l.price || l.unit_price || 0),
-      total: Number(l.total || Number(l.qty || 1) * Number(l.price || 0)),
-      code: l.code || l.sku,
-    })),
+    subtotal: raw.subtotal !== undefined ? Number(raw.subtotal) : undefined,
+    tax: raw.tax !== undefined ? Number(raw.tax) : undefined,
+    discount: raw.discount !== undefined ? Number(raw.discount) : undefined,
+    total: raw.total !== undefined ? Number(raw.total) : 0,
+    paid: raw.paid !== undefined ? Number(raw.paid) : undefined,
+    balance: raw.balance !== undefined ? Number(raw.balance) : undefined,
+    notes: raw.notes || raw.note || raw.terms,
+    lines: safeLines,
     company: raw.company,
     currency: raw.currency || "ر.ي",
+    options: raw.options,
   };
 }
 
