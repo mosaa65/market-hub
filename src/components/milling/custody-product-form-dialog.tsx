@@ -76,7 +76,7 @@ export function CustodyProductFormDialog({
   /* ---- form state ---- */
   const [nameAr, setNameAr] = useState("");
   const [sku, setSku] = useState("");
-  const [weightKg, setWeightKg] = useState("");
+  const [weightKg, setWeightKg] = useState<number | null>(50);
   const [itemClass, setItemClass] = useState<ItemClassOption>(defaultClass);
   const [isActive, setIsActive] = useState(true);
 
@@ -86,13 +86,13 @@ export function CustodyProductFormDialog({
     if (editing) {
       setNameAr(editing.name_ar || "");
       setSku(editing.sku || "");
-      setWeightKg(editing.package_weight_kg != null ? String(editing.package_weight_kg) : "");
+      setWeightKg(editing.package_weight_kg != null ? editing.package_weight_kg : null);
       setItemClass(editing.item_class);
       setIsActive(editing.is_active);
     } else {
       setNameAr("");
       setSku(SKU_PREFIXES[defaultClass]);
-      setWeightKg("50");
+      setWeightKg(50);
       setItemClass(defaultClass);
       setIsActive(true);
     }
@@ -111,12 +111,16 @@ export function CustodyProductFormDialog({
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!nameAr.trim()) throw new Error("اسم الصنف مطلوب");
-      if (!sku.trim()) throw new Error("كود الصنف (SKU) مطلوب");
+
+      // إنشاء كود صنف داخلي تلقائياً بدون إزعاج المستخدم به
+      const autoSku =
+        editing?.sku ||
+        `${SKU_PREFIXES[itemClass]}${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
 
       const payload: Record<string, unknown> = {
         name_ar: nameAr.trim(),
         name: null,
-        sku: sku.trim().toUpperCase(),
+        sku: autoSku.trim().toUpperCase(),
         item_class: itemClass,
         is_custody_item: true,
         is_active: isActive,
@@ -125,8 +129,7 @@ export function CustodyProductFormDialog({
         is_purchasable: false,
         status: "ACTIVE",
         inventory_policy: "TRACKED",
-        package_weight_kg:
-          weightKg.trim() !== "" && Number(weightKg) > 0 ? Number(weightKg) : null,
+        package_weight_kg: weightKg != null && weightKg > 0 ? weightKg : null,
       };
 
       if (editing?.id) {
@@ -246,31 +249,13 @@ export function CustodyProductFormDialog({
             />
           </div>
 
-          {/* ── كود الصنف (SKU) ── */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
-              كود الصنف (SKU) <span className="text-destructive">*</span>
-            </label>
-            <MillingInput
-              value={sku}
-              onChange={(e) => setSku(e.target.value)}
-              placeholder={SKU_PREFIXES[itemClass] + "001"}
-              dir="ltr"
-              className="font-mono text-sm"
-              required
-            />
-            <p className="text-[10px] text-muted-foreground/70">
-              كود فريد لتمييز الصنف — يبدأ بالبادئة {SKU_PREFIXES[itemClass]} تلقائياً
-            </p>
-          </div>
-
           {/* ── سعة العبوة بالكجم ── */}
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">سعة العبوة</label>
             <div className="flex items-center gap-2">
               <QuantityInput
                 value={weightKg}
-                onChange={setWeightKg}
+                onValueChange={setWeightKg}
                 unit="كجم"
                 min={0}
                 step={0.5}

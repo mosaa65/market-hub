@@ -296,13 +296,22 @@ function CustodyProductsPage() {
               <span className="text-sm">جارِ التحميل…</span>
             </div>
           ) : filtered.length === 0 ? (
-            <MillingEmpty>
-              {search
-                ? `لا توجد أصناف تطابق «${search}»`
-                : tab === "raw"
-                  ? "لم تُضف أنواع حبوب بعد — اضغط «إضافة» لإنشاء أول نوع"
-                  : "لم تُضف نواتج طحن بعد — اضغط «إضافة» لإنشاء أول ناتج"}
-            </MillingEmpty>
+            <MillingEmpty
+              title={
+                search
+                  ? `لا توجد أصناف تطابق «${search}»`
+                  : tab === "raw"
+                    ? "لم تُضف أنواع حبوب بعد"
+                    : "لم تُضف نواتج طحن بعد"
+              }
+              hint={
+                search
+                  ? "جرّب البحث بكلمة أخرى"
+                  : tab === "raw"
+                    ? "اضغط «إضافة» بالأعلى لإنشاء أول نوع حبوب خام"
+                    : "اضغط «إضافة» بالأعلى لإنشاء أول ناتج طحن"
+              }
+            />
           ) : (
             <div className="divide-y divide-border/40">
               {filtered.map((p) => {
@@ -335,9 +344,6 @@ function CustodyProductsPage() {
                         )}
                       </div>
                       <div className="flex items-center gap-3 mt-0.5">
-                        <span className="text-[11px] font-mono text-muted-foreground/70" dir="ltr">
-                          {p.sku}
-                        </span>
                         {p.package_weight_kg && (
                           <span className="text-[11px] text-muted-foreground flex items-center gap-0.5">
                             <Scale className="h-3 w-3" />
