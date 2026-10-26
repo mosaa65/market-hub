@@ -19,11 +19,10 @@ echo   [6] دفع التحديثات إلى Supabase السحابي (Cloud Push)
 echo   [7] أخذ نسخة احتياطية محلية لقاعدة البيانات (Backup)
 echo   [8] تشغيل واجهة التطبيق في المتصفح (Start App / npm run dev)
 echo   [9] قراءة الدليل الشامل لقواعد البيانات (Open Master Guide)
-echo   [10] تفعيل الدومين المحلي (market-hub.local)
 echo   [0] خروج
 echo.
 echo ===============================================================================
-set /p choice="اختر رقم العملية [0-10]: "
+set /p choice="اختر رقم العملية [0-9]: "
 
 if "%choice%"=="1" goto START_LOCAL
 if "%choice%"=="2" goto STOP_LOCAL
@@ -34,10 +33,9 @@ if "%choice%"=="6" goto PUSH_CLOUD
 if "%choice%"=="7" goto BACKUP
 if "%choice%"=="8" goto START_APP
 if "%choice%"=="9" goto OPEN_GUIDE
-if "%choice%"=="10" goto SETUP_DOMAIN
 if "%choice%"=="0" exit /b 0
 
-echo خيار غير صحيح، الرجاء اختيار رقم بين 0 و 10.
+echo خيار غير صحيح، الرجاء اختيار رقم بين 0 و 9.
 timeout /t 2 >nul
 goto MENU
 
@@ -123,10 +121,4 @@ if exist "docs\DATABASE_MASTER_GUIDE.md" (
 ) else (
     echo ملف الدليل غير موجود.
 )
-goto MENU
-
-:SETUP_DOMAIN
-cls
-echo [تفعيل وربط الدومين المحلي market-hub.local...]
-call setup-local-domain.bat
 goto MENU
