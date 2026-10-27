@@ -67,7 +67,7 @@ import {
 } from "@/lib/payments/payment-methods";
 
 export const Route = createFileRoute("/_app/purchases")({
-  head: () => ({ meta: [{ title: "Purchases — Vortex ERP" }] }),
+  head: () => ({ meta: [{ title: "المشتريات — فورتيكس ERP" }] }),
   component: () => (
     <ModuleGuard moduleId="purchases">
       <PurchasesPage />
@@ -186,8 +186,9 @@ function PurchasesPage() {
       return;
     }
     const remaining = Math.max(0, Number(inv.total) - Number(inv.paid));
+    const dateStr = new Date(inv.created_at).toLocaleDateString(isRtl ? "ar" : "en-GB");
     const text = isRtl
-      ? `فاتورة مشتريات رقم ${inv.invoice_number}\nالمورد: ${inv.suppliers?.name || ""}\nالتاريخ: ${new Date(inv.created_at).toLocaleDateString("ar-YE")}\nالإجمالي: ${money(Number(inv.total))}\nالمدفوع: ${money(Number(inv.paid))}${remaining > 0 ? `\nالمتبقي: ${money(remaining)}` : ""}`
+      ? `فاتورة مشتريات رقم ${inv.invoice_number}\nالمورد: ${inv.suppliers?.name || ""}\nالتاريخ: ${dateStr}\nالإجمالي: ${money(Number(inv.total))}\nالمدفوع: ${money(Number(inv.paid))}${remaining > 0 ? `\nالمتبقي: ${money(remaining)}` : ""}`
       : `Purchase Invoice #${inv.invoice_number}\nSupplier: ${inv.suppliers?.name || ""}\nTotal: ${money(Number(inv.total))}\nPaid: ${money(Number(inv.paid))}${remaining > 0 ? `\nRemaining: ${money(remaining)}` : ""}`;
     const clean = phone.replace(/[^\d+]/g, "");
     const target = clean.startsWith("+") ? clean.slice(1) : clean;
@@ -224,11 +225,28 @@ function PurchasesPage() {
         .limit(200);
       if (error) {
         console.error("Error loading purchases:", error);
-        toast.error(isRtl ? "تعذر تحميل فواتير المشتريات" : "Failed to load purchases");
+        toast.error(
+          translateRpcError(
+            error,
+            isRtl ? "ar" : "en",
+            isRtl
+              ? "تعذر تحميل فواتير المشتريات. تحقق من الاتصال وأعد المحاولة."
+              : "Could not load purchase invoices. Check connectivity and retry.",
+          ),
+        );
       }
       setRows((data ?? []) as any);
     } catch (err) {
       console.error("Failed to load purchases:", err);
+      toast.error(
+        translateRpcError(
+          err,
+          isRtl ? "ar" : "en",
+          isRtl
+            ? "تعذر تحميل فواتير المشتريات. تحقق من الاتصال وأعد المحاولة."
+            : "Could not load purchase invoices. Check connectivity and retry.",
+        ),
+      );
     } finally {
       setLoading(false);
     }
@@ -248,10 +266,24 @@ function PurchasesPage() {
         .eq("invoice_id", inv.id);
       if (error) {
         console.error("Error loading purchase items:", error);
+        toast.error(
+          translateRpcError(
+            error,
+            isRtl ? "ar" : "en",
+            isRtl
+              ? "تعذر تحميل بنود الفاتورة. أغلق النافذة وأعد فتحها."
+              : "Could not load invoice items. Close and reopen the invoice.",
+          ),
+        );
       }
       setLines((data ?? []) as any);
     } catch (err) {
       console.error("Failed to load invoice items:", err);
+      toast.error(
+        isRtl
+          ? "تعذر تحميل بنود الفاتورة. أغلق النافذة وأعد فتحها."
+          : "Could not load invoice items. Close and reopen the invoice.",
+      );
       setLines([]);
     } finally {
       setLoadingLines(false);
@@ -321,6 +353,8 @@ function PurchasesPage() {
       bg: "bg-surface-2",
       text: "text-foreground",
       dot: "bg-foreground",
+      // حالة غير معروفة: نص خام إنجليزي (مثل drafted) — عُرضه كما هو لكن ضمن
+      // الشارة الموحدة بدل كسر التخطيط، مع تفادي ظهوره في مسارات أخرى.
       label: s,
     };
     return (
@@ -409,8 +443,11 @@ function PurchasesPage() {
         list = list.filter((r) => new Date(r.created_at).getTime() >= fromDate);
       }
       if (to) {
-        const toDate = new Date(to).getTime();
-        list = list.filter((r) => new Date(r.created_at).getTime() <= toDate);
+        // شمول اليوم الأخير: نهاية اليوم 23:59:59.999 بدلاً من منتصف الليل،
+        // وإلا تُستبعد فواتير اليوم الأخير من النتيجة.
+        const toDate = new Date(to);
+        toDate.setHours(23, 59, 59, 999);
+        list = list.filter((r) => new Date(r.created_at).getTime() <= toDate.getTime());
       }
     }
 
@@ -2000,8 +2037,17 @@ function CreateDialog({
       toast.success(t("purchases.recorded"));
       onDone();
     } catch (e: any) {
-      // P1-4: ترجمة موحدة لأخطاء RPC قبل العرض.
-      toast.error(translateRpcError(e, "ar", t("common.failed")));
+      // P1-4: ترجمة موحدة لأخطاء RPC قبل العرض — بلغة المستخدم الحالية
+      // (كانت مُشفرة "ar" مما كان يعرض العربية للمستخدم الإنجليزي والعكس).
+      toast.error(
+        translateRpcError(
+          e,
+          lang === "ar" ? "ar" : "en",
+          lang === "ar"
+            ? "تعذر حفظ فاتورة الشراء. لم تُحفظ أي كمية أو يتغير أي رصيد."
+            : "Could not save the purchase invoice. No quantity was saved and no balance changed.",
+        ),
+      );
     } finally {
       setLoading(false);
     }
