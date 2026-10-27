@@ -531,6 +531,12 @@ export async function createMillingServiceDocumentMulti(input: {
   discount?: number;
   paymentMethod: string;
   paid: number;
+  paymentSplits?: {
+    method: string;
+    amount: number;
+    payment_method_id?: string;
+    reference?: string | null;
+  }[] | null;
   notes?: string;
 }): Promise<OpResult<MillingServiceDocumentCreated>> {
   const valid = (input.grains ?? []).filter(
@@ -543,17 +549,24 @@ export async function createMillingServiceDocumentMulti(input: {
     return { ok: false, message: "سجّل نوع حبوب واحد على الأقل مع كميته." };
   }
 
-  const { data, error } = await db.rpc("create_milling_service_document_multi", {
+  const paymentSplits = (input.paymentSplits ?? []).filter((line) => Number(line.amount) > 0);
+
+  const rpcArgs: Record<string, unknown> = {
     _customer_id: input.customerId,
     _warehouse_id: input.warehouseId,
     _grains: valid.map((g) => ({ item_id: g.itemId, bags: g.bags, kg: g.kg })),
     _service_item_id: input.serviceItemId,
     _service_unit_price: input.serviceTotal ?? 0,
     _discount: input.discount ?? 0,
-    _payment_method: input.paymentMethod,
-    _paid: input.paid ?? 0,
+    _payment_method: paymentSplits.length > 1 ? "split" : input.paymentMethod,
+    _paid: paymentSplits.length > 1
+      ? Math.round(paymentSplits.reduce((sum, line) => sum + Number(line.amount), 0) * 100) / 100
+      : (input.paid ?? 0),
     _notes: input.notes ?? null,
-  });
+  };
+  if (paymentSplits.length > 1) rpcArgs._payment_splits = paymentSplits;
+
+  const { data, error } = await (db.rpc as any)("create_milling_service_document_multi", rpcArgs);
   if (error) return { ok: false, message: translateCustodyError(error.message) };
   return { ok: true, data: data as MillingServiceDocumentCreated };
 }

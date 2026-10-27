@@ -346,8 +346,8 @@ function PurchasesPage() {
         type: "select",
         options: [
           { value: "cash", label: t("pos.pm.cash") },
-          { value: "card", label: t("pos.pm.card") },
           { value: "bank_transfer", label: t("pos.pm.bank") },
+          { value: "mobile_money", label: isRtl ? "محفظة إلكترونية" : "Mobile wallet" },
           { value: "credit", label: t("pos.pm.credit") },
         ],
       },

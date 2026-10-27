@@ -40,27 +40,9 @@ CREATE TABLE IF NOT EXISTS public.payment_account_reference_archive (
   archived_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS public.payment_method_archive (
-  id text PRIMARY KEY,
-  method_snapshot jsonb NOT NULL,
-  settings_snapshot jsonb,
-  archived_at timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS public.payment_method_reference_archive (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  relation_name text NOT NULL,
-  column_name text NOT NULL,
-  row_snapshot jsonb NOT NULL,
-  archived_method_id text NOT NULL,
-  archived_at timestamptz NOT NULL DEFAULT now()
-);
-
 ALTER TABLE public.payment_account_archive ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.payment_account_journal_archive ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.payment_account_reference_archive ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.payment_method_archive ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.payment_method_reference_archive ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS payment_account_archive_finance_read ON public.payment_account_archive;
 CREATE POLICY payment_account_archive_finance_read ON public.payment_account_archive
@@ -74,24 +56,12 @@ DROP POLICY IF EXISTS payment_account_reference_archive_finance_read ON public.p
 CREATE POLICY payment_account_reference_archive_finance_read ON public.payment_account_reference_archive
   FOR SELECT TO authenticated
   USING (public.has_role(auth.uid(),'owner') OR public.has_role(auth.uid(),'manager') OR public.has_role(auth.uid(),'accountant'));
-DROP POLICY IF EXISTS payment_method_archive_finance_read ON public.payment_method_archive;
-CREATE POLICY payment_method_archive_finance_read ON public.payment_method_archive
-  FOR SELECT TO authenticated
-  USING (public.has_role(auth.uid(),'owner') OR public.has_role(auth.uid(),'manager') OR public.has_role(auth.uid(),'accountant'));
-DROP POLICY IF EXISTS payment_method_reference_archive_finance_read ON public.payment_method_reference_archive;
-CREATE POLICY payment_method_reference_archive_finance_read ON public.payment_method_reference_archive
-  FOR SELECT TO authenticated
-  USING (public.has_role(auth.uid(),'owner') OR public.has_role(auth.uid(),'manager') OR public.has_role(auth.uid(),'accountant'));
-
 REVOKE ALL ON public.payment_account_archive, public.payment_account_journal_archive,
-  public.payment_account_reference_archive, public.payment_method_archive,
-  public.payment_method_reference_archive FROM PUBLIC, anon, authenticated;
+  public.payment_account_reference_archive FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.payment_account_archive, public.payment_account_journal_archive,
-  public.payment_account_reference_archive, public.payment_method_archive,
-  public.payment_method_reference_archive TO authenticated;
+  public.payment_account_reference_archive TO authenticated;
 GRANT ALL ON public.payment_account_archive, public.payment_account_journal_archive,
-  public.payment_account_reference_archive, public.payment_method_archive,
-  public.payment_method_reference_archive TO service_role;
+  public.payment_account_reference_archive TO service_role;
 
 CREATE OR REPLACE FUNCTION public.payment_method_ledger_account(p_stored text)
 RETURNS text
@@ -131,11 +101,6 @@ COMMENT ON TABLE public.payment_account_journal_archive IS
   'يحفظ الحساب التاريخي لكل سطر قيد قبل تحويله إلى حساب الدفع الموحد.';
 COMMENT ON TABLE public.payment_account_reference_archive IS
   'يحفظ الصفوف التي تشير إلى حساب الدفع القديم قبل تحويل مراجعها إلى الحساب الموحد.';
-COMMENT ON TABLE public.payment_method_archive IS
-  'أرشيف طرق الدفع وإعداداتها قبل إزالتها من الكتالوج النشط.';
-COMMENT ON TABLE public.payment_method_reference_archive IS
-  'يحفظ الصفوف التي تشير إلى طريقة الدفع القديمة قبل حذفها من الكتالوج النشط.';
-
 COMMIT;
 
 -- Rollback: drop the helper function and archive tables after restoring

@@ -20,10 +20,8 @@ export type CoreSplitMethod = (typeof CORE_SPLIT_METHODS)[number];
 /** القيم التي تقبلها قاعدة البيانات في `_payment_splits[].method` حالياً. */
 const SPLITTABLE_TENDER_VALUES = new Set([
   "cash",
-  "card",
   "bank_transfer",
   "mobile_money",
-  "cheque",
 ]);
 
 /**

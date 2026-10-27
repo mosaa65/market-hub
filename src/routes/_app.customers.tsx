@@ -25,7 +25,6 @@ import {
   User,
   Phone,
   CheckCircle2,
-  Loader2,
   Sparkles,
   MessageSquareText,
   LayoutGrid,
@@ -60,7 +59,8 @@ import {
 } from "@/components/ui/table-toolbar";
 import { RecordsViewToggle } from "@/components/ui/records-view-toggle";
 import { usePersistedViewMode } from "@/hooks/use-persisted-view-mode";
-import { DataTable, type DataTableColumn, type DataTableSort } from "@/components/ui/data-table";
+import { type DataTableColumn, type DataTableSort } from "@/components/ui/data-table";
+import { RecordsView } from "@/components/ui/records-view";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { IconButton } from "@/components/ui/icon-button";
 import { useBreakpoint } from "@/design/breakpoints";
@@ -1012,399 +1012,347 @@ function CustomersPage() {
         </div>
       </TableToolbar>
 
-      {/* ─── Main Content Display: Mullak Cards View vs Advanced Table View ─── */}
-      {loading ? (
-        <div className="card-mullak p-12 text-center">
-          <Loader2 className="mx-auto size-8 animate-spin text-primary" />
-          <p className="mt-3 text-sm text-muted-foreground">
-            {lang === "ar" ? "جارِ تحميل سجلات العملاء..." : "Loading customers…"}
-          </p>
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="card-mullak flex flex-col items-center gap-3 p-12 text-center">
-          <div className="grid size-16 place-items-center rounded-3xl bg-primary/10 text-primary border border-primary/20 shadow-sm">
-            <Users className="size-8" />
-          </div>
-          <h3 className="text-base font-bold text-foreground">
-            {lang === "ar" ? "لا توجد سجلات مطابقة" : "No matching customers"}
-          </h3>
-          <p className="max-w-sm text-xs text-muted-foreground">
-            {search
-              ? lang === "ar"
-                ? `لا توجد نتائج تطابق "${search}". جرب البحث بكلمة أخرى.`
-                : `No results found for "${search}".`
-              : lang === "ar"
-                ? "ابدأ بتسجيل العميل الأول لإصدار الفواتير ومتابعة الأرصدة والديون."
-                : "Register your first customer to start tracking invoices and balances."}
-          </p>
-          <button
-            onClick={() => setEdit({})}
-            className="mt-2 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-xs font-bold text-primary-foreground shadow-sm hover:bg-primary/90 transition active:scale-95"
-          >
-            <Plus className="size-4" />
-            <span>{lang === "ar" ? "إضافة عميل جديد الآن" : "Add New Customer Now"}</span>
-          </button>
-        </div>
-      ) : viewMode === "cards" ? (
-        /* ─── Mullak Luxury Cards Grid — unified density: 2 / md:3 / lg:4 / 2xl:5 ─── */
-        <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
-          {filtered.map((r, i) => {
-            const meta = getRecordIndicator(r);
-            const bal = Number(r.balance);
-            const limit = Number(r.credit_limit);
+      {/* ─── Records: cards / list / classic table — shared scaffold ─── */}
+      <RecordsView<Customer>
+        rows={filtered}
+        getRowId={(r) => r.id}
+        viewMode={viewMode}
+        loading={loading}
+        columns={columns}
+        sort={sort}
+        onSortChange={setSort}
+        minWidth={1260}
+        horizontalScroll={tableUsesHorizontalScroll}
+        onRowClick={(r) => void openCustomer(r)}
+        tableRowProps={(r) => ({
+          onMouseEnter: () => setHoveredRow(r.id),
+          onMouseLeave: () => setHoveredRow(null),
+        })}
+        empty={{
+          icon: <Users />,
+          title: lang === "ar" ? "لا توجد سجلات مطابقة" : "No matching customers",
+          description: search
+            ? lang === "ar"
+              ? `لا توجد نتائج تطابق "${search}". جرب البحث بكلمة أخرى.`
+              : `No results found for "${search}".`
+            : lang === "ar"
+              ? "ابدأ بتسجيل العميل الأول لإصدار الفواتير ومتابعة الأرصدة والديون."
+              : "Register your first customer to start tracking invoices and balances.",
+          action: (
+            <Button size="sm" icon={<Plus />} onClick={() => setEdit({})}>
+              {lang === "ar" ? "عميل جديد" : "New Customer"}
+            </Button>
+          ),
+        }}
+        renderCard={(r, i) => {
+          const meta = getRecordIndicator(r);
+          const bal = Number(r.balance);
+          const limit = Number(r.credit_limit);
 
-            return (
-              <div
-                key={r.id}
-                onMouseEnter={() => setHoveredRow(r.id)}
-                onMouseLeave={() => setHoveredRow(null)}
-                onClick={() => void openCustomer(r)}
-                style={{ animationDelay: `${i * 30}ms` }}
-                className="card-mullak group relative flex flex-col justify-between p-4 cursor-pointer animate-in fade-in slide-in-from-bottom-2 duration-200"
-              >
-                {/* Top Section: Colored Strip + Avatar + Name + Badges */}
-                <div className="flex items-start gap-3">
-                  {/* Mullak Signature: Rounded colored vertical bar on the right (RTL start) */}
-                  <span
-                    aria-hidden
-                    className={`h-14 w-1.5 shrink-0 rounded-full transition-all duration-300 ${meta.barClass}`}
-                  />
+          return (
+            <div
+              onMouseEnter={() => setHoveredRow(r.id)}
+              onMouseLeave={() => setHoveredRow(null)}
+              style={{ animationDelay: `${i * 30}ms` }}
+              className="card-mullak group relative flex h-full flex-col justify-between p-4 cursor-pointer animate-in fade-in slide-in-from-bottom-2 duration-200"
+            >
+              {/* Top Section: Colored Strip + Avatar + Name + Badges */}
+              <div className="flex items-start gap-3">
+                {/* Mullak Signature: Rounded colored vertical bar on the right (RTL start) */}
+                <span
+                  aria-hidden
+                  className={`h-14 w-1.5 shrink-0 rounded-full transition-all duration-300 ${meta.barClass}`}
+                />
 
-                  {/* Customer Avatar Squircle */}
-                  <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary font-bold text-base border border-primary/20 shadow-xs group-hover:scale-105 transition-transform">
-                    {r.name.slice(0, 1)}
-                  </div>
-
-                  {/* Customer Information */}
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-1">
-                      <h4 className="truncate text-sm font-bold text-foreground group-hover:text-primary transition-colors">
-                        {r.name}
-                      </h4>
-                      {/* Status Tag */}
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[9px] font-bold border shrink-0 ${meta.toneClass}`}
-                      >
-                        {meta.label}
-                      </span>
-                    </div>
-
-                    {/* Contact & Extra Details */}
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                      {r.phone && (
-                        <span className="flex items-center gap-1 font-mono" dir="ltr">
-                          <Phone className="size-3 text-muted-foreground" />
-                          {r.phone}
-                        </span>
-                      )}
-                      {r.email && (
-                        <span className="flex items-center gap-1 truncate max-w-[140px]">
-                          <Mail className="size-3 text-muted-foreground" />
-                          {r.email}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Credit limit / Loyalty pills */}
-                    <div className="mt-2 flex items-center gap-1.5 flex-wrap">
-                      {limit > 0 && (
-                        <span className="rounded-lg bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 text-[9px] font-mono font-medium text-rose-400 flex items-center gap-1">
-                          <ShieldCheck className="size-2.5" />
-                          {lang === "ar" ? "حد الائتمان:" : "Limit:"} <Ltr>{money(limit)}</Ltr>
-                        </span>
-                      )}
-                      {Number(r.loyalty_points) > 0 && (
-                        <span className="rounded-lg bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[9px] font-mono font-medium text-amber-400 flex items-center gap-1">
-                          <Star className="size-2.5 fill-amber-400 text-amber-400" />
-                          <Ltr>{r.loyalty_points}</Ltr> {lang === "ar" ? "نقطة" : "pts"}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                {/* Customer Avatar Squircle */}
+                <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary font-bold text-base border border-primary/20 shadow-xs group-hover:scale-105 transition-transform">
+                  {r.name.slice(0, 1)}
                 </div>
 
-                {/* Balance & Actions Section */}
-                <div className="mt-4 pt-3 border-t border-border/50 flex items-center justify-between">
-                  {/* Financial Balance Status */}
-                  <div>
-                    <span className="block text-[10px] text-muted-foreground">
-                      {bal > 0
-                        ? lang === "ar"
-                          ? "الرصيد المستحق (عليه)"
-                          : "Outstanding Debt"
-                        : bal < 0
-                          ? lang === "ar"
-                            ? "رصيد دائن (له)"
-                            : "Credit Balance"
-                          : lang === "ar"
-                            ? "الرصيد الحالي"
-                            : "Current Balance"}
-                    </span>
+                {/* Customer Information */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-1">
+                    <h4 className="truncate text-sm font-bold text-foreground group-hover:text-primary transition-colors">
+                      {r.name}
+                    </h4>
+                    {/* Status Tag */}
                     <span
-                      className={`font-mono text-base font-bold tracking-tight ${
-                        bal > 0
-                          ? "text-amber-400"
-                          : bal < 0
-                            ? "text-emerald-400"
-                            : "text-muted-foreground"
-                      }`}
+                      className={`rounded-full px-2 py-0.5 text-[9px] font-bold border shrink-0 ${meta.toneClass}`}
                     >
-                      <Ltr>{money(bal)}</Ltr>
+                      {meta.label}
                     </span>
                   </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                    {/* Communication Actions Menu */}
-                    <CustomerCommunicationMenu
-                      customer={{
-                        id: r.id,
-                        name: r.name,
-                        phone: r.phone,
-                        balance: bal,
-                        hasLedgerActivity: Boolean(
-                          ledgerIndex.get(r.id)?.lastMovementAt || bal !== 0,
-                        ),
-                      }}
-                      onSelectStatementPdf={() => goStatement(r)}
-                      onSelectStatementExcel={() => goStatement(r)}
-                      trigger={
-                        <button
-                          type="button"
-                          title={
-                            lang === "ar" ? "إجراءات المراسلة والتواصل" : "Communication options"
-                          }
-                          className={`grid size-8 place-items-center rounded-full border transition active:scale-95 ${
-                            r.phone
-                              ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border-emerald-500/20"
-                              : "bg-muted/40 text-muted-foreground/50 border-border/60"
-                          }`}
-                        >
-                          <WhatsAppIcon className="size-3.5" />
-                        </button>
-                      }
-                    />
-
-                    {/* Quick Payment Button (F3) */}
-                    {isModuleEnabled("payments") && (
-                      <button
-                        onClick={() => goPayment(r)}
-                        title={lang === "ar" ? "تحصيل دفعة (F3)" : "Collect payment (F3)"}
-                        className="flex h-8 items-center gap-1 rounded-full bg-primary/10 hover:bg-primary hover:text-primary-foreground border border-primary/20 px-2.5 text-[11px] font-bold text-primary transition active:scale-95"
-                      >
-                        <Wallet className="size-3" />
-                        <span>{lang === "ar" ? "تحصيل" : "Pay"}</span>
-                      </button>
+                  {/* Contact & Extra Details */}
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                    {r.phone && (
+                      <span className="flex items-center gap-1 font-mono" dir="ltr">
+                        <Phone className="size-3 text-muted-foreground" />
+                        {r.phone}
+                      </span>
                     )}
+                    {r.email && (
+                      <span className="flex items-center gap-1 truncate max-w-[140px]">
+                        <Mail className="size-3 text-muted-foreground" />
+                        {r.email}
+                      </span>
+                    )}
+                  </div>
 
-                    {/* Quick Statement Button (F5) */}
+                  {/* Credit limit / Loyalty pills */}
+                  <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                    {limit > 0 && (
+                      <span className="rounded-lg bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 text-[9px] font-mono font-medium text-rose-400 flex items-center gap-1">
+                        <ShieldCheck className="size-2.5" />
+                        {lang === "ar" ? "حد الائتمان:" : "Limit:"} <Ltr>{money(limit)}</Ltr>
+                      </span>
+                    )}
+                    {Number(r.loyalty_points) > 0 && (
+                      <span className="rounded-lg bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[9px] font-mono font-medium text-amber-400 flex items-center gap-1">
+                        <Star className="size-2.5 fill-amber-400 text-amber-400" />
+                        <Ltr>{r.loyalty_points}</Ltr> {lang === "ar" ? "نقطة" : "pts"}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Balance & Actions Section */}
+              <div className="mt-4 pt-3 border-t border-border/50 flex items-center justify-between">
+                {/* Financial Balance Status */}
+                <div>
+                  <span className="block text-[10px] text-muted-foreground">
+                    {bal > 0
+                      ? lang === "ar"
+                        ? "الرصيد المستحق (عليه)"
+                        : "Outstanding Debt"
+                      : bal < 0
+                        ? lang === "ar"
+                          ? "رصيد دائن (له)"
+                          : "Credit Balance"
+                        : lang === "ar"
+                          ? "الرصيد الحالي"
+                          : "Current Balance"}
+                  </span>
+                  <span
+                    className={`font-mono text-base font-bold tracking-tight ${
+                      bal > 0
+                        ? "text-amber-400"
+                        : bal < 0
+                          ? "text-emerald-400"
+                          : "text-muted-foreground"
+                    }`}
+                  >
+                    <Ltr>{money(bal)}</Ltr>
+                  </span>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                  {/* Communication Actions Menu */}
+                  <CustomerCommunicationMenu
+                    customer={{
+                      id: r.id,
+                      name: r.name,
+                      phone: r.phone,
+                      balance: bal,
+                      hasLedgerActivity: Boolean(
+                        ledgerIndex.get(r.id)?.lastMovementAt || bal !== 0,
+                      ),
+                    }}
+                    onSelectStatementPdf={() => goStatement(r)}
+                    onSelectStatementExcel={() => goStatement(r)}
+                    trigger={
+                      <button
+                        type="button"
+                        title={
+                          lang === "ar" ? "إجراءات المراسلة والتواصل" : "Communication options"
+                        }
+                        className={`grid size-8 place-items-center rounded-full border transition active:scale-95 ${
+                          r.phone
+                            ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border-emerald-500/20"
+                            : "bg-muted/40 text-muted-foreground/50 border-border/60"
+                        }`}
+                      >
+                        <WhatsAppIcon className="size-3.5" />
+                      </button>
+                    }
+                  />
+
+                  {/* Quick Payment Button (F3) */}
+                  {isModuleEnabled("payments") && (
                     <button
-                      onClick={() => goStatement(r)}
-                      title={lang === "ar" ? "كشف حساب (F5)" : "Statement (F5)"}
+                      onClick={() => goPayment(r)}
+                      title={lang === "ar" ? "تحصيل دفعة (F3)" : "Collect payment (F3)"}
+                      className="flex h-8 items-center gap-1 rounded-full bg-primary/10 hover:bg-primary hover:text-primary-foreground border border-primary/20 px-2.5 text-[11px] font-bold text-primary transition active:scale-95"
+                    >
+                      <Wallet className="size-3" />
+                      <span>{lang === "ar" ? "تحصيل" : "Pay"}</span>
+                    </button>
+                  )}
+
+                  {/* Quick Statement Button (F5) */}
+                  <button
+                    onClick={() => goStatement(r)}
+                    title={lang === "ar" ? "كشف حساب (F5)" : "Statement (F5)"}
+                    className="grid size-8 place-items-center rounded-full bg-surface-2 hover:bg-surface-3 border border-border text-muted-foreground hover:text-foreground transition active:scale-95"
+                  >
+                    <FileText className="size-3.5" />
+                  </button>
+
+                  {/* Edit Button (F2) or System Lock */}
+                  {isSystemCashCustomerName(r.name) ? (
+                    <span
+                      title={
+                        lang === "ar"
+                          ? "حساب نظامي رسمي (نقدي) — محمي من التعديل والحذف"
+                          : "Official system entity (Cash) — protected"
+                      }
+                      className="grid size-8 place-items-center rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                    >
+                      <Lock className="size-3.5" />
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => setEdit(r)}
+                      title={lang === "ar" ? "تعديل (F2)" : "Edit (F2)"}
                       className="grid size-8 place-items-center rounded-full bg-surface-2 hover:bg-surface-3 border border-border text-muted-foreground hover:text-foreground transition active:scale-95"
                     >
-                      <FileText className="size-3.5" />
+                      <Pencil className="size-3.5" />
                     </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        }}
+        renderListRow={(r) => {
+          const meta = getRecordIndicator(r);
+          const bal = Number(r.balance);
+          const limit = Number(r.credit_limit);
 
-                    {/* Edit Button (F2) or System Lock */}
-                    {isSystemCashCustomerName(r.name) ? (
+          return (
+            <div
+              onMouseEnter={() => setHoveredRow(r.id)}
+              onMouseLeave={() => setHoveredRow(null)}
+              className="card-mullak group relative flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 sm:px-4 sm:py-3 cursor-pointer hover:border-primary/40 transition-all rounded-2xl"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <span
+                  aria-hidden
+                  className={`h-10 w-1.5 shrink-0 rounded-full transition-all duration-300 ${meta.barClass}`}
+                />
+                <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary font-bold text-sm border border-primary/20">
+                  {r.name.slice(0, 1)}
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h4 className="font-bold text-foreground group-hover:text-primary transition-colors text-sm truncate">
+                      {r.name}
+                    </h4>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[9px] font-bold border shrink-0 ${meta.toneClass}`}
+                    >
+                      {meta.label}
+                    </span>
+                  </div>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                    {r.phone && (
                       <span
-                        title={
-                          lang === "ar"
-                            ? "حساب نظامي رسمي (نقدي) — محمي من التعديل والحذف"
-                            : "Official system entity (Cash) — protected"
-                        }
-                        className="grid size-8 place-items-center rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                        className="flex items-center gap-1 truncate font-mono text-[11px]"
+                        dir="ltr"
                       >
-                        <Lock className="size-3.5" />
+                        <Phone className="size-3 shrink-0 text-muted-foreground" />
+                        <span className="truncate">{r.phone}</span>
                       </span>
-                    ) : (
-                      <button
-                        onClick={() => setEdit(r)}
-                        title={lang === "ar" ? "تعديل (F2)" : "Edit (F2)"}
-                        className="grid size-8 place-items-center rounded-full bg-surface-2 hover:bg-surface-3 border border-border text-muted-foreground hover:text-foreground transition active:scale-95"
-                      >
-                        <Pencil className="size-3.5" />
-                      </button>
+                    )}
+                    {r.email && (
+                      <span className="flex max-w-[150px] items-center gap-1 truncate text-[11px]">
+                        <Mail className="size-3 shrink-0 text-muted-foreground" />
+                        <span className="truncate">{r.email}</span>
+                      </span>
+                    )}
+                    {limit > 0 && (
+                      <span className="truncate font-mono text-[10px] text-rose-400">
+                        {lang === "ar" ? "الحد:" : "Limit:"} <Ltr>{money(limit)}</Ltr>
+                      </span>
                     )}
                   </div>
                 </div>
               </div>
-            );
-          })}
-        </div>
-      ) : viewMode === "list" ? (
-        /* ─── Luxury Mullak Row-Cards View (List with Right Accent Strip) ─── */
-        <div className="space-y-2.5">
-          {filtered.map((r) => {
-            const meta = getRecordIndicator(r);
-            const bal = Number(r.balance);
-            const limit = Number(r.credit_limit);
 
-            return (
-              <div
-                key={r.id}
-                onClick={() => void openCustomer(r)}
-                onMouseEnter={() => setHoveredRow(r.id)}
-                onMouseLeave={() => setHoveredRow(null)}
-                className="card-mullak group relative flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 sm:px-4 sm:py-3 cursor-pointer hover:border-primary/40 transition-all rounded-2xl"
-              >
-                <div className="flex items-center gap-3 min-w-0">
+              <div className="flex items-center justify-between gap-4 border-t pt-2 border-border/50 sm:justify-end sm:border-t-0 sm:pt-0 shrink-0">
+                <div className="text-start sm:text-end">
+                  <span className="block text-[10px] text-muted-foreground">
+                    {bal > 0
+                      ? lang === "ar"
+                        ? "عليه"
+                        : "Owed"
+                      : bal < 0
+                        ? lang === "ar"
+                          ? "له"
+                          : "Credit"
+                        : lang === "ar"
+                          ? "الرصيد"
+                          : "Balance"}
+                  </span>
                   <span
-                    aria-hidden
-                    className={`h-10 w-1.5 shrink-0 rounded-full transition-all duration-300 ${meta.barClass}`}
-                  />
-                  <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary font-bold text-sm border border-primary/20">
-                    {r.name.slice(0, 1)}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h4 className="font-bold text-foreground group-hover:text-primary transition-colors text-sm truncate">
-                        {r.name}
-                      </h4>
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[9px] font-bold border shrink-0 ${meta.toneClass}`}
-                      >
-                        {meta.label}
-                      </span>
-                    </div>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                      {r.phone && (
-                        <span
-                          className="flex items-center gap-1 truncate font-mono text-[11px]"
-                          dir="ltr"
-                        >
-                          <Phone className="size-3 shrink-0 text-muted-foreground" />
-                          <span className="truncate">{r.phone}</span>
-                        </span>
-                      )}
-                      {r.email && (
-                        <span className="flex max-w-[150px] items-center gap-1 truncate text-[11px]">
-                          <Mail className="size-3 shrink-0 text-muted-foreground" />
-                          <span className="truncate">{r.email}</span>
-                        </span>
-                      )}
-                      {limit > 0 && (
-                        <span className="truncate font-mono text-[10px] text-rose-400">
-                          {lang === "ar" ? "الحد:" : "Limit:"} <Ltr>{money(limit)}</Ltr>
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                    className={`font-mono text-sm sm:text-base font-bold tracking-tight ${
+                      bal > 0
+                        ? "text-amber-400"
+                        : bal < 0
+                          ? "text-emerald-400"
+                          : "text-muted-foreground"
+                    }`}
+                  >
+                    <Ltr>{money(bal)}</Ltr>
+                  </span>
                 </div>
 
-                <div className="flex items-center justify-between gap-4 border-t pt-2 border-border/50 sm:justify-end sm:border-t-0 sm:pt-0 shrink-0">
-                  <div className="text-start sm:text-end">
-                    <span className="block text-[10px] text-muted-foreground">
-                      {bal > 0
-                        ? lang === "ar"
-                          ? "عليه"
-                          : "Owed"
-                        : bal < 0
-                          ? lang === "ar"
-                            ? "له"
-                            : "Credit"
-                          : lang === "ar"
-                            ? "الرصيد"
-                            : "Balance"}
-                    </span>
-                    <span
-                      className={`font-mono text-sm sm:text-base font-bold tracking-tight ${
-                        bal > 0
-                          ? "text-amber-400"
-                          : bal < 0
-                            ? "text-emerald-400"
-                            : "text-muted-foreground"
-                      }`}
-                    >
-                      <Ltr>{money(bal)}</Ltr>
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                    {isModuleEnabled("payments") && (
-                      <button
-                        onClick={() => goPayment(r)}
-                        title={`${lang === "ar" ? "تحصيل" : "Payment"} (F3)`}
-                        className="flex h-8 items-center gap-1 rounded-lg border border-primary/20 bg-primary/10 px-2.5 text-xs font-semibold text-primary transition hover:bg-primary hover:text-primary-foreground active:scale-95"
-                      >
-                        <Wallet className="size-3.5" />
-                        <span className="hidden md:inline">{lang === "ar" ? "تحصيل" : "Pay"}</span>
-                      </button>
-                    )}
+                <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                  {isModuleEnabled("payments") && (
                     <button
-                      onClick={() => goStatement(r)}
-                      title={`${lang === "ar" ? "كشف حساب" : "Statement"} (F5)`}
+                      onClick={() => goPayment(r)}
+                      title={`${lang === "ar" ? "تحصيل" : "Payment"} (F3)`}
+                      className="flex h-8 items-center gap-1 rounded-lg border border-primary/20 bg-primary/10 px-2.5 text-xs font-semibold text-primary transition hover:bg-primary hover:text-primary-foreground active:scale-95"
+                    >
+                      <Wallet className="size-3.5" />
+                      <span className="hidden md:inline">{lang === "ar" ? "تحصيل" : "Pay"}</span>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => goStatement(r)}
+                    title={`${lang === "ar" ? "كشف حساب" : "Statement"} (F5)`}
+                    className="grid size-8 place-items-center rounded-lg border border-border bg-surface text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
+                  >
+                    <FileText className="size-3.5" />
+                  </button>
+                  {isSystemCashCustomerName(r.name) ? (
+                    <span
+                      title={
+                        lang === "ar"
+                          ? "حساب نظامي رسمي (نقدي) — محمي من التعديل والحذف"
+                          : "Official system entity (Cash) — protected"
+                      }
+                      className="grid size-8 place-items-center rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                    >
+                      <Lock className="size-3.5" />
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => setEdit(r)}
+                      title={`${lang === "ar" ? "تعديل" : "Edit"} (F2)`}
                       className="grid size-8 place-items-center rounded-lg border border-border bg-surface text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
                     >
-                      <FileText className="size-3.5" />
+                      <Pencil className="size-3.5" />
                     </button>
-                    {isSystemCashCustomerName(r.name) ? (
-                      <span
-                        title={
-                          lang === "ar"
-                            ? "حساب نظامي رسمي (نقدي) — محمي من التعديل والحذف"
-                            : "Official system entity (Cash) — protected"
-                        }
-                        className="grid size-8 place-items-center rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                      >
-                        <Lock className="size-3.5" />
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => setEdit(r)}
-                        title={`${lang === "ar" ? "تعديل" : "Edit"} (F2)`}
-                        className="grid size-8 place-items-center rounded-lg border border-border bg-surface text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
-                      >
-                        <Pencil className="size-3.5" />
-                      </button>
-                    )}
-                  </div>
+                  )}
                 </div>
               </div>
-            );
-          })}
-        </div>
-      ) : (
-        /* ─── Classic Table View: same DataTable as products (sortable headers) ─── */
-        <div className="panel-elevated -mx-1 overflow-hidden rounded-2xl border border-border/70 sm:mx-0">
-          <DataTable
-            className="px-0"
-            columns={columns}
-            rows={filtered}
-            rowKey={(r) => r.id}
-            loading={loading}
-            initialLoading={loading}
-            error={null}
-            sort={sort}
-            onSortChange={setSort}
-            minWidth={1260}
-            horizontalScroll={tableUsesHorizontalScroll}
-            stickyHeader
-            onRowClick={(r) => void openCustomer(r)}
-            rowProps={(r) => ({
-              onMouseEnter: () => setHoveredRow(r.id),
-              onMouseLeave: () => setHoveredRow(null),
-            })}
-            empty={{
-              icon: <Users />,
-              title: lang === "ar" ? "لا توجد سجلات مطابقة" : "No matching customers",
-              description: search
-                ? lang === "ar"
-                  ? `لا توجد نتائج تطابق "${search}". جرب البحث بكلمة أخرى.`
-                  : `No results found for "${search}".`
-                : lang === "ar"
-                  ? "ابدأ بتسجيل العميل الأول لإصدار الفواتير ومتابعة الأرصدة والديون."
-                  : "Register your first customer to start tracking invoices and balances.",
-              action: (
-                <Button size="sm" icon={<Plus />} onClick={() => setEdit({})}>
-                  {lang === "ar" ? "عميل جديد" : "New Customer"}
-                </Button>
-              ),
-            }}
-          />
-        </div>
-      )}
+            </div>
+          );
+        }}
+      />
 
       {/* ─── Mullak-Style Customer Detail Sheet (Drawer) ─── */}
       {selected && (

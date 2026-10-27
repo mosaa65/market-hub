@@ -245,6 +245,9 @@ function SalesInvoicePage() {
   });
   const [paid, setPaid] = useState("");
   const [paymentReference, setPaymentReference] = useState("");
+  const [paymentSplits, setPaymentSplits] = useState<
+    { method: string; amount: number; payment_method_id: string; reference?: string }[]
+  >([]);
 
   // Keyboard-only operation: arrows/Enter walk the payment block in order
   // (customer → warehouse → method → reference → paid → discount → note),
@@ -522,14 +525,23 @@ function SalesInvoicePage() {
       const result = await createSalesInvoice({
         warehouseId,
         customerId: customerId || null,
-        paymentMethod: toLegacyPaymentValue(paymentMethod) as PaymentMethod,
+        paymentMethod: toLegacyPaymentValue(paymentSplits.length > 1 ? "split" : paymentMethod) as PaymentMethod,
         paid: effectivePaid,
         discount: discountN,
+        paymentSplits: paymentSplits.length > 1 ? paymentSplits : null,
         // On a ticket the negotiated terms belong on the document, not only on
         // the line, so the receipt the customer keeps can be re-read later.
         note:
           [
             mode === "ticket" ? ticketDetail : "",
+            paymentSplits.length > 1
+              ? `[${isRtl ? "الدفع بأكثر من طريقة" : "Split"}: ${paymentSplits
+                  .map(
+                    (line) =>
+                      `${paymentMethodLabel(line.method, isRtl ? "ar" : "en")}: ${money(line.amount)}`,
+                  )
+                  .join(" | ")}]`
+              : "",
             paymentReference.trim()
               ? `${isRtl ? "مرجع الحوالة" : "Transfer ref"}: ${paymentReference.trim()}`
               : "",
@@ -559,11 +571,16 @@ function SalesInvoicePage() {
         (isRtl ? "عميل نقدي" : "Walk-in");
       const warehouse = warehouses.find((w) => w.id === warehouseId);
 
-      const resolvedPaymentLabel = settlement.bankAccountName
-        ? `${pmLabel(paymentMethod, isRtl)} (${settlement.bankAccountName})`
-        : settlement.cashboxName
-          ? `${pmLabel(paymentMethod, isRtl)} (${settlement.cashboxName})`
-          : pmLabel(paymentMethod, isRtl);
+      const resolvedPaymentLabel =
+        paymentSplits.length > 1
+          ? isRtl
+            ? "دفع بأكثر من طريقة"
+            : "Split payment"
+          : settlement.bankAccountName
+            ? `${pmLabel(paymentMethod, isRtl)} (${settlement.bankAccountName})`
+            : settlement.cashboxName
+              ? `${pmLabel(paymentMethod, isRtl)} (${settlement.cashboxName})`
+              : pmLabel(paymentMethod, isRtl);
 
       const doc: InvoiceDoc = {
         title:
@@ -627,6 +644,11 @@ function SalesInvoicePage() {
         millingType: current.millingType,
       }));
       setPaid("");
+      setPaymentSplits([]);
+      if (paymentSplits.length > 1) {
+        setPaymentMethod("cash");
+        setSettlement({ method: "cash", paymentMethodId: "cash" });
+      }
       setDiscount("");
       setNote("");
       setPaymentReference("");
@@ -1269,29 +1291,45 @@ function SalesInvoicePage() {
                 <label className="text-xs font-semibold text-muted-foreground">
                   {isRtl ? "طريقة السداد والتوجيه المالي" : "Payment method & settlement"}
                 </label>
-                <DynamicPaymentSelector
-                  context="sales"
-                  value={paymentMethod}
-                  onChange={(method) => {
-                    setPaymentMethod(method);
-                    if (getPaymentMethodDefinition(method)?.isCreditTerm) setPaid("0");
-                  }}
-                  settlement={settlement}
-                  onSettlementChange={setSettlement}
-                  includeCredit
-                />
+                {paymentMethod !== "split" && (
+                  <DynamicPaymentSelector
+                    context="sales"
+                    value={paymentMethod}
+                    onChange={(method) => {
+                      setPaymentSplits([]);
+                      setPaymentMethod(method);
+                      if (getPaymentMethodDefinition(method)?.isCreditTerm) setPaid("0");
+                    }}
+                    settlement={settlement}
+                    onSettlementChange={setSettlement}
+                    includeCredit
+                  />
+                )}
+                {paymentMethod === "split" && (
+                  <div className="flex min-h-9 items-center justify-between rounded-xl border border-primary/20 bg-primary/[0.04] px-3 text-xs font-semibold text-primary">
+                    <span>{isRtl ? "الدفع موزع على عدة طرق" : "Payment split across methods"}</span>
+                    <button type="button" onClick={() => { setPaymentSplits([]); setPaymentMethod("cash"); setSettlement((current) => ({ ...current, method: "cash", paymentMethodId: "cash" })); }} className="underline underline-offset-2">
+                      {isRtl ? "إلغاء التجزئة" : "Cancel split"}
+                    </button>
+                  </div>
+                )}
               </div>
               <PaymentPanel
                 context="sales"
                 total={total}
                 method={paymentMethod}
-                onMethodChange={setPaymentMethod}
+                onMethodChange={(next) => {
+                  setPaymentMethod(next);
+                  if (next !== "split") setPaymentSplits([]);
+                }}
                 paid={paid}
                 onPaidChange={setPaid}
                 customerId={customerId}
                 customers={customers}
                 reference={paymentReference}
                 onReferenceChange={setPaymentReference}
+                onSplitChange={(splits) => setPaymentSplits(splits.length > 1 ? splits : [])}
+                showMethodPicker={false}
                 showShortcuts={false}
               />
               <div className="grid grid-cols-2 gap-2">

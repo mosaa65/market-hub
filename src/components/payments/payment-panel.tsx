@@ -44,10 +44,11 @@
  * the arithmetic, usable by a screen that renders its own layout.
  */
 
-import { useEffect, useMemo, useRef } from "react";
-import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { AlertCircle, CheckCircle2, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { money } from "@/lib/format";
+import { PaymentSplitCatalogDialog, type PaymentSplitTender } from "@/components/ui/payment-method/payment-split-catalog-dialog";
 import { useI18n } from "@/lib/i18n";
 import { getPaymentMethodDefinition, type PaymentContext } from "@/lib/payments/payment-methods";
 import {
@@ -207,6 +208,12 @@ export interface PaymentPanelProps {
   /** Called with the reference text when the method needs one. */
   reference?: string;
   onReferenceChange?: (value: string) => void;
+  /** Enable the shared multi-tender flow only when the caller can persist its rows. */
+  onSplitChange?: (
+    splits: PaymentSplitTender[],
+  ) => void;
+  /** Hide the method picker when a screen already renders the shared settlement selector. */
+  showMethodPicker?: boolean;
 }
 
 /**
@@ -230,10 +237,15 @@ export function PaymentPanel(props: PaymentPanelProps) {
     className,
     reference,
     onReferenceChange,
+    onSplitChange,
+    showMethodPicker = true,
   } = props;
 
   const { t, lang } = useI18n();
   const isRtl = lang === "ar";
+  const [splitOpen, setSplitOpen] = useState(false);
+  const [splitLines, setSplitLines] = useState<import("@/components/payments/split-payment-editor").SplitPaymentEditorLine[]>([]);
+  const splitAllocated = splitLines.reduce((sum, line) => sum + Math.max(0, Number(line.amount) || 0), 0);
 
   const result = usePaymentPanel({
     total,
@@ -249,11 +261,14 @@ export function PaymentPanel(props: PaymentPanelProps) {
   return (
     <div className={cn("space-y-3", className)}>
       <div className="space-y-2">
-        <div className="flex items-center justify-between gap-2">
-          <label className="text-xs font-semibold text-muted-foreground">
-            {t("common.payment_method")}
-          </label>
-          {showShortcuts && (
+        {(showMethodPicker || showShortcuts) && (
+          <div className="flex items-center justify-between gap-2">
+            {showMethodPicker && (
+              <label className="text-xs font-semibold text-muted-foreground">
+                {t("common.payment_method")}
+              </label>
+            )}
+            {showShortcuts && (
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
@@ -267,6 +282,7 @@ export function PaymentPanel(props: PaymentPanelProps) {
                 type="button"
                 disabled={disabled}
                 onClick={() => {
+                  setSplitLines([]);
                   onMethodChange("credit");
                   onPaidChange("0");
                 }}
@@ -275,23 +291,42 @@ export function PaymentPanel(props: PaymentPanelProps) {
                 {t("common.pay_credit")}
               </button>
             </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
-        <PaymentMethodPicker
-          context={context}
-          value={method}
-          onChange={(next) => {
-            onMethodChange(next);
-            // Choosing a credit term means collecting nothing now — stated
-            // once here instead of three screens each remembering to do it.
-            if (getPaymentMethodDefinition(next)?.isCreditTerm) onPaidChange("0");
-          }}
-          ensureIds={[method]}
-          disabled={disabled}
-          ariaLabel={t("common.payment_method")}
-          data-form-nav
-        />
+        {showMethodPicker && (
+          <PaymentMethodPicker
+            context={context}
+            value={method}
+            onChange={(next) => {
+              setSplitLines([]);
+              onMethodChange(next);
+              // Choosing a credit term means collecting nothing now — stated
+              // once here instead of three screens each remembering to do it.
+              if (getPaymentMethodDefinition(next)?.isCreditTerm) onPaidChange("0");
+            }}
+            ensureIds={[method]}
+            disabled={disabled}
+            ariaLabel={t("common.payment_method")}
+            data-form-nav
+          />
+        )}
+
+        {onSplitChange && (
+          <button
+            type="button"
+            disabled={disabled || total <= 0}
+            onClick={() => setSplitOpen(true)}
+            className="inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-xl border border-primary/25 bg-primary/[0.04] px-3 text-[11px] font-semibold text-primary transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Layers className="size-3.5" />
+            {isRtl ? "توزيع الدفع على أكثر من طريقة" : "Split across payment methods"}
+            {splitAllocated > 0 && (
+              <span className="font-mono">{money(splitAllocated)}</span>
+            )}
+          </button>
+        )}
 
         {result.needsReference && onReferenceChange && (
           <input
@@ -403,6 +438,27 @@ export function PaymentPanel(props: PaymentPanelProps) {
           <CheckCircle2 className="h-3.5 w-3.5" />
           {isRtl ? "الفاتورة مسددة بالكامل" : "Invoice fully settled"}
         </div>
+      )}
+
+      {onSplitChange && (
+        <PaymentSplitCatalogDialog
+          open={splitOpen}
+          onOpenChange={setSplitOpen}
+          total={total}
+          context={context}
+          initialLines={splitLines}
+          onConfirm={(splits) => {
+            setSplitLines(splits.map((line, index) => ({
+              key: `${line.payment_method_id}-${index}`,
+              methodId: line.payment_method_id,
+              amount: String(line.amount),
+              reference: line.reference,
+            })));
+            onMethodChange(splits.length > 1 ? "split" : (splits[0]?.method ?? "credit"));
+            onPaidChange(String(splits.reduce((sum, line) => sum + line.amount, 0)));
+            onSplitChange(splits);
+          }}
+        />
       )}
     </div>
   );

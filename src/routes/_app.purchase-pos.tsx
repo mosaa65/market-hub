@@ -1,41 +1,25 @@
-import { ModuleGuard, useModules } from "@/lib/modules";
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+﻿import { ModuleGuard, useModules } from "@/lib/modules";
+import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowDownUp,
   ArrowUp,
   Building2,
-  Search,
   Plus,
-  Minus,
   Trash2,
   ScanBarcode,
   Loader2,
-  X,
-  Filter,
-  ChevronDown,
   UserPlus,
   ShoppingBag,
-  Sparkles,
-  AlertCircle,
-  RotateCcw,
-  CheckCircle2,
-  CreditCard,
-  Banknote,
-  Clock,
-  Printer,
-  Receipt,
   FileText,
-  Truck,
-  Coins,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { money } from "@/lib/format";
 import { PageGuideButton, type PageGuideConfig } from "@/components/page-guide";
-import { DollarSign, Archive, Zap } from "lucide-react";
+import { DollarSign, Archive, Zap, Truck } from "lucide-react";
 import { toast } from "sonner";
 import { BarcodeScanner } from "@/components/barcode-scanner";
 import { useKeyboardWedge } from "@/hooks/use-keyboard-wedge";
@@ -54,7 +38,8 @@ import { usePaymentMethodsForContext } from "@/hooks/use-payment-methods";
 import { usePersistedViewMode } from "@/hooks/use-persisted-view-mode";
 import { SupplierFormDialog } from "@/components/contacts/supplier-form-dialog";
 import { UniversalPrintPreview } from "@/components/universal-print-preview";
-import type { PrintRequest } from "@/lib/printing";
+import { getUnifiedPrintSettings, printUnifiedDocument, type PrintRequest } from "@/lib/printing";
+import { translateRpcError } from "@/lib/errors/rpc-errors";
 import { DynamicPaymentSelector } from "@/components/ui/payment-method/dynamic-payment-selector";
 import {
   SplitPaymentEditor,
@@ -267,7 +252,6 @@ function PurchasePOSPage() {
   const { t, lang } = useI18n();
   const { config: catalogConfig } = useCatalogModules();
   const { methods: purchasePaymentMethods } = usePaymentMethodsForContext("purchases");
-  const navigate = useNavigate();
   const { roles } = useAuth();
   // Suppliers are RLS-restricted to owner/manager/accountant; cashiers must not
   // be shown an "add supplier" action they cannot complete.
@@ -301,7 +285,6 @@ function PurchasePOSPage() {
     direction: "asc",
   });
   const [viewMode, setViewMode] = usePersistedViewMode("purchase-pos-catalog", "cards");
-  const [filterOpen, setFilterOpen] = useState(false);
 
   // Filter States
   const [selectedCategory, setSelectedCategory] = useState("");
@@ -351,13 +334,16 @@ function PurchasePOSPage() {
     if (typeof window === "undefined") return true;
     return localStorage.getItem("purchase_pos_barcode_reader_enabled") !== "false";
   });
-  const [successInvoice, setSuccessInvoice] = useState<{
-    id: string;
-    number?: string;
-    total: number;
-    paid: number;
-    supplierName: string;
-  } | null>(null);
+  /*
+   * Unified post-purchase flow — mirrors the Sales POS exactly:
+   * 1. The invoice document is built into a `PrintRequest` (supplier_invoice).
+   * 2. The user's print settings decide: direct thermal/browser print, the
+   *    UniversalPrintPreview sheet, or nothing.
+   * 3. The bespoke success popup is gone — the preview sheet is the
+   *    confirmation, and the toast carries the summary.
+   */
+  const [purchasePrintRequest, setPurchasePrintRequest] = useState<PrintRequest | null>(null);
+  const lastPurchasePrintRequestRef = useRef<PrintRequest | null>(null);
   const [quoteRequest, setQuoteRequest] = useState<PrintRequest | null>(null);
 
   const searchRef = useRef<HTMLInputElement>(null);
@@ -514,6 +500,15 @@ function PurchasePOSPage() {
       }
     } catch (err: any) {
       console.error("Error loading POP meta:", err);
+      toast.error(
+        translateRpcError(
+          err,
+          lang === "ar" ? "ar" : "en",
+          lang === "ar"
+            ? "تعذر تحميل بيانات الشاشة (الأصناف والمستودعات والموردين). أعد المحاولة."
+            : "Could not load screen data (products, warehouses, suppliers). Retry.",
+        ),
+      );
     }
   }
 
@@ -528,28 +523,6 @@ function PurchasePOSPage() {
     });
     setStockMap(map);
   }
-
-  // Active filters count
-  const activeFiltersCount = useMemo(() => {
-    return [
-      selectedCategory,
-      catalogConfig.enableBrands ? selectedBrand : "",
-      catalogConfig.enableUnits ? selectedUnit : "",
-      catalogConfig.enableOrigins ? selectedOrigin : "",
-      catalogConfig.enableQualityGrades ? selectedQuality : "",
-      catalogConfig.enableMakesAndModels ? selectedMake : "",
-      catalogConfig.enableMakesAndModels ? selectedModel : "",
-    ].filter(Boolean).length;
-  }, [
-    selectedCategory,
-    selectedBrand,
-    selectedUnit,
-    selectedOrigin,
-    selectedQuality,
-    selectedMake,
-    selectedModel,
-    catalogConfig,
-  ]);
 
   const clearAllFilters = () => {
     setSelectedCategory("");
@@ -666,9 +639,10 @@ function PurchasePOSPage() {
   const taxTotal = cart.reduce((s, l) => s + l.unit_cost * l.quantity * (l.tax_rate / 100), 0);
   const discountN = Number(discount || 0);
   const total = Math.max(0, subtotal + taxTotal - discountN);
-  const splitPaidN = Math.round(
-    splitPaymentLines.reduce((sum, line) => sum + Math.max(0, Number(line.amount) || 0), 0) * 100,
-  ) / 100;
+  const splitPaidN =
+    Math.round(
+      splitPaymentLines.reduce((sum, line) => sum + Math.max(0, Number(line.amount) || 0), 0) * 100,
+    ) / 100;
   const paidN =
     paymentMethod === "credit"
       ? 0
@@ -830,7 +804,9 @@ function PurchasePOSPage() {
         );
       }
       if (paidN > total) {
-        return toast.error(lang === "ar" ? "مجموع الدفع يتجاوز الإجمالي" : "Tender total exceeds the invoice total");
+        return toast.error(
+          lang === "ar" ? "مجموع الدفع يتجاوز الإجمالي" : "Tender total exceeds the invoice total",
+        );
       }
     }
 
@@ -863,9 +839,10 @@ function PurchasePOSPage() {
         const purchaseRpcArgs = {
           _warehouse_id: warehouseId,
           _supplier_id: supplierId,
-          _payment_method: paymentMethod === "split"
-            ? "split"
-            : selectedPurchasePaymentMethod?.legacyValue ?? toLegacyPaymentValue(paymentMethod),
+          _payment_method:
+            paymentMethod === "split"
+              ? "split"
+              : (selectedPurchasePaymentMethod?.legacyValue ?? toLegacyPaymentValue(paymentMethod)),
           _paid: paidN,
           _discount: discountN,
           _note: composedNote as any,
@@ -876,22 +853,23 @@ function PurchasePOSPage() {
             tax_rate: Number(l.tax_rate),
           })),
         };
-        const res = paymentMethod === "split"
-          ? await (supabase.rpc as any)("create_purchase", {
-              ...purchaseRpcArgs,
-              _payment_splits: purchaseSplits,
-            })
-          : await (supabase.rpc as any)("create_purchase", {
-              ...purchaseRpcArgs,
-              _cashbox_id: paymentSelection.cashboxId || null,
-              _bank_account_id: paymentSelection.bankAccountId || null,
-              _payment_reference:
-                paymentSelection.reference ||
-                paymentSelection.paymentReference ||
-                transferRef.trim() ||
-                null,
-              _payment_method_id: paymentSelection.paymentMethodId || paymentMethod,
-            });
+        const res =
+          paymentMethod === "split"
+            ? await (supabase.rpc as any)("create_purchase", {
+                ...purchaseRpcArgs,
+                _payment_splits: purchaseSplits,
+              })
+            : await (supabase.rpc as any)("create_purchase", {
+                ...purchaseRpcArgs,
+                _cashbox_id: paymentSelection.cashboxId || null,
+                _bank_account_id: paymentSelection.bankAccountId || null,
+                _payment_reference:
+                  paymentSelection.reference ||
+                  paymentSelection.paymentReference ||
+                  transferRef.trim() ||
+                  null,
+                _payment_method_id: paymentSelection.paymentMethodId || paymentMethod,
+              });
         invoiceId = res.data;
         error = res.error;
       } catch {
@@ -922,6 +900,21 @@ function PurchasePOSPage() {
       }
 
       if (error) throw error;
+
+      // جلب رقم الفاتورة الفعلي الذي أنشأه الـ RPC لعرضه في الطباعة والتلميح.
+      let invoiceNumber: string | null = null;
+      if (invoiceId) {
+        try {
+          const { data: invRow } = await (supabase as any)
+            .from("purchase_invoices")
+            .select("invoice_number")
+            .eq("id", invoiceId)
+            .maybeSingle();
+          invoiceNumber = invRow?.invoice_number ?? null;
+        } catch {
+          invoiceNumber = null;
+        }
+      }
 
       // Attach treasury settlement details if provided
       if (invoiceId && paymentMethod !== "split") {
@@ -955,16 +948,79 @@ function PurchasePOSPage() {
 
       toast.success(
         lang === "ar"
-          ? "تم تسجيل فاتورة الشراء وتحديث المخزون بنجاح"
-          : "Purchase recorded successfully",
+          ? `تم تسجيل فاتورة الشراء وتحديث المخزون بنجاح${invoiceNumber ? ` — فاتورة #${invoiceNumber}` : ""}`
+          : `Purchase recorded successfully${invoiceNumber ? ` — Invoice #${invoiceNumber}` : ""}`,
       );
 
-      setSuccessInvoice({
-        id: invoiceId || "recorded",
-        total,
-        paid: paidN,
-        supplierName: currentSup?.name || (lang === "ar" ? "مورد نقدي" : "Cash Supplier"),
-      });
+      /*
+       * Unified print flow — identical to the Sales POS: build the
+       * supplier_invoice PrintRequest, then honor the operator's printing
+       * settings (direct print / preview sheet / off). The old bespoke
+       * success popup is gone; the preview sheet IS the confirmation.
+       */
+      const printSettings = getUnifiedPrintSettings();
+      const printOverride = printSettings.overrides.purchase_invoice;
+      const printBehavior = printOverride?.behavior ?? printSettings.behavior;
+      const printRequest: PrintRequest = {
+        documentType: "purchase_invoice",
+        rtl: lang === "ar",
+        templateId: printOverride?.templateId,
+        theme: printOverride?.theme,
+        paperId: printOverride?.paperId,
+        orientation: printOverride?.orientation,
+        method: printOverride?.method,
+        showBarcode: printOverride?.showBarcode,
+        showQrCode: printOverride?.showQrCode,
+        showSignatures: printOverride?.showSignatures,
+        doc: {
+          docType: "purchase_invoice",
+          title: lang === "ar" ? "فاتورة مشتريات" : "Purchase Invoice",
+          number: invoiceNumber ?? String(invoiceId ?? "").slice(0, 8),
+          date: purchaseDate,
+          partyLabel: lang === "ar" ? "المورد" : "Supplier",
+          partyName: currentSup?.name ?? (lang === "ar" ? "مورد نقدي" : "Cash Supplier"),
+          partyPhone: currentSup?.phone ?? undefined,
+          warehouse: warehouses.find((w) => w.id === warehouseId)?.name ?? undefined,
+          payment:
+            lang === "ar"
+              ? (selectedPurchasePaymentMethod?.nameAr ?? paymentMethod)
+              : (selectedPurchasePaymentMethod?.nameEn ?? paymentMethod),
+          status:
+            total - paidN > 0
+              ? paidN > 0
+                ? lang === "ar"
+                  ? "سداد جزئي"
+                  : "Partial"
+                : lang === "ar"
+                  ? "آجل / غير مدفوع"
+                  : "Unpaid"
+              : lang === "ar"
+                ? "مسدد بالكامل"
+                : "Paid",
+          currency: "",
+          subtotal,
+          tax: taxTotal,
+          discount: discountN,
+          total,
+          paid: paidN,
+          balance: Math.max(0, total - paidN),
+          notes: composedNote ?? undefined,
+          lines: cart.map((l) => ({
+            product: l.name,
+            qty: l.quantity,
+            price: l.unit_cost,
+            total: Math.round(l.unit_cost * l.quantity * (1 + l.tax_rate / 100) * 100) / 100,
+          })),
+        },
+      };
+
+      lastPurchasePrintRequestRef.current = printRequest;
+
+      if (printBehavior === "direct" || (printBehavior === "default" && !printSettings.preview)) {
+        void printUnifiedDocument(printRequest);
+      } else if (printBehavior !== "off") {
+        setPurchasePrintRequest(printRequest);
+      }
 
       // Reset cart and payment
       setCart([]);
@@ -974,8 +1030,15 @@ function PurchasePOSPage() {
       setNote("");
       setTransferRef("");
     } catch (e: any) {
+      // كل خطأ من RPC يمر بطبقة الترجمة الموحدة قبل أن يراه المستخدم.
       toast.error(
-        e.message || (lang === "ar" ? "حدث خطأ أثناء حفظ الفاتورة" : "Failed to record purchase"),
+        translateRpcError(
+          e,
+          lang === "ar" ? "ar" : "en",
+          lang === "ar"
+            ? "حدث خطأ أثناء حفظ الفاتورة. لم تُحفظ أي كمية أو تُعدّل أي رصيد."
+            : "Failed to record the purchase. No quantity was saved and no balance changed.",
+        ),
       );
     } finally {
       setLoading(false);
@@ -1307,149 +1370,6 @@ function PurchasePOSPage() {
               </div>
             </TableToolbar>
 
-            {/* Legacy filter controls are retained temporarily for an isolated follow-up cleanup. */}
-            {filterOpen && (
-              <div className="p-3 border-b border-border/60 bg-surface/50 space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="relative flex-1">
-                    <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <input
-                      ref={searchRef}
-                      type="text"
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          handleBarcode(search);
-                        }
-                      }}
-                      placeholder={
-                        lang === "ar"
-                          ? "ابحث باسم المنتج، الكود SKU، أو امسح الباركود (F2)..."
-                          : "Search by product name, SKU, or scan barcode (F2)..."
-                      }
-                      className="h-10 w-full rounded-2xl border border-border/80 bg-surface pe-9 ps-9 text-xs text-foreground placeholder:text-muted-foreground/70 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition"
-                    />
-                    {search && (
-                      <button
-                        onClick={() => setSearch("")}
-                        className="absolute end-3 top-1/2 -translate-y-1/2 rounded-full p-0.5 hover:bg-surface-2 text-muted-foreground"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Toggle Filter Panel */}
-                  <button
-                    type="button"
-                    onClick={() => setFilterOpen((o) => !o)}
-                    className={`relative flex h-10 items-center gap-1.5 rounded-2xl border px-3 text-xs font-semibold transition ${
-                      filterOpen || activeFiltersCount > 0
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border/80 bg-surface text-muted-foreground hover:bg-surface-2 hover:text-foreground"
-                    }`}
-                  >
-                    <Filter className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">{lang === "ar" ? "تصفية" : "Filter"}</span>
-                    {activeFiltersCount > 0 && (
-                      <span className="grid h-4 w-4 place-items-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
-                        {activeFiltersCount}
-                      </span>
-                    )}
-                  </button>
-                </div>
-
-                {/* Collapsible Filter Panel */}
-                {filterOpen && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 pt-2 border-t border-border/60">
-                    {/* Category */}
-                    <div>
-                      <label className="text-[10px] font-semibold text-muted-foreground mb-1 block">
-                        {lang === "ar" ? "التصنيف" : "Category"}
-                      </label>
-                      <select
-                        value={selectedCategory}
-                        onChange={(e) => setSelectedCategory(e.target.value)}
-                        className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2 text-xs text-foreground outline-none"
-                      >
-                        <option value="">{lang === "ar" ? "الكل" : "All"}</option>
-                        {categories.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {lang === "ar" ? c.name_ar || c.name : c.name || c.name_ar}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Brand */}
-                    {catalogConfig.enableBrands && (
-                      <div>
-                        <label className="text-[10px] font-semibold text-muted-foreground mb-1 block">
-                          {lang === "ar" ? "الماركة" : "Brand"}
-                        </label>
-                        <select
-                          value={selectedBrand}
-                          onChange={(e) => setSelectedBrand(e.target.value)}
-                          className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2 text-xs text-foreground outline-none"
-                        >
-                          <option value="">{lang === "ar" ? "الكل" : "All"}</option>
-                          {brands.map((b) => (
-                            <option key={b.id} value={b.id}>
-                              {lang === "ar" ? b.name_ar || b.name : b.name || b.name_ar}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-
-                    {/* Quality */}
-                    {catalogConfig.enableQualityGrades && (
-                      <div>
-                        <label className="text-[10px] font-semibold text-muted-foreground mb-1 block">
-                          {lang === "ar" ? "درجة الجودة" : "Quality Grade"}
-                        </label>
-                        <select
-                          value={selectedQuality}
-                          onChange={(e) => setSelectedQuality(e.target.value)}
-                          className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2 text-xs text-foreground outline-none"
-                        >
-                          <option value="">{lang === "ar" ? "الكل" : "All"}</option>
-                          {qualities.map((q) => (
-                            <option key={q.id} value={q.id}>
-                              {lang === "ar" ? q.name_ar || q.name : q.name || q.name_ar}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-
-                    {/* Origin */}
-                    {catalogConfig.enableOrigins && (
-                      <div>
-                        <label className="text-[10px] font-semibold text-muted-foreground mb-1 block">
-                          {lang === "ar" ? "بلد المنشأ" : "Origin"}
-                        </label>
-                        <select
-                          value={selectedOrigin}
-                          onChange={(e) => setSelectedOrigin(e.target.value)}
-                          className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2 text-xs text-foreground outline-none"
-                        >
-                          <option value="">{lang === "ar" ? "الكل" : "All"}</option>
-                          {origins.map((o) => (
-                            <option key={o.id} value={o.id}>
-                              {lang === "ar" ? o.name_ar || o.name : o.name || o.name_ar}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
             {/* Products Grid */}
             <div className="flex-1 min-h-0 overflow-y-auto p-3 custom-scrollbar">
               {filtered.length === 0 ? (
@@ -1486,7 +1406,7 @@ function PurchasePOSPage() {
                         key={p.id}
                         type="button"
                         onClick={() => addToCart(p)}
-                        className="group flex flex-col justify-between rounded-2xl border border-border/80 bg-white p-3 text-start transition-all hover:border-primary/60 hover:bg-muted/50 hover:shadow-md active:scale-[0.98] dark:bg-card"
+                        className="card-mullak group flex h-full flex-col justify-between rounded-2xl p-3 text-start transition-all hover:shadow-md active:scale-[0.98]"
                       >
                         <div className="w-full">
                           {/* Quality & Category Badges */}
@@ -1549,7 +1469,7 @@ function PurchasePOSPage() {
                       key={product.id}
                       type="button"
                       onClick={() => addToCart(product)}
-                      className="flex w-full items-center justify-between gap-3 rounded-lg border border-border/70 bg-white px-3 py-2 text-start transition hover:border-primary/40 hover:bg-muted/50 dark:bg-card"
+                      className="card-mullak flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-start transition hover:shadow-sm"
                     >
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-semibold">
@@ -1581,7 +1501,10 @@ function PurchasePOSPage() {
               ) : (
                 <div className="overflow-x-auto rounded-lg border border-border">
                   <table className="w-full text-start text-xs">
-                    <thead className="sticky top-0 bg-surface-2 text-muted-foreground">
+                    {/* الترويسة ليست sticky: الحاوي الأب overflow-x-auto فقط،
+                     * والـ sticky بداخله كان يرسم الترويسة كطبقة عائمة شفافة
+                     * (تأثير غريب أثناء التمرير) بدل صف ثابت عادي. */}
+                    <thead className="bg-surface-2 text-muted-foreground">
                       <tr>
                         {(
                           [
@@ -1963,68 +1886,18 @@ function PurchasePOSPage() {
         onSaved={(record) => handleSupplierSaved(record)}
       />
 
-      {/* Success Modal */}
-      {successInvoice && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur-sm p-4">
-          <div className="panel-elevated w-full max-w-sm rounded-2xl p-6 border border-border/80 bg-surface text-center space-y-4 shadow-2xl">
-            <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-              <CheckCircle2 className="h-8 w-8" />
-            </div>
-
-            <div>
-              <h3 className="text-base font-bold text-foreground">
-                {lang === "ar"
-                  ? "تم تسجيل فاتورة الشراء بنجاح!"
-                  : "Purchase Recorded Successfully!"}
-              </h3>
-              <p className="text-xs text-muted-foreground mt-1">
-                {lang === "ar"
-                  ? `المورد: ${successInvoice.supplierName}`
-                  : `Supplier: ${successInvoice.supplierName}`}
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-border/70 bg-surface-2/40 p-3 space-y-1 text-xs">
-              <div className="flex justify-between text-muted-foreground">
-                <span>{lang === "ar" ? "إجمالي الفاتورة:" : "Total:"}</span>
-                <span className="font-mono font-bold text-foreground">
-                  {money(successInvoice.total)}
-                </span>
-              </div>
-              <div className="flex justify-between text-muted-foreground">
-                <span>{lang === "ar" ? "المسدد نقداً:" : "Paid:"}</span>
-                <span className="font-mono font-bold text-emerald-500">
-                  {money(successInvoice.paid)}
-                </span>
-              </div>
-              {successInvoice.total > successInvoice.paid && (
-                <div className="flex justify-between text-amber-500 font-semibold pt-1 border-t border-border/60">
-                  <span>{lang === "ar" ? "المتبقي (آجل):" : "Balance Due:"}</span>
-                  <span className="font-mono">
-                    {money(successInvoice.total - successInvoice.paid)}
-                  </span>
-                </div>
-              )}
-            </div>
-
-            <div className="flex flex-col gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setSuccessInvoice(null)}
-                className="h-10 w-full rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition shadow-sm"
-              >
-                {lang === "ar" ? "فاتورة شراء جديدة" : "New Purchase"}
-              </button>
-              <Link
-                to="/purchases"
-                className="h-9 w-full grid place-items-center rounded-xl border border-border text-xs font-semibold text-muted-foreground hover:bg-surface-2 transition"
-              >
-                {lang === "ar" ? "عرض في سجل المشتريات" : "View in Purchases Register"}
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Unified purchase-invoice print preview — same sheet as the Sales POS. */}
+      {purchasePrintRequest ? (
+        <UniversalPrintPreview
+          open
+          onOpenChange={(open) => {
+            if (!open) setPurchasePrintRequest(null);
+          }}
+          request={purchasePrintRequest}
+          title={lang === "ar" ? "معاينة فاتورة المشتريات" : "Purchase invoice preview"}
+          rtl={lang === "ar"}
+        />
+      ) : null}
 
       {/* Barcode Camera Scanner */}
       {scannerOpen && (

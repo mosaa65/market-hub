@@ -1,7 +1,6 @@
 import { cn } from "@/lib/utils";
 import { usePersistedViewMode } from "@/hooks/use-persisted-view-mode";
 import { RecordsViewToggle } from "@/components/ui/records-view-toggle";
-import { RecordsSkeleton } from "@/components/ui/records-states";
 import { QuickFilterBar } from "@/components/ui/quick-filter-bar";
 import { PrimaryAction } from "@/components/ui/primary-action";
 import { InvoiceSectionTabs } from "@/components/invoices/invoice-section-tabs";
@@ -72,7 +71,8 @@ import {
   type FilterValues,
   type SortOption,
 } from "@/components/ui/table-toolbar";
-import { DataTable, type DataTableColumn, type DataTableSort } from "@/components/ui/data-table";
+import { type DataTableColumn, type DataTableSort } from "@/components/ui/data-table";
+import { RecordsView } from "@/components/ui/records-view";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { IconButton } from "@/components/ui/icon-button";
 import { useBreakpoint } from "@/design/breakpoints";
@@ -263,6 +263,11 @@ export function SalesPage() {
     observer.observe(el);
     return () => observer.disconnect();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  // Keep the sentinel near the viewport bottom for all three record modes.
+  const setSentinelRef = (node: HTMLDivElement | null) => {
+    sentinelRef.current = node;
+  };
 
   useRealtimeTable<Invoice>(
     {
@@ -632,8 +637,9 @@ export function SalesPage() {
         type: "select",
         options: [
           { value: "cash", label: isRtl ? "نقدي (كاش)" : "Cash" },
-          { value: "card", label: isRtl ? "شبكة / بطاقة" : "Card" },
           { value: "bank_transfer", label: isRtl ? "تحويل بنكي" : "Bank Transfer" },
+          { value: "mobile_money", label: isRtl ? "محفظة إلكترونية" : "Mobile wallet" },
+          { value: "credit", label: isRtl ? "آجل" : "Credit" },
           { value: "split", label: isRtl ? "دفع مجزأ" : "Split Payment" },
         ],
       },
@@ -1206,38 +1212,39 @@ export function SalesPage() {
         />
       </TableToolbar>
 
-      {/* Main Content: Cards, List, or Classic Table View */}
-      {loading ? (
-        <RecordsSkeleton mode={viewMode} />
-      ) : filteredRows.length === 0 ? (
-        <div className="panel-elevated flex min-h-[300px] flex-col items-center justify-center gap-3 p-8 text-center text-muted-foreground">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-surface-2 text-muted-foreground">
-            <Receipt className="h-8 w-8 opacity-60" />
-          </div>
-          <div>
-            <h4 className="text-base font-semibold text-foreground">
-              {isRtl ? "لا توجد فواتير مبيعات مطابقة" : "No matching sales invoices"}
-            </h4>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {search || activeFiltersCount > 0 || statusTab !== "all"
-                ? isRtl
-                  ? "جرب تعديل خيارات البحث أو التصفية"
-                  : "Try adjusting your search query or filters"
-                : isRtl
-                  ? "يمكنك إنشاء أول فاتورة عبر نقطة البيع الآن"
-                  : "Start creating invoices via the POS page"}
-            </p>
-          </div>
-          <div className="mt-2 flex gap-2">
-            {(search || activeFiltersCount > 0 || statusTab !== "all") && (
-              <button
-                onClick={clearAllFilters}
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-xs hover:bg-surface-2"
-              >
-                <X className="h-3 w-3" />
-                {isRtl ? "مسح التصفية" : "Clear filters"}
-              </button>
-            )}
+      {/* ─── Records: cards / list / classic table — shared scaffold ─── */}
+      <RecordsView<Invoice>
+        rows={filteredRows}
+        getRowId={(inv) => inv.id}
+        viewMode={viewMode}
+        loading={loading}
+        columns={columns}
+        sort={sort}
+        onSortChange={setSort}
+        infinite
+        hasMore={Boolean(hasNextPage)}
+        onLoadMore={() => {
+          if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
+        }}
+        loadingMore={isFetchingNextPage}
+        pageSize={INVOICES_PAGE_SIZE}
+        totalCount={totalInvoiceCount}
+        cardsInfinite
+        minWidth={hasMultiWarehouse ? 1120 : 980}
+        horizontalScroll={tableUsesHorizontalScroll}
+        onRowClick={(inv) => openInvoice(inv)}
+        empty={{
+          icon: <Receipt />,
+          title: isRtl ? "لا توجد فواتير مبيعات مطابقة" : "No matching sales invoices",
+          description:
+            search || activeFiltersCount > 0 || statusTab !== "all"
+              ? isRtl
+                ? "جرب تعديل خيارات البحث أو التصفية"
+                : "Try adjusting your search query or filters"
+              : isRtl
+                ? "يمكنك إنشاء أول فاتورة عبر نقطة البيع الآن"
+                : "Start creating invoices via the POS page",
+          action: (
             <Link
               to="/sales-invoice/new"
               className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground"
@@ -1245,420 +1252,329 @@ export function SalesPage() {
               <Plus className="h-3 w-3" />
               {isRtl ? "إنشاء فاتورة مبيعات" : "Create sales invoice"}
             </Link>
-          </div>
-        </div>
-      ) : (
-        <>
-          {/* 1. Cards View — the shared unified grid (2-up mobile, 3 md, 4 lg, 5 2xl) */}
-          {viewMode === "cards" && (
-            <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
-              {filteredRows.map((inv) => {
-                const total = Number(inv.total) || 0;
-                const paid = Number(inv.paid) || 0;
-                const remaining = Math.max(0, total - paid);
-                const customerName = inv.customers?.name ?? (isRtl ? "عميل نقدي" : "Walk-in");
+          ),
+        }}
+        renderCard={(inv) => {
+          const total = Number(inv.total) || 0;
+          const paid = Number(inv.paid) || 0;
+          const remaining = Math.max(0, total - paid);
+          const customerName = inv.customers?.name ?? (isRtl ? "عميل نقدي" : "Walk-in");
 
-                return (
-                  <div
-                    key={inv.id}
-                    data-qa="sales-card"
-                    onClick={() => openInvoice(inv)}
-                    className="card-mullak group relative flex cursor-pointer flex-col justify-between overflow-hidden rounded-2xl p-3 transition-all duration-200 hover:shadow-md sm:p-4.5"
-                  >
-                    <div>
-                      {/* Header: Invoice # + Copy + Status */}
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1">
-                            <span className="truncate font-mono text-sm font-bold text-foreground transition group-hover:text-primary">
-                              {inv.invoice_number}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                copyInvoiceNumber(inv.invoice_number, inv.id);
-                              }}
-                              className="grid size-7 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-surface-2 hover:text-foreground transition"
-                              aria-label={isRtl ? "نسخ رقم الفاتورة" : "Copy invoice number"}
-                            >
-                              {copiedInvoiceId === inv.id ? (
-                                <Check className="h-3.5 w-3.5 text-emerald-500" />
-                              ) : (
-                                <Copy className="h-3.5 w-3.5" />
-                              )}
-                            </button>
-                          </div>
-                          <div className="mt-1">
-                            <VortexDateBadge date={inv.created_at} variant="subtle" size="sm" />
-                          </div>
-                        </div>
-                        <div className="shrink-0">{statusBadge(inv.status)}</div>
-                      </div>
-
-                      {/* Customer + Payment method */}
-                      <div className="mt-3 flex items-center justify-between gap-2 border-t border-border/60 pt-2.5 text-xs">
-                        <div className="flex min-w-0 items-center gap-1.5">
-                          <div className="grid size-6 shrink-0 place-items-center rounded-full bg-surface-2 text-[10px] font-bold">
-                            {customerName.slice(0, 1).toUpperCase()}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="truncate font-medium text-foreground">
-                              {customerName}
-                            </div>
-                            {inv.customers?.phone && (
-                              <div className="dir-ltr truncate font-mono text-[10px] text-muted-foreground">
-                                {toSystemDigits(inv.customers.phone)}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <div className="inline-flex max-w-[45%] shrink-0 items-center gap-1 truncate rounded-lg border border-border/80 bg-surface-2/60 px-2 py-1 text-[11px] text-muted-foreground">
-                          {pmChip(
-                            inv.payment_method,
-                            inv.note,
-                            "max-w-[45%] shrink-0 truncate rounded-lg border-border/80 bg-surface-2/60 px-2 py-1 text-[11px] text-muted-foreground",
-                          )}
-                        </div>
-                      </div>
-
-                      {hasMultiWarehouse && inv.warehouses && (
-                        <div className="mt-2 truncate text-[11px] text-muted-foreground">
-                          {isRtl ? "المستودع: " : "Warehouse: "}
-                          {whName(inv.warehouses)}
-                        </div>
-                      )}
-
-                      {/* Financial summary */}
-                      <div className="mt-3 space-y-1.5 rounded-xl border border-border/60 bg-surface-2/40 p-2.5 text-xs">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-muted-foreground">
-                            {isRtl ? "إجمالي الفاتورة" : "Total"}
-                          </span>
-                          <span className="truncate font-mono text-sm font-bold text-foreground">
-                            {toSystemDigits(money(total))}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-muted-foreground">
-                            {isRtl ? "المدفوع" : "Paid"}
-                          </span>
-                          <span className="truncate font-mono font-medium text-emerald-500">
-                            {toSystemDigits(money(paid))}
-                          </span>
-                        </div>
-                        {remaining > 0 && (
-                          <div className="flex items-center justify-between gap-2 border-t border-border/40 pt-1.5 font-semibold text-rose-500">
-                            <span>{isRtl ? "المتبقي (آجل)" : "Remaining Due"}</span>
-                            <span className="truncate font-mono">
-                              {toSystemDigits(money(remaining))}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Actions Row */}
-                    <div
-                      className="mt-3.5 flex items-center justify-between gap-2 border-t border-border/60 pt-3"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          disabled={!inv.customers?.phone}
-                          onClick={() => shareInvoiceWhatsApp(inv)}
-                          className={`grid size-8 place-items-center rounded-lg border transition ${
-                            inv.customers?.phone
-                              ? "border-border/70 text-muted-foreground hover:bg-surface-2 hover:text-emerald-500 cursor-pointer"
-                              : "border-border/40 text-muted-foreground/30 cursor-not-allowed opacity-50"
-                          }`}
-                          title={
-                            !inv.customers?.phone
-                              ? isRtl
-                                ? "هذا العميل لا يوجد لديه رقم هاتف مسجل في النظام"
-                                : "This customer has no phone number registered"
-                              : isRtl
-                                ? "مشاركة عبر واتساب"
-                                : "Share via WhatsApp"
-                          }
-                        >
-                          <WhatsAppIcon className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          disabled={!inv.customers?.phone}
-                          onClick={() => shareInvoiceSms(inv)}
-                          className={`grid size-8 place-items-center rounded-lg border transition ${
-                            inv.customers?.phone
-                              ? "border-border/70 text-muted-foreground hover:bg-surface-2 hover:text-blue-500 cursor-pointer"
-                              : "border-border/40 text-muted-foreground/30 cursor-not-allowed opacity-50"
-                          }`}
-                          title={
-                            !inv.customers?.phone
-                              ? isRtl
-                                ? "هذا العميل لا يوجد لديه رقم هاتف مسجل في النظام"
-                                : "This customer has no phone number registered"
-                              : isRtl
-                                ? "مشاركة عبر رسالة نصية SMS"
-                                : "Share via SMS"
-                          }
-                        >
-                          <MessageSquare className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => openInvoice(inv)}
-                          className="grid size-8 place-items-center rounded-lg border border-border/70 text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
-                          title={isRtl ? "عرض التفاصيل" : "View Details"}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </button>
-                      </div>
-
-                      {remaining > 0 && inv.status !== "cancelled" ? (
-                        <button
-                          type="button"
-                          onClick={() => triggerQuickCollect(inv)}
-                          className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-amber-500/10 px-3 text-xs font-semibold text-amber-500 transition hover:bg-amber-500/20"
-                        >
-                          <Wallet className="h-3.5 w-3.5" />
-                          <span>{isRtl ? "تحصيل فوري" : "Collect"}</span>
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => void openPrintPreview(inv)}
-                          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-xs font-medium text-foreground transition hover:bg-surface-2"
-                        >
-                          <Printer className="h-3.5 w-3.5" />
-                          <span>{isRtl ? "طباعة" : "Print"}</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* 2. List View (Luxury Row-Cards Mode) */}
-          {viewMode === "list" && (
-            <div className="space-y-2.5">
-              {filteredRows.map((inv) => {
-                const total = Number(inv.total) || 0;
-                const paid = Number(inv.paid) || 0;
-                const remaining = Math.max(0, total - paid);
-                const customerName = inv.customers?.name ?? (isRtl ? "عميل نقدي" : "Walk-in");
-                const barColor = invoiceStatusMeta(inv.status).bar;
-
-                return (
-                  <div
-                    key={inv.id}
-                    onClick={() => openInvoice(inv)}
-                    className="card-mullak group relative flex cursor-pointer flex-col justify-between gap-3 rounded-2xl border p-3.5 transition-all duration-200 hover:border-primary/50 hover:shadow-md sm:flex-row sm:items-center sm:p-4"
-                  >
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <span
-                        aria-hidden
-                        className={`h-11 sm:h-12 w-1.5 shrink-0 rounded-full ${barColor}`}
-                      />
-                      <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary border border-primary/20 group-hover:bg-primary group-hover:text-primary-foreground group-hover:scale-105 transition-all">
-                        <Receipt className="size-5" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="truncate font-mono text-sm font-bold text-foreground transition-colors group-hover:text-primary sm:text-base">
-                            {inv.invoice_number}
-                          </span>
-                          <div className="shrink-0">{statusBadge(inv.status)}</div>
-                          {pmChip(
-                            inv.payment_method,
-                            inv.note,
-                            "truncate text-[11px] text-muted-foreground",
-                          )}
-                        </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
-                          <span className="truncate font-medium text-foreground">
-                            {customerName}
-                          </span>
-                          {inv.customers?.phone && (
-                            <span className="dir-ltr truncate font-mono text-muted-foreground/80">
-                              {toSystemDigits(inv.customers.phone)}
-                            </span>
-                          )}
-                          <VortexDateBadge date={inv.created_at} variant="subtle" size="sm" />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-4 border-t border-border/60 pt-2 sm:justify-end sm:border-t-0 sm:pt-0">
-                      <div className="min-w-0 text-start sm:min-w-[120px] sm:text-end">
-                        <div className="text-[10px] text-muted-foreground">
-                          {isRtl ? "الإجمالي:" : "Total:"}
-                        </div>
-                        <div className="truncate font-mono text-sm font-bold text-foreground sm:text-base">
-                          {toSystemDigits(money(total))}
-                        </div>
-                        {remaining > 0 ? (
-                          <div className="truncate font-mono text-[10px] font-semibold text-rose-500">
-                            {isRtl ? "متبقي: " : "Due: "}
-                            {toSystemDigits(money(remaining))}
-                          </div>
-                        ) : (
-                          <div className="text-[10px] font-medium text-emerald-500">
-                            {isRtl ? "مدفوعة بالكامل" : "Fully paid"}
-                          </div>
-                        )}
-                      </div>
-
-                      <div
-                        className="flex items-center gap-1 shrink-0"
-                        onClick={(e) => e.stopPropagation()}
+          return (
+            <div
+              data-qa="sales-card"
+              className="card-mullak group relative flex h-full cursor-pointer flex-col justify-between overflow-hidden rounded-2xl p-3 transition-all duration-200 hover:shadow-md sm:p-4.5"
+            >
+              <div>
+                {/* Header: Invoice # + Copy + Status */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1">
+                      <span className="truncate font-mono text-sm font-bold text-foreground transition group-hover:text-primary">
+                        {inv.invoice_number}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          copyInvoiceNumber(inv.invoice_number, inv.id);
+                        }}
+                        className="grid size-7 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-surface-2 hover:text-foreground transition"
+                        aria-label={isRtl ? "نسخ رقم الفاتورة" : "Copy invoice number"}
                       >
-                        {remaining > 0 && inv.status !== "cancelled" ? (
-                          <button
-                            type="button"
-                            onClick={() => triggerQuickCollect(inv)}
-                            className="inline-flex h-8 items-center gap-1 rounded-lg bg-amber-500/10 px-2.5 text-xs font-semibold text-amber-500 hover:bg-amber-500/20 transition"
-                            title={isRtl ? "تحصيل سريع" : "Quick Collect"}
-                          >
-                            <Wallet className="h-3.5 w-3.5" />
-                            <span className="hidden md:inline">{isRtl ? "تحصيل" : "Collect"}</span>
-                          </button>
+                        {copiedInvoiceId === inv.id ? (
+                          <Check className="h-3.5 w-3.5 text-emerald-500" />
                         ) : (
-                          <button
-                            type="button"
-                            onClick={() => void openPrintPreview(inv)}
-                            className="inline-flex h-8 items-center gap-1 rounded-lg border border-border bg-surface px-2.5 text-xs font-medium text-foreground hover:bg-surface-2 transition"
-                            title={isRtl ? "طباعة" : "Print"}
-                          >
-                            <Printer className="h-3.5 w-3.5" />
-                            <span className="hidden md:inline">{isRtl ? "طباعة" : "Print"}</span>
-                          </button>
+                          <Copy className="h-3.5 w-3.5" />
                         )}
-                        <button
-                          type="button"
-                          disabled={!inv.customers?.phone}
-                          onClick={() => shareInvoiceWhatsApp(inv)}
-                          className={`rounded-lg p-1.5 transition ${
-                            inv.customers?.phone
-                              ? "text-muted-foreground hover:bg-surface-2 hover:text-emerald-500 cursor-pointer"
-                              : "text-muted-foreground/30 cursor-not-allowed opacity-50"
-                          }`}
-                          title={
-                            !inv.customers?.phone
-                              ? isRtl
-                                ? "لا يوجد رقم هاتف مسجل"
-                                : "No phone registered"
-                              : isRtl
-                                ? "مشاركة عبر واتساب"
-                                : "Share via WhatsApp"
-                          }
-                        >
-                          <WhatsAppIcon className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          disabled={!inv.customers?.phone}
-                          onClick={() => shareInvoiceSms(inv)}
-                          className={`rounded-lg p-1.5 transition ${
-                            inv.customers?.phone
-                              ? "text-muted-foreground hover:bg-surface-2 hover:text-blue-500 cursor-pointer"
-                              : "text-muted-foreground/30 cursor-not-allowed opacity-50"
-                          }`}
-                          title={
-                            !inv.customers?.phone
-                              ? isRtl
-                                ? "لا يوجد رقم هاتف مسجل"
-                                : "No phone registered"
-                              : isRtl
-                                ? "مشاركة عبر رسالة SMS"
-                                : "Share via SMS"
-                          }
-                        >
-                          <MessageSquare className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => openInvoice(inv)}
-                          className="rounded-lg p-1.5 text-muted-foreground hover:bg-surface-2 hover:text-foreground transition"
-                          title={isRtl ? "تفاصيل" : "Details"}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </button>
-                      </div>
+                      </button>
+                    </div>
+                    <div className="mt-1">
+                      <VortexDateBadge date={inv.created_at} variant="subtle" size="sm" />
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
+                  <div className="shrink-0">{statusBadge(inv.status)}</div>
+                </div>
 
-          {/* 3. Classic Table View */}
-          {viewMode === "table" && (
-            <div className="panel-elevated -mx-1 sm:mx-0 overflow-hidden rounded-2xl border border-border/70">
-              <DataTable
-                className="px-0"
-                columns={columns}
-                rows={filteredRows}
-                rowKey={(inv) => inv.id}
-                loading={loading}
-                initialLoading={loading}
-                error={null}
-                sort={sort}
-                onSortChange={setSort}
-                infinite
-                hasMore={Boolean(hasNextPage)}
-                onLoadMore={() => {
-                  if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
-                }}
-                loadingMore={isFetchingNextPage}
-                pageSize={INVOICES_PAGE_SIZE}
-                totalCount={totalInvoiceCount}
-                minWidth={hasMultiWarehouse ? 1120 : 980}
-                horizontalScroll={tableUsesHorizontalScroll}
-                stickyHeader
-                onRowClick={(inv) => openInvoice(inv)}
-                empty={{
-                  icon: <Receipt />,
-                  title: isRtl ? "لا توجد فواتير مبيعات مطابقة" : "No matching sales invoices",
-                  description:
-                    search || activeFiltersCount > 0 || statusTab !== "all"
-                      ? isRtl
-                        ? "جرب تعديل خيارات البحث أو التصفية"
-                        : "Try adjusting your search query or filters"
-                      : isRtl
-                        ? "يمكنك إنشاء أول فاتورة عبر نقطة البيع الآن"
-                        : "Start creating invoices via the POS page",
-                }}
-              />
-            </div>
-          )}
+                {/* Customer + Payment method */}
+                <div className="mt-3 flex items-center justify-between gap-2 border-t border-border/60 pt-2.5 text-xs">
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <div className="grid size-6 shrink-0 place-items-center rounded-full bg-surface-2 text-[10px] font-bold">
+                      {customerName.slice(0, 1).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="truncate font-medium text-foreground">{customerName}</div>
+                      {inv.customers?.phone && (
+                        <div className="dir-ltr truncate font-mono text-[10px] text-muted-foreground">
+                          {toSystemDigits(inv.customers.phone)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="inline-flex max-w-[45%] shrink-0 items-center gap-1 truncate rounded-lg border border-border/80 bg-surface-2/60 px-2 py-1 text-[11px] text-muted-foreground">
+                    {pmChip(
+                      inv.payment_method,
+                      inv.note,
+                      "max-w-[45%] shrink-0 truncate rounded-lg border-border/80 bg-surface-2/60 px-2 py-1 text-[11px] text-muted-foreground",
+                    )}
+                  </div>
+                </div>
 
-          {/* Infinite Scroll Sentinel & Auto-update when reaching bottom */}
-          <div ref={sentinelRef} className="py-6 flex flex-col items-center justify-center gap-2">
-            {isFetchingNextPage ? (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium">
-                <Loader2 className="size-4 animate-spin text-primary" />
-                <span>{t("records.loading_more")}</span>
+                {hasMultiWarehouse && inv.warehouses && (
+                  <div className="mt-2 truncate text-[11px] text-muted-foreground">
+                    {isRtl ? "المستودع: " : "Warehouse: "}
+                    {whName(inv.warehouses)}
+                  </div>
+                )}
+
+                {/* Financial summary */}
+                <div className="mt-3 space-y-1.5 rounded-xl border border-border/60 bg-surface-2/40 p-2.5 text-xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-muted-foreground">
+                      {isRtl ? "إجمالي الفاتورة" : "Total"}
+                    </span>
+                    <span className="truncate font-mono text-sm font-bold text-foreground">
+                      {toSystemDigits(money(total))}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-muted-foreground">{isRtl ? "المدفوع" : "Paid"}</span>
+                    <span className="truncate font-mono font-medium text-emerald-500">
+                      {toSystemDigits(money(paid))}
+                    </span>
+                  </div>
+                  {remaining > 0 && (
+                    <div className="flex items-center justify-between gap-2 border-t border-border/40 pt-1.5 font-semibold text-rose-500">
+                      <span>{isRtl ? "المتبقي (آجل)" : "Remaining Due"}</span>
+                      <span className="truncate font-mono">{toSystemDigits(money(remaining))}</span>
+                    </div>
+                  )}
+                </div>
               </div>
-            ) : hasNextPage ? (
-              <button
-                type="button"
-                onClick={() => void fetchNextPage()}
-                className="flex items-center gap-2 rounded-2xl border border-border/80 bg-surface px-6 py-2.5 text-xs font-bold text-foreground shadow-sm hover:bg-surface-2 transition active:scale-95 cursor-pointer"
+
+              {/* Actions Row */}
+              <div
+                className="mt-3.5 flex items-center justify-between gap-2 border-t border-border/60 pt-3"
+                onClick={(e) => e.stopPropagation()}
               >
-                <span>{t("records.load_more")}</span>
-              </button>
-            ) : rows.length > 0 ? (
-              <span className="text-[11px] text-muted-foreground/60 font-medium">
-                {t("records.all_loaded").replace("{count}", toSystemDigits(rows.length.toString()))}
-              </span>
-            ) : null}
-          </div>
-        </>
-      )}
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={!inv.customers?.phone}
+                    onClick={() => shareInvoiceWhatsApp(inv)}
+                    className={`grid size-8 place-items-center rounded-lg border transition ${
+                      inv.customers?.phone
+                        ? "border-border/70 text-muted-foreground hover:bg-surface-2 hover:text-emerald-500 cursor-pointer"
+                        : "border-border/40 text-muted-foreground/30 cursor-not-allowed opacity-50"
+                    }`}
+                    title={
+                      !inv.customers?.phone
+                        ? isRtl
+                          ? "هذا العميل لا يوجد لديه رقم هاتف مسجل في النظام"
+                          : "This customer has no phone number registered"
+                        : isRtl
+                          ? "مشاركة عبر واتساب"
+                          : "Share via WhatsApp"
+                    }
+                  >
+                    <WhatsAppIcon className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!inv.customers?.phone}
+                    onClick={() => shareInvoiceSms(inv)}
+                    className={`grid size-8 place-items-center rounded-lg border transition ${
+                      inv.customers?.phone
+                        ? "border-border/70 text-muted-foreground hover:bg-surface-2 hover:text-blue-500 cursor-pointer"
+                        : "border-border/40 text-muted-foreground/30 cursor-not-allowed opacity-50"
+                    }`}
+                    title={
+                      !inv.customers?.phone
+                        ? isRtl
+                          ? "هذا العميل لا يوجد لديه رقم هاتف مسجل في النظام"
+                          : "This customer has no phone number registered"
+                        : isRtl
+                          ? "مشاركة عبر رسالة نصية SMS"
+                          : "Share via SMS"
+                    }
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openInvoice(inv)}
+                    className="grid size-8 place-items-center rounded-lg border border-border/70 text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
+                    title={isRtl ? "عرض التفاصيل" : "View Details"}
+                  >
+                    <Eye className="h-4 w-4" />
+                  </button>
+                </div>
+
+                {remaining > 0 && inv.status !== "cancelled" ? (
+                  <button
+                    type="button"
+                    onClick={() => triggerQuickCollect(inv)}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-amber-500/10 px-3 text-xs font-semibold text-amber-500 transition hover:bg-amber-500/20"
+                  >
+                    <Wallet className="h-3.5 w-3.5" />
+                    <span>{isRtl ? "تحصيل فوري" : "Collect"}</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void openPrintPreview(inv)}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-xs font-medium text-foreground transition hover:bg-surface-2"
+                  >
+                    <Printer className="h-3.5 w-3.5" />
+                    <span>{isRtl ? "طباعة" : "Print"}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        }}
+        renderListRow={(inv) => {
+          const total = Number(inv.total) || 0;
+          const paid = Number(inv.paid) || 0;
+          const remaining = Math.max(0, total - paid);
+          const customerName = inv.customers?.name ?? (isRtl ? "عميل نقدي" : "Walk-in");
+          const barColor = invoiceStatusMeta(inv.status).bar;
+
+          return (
+            <div className="card-mullak group relative flex cursor-pointer flex-col justify-between gap-3 rounded-2xl border p-3.5 transition-all duration-200 hover:border-primary/50 hover:shadow-md sm:flex-row sm:items-center sm:p-4">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <span
+                  aria-hidden
+                  className={`h-11 sm:h-12 w-1.5 shrink-0 rounded-full ${barColor}`}
+                />
+                <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary border border-primary/20 group-hover:bg-primary group-hover:text-primary-foreground group-hover:scale-105 transition-all">
+                  <Receipt className="size-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="truncate font-mono text-sm font-bold text-foreground transition-colors group-hover:text-primary sm:text-base">
+                      {inv.invoice_number}
+                    </span>
+                    <div className="shrink-0">{statusBadge(inv.status)}</div>
+                    {pmChip(
+                      inv.payment_method,
+                      inv.note,
+                      "truncate text-[11px] text-muted-foreground",
+                    )}
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+                    <span className="truncate font-medium text-foreground">{customerName}</span>
+                    {inv.customers?.phone && (
+                      <span className="dir-ltr truncate font-mono text-muted-foreground/80">
+                        {toSystemDigits(inv.customers.phone)}
+                      </span>
+                    )}
+                    <VortexDateBadge date={inv.created_at} variant="subtle" size="sm" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-4 border-t border-border/60 pt-2 sm:justify-end sm:border-t-0 sm:pt-0">
+                <div className="min-w-0 text-start sm:min-w-[120px] sm:text-end">
+                  <div className="text-[10px] text-muted-foreground">
+                    {isRtl ? "الإجمالي:" : "Total:"}
+                  </div>
+                  <div className="truncate font-mono text-sm font-bold text-foreground sm:text-base">
+                    {toSystemDigits(money(total))}
+                  </div>
+                  {remaining > 0 ? (
+                    <div className="truncate font-mono text-[10px] font-semibold text-rose-500">
+                      {isRtl ? "متبقي: " : "Due: "}
+                      {toSystemDigits(money(remaining))}
+                    </div>
+                  ) : (
+                    <div className="text-[10px] font-medium text-emerald-500">
+                      {isRtl ? "مدفوعة بالكامل" : "Fully paid"}
+                    </div>
+                  )}
+                </div>
+
+                <div
+                  className="flex items-center gap-1 shrink-0"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {remaining > 0 && inv.status !== "cancelled" ? (
+                    <button
+                      type="button"
+                      onClick={() => triggerQuickCollect(inv)}
+                      className="inline-flex h-8 items-center gap-1 rounded-lg bg-amber-500/10 px-2.5 text-xs font-semibold text-amber-500 hover:bg-amber-500/20 transition"
+                      title={isRtl ? "تحصيل سريع" : "Quick Collect"}
+                    >
+                      <Wallet className="h-3.5 w-3.5" />
+                      <span className="hidden md:inline">{isRtl ? "تحصيل" : "Collect"}</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => void openPrintPreview(inv)}
+                      className="inline-flex h-8 items-center gap-1 rounded-lg border border-border bg-surface px-2.5 text-xs font-medium text-foreground hover:bg-surface-2 transition"
+                      title={isRtl ? "طباعة" : "Print"}
+                    >
+                      <Printer className="h-3.5 w-3.5" />
+                      <span className="hidden md:inline">{isRtl ? "طباعة" : "Print"}</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    disabled={!inv.customers?.phone}
+                    onClick={() => shareInvoiceWhatsApp(inv)}
+                    className={`rounded-lg p-1.5 transition ${
+                      inv.customers?.phone
+                        ? "text-muted-foreground hover:bg-surface-2 hover:text-emerald-500 cursor-pointer"
+                        : "text-muted-foreground/30 cursor-not-allowed opacity-50"
+                    }`}
+                    title={
+                      !inv.customers?.phone
+                        ? isRtl
+                          ? "لا يوجد رقم هاتف مسجل"
+                          : "No phone registered"
+                        : isRtl
+                          ? "مشاركة عبر واتساب"
+                          : "Share via WhatsApp"
+                    }
+                  >
+                    <WhatsAppIcon className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!inv.customers?.phone}
+                    onClick={() => shareInvoiceSms(inv)}
+                    className={`rounded-lg p-1.5 transition ${
+                      inv.customers?.phone
+                        ? "text-muted-foreground hover:bg-surface-2 hover:text-blue-500 cursor-pointer"
+                        : "text-muted-foreground/30 cursor-not-allowed opacity-50"
+                    }`}
+                    title={
+                      !inv.customers?.phone
+                        ? isRtl
+                          ? "لا يوجد رقم هاتف مسجل"
+                          : "No phone registered"
+                        : isRtl
+                          ? "مشاركة عبر رسالة SMS"
+                          : "Share via SMS"
+                    }
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openInvoice(inv)}
+                    className="rounded-lg p-1.5 text-muted-foreground hover:bg-surface-2 hover:text-foreground transition"
+                    title={isRtl ? "تفاصيل" : "Details"}
+                  >
+                    <Eye className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        }}
+      />
 
       {/* Advanced Filter Sheet */}
       <VortexFilterSheet
@@ -1699,8 +1615,8 @@ export function SalesPage() {
             {[
               { id: "all", label: isRtl ? "الكل" : "All" },
               { id: "cash", label: isRtl ? "نقداً" : "Cash" },
-              { id: "card", label: isRtl ? "شبكة/بطاقة" : "Card" },
               { id: "bank_transfer", label: isRtl ? "تحويل بنكي" : "Bank Transfer" },
+              { id: "mobile_money", label: isRtl ? "محفظة إلكترونية" : "Mobile wallet" },
               { id: "credit", label: isRtl ? "آجل" : "Credit" },
               { id: "split", label: isRtl ? "دفع مجزأ" : "Split" },
             ].map((m) => (

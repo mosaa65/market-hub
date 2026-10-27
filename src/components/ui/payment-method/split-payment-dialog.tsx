@@ -44,6 +44,8 @@ export interface SplitPaymentDialogProps {
    * booked 500 as a new receivable" mistakes.
    */
   methods?: readonly SplitMethodKey[];
+  /** Require references for bank and wallet tenders when the catalogue says so. */
+  requireElectronicReferences?: boolean;
   onConfirm: (values: SplitPaymentValues) => void;
 }
 
@@ -64,6 +66,7 @@ export function SplitPaymentDialog({
   isCreditAllowed = true,
   creditBlockReason,
   methods = DEFAULT_SPLIT_METHODS,
+  requireElectronicReferences = false,
   onConfirm,
 }: SplitPaymentDialogProps) {
   const { lang } = useI18n();
@@ -124,7 +127,9 @@ export function SplitPaymentDialog({
         (isAr ? "العميل النقدي لا يمكنه الشراء بالآجل" : "Cash customer cannot carry credit")
       : null;
 
-  const canConfirm = isBalanced && !creditError;
+  const missingBankReference = requireElectronicReferences && bank > 0 && !bankRef.trim();
+  const missingWalletReference = requireElectronicReferences && wallet > 0 && !walletRef.trim();
+  const canConfirm = isBalanced && !creditError && !missingBankReference && !missingWalletReference;
 
   const handleReset = () => {
     setCash(0);
@@ -330,11 +335,20 @@ export function SplitPaymentDialog({
                     onChange={(e) => setBankRef(e.target.value)}
                     placeholder={
                       isAr
-                        ? "رقم الحوالة البنكية / المرجع (اختياري)..."
-                        : "Bank reference (optional)..."
+                        ? requireElectronicReferences
+                          ? "رقم الحوالة البنكية / المرجع (مطلوب)..."
+                          : "رقم الحوالة البنكية / المرجع (اختياري)..."
+                        : requireElectronicReferences
+                          ? "Bank reference (required)..."
+                          : "Bank reference (optional)..."
                     }
                     className="h-8 w-full rounded-xl border border-indigo-500/20 bg-background px-3 text-[11px] font-medium outline-none focus:border-indigo-500"
                   />
+                )}
+                {missingBankReference && (
+                  <p className="text-[10px] font-semibold text-destructive">
+                    {isAr ? "أدخل مرجع الحوالة البنكية." : "Enter the bank reference."}
+                  </p>
                 )}
               </div>
             </div>
@@ -386,10 +400,21 @@ export function SplitPaymentDialog({
                     value={walletRef}
                     onChange={(e) => setWalletRef(e.target.value)}
                     placeholder={
-                      isAr ? "رقم عملية المحفظة (اختياري)..." : "Wallet transaction reference..."
+                      isAr
+                        ? requireElectronicReferences
+                          ? "رقم عملية المحفظة (مطلوب)..."
+                          : "رقم عملية المحفظة (اختياري)..."
+                        : requireElectronicReferences
+                          ? "Wallet transaction reference (required)..."
+                          : "Wallet transaction reference..."
                     }
                     className="h-8 w-full rounded-xl border border-sky-500/20 bg-background px-3 text-[11px] font-medium outline-none focus:border-sky-500"
                   />
+                )}
+                {missingWalletReference && (
+                  <p className="text-[10px] font-semibold text-destructive">
+                    {isAr ? "أدخل مرجع عملية المحفظة." : "Enter the wallet reference."}
+                  </p>
                 )}
               </div>
             </div>

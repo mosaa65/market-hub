@@ -26,7 +26,6 @@ import {
   MapPin,
   Tag,
   CheckCircle2,
-  Loader2,
   Sparkles,
   TrendingDown,
   Wallet,
@@ -39,7 +38,8 @@ import { ActionButton } from "@/components/ui/action-button";
 import { IconButton } from "@/components/ui/icon-button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Modal } from "@/components/ui/modal";
-import { DataTable, type DataTableColumn, type DataTableSort } from "@/components/ui/data-table";
+import { type DataTableColumn, type DataTableSort } from "@/components/ui/data-table";
+import { RecordsView } from "@/components/ui/records-view";
 import {
   TableToolbar,
   ToolbarAction,
@@ -51,7 +51,6 @@ import {
 import { RecordsViewToggle } from "@/components/ui/records-view-toggle";
 import { QuickFilterBar } from "@/components/ui/quick-filter-bar";
 import { usePersistedViewMode } from "@/hooks/use-persisted-view-mode";
-import { RecordsSkeleton } from "@/components/ui/records-states";
 import { buildSearchIndex, fuzzySearch } from "@/design/fuzzy";
 import { moneyCell, qtyCell } from "@/lib/format";
 import { useBreakpoint } from "@/design/breakpoints";
@@ -658,41 +657,9 @@ function InventoryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lang, t, warehouseId]);
 
-  const emptyState = (
-    <div className="card-mullak flex flex-col items-center justify-center space-y-3 p-12 text-center">
-      <div className="grid size-14 place-items-center rounded-2xl bg-muted/30 text-muted-foreground">
-        <Warehouse className="size-8" />
-      </div>
-      <h4 className="text-base font-bold text-foreground">{t("inventory.no_inventory")}</h4>
-      <p className="max-w-sm text-xs text-muted-foreground">{t("inventory.empty_hint")}</p>
-    </div>
-  );
-
   // A failed read must never look like an empty warehouse. That concealed
   // permissions/schema problems behind a misleading "no inventory" card.
-  const inventoryLoadError = error ? (
-    <div className="card-mullak flex flex-col items-center justify-center space-y-3 p-12 text-center">
-      <div className="grid size-14 place-items-center rounded-2xl bg-destructive/10 text-destructive">
-        <AlertTriangle className="size-8" />
-      </div>
-      <h4 className="text-base font-bold text-foreground">
-        {lang === "ar" ? "تعذر تحميل بيانات المخزون" : "Could not load inventory"}
-      </h4>
-      <p className="max-w-sm text-xs text-muted-foreground">
-        {lang === "ar"
-          ? "لم يتم اعتبار الخطأ مخزوناً فارغاً. أعد المحاولة، وإذا استمر الخطأ راجع صلاحية المستخدم أو اتصال قاعدة البيانات."
-          : "The error is not shown as an empty inventory. Retry, then check access and database connectivity if it persists."}
-      </p>
-      <Button
-        size="sm"
-        variant="outline"
-        icon={<RefreshCw className="size-4" />}
-        onClick={() => void refetch()}
-      >
-        {lang === "ar" ? "إعادة المحاولة" : "Retry"}
-      </Button>
-    </div>
-  ) : null;
+  // RecordsView renders a unified error state for this now.
 
   return (
     <div className="space-y-4 pb-12">
@@ -849,376 +816,288 @@ function InventoryPage() {
         </TableToolbar>
       </div>
 
-      {/* ─── Grid view ─── */}
-      {viewMode === "cards" ? (
-        <div className="space-y-4">
-          {isLoading ? (
-            <RecordsSkeleton mode="cards" />
-          ) : inventoryLoadError ? (
-            inventoryLoadError
-          ) : sortedRows.length === 0 ? (
-            emptyState
-          ) : (
-            <>
-              <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
-                {sortedRows.map((r) => {
-                  const s = stateFor(r);
-                  const primary = lang === "ar" ? r.name_ar || r.name : r.name || r.name_ar || "—";
-                  const other = lang === "ar" ? r.name : r.name_ar;
-                  const secondary =
-                    other && other.trim() && other.trim() !== primary.trim() ? other : null;
-                  const qty = qtyFor(r);
-                  const min = Number(r.min_stock) || 0;
-                  return (
-                    <div
-                      key={r.id}
-                      onClick={() => openAdjust(r)}
-                      className={`card-mullak group relative flex cursor-pointer flex-col justify-between overflow-hidden rounded-2xl border border-r-4 p-4 transition-all duration-200 sm:p-5 ${
+      {/* ─── Records: cards / list / classic table — shared scaffold ─── */}
+      <RecordsView
+        rows={sortedRows}
+        getRowId={(r) => r.id}
+        viewMode={viewMode}
+        loading={isLoading}
+        refreshing={isFetching && !isLoading && !isFetchingNextPage}
+        error={error}
+        onRetry={() => void refetch()}
+        columns={columns}
+        sort={sort}
+        onSortChange={setSort}
+        infinite
+        hasMore={Boolean(hasNextPage)}
+        onLoadMore={() => {
+          if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
+        }}
+        loadingMore={isFetchingNextPage}
+        pageSize={INVENTORY_PAGE_SIZE}
+        totalCount={totalCount}
+        cardsInfinite
+        minWidth={860}
+        horizontalScroll={tableUsesHorizontalScroll}
+        onRowClick={(r) => openAdjust(r)}
+        empty={{
+          icon: <Warehouse />,
+          title: t("inventory.no_inventory"),
+          description: t("inventory.empty_hint"),
+        }}
+        renderCard={(r) => {
+          const s = stateFor(r);
+          const primary = lang === "ar" ? r.name_ar || r.name : r.name || r.name_ar || "—";
+          const other = lang === "ar" ? r.name : r.name_ar;
+          const secondary = other && other.trim() && other.trim() !== primary.trim() ? other : null;
+          const qty = qtyFor(r);
+          const min = Number(r.min_stock) || 0;
+          return (
+            <div
+              className={`card-mullak group relative flex h-full cursor-pointer flex-col justify-between overflow-hidden rounded-2xl border border-r-4 p-4 transition-all duration-200 sm:p-5 ${
+                s === "out"
+                  ? "border-r-red-500 hover:border-red-500/60"
+                  : s === "low"
+                    ? "border-r-amber-500 hover:border-amber-500/60"
+                    : s === "near"
+                      ? "border-r-orange-400 hover:border-orange-400/60"
+                      : s === "healthy"
+                        ? "border-r-emerald-500 hover:border-primary/40"
+                        : "border-r-muted-foreground/40"
+              }`}
+            >
+              <div className="mb-2.5 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1 min-w-0">
+                  <span className="inline-flex max-w-[110px] items-center gap-1 truncate rounded-full border border-primary/20 bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold text-primary">
+                    <Tag className="size-3 shrink-0" />
+                    <span className="truncate">
+                      {label(r.category?.name, r.category?.name_ar) ||
+                        (lang === "ar" ? "عام" : "General")}
+                    </span>
+                  </span>
+                  <ItemRoleBadge
+                    itemClass={r.item_class}
+                    itemNature={r.item_nature}
+                    inventoryPolicy={r.inventory_policy}
+                    isRtl={lang === "ar"}
+                    compact
+                  />
+                </div>
+                <span
+                  className={`size-2 shrink-0 rounded-full ${
+                    s === "out"
+                      ? "bg-red-500 ring-2 ring-red-500/20"
+                      : s === "low"
+                        ? "bg-amber-500 ring-2 ring-amber-500/20"
+                        : s === "near"
+                          ? "bg-orange-400 ring-2 ring-orange-400/20"
+                          : s === "healthy"
+                            ? "bg-emerald-500 ring-2 ring-emerald-500/20"
+                            : "bg-muted-foreground/40"
+                  }`}
+                  title={stateLabel(s)}
+                />
+              </div>
+
+              <div className="mb-3">
+                <h4
+                  className="line-clamp-2 text-sm font-bold leading-snug text-foreground transition-colors group-hover:text-primary sm:text-base"
+                  dir={lang === "ar" ? "rtl" : "ltr"}
+                >
+                  {primary}
+                </h4>
+              </div>
+
+              <div className="mb-3.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                {r.barcode && (
+                  <span className="inline-flex items-center gap-1 rounded-md border border-border/50 bg-surface-2/70 px-2 py-0.5 font-mono text-[10px]">
+                    <Barcode className="size-2.5" />
+                    <span>{r.barcode}</span>
+                  </span>
+                )}
+                {r.shelf_location && (
+                  <span className="inline-flex items-center gap-1 rounded-md border border-border/50 bg-surface-2/70 px-2 py-0.5 text-[10px]">
+                    <MapPin className="size-2.5" />
+                    <span>{r.shelf_location}</span>
+                  </span>
+                )}
+                {min > 0 && (
+                  <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 font-mono text-[10px] text-amber-500">
+                    <Boxes className="size-2.5" />
+                    <span>{qtyCell(min)}</span>
+                  </span>
+                )}
+              </div>
+
+              <div className="mt-auto flex items-end justify-between gap-2 border-t border-border/60 pt-3">
+                <div>
+                  <p className="text-[10px] font-medium text-muted-foreground">
+                    {t("inventory.on_hand")}
+                  </p>
+                  <div className="flex items-baseline gap-1.5">
+                    <p
+                      className={`font-mono text-lg font-bold tracking-tight ${
                         s === "out"
-                          ? "border-r-red-500 hover:border-red-500/60"
+                          ? "text-red-500"
                           : s === "low"
-                            ? "border-r-amber-500 hover:border-amber-500/60"
+                            ? "text-amber-500"
                             : s === "near"
-                              ? "border-r-orange-400 hover:border-orange-400/60"
+                              ? "text-orange-400"
                               : s === "healthy"
-                                ? "border-r-emerald-500 hover:border-primary/40"
-                                : "border-r-muted-foreground/40"
+                                ? "text-emerald-500"
+                                : "text-foreground"
                       }`}
                     >
-                      <div className="mb-2.5 flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-1 min-w-0">
-                          <span className="inline-flex max-w-[110px] items-center gap-1 truncate rounded-full border border-primary/20 bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold text-primary">
-                            <Tag className="size-3 shrink-0" />
-                            <span className="truncate">
-                              {label(r.category?.name, r.category?.name_ar) ||
-                                (lang === "ar" ? "عام" : "General")}
-                            </span>
-                          </span>
-                          <ItemRoleBadge
-                            itemClass={r.item_class}
-                            itemNature={r.item_nature}
-                            inventoryPolicy={r.inventory_policy}
-                            isRtl={lang === "ar"}
-                            compact
-                          />
-                        </div>
-                        <span
-                          className={`size-2 shrink-0 rounded-full ${
-                            s === "out"
-                              ? "bg-red-500 ring-2 ring-red-500/20"
-                              : s === "low"
-                                ? "bg-amber-500 ring-2 ring-amber-500/20"
-                                : s === "near"
-                                  ? "bg-orange-400 ring-2 ring-orange-400/20"
-                                  : s === "healthy"
-                                    ? "bg-emerald-500 ring-2 ring-emerald-500/20"
-                                    : "bg-muted-foreground/40"
-                          }`}
-                          title={stateLabel(s)}
-                        />
-                      </div>
-
-                      <div className="mb-3">
-                        <h4
-                          className="line-clamp-2 text-sm font-bold leading-snug text-foreground transition-colors group-hover:text-primary sm:text-base"
-                          dir={lang === "ar" ? "rtl" : "ltr"}
-                        >
-                          {primary}
-                        </h4>
-                      </div>
-
-                      <div className="mb-3.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
-                        {r.barcode && (
-                          <span className="inline-flex items-center gap-1 rounded-md border border-border/50 bg-surface-2/70 px-2 py-0.5 font-mono text-[10px]">
-                            <Barcode className="size-2.5" />
-                            <span>{r.barcode}</span>
-                          </span>
-                        )}
-                        {r.shelf_location && (
-                          <span className="inline-flex items-center gap-1 rounded-md border border-border/50 bg-surface-2/70 px-2 py-0.5 text-[10px]">
-                            <MapPin className="size-2.5" />
-                            <span>{r.shelf_location}</span>
-                          </span>
-                        )}
-                        {min > 0 && (
-                          <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 font-mono text-[10px] text-amber-500">
-                            <Boxes className="size-2.5" />
-                            <span>{qtyCell(min)}</span>
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="mt-auto flex items-end justify-between gap-2 border-t border-border/60 pt-3">
-                        <div>
-                          <p className="text-[10px] font-medium text-muted-foreground">
-                            {t("inventory.on_hand")}
-                          </p>
-                          <div className="flex items-baseline gap-1.5">
-                            <p
-                              className={`font-mono text-lg font-bold tracking-tight ${
-                                s === "out"
-                                  ? "text-red-500"
-                                  : s === "low"
-                                    ? "text-amber-500"
-                                    : s === "near"
-                                      ? "text-orange-400"
-                                      : s === "healthy"
-                                        ? "text-emerald-500"
-                                        : "text-foreground"
-                              }`}
-                            >
-                              {qtyCell(qty)}
-                            </p>
-                            {(r.unit?.name_ar || r.unit?.name || r.unit?.short_name) && (
-                              <span className="text-xs font-semibold text-muted-foreground">
-                                {r.unit.name_ar || r.unit.name || r.unit.short_name}
-                              </span>
-                            )}
-                          </div>
-                          {min > 0 && qty < min && (
-                            <p className="text-[10px] font-mono text-red-500/80">
-                              {t("inventory.diff")}: {qtyCell(min - qty)}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-1 opacity-90 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
-                          <IconButton
-                            size="sm"
-                            variant="outline"
-                            tooltip
-                            ariaLabel={t("inventory.adjust_stock")}
-                            icon={<ArrowUpDown className="size-3.5" />}
-                            round
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              openAdjust(r);
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {hasNextPage && (
-                <div className="flex justify-center pt-4">
-                  <button
-                    onClick={() => void fetchNextPage()}
-                    disabled={isFetchingNextPage}
-                    className="flex items-center gap-2 rounded-2xl border border-border/80 bg-surface px-6 py-2.5 text-xs font-bold text-foreground shadow-sm transition hover:bg-surface-2 active:scale-95 disabled:opacity-50"
-                  >
-                    {isFetchingNextPage ? (
-                      <>
-                        <Loader2 className="size-4 animate-spin" />
-                        <span>{t("inventory.loading_more")}</span>
-                      </>
-                    ) : (
-                      <span>{t("inventory.load_more")}</span>
+                      {qtyCell(qty)}
+                    </p>
+                    {(r.unit?.name_ar || r.unit?.name || r.unit?.short_name) && (
+                      <span className="text-xs font-semibold text-muted-foreground">
+                        {r.unit.name_ar || r.unit.name || r.unit.short_name}
+                      </span>
                     )}
-                  </button>
+                  </div>
+                  {min > 0 && qty < min && (
+                    <p className="text-[10px] font-mono text-red-500/80">
+                      {t("inventory.diff")}: {qtyCell(min - qty)}
+                    </p>
+                  )}
                 </div>
-              )}
-            </>
-          )}
-        </div>
-      ) : viewMode === "list" ? (
-        /* ─── List view: horizontal row cards with accent bar ─── */
-        <div className="space-y-3">
-          {isLoading ? (
-            <RecordsSkeleton mode="list" />
-          ) : inventoryLoadError ? (
-            inventoryLoadError
-          ) : sortedRows.length === 0 ? (
-            emptyState
-          ) : (
-            <>
-              <div className="space-y-2.5">
-                {sortedRows.map((r) => {
-                  const s = stateFor(r);
-                  const primary = lang === "ar" ? r.name_ar || r.name : r.name || r.name_ar || "—";
-                  const qty = qtyFor(r);
-                  const min = Number(r.min_stock) || 0;
-                  return (
-                    <div
-                      key={r.id}
-                      onClick={() => openAdjust(r)}
-                      className="card-mullak group relative flex cursor-pointer flex-col justify-between gap-3 rounded-2xl border p-3.5 transition-all duration-200 hover:border-primary/50 hover:shadow-md sm:p-4 md:flex-row md:items-center"
+
+                <div className="flex items-center gap-1 opacity-90 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
+                  <IconButton
+                    size="sm"
+                    variant="outline"
+                    tooltip
+                    ariaLabel={t("inventory.adjust_stock")}
+                    icon={<ArrowUpDown className="size-3.5" />}
+                    round
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      openAdjust(r);
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          );
+        }}
+        renderListRow={(r) => {
+          const s = stateFor(r);
+          const primary = lang === "ar" ? r.name_ar || r.name : r.name || r.name_ar || "—";
+          const qty = qtyFor(r);
+          const min = Number(r.min_stock) || 0;
+          return (
+            <div className="card-mullak group relative flex cursor-pointer flex-col justify-between gap-3 rounded-2xl border p-3.5 transition-all duration-200 hover:border-primary/50 hover:shadow-md sm:p-4 md:flex-row md:items-center">
+              <div className="flex min-w-0 flex-1 items-center gap-3">
+                <span
+                  aria-hidden
+                  className={`h-11 w-1.5 shrink-0 rounded-full sm:h-12 ${barClass(s)}`}
+                />
+                <div className="grid size-11 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-primary transition-all group-hover:scale-105 group-hover:bg-primary group-hover:text-primary-foreground">
+                  <Package className="size-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h4
+                      className="truncate text-sm font-bold leading-snug text-foreground transition-colors group-hover:text-primary sm:text-base"
+                      dir={lang === "ar" ? "rtl" : "ltr"}
                     >
-                      <div className="flex min-w-0 flex-1 items-center gap-3">
-                        <span
-                          aria-hidden
-                          className={`h-11 w-1.5 shrink-0 rounded-full sm:h-12 ${barClass(s)}`}
-                        />
-                        <div className="grid size-11 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-primary transition-all group-hover:scale-105 group-hover:bg-primary group-hover:text-primary-foreground">
-                          <Package className="size-5" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h4
-                              className="truncate text-sm font-bold leading-snug text-foreground transition-colors group-hover:text-primary sm:text-base"
-                              dir={lang === "ar" ? "rtl" : "ltr"}
-                            >
-                              {primary}
-                            </h4>
-                            <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border/60 bg-surface-2/70 px-2 py-0.5 text-[10px] text-muted-foreground">
-                              {label(r.category?.name, r.category?.name_ar) ||
-                                (lang === "ar" ? "عام" : "General")}
-                            </span>
-                            <ItemRoleBadge
-                              itemClass={r.item_class}
-                              itemNature={r.item_nature}
-                              inventoryPolicy={r.inventory_policy}
-                              isRtl={lang === "ar"}
-                              compact
-                            />
-                          </div>
-                          <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                            {r.sku ? (
-                              <span className="rounded-md border border-border/50 bg-surface-2 px-1.5 py-0.5 font-mono text-[10px]">
-                                {r.sku}
-                              </span>
-                            ) : null}
-                            {r.barcode ? (
-                              <span className="inline-flex items-center gap-1 rounded-md border border-border/50 bg-surface-2 px-1.5 py-0.5 font-mono text-[10px]">
-                                <Barcode className="size-2.5" />
-                                <span>{r.barcode}</span>
-                              </span>
-                            ) : null}
-                            {r.shelf_location ? (
-                              <span className="inline-flex items-center gap-1 text-[10px]">
-                                <MapPin className="size-2.5" />
-                                <span className="font-mono">{r.shelf_location}</span>
-                              </span>
-                            ) : null}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex shrink-0 items-center gap-3 ps-4 text-xs sm:gap-4 md:ps-0">
-                        {min > 0 && (
-                          <div className="hidden items-center gap-1 rounded-xl border border-border/40 bg-surface-2/60 px-2.5 py-1 text-[11px] text-muted-foreground sm:flex">
-                            <Boxes className="size-3" />
-                            <span className="font-mono">{qtyCell(min)}</span>
-                          </div>
-                        )}
-                        <StatusBadge
-                          tone={
-                            s === "out"
-                              ? "danger"
-                              : s === "low" || s === "near"
-                                ? "warning"
-                                : "success"
-                          }
-                          dot
-                        >
-                          {stateLabel(s)}
-                        </StatusBadge>
-                      </div>
-
-                      <div className="flex shrink-0 items-center justify-between gap-3 border-t border-border/50 ps-4 pt-2 md:justify-end md:border-t-0 md:pt-0">
-                        <div className="text-start md:text-end">
-                          <p className="text-[10px] font-medium text-muted-foreground">
-                            {t("inventory.on_hand")}
-                          </p>
-                          <p
-                            className={`font-mono text-base font-bold tracking-tight sm:text-lg ${
-                              s === "out"
-                                ? "text-red-500"
-                                : s === "low"
-                                  ? "text-amber-500"
-                                  : s === "near"
-                                    ? "text-orange-400"
-                                    : s === "healthy"
-                                      ? "text-emerald-500"
-                                      : "text-foreground"
-                            }`}
-                          >
-                            {qtyCell(qty)}
-                          </p>
-                          {canViewCost && min > 0 && qty < min && (
-                            <p className="text-[10px] font-mono text-red-500/80">
-                              {t("inventory.diff")}: {qtyCell(min - qty)}
-                            </p>
-                          )}
-                        </div>
-                        <IconButton
-                          size="sm"
-                          variant="outline"
-                          tooltip
-                          ariaLabel={t("inventory.adjust_stock")}
-                          icon={<ArrowUpDown className="size-3.5" />}
-                          round
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            openAdjust(r);
-                          }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
+                      {primary}
+                    </h4>
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border/60 bg-surface-2/70 px-2 py-0.5 text-[10px] text-muted-foreground">
+                      {label(r.category?.name, r.category?.name_ar) ||
+                        (lang === "ar" ? "عام" : "General")}
+                    </span>
+                    <ItemRoleBadge
+                      itemClass={r.item_class}
+                      itemNature={r.item_nature}
+                      inventoryPolicy={r.inventory_policy}
+                      isRtl={lang === "ar"}
+                      compact
+                    />
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                    {r.sku ? (
+                      <span className="rounded-md border border-border/50 bg-surface-2 px-1.5 py-0.5 font-mono text-[10px]">
+                        {r.sku}
+                      </span>
+                    ) : null}
+                    {r.barcode ? (
+                      <span className="inline-flex items-center gap-1 rounded-md border border-border/50 bg-surface-2 px-1.5 py-0.5 font-mono text-[10px]">
+                        <Barcode className="size-2.5" />
+                        <span>{r.barcode}</span>
+                      </span>
+                    ) : null}
+                    {r.shelf_location ? (
+                      <span className="inline-flex items-center gap-1 text-[10px]">
+                        <MapPin className="size-2.5" />
+                        <span className="font-mono">{r.shelf_location}</span>
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
               </div>
 
-              {hasNextPage && (
-                <div className="flex justify-center pt-4">
-                  <button
-                    onClick={() => void fetchNextPage()}
-                    disabled={isFetchingNextPage}
-                    className="flex items-center gap-2 rounded-2xl border border-border/80 bg-surface px-6 py-2.5 text-xs font-bold text-foreground shadow-sm transition hover:bg-surface-2 active:scale-95 disabled:opacity-50"
+              <div className="flex shrink-0 items-center gap-3 ps-4 text-xs sm:gap-4 md:ps-0">
+                {min > 0 && (
+                  <div className="hidden items-center gap-1 rounded-xl border border-border/40 bg-surface-2/60 px-2.5 py-1 text-[11px] text-muted-foreground sm:flex">
+                    <Boxes className="size-3" />
+                    <span className="font-mono">{qtyCell(min)}</span>
+                  </div>
+                )}
+                <StatusBadge
+                  tone={
+                    s === "out" ? "danger" : s === "low" || s === "near" ? "warning" : "success"
+                  }
+                  dot
+                >
+                  {stateLabel(s)}
+                </StatusBadge>
+              </div>
+
+              <div className="flex shrink-0 items-center justify-between gap-3 border-t border-border/50 ps-4 pt-2 md:justify-end md:border-t-0 md:pt-0">
+                <div className="text-start md:text-end">
+                  <p className="text-[10px] font-medium text-muted-foreground">
+                    {t("inventory.on_hand")}
+                  </p>
+                  <p
+                    className={`font-mono text-base font-bold tracking-tight sm:text-lg ${
+                      s === "out"
+                        ? "text-red-500"
+                        : s === "low"
+                          ? "text-amber-500"
+                          : s === "near"
+                            ? "text-orange-400"
+                            : s === "healthy"
+                              ? "text-emerald-500"
+                              : "text-foreground"
+                    }`}
                   >
-                    {isFetchingNextPage ? (
-                      <>
-                        <Loader2 className="size-4 animate-spin" />
-                        <span>{t("inventory.loading_more")}</span>
-                      </>
-                    ) : (
-                      <span>{t("inventory.load_more")}</span>
-                    )}
-                  </button>
+                    {qtyCell(qty)}
+                  </p>
+                  {canViewCost && min > 0 && qty < min && (
+                    <p className="text-[10px] font-mono text-red-500/80">
+                      {t("inventory.diff")}: {qtyCell(min - qty)}
+                    </p>
+                  )}
                 </div>
-              )}
-            </>
-          )}
-        </div>
-      ) : inventoryLoadError ? (
-        inventoryLoadError
-      ) : (
-        /* ─── Classic table view with infinite scroll sentinel ─── */
-        <div className="panel-elevated -mx-1 overflow-hidden rounded-2xl border border-border/70 sm:mx-0">
-          <DataTable
-            className="px-0"
-            columns={columns}
-            rows={sortedRows}
-            rowKey={(r) => r.id}
-            loading={isLoading}
-            initialLoading={isLoading}
-            refreshing={isFetching && !isLoading && !isFetchingNextPage}
-            error={(error as Error) ?? null}
-            onRetry={() => refetch()}
-            sort={sort}
-            onSortChange={setSort}
-            infinite
-            hasMore={Boolean(hasNextPage)}
-            onLoadMore={() => {
-              if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
-            }}
-            loadingMore={isFetchingNextPage}
-            pageSize={INVENTORY_PAGE_SIZE}
-            totalCount={totalCount}
-            minWidth={860}
-            horizontalScroll={tableUsesHorizontalScroll}
-            stickyHeader
-            onRowClick={(r) => openAdjust(r)}
-            empty={{
-              icon: <Warehouse />,
-              title: t("inventory.no_inventory"),
-              description: t("inventory.empty_hint"),
-            }}
-          />
-        </div>
-      )}
+                <IconButton
+                  size="sm"
+                  variant="outline"
+                  tooltip
+                  ariaLabel={t("inventory.adjust_stock")}
+                  icon={<ArrowUpDown className="size-3.5" />}
+                  round
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    openAdjust(r);
+                  }}
+                />
+              </div>
+            </div>
+          );
+        }}
+      />
 
       <p className="px-1 text-[11px] text-muted-foreground/70">{t("inventory.scope_hint")}</p>
 

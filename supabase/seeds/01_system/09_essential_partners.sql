@@ -43,18 +43,28 @@ ON CONFLICT (code) DO UPDATE
       is_active  = true;
 
 -- ─ 2. العميل النقدي ─────────────
-INSERT INTO public.customers (name, phone, credit_limit, balance, is_active)
-SELECT 'عميل نقدي', NULL, 0, 0, true
+INSERT INTO public.customers (name, phone, credit_limit, balance, is_active, is_system, system_key)
+SELECT 'عميل نقدي', NULL, 0, 0, true, true, 'CASH_CUSTOMER'
 WHERE NOT EXISTS (
-  SELECT 1 FROM public.customers WHERE name = 'عميل نقدي'
-);
+  SELECT 1 FROM public.customers WHERE system_key = 'CASH_CUSTOMER' OR name = 'عميل نقدي'
+)
+ON CONFLICT (system_key) DO NOTHING;
 
 -- ─ 3. المورد النقدي ─────────────
-INSERT INTO public.suppliers (name, phone, balance, is_active)
-SELECT 'مورد نقدي', NULL, 0, true
+INSERT INTO public.suppliers (name, phone, balance, is_active, is_system, system_key)
+SELECT 'مورد نقدي', NULL, 0, true, true, 'CASH_SUPPLIER'
 WHERE NOT EXISTS (
-  SELECT 1 FROM public.suppliers WHERE name = 'مورد نقدي'
-);
+  SELECT 1 FROM public.suppliers WHERE system_key = 'CASH_SUPPLIER' OR name = 'مورد نقدي'
+)
+ON CONFLICT (system_key) DO NOTHING;
+
+-- صندوق نقدي عام فقط. الحسابات البنكية والمحافظ المسماة إعدادات خاصة بالمنشأة
+-- ولا تُنشأ افتراضيًا من أي بنك أو محفظة محلية بعينها.
+INSERT INTO public.cashboxes (name_ar, name_en, code, account_id, is_default, is_active)
+SELECT 'الصندوق الرئيسي', 'Main Cashbox', 'CASH-MAIN', a.id, true, true
+FROM public.accounts a
+WHERE a.code = '1101'
+ON CONFLICT (code) DO NOTHING;
 
 COMMIT;
 

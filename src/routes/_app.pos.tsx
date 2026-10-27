@@ -1302,7 +1302,7 @@ function POSPage() {
       posPaymentMethods.filter(
         (method) =>
           !method.isCreditTerm &&
-          ["cash", "card", "bank_transfer", "mobile_money", "cheque"].includes(method.legacyValue),
+          ["cash", "bank_transfer", "mobile_money"].includes(method.legacyValue),
       ),
     [posPaymentMethods],
   );
