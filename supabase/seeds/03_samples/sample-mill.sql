@@ -35,23 +35,13 @@ BEGIN;
 -- ============================================================================
 -- القسم 0 — تنظيف بيانات العينة القديمة
 -- ============================================================================
---   بيانات العينة القديمة تُعطَّل وتُحذف إن لم تشير إليها حركة. الصنفان
---   المشار إليهما بحركات يبقيان موجودين غير نشطين للحفاظ على السجلات.
---   القائمة القديمة كُانت بنسخة SKU (حبوب-… / ناتج-…) والجديدة بلا SKU —
---   لذا كلاهما مغطى بشروط الحذف أدناه.
+--   تُعطَّل فقط أصناف العينة القديمة التي تحمل بادئات SKU المعروفة.
+--   لا نلمس كل أصناف الأمانات ذات SKU الفارغ: قد تكون منتجات فعلية ولها
+--   حركات طحن أو تسليم لا ترتبط كلها بمفاتيح أجنبية.
 
 UPDATE public.products
 SET is_active = false
-WHERE (sku LIKE 'حبوب-%' OR sku LIKE 'ناتج-%' OR sku LIKE 'مستهلك-%')
-   OR (sku IS NULL AND is_custody_item = true);
-
-DELETE FROM public.products p
-WHERE (
-  (p.sku LIKE 'حبوب-%' OR p.sku LIKE 'ناتج-%' OR p.sku LIKE 'مستهلك-%')
-  OR (p.sku IS NULL AND p.is_custody_item = true)
-)
-  AND NOT EXISTS (SELECT 1 FROM public.custody_ledger l WHERE l.item_id = p.id)
-  AND NOT EXISTS (SELECT 1 FROM public.sales_invoice_items s WHERE s.product_id = p.id);
+WHERE sku LIKE 'حبوب-%' OR sku LIKE 'ناتج-%' OR sku LIKE 'مستهلك-%';
 
 -- ============================================================================
 -- القسم 1 — (نُقل) المستودع
@@ -84,7 +74,8 @@ WHERE NOT EXISTS (
 -- وباقي المعلومات حقول معلوماتية فقط — خصوصًا سعة العبوة (package_weight_kg)
 -- فهي معلومة لا تؤثر على أي حساب (الأكياس والوزن إدخال مستقل).
 -- بدون إنجليزي ولا باركود ولا اختصار: الاسم (name) فارغ، والـ SKU غير مُدخل،
--- والتمييز بالاسم العربي عبر NOT EXISTS (ثابت عند إعادة التشغيل).
+-- ويُطابق الإدراج الاسم مع النوع والملكية حتى لا يمنع منتج تجاريٌّ
+-- يحمل الاسم نفسه إنشاء صنف أمانات المطحنة، أو العكس.
 
 INSERT INTO public.products (
   name, name_ar, description,
@@ -145,10 +136,10 @@ FROM (VALUES
    0, 0, false, 'GOOD', 'CUSTOMER_OWNED', 'NONE', 'NONE', false, false, 'FINISHED_GOOD', 25),
 
   ('كيس نخالة 50 كيلوجرام',
-   'نخالة البُر — ناتج جانبي مخزني وقابل للبيع (للمواشي).', 'النخالة',
+   'نخالة البُر — ناتج طحن يُسجّل أمانةً للعميل ويُسلّم له.', 'النخالة',
    0, 0, false, 'GOOD', 'CUSTOMER_OWNED', 'NONE', 'NONE', false, false, 'BY_PRODUCT', 50),
   ('كيس نخالة 25 كيلوجرام',
-   'نخالة البُر — ناتج جانبي — نسخة نصف كيس.', 'النخالة',
+   'نخالة البُر — ناتج طحن أمانة للعميل — نسخة نصف كيس.', 'النخالة',
    0, 0, false, 'GOOD', 'CUSTOMER_OWNED', 'NONE', 'NONE', false, false, 'BY_PRODUCT', 25),
 
   -- ── الخدمة الوحيدة: أجور طحن وتجهيز (ق5 — البساطة المطلقة) ────────────────
@@ -161,7 +152,12 @@ FROM (VALUES
 ) AS v(name_ar, description, category, cost, price, is_service,
        nature, policy, tracking, costing, sellable, purchasable, item_class, weight)
 WHERE NOT EXISTS (
-  SELECT 1 FROM public.products p WHERE p.name_ar = v.name_ar
+  SELECT 1 FROM public.products p
+  WHERE p.name_ar = v.name_ar
+    AND p.item_class = v.item_class::public.item_class
+    AND p.item_nature = v.nature::public.item_nature
+    AND p.inventory_policy = v.policy::public.inventory_policy
+    AND p.is_custody_item = (v.policy = 'CUSTOMER_OWNED')
 );
 
 -- ============================================================================

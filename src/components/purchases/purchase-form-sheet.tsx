@@ -54,6 +54,9 @@ export interface PurchaseProduct {
   cost_price: number;
   tax_rate: number;
   package_weight_kg?: number | null;
+  tracking?: "NONE" | "BATCH" | "SERIAL" | null;
+  is_custody_item?: boolean;
+  is_purchasable?: boolean;
 }
 
 export interface PurchaseSupplier {
@@ -77,6 +80,9 @@ export interface CartLine {
   bags_count?: number;
   package_weight_kg?: number;
   bag_cost?: number;
+  tracking: "NONE" | "BATCH" | "SERIAL";
+  batch_number: string;
+  expiry_date: string;
 }
 
 /*
@@ -166,10 +172,13 @@ export function PurchaseFormSheet({
     setCatalogueLoading(true);
     void (async () => {
       const [ps, ss, ws] = await Promise.all([
-        supabase
-          .from("products")
-          .select("id,name_ar,sku,barcode,cost_price,tax_rate,package_weight_kg")
+        (supabase.from("products") as any)
+          .select(
+            "id,name_ar,sku,barcode,cost_price,tax_rate,package_weight_kg,tracking,is_custody_item,is_purchasable",
+          )
           .eq("is_active", true)
+          .eq("is_purchasable", true)
+          .eq("is_custody_item", false)
           .order("name")
           .limit(500),
         supabase.from("suppliers").select("id,name").eq("is_active", true).order("name"),
@@ -260,6 +269,9 @@ export function PurchaseFormSheet({
           bags_count: isPackaged ? 1 : undefined,
           package_weight_kg: isPackaged ? pkgKg : 50,
           bag_cost: isPackaged ? (Number(p.cost_price) || 0) * pkgKg : undefined,
+          tracking: p.tracking ?? "NONE",
+          batch_number: "",
+          expiry_date: "",
         },
       ];
     });
@@ -298,8 +310,10 @@ export function PurchaseFormSheet({
       !Number.isFinite(line.tax_rate) ||
       line.tax_rate < 0,
   );
+  const missingBatch = cart.find((line) => line.tracking === "BATCH" && !line.batch_number.trim());
 
-  const canSubmit = !saving && cart.length > 0 && !!warehouseId && !!supplierId && !invalidLine;
+  const canSubmit =
+    !saving && cart.length > 0 && !!warehouseId && !!supplierId && !invalidLine && !missingBatch;
 
   async function submit() {
     if (saving) return;
@@ -314,6 +328,13 @@ export function PurchaseFormSheet({
         isAr
           ? "يجب أن تكون الكمية والتكلفة والضريبة أرقامًا صحيحة غير سالبة"
           : "Quantity, cost and tax must be valid non-negative numbers.",
+      );
+    }
+    if (missingBatch) {
+      return toast.error(
+        isAr
+          ? `أدخل رقم الدفعة للصنف: ${missingBatch.name}`
+          : `Enter a batch number for: ${missingBatch.name}`,
       );
     }
 
@@ -332,6 +353,8 @@ export function PurchaseFormSheet({
           quantity: Number(l.quantity),
           unit_cost: Number(l.unit_cost),
           tax_rate: Number(l.tax_rate),
+          batch_number: l.batch_number.trim() || null,
+          expiry_date: l.expiry_date || null,
         })),
       });
       if (error) throw error;
@@ -586,6 +609,38 @@ export function PurchaseFormSheet({
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       </div>
+
+                      {l.tracking === "BATCH" && (
+                        <div className="grid grid-cols-2 gap-2">
+                          <FormField label={isAr ? "رقم الدفعة" : "Batch number"} required>
+                            {(p) => (
+                              <input
+                                {...p}
+                                required
+                                dir="ltr"
+                                value={l.batch_number}
+                                onChange={(event) =>
+                                  updateLine(l.product_id, { batch_number: event.target.value })
+                                }
+                                className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm"
+                              />
+                            )}
+                          </FormField>
+                          <FormField label={isAr ? "تاريخ الانتهاء" : "Expiry date"}>
+                            {(p) => (
+                              <input
+                                {...p}
+                                type="date"
+                                value={l.expiry_date}
+                                onChange={(event) =>
+                                  updateLine(l.product_id, { expiry_date: event.target.value })
+                                }
+                                className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm"
+                              />
+                            )}
+                          </FormField>
+                        </div>
+                      )}
 
                       {l.buy_by_bags ? (
                         <div className="space-y-2">

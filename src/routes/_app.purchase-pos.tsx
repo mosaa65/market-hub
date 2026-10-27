@@ -15,6 +15,7 @@ import {
   FileText,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { createPurchaseBatchNumber } from "@/lib/purchases/batch-number";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { money } from "@/lib/format";
@@ -66,6 +67,10 @@ interface Product {
   cost_price: number;
   sale_price: number;
   tax_rate: number;
+  tracking?: "NONE" | "BATCH" | "SERIAL" | null;
+  is_custody_item?: boolean;
+  is_purchasable?: boolean;
+  is_active?: boolean;
   image_url: string | null;
   category_id?: string | null;
   brand_id?: string | null;
@@ -86,6 +91,9 @@ interface CartLine {
   unit_cost: number;
   tax_rate: number;
   quantity: number;
+  tracking: "NONE" | "BATCH" | "SERIAL";
+  batch_number: string;
+  expiry_date: string;
 }
 
 interface Warehouse {
@@ -386,10 +394,22 @@ function PurchasePOSPage() {
           return;
         }
         const product = payload.new as Product;
+        if (!product.is_active || product.is_custody_item || !product.is_purchasable) {
+          setProducts((current) => current.filter((entry) => entry.id !== product.id));
+          setCart((current) => current.filter((line) => line.product_id !== product.id));
+          return;
+        }
         setProducts((current) =>
           current.some((entry) => entry.id === product.id)
             ? current.map((entry) => (entry.id === product.id ? { ...entry, ...product } : entry))
             : [product, ...current],
+        );
+        setCart((current) =>
+          current.map((line) =>
+            line.product_id === product.id
+              ? { ...line, tracking: product.tracking ?? "NONE" }
+              : line,
+          ),
         );
       },
     );
@@ -452,12 +472,13 @@ function PurchasePOSPage() {
       ] = await Promise.all([
         supabase.from("warehouses").select("id,name,name_ar").eq("is_active", true).order("name"),
         supabase.from("suppliers").select("id,name,phone,balance,is_system").order("name"),
-        supabase
-          .from("products")
+        (supabase.from("products") as any)
           .select(
-            "id,sku,barcode,name,name_ar,cost_price,sale_price,tax_rate,image_url,category_id,brand_id,unit_id,origin_id,quality_grade_id,unit:units!products_unit_id_fkey(short_name,name,name_ar),category:categories(name,name_ar),brand:brands!products_brand_id_fkey(name,name_ar),origin:countries_of_origin(name,name_ar,code),quality:quality_grades(name,name_ar,code)",
+            "id,sku,barcode,name,name_ar,cost_price,sale_price,tax_rate,tracking,is_custody_item,is_purchasable,image_url,category_id,brand_id,unit_id,origin_id,quality_grade_id,unit:units!products_unit_id_fkey(short_name,name,name_ar),category:categories(name,name_ar),brand:brands!products_brand_id_fkey(name,name_ar),origin:countries_of_origin(name,name_ar,code),quality:quality_grades(name,name_ar,code)",
           )
           .eq("is_active", true)
+          .eq("is_custody_item", false)
+          .eq("is_purchasable", true)
           .order("name")
           .limit(500),
         supabase.from("categories").select("id,name,name_ar").order("name"),
@@ -553,6 +574,9 @@ function PurchasePOSPage() {
           unit_cost: unitCost,
           tax_rate: Number(p.tax_rate || 0),
           quantity: 1,
+          tracking: p.tracking ?? "NONE",
+          batch_number: p.tracking === "BATCH" ? createPurchaseBatchNumber() : "",
+          expiry_date: "",
         },
       ];
     });
@@ -769,6 +793,16 @@ function PurchasePOSPage() {
           : "Invalid quantity or cost price",
       );
     }
+    const missingBatch = cart.find(
+      (line) => line.tracking === "BATCH" && !line.batch_number.trim(),
+    );
+    if (missingBatch) {
+      return toast.error(
+        lang === "ar"
+          ? `أدخل رقم الدفعة للصنف: ${missingBatch.name}`
+          : `Enter a batch number for: ${missingBatch.name}`,
+      );
+    }
 
     const purchaseSplits = splitPaymentLines
       .map((line) => {
@@ -851,6 +885,8 @@ function PurchasePOSPage() {
             quantity: Number(l.quantity),
             unit_cost: Number(l.unit_cost),
             tax_rate: Number(l.tax_rate),
+            batch_number: l.batch_number.trim() || null,
+            expiry_date: l.expiry_date || null,
           })),
         };
         const res =
@@ -893,6 +929,8 @@ function PurchasePOSPage() {
             quantity: Number(l.quantity),
             unit_cost: Number(l.unit_cost),
             tax_rate: Number(l.tax_rate),
+            batch_number: l.batch_number.trim() || null,
+            expiry_date: l.expiry_date || null,
           })),
         });
         invoiceId = res.data;
@@ -1086,7 +1124,6 @@ function PurchasePOSPage() {
 
   return (
     <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden bg-[radial-gradient(ellipse_at_top,_color-mix(in_oklab,var(--primary)_8%,transparent),transparent_48%)] p-0 sm:gap-1 sm:p-1 lg:grid-cols-[minmax(0,1fr)_clamp(360px,26vw,440px)] lg:grid-rows-[auto_minmax(0,1fr)]">
-      <div className="hidden min-w-0 items-center justify-end gap-2 px-1 py-0.5 sm:flex lg:col-span-2 lg:row-start-1" />
       {/* Top Bar / Header */}
       <div className="flex min-w-0 shrink-0 items-center justify-between gap-1 self-start overflow-x-auto overscroll-x-contain rounded-xl border border-border/80 bg-surface/95 px-1.5 py-1.5 shadow-xs backdrop-blur-md sm:gap-2 sm:px-3 sm:py-2 lg:col-span-2 lg:row-start-1">
         {/* Global Toolbar Selectors */}
@@ -1657,29 +1694,57 @@ function PurchasePOSPage() {
                 </div>
               ) : (
                 cart.map((line) => (
-                  <CartLineRow
-                    key={line.product_id}
-                    line={{
-                      id: line.product_id,
-                      name: line.name,
-                      quantity: line.quantity,
-                      unitPrice: line.unit_cost,
-                      taxRate: line.tax_rate,
-                      stock: stockMap[line.product_id],
-                      unboundedQuantity: true,
-                    }}
-                    labels={{
-                      price: lang === "ar" ? "سعر الشراء" : "Cost",
-                      quantity: lang === "ar" ? "الكمية" : "Qty",
-                      remove: lang === "ar" ? "حذف" : "Remove",
-                    }}
-                    formatMoney={money}
-                    onQuantityCommit={(next) => setQty(line.product_id, next)}
-                    onPriceChange={(next) => setCost(line.product_id, next)}
-                    onRemove={() =>
-                      setCart((c) => c.filter((x) => x.product_id !== line.product_id))
-                    }
-                  />
+                  <div key={line.product_id} className="space-y-2">
+                    <CartLineRow
+                      line={{
+                        id: line.product_id,
+                        name: line.name,
+                        quantity: line.quantity,
+                        unitPrice: line.unit_cost,
+                        taxRate: line.tax_rate,
+                        stock: stockMap[line.product_id],
+                        unboundedQuantity: true,
+                      }}
+                      labels={{
+                        price: lang === "ar" ? "سعر الشراء" : "Cost",
+                        quantity: lang === "ar" ? "الكمية" : "Qty",
+                        remove: lang === "ar" ? "حذف" : "Remove",
+                      }}
+                      formatMoney={money}
+                      onQuantityCommit={(next) => setQty(line.product_id, next)}
+                      onPriceChange={(next) => setCost(line.product_id, next)}
+                      onRemove={() =>
+                        setCart((c) => c.filter((x) => x.product_id !== line.product_id))
+                      }
+                    />
+                    {line.tracking === "BATCH" && (
+                      <div className="grid grid-cols-2 gap-2 ps-2">
+                        <label className="space-y-1 text-[11px] text-muted-foreground">
+                          <span>{lang === "ar" ? "رقم الدفعة *" : "Batch number *"}</span>
+                          <input
+                            required
+                            dir="ltr"
+                            value={line.batch_number}
+                            onChange={(event) =>
+                              updateCartLine(line.product_id, { batch_number: event.target.value })
+                            }
+                            className="h-9 w-full rounded-md border border-input bg-surface px-2 text-sm text-foreground"
+                          />
+                        </label>
+                        <label className="space-y-1 text-[11px] text-muted-foreground">
+                          <span>{lang === "ar" ? "تاريخ الانتهاء" : "Expiry date"}</span>
+                          <input
+                            type="date"
+                            value={line.expiry_date}
+                            onChange={(event) =>
+                              updateCartLine(line.product_id, { expiry_date: event.target.value })
+                            }
+                            className="h-9 w-full rounded-md border border-input bg-surface px-2 text-sm text-foreground"
+                          />
+                        </label>
+                      </div>
+                    )}
+                  </div>
                 ))
               )}
             </div>

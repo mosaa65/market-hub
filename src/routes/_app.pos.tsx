@@ -59,7 +59,6 @@ import type { InvoiceDoc } from "@/lib/pdf";
 import { getUnifiedPrintSettings, printUnifiedDocument, type PrintRequest } from "@/lib/printing";
 import { OperationSuccessModal } from "@/components/communication";
 import { PosBatchSelectorModal } from "@/components/batches/pos-batch-selector-modal";
-import { useBatchSettings } from "@/hooks/use-batch-settings";
 import { useCashboxes } from "@/hooks/use-cashboxes";
 import { useCompanyBankAccounts } from "@/hooks/use-company-bank-accounts";
 import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
@@ -287,7 +286,6 @@ function POSPage() {
   const { methods: posPaymentMethods } = usePaymentMethodsForContext("pos", {
     includeCredit: true,
   });
-  const { settings: batchSettings } = useBatchSettings();
   const { activeCashboxes, defaultCashbox } = useCashboxes();
   const {
     banks: companyBanks,
@@ -551,10 +549,11 @@ function POSPage() {
        */
       void (supabase.from("products") as any)
         .select(
-          "id,sku,barcode,name,name_ar,sale_price,tax_rate,image_url,category_id,brand_id,unit_id,origin_id,quality_grade_id,is_active,is_service,item_nature,inventory_policy",
+          "id,sku,barcode,name,name_ar,sale_price,tax_rate,image_url,category_id,brand_id,unit_id,origin_id,quality_grade_id,is_active,is_service,item_nature,inventory_policy,tracking,is_custody_item",
         )
         .eq("is_active", true)
         .eq("is_sellable", true)
+        .eq("is_custody_item", false)
         .neq("item_class", "RAW_MATERIAL")
         .neq("item_class", "PACKAGING")
         .neq("item_class", "SERVICE")
@@ -591,12 +590,13 @@ function POSPage() {
           .order("name"),
         (supabase.from("products") as any)
           .select(
-            "id,sku,barcode,name,name_ar,sale_price,tax_rate,image_url,category_id,brand_id,unit_id,origin_id,quality_grade_id,is_active,is_service,item_nature,inventory_policy",
+            "id,sku,barcode,name,name_ar,sale_price,tax_rate,image_url,category_id,brand_id,unit_id,origin_id,quality_grade_id,is_active,is_service,item_nature,inventory_policy,tracking,is_custody_item",
           )
           // خدمة الطحن لا تباع من POS: تحتاج بيانات الاستلام والأكياس والأمانة
           // الموجودة حصراً في كاونتر المطحنة. تظل الخدمة الحرة في زرها المخصص.
           .eq("is_active", true)
           .eq("is_sellable", true)
+          .eq("is_custody_item", false)
           .neq("item_class", "RAW_MATERIAL")
           .neq("item_class", "PACKAGING")
           .neq("item_class", "SERVICE")
@@ -1050,11 +1050,7 @@ function POSPage() {
 
     if (!isService) {
       // التحقق من سياسة المخزون وتتبع الدفعات (BATCH):
-      const isBatchTracked =
-        p.tracking === "BATCH" ||
-        p.inventory_policy === "BATCH" ||
-        (batchSettings?.enforce_batch_selection_on_pos &&
-          (p.tracking === "BATCH" || p.inventory_policy === "BATCH"));
+      const isBatchTracked = p.tracking === "BATCH";
 
       if (isBatchTracked && selectedBatch === undefined) {
         if (!warehouseId) {
@@ -2691,10 +2687,7 @@ function POSPage() {
                     }
                     startSplitPayment();
                   }}
-                  disabled={
-                    cart.length === 0 ||
-                    supportedSplitMethods.length === 0
-                  }
+                  disabled={cart.length === 0 || supportedSplitMethods.length === 0}
                   aria-pressed={isSplitPayment}
                   aria-label={lang === "ar" ? "الدفع بأكثر من طريقة" : "Split payment"}
                   title={

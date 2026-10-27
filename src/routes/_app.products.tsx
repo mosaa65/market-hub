@@ -176,7 +176,6 @@ type ProductRow = {
   costing_method?: CostingMethod;
   is_sellable?: boolean;
   is_purchasable?: boolean;
-  is_custody_item?: boolean;
   compatibilities?: { vehicle_model_id: string }[];
 };
 
@@ -339,8 +338,9 @@ function ProductsPage() {
       // disappear from the grid.
       const { data: page, error: productError } = await (supabase.from("products") as any)
         .select(
-          "id, name, name_ar, sku, barcode, sale_price, cost_price, tax_rate, min_stock, package_weight_kg, is_active, category_id, brand_id, unit_id, item_nature, item_class, inventory_policy, tracking, costing_method, is_sellable, is_purchasable, is_custody_item",
+          "id, name, name_ar, sku, barcode, sale_price, cost_price, tax_rate, min_stock, package_weight_kg, is_active, category_id, brand_id, unit_id, item_nature, item_class, inventory_policy, tracking, costing_method, is_sellable, is_purchasable",
         )
+        // أصناف أمانات المطحنة تُدار من واجهتها المستقلة، وليست ضمن كتالوج الشركة.
         .eq("is_custody_item", false)
         // `created_at` alone is not a total order: two products inserted in the
         // same millisecond (a bulk import, a sync) have no defined relative
@@ -443,10 +443,12 @@ function ProductsPage() {
   const { data: productCount } = useQuery({
     queryKey: productKeys.count(),
     queryFn: async () => {
-      const { count, error: countError } = await (supabase.from("products") as any).select("id", {
-        count: "exact",
-        head: true,
-      });
+      const { count, error: countError } = await (supabase.from("products") as any)
+        .select("id", {
+          count: "exact",
+          head: true,
+        })
+        .eq("is_custody_item", false);
       if (countError) throw countError;
       return count ?? 0;
     },
@@ -2483,17 +2485,6 @@ function ProductDialog({
   const [categoryNameEn, setCategoryNameEn] = useState("");
   const [savingCategory, setSavingCategory] = useState(false);
   const policyFromProduct = (product: ProductRow): UserItemPolicyPreferences => {
-    if (product.is_custody_item || product.inventory_policy === "CUSTOMER_OWNED") {
-      return {
-        item_nature: "GOOD",
-        inventory_policy: "CUSTOMER_OWNED",
-        tracking: "NONE",
-        costing_method: "NONE",
-        is_sellable: false,
-        is_purchasable: false,
-      };
-    }
-
     const inventoryPolicy = product.inventory_policy ?? "TRACKED";
     return {
       item_nature: product.item_nature ?? "GOOD",
@@ -2532,7 +2523,6 @@ function ProductDialog({
     origin_id: initial?.origin_id ?? "",
     quality_grade_id: initial?.quality_grade_id ?? "",
     is_active: initial?.is_active ?? true,
-    is_custody_item: initial?.is_custody_item ?? false,
   });
   const [saving, setSaving] = useState(false);
 
@@ -2554,32 +2544,6 @@ function ProductDialog({
     disabled: !isModuleEnabled("barcode") || scannerOpen,
   });
 
-  function setCustodyPolicy(enabled: boolean) {
-    setForm((current) => ({
-      ...current,
-      is_custody_item: enabled,
-      item_class:
-        enabled && !["RAW_MATERIAL", "FINISHED_GOOD", "BY_PRODUCT"].includes(current.item_class)
-          ? "RAW_MATERIAL"
-          : current.item_class,
-    }));
-    setPolicy((current) =>
-      enabled
-        ? {
-            ...current,
-            item_nature: "GOOD",
-            inventory_policy: "CUSTOMER_OWNED",
-            tracking: "NONE",
-            costing_method: "NONE",
-            is_sellable: false,
-            is_purchasable: false,
-          }
-        : current.inventory_policy === "CUSTOMER_OWNED"
-          ? { ...DEFAULT_ITEM_POLICY }
-          : current,
-    );
-  }
-
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (saving) return;
@@ -2591,18 +2555,7 @@ function ProductDialog({
       );
       return;
     }
-    const savePolicy = form.is_custody_item
-      ? {
-          ...policy,
-          item_nature: "GOOD" as const,
-          inventory_policy: "CUSTOMER_OWNED" as const,
-          tracking: "NONE" as const,
-          costing_method: "NONE" as const,
-          is_sellable: false,
-          is_purchasable: false,
-        }
-      : policy;
-    const policyCheck = validateItemPolicy(savePolicy);
+    const policyCheck = validateItemPolicy(policy);
     if (!policyCheck.valid) {
       toast.error(lang === "ar" ? policyCheck.errors[0] : "The selected item policy is not valid.");
       return;
@@ -2626,31 +2579,27 @@ function ProductDialog({
         category_id: form.category_id || null,
         // دور الصنف (مادة خام / منتج نهائي / ناتج طحن / خدمة / مستهلكات) —
         // القيمة الفارغة تترك للخادم قيمته الافتراضية.
-        item_class: form.is_custody_item
-          ? ["RAW_MATERIAL", "FINISHED_GOOD", "BY_PRODUCT"].includes(form.item_class)
-            ? form.item_class
-            : "RAW_MATERIAL"
-          : form.item_class || null,
+        item_class: form.item_class || null,
         brand_id: config.enableBrands ? form.brand_id || null : null,
         unit_id: config.enableUnits ? form.unit_id || null : null,
         cost_price: Number(form.cost_price) || 0,
         sale_price: Number(form.sale_price) || 0,
         tax_rate: Number(form.tax_rate) || 0,
         min_stock: Number(form.min_stock) || 1,
-        track_expiry: savePolicy.tracking === "BATCH",
+        track_expiry: policy.tracking === "BATCH",
         package_weight_kg:
           form.package_weight_kg.trim() === "" ? null : Number(form.package_weight_kg) || null,
         shelf_location: form.shelf_location.trim() || null,
         origin_id: config.enableOrigins ? form.origin_id || null : null,
         quality_grade_id: config.enableQualityGrades ? form.quality_grade_id || null : null,
         is_active: form.is_active,
-        item_nature: savePolicy.item_nature,
-        inventory_policy: savePolicy.inventory_policy,
-        tracking: savePolicy.tracking,
-        costing_method: savePolicy.costing_method,
-        is_sellable: savePolicy.is_sellable,
-        is_purchasable: savePolicy.is_purchasable,
-        is_custody_item: form.is_custody_item,
+        item_nature: policy.item_nature,
+        inventory_policy: policy.inventory_policy,
+        tracking: policy.tracking,
+        costing_method: policy.costing_method,
+        is_sellable: policy.is_sellable,
+        is_purchasable: policy.is_purchasable,
+        is_custody_item: false,
       };
       const request: any = initial
         ? (supabase.from("products") as any)
@@ -2678,7 +2627,7 @@ function ProductDialog({
         return;
       }
 
-      if (userId && !form.is_custody_item) saveUserItemPolicyPreferences(userId, savePolicy);
+      if (userId) saveUserItemPolicyPreferences(userId, policy);
       toast.success(
         lang === "ar"
           ? initial
@@ -3055,59 +3004,61 @@ function ProductDialog({
             icon={<DollarSign className="size-4" />}
             title={lang === "ar" ? "التسعير" : "Pricing"}
           />
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormField label={t("common.price")} required>
-              {(p) => (
-                <VortexCurrencyInput
-                  id={p.id}
-                  aria-describedby={p["aria-describedby"]}
-                  value={form.sale_price === "" ? null : Number(form.sale_price)}
-                  onValueChange={(num) =>
-                    setForm({ ...form, sale_price: num == null ? "" : String(num) })
-                  }
-                  min={0}
-                  currencySymbol={getCompanyCurrencySymbol()}
-                  placeholder="0.00"
-                  className="rounded-full"
-                />
-              )}
-            </FormField>
-
-            {canViewCost && showForm("cost") && (
-              <FormField label={t("common.cost")}>
-                <VortexCurrencyInput
-                  value={form.cost_price === "" ? null : Number(form.cost_price)}
-                  onValueChange={(num) =>
-                    setForm({ ...form, cost_price: num == null ? "" : String(num) })
-                  }
-                  min={0}
-                  currencySymbol={getCompanyCurrencySymbol()}
-                  placeholder="0.00"
-                  className="rounded-full"
-                />
-              </FormField>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {showForm("tax") && (
-              <FormField label={t("products.tax_rate")}>
+          <>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FormField label={t("common.price")} required>
                 {(p) => (
-                  <NumberInput
-                    {...p}
-                    value={form.tax_rate === "" ? null : Number(form.tax_rate)}
-                    onValueChange={(v) =>
-                      setForm({ ...form, tax_rate: v == null ? "" : String(v) })
+                  <VortexCurrencyInput
+                    id={p.id}
+                    aria-describedby={p["aria-describedby"]}
+                    value={form.sale_price === "" ? null : Number(form.sale_price)}
+                    onValueChange={(num) =>
+                      setForm({ ...form, sale_price: num == null ? "" : String(num) })
                     }
                     min={0}
-                    max={100}
-                    suffix="%"
-                    placeholder="0"
+                    currencySymbol={getCompanyCurrencySymbol()}
+                    placeholder="0.00"
+                    className="rounded-full"
                   />
                 )}
               </FormField>
-            )}
-          </div>
+
+              {canViewCost && showForm("cost") && (
+                <FormField label={t("common.cost")}>
+                  <VortexCurrencyInput
+                    value={form.cost_price === "" ? null : Number(form.cost_price)}
+                    onValueChange={(num) =>
+                      setForm({ ...form, cost_price: num == null ? "" : String(num) })
+                    }
+                    min={0}
+                    currencySymbol={getCompanyCurrencySymbol()}
+                    placeholder="0.00"
+                    className="rounded-full"
+                  />
+                </FormField>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {showForm("tax") && (
+                <FormField label={t("products.tax_rate")}>
+                  {(p) => (
+                    <NumberInput
+                      {...p}
+                      value={form.tax_rate === "" ? null : Number(form.tax_rate)}
+                      onValueChange={(v) =>
+                        setForm({ ...form, tax_rate: v == null ? "" : String(v) })
+                      }
+                      min={0}
+                      max={100}
+                      suffix="%"
+                      placeholder="0"
+                    />
+                  )}
+                </FormField>
+              )}
+            </div>
+          </>
         </section>
 
         {/* Tab 3: Specs & Inventory */}
@@ -3240,21 +3191,17 @@ function ProductDialog({
             role="status"
             className="rounded-xl border border-sky-500/25 bg-sky-500/5 p-3 text-xs leading-relaxed text-muted-foreground"
           >
-            {form.is_custody_item
+            {policy.item_nature === "SERVICE"
               ? lang === "ar"
-                ? "أمانة عميل: تُدار حصريًا في المطحنة، ولا تدخل البيع أو الشراء أو مخزون المنشأة."
-                : "Customer custody: handled only in milling, outside commercial sales, purchases and company stock."
-              : policy.item_nature === "SERVICE"
+                ? "خدمة: تظهر في الفواتير المناسبة ولا تنشئ رصيدًا أو تكلفة مخزنية."
+                : "Service: available on relevant invoices without stock balance or stock valuation."
+              : policy.inventory_policy === "UNTRACKED"
                 ? lang === "ar"
-                  ? "خدمة: تظهر في الفواتير المناسبة ولا تنشئ رصيدًا أو تكلفة مخزنية."
-                  : "Service: available on relevant invoices without stock balance or stock valuation."
-                : policy.inventory_policy === "UNTRACKED"
-                  ? lang === "ar"
-                    ? "صنف قديم محفوظ بلا تتبع مخزني. لا يمكن اختيار هذه السياسة لصنف جديد؛ للخدمات تُختار طبيعة (خدمة)، ولأمانات المطحنة (مملوك للعميل)."
-                    : "Legacy good saved without stock tracking. New goods cannot use this policy; choose Service for services or Customer-owned for mill custody."
-                  : lang === "ar"
-                    ? "سلعة مخزنية: حركات الفواتير تحدّث الرصيد والتكلفة تلقائيًا."
-                    : "Stocked good: invoices update its stock balance and cost automatically."}
+                  ? "صنف قديم محفوظ بلا تتبع مخزني. لا يمكن اختيار هذه السياسة لصنف جديد؛ اختر طبيعة (خدمة) للخدمات."
+                  : "Legacy good saved without stock tracking. New goods cannot use this policy; choose Service for services."
+                : lang === "ar"
+                  ? "سلعة مخزنية: حركات الفواتير تحدّث الرصيد والتكلفة تلقائيًا."
+                  : "Stocked good: invoices update its stock balance and cost automatically."}
           </p>
           <div className="space-y-4">
             <SettingsChoice
@@ -3269,7 +3216,6 @@ function ProductDialog({
               ]}
               onChange={(value) => {
                 if (value === "SERVICE") {
-                  setForm((current) => ({ ...current, is_custody_item: false }));
                   setPolicy((current) => ({
                     ...current,
                     item_nature: "SERVICE",
@@ -3279,11 +3225,7 @@ function ProductDialog({
                     is_sellable: true,
                     is_purchasable: false,
                   }));
-                } else if (
-                  policy.item_nature === "SERVICE" ||
-                  policy.inventory_policy === "CUSTOMER_OWNED"
-                ) {
-                  setForm((current) => ({ ...current, is_custody_item: false }));
+                } else if (policy.item_nature === "SERVICE") {
                   setPolicy({ ...DEFAULT_ITEM_POLICY });
                 } else {
                   setPolicy((current) => ({ ...current, item_nature: "GOOD" }));
@@ -3309,35 +3251,19 @@ function ProductDialog({
                         },
                       ]
                     : []),
-                  {
-                    value: "CUSTOMER_OWNED",
-                    label: INVENTORY_POLICY_LABELS.CUSTOMER_OWNED[lang === "ar" ? "ar" : "en"],
-                  },
                 ]}
                 onChange={(value) => {
                   const nextPolicy = value as InventoryPolicy;
-                  if (nextPolicy === "CUSTOMER_OWNED") {
-                    setCustodyPolicy(true);
-                    return;
-                  }
-
-                  setForm((current) => ({ ...current, is_custody_item: false }));
                   setPolicy((current) => {
-                    const wasCustomerOwned = current.inventory_policy === "CUSTOMER_OWNED";
                     if (nextPolicy === "TRACKED") {
                       return {
                         ...current,
                         inventory_policy: nextPolicy,
-                        tracking:
-                          wasCustomerOwned || current.tracking === "NONE"
-                            ? "BATCH"
-                            : current.tracking,
+                        tracking: current.tracking === "NONE" ? "BATCH" : current.tracking,
                         costing_method:
-                          wasCustomerOwned || current.costing_method === "NONE"
+                          current.costing_method === "NONE"
                             ? "MOVING_AVERAGE"
                             : current.costing_method,
-                        is_sellable: wasCustomerOwned ? true : current.is_sellable,
-                        is_purchasable: wasCustomerOwned ? true : current.is_purchasable,
                       };
                     }
                     return {
@@ -3345,8 +3271,8 @@ function ProductDialog({
                       inventory_policy: nextPolicy,
                       tracking: "NONE",
                       costing_method: "NONE",
-                      is_sellable: wasCustomerOwned ? true : current.is_sellable,
-                      is_purchasable: wasCustomerOwned ? true : current.is_purchasable,
+                      is_sellable: current.is_sellable,
+                      is_purchasable: current.is_purchasable,
                     };
                   });
                 }}
@@ -3424,42 +3350,18 @@ function ProductDialog({
               </>
             )}
 
-            {policy.inventory_policy === "CUSTOMER_OWNED" ? (
-              <p className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-3 text-xs text-amber-800 dark:text-amber-300">
-                {lang === "ar"
-                  ? "البيع والشراء التجاريان معطلان تلقائيًا لأصناف الأمانات."
-                  : "Commercial sales and purchases are disabled for custody items."}
-              </p>
-            ) : (
-              <div className="grid grid-cols-2 gap-2 pt-2">
-                <SettingsToggle
-                  label={lang === "ar" ? "متاح للبيع" : "Available for sales"}
-                  checked={policy.is_sellable}
-                  onChange={(checked) => setPolicy((c) => ({ ...c, is_sellable: checked }))}
-                />
-                <SettingsToggle
-                  label={lang === "ar" ? "متاح للشراء" : "Available for purchase"}
-                  checked={policy.is_purchasable}
-                  onChange={(checked) => setPolicy((c) => ({ ...c, is_purchasable: checked }))}
-                />
-              </div>
-            )}
-
-            {/* طاحونة الأمانات: عزل المنتج عن قوائم البيع والشراء وتخصيصه لقوائم أمانات المطحنة */}
-            <SettingsToggle
-              label={
-                lang === "ar"
-                  ? "منتج أمانات مطحنة (حبوب/نواتج)"
-                  : "Mill custody item (grain/output)"
-              }
-              description={
-                lang === "ar"
-                  ? "يظهر فقط في قوائم أمانات المطحنة (الاستلام، الطحن، التسليم) — ويختفي من البيع والشراء والمخزون التجاري"
-                  : "Shows only in mill custody lists (intake, milling, delivery) — hidden from sales, purchases and commercial stock"
-              }
-              checked={form.is_custody_item}
-              onChange={setCustodyPolicy}
-            />
+            <div className="grid grid-cols-2 gap-2 pt-2">
+              <SettingsToggle
+                label={lang === "ar" ? "متاح للبيع" : "Available for sales"}
+                checked={policy.is_sellable}
+                onChange={(checked) => setPolicy((c) => ({ ...c, is_sellable: checked }))}
+              />
+              <SettingsToggle
+                label={lang === "ar" ? "متاح للشراء" : "Available for purchase"}
+                checked={policy.is_purchasable}
+                onChange={(checked) => setPolicy((c) => ({ ...c, is_purchasable: checked }))}
+              />
+            </div>
           </div>
         </section>
       </form>

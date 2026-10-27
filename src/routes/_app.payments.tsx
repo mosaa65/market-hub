@@ -263,23 +263,28 @@ function PaymentsPage() {
 
   async function submit() {
     if (saving || !selected) return;
+    setSaving(true);
     const amt = Number(amount);
-    if (!amt || amt <= 0)
+    if (!amt || amt <= 0) {
+      setSaving(false);
       return toast.error(
         t("payments.invalid_amount") || (lang === "ar" ? "أدخل مبلغ صحيح" : "Enter a valid amount"),
       );
+    }
     const payableAmount = selectedInvoice ? remaining : Math.max(Number(selected.balance), 0);
-    if (amt > payableAmount + 0.01)
+    if (amt > payableAmount + 0.001) {
+      setSaving(false);
       return toast.error(
         t("payments.exceeds_remaining") ||
           (lang === "ar" ? "المبلغ يتجاوز المتبقي" : "Amount exceeds remaining"),
       );
+    }
     if (!isSplitCollection && needsReference && !reference.trim()) {
+      setSaving(false);
       return toast.error(
         lang === "ar" ? "أدخل رقم الحوالة أو المرجع" : "Enter the payment reference",
       );
     }
-    setSaving(true);
     try {
       const paymentNote = [
         reference.trim() ? `مرجع: ${reference.trim()}` : null,
@@ -325,33 +330,29 @@ function PaymentsPage() {
       } else {
         try {
           const res = await supabase.rpc("record_customer_payment" as any, {
-          _customer_id: selected.id,
-          _invoice_id: invoiceId || null,
-          _amount: amt,
-          // The RPC validates this exact catalogue id (including its enabled
-          // state and allowed context), then stores its legacy ENUM value.
-          _method: settlement.paymentMethodId || method,
-          _payment_date: date,
-          _note: paymentNote || null,
-          _cashbox_id: settlement.cashboxId || null,
-          _bank_account_id: settlement.bankAccountId || null,
-          _payment_method_id: settlement.paymentMethodId || null,
-          _cheque_number: settlement.chequeNumber || settlement.cheque?.chequeNumber || null,
-          _cheque_bank: settlement.chequeBank || settlement.cheque?.bankName || null,
-          _cheque_due_date: settlement.chequeDueDate || settlement.cheque?.dueDate || null,
-          _cheque_drawer: settlement.chequeDrawer || settlement.cheque?.drawerName || null,
+            _customer_id: selected.id,
+            _invoice_id: invoiceId || null,
+            _amount: amt,
+            // The RPC validates this exact catalogue id (including its enabled
+            // state and allowed context), then stores its legacy ENUM value.
+            _method: settlement.paymentMethodId || method,
+            _payment_date: date,
+            _note: paymentNote || null,
+            _cashbox_id: settlement.cashboxId || null,
+            _bank_account_id: settlement.bankAccountId || null,
+            _payment_method_id: settlement.paymentMethodId || null,
+            _cheque_number: settlement.chequeNumber || settlement.cheque?.chequeNumber || null,
+            _cheque_bank: settlement.chequeBank || settlement.cheque?.bankName || null,
+            _cheque_due_date: settlement.chequeDueDate || settlement.cheque?.dueDate || null,
+            _cheque_drawer: settlement.chequeDrawer || settlement.cheque?.drawerName || null,
           });
           error = res.error;
         } catch {
-          const res = await supabase.rpc("record_customer_payment" as any, {
-          _customer_id: selected.id,
-          _invoice_id: invoiceId || null,
-          _amount: amt,
-          _method: settlement.paymentMethodId || method,
-          _payment_date: date,
-          _note: paymentNote || null,
-          });
-          error = res.error;
+          throw new Error(
+            lang === "ar"
+              ? "تعذر التحقق من إصدار خدمة التحصيل. لم يتم تسجيل الدفعة؛ حدّث الصفحة أو تواصل مع الدعم."
+              : "Could not verify the collection service version. No payment was recorded; refresh or contact support.",
+          );
         }
       }
 

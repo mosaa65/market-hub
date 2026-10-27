@@ -68,6 +68,9 @@ SELECT
       OR costing_method <> 'NONE'
       OR is_sellable
       OR is_purchasable
+      OR sale_price <> 0
+      OR cost_price <> 0
+      OR tax_rate <> 0
       OR item_class NOT IN ('RAW_MATERIAL','FINISHED_GOOD','BY_PRODUCT')
   )),
   (SELECT count(*) FROM auth.users WHERE id::text LIKE 'a0000000-%' AND encrypted_password IS NOT NULL)

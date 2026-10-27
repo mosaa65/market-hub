@@ -112,6 +112,7 @@ interface Product {
   category_id?: string | null;
   cost_price: number;
   tax_rate: number;
+  tracking?: string | null;
   unit?: { short_name?: string | null; name?: string | null; name_ar?: string | null } | null;
   category?: { id?: string; name?: string | null; name_ar?: string | null } | null;
   inventory?: { warehouse_id: string; quantity: number }[] | null;
@@ -134,6 +135,9 @@ interface CartLine {
   unit_cost: number;
   tax_rate: number;
   quantity: number;
+  tracking: string;
+  batch_number: string;
+  expiry_date: string;
 }
 
 function PurchasesPage() {
@@ -1812,12 +1816,13 @@ function CreateDialog({
   useEffect(() => {
     void (async () => {
       const [{ data: ps }, { data: ss }, { data: ws }] = await Promise.all([
-        supabase
-          .from("products")
+        (supabase.from("products") as any)
           .select(
-            "id,name,name_ar,sku,barcode,cost_price,tax_rate,category_id,unit:units!products_unit_id_fkey(short_name,name,name_ar),category:categories(id,name,name_ar),inventory!inventory_product_id_fkey(warehouse_id,quantity)",
+            "id,name,name_ar,sku,barcode,cost_price,tax_rate,tracking,is_custody_item,is_purchasable,category_id,unit:units!products_unit_id_fkey(short_name,name,name_ar),category:categories(id,name,name_ar),inventory!inventory_product_id_fkey(warehouse_id,quantity)",
           )
           .eq("is_active", true)
+          .eq("is_purchasable", true)
+          .eq("is_custody_item", false)
           .order("name")
           .limit(500),
         supabase.from("suppliers").select("id,name").eq("is_active", true).order("name"),
@@ -1915,6 +1920,9 @@ function CreateDialog({
           unit_cost: Number(p.cost_price),
           tax_rate: Number(p.tax_rate ?? 0),
           quantity: 1,
+          tracking: p.tracking ?? "NONE",
+          batch_number: "",
+          expiry_date: "",
         },
       ];
     });
@@ -1964,6 +1972,16 @@ function CreateDialog({
           : "Quantity, cost, and tax must be valid positive numbers.",
       );
     }
+    const missingBatch = cart.find(
+      (line) => line.tracking === "BATCH" && !line.batch_number.trim(),
+    );
+    if (missingBatch) {
+      return toast.error(
+        lang === "ar"
+          ? `أدخل رقم الدفعة للصنف: ${missingBatch.name}`
+          : `Enter a batch number for: ${missingBatch.name}`,
+      );
+    }
 
     setLoading(true);
     try {
@@ -1986,6 +2004,8 @@ function CreateDialog({
             quantity: Number(l.quantity),
             unit_cost: Number(l.unit_cost),
             tax_rate: Number(l.tax_rate),
+            batch_number: l.batch_number.trim() || null,
+            expiry_date: l.expiry_date || null,
           })),
           _cashbox_id: paymentSelection.cashboxId || null,
           _bank_account_id: paymentSelection.bankAccountId || null,
@@ -2008,6 +2028,8 @@ function CreateDialog({
             quantity: Number(l.quantity),
             unit_cost: Number(l.unit_cost),
             tax_rate: Number(l.tax_rate),
+            batch_number: l.batch_number.trim() || null,
+            expiry_date: l.expiry_date || null,
           })),
         });
         invId = res.data;
@@ -2351,6 +2373,33 @@ function CreateDialog({
                         onChange={(v) => update(l.product_id, { tax_rate: v })}
                       />
                     </div>
+                    {l.tracking === "BATCH" && (
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        <label className="space-y-1 text-[11px] text-muted-foreground">
+                          <span>{lang === "ar" ? "رقم الدفعة *" : "Batch number *"}</span>
+                          <input
+                            required
+                            dir="ltr"
+                            value={l.batch_number}
+                            onChange={(event) =>
+                              update(l.product_id, { batch_number: event.target.value })
+                            }
+                            className="h-9 w-full rounded-md border border-input bg-surface px-2 text-sm text-foreground"
+                          />
+                        </label>
+                        <label className="space-y-1 text-[11px] text-muted-foreground">
+                          <span>{lang === "ar" ? "تاريخ الانتهاء" : "Expiry date"}</span>
+                          <input
+                            type="date"
+                            value={l.expiry_date}
+                            onChange={(event) =>
+                              update(l.product_id, { expiry_date: event.target.value })
+                            }
+                            className="h-9 w-full rounded-md border border-input bg-surface px-2 text-sm text-foreground"
+                          />
+                        </label>
+                      </div>
+                    )}
                   </div>
                 ))
               )}
