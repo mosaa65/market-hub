@@ -193,6 +193,7 @@ function InventoryPage() {
       const { data, error: idsError } = await (supabase.from("products") as any)
         .select("id")
         .eq("is_active", true)
+        .eq("is_custody_item", false)
         .neq("item_nature", "SERVICE")
         .neq("inventory_policy", "UNTRACKED")
         .order("name_ar", { ascending: true })

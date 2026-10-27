@@ -119,37 +119,37 @@ SELECT
   v.item_class::public.item_class,
   NULL,        -- package_type_id
   v.weight::numeric,
-  true         -- is_custody_item: منتج أمانات يظهر فقط في قوائم المطحنة
+  (v.policy = 'CUSTOMER_OWNED') -- الخدمة ليست صنف أمانات
 FROM (VALUES
   -- ── حبتان خام × نسختين (50 / 25) — الاسم الكامل يحمل كل المعلومات ────────
   ('حبوب بُر سمراء كيس 50 كيلوجرام',
    'حبوب بُر سمراء محلي — أشهر أصناف القمح اليمني.', 'البُر (القمح)',
-   11000, 0, false, 'GOOD', 'TRACKED', 'BATCH', 'MOVING_AVERAGE', false, true, 'RAW_MATERIAL', 50),
+   0, 0, false, 'GOOD', 'CUSTOMER_OWNED', 'NONE', 'NONE', false, false, 'RAW_MATERIAL', 50),
   ('حبوب بُر سمراء كيس 25 كيلوجرام',
    'حبوب بُر سمراء محلي — نسخة نصف كيس.', 'البُر (القمح)',
-   5500, 0, false, 'GOOD', 'TRACKED', 'BATCH', 'MOVING_AVERAGE', false, true, 'RAW_MATERIAL', 25),
+   0, 0, false, 'GOOD', 'CUSTOMER_OWNED', 'NONE', 'NONE', false, false, 'RAW_MATERIAL', 25),
 
   ('حبوب بُر ميساني كيس 50 كيلوجرام',
    'حبوب بُر ميساني — صنف قمح محلي معروف.', 'البُر (القمح)',
-   11000, 0, false, 'GOOD', 'TRACKED', 'BATCH', 'MOVING_AVERAGE', false, true, 'RAW_MATERIAL', 50),
+   0, 0, false, 'GOOD', 'CUSTOMER_OWNED', 'NONE', 'NONE', false, false, 'RAW_MATERIAL', 50),
   ('حبوب بُر ميساني كيس 25 كيلوجرام',
    'حبوب بُر ميساني — نسخة نصف كيس.', 'البُر (القمح)',
-   5500, 0, false, 'GOOD', 'TRACKED', 'BATCH', 'MOVING_AVERAGE', false, true, 'RAW_MATERIAL', 25),
+   0, 0, false, 'GOOD', 'CUSTOMER_OWNED', 'NONE', 'NONE', false, false, 'RAW_MATERIAL', 25),
 
   -- ── ناتجان × نسختين (50 / 25) ────────────────────────────────────────────
   ('كيس دقيق أبيض 50 كيلوجرام',
    'دقيق أبيض من البُر — للخبز والرشوش والملوج.', 'دقيق البُر',
-   0, 6750, false, 'GOOD', 'TRACKED', 'BATCH', 'MOVING_AVERAGE', true, false, 'FINISHED_GOOD', 50),
+   0, 0, false, 'GOOD', 'CUSTOMER_OWNED', 'NONE', 'NONE', false, false, 'FINISHED_GOOD', 50),
   ('كيس دقيق أبيض 25 كيلوجرام',
    'دقيق أبيض من البُر — نسخة نصف كيس.', 'دقيق البُر',
-   0, 3400, false, 'GOOD', 'TRACKED', 'BATCH', 'MOVING_AVERAGE', true, false, 'FINISHED_GOOD', 25),
+   0, 0, false, 'GOOD', 'CUSTOMER_OWNED', 'NONE', 'NONE', false, false, 'FINISHED_GOOD', 25),
 
   ('كيس نخالة 50 كيلوجرام',
    'نخالة البُر — ناتج جانبي مخزني وقابل للبيع (للمواشي).', 'النخالة',
-   0, 3750, false, 'GOOD', 'TRACKED', 'BATCH', 'MOVING_AVERAGE', true, false, 'BY_PRODUCT', 50),
+   0, 0, false, 'GOOD', 'CUSTOMER_OWNED', 'NONE', 'NONE', false, false, 'BY_PRODUCT', 50),
   ('كيس نخالة 25 كيلوجرام',
    'نخالة البُر — ناتج جانبي — نسخة نصف كيس.', 'النخالة',
-   0, 1900, false, 'GOOD', 'TRACKED', 'BATCH', 'MOVING_AVERAGE', true, false, 'BY_PRODUCT', 25),
+   0, 0, false, 'GOOD', 'CUSTOMER_OWNED', 'NONE', 'NONE', false, false, 'BY_PRODUCT', 25),
 
   -- ── الخدمة الوحيدة: أجور طحن وتجهيز (ق5 — البساطة المطلقة) ────────────────
   -- سطر واحد في فاتورة الأجور، والسعر من هذا الصنف (مصدر السعر الوحيد).

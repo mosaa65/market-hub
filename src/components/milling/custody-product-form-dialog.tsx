@@ -105,7 +105,7 @@ export function CustodyProductFormDialog({
     if (!sku.startsWith(prefix)) {
       setSku(prefix);
     }
-  }, [itemClass, editing]);
+  }, [itemClass, editing, sku]);
 
   /* ---- save mutation ---- */
   const saveMutation = useMutation({
@@ -128,7 +128,9 @@ export function CustodyProductFormDialog({
         is_sellable: false,
         is_purchasable: false,
         status: "ACTIVE",
-        inventory_policy: "TRACKED",
+        inventory_policy: "CUSTOMER_OWNED",
+        tracking: "NONE",
+        costing_method: "NONE",
         package_weight_kg: weightKg != null && weightKg > 0 ? weightKg : null,
       };
 
@@ -137,11 +139,7 @@ export function CustodyProductFormDialog({
         if (error) throw error;
         return editing.id as string;
       } else {
-        const { data, error } = await db
-          .from("products")
-          .insert(payload)
-          .select("id")
-          .single();
+        const { data, error } = await db.from("products").insert(payload).select("id").single();
         if (error) throw error;
         return data.id as string;
       }
@@ -270,9 +268,7 @@ export function CustodyProductFormDialog({
           {/* ── حالة الصنف ── */}
           {editing && (
             <div className="flex items-center gap-3 rounded-xl border border-border/60 p-3">
-              <label className="text-xs font-medium text-muted-foreground flex-1">
-                حالة الصنف
-              </label>
+              <label className="text-xs font-medium text-muted-foreground flex-1">حالة الصنف</label>
               <button
                 type="button"
                 onClick={() => setIsActive(!isActive)}
@@ -284,10 +280,7 @@ export function CustodyProductFormDialog({
                 )}
               >
                 <span
-                  className={cn(
-                    "h-2 w-2 rounded-full",
-                    isActive ? "bg-emerald-500" : "bg-red-500",
-                  )}
+                  className={cn("h-2 w-2 rounded-full", isActive ? "bg-emerald-500" : "bg-red-500")}
                 />
                 {isActive ? "نشط" : "معطّل"}
               </button>

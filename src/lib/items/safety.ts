@@ -222,7 +222,7 @@ export function policyFromRow(
     return {
       item_nature: "GOOD",
       inventory_policy: "TRACKED",
-      tracking: "NONE",
+      tracking: "BATCH",
       costing_method: "MOVING_AVERAGE",
       is_sellable: true,
       is_purchasable: true,
@@ -232,7 +232,9 @@ export function policyFromRow(
   return {
     item_nature: (row.item_nature as ItemNature) ?? "GOOD",
     inventory_policy: (row.inventory_policy as InventoryPolicy) ?? "TRACKED",
-    tracking: (row.tracking as ItemTracking) ?? "NONE",
+    tracking:
+      (row.tracking as ItemTracking) ??
+      ((row.inventory_policy ?? "TRACKED") === "TRACKED" ? "BATCH" : "NONE"),
     costing_method: (row.costing_method as CostingMethod) ?? "MOVING_AVERAGE",
     is_sellable: row.is_sellable ?? true,
     is_purchasable: row.is_purchasable ?? true,

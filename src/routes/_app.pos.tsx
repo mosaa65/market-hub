@@ -49,7 +49,7 @@ import { useIsDesktop, useMediaQuery } from "@/hooks/use-media-query";
 import { usePersistedViewMode } from "@/hooks/use-persisted-view-mode";
 import { CartLine as CartLineRow } from "@/components/commerce/cart-line";
 import { MobileProductPicker } from "@/components/commerce/mobile-product-picker";
-import { RecordsFilterPanel, RecordsSortPanel } from "@/components/ui/records-panels";
+import { RecordsSortPanel, RecordsFilterPanel } from "@/components/ui/records-panels";
 import { RecordsToolbar } from "@/components/ui/records-toolbar";
 import type { FilterDefinition, FilterValues } from "@/components/ui/table-toolbar";
 import type { DataTableSort } from "@/components/ui/data-table";

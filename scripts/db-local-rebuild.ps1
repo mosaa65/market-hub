@@ -54,7 +54,25 @@ if ($LASTEXITCODE -ne 0) {
 
 $migrationFiles = Get-ChildItem (Join-Path $repoRoot "supabase\migrations") -Filter "*.sql" | Where-Object { $_.BaseName -match '^\d+_' } | Sort-Object Name
 $expectedVersion = ($migrationFiles[-1].BaseName -split "_", 2)[0]
-$verifySql = "SELECT count(*), max(version), (SELECT count(*) FROM public.grain_types), (SELECT count(*) FROM public.products WHERE sku LIKE 'حبوب-%' OR sku LIKE 'ناتج-%' OR sku LIKE 'مستهلك-%'), (SELECT count(*) FROM auth.users WHERE id::text LIKE 'a0000000-%' AND encrypted_password IS NOT NULL) FROM supabase_migrations.schema_migrations;"
+$verifySql = @"
+SELECT
+  count(*),
+  max(version),
+  (SELECT count(*) FROM public.grain_types),
+  (SELECT count(*) FROM public.products WHERE is_custody_item),
+  (SELECT count(*) FROM public.products WHERE item_class = 'SERVICE' AND name_ar = 'أجور طحن وتجهيز' AND NOT is_custody_item),
+  (SELECT count(*) FROM public.products WHERE is_custody_item AND (
+      item_nature <> 'GOOD'
+      OR inventory_policy <> 'CUSTOMER_OWNED'
+      OR tracking <> 'NONE'
+      OR costing_method <> 'NONE'
+      OR is_sellable
+      OR is_purchasable
+      OR item_class NOT IN ('RAW_MATERIAL','FINISHED_GOOD','BY_PRODUCT')
+  )),
+  (SELECT count(*) FROM auth.users WHERE id::text LIKE 'a0000000-%' AND encrypted_password IS NOT NULL)
+FROM supabase_migrations.schema_migrations;
+"@
 $verifyOutput = docker exec $container psql -U postgres -d postgres -At -F "`t" -v ON_ERROR_STOP=1 -c $verifySql 2>&1
 $verifyExitCode = $LASTEXITCODE
 if ($verifyExitCode -ne 0) {
@@ -62,15 +80,15 @@ if ($verifyExitCode -ne 0) {
   throw "Could not verify the rebuilt local database."
 }
 $verification = ([string]($verifyOutput | Select-Object -Last 1)).Trim() -split "`t"
-if ($verification.Count -ne 5 -or $verification[1] -ne $expectedVersion) {
+if ($verification.Count -ne 7 -or $verification[1] -ne $expectedVersion) {
   throw "Local verification failed: expected migration $expectedVersion."
 }
-if ([int]$verification[2] -ne 4 -or [int]$verification[3] -lt 28 -or [int]$verification[4] -ne 4) {
-  throw "Local verification failed: expected mill sample data or demo accounts are missing."
+if ([int]$verification[2] -ne 4 -or [int]$verification[3] -ne 8 -or [int]$verification[4] -ne 1 -or [int]$verification[5] -ne 0 -or [int]$verification[6] -ne 4) {
+  throw "Local verification failed: expected 8 isolated mill-custody items, 1 non-custody service, 4 grain types, 4 demo accounts, and no invalid custody product."
 }
 
 Write-Host "Local Supabase is rebuilt and verified." -ForegroundColor Green
 Write-Host "API:    http://127.0.0.1:54321"
 Write-Host "Studio: http://127.0.0.1:54323"
 Write-Host "Migrations: $($verification[0]), latest: $($verification[1])"
-Write-Host "Demo mill products: $($verification[3]); grain types: $($verification[2]); demo accounts: $($verification[4])"
+Write-Host "Mill custody items: $($verification[3]); milling service items: $($verification[4]); invalid custody items: $($verification[5]); grain types: $($verification[2]); demo accounts: $($verification[6])"
