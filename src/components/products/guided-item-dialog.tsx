@@ -75,7 +75,7 @@ export function GuidedItemDialog({ onClose, onCreated, units, categories }: Guid
   // فهرس مستلزمات التعبئة. يُعرض هنا فقط لصنف مخزني، ويغذّي الوزن الإجمالي
   // التلقائي في الطحن. (G16 في 04_القرارات_التكميلية)
   const [packageWeightKg, setPackageWeightKg] = useState("");
-  const [tracking, setTracking] = useState<ItemTracking>("NONE");
+  const [tracking, setTracking] = useState<ItemTracking>(DEFAULT_ITEM_POLICY.tracking);
   const [costingMethod, setCostingMethod] = useState<CostingMethod>("MOVING_AVERAGE");
 
   const [saving, setSaving] = useState(false);
@@ -97,6 +97,7 @@ export function GuidedItemDialog({ onClose, onCreated, units, categories }: Guid
       setStep(3);
     } else {
       setTrackInventory(null);
+      setTracking(DEFAULT_ITEM_POLICY.tracking);
       setStep(2);
     }
   }
@@ -462,7 +463,7 @@ export function GuidedItemDialog({ onClose, onCreated, units, categories }: Guid
                       onChange={(event) => setCostingMethod(event.target.value as CostingMethod)}
                       className={inputClass}
                     >
-                      {(["MOVING_AVERAGE", "FIFO", "STANDARD"] as CostingMethod[]).map((method) => (
+                      {(["MOVING_AVERAGE"] as CostingMethod[]).map((method) => (
                         <option key={method} value={method}>
                           {COSTING_METHOD_LABELS[method][ar ? "ar" : "en"]}
                         </option>
@@ -475,7 +476,7 @@ export function GuidedItemDialog({ onClose, onCreated, units, categories }: Guid
                       onChange={(event) => setTracking(event.target.value as ItemTracking)}
                       className={inputClass}
                     >
-                      {(["NONE", "BATCH", "SERIAL"] as ItemTracking[]).map((value) => (
+                      {(["NONE", "BATCH"] as ItemTracking[]).map((value) => (
                         <option key={value} value={value}>
                           {TRACKING_LABELS[value][ar ? "ar" : "en"]}
                         </option>

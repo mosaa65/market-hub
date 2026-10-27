@@ -15,16 +15,12 @@ import {
   PackageCheck,
   CheckCircle2,
   AlertCircle,
-  Clock,
-  Printer,
-  Share2,
   User,
   Building2,
   ShieldCheck,
   Sparkles,
   RefreshCw,
   Check,
-  Scale,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
@@ -34,10 +30,10 @@ import {
   custodyDelivery,
   fetchCustodyBalances,
   buildCustodyDeliveryDoc,
+  capacityKgOf,
   type CustodyLine,
   type CustodyBalance,
 } from "@/lib/milling";
-import { LuxuryPrintPreviewModal } from "@/components/luxury-print-preview-modal";
 import { UnifiedPrintModal } from "@/components/milling/unified-print-modal";
 import { MillingDocumentsBoard } from "@/components/milling/milling-documents-board";
 import type { UnifiedDocumentData } from "@/lib/templates/types";
@@ -77,8 +73,6 @@ function MillingDeliveryPage() {
   const [customerId, setCustomerId] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
   const [lines, setLines] = useState<CustodyLine[]>([{ itemId: "", bags: 0, kg: 0 }]);
-  const [driverName, setDriverName] = useState("");
-  const [vehicleNumber, setVehicleNumber] = useState("");
   const [notes, setNotes] = useState("");
 
   // حالة معاينة وطباعة الفاتورة الفاخرة
@@ -144,11 +138,39 @@ function MillingDeliveryPage() {
   }
 
   function changeLineItem(idx: number, itemId: string) {
-    setLines((l) => l.map((x, i) => (i !== idx ? x : { ...x, itemId })));
+    setLines((l) =>
+      l.map((x, i) => {
+        if (i !== idx) return x;
+        const b = balanceFor(itemId);
+        const unitWeight =
+          b && Number(b.bags_balance) > 0
+            ? Number(b.kg_balance) / Number(b.bags_balance)
+            : capacityKgOf(b as any) || 0;
+        const autoKg =
+          x.bags > 0 && unitWeight > 0 ? Math.round(x.bags * unitWeight * 100) / 100 : x.kg;
+        return { ...x, itemId, kg: autoKg };
+      }),
+    );
   }
 
   function changeLineBags(idx: number, bags: number) {
-    setLines((l) => l.map((x, i) => (i !== idx ? x : { ...x, bags })));
+    setLines((l) =>
+      l.map((x, i) => {
+        if (i !== idx) return x;
+        const b = balanceFor(x.itemId);
+        const unitWeight =
+          b && Number(b.bags_balance) > 0
+            ? Number(b.kg_balance) / Number(b.bags_balance)
+            : capacityKgOf(b as any) || 0;
+        const autoKg =
+          bags > 0 && unitWeight > 0
+            ? Math.round(bags * unitWeight * 100) / 100
+            : bags === 0
+              ? 0
+              : x.kg;
+        return { ...x, bags, kg: autoKg };
+      }),
+    );
   }
 
   function changeLineKg(idx: number, kg: number) {
@@ -197,19 +219,11 @@ function MillingDeliveryPage() {
   // إرسال عملية التسليم
   const submit = useMutation({
     mutationFn: () => {
-      const combinedNotes = [
-        driverName.trim() ? `المستلم / السائق: ${driverName.trim()}` : "",
-        vehicleNumber.trim() ? `المركبة: ${vehicleNumber.trim()}` : "",
-        notes.trim() ? notes.trim() : "",
-      ]
-        .filter(Boolean)
-        .join(" | ");
-
       return custodyDelivery({
         customerId,
         warehouseId,
         lines,
-        notes: combinedNotes || undefined,
+        notes: notes.trim() || undefined,
       });
     },
     onSuccess: async (res) => {
@@ -242,20 +256,8 @@ function MillingDeliveryPage() {
             remainingBags: remBags,
             remainingKg: remKg,
             unit: delBags > 0 ? "كيس" : "كجم",
-            note:
-              driverName || vehicleNumber
-                ? `${driverName ? `السائق: ${driverName}` : ""} ${vehicleNumber ? `(${vehicleNumber})` : ""}`.trim()
-                : undefined,
           };
         });
-
-      const combinedNotes = [
-        driverName.trim() ? `المستلم: ${driverName.trim()}` : "",
-        vehicleNumber.trim() ? `رقم المركبة: ${vehicleNumber.trim()}` : "",
-        notes.trim() ? notes.trim() : "",
-      ]
-        .filter(Boolean)
-        .join(" — ");
 
       const uDoc = buildCustodyDeliveryDoc({
         docNumber,
@@ -263,7 +265,7 @@ function MillingDeliveryPage() {
         customerPhone: selectedCustomer?.phone,
         warehouseName,
         lines: deliveryLinesPayload,
-        notes: combinedNotes || undefined,
+        notes: notes.trim() || undefined,
       });
 
       setDeliveryPrintDoc(uDoc);
@@ -271,8 +273,6 @@ function MillingDeliveryPage() {
 
       // تفريغ النموذج
       setLines([{ itemId: "", bags: 0, kg: 0 }]);
-      setDriverName("");
-      setVehicleNumber("");
       setNotes("");
 
       void qc.invalidateQueries({ queryKey: ["milling"] });
@@ -518,24 +518,7 @@ function MillingDeliveryPage() {
                 </button>
               </div>
 
-              {/* بيانات المستلم والسائق والملاحظات */}
-              <div className="grid gap-3 sm:grid-cols-2">
-                <MillingField label="اسم المستلم أو السائق" hint="اختياري">
-                  <MillingInput
-                    value={driverName}
-                    onChange={(e) => setDriverName(e.target.value)}
-                    placeholder="مثال: محمد علي السلمي"
-                  />
-                </MillingField>
 
-                <MillingField label="رقم المركبة أو لوحة الشاحنة" hint="اختياري">
-                  <MillingInput
-                    value={vehicleNumber}
-                    onChange={(e) => setVehicleNumber(e.target.value)}
-                    placeholder="مثال: نقل 4859 / أ ب ج"
-                  />
-                </MillingField>
-              </div>
 
               <MillingField label="ملاحظات التسليم الإضافية" hint="تظهر في سند التسليم الرسمي">
                 <MillingTextarea

@@ -31,7 +31,7 @@ project_id = "kwzqvgdyadylwnvjghqn"
 # ملاحظة: جدول pacsqlkaging_types يبدأ فارغًا عن قصد. «شوال» و«كيس» لا يحملان
 # وزنًا ولا يصفان شيئًا يحتاجه كل عميل، والمنتج الحقيقي هو «كيس 50 كجم».
 #
-# ملفات العيّنات اختيارية وخارج هذا المسار:
+# ملفات العيّنات اختيارية وخارج التشغيل التلقائي؛ لن تُزرع عند `supabase db reset`:
 #   supabase/seeds/02_company/  — هوية العميل وأرصدته الافتتاحية.
 #   supabase/seeds/03_samples/  — بيانات عرض لكل نشاط (مطحنة…).
 #   supabase/seeds/04_tests/    — مثبتات الاختبارات الآلية.
@@ -39,8 +39,7 @@ project_id = "kwzqvgdyadylwnvjghqn"
 
 enabled = true
 sql_paths = [
-  "./seeds/01_system/*.sql",
-  "./seeds/03_samples/*.sql"
+  "./seeds/01_system/*.sql"
 
   
 ]

@@ -20,7 +20,13 @@ export function renderThermalTemplate(
   const money = (n?: number) => formatMoney(n, c);
   const company = getCachedCompanyProfile();
   const companyArabicName =
-    company.arabicName || doc.company?.arabicName || doc.company?.name || company.name;
+    doc.company?.arabicName ||
+    doc.company?.name ||
+    company.arabicName ||
+    company.name;
+  const companyAddress = doc.company?.address || company.address || "";
+  const companyPhone = doc.company?.phone || company.phone || "";
+  const companyVat = doc.company?.vat || company.taxNumber || "";
   const opts = {
     showLogo: true,
     showCompanyInfo: true,
@@ -68,9 +74,9 @@ export function renderThermalTemplate(
 <div class="r">
   <div class="c">
     ${opts.showCompanyInfo && companyArabicName ? `<h1>${esc(companyArabicName)}</h1>` : ""}
-    ${opts.showCompanyInfo && doc.company?.address ? `<div class="muted">${esc(doc.company.address)}</div>` : ""}
-    ${opts.showCompanyInfo && doc.company?.phone ? `<div class="muted">${esc(doc.company.phone)}</div>` : ""}
-    ${opts.showCompanyInfo && doc.company?.vat ? `<div class="muted">VAT: ${esc(doc.company.vat)}</div>` : ""}
+    ${opts.showCompanyInfo && companyAddress ? `<div class="muted">${esc(companyAddress)}</div>` : ""}
+    ${opts.showCompanyInfo && companyPhone ? `<div class="muted" dir="ltr">${esc(companyPhone)}</div>` : ""}
+    ${opts.showCompanyInfo && companyVat ? `<div class="muted">VAT: ${esc(companyVat)}</div>` : ""}
   </div>
   <div class="hr"></div>
   ${

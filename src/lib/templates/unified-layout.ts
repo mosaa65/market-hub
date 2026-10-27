@@ -744,7 +744,7 @@ export function renderUnifiedLayout(
     showPaymentInfo: true,
     showNotes: true,
     showSignatures: false,
-    showFooter: false,
+    showFooter: true,
     showBarcode: true,
     showQrCode: unifiedSettings.showQrCode,
     ...doc.options,

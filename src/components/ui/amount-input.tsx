@@ -188,7 +188,7 @@ export const AmountInput = React.forwardRef<HTMLInputElement, AmountInputProps>(
               (ref as React.RefObject<HTMLInputElement>).current = el as HTMLInputElement;
           }}
           type="currency" // يعرض كنص DOM مع inputMode="decimal" — لا spinner ولا عجلة ماوس
-          clearable={clearable && !hideClear}
+          clearable={false}
           suffix={props.suffix}
           dir="ltr"
           className={cn(

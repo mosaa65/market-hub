@@ -18,6 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Printer, Calendar, BookOpen, FileSpreadsheet } from "lucide-react";
+import { formatJournalDateTime } from "@/lib/accounting/format-journal-date-time";
 
 export const Route = createFileRoute("/_app/daily-journal")({
   head: () => ({ meta: [{ title: "دفتر اليومية — Vortex ERP" }] }),
@@ -31,6 +32,7 @@ export const Route = createFileRoute("/_app/daily-journal")({
 interface JournalEntry {
   id: string;
   date: string;
+  occurredAt: string;
   voucherNo: string;
   source: string;
   accountDebit: string;
@@ -64,7 +66,7 @@ function DailyJournalPage() {
     const { data, error: qErr } = await supabase
       .from("journal_entries" as never)
       .select(
-        "id,entry_number,entry_date,memo,source_type,journal_lines(debit,credit,memo,accounts(code,name_ar))",
+        "id,entry_number,entry_date,created_at,memo,source_type,journal_lines(debit,credit,memo,accounts(code,name_ar))",
       )
       .eq("entry_date", dateStr)
       .neq("status", "REVERSED")
@@ -110,6 +112,7 @@ function DailyJournalPage() {
       id: string;
       entry_number: string;
       entry_date: string;
+      created_at: string;
       memo: string;
       source_type: string | null;
       journal_lines: Array<{
@@ -126,11 +129,12 @@ function DailyJournalPage() {
           ? `${l.accounts.name_ar} (${l.accounts.code})`
           : `${l.accounts.code} — ${l.accounts.name_ar}`;
 
-      // كل قيد يُعرض بصفّين: مدين (من حـ/) ودائن (إلى حـ/) — بحسابات الدليل.
+      // عرض القيد المتوازن في صف واحد حتى لا يبدو طرفا المدين والدائن كأنهما قيدان.
       for (const dl of debitLines) {
         journalList.push({
           id: `${e.id}-D${journalList.length}`,
           date: e.entry_date,
+          occurredAt: e.created_at,
           voucherNo: e.entry_number,
           source: sourceLabel(e.source_type),
           accountDebit: accName(dl),
@@ -139,21 +143,9 @@ function DailyJournalPage() {
           note: e.memo,
         });
       }
-      for (const cl of creditLines) {
-        journalList.push({
-          id: `${e.id}-C${journalList.length}`,
-          date: e.entry_date,
-          voucherNo: e.entry_number,
-          source: sourceLabel(e.source_type),
-          accountDebit: debitLines.length > 0 ? accName(debitLines[0]) : "—",
-          accountCredit: accName(cl),
-          amount: Number(cl.credit ?? 0),
-          note: e.memo,
-        });
-      }
     }
 
-    journalList.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    journalList.sort((a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime());
     setEntries(journalList);
     setLoading(false);
   }
@@ -335,10 +327,7 @@ function DailyJournalPage() {
                     <TableRow key={idx} className="hover:bg-surface-2/60">
                       <TableCell className="font-mono text-xs">{idx + 1}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">
-                        {new Date(e.date).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                        {formatJournalDateTime(e.occurredAt, lang)}
                       </TableCell>
                       <TableCell className="font-mono text-xs font-semibold text-primary">
                         {e.voucherNo}

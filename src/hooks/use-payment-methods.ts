@@ -32,6 +32,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   PAYMENT_METHOD_CATALOG,
+  CORE_PAYMENT_METHOD_IDS,
   PAYMENT_CONTEXTS,
   hasAuthoredIdentity,
   isLegacyPaymentValue,
@@ -234,8 +235,10 @@ function resolveRow(row: CatalogRow, settings?: SettingsRow): ResolvedPaymentMet
 
     enabled: settings ? settings.enabled : true,
     effectiveSortOrder: settings ? settings.sort_order : row.sort_order,
-    // Approved methods appear across all screens universally
-    effectiveContexts: PAYMENT_CONTEXTS,
+    // A business may narrow a method to its approved contexts, never widen it.
+    effectiveContexts: settings?.enabled_contexts?.length
+      ? tenantContexts.filter((context) => allowedContexts.includes(context))
+      : allowedContexts,
     isConfigured: Boolean(settings),
     isSystem: row.is_system !== false,
     isAuthored: false,
@@ -353,12 +356,14 @@ export function usePaymentMethodsForContext(
     () =>
       methods.filter(
         (m) =>
+          (CORE_PAYMENT_METHOD_IDS.includes(m.id as (typeof CORE_PAYMENT_METHOD_IDS)[number]) ||
+            (includeSplit && m.id === "split")) &&
           m.isActive &&
           m.enabled &&
-          (includeSplit || m.id !== "split") &&
+          (!context || m.effectiveContexts.includes(context)) &&
           (includeCredit || !m.isCreditTerm),
       ),
-    [methods, includeCredit, includeSplit],
+    [methods, context, includeCredit, includeSplit],
   );
 
   return { methods: available, isLoading, isFallback, fallbackReason };

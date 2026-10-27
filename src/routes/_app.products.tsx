@@ -109,6 +109,7 @@ import {
 } from "@/lib/items/user-policy-preferences";
 import {
   COSTING_METHOD_LABELS,
+  DEFAULT_ITEM_POLICY,
   INVENTORY_POLICY_LABELS,
   ITEM_NATURE_LABELS,
   TRACKING_LABELS,
@@ -339,6 +340,8 @@ function ProductsPage() {
         .select(
           "id, name, name_ar, sku, barcode, sale_price, cost_price, tax_rate, min_stock, package_weight_kg, is_active, category_id, brand_id, unit_id, item_nature, item_class, inventory_policy, tracking, costing_method, is_sellable, is_purchasable",
         )
+        // أصناف أمانات المطحنة تُدار من واجهتها المستقلة، وليست ضمن كتالوج الشركة.
+        .eq("is_custody_item", false)
         // `created_at` alone is not a total order: two products inserted in the
         // same millisecond (a bulk import, a sync) have no defined relative
         // order, so the database may return them differently for page 1 and
@@ -440,10 +443,12 @@ function ProductsPage() {
   const { data: productCount } = useQuery({
     queryKey: productKeys.count(),
     queryFn: async () => {
-      const { count, error: countError } = await (supabase.from("products") as any).select("id", {
-        count: "exact",
-        head: true,
-      });
+      const { count, error: countError } = await (supabase.from("products") as any)
+        .select("id", {
+          count: "exact",
+          head: true,
+        })
+        .eq("is_custody_item", false);
       if (countError) throw countError;
       return count ?? 0;
     },
@@ -2479,19 +2484,20 @@ function ProductDialog({
   const [categoryNameAr, setCategoryNameAr] = useState("");
   const [categoryNameEn, setCategoryNameEn] = useState("");
   const [savingCategory, setSavingCategory] = useState(false);
-  const policyFromProduct = (product: ProductRow): UserItemPolicyPreferences => ({
-    item_nature: product.item_nature ?? "GOOD",
-    inventory_policy: product.inventory_policy ?? "TRACKED",
-    tracking: product.tracking ?? "NONE",
-    // صنف قديم محفوظ TRACKED بطريقة تقييم NONE (قبل فرض القاعدة)؟ نعدّله
-    // للمتوسط المتحرك عند فتحه للتعديل، وإلا فشل الحفظ برسالة بلا علاج.
-    costing_method:
-      (product.inventory_policy ?? "TRACKED") === "TRACKED" && product.costing_method === "NONE"
-        ? "MOVING_AVERAGE"
-        : (product.costing_method ?? "MOVING_AVERAGE"),
-    is_sellable: product.is_sellable ?? true,
-    is_purchasable: product.is_purchasable ?? true,
-  });
+  const policyFromProduct = (product: ProductRow): UserItemPolicyPreferences => {
+    const inventoryPolicy = product.inventory_policy ?? "TRACKED";
+    return {
+      item_nature: product.item_nature ?? "GOOD",
+      inventory_policy: inventoryPolicy,
+      tracking: product.tracking ?? (inventoryPolicy === "TRACKED" ? "BATCH" : "NONE"),
+      costing_method:
+        inventoryPolicy === "TRACKED" && product.costing_method === "NONE"
+          ? "MOVING_AVERAGE"
+          : (product.costing_method ?? "MOVING_AVERAGE"),
+      is_sellable: product.is_sellable ?? true,
+      is_purchasable: product.is_purchasable ?? true,
+    };
+  };
   const [policy, setPolicy] = useState<UserItemPolicyPreferences>(() =>
     initial
       ? policyFromProduct(initial)
@@ -2517,8 +2523,6 @@ function ProductDialog({
     origin_id: initial?.origin_id ?? "",
     quality_grade_id: initial?.quality_grade_id ?? "",
     is_active: initial?.is_active ?? true,
-    is_custody_item:
-      (initial as unknown as { is_custody_item?: boolean })?.is_custody_item ?? false,
   });
   const [saving, setSaving] = useState(false);
 
@@ -2582,6 +2586,7 @@ function ProductDialog({
         sale_price: Number(form.sale_price) || 0,
         tax_rate: Number(form.tax_rate) || 0,
         min_stock: Number(form.min_stock) || 1,
+        track_expiry: policy.tracking === "BATCH",
         package_weight_kg:
           form.package_weight_kg.trim() === "" ? null : Number(form.package_weight_kg) || null,
         shelf_location: form.shelf_location.trim() || null,
@@ -2594,9 +2599,7 @@ function ProductDialog({
         costing_method: policy.costing_method,
         is_sellable: policy.is_sellable,
         is_purchasable: policy.is_purchasable,
-        // طاحونة الأمانات: تعليم المنتج كمنتج أمانات (حبوب/نواتج) — عزله عن قوائم البيع والشراء.
-        is_custody_item:
-          (form as unknown as { is_custody_item?: boolean }).is_custody_item ?? false,
+        is_custody_item: false,
       };
       const request: any = initial
         ? (supabase.from("products") as any)
@@ -3001,59 +3004,61 @@ function ProductDialog({
             icon={<DollarSign className="size-4" />}
             title={lang === "ar" ? "التسعير" : "Pricing"}
           />
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormField label={t("common.price")} required>
-              {(p) => (
-                <VortexCurrencyInput
-                  id={p.id}
-                  aria-describedby={p["aria-describedby"]}
-                  value={form.sale_price === "" ? null : Number(form.sale_price)}
-                  onValueChange={(num) =>
-                    setForm({ ...form, sale_price: num == null ? "" : String(num) })
-                  }
-                  min={0}
-                  currencySymbol={getCompanyCurrencySymbol()}
-                  placeholder="0.00"
-                  className="rounded-full"
-                />
-              )}
-            </FormField>
-
-            {canViewCost && showForm("cost") && (
-              <FormField label={t("common.cost")}>
-                <VortexCurrencyInput
-                  value={form.cost_price === "" ? null : Number(form.cost_price)}
-                  onValueChange={(num) =>
-                    setForm({ ...form, cost_price: num == null ? "" : String(num) })
-                  }
-                  min={0}
-                  currencySymbol={getCompanyCurrencySymbol()}
-                  placeholder="0.00"
-                  className="rounded-full"
-                />
-              </FormField>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {showForm("tax") && (
-              <FormField label={t("products.tax_rate")}>
+          <>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FormField label={t("common.price")} required>
                 {(p) => (
-                  <NumberInput
-                    {...p}
-                    value={form.tax_rate === "" ? null : Number(form.tax_rate)}
-                    onValueChange={(v) =>
-                      setForm({ ...form, tax_rate: v == null ? "" : String(v) })
+                  <VortexCurrencyInput
+                    id={p.id}
+                    aria-describedby={p["aria-describedby"]}
+                    value={form.sale_price === "" ? null : Number(form.sale_price)}
+                    onValueChange={(num) =>
+                      setForm({ ...form, sale_price: num == null ? "" : String(num) })
                     }
                     min={0}
-                    max={100}
-                    suffix="%"
-                    placeholder="0"
+                    currencySymbol={getCompanyCurrencySymbol()}
+                    placeholder="0.00"
+                    className="rounded-full"
                   />
                 )}
               </FormField>
-            )}
-          </div>
+
+              {canViewCost && showForm("cost") && (
+                <FormField label={t("common.cost")}>
+                  <VortexCurrencyInput
+                    value={form.cost_price === "" ? null : Number(form.cost_price)}
+                    onValueChange={(num) =>
+                      setForm({ ...form, cost_price: num == null ? "" : String(num) })
+                    }
+                    min={0}
+                    currencySymbol={getCompanyCurrencySymbol()}
+                    placeholder="0.00"
+                    className="rounded-full"
+                  />
+                </FormField>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {showForm("tax") && (
+                <FormField label={t("products.tax_rate")}>
+                  {(p) => (
+                    <NumberInput
+                      {...p}
+                      value={form.tax_rate === "" ? null : Number(form.tax_rate)}
+                      onValueChange={(v) =>
+                        setForm({ ...form, tax_rate: v == null ? "" : String(v) })
+                      }
+                      min={0}
+                      max={100}
+                      suffix="%"
+                      placeholder="0"
+                    />
+                  )}
+                </FormField>
+              )}
+            </div>
+          </>
         </section>
 
         {/* Tab 3: Specs & Inventory */}
@@ -3182,36 +3187,22 @@ function ProductDialog({
             icon={<SlidersHorizontal className="size-4" />}
             title={lang === "ar" ? "طبيعة وسياسة الصنف" : "Item nature & policy"}
           />
-          <div className="rounded-xl border border-sky-500/25 bg-sky-500/5 p-3 text-[11px] leading-relaxed text-muted-foreground space-y-1">
-            <p>
-              <strong className="text-foreground">طبيعة الصنف:</strong> تحدد هل هذا الصنف
-              <strong className="text-foreground"> بضاعة (GOOD)</strong> تُخزن وتُعدّ كمياتها
-              وتكلفتها، أو
-              <strong className="text-foreground"> خدمة (SERVICE)</strong> تُباع مباشرة بلا مخزون
-              (مثل أجور الطحن). الخيار هو نفسه الزر الموحد في كل النظام — لا يوجد شكل ثالث.
-            </p>
-            <p>
-              <strong className="text-foreground">سياسة المخزون:</strong>
-              <strong className="text-foreground"> تُتتبع (TRACKED)</strong> = الكمية تُخصم وتُضاف
-              تلقائياً مع كل فاتورة وتُحسب تكلفتها (للمنتجات والنواتج)؛
-              <strong className="text-foreground"> غير تُتتبع (UNTRACKED)</strong> = لا مخزون ولا
-              خصم تلقائي (خدمات فقط)؛
-              <strong className="text-foreground"> ملك العميل (CUSTOMER_OWNED)</strong> = أمانات
-              المطحنة خارج مخزون المنشأة — لا تُخصم ولا تُقّيم تكلفتها وإنما تُتابع في سجل أمانات
-              العميل.
-            </p>
-            <p>
-              <strong className="text-foreground">التتبع:</strong> دفعات (BATCH) = كل دفعة بمدة
-              صلاحية وتكلفة خاصة — المناسب للحبوب والدقيق؛ تسلسل (SERIAL) = كل قطعة برقم فريد —
-              للأجهزة؛ بلا (NONE) = لا تتبع فردي.
-            </p>
-            <p>
-              <strong className="text-foreground">التأثير المباشر عند الاختيار:</strong> الترجيح
-              «بضاعة + تُتتبع» يجعل الفاتورة تخصم من المخزون وتُنشئ قيد تكلفة آلياً؛ اختيار «خدمة»
-              يجعل الفاتورة إيراداً فقط بلا حركة مخزون؛ اختيار «ملك العميل» يمنع أي حركة مخزون
-              نهائياً ويسجل كل شيء في دفتر أمانات العميل.
-            </p>
-          </div>
+          <p
+            role="status"
+            className="rounded-xl border border-sky-500/25 bg-sky-500/5 p-3 text-xs leading-relaxed text-muted-foreground"
+          >
+            {policy.item_nature === "SERVICE"
+              ? lang === "ar"
+                ? "خدمة: تظهر في الفواتير المناسبة ولا تنشئ رصيدًا أو تكلفة مخزنية."
+                : "Service: available on relevant invoices without stock balance or stock valuation."
+              : policy.inventory_policy === "UNTRACKED"
+                ? lang === "ar"
+                  ? "صنف قديم محفوظ بلا تتبع مخزني. لا يمكن اختيار هذه السياسة لصنف جديد؛ اختر طبيعة (خدمة) للخدمات."
+                  : "Legacy good saved without stock tracking. New goods cannot use this policy; choose Service for services."
+                : lang === "ar"
+                  ? "سلعة مخزنية: حركات الفواتير تحدّث الرصيد والتكلفة تلقائيًا."
+                  : "Stocked good: invoices update its stock balance and cost automatically."}
+          </p>
           <div className="space-y-4">
             <SettingsChoice
               label={lang === "ar" ? "طبيعة الصنف" : "Item nature"}
@@ -3223,80 +3214,140 @@ function ProductDialog({
                   label: ITEM_NATURE_LABELS.SERVICE[lang === "ar" ? "ar" : "en"],
                 },
               ]}
-              onChange={(value) =>
-                setPolicy((current) => ({
-                  ...current,
-                  item_nature: value as ItemNature,
-                  inventory_policy: value === "SERVICE" ? "UNTRACKED" : current.inventory_policy,
-                  tracking: value === "SERVICE" ? "NONE" : current.tracking,
-                  costing_method: value === "SERVICE" ? "NONE" : current.costing_method,
-                }))
-              }
+              onChange={(value) => {
+                if (value === "SERVICE") {
+                  setPolicy((current) => ({
+                    ...current,
+                    item_nature: "SERVICE",
+                    inventory_policy: "UNTRACKED",
+                    tracking: "NONE",
+                    costing_method: "NONE",
+                    is_sellable: true,
+                    is_purchasable: false,
+                  }));
+                } else if (policy.item_nature === "SERVICE") {
+                  setPolicy({ ...DEFAULT_ITEM_POLICY });
+                } else {
+                  setPolicy((current) => ({ ...current, item_nature: "GOOD" }));
+                }
+              }}
             />
 
             {policy.item_nature === "GOOD" && (
               <SettingsChoice
                 label={lang === "ar" ? "سياسة المخزون" : "Inventory policy"}
                 value={policy.inventory_policy}
-                options={(["TRACKED", "UNTRACKED", "CUSTOMER_OWNED"] as InventoryPolicy[]).map(
-                  (value) => ({
-                    value,
-                    label: INVENTORY_POLICY_LABELS[value][lang === "ar" ? "ar" : "en"],
-                  }),
-                )}
-                onChange={(value) =>
-                  setPolicy((current) => ({
-                    ...current,
-                    inventory_policy: value as InventoryPolicy,
-                    tracking: value === "TRACKED" ? current.tracking : "NONE",
-                    // TRACKED يحتاج طريقة تقييم صالحة: لو صار NONE (مثلًا بعد
-                    // تحويل الصنف خدمة ثم رجوعه سلعة) نرجع المتوسط المتحرك
-                    // افتراضيًا بدل ترك المستخدم عالقًا برسالة خطأ بلا علاج.
-                    costing_method:
-                      value === "TRACKED" && current.costing_method === "NONE"
-                        ? "MOVING_AVERAGE"
-                        : value === "TRACKED"
-                          ? current.costing_method
-                          : "NONE",
-                  }))
-                }
+                options={[
+                  {
+                    value: "TRACKED",
+                    label: INVENTORY_POLICY_LABELS.TRACKED[lang === "ar" ? "ar" : "en"],
+                  },
+                  ...(initial && policy.inventory_policy === "UNTRACKED"
+                    ? [
+                        {
+                          value: "UNTRACKED",
+                          label: lang === "ar" ? "غير متتبع (قديم)" : "Untracked (legacy)",
+                          disabled: true,
+                        },
+                      ]
+                    : []),
+                ]}
+                onChange={(value) => {
+                  const nextPolicy = value as InventoryPolicy;
+                  setPolicy((current) => {
+                    if (nextPolicy === "TRACKED") {
+                      return {
+                        ...current,
+                        inventory_policy: nextPolicy,
+                        tracking: current.tracking === "NONE" ? "BATCH" : current.tracking,
+                        costing_method:
+                          current.costing_method === "NONE"
+                            ? "MOVING_AVERAGE"
+                            : current.costing_method,
+                      };
+                    }
+                    return {
+                      ...current,
+                      inventory_policy: nextPolicy,
+                      tracking: "NONE",
+                      costing_method: "NONE",
+                      is_sellable: current.is_sellable,
+                      is_purchasable: current.is_purchasable,
+                    };
+                  });
+                }}
               />
             )}
 
             {policy.item_nature === "GOOD" && policy.inventory_policy === "TRACKED" && (
-              <SettingsChoice
-                label={lang === "ar" ? "طريقة التتبع" : "Tracking method"}
-                value={policy.tracking}
-                options={(["NONE", "BATCH", "SERIAL"] as ItemTracking[]).map((value) => ({
-                  value,
-                  label: TRACKING_LABELS[value][lang === "ar" ? "ar" : "en"],
-                }))}
-                onChange={(value) =>
-                  setPolicy((current) => ({
-                    ...current,
-                    tracking: value as ItemTracking,
-                  }))
-                }
-              />
+              <>
+                <SettingsChoice
+                  label={lang === "ar" ? "طريقة التتبع" : "Tracking method"}
+                  value={policy.tracking}
+                  options={[
+                    { value: "NONE", label: TRACKING_LABELS.NONE[lang === "ar" ? "ar" : "en"] },
+                    { value: "BATCH", label: TRACKING_LABELS.BATCH[lang === "ar" ? "ar" : "en"] },
+                    {
+                      value: "SERIAL",
+                      label:
+                        lang === "ar"
+                          ? "أرقام تسلسلية — غير مدعومة بعد"
+                          : "Serial — not supported yet",
+                      disabled: true,
+                    },
+                  ]}
+                  onChange={(value) =>
+                    setPolicy((current) => ({
+                      ...current,
+                      tracking: value as ItemTracking,
+                    }))
+                  }
+                />
+                <p className="-mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                  {lang === "ar"
+                    ? "تتبع الدفعات يعمل مع الاستلام والصرف. سجل الأرقام التسلسلية غير منفذ بعد."
+                    : "Batch tracking is connected to receipts and dispatch. Serial-number records are not implemented yet."}
+                </p>
+              </>
             )}
 
             {policy.item_nature === "GOOD" && policy.inventory_policy === "TRACKED" && (
-              <SettingsChoice
-                label={lang === "ar" ? "طريقة تقييم المخزون" : "Stock valuation method"}
-                value={policy.costing_method}
-                options={(["MOVING_AVERAGE", "FIFO", "STANDARD"] as CostingMethod[]).map(
-                  (value) => ({
-                    value,
-                    label: COSTING_METHOD_LABELS[value][lang === "ar" ? "ar" : "en"],
-                  }),
-                )}
-                onChange={(value) =>
-                  setPolicy((current) => ({
-                    ...current,
-                    costing_method: value as CostingMethod,
-                  }))
-                }
-              />
+              <>
+                <SettingsChoice
+                  label={lang === "ar" ? "طريقة تقييم المخزون" : "Stock valuation method"}
+                  value={policy.costing_method}
+                  options={[
+                    {
+                      value: "MOVING_AVERAGE",
+                      label: COSTING_METHOD_LABELS.MOVING_AVERAGE[lang === "ar" ? "ar" : "en"],
+                    },
+                    {
+                      value: "FIFO",
+                      label:
+                        lang === "ar"
+                          ? "FIFO — غير مدعوم كتقييم تكلفة"
+                          : "FIFO — not supported as costing",
+                      disabled: true,
+                    },
+                    {
+                      value: "STANDARD",
+                      label: lang === "ar" ? "قياسي — إعداد مركزي" : "Standard — company setting",
+                      disabled: true,
+                    },
+                  ]}
+                  onChange={(value) =>
+                    setPolicy((current) => ({
+                      ...current,
+                      costing_method: value as CostingMethod,
+                    }))
+                  }
+                />
+                <p className="-mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                  {lang === "ar"
+                    ? "المتوسط المتحرك هو طريقة التقييم الافتراضية. FIFO في إعداد الدفعات يحدد ترتيب الصرف فقط، والتكلفة القياسية إعداد محاسبي مركزي."
+                    : "Moving average is the active default. FIFO in batch settings controls dispatch order only; standard costing is company-wide."}
+                </p>
+              </>
             )}
 
             <div className="grid grid-cols-2 gap-2 pt-2">
@@ -3311,24 +3362,6 @@ function ProductDialog({
                 onChange={(checked) => setPolicy((c) => ({ ...c, is_purchasable: checked }))}
               />
             </div>
-
-            {/* طاحونة الأمانات: عزل المنتج عن قوائم البيع والشراء وتخصيصه لقوائم أمانات المطحنة */}
-            <SettingsToggle
-              label={
-                lang === "ar"
-                  ? "منتج أمانات مطحنة (حبوب/نواتج)"
-                  : "Mill custody item (grain/output)"
-              }
-              description={
-                lang === "ar"
-                  ? "يظهر فقط في قوائم أمانات المطحنة (الاستلام، الطحن، التسليم) — ويختفي من البيع والشراء والمخزون التجاري"
-                  : "Shows only in mill custody lists (intake, milling, delivery) — hidden from sales, purchases and commercial stock"
-              }
-              checked={(form as unknown as { is_custody_item?: boolean }).is_custody_item ?? false}
-              onChange={(checked) =>
-                setForm((c) => ({ ...c, is_custody_item: checked }) as typeof c)
-              }
-            />
           </div>
         </section>
       </form>
@@ -3378,7 +3411,7 @@ function SettingsChoice({
 }: {
   label: string;
   value: string;
-  options: { value: string; label: string }[];
+  options: { value: string; label: string; disabled?: boolean }[];
   onChange: (value: string) => void;
 }) {
   return (
@@ -3397,12 +3430,16 @@ function SettingsChoice({
               type="button"
               role="radio"
               aria-checked={selected}
+              aria-disabled={option.disabled || undefined}
+              disabled={option.disabled}
               onClick={() => onChange(option.value)}
               className={cn(
                 "flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-xl border px-2 py-2 text-center text-[11px] font-semibold leading-tight transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:scale-[0.99] sm:gap-2 sm:px-3 sm:text-xs",
                 selected
                   ? "border-primary/50 bg-primary/10 text-primary shadow-xs"
-                  : "border-border/70 bg-background/70 text-muted-foreground hover:border-primary/30 hover:bg-muted/50 hover:text-foreground",
+                  : option.disabled
+                    ? "cursor-not-allowed border-border/40 bg-muted/30 text-muted-foreground/60"
+                    : "border-border/70 bg-background/70 text-muted-foreground hover:border-primary/30 hover:bg-muted/50 hover:text-foreground",
               )}
             >
               <span className="min-w-0">{option.label}</span>

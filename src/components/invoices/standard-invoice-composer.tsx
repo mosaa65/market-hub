@@ -71,9 +71,19 @@ type ProductRow = {
   cost_price: number;
   sale_price: number;
   tax_rate: number;
+  tracking?: "NONE" | "BATCH" | "SERIAL" | null;
+  is_custody_item?: boolean;
+  is_purchasable?: boolean;
   unit?: { short_name?: string | null; name?: string | null; name_ar?: string | null } | null;
 };
-type CartLine = { product: ProductRow; quantity: number; price: number; tax_rate: number };
+type CartLine = {
+  product: ProductRow;
+  quantity: number;
+  price: number;
+  tax_rate: number;
+  batch_number: string;
+  expiry_date: string;
+};
 type SavedInvoice = {
   id: string;
   number: string;
@@ -135,6 +145,16 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
   useEffect(() => {
     let live = true;
     setLoading(true);
+    let productQuery = (supabase.from("products") as any)
+      .select(
+        "id,name,name_ar,sku,barcode,unit_id,cost_price,sale_price,tax_rate,tracking,is_custody_item,is_purchasable,unit:units!products_unit_id_fkey(short_name,name,name_ar)",
+      )
+      .eq("is_active", true);
+    if (!sales) {
+      productQuery = productQuery.eq("is_custody_item", false).eq("is_purchasable", true);
+    } else {
+      productQuery = productQuery.eq("is_custody_item", false).eq("is_sellable", true);
+    }
     void Promise.all([
       sales
         ? supabase
@@ -155,14 +175,7 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
         .eq("is_active", true)
         .order("name")
         .limit(200),
-      supabase
-        .from("products")
-        .select(
-          "id,name,name_ar,sku,barcode,unit_id,cost_price,sale_price,tax_rate,unit:units!products_unit_id_fkey(short_name,name,name_ar)",
-        )
-        .eq("is_active", true)
-        .order("name")
-        .limit(1000),
+      productQuery.order("name").limit(1000),
     ]).then(([partyRes, whRes, productRes]) => {
       if (!live) return;
       if (partyRes.error || whRes.error || productRes.error) {
@@ -242,6 +255,8 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
           quantity: 1,
           price: Number(sales ? product.sale_price : product.cost_price) || 0,
           tax_rate: Number(product.tax_rate) || 0,
+          batch_number: "",
+          expiry_date: "",
         },
       ];
     });
@@ -268,6 +283,16 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
       )
     ) {
       return toast.error(ar ? "راجع الكمية والسعر في الأصناف" : "Check item quantities and prices");
+    }
+    if (
+      !sales &&
+      cart.some((line) => line.product.tracking === "BATCH" && !line.batch_number.trim())
+    ) {
+      return toast.error(
+        ar
+          ? "أدخل رقم الدفعة لكل صنف متتبع بالدفعات"
+          : "Enter a batch number for each batch-tracked item",
+      );
     }
     if (discount && discount > subtotal + tax)
       return toast.error(
@@ -353,11 +378,13 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
           _paid: credit ? 0 : (paid ?? total),
           _discount: discount ?? 0,
           _note: note || null,
-          _items: cart.map(({ product, quantity, price }) => ({
+          _items: cart.map(({ product, quantity, price, batch_number, expiry_date }) => ({
             product_id: product.id,
             quantity,
             unit_cost: price,
             tax_rate: Number(product.tax_rate) || 0,
+            batch_number: batch_number.trim() || null,
+            expiry_date: expiry_date || null,
           })),
         };
         const { data, error } = await (supabase.rpc as any)("create_purchase", payload);
@@ -719,6 +746,39 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
                                 ? ` · ${ar ? "المتاح" : "Stock"}: ${toSystemDigits(String(stockMap[line.product.id] ?? 0))}`
                                 : ""}
                             </div>
+                            {!sales && line.product.tracking === "BATCH" && (
+                              <div className="mt-2 grid grid-cols-2 gap-2">
+                                <input
+                                  aria-label={ar ? "رقم الدفعة" : "Batch number"}
+                                  placeholder={ar ? "رقم الدفعة *" : "Batch number *"}
+                                  dir="ltr"
+                                  value={line.batch_number}
+                                  onChange={(event) =>
+                                    setCart((prev) =>
+                                      prev.map((row, j) =>
+                                        j === i
+                                          ? { ...row, batch_number: event.target.value }
+                                          : row,
+                                      ),
+                                    )
+                                  }
+                                  className="h-8 min-w-0 rounded-md border border-input bg-background px-2 text-xs"
+                                />
+                                <input
+                                  type="date"
+                                  aria-label={ar ? "تاريخ الانتهاء" : "Expiry date"}
+                                  value={line.expiry_date}
+                                  onChange={(event) =>
+                                    setCart((prev) =>
+                                      prev.map((row, j) =>
+                                        j === i ? { ...row, expiry_date: event.target.value } : row,
+                                      ),
+                                    )
+                                  }
+                                  className="h-8 min-w-0 rounded-md border border-input bg-background px-2 text-xs"
+                                />
+                              </div>
+                            )}
                           </td>
                           <td className="px-3 py-2">
                             <QuantityInput

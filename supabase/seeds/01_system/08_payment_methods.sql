@@ -3,9 +3,9 @@
 -- ============================================================================
 --
 -- ما هذا الملف؟
---   طرق الدفع التي يقبلها النظام، معناها المحاسبي، وأين تُسمح. 13 طريقة:
---   النقد والآجل، والتحويل البنكي، وبنكان يمنيان، وأربع محافظ إلكترونية،
---   والبطاقة، والشيك، وخط الدفع المجزأ.
+--   طرق الاختيار الجديدة أربع فقط: النقد والآجل والتحويل البنكي والمحفظة.
+--   على القواعد القائمة تبقى الصفوف التاريخية غير نشطة. إعادة البناء النظيفة
+--   لا تزرع هويات البنوك/المحافظ المسماة أو البطاقة والشيك ضمن الكتالوج.
 --
 -- لماذا هو ملف نظام (يُشغَّل تلقائيًا)؟
 --   لأن بلا هذه الصفوف لا يستطيع الكاشير تسجيل أي دفعة: كل الاستعلامات تقرأ
@@ -21,20 +21,18 @@
 --   أين يسجّل المبلغ:
 --
 --     CASH   → 1101 الصندوق
---     BANK   → 1111 البنك (أو 1121 لبنك اليمن الدولي)
---     WALLET → حساب خاص بكل محفظة (1131–1134)، والمحفظة العامة على 1139
---     CARD   → 1111 شبكة الدفع تُسوّى بنكيًا
+--     BANK   → 1111 البنك
+--     WALLET → 1131 المحفظة الإلكترونية
+--     CARD   → 1111 (سجلات تاريخية فقط؛ لا يُقبل في عمليات جديدة)
 --     CREDIT → 1211 ذمم العملاء
 --     OTHER  → بلا حساب (خط الدفع المجزأ ليس وسيلة)
 --
 -- ── `legacy_ids` ليست زخرفة ─────────────────────────────────────────────────
---   هي ما يسمح لـ cash · card · bank_transfer · credit · mobile_money بالاحتفاظ
---   بمعناها القديم حرفيًا في `payment_method` enum، بينما تصبح المؤسسات اليمنية
---   المسمّاة طرقًا من الدرجة الأولى تُختار بجانبها.
+--   تحتفظ أنواع قاعدة البيانات التاريخية بقيمها، لكن التثبيت الجديد لا يزرع
+--   هويات البنوك/المحافظ المسماة أو البطاقة/الشيك في كتالوج الخيارات.
 --
---   مثال: `jawali` تحمل `legacy_ids = ['mobile_money']`، فأي تقرير قديم يسأل
---   عن mobile_money يعُدّها. و`kuraimi_bank` بلا legacy_ids: هي بنك جديد حقًا،
---   ولا تدّعي أنها كانت التحويل البنكي العام.
+--   المستندات السابقة تحتفظ بقيمة الدفع المخزنة وبقيدها؛ أما الإعدادات والكتابة
+--   الجديدة فمقصورة على النقد والآجل والتحويل والمحفظة العامة.
 --
 -- ── ⚠️ الأسماء والحسابات مرتبطة ببعضها ──────────────────────────────────────
 --   `default_account_code` تشير إلى أكواد دليل الحسابات في
@@ -47,7 +45,7 @@
 --   `is_renamed` إلى `false` دائماً كما كان قبل إصلاح الترحيل 16.
 --
 -- ── إعداد المنشأة الافتراضي يُزرع هنا ────────────────────────────────────────
---   قسم 4.1 من الترحيل 16 كان يُدرج `payment_method_settings` للطرق الست
+--   قسم 4.1 من الترحيل 16 كان يُدرج `payment_method_settings` للطرق القديمة
 --   القديمة، لكنه يعمل **قبل** هذه البذرة، فيجد كتالوجاً فارغاً ويُدرج صفراً
 --   بصمت. نُقل الإدراج إلى هنا بعد الكتالوج، فهو بيانات لا بنية.
 --
@@ -83,68 +81,12 @@ INSERT INTO public.payment_methods (
    'حوالة مصرفية عامة. يتطلب رقم الحوالة.',
    'تحويل بنكي'),
 
-  -- ─── بنك الكريمي: أكبر شبكة تحويلات في اليمن ──────────────────────────────
-  ('kuraimi_bank', 'بنك الكريمي', 'Al-Kuraimi Bank', 'kuraimi', true, 40,
-   ARRAY['pos','sales','purchases','expenses','customer_collection'],
-   'BANK', '1111', false, true, ARRAY[]::text[], 'bank_transfer',
-   'أوسع شبكة حوالات في اليمن. يتطلب رقم الحوالة.',
-   'بنك الكريمي'),
-
-  -- ─── بنك اليمن الدولي ────────────────────────────────────────────────────
-  ('yemen_kuwait_bank', 'بنك اليمن الدولي', 'Yemen International Bank', 'bank', true, 50,
-   ARRAY['pos','sales','purchases','expenses','customer_collection'],
-   'BANK', '1121', false, true, ARRAY[]::text[], 'bank_transfer',
-   'حساب بنكي مستقل في دفتر الحسابات.',
-   'بنك اليمن الدولي'),
-
-  -- ─── جوالي (يمن موبايل) ──────────────────────────────────────────────────
-  ('jawali', 'جوالي', 'Jawali', 'mobile-money', true, 60,
-   ARRAY['pos','sales','purchases','expenses','customer_collection'],
-   'WALLET', '1131', false, true, ARRAY['mobile_money'], 'mobile_money',
-   'محفظة يمن موبايل. المحفظة الأولى في الكتالوج تحمل قيمة mobile_money التاريخية.',
-   'جوالي'),
-
-  -- ─── جيب (شركة الأهدل المالية — محفظة مستقلة، ليست تابعة لأي بنك) ────────
-  ('jaib', 'جيب', 'Jaib', 'jaib', true, 70,
-   ARRAY['pos','sales','purchases','expenses','customer_collection'],
-   'WALLET', '1132', false, true, ARRAY[]::text[], 'mobile_money',
-   'محفظة إلكترونية مستقلة (شركة الأهدل المالية). ليست تابعة لبنك الكريمي. تحمل شعارها الخاص.',
-   'جيب'),
-
-  -- ─── فلوسك ───────────────────────────────────────────────────────────────
-  ('floosak', 'فلوسك', 'Floosak', 'wallet', true, 80,
-   ARRAY['pos','sales','purchases','expenses','customer_collection'],
-   'WALLET', '1133', false, true, ARRAY[]::text[], 'mobile_money',
-   'محفظة إلكترونية.',
-   'فلوسك'),
-
-  -- ─── ون كاش ──────────────────────────────────────────────────────────────
-  ('one_cash', 'ون كاش', 'One Cash', 'wallet', true, 90,
-   ARRAY['pos','sales','purchases','expenses','customer_collection'],
-   'WALLET', '1134', false, true, ARRAY[]::text[], 'mobile_money',
-   'محفظة إلكترونية.',
-   'ون كاش'),
-
-  -- ─── البطاقة / الشبكة ────────────────────────────────────────────────────
-  ('card', 'بطاقة / شبكة', 'Card', 'card', true, 100,
-   ARRAY['pos','sales','purchases','expenses','customer_collection'],
-   'CARD', '1111', false, false, ARRAY['card'], 'card',
-   'شبكة مدى/الدفع الإلكتروني. تُسوّى عبر البنك.',
-   'بطاقة / شبكة'),
-
   -- ─── المحفظة الإلكترونية العامة: البديل التاريخي بلا مؤسسة محددة ─────────
   ('mobile_money', 'محفظة إلكترونية', 'Mobile money', 'mobile-money', true, 110,
    ARRAY['pos','sales','purchases','expenses','customer_collection'],
-   'WALLET', '1139', false, true, ARRAY['mobile_money'], 'mobile_money',
+   'WALLET', '1131', false, true, ARRAY['mobile_money'], 'mobile_money',
    'محفظة محلية غير محددة. تبقى للتوافق مع العمليات القديمة.',
    'محفظة إلكترونية'),
-
-  -- ─── شيك ─────────────────────────────────────────────────────────────────
-  ('cheque', 'شيك', 'Cheque', 'bank-transfer', true, 120,
-   ARRAY['pos','sales','purchases','expenses','customer_collection'],
-   'BANK', '1111', false, true, ARRAY['cheque'], 'cheque',
-   'شيك مصرفي. يتطلب رقم الشيك كمرجع.',
-   'شيك'),
 
   -- ─── خط الدفع المجزأ: اسم وأيقونة للفاتورة التي سُدّدت بأكثر من وسيلة ────
   ('split', 'دفع بأكثر من طريقة', 'Split payment', 'split', true, 900,
@@ -169,7 +111,7 @@ ON CONFLICT (id) DO UPDATE SET
   shipped_name_ar      = EXCLUDED.shipped_name_ar,   -- الاسم الأصلي يُحدَّث مع البذرة فقط
   updated_at           = now();
 
--- ── إعداد المنشأة الافتراضي للطرق الست القديمة ──────────────────────────────
+-- ── إعداد المنشأة الافتراضي للطرق الأربع المعتمدة ──────────────────────────
 -- نُقل من الترحيل 16 §4.1: كان يُدرج قبل هذه البذرة فيجد الكتالوج فارغًا ويُدرج
 -- صفرًا بصمت. هنا يجده مملوءًا، فإن غاب صف إعداد لطريقة قديمة، لا يُفقد خيار
 -- دفع من الصندوق عند الترقية.
@@ -182,7 +124,7 @@ INSERT INTO public.payment_method_settings (
 )
 SELECT m.id, true, m.sort_order, m.allowed_contexts
 FROM public.payment_methods m
-WHERE m.id IN ('cash','credit','bank_transfer','card','mobile_money','split')
+WHERE m.id IN ('cash','credit','bank_transfer','mobile_money')
 ON CONFLICT (payment_method_id) DO NOTHING;
 
 -- ── التحقق الذاتي ───────────────────────────────────────────────────────────
@@ -205,10 +147,10 @@ BEGIN
       array_to_string(v_missing, ', ');
   END IF;
 
-  -- ولا بد أن تحمل قيم payment_method التاريخية القيم الست جميعًا، وإلا صار
-  -- أي تقرير قديم يسأل عنها بلا جواب.
+  -- القيم الأساسية الأربع وحالة split لها تعريف؛ enum card/cheque تبقى للتوافق
+  -- مع قواعد البيانات القديمة، لكنها لا تُزرع كخيارات في قاعدة جديدة.
   IF EXISTS (
-    SELECT 1 FROM unnest(ARRAY['cash','credit','bank_transfer','card','mobile_money','split']) AS t
+    SELECT 1 FROM unnest(ARRAY['cash','credit','bank_transfer','mobile_money','split']) AS t
     WHERE NOT EXISTS (
       SELECT 1 FROM public.payment_methods m WHERE t = ANY(m.legacy_ids)
     )
@@ -225,15 +167,22 @@ BEGIN
       'طرق دفع نظامية بلا اسم أصلي مشحون (shipped_name_ar) — ميزة «معدّلة» لن تعمل';
   END IF;
 
-  -- والطرق الست التاريخية يجب أن يكون لها صف إعداد، وإلا فشل نقل §4.1 بصمت.
+  -- خيارات الدفع الجديدة الأربع فقط لها إعدادات قابلة للتعديل.
   IF EXISTS (
-    SELECT 1 FROM unnest(ARRAY['cash','credit','bank_transfer','card','mobile_money','split']) AS t
+    SELECT 1 FROM unnest(ARRAY['cash','credit','bank_transfer','mobile_money']) AS t
     WHERE NOT EXISTS (
       SELECT 1 FROM public.payment_method_settings s WHERE s.payment_method_id = t
     )
   ) THEN
     RAISE EXCEPTION
-      'طرق دفع تاريخية بلا صف إعداد للمنشأة — خيار دفع قد يختفي من الصندوق';
+      'طريقة دفع أساسية بلا صف إعداد للمنشأة';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.payment_methods m
+    WHERE m.is_active AND m.id NOT IN ('cash','credit','bank_transfer','mobile_money','split')
+  ) THEN
+    RAISE EXCEPTION 'يوجد خيار نشط خارج طرق الدفع الأربع المعتمدة';
   END IF;
 END $$;
 

@@ -22,9 +22,12 @@ function createSupabaseClient() {
 
   return createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
     auth: {
+      // حفظ الجلسة دائماً في localStorage — تبقى صالحة حتى بعد إغلاق المتصفح
+      // وإعادة فتحه، وتُجَدَّد التوكنات تلقائياً في الخلفية دون انقطاع.
       storage: typeof window !== "undefined" ? localStorage : undefined,
       persistSession: true,
       autoRefreshToken: true,
+      detectSessionInUrl: false,
     },
   });
 }

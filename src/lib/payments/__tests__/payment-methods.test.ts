@@ -3,6 +3,7 @@ import type { BankAccountKind, ChequeStatus, PaymentSettlementSelection } from "
 import {
   LEGACY_PAYMENT_VALUES,
   PAYMENT_METHOD_CATALOG,
+  CORE_PAYMENT_METHOD_IDS,
   PAYMENT_METHOD_ICON_ASSETS,
   SHIPPED_PAYMENT_METHOD_ORDER,
   TENANT_SELECTABLE_LEGACY_VALUES,
@@ -19,6 +20,7 @@ import {
   toLegacyPaymentValue,
   toStorablePaymentValue,
 } from "../payment-methods";
+import { isSplitTender } from "../split-tenders";
 
 const methodIds = PAYMENT_METHOD_CATALOG.map((method) => method.id);
 assert.equal(new Set(methodIds).size, methodIds.length, "catalogue method ids must be unique");
@@ -57,6 +59,11 @@ assert.ok(paymentMethodIcon("unknown", "WALLET"));
 assert.equal(paymentMethodLabel("bank_transfer", "ar"), "تحويل بنكي");
 assert.equal(paymentMethodLabel("split", "en"), "Split payment");
 assert.ok(!TENANT_SELECTABLE_LEGACY_VALUES.includes("split"));
+assert.equal(isSplitTender("cash"), true);
+assert.equal(isSplitTender("bank_transfer"), true);
+assert.equal(isSplitTender("mobile_money"), true);
+assert.equal(isSplitTender("card"), false);
+assert.equal(isSplitTender("cheque"), false);
 assert.ok(!TENANT_SELECTABLE_LEGACY_VALUES.includes("credit"));
 
 assert.deepEqual(Object.keys(PAYMENT_METHOD_ICON_ASSETS).sort(), ["floosak", "jaib", "one_cash"]);
@@ -85,9 +92,10 @@ assert.notEqual(toLegacyPaymentValue("not_a_real_method"), "cash");
 assert.equal(toLegacyPaymentValue(""), "");
 
 // The honest converter returns null instead of guessing.
-assert.equal(toStorablePaymentValue("kuraimi_bank"), "bank_transfer");
-assert.equal(toStorablePaymentValue("jawali"), "mobile_money");
-assert.equal(toStorablePaymentValue("cheque"), "cheque");
+assert.equal(toStorablePaymentValue("kuraimi_bank"), null);
+assert.equal(toStorablePaymentValue("jawali"), null);
+assert.equal(toStorablePaymentValue("cheque"), null);
+assert.equal(toStorablePaymentValue("card"), null);
 assert.equal(toStorablePaymentValue("cash"), "cash");
 assert.equal(toStorablePaymentValue("not_a_real_method"), null);
 assert.equal(toStorablePaymentValue(null), null);
@@ -151,9 +159,17 @@ assert.equal(getPaymentMethodDefinition("jawali")?.legacyIds?.[0], "mobile_money
 const splitDef = getPaymentMethodDefinition("split");
 assert.ok(splitDef, "split must stay in the catalogue so historic invoices render");
 assert.equal(isSelectableTender(splitDef), false);
+assert.deepEqual(
+  PAYMENT_METHOD_CATALOG.filter((method) => method.isActive && isSelectableTender(method)).map((method) => method.id).sort(),
+  [...CORE_PAYMENT_METHOD_IDS].sort(),
+  "only cash, credit, bank transfer and mobile wallet may be selected for new transactions",
+);
 for (const method of PAYMENT_METHOD_CATALOG) {
-  if (method.id === "split") continue;
-  assert.equal(isSelectableTender(method), true, `${method.id} must be selectable`);
+  assert.equal(
+    isSelectableTender(method),
+    CORE_PAYMENT_METHOD_IDS.includes(method.id as (typeof CORE_PAYMENT_METHOD_IDS)[number]),
+    `${method.id} must match the four-method policy`,
+  );
 }
 assert.ok(!TENANT_SELECTABLE_LEGACY_VALUES.includes("split"));
 
@@ -223,19 +239,11 @@ const shippedIds = new Set(PAYMENT_METHOD_CATALOG.map((m) => m.id));
 for (const id of SHIPPED_PAYMENT_METHOD_ORDER) {
   assert.ok(shippedIds.has(id), `order list names '${id}', which is not in the catalogue`);
 }
-for (const id of shippedIds) {
-  assert.ok(
-    (SHIPPED_PAYMENT_METHOD_ORDER as readonly string[]).includes(id),
-    `catalogue method '${id}' is missing from the shipped order list`,
-  );
-}
 assert.equal(new Set(SHIPPED_PAYMENT_METHOD_ORDER).size, SHIPPED_PAYMENT_METHOD_ORDER.length);
 
-// `card` and the generic `mobile_money` were in the catalogue but absent from the
-// picker whitelist that used to gate them — the reason they never appeared.
-assert.ok(SHIPPED_PAYMENT_METHOD_ORDER.includes("card"));
-assert.ok(SHIPPED_PAYMENT_METHOD_ORDER.includes("mobile_money"));
-assert.ok(SHIPPED_PAYMENT_METHOD_ORDER.includes("cheque"));
+// Only the approved operator choices and the non-selectable split state are
+// in the order list. Other catalogue identities remain for historical labels.
+assert.deepEqual(SHIPPED_PAYMENT_METHOD_ORDER, ["cash", "credit", "bank_transfer", "mobile_money", "split"]);
 
 // ── 9. Named institutions keep their own identity for display ────────────
 //

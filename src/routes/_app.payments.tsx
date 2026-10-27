@@ -1,6 +1,6 @@
 import { ModuleGuard } from "@/lib/modules";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowUpRight,
   CalendarDays,
@@ -14,6 +14,7 @@ import {
   User,
   Users,
   Wallet,
+  Layers,
 } from "lucide-react";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,6 +24,10 @@ import { money } from "@/lib/format";
 import { paymentMethodLabel, requiresPaymentReference } from "@/lib/payments/payment-methods";
 import { PaymentMethodPicker, DynamicPaymentSelector } from "@/components/ui/payment-method";
 import { AmountInput } from "@/components/ui/amount-input";
+import {
+  SplitPaymentDialog,
+  type SplitPaymentValues,
+} from "@/components/ui/payment-method/split-payment-dialog";
 import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
 import { usePaymentMethodsForContext } from "@/hooks/use-payment-methods";
 import { useCashboxes } from "@/hooks/use-cashboxes";
@@ -56,6 +61,7 @@ interface Customer {
   name: string;
   phone: string | null;
   balance: number;
+  is_system?: boolean | null;
 }
 interface Invoice {
   id: string;
@@ -112,7 +118,16 @@ function PaymentsPage() {
   const [note, setNote] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const [paymentFormOpen, setPaymentFormOpen] = useState(false);
+  const [splitCollectionOpen, setSplitCollectionOpen] = useState(false);
+  const [splitCollectionValues, setSplitCollectionValues] = useState<SplitPaymentValues>({
+    cash: 0,
+    credit: 0,
+    bank_transfer: 0,
+    mobile_money: 0,
+  });
+  const [isSplitCollection, setIsSplitCollection] = useState(false);
   const [selectedTx, setSelectedTx] = useState<any>(null);
   const { methods: collectionMethods } = usePaymentMethodsForContext("customer_collection", {
     includeCredit: false,
@@ -146,21 +161,21 @@ function PaymentsPage() {
     (async () => {
       const { data } = await supabase
         .from("customers")
-        .select("id,name,phone,balance")
+        .select("id,name,phone,balance,is_system")
         .eq("is_active", true)
         .order("name")
         .limit(200);
-      const list = (data ?? []) as Customer[];
+      const list = ((data ?? []) as Customer[]).filter((customer) => !customer.is_system);
       setCustomers(list);
       if (customerId) {
         let target = list.find((c) => c.id === customerId);
         if (!target) {
           const { data: c } = await supabase
             .from("customers")
-            .select("id,name,phone,balance")
+            .select("id,name,phone,balance,is_system")
             .eq("id", customerId)
             .maybeSingle();
-          if (c) target = c as Customer;
+          if (c && !(c as Customer).is_system) target = c as Customer;
         }
         if (target) {
           void loadCustomer(target);
@@ -182,6 +197,8 @@ function PaymentsPage() {
     setPaymentFormOpen(false);
     setInvoiceId("");
     setAmount("");
+    setIsSplitCollection(false);
+    setSplitCollectionValues({ cash: 0, credit: 0, bank_transfer: 0, mobile_money: 0 });
     setReference("");
     setNote("");
 
@@ -228,18 +245,20 @@ function PaymentsPage() {
     setPayments(payData as Payment[]);
   }
 
-  async function refresh() {
-    if (!selected) return;
+  async function refresh(customerId: string = selected?.id ?? ""): Promise<Customer | null> {
+    if (!customerId) return null;
     const { data: c } = await supabase
       .from("customers")
       .select("id,name,phone,balance")
-      .eq("id", selected.id)
+      .eq("id", customerId)
       .maybeSingle();
-    if (c) {
-      setSelected(c as Customer);
-      setCustomers((prev) => prev.map((x) => (x.id === c.id ? (c as Customer) : x)));
+    const customer = c ? (c as Customer) : null;
+    if (customer) {
+      setSelected(customer);
+      setCustomers((prev) => prev.map((x) => (x.id === customer.id ? customer : x)));
+      await loadCustomer(customer);
     }
-    await loadCustomer(selected);
+    return customer;
   }
 
   const outstanding = invoices.filter((i) => Number(i.total) - Number(i.paid) > 0.001);
@@ -249,24 +268,33 @@ function PaymentsPage() {
     : 0;
 
   async function submit() {
-    if (saving || !selected) return;
+    if (savingRef.current || !selected) return;
+    savingRef.current = true;
+    setSaving(true);
     const amt = Number(amount);
-    if (!amt || amt <= 0)
+    if (!amt || amt <= 0) {
+      savingRef.current = false;
+      setSaving(false);
       return toast.error(
         t("payments.invalid_amount") || (lang === "ar" ? "أدخل مبلغ صحيح" : "Enter a valid amount"),
       );
+    }
     const payableAmount = selectedInvoice ? remaining : Math.max(Number(selected.balance), 0);
-    if (amt > payableAmount + 0.01)
+    if (amt > payableAmount + 0.001) {
+      savingRef.current = false;
+      setSaving(false);
       return toast.error(
         t("payments.exceeds_remaining") ||
           (lang === "ar" ? "المبلغ يتجاوز المتبقي" : "Amount exceeds remaining"),
       );
-    if (needsReference && !reference.trim()) {
+    }
+    if (!isSplitCollection && needsReference && !reference.trim()) {
+      savingRef.current = false;
+      setSaving(false);
       return toast.error(
         lang === "ar" ? "أدخل رقم الحوالة أو المرجع" : "Enter the payment reference",
       );
     }
-    setSaving(true);
     try {
       const paymentNote = [
         reference.trim() ? `مرجع: ${reference.trim()}` : null,
@@ -276,7 +304,43 @@ function PaymentsPage() {
         .join(" | ");
 
       let error: any = null;
-      try {
+      let resultPaymentId: string | null = null;
+      if (isSplitCollection) {
+        const splitRows = [
+          { method: "cash", methodId: "cash", amount: splitCollectionValues.cash },
+          {
+            method: "bank_transfer",
+            methodId: "bank_transfer",
+            amount: splitCollectionValues.bank_transfer,
+            reference: splitCollectionValues.bankReference,
+          },
+          {
+            method: "mobile_money",
+            methodId: "mobile_money",
+            amount: splitCollectionValues.mobile_money,
+            reference: splitCollectionValues.walletReference,
+          },
+        ].filter((line) => line.amount > 0);
+        if (splitRows.length < 2) {
+          savingRef.current = false;
+          setSaving(false);
+          return toast.error(
+            lang === "ar"
+              ? "أدخل مبلغًا في طريقتين على الأقل، واستخدم طريقة واحدة للدفع المفرد"
+              : "Enter amounts for at least two tenders; use single payment for one tender",
+          );
+        }
+        const res = await (supabase.rpc as any)("record_customer_payment_splits", {
+          _customer_id: selected.id,
+          _invoice_id: invoiceId || null,
+          _amount: amt,
+          _payment_date: date,
+          _note: paymentNote || null,
+          _splits: splitRows,
+        });
+        error = res.error;
+        resultPaymentId = typeof res.data === "string" ? res.data : null;
+      } else {
         const res = await supabase.rpc("record_customer_payment" as any, {
           _customer_id: selected.id,
           _invoice_id: invoiceId || null,
@@ -295,22 +359,20 @@ function PaymentsPage() {
           _cheque_drawer: settlement.chequeDrawer || settlement.cheque?.drawerName || null,
         });
         error = res.error;
-      } catch {
-        const res = await supabase.rpc("record_customer_payment" as any, {
-          _customer_id: selected.id,
-          _invoice_id: invoiceId || null,
-          _amount: amt,
-          _method: settlement.paymentMethodId || method,
-          _payment_date: date,
-          _note: paymentNote || null,
-        });
-        error = res.error;
+        resultPaymentId = typeof res.data === "string" ? res.data : null;
       }
 
       if (error) throw error;
-      const receiptNumber = selectedInvoice
-        ? `REC-${selectedInvoice.invoice_number}`
-        : `REC-${String(Date.now()).slice(-6)}`;
+      if (!resultPaymentId) {
+        throw new Error(
+          lang === "ar"
+            ? "لم يتم إرجاع رقم سند القبض؛ لم يتم تأكيد التحصيل. حدّث الصفحة وتحقق من سجل العميل قبل إعادة المحاولة."
+            : "No receipt ID was returned. Verify the customer ledger before retrying.",
+        );
+      }
+      const updatedCustomer = await refresh(selected.id);
+      const updatedBalance = Math.max(Number(updatedCustomer?.balance ?? selected.balance), 0);
+      const receiptNumber = resultPaymentId;
       const resolvedMethodLabel = settlement.bankAccountName
         ? `${pmLabel(method)} (${settlement.bankAccountName})`
         : settlement.cashboxName
@@ -325,20 +387,26 @@ function PaymentsPage() {
         customerName: selected.name,
         customerPhone: selected.phone,
         referenceNumber: settlement.reference || receiptNumber,
-        method: resolvedMethodLabel,
+        method: isSplitCollection
+          ? lang === "ar"
+            ? "دفع بأكثر من طريقة"
+            : "Split payment"
+          : resolvedMethodLabel,
         cashboxName: settlement.cashboxName,
         bankAccountName: settlement.bankAccountName,
         notes: paymentNote || undefined,
-        remainingBalance: Math.max(Number(selected.balance) - amt, 0),
+        remainingBalance: updatedBalance,
       });
       setPaymentFormOpen(false);
       setAmount("");
       setReference("");
       setNote("");
-      await refresh();
+      setIsSplitCollection(false);
+      setSplitCollectionValues({ cash: 0, credit: 0, bank_transfer: 0, mobile_money: 0 });
     } catch (e: any) {
       toast.error(e.message ?? t("common.failed"));
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }
@@ -355,6 +423,8 @@ function PaymentsPage() {
   function beginPayment(invoice?: Invoice) {
     setInvoiceId(invoice?.id ?? "");
     setAmount(invoice ? String(Number(invoice.total) - Number(invoice.paid)) : "");
+    setIsSplitCollection(false);
+    setSplitCollectionValues({ cash: 0, credit: 0, bank_transfer: 0, mobile_money: 0 });
     setPaymentFormOpen(true);
   }
 
@@ -630,7 +700,10 @@ function PaymentsPage() {
                         {selectedInvoice && (
                           <button
                             type="button"
-                            onClick={() => setAmount(String(remaining))}
+                            onClick={() => {
+                              setAmount(String(remaining));
+                              setIsSplitCollection(false);
+                            }}
                             className="text-[11px] font-bold text-primary hover:underline"
                           >
                             {lang === "ar" ? "سداد كامل" : "Full payment"}
@@ -641,7 +714,10 @@ function PaymentsPage() {
                       <AmountInput
                         min={0}
                         value={toNumberOrNull(amount)}
-                        onValueChange={(v) => setAmount(v == null ? "" : String(v))}
+                        onValueChange={(v) => {
+                          setAmount(v == null ? "" : String(v));
+                          setIsSplitCollection(false);
+                        }}
                         placeholder="0.00"
                         aria-label={lang === "ar" ? "المبلغ المحصل" : "Collected amount"}
                         wordsClassName="text-xs"
@@ -676,6 +752,7 @@ function PaymentsPage() {
                         onChange={(methodId) => {
                           setMethod(methodId);
                           setReference("");
+                          setIsSplitCollection(false);
                         }}
                         settlement={settlement}
                         onSettlementChange={(next) => {
@@ -684,6 +761,22 @@ function PaymentsPage() {
                         }}
                         includeCredit={false}
                       />
+                      <button
+                        type="button"
+                        onClick={() => setSplitCollectionOpen(true)}
+                        disabled={!Number(amount) || saving}
+                        className="mt-2 inline-flex min-h-9 items-center gap-2 rounded-xl border border-primary/25 bg-primary/[0.04] px-3 text-xs font-semibold text-primary hover:bg-primary/10 disabled:opacity-40"
+                      >
+                        <Layers className="size-4" />
+                        {lang === "ar" ? "تجزئة التحصيل" : "Split collection"}
+                      </button>
+                      {isSplitCollection && (
+                        <p className="mt-1 text-[11px] font-medium text-primary">
+                          {lang === "ar"
+                            ? "تم اختيار توزيع التحصيل على عدة طرق"
+                            : "Multiple collection tenders selected"}
+                        </p>
+                      )}
                     </div>
                     <Field label={lang === "ar" ? "تاريخ السند" : "Receipt date"}>
                       <div className="relative">
@@ -945,6 +1038,23 @@ function PaymentsPage() {
         open={!!selectedTx}
         onOpenChange={(op) => !op && setSelectedTx(null)}
         transaction={selectedTx}
+      />
+      <SplitPaymentDialog
+        open={splitCollectionOpen}
+        onOpenChange={setSplitCollectionOpen}
+        total={Number(amount) || 0}
+        initialValues={splitCollectionValues}
+        methods={["cash", "bank_transfer", "mobile_money"]}
+        isCreditAllowed={false}
+        onConfirm={(values) => {
+          setSplitCollectionValues(values);
+          setAmount(
+            String(
+              Math.round((values.cash + values.bank_transfer + values.mobile_money) * 100) / 100,
+            ),
+          );
+          setIsSplitCollection(true);
+        }}
       />
     </>
   );

@@ -409,7 +409,7 @@ function SuppliersPage() {
             .eq("supplier_id", supplier.id)
             .order("created_at", { ascending: false })
             .limit(30),
-          supabase
+          (supabase as any)
             .from("supplier_payments")
             .select("payment_date,amount,payment_method")
             .eq("supplier_id", supplier.id)
@@ -427,7 +427,7 @@ function SuppliersPage() {
               amount: Number(purchase.total ?? 0),
               kind: "purchase" as const,
             })),
-            ...(paymentResult.data ?? []).map((payment) => ({
+            ...((paymentResult.data as any[]) ?? []).map((payment: any) => ({
               label: `${isRtl ? "سند صرف" : "Payment voucher"}${payment.payment_method ? ` · ${payment.payment_method}` : ""}`,
               date: payment.payment_date,
               amount: Number(payment.amount ?? 0),
@@ -770,7 +770,6 @@ function SuppliersPage() {
         onRowClick={(supplier) => void openSupplier(supplier)}
         minWidth={1260}
         horizontalScroll={tableUsesHorizontalScroll}
-        onRowClick={openEdit}
         renderCard={(r) => (
           <SupplierCard
             supplier={r}

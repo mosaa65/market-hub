@@ -22,6 +22,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useI18n } from "@/lib/i18n";
 import { useTheme } from "@/lib/theme";
+import { MODE_VARIANTS, type ModeVariantId } from "@/lib/color-theme";
 import { AutoSaveBadge } from "@/components/settings/auto-save-badge";
 import { ThemeVisualTestSuite } from "@/components/theme/theme-visual-test-suite";
 import { CURATED_THEMES, type AccentThemeId, type ArchivedColor } from "@/lib/color-theme";
@@ -36,6 +37,8 @@ export function AppearanceSection({ canEdit = true }: AppearanceSectionProps) {
   const {
     theme,
     setTheme,
+    modeVariant,
+    setModeVariant,
     accentTheme,
     setAccentTheme,
     customColor,
@@ -104,52 +107,129 @@ export function AppearanceSection({ canEdit = true }: AppearanceSectionProps) {
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-5 space-y-4">
-          {/* تبديل الوضع الليلي / النهاري */}
+          {/* اختيار درجة الوضع النهاري / الليلي */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-border/80 bg-surface/70 p-4">
             <div>
               <div className="text-sm font-semibold flex items-center gap-2">
-                <span>{isAr ? "نمط السمة الضوئية" : "Theme Brightness"}</span>
+                <span>{isAr ? "وضع العرض ودرجاته" : "Display Mode & Variants"}</span>
                 <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
                   {theme === "dark"
-                    ? isAr
-                      ? "ليلي فاخر"
-                      : "Dark Obsidian"
-                    : isAr
-                      ? "نهاري رخامي"
-                      : "Light Alabaster"}
+                    ? MODE_VARIANTS[modeVariant].base === "dark"
+                      ? isAr
+                        ? MODE_VARIANTS[modeVariant].name_ar
+                        : MODE_VARIANTS[modeVariant].name_en
+                      : isAr
+                        ? "ليلي فاخر"
+                        : "Dark Obsidian"
+                    : MODE_VARIANTS[modeVariant].base === "light"
+                      ? isAr
+                        ? MODE_VARIANTS[modeVariant].name_ar
+                        : MODE_VARIANTS[modeVariant].name_en
+                      : isAr
+                        ? "نهاري رخامي"
+                        : "Light Alabaster"}
                 </span>
               </div>
               <div className="text-xs text-muted-foreground mt-0.5">
                 {isAr
-                  ? "الوضع الليلي مريح للعين أثناء العمل الطويل، والوضع النهاري ساطع وعالي الوضوح."
-                  : "Dark mode enhances focus in low light; light mode is crisp and pristine."}
+                  ? "اختر الدرجة المناسبة: نهاري رخامي، فخم عاجي، أبيض نقي، ليلي أصلي، رمادي فحمي، أو معتم عميق."
+                  : "Pick a variant: alabaster, ivory, pure white, classic dark, charcoal, or deep midnight."}
               </div>
             </div>
-            <div className="inline-flex rounded-full border border-border bg-surface p-1 shadow-xs shrink-0">
-              <button
-                type="button"
-                onClick={() => setTheme("light")}
-                className={`flex items-center gap-2 h-9 rounded-full px-4 text-xs font-bold transition-all ${
-                  theme === "light"
-                    ? "bg-primary text-primary-foreground shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <Sun className="h-3.5 w-3.5" />
-                <span>{isAr ? "نهاري" : "Light"}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setTheme("dark")}
-                className={`flex items-center gap-2 h-9 rounded-full px-4 text-xs font-bold transition-all ${
-                  theme === "dark"
-                    ? "bg-primary text-primary-foreground shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <Moon className="h-3.5 w-3.5" />
-                <span>{isAr ? "ليلي" : "Dark"}</span>
-              </button>
+            <div className="grid grid-cols-3 gap-2 shrink-0">
+              {[
+                {
+                  variant: "default" as ModeVariantId,
+                  base: "light" as const,
+                  label_ar: "رخامي",
+                  label_en: "Alabaster",
+                  icon: Sun,
+                },
+                {
+                  variant: "luxe" as ModeVariantId,
+                  base: "light" as const,
+                  label_ar: "فخم عاجي",
+                  label_en: "Ivory Luxe",
+                  icon: Sparkles,
+                },
+                {
+                  variant: "pure" as ModeVariantId,
+                  base: "light" as const,
+                  label_ar: "أبيض نقي",
+                  label_en: "Pure White",
+                  icon: Sun,
+                },
+                {
+                  variant: "sand" as ModeVariantId,
+                  base: "light" as const,
+                  label_ar: "رملي دافئ",
+                  label_en: "Warm Sand",
+                  icon: Sparkles,
+                },
+                {
+                  variant: "mist" as ModeVariantId,
+                  base: "light" as const,
+                  label_ar: "رمادي ناعم",
+                  label_en: "Soft Mist",
+                  icon: Sun,
+                },
+                {
+                  variant: "default" as ModeVariantId,
+                  base: "dark" as const,
+                  label_ar: "ليلي أصلي",
+                  label_en: "Classic Dark",
+                  icon: Moon,
+                },
+                {
+                  variant: "slate" as ModeVariantId,
+                  base: "dark" as const,
+                  label_ar: "رمادي فحمي",
+                  label_en: "Charcoal",
+                  icon: Moon,
+                },
+                {
+                  variant: "deep" as ModeVariantId,
+                  base: "dark" as const,
+                  label_ar: "معتم عميق",
+                  label_en: "Deep Midnight",
+                  icon: Moon,
+                },
+                {
+                  variant: "navy" as ModeVariantId,
+                  base: "dark" as const,
+                  label_ar: "أزرق نيلي",
+                  label_en: "Midnight Navy",
+                  icon: Moon,
+                },
+                {
+                  variant: "cocoa" as ModeVariantId,
+                  base: "dark" as const,
+                  label_ar: "قهوة دافئة",
+                  label_en: "Warm Cocoa",
+                  icon: Moon,
+                },
+              ].map((opt) => {
+                const isActive = theme === opt.base && modeVariant === opt.variant;
+                const Icon = opt.icon;
+                return (
+                  <button
+                    key={`${opt.base}-${opt.variant}`}
+                    type="button"
+                    onClick={() => {
+                      setTheme(opt.base);
+                      setModeVariant(opt.variant);
+                    }}
+                    className={`flex flex-col items-center gap-1 rounded-xl border px-3 py-2 text-[11px] font-bold transition-all ${
+                      isActive
+                        ? "bg-primary text-primary-foreground border-primary shadow-xs"
+                        : "border-border bg-surface text-muted-foreground hover:text-foreground hover:border-primary/40"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    <span>{isAr ? opt.label_ar : opt.label_en}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 

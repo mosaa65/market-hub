@@ -66,10 +66,14 @@ import {
   custodyDelivery,
   buildMillingDocumentUnifiedDoc,
   buildCustodyDeliveryDoc,
+  buildCustodyVoucher,
+  custodyVoucherToDoc,
+  capacityKgOf,
   type CustodyStatementRow,
   type CustodyMoneyRow,
   type CustodyLine,
   type ProductOption,
+  type CustodyVoucherData,
 } from "@/lib/milling";
 import {
   MillingPanel,
@@ -987,9 +991,13 @@ export function CustomerCustodyPageBase({ mode }: { mode: CustodyMode }) {
             grainItems={grainItemsQuery.data ?? []}
             customers={customersQuery.data ?? []}
             warehouses={warehousesQuery.data ?? []}
-            onSuccess={() => {
+            onSuccess={(voucherDoc) => {
               void qc.invalidateQueries({ queryKey: ["milling"] });
               setMillingModalOpen(false);
+              if (voucherDoc) {
+                setPrintDoc(voucherDoc);
+                setPrintModalOpen(true);
+              }
             }}
           />
         )}
@@ -1086,17 +1094,17 @@ function QuickMillingModal({
   grainItems: ProductOption[];
   customers: { id: string; name: string; phone?: string | null }[];
   warehouses: { id: string; name: string; name_ar: string | null }[];
-  onSuccess: () => void;
+  onSuccess: (doc?: UnifiedDocumentData) => void;
 }) {
   const [customerId, setCustomerId] = useState(initialRow?.customer_id || "");
   const [warehouseId, setWarehouseId] = useState(initialRow?.warehouse_id || "");
   const [grainItemId, setGrainItemId] = useState(initialRow?.item_id || "");
 
-  // الحبوب المطحونة — أكياس ووزن مستقلان (V2: بلا اشتقاق من أي سعة)
+  // الحبوب المطحونة — مع احتساب تلقائي ذكي للوزن
   const [bagsOut, setBagsOut] = useState("");
   const [kgOut, setKgOut] = useState("");
 
-  // نواتج الطحن (الدقيق والنخالة) — أكياس ووزن مستقلان لكل سطر
+  // نواتج الطحن (الدقيق والنخالة)
   const [outputs, setOutputs] = useState<{ itemId: string; bags: string; kg: string }[]>([
     { itemId: "", bags: "", kg: "" },
   ]);
@@ -1128,7 +1136,6 @@ function QuickMillingModal({
     const milledKg = Number(kgOut) || 0;
 
     // سطور النواتج الافتراضية: مطابقة نسب النوع مع كتالوج النواتج
-    // (الفاقد الافتراضي يظهر كتلميح — هذا المودال بلا حقل فاقد مستقل)
     const map = type.default_output_map ?? [];
     if (map.length > 0) {
       const prefilled = map
@@ -1140,7 +1147,9 @@ function QuickMillingModal({
           );
           if (!match) return null;
           const kg = milledKg > 0 ? Math.round(((milledKg * g.ratio) / 100) * 100) / 100 : 0;
-          return { itemId: match.id, bags: "", kg: kg ? String(kg) : "" };
+          const cap = capacityKgOf(match) || 0;
+          const bags = cap > 0 && kg > 0 ? Math.round(kg / cap) : 0;
+          return { itemId: match.id, bags: bags ? String(bags) : "", kg: kg ? String(kg) : "" };
         })
         .filter((l): l is { itemId: string; bags: string; kg: string } => l !== null);
       if (prefilled.length > 0) setOutputs(prefilled);
@@ -1149,9 +1158,24 @@ function QuickMillingModal({
   const maxAvailableBags = initialRow ? Number(initialRow.remaining_bags ?? 0) : 9999;
   const maxAvailableKg = initialRow ? Number(initialRow.remaining_kg ?? 0) : 999999;
 
-  // عند تغيير عدد الأكياس المطحونة — بلا احتساب تلقائي
+  // عند تغيير عدد الأكياس المطحونة — مع احتساب تلقائي للوزن
   function handleBagsOutChange(v: string) {
     setBagsOut(v);
+    const b = Number(v) || 0;
+    if (b > 0) {
+      let unitWeight = 0;
+      if (initialRow && Number(initialRow.remaining_bags) > 0) {
+        unitWeight = Number(initialRow.remaining_kg) / Number(initialRow.remaining_bags);
+      } else {
+        const grain = grainItems.find((g) => g.id === grainItemId);
+        unitWeight = capacityKgOf(grain) || 0;
+      }
+      if (unitWeight > 0) {
+        setKgOut(String(Math.round(b * unitWeight * 100) / 100));
+      }
+    } else if (b === 0) {
+      setKgOut("");
+    }
   }
 
   // إضافة ناتج جديد
@@ -1164,9 +1188,31 @@ function QuickMillingModal({
     setOutputs((prev) => prev.filter((_, i) => i !== index));
   }
 
-  // تعديل سطر ناتج — بلا أي اشتقاق من السعة
+  // تعديل سطر ناتج — مع حساب تلقائي للوزن من سعة الصنف (أكياس × سعة)
   function updateOutputLine(index: number, field: "itemId" | "bags" | "kg", val: any) {
-    setOutputs((prev) => prev.map((line, i) => (i !== index ? line : { ...line, [field]: val })));
+    setOutputs((prev) =>
+      prev.map((line, i) => {
+        if (i !== index) return line;
+        const updated = { ...line, [field]: val };
+        if (field === "itemId") {
+          const item = outputItems.find((p) => p.id === val);
+          const cap = capacityKgOf(item) || 0;
+          if (cap > 0 && Number(line.bags) > 0) {
+            updated.kg = String(Math.round(Number(line.bags) * cap * 100) / 100);
+          }
+        } else if (field === "bags") {
+          const item = outputItems.find((p) => p.id === line.itemId);
+          const cap = capacityKgOf(item) || 0;
+          const bagsNum = Number(val) || 0;
+          if (cap > 0 && bagsNum > 0) {
+            updated.kg = String(Math.round(bagsNum * cap * 100) / 100);
+          } else if (bagsNum === 0) {
+            updated.kg = "";
+          }
+        }
+        return updated;
+      }),
+    );
   }
 
   // حساب إجمالي النواتج لمقارنتها بوزن الحبوب المطحونة
@@ -1198,13 +1244,67 @@ function QuickMillingModal({
         grainTypeId: grainTypeId || null,
       });
     },
-    onSuccess: (res) => {
+    onSuccess: async (res) => {
       if (!res.ok) {
         toast.error(res.message || "تعذر تسجيل عملية الطحن.");
         return;
       }
       toast.success("تم تسجيل عملية الطحن وإيداع النواتج في أمانات العميل بنجاح.");
-      onSuccess();
+      const docNumber = (res.data as string) || `CM-${Date.now().toString().slice(-6)}`;
+      let voucher: CustodyVoucherData | null = null;
+      try {
+        voucher = await buildCustodyVoucher(docNumber);
+      } catch (e) {
+        console.error("Failed to build voucher from DB:", e);
+      }
+
+      if (!voucher) {
+        const selectedCust = customers.find((c) => c.id === customerId);
+        const selectedWh = warehouses.find((w) => w.id === warehouseId);
+        const grainObj = grainItems.find((g) => g.id === grainItemId);
+        const grainName =
+          initialRow?.item_name_ar || grainObj?.name_ar || grainObj?.name || "حبوب خام";
+
+        const validOutputs: CustodyLine[] = outputs
+          .filter((o) => o.itemId && (Number(o.bags) > 0 || Number(o.kg) > 0))
+          .map((o) => ({
+            itemId: o.itemId,
+            bags: Number(o.bags) || 0,
+            kg: Number(o.kg) || 0,
+          }));
+
+        voucher = {
+          entryType: "MILLING",
+          docNumber,
+          createdAt: new Date().toISOString(),
+          customerName: selectedCust?.name || initialRow?.customer_name_ar || "عميل أمانة",
+          customerPhone: selectedCust?.phone || null,
+          warehouseName:
+            selectedWh?.name_ar ||
+            selectedWh?.name ||
+            initialRow?.warehouse_name_ar ||
+            "المستودع الرئيسي",
+          lines: [
+            {
+              item: grainName,
+              bags: Number(bagsOut) || 0,
+              kg: Number(kgOut) || 0,
+            },
+            ...validOutputs.map((o) => {
+              const outItem = outputItems.find((p) => p.id === o.itemId);
+              return {
+                item: outItem?.name_ar || outItem?.name || "ناتج طحن",
+                bags: o.bags,
+                kg: o.kg,
+              };
+            }),
+          ],
+          notes: notes.trim() || undefined,
+        };
+      }
+
+      const uDoc = custodyVoucherToDoc(voucher);
+      onSuccess(uDoc);
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "خطأ غير متوقع"),
   });
@@ -1723,7 +1823,20 @@ function QuickDeliveryModal({
                   placeholder="0"
                   aria-label="عدد الأكياس المسلمة"
                   value={bags === "" ? null : Number(bags)}
-                  onValueChange={(v) => setBags(v == null ? "" : String(v))}
+                  onValueChange={(v) => {
+                    const strVal = v == null ? "" : String(v);
+                    setBags(strVal);
+                    const b = Number(v) || 0;
+                    if (b > 0 && initialRow && Number(initialRow.remaining_bags) > 0) {
+                      const unitWeight =
+                        Number(initialRow.remaining_kg) / Number(initialRow.remaining_bags);
+                      if (unitWeight > 0) {
+                        setKg(String(Math.round(b * unitWeight * 100) / 100));
+                      }
+                    } else if (b === 0) {
+                      setKg("");
+                    }
+                  }}
                   className="font-bold text-emerald-600 dark:text-emerald-400"
                 />
               </MillingField>
@@ -1742,11 +1855,11 @@ function QuickDeliveryModal({
             </div>
           </div>
 
-          <MillingField label="ملاحظات التسليم والمستلم">
+          <MillingField label="ملاحظات التسليم">
             <MillingInput
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="مثال: استلم بواسطة السائق / رقم الشاحنة أو الإشعار"
+              placeholder="مثال: تسليم دفعة للعميل أو رقم إشعار التسليم..."
             />
           </MillingField>
         </div>

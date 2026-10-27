@@ -138,11 +138,13 @@ export type PaymentMethodOverrides = Record<string, PaymentMethodOverride>;
  */
 export const TENANT_SELECTABLE_LEGACY_VALUES: readonly LegacyPaymentValue[] = [
   "cash",
-  "card",
   "bank_transfer",
   "mobile_money",
-  "cheque",
 ];
+
+/** The four methods exposed for new transactions across the application. */
+export const CORE_PAYMENT_METHOD_IDS = ["cash", "credit", "bank_transfer", "mobile_money"] as const;
+const CORE_PAYMENT_METHOD_ID_SET = new Set<string>(CORE_PAYMENT_METHOD_IDS);
 
 /**
  * The catalogue row a tenant may edit freely. Mirrors the migration's
@@ -282,7 +284,7 @@ export const PAYMENT_METHOD_CATALOG: readonly PaymentMethodDefinition[] = [
     nameAr: "بنك الكريمي",
     nameEn: "Al-Kuraimi Bank",
     iconKey: "kuraimi",
-    isActive: true,
+    isActive: false,
     sortOrder: 40,
     allowedContexts: ["pos", "sales", "purchases", "expenses", "customer_collection"],
     ledgerKind: "BANK",
@@ -298,11 +300,11 @@ export const PAYMENT_METHOD_CATALOG: readonly PaymentMethodDefinition[] = [
     nameAr: "بنك اليمن الدولي",
     nameEn: "Yemen International Bank",
     iconKey: "bank",
-    isActive: true,
+    isActive: false,
     sortOrder: 50,
     allowedContexts: ["pos", "sales", "purchases", "expenses", "customer_collection"],
     ledgerKind: "BANK",
-    defaultAccountCode: "1121",
+    defaultAccountCode: "1111",
     requiresReference: true,
     legacyValue: "bank_transfer",
     legacyIds: [],
@@ -312,10 +314,11 @@ export const PAYMENT_METHOD_CATALOG: readonly PaymentMethodDefinition[] = [
     nameAr: "جوالي",
     nameEn: "Jawali",
     iconKey: "mobile-money",
-    isActive: true,
+    isActive: false,
     sortOrder: 60,
     allowedContexts: ["pos", "sales", "purchases", "expenses", "customer_collection"],
     ledgerKind: "WALLET",
+    defaultAccountCode: "1131",
     requiresReference: true,
     legacyValue: "mobile_money",
     // The FIRST wallet carries the historical `mobile_money` value; the others
@@ -327,10 +330,11 @@ export const PAYMENT_METHOD_CATALOG: readonly PaymentMethodDefinition[] = [
     nameAr: "جيب",
     nameEn: "Jaib Wallet",
     iconKey: "wallet",
-    isActive: true,
+    isActive: false,
     sortOrder: 70,
     allowedContexts: ["pos", "sales", "purchases", "expenses", "customer_collection"],
     ledgerKind: "WALLET",
+    defaultAccountCode: "1131",
     requiresReference: true,
     legacyValue: "mobile_money",
     legacyIds: [],
@@ -340,10 +344,11 @@ export const PAYMENT_METHOD_CATALOG: readonly PaymentMethodDefinition[] = [
     nameAr: "فلوسك",
     nameEn: "Floosak",
     iconKey: "wallet",
-    isActive: true,
+    isActive: false,
     sortOrder: 80,
     allowedContexts: ["pos", "sales", "purchases", "expenses", "customer_collection"],
     ledgerKind: "WALLET",
+    defaultAccountCode: "1131",
     requiresReference: true,
     legacyValue: "mobile_money",
     legacyIds: [],
@@ -353,10 +358,11 @@ export const PAYMENT_METHOD_CATALOG: readonly PaymentMethodDefinition[] = [
     nameAr: "ون كاش",
     nameEn: "One Cash",
     iconKey: "wallet",
-    isActive: true,
+    isActive: false,
     sortOrder: 90,
     allowedContexts: ["pos", "sales", "purchases", "expenses", "customer_collection"],
     ledgerKind: "WALLET",
+    defaultAccountCode: "1131",
     requiresReference: true,
     legacyValue: "mobile_money",
     legacyIds: [],
@@ -366,7 +372,7 @@ export const PAYMENT_METHOD_CATALOG: readonly PaymentMethodDefinition[] = [
     nameAr: "بطاقة / شبكة",
     nameEn: "Card",
     iconKey: "card",
-    isActive: true,
+    isActive: false,
     sortOrder: 100,
     allowedContexts: ["pos", "sales", "purchases", "expenses", "customer_collection"],
     ledgerKind: "CARD",
@@ -382,6 +388,7 @@ export const PAYMENT_METHOD_CATALOG: readonly PaymentMethodDefinition[] = [
     sortOrder: 110,
     allowedContexts: ["pos", "sales", "purchases", "expenses", "customer_collection"],
     ledgerKind: "WALLET",
+    defaultAccountCode: "1131",
     requiresReference: true,
     legacyValue: "mobile_money",
   },
@@ -396,7 +403,7 @@ export const PAYMENT_METHOD_CATALOG: readonly PaymentMethodDefinition[] = [
     // The applied database seed uses `bank-transfer`; keep it aligned until a
     // forward migration deliberately changes the stored icon key.
     iconKey: "bank-transfer",
-    isActive: true,
+    isActive: false,
     sortOrder: 120,
     allowedContexts: ["pos", "sales", "purchases", "expenses", "customer_collection"],
     ledgerKind: "BANK",
@@ -433,33 +440,21 @@ export const PAYMENT_METHOD_CATALOG: readonly PaymentMethodDefinition[] = [
  * excluded where it is meaningless (see `isCreditTerm`).
  */
 export function isSelectableTender(method: Pick<PaymentMethodDefinition, "id">): boolean {
-  return method.id !== "split";
+  return CORE_PAYMENT_METHOD_ID_SET.has(method.id);
 }
 
 /**
  * The methods the settings screen manages, IN PRESENTATION ORDER.
  *
- * ── This is NOT a whitelist of what may be offered ──────────────────────────
- * It used to be, and that was the bug: a filter against this array meant a
- * method a business created in Settings — which lives in `payment_methods` and
- * is returned by the catalogue query — never reached a picker, and neither did
- * `card`, `cheque` or the generic `mobile_money`. The database is the authority
- * for which methods exist; this array only decides the ORDER the settings
- * screen lists the shipped ones in.
+ * This is the order of the approved operator choices. Retired catalog identities
+ * remain in PAYMENT_METHOD_CATALOG for labels on existing records, but are not
+ * in this list and cannot be stored by new operations.
  */
 export const SHIPPED_PAYMENT_METHOD_ORDER = [
   "cash",
   "credit",
   "bank_transfer",
-  "kuraimi_bank",
-  "yemen_kuwait_bank",
-  "jaib",
-  "one_cash",
-  "jawali",
-  "floosak",
-  "card",
   "mobile_money",
-  "cheque",
   "split",
 ] as const;
 
@@ -524,9 +519,9 @@ export function toLegacyPaymentValue(id: string): LegacyPaymentValue {
  */
 export function toStorablePaymentValue(id: string | null | undefined): LegacyPaymentValue | null {
   if (!id) return null;
-  const known = CATALOG_BY_ID.get(id)?.legacyValue;
-  if (known) return known;
-  return isLegacyPaymentValue(id) ? id : null;
+  const catalogId = CATALOG_BY_ID.has(id) ? id : toCatalogId(id);
+  if (!catalogId || !CORE_PAYMENT_METHOD_ID_SET.has(catalogId)) return null;
+  return CATALOG_BY_ID.get(catalogId)?.legacyValue ?? null;
 }
 
 /**

@@ -49,7 +49,7 @@ import { useIsDesktop, useMediaQuery } from "@/hooks/use-media-query";
 import { usePersistedViewMode } from "@/hooks/use-persisted-view-mode";
 import { CartLine as CartLineRow } from "@/components/commerce/cart-line";
 import { MobileProductPicker } from "@/components/commerce/mobile-product-picker";
-import { RecordsFilterPanel, RecordsSortPanel } from "@/components/ui/records-panels";
+import { RecordsSortPanel, RecordsFilterPanel } from "@/components/ui/records-panels";
 import { RecordsToolbar } from "@/components/ui/records-toolbar";
 import type { FilterDefinition, FilterValues } from "@/components/ui/table-toolbar";
 import type { DataTableSort } from "@/components/ui/data-table";
@@ -59,7 +59,6 @@ import type { InvoiceDoc } from "@/lib/pdf";
 import { getUnifiedPrintSettings, printUnifiedDocument, type PrintRequest } from "@/lib/printing";
 import { OperationSuccessModal } from "@/components/communication";
 import { PosBatchSelectorModal } from "@/components/batches/pos-batch-selector-modal";
-import { useBatchSettings } from "@/hooks/use-batch-settings";
 import { useCashboxes } from "@/hooks/use-cashboxes";
 import { useCompanyBankAccounts } from "@/hooks/use-company-bank-accounts";
 import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
@@ -164,8 +163,8 @@ interface SplitPaymentLine {
   reference?: string;
 }
 
-// Split allocations are persisted through the guarded split RPC and each tender
-// is validated before checkout, so the cashier can use multiple methods safely.
+// Migration 64 records split tenders before posting and resolves each tender's
+// ledger account, so the POS split flow can submit a real accounting breakdown.
 const POS_SPLIT_LEDGER_POSTING_READY = true;
 
 const posGuideConfig: PageGuideConfig = {
@@ -287,7 +286,6 @@ function POSPage() {
   const { methods: posPaymentMethods } = usePaymentMethodsForContext("pos", {
     includeCredit: true,
   });
-  const { settings: batchSettings } = useBatchSettings();
   const { activeCashboxes, defaultCashbox } = useCashboxes();
   const {
     banks: companyBanks,
@@ -551,10 +549,11 @@ function POSPage() {
        */
       void (supabase.from("products") as any)
         .select(
-          "id,sku,barcode,name,name_ar,sale_price,tax_rate,image_url,category_id,brand_id,unit_id,origin_id,quality_grade_id,is_active,is_service,item_nature,inventory_policy",
+          "id,sku,barcode,name,name_ar,sale_price,tax_rate,image_url,category_id,brand_id,unit_id,origin_id,quality_grade_id,is_active,is_service,item_nature,inventory_policy,tracking,is_custody_item",
         )
         .eq("is_active", true)
         .eq("is_sellable", true)
+        .eq("is_custody_item", false)
         .neq("item_class", "RAW_MATERIAL")
         .neq("item_class", "PACKAGING")
         .neq("item_class", "SERVICE")
@@ -591,12 +590,13 @@ function POSPage() {
           .order("name"),
         (supabase.from("products") as any)
           .select(
-            "id,sku,barcode,name,name_ar,sale_price,tax_rate,image_url,category_id,brand_id,unit_id,origin_id,quality_grade_id,is_active,is_service,item_nature,inventory_policy",
+            "id,sku,barcode,name,name_ar,sale_price,tax_rate,image_url,category_id,brand_id,unit_id,origin_id,quality_grade_id,is_active,is_service,item_nature,inventory_policy,tracking,is_custody_item",
           )
           // خدمة الطحن لا تباع من POS: تحتاج بيانات الاستلام والأكياس والأمانة
           // الموجودة حصراً في كاونتر المطحنة. تظل الخدمة الحرة في زرها المخصص.
           .eq("is_active", true)
           .eq("is_sellable", true)
+          .eq("is_custody_item", false)
           .neq("item_class", "RAW_MATERIAL")
           .neq("item_class", "PACKAGING")
           .neq("item_class", "SERVICE")
@@ -628,8 +628,11 @@ function POSPage() {
       const compats = compatsRes.status === "fulfilled" ? compatsRes.value.data : [];
 
       const loadedWarehouses = ws ?? [];
+      const loadedCustomers = cs ?? [];
       setWarehouses(loadedWarehouses);
-      setCustomers(cs ?? []);
+      setCustomers(loadedCustomers);
+      const cashCustomer = loadedCustomers.find((customer) => customer.is_system);
+      if (cashCustomer) setCustomerId((current) => current || cashCustomer.id);
 
       // Build safe in-memory lookup maps to enrich products without brittle DB joins
       const catMap = new Map((cats ?? []).map((c: any) => [c.id, c]));
@@ -1047,11 +1050,7 @@ function POSPage() {
 
     if (!isService) {
       // التحقق من سياسة المخزون وتتبع الدفعات (BATCH):
-      const isBatchTracked =
-        p.tracking === "BATCH" ||
-        p.inventory_policy === "BATCH" ||
-        (batchSettings?.enforce_batch_selection_on_pos &&
-          (p.tracking === "BATCH" || p.inventory_policy === "BATCH"));
+      const isBatchTracked = p.tracking === "BATCH";
 
       if (isBatchTracked && selectedBatch === undefined) {
         if (!warehouseId) {
@@ -1299,7 +1298,7 @@ function POSPage() {
       posPaymentMethods.filter(
         (method) =>
           !method.isCreditTerm &&
-          ["cash", "card", "bank_transfer", "mobile_money", "cheque"].includes(method.legacyValue),
+          ["cash", "bank_transfer", "mobile_money"].includes(method.legacyValue),
       ),
     [posPaymentMethods],
   );
@@ -1326,6 +1325,8 @@ function POSPage() {
   const paymentSplits = splitRows.map((line) => ({
     method: line.method!.legacyValue,
     amount: Math.round(line.amount * 100) / 100,
+    payment_method_id: line.method!.id,
+    reference: line.reference?.trim() || null,
   }));
 
   function startSplitPayment() {
@@ -2050,16 +2051,27 @@ function POSPage() {
                     <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                       {lang === "ar" ? "البيانات الأساسية" : "Sale context"}
                     </div>
-                    <PartyPicker
-                      options={customers}
-                      value={customerId}
-                      onChange={setCustomerId}
-                      lang={lang}
-                      label={lang === "ar" ? "العميل" : "Customer"}
-                      emptyLabel={t("pos.walkin")}
-                      kind="customer"
-                      className="h-10 min-w-0 w-full rounded-2xl border-primary/20 bg-primary/[0.035] text-xs hover:border-primary/50 hover:bg-primary/[0.07]"
-                    />
+                    <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                      <PartyPicker
+                        options={customers}
+                        value={customerId}
+                        onChange={setCustomerId}
+                        lang={lang}
+                        label={lang === "ar" ? "العميل" : "Customer"}
+                        emptyLabel={t("pos.walkin")}
+                        kind="customer"
+                        className="h-10 min-w-0 flex-1 rounded-2xl border-primary/20 bg-primary/[0.035] text-xs hover:border-primary/50 hover:bg-primary/[0.07]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setNewCustomerOpen(true)}
+                        className="grid size-9 shrink-0 place-items-center rounded-full border border-primary/25 bg-primary/10 text-primary shadow-sm transition hover:border-primary/40 hover:bg-primary/15 active:scale-95"
+                        title={lang === "ar" ? "إضافة عميل جديد" : "Add customer"}
+                        aria-label={lang === "ar" ? "إضافة عميل جديد" : "Add customer"}
+                      >
+                        <UserPlus className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
 
                   {isModuleEnabled("multi_warehouse") && warehouses.length > 1 && (
@@ -2665,23 +2677,27 @@ function POSPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    toast.info(
-                      lang === "ar"
-                        ? "الدفع بأكثر من طريقة سيتاح بعد اكتمال ترحيله المحاسبي"
-                        : "Split payments will be enabled after ledger posting support is complete",
-                    );
+                    if (!POS_SPLIT_LEDGER_POSTING_READY) {
+                      toast.info(
+                        lang === "ar"
+                          ? "الدفع بأكثر من طريقة سيتاح بعد اكتمال ترحيله المحاسبي"
+                          : "Split payments will be enabled after ledger posting support is complete",
+                      );
+                      return;
+                    }
+                    startSplitPayment();
                   }}
-                  disabled={
-                    !POS_SPLIT_LEDGER_POSTING_READY ||
-                    cart.length === 0 ||
-                    supportedSplitMethods.length === 0
-                  }
+                  disabled={cart.length === 0 || supportedSplitMethods.length === 0}
                   aria-pressed={isSplitPayment}
                   aria-label={lang === "ar" ? "الدفع بأكثر من طريقة" : "Split payment"}
                   title={
-                    lang === "ar"
-                      ? "يتطلب دعم الترحيل المحاسبي متعدد الطرق"
-                      : "Requires multi-tender ledger posting support"
+                    POS_SPLIT_LEDGER_POSTING_READY
+                      ? lang === "ar"
+                        ? "توزيع قيمة الفاتورة على أكثر من طريقة دفع"
+                        : "Split the invoice across multiple payment methods"
+                      : lang === "ar"
+                        ? "يتطلب دعم الترحيل المحاسبي متعدد الطرق"
+                        : "Requires multi-tender ledger posting support"
                   }
                   className={`grid size-8 place-items-center rounded-full border transition disabled:opacity-40 ${isSplitPayment ? "border-primary/40 bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-primary/10 hover:text-primary"}`}
                 >

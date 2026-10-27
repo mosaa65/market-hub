@@ -1647,7 +1647,7 @@ const ar: Dict = {
   "sales.status.paid": "مدفوعة",
   "sales.status.partial": "جزئية",
   "sales.status.unpaid": "غير مدفوعة",
-  "sales.status.cancelled": "ملغية",
+  "sales.status.cancelled": "ملغاة",
   "sales.status.draft": "مسودة",
   "sales.status.confirmed": "مؤكدة",
   "sales.status.returned": "مرتجعة",

@@ -6,7 +6,7 @@ import {
   CustomFieldOptions,
 } from "./types";
 import { getCachedCompanyProfile } from "@/lib/printing/company-profile";
-import { COMPANY_RIGHTS_TEXT } from "@/lib/printing/footer";
+import { COMPANY_RIGHTS_TEXT, renderUniversalFooter } from "@/lib/printing/footer";
 import { formatPrintedDateTime } from "@/lib/printing/date-time";
 import { generateBarcodeSvg, generateQrCodeSvg } from "@/lib/printing/barcode-qr";
 import { numberToArabicWords } from "./tafqeet";
@@ -37,7 +37,7 @@ export function renderMillingMasterTemplate(
     showPaymentInfo: true,
     showNotes: true,
     showSignatures: false,
-    showFooter: false,
+    showFooter: true,
     showBarcode: true,
     showQrCode: false,
     ...options,
@@ -680,11 +680,8 @@ export function renderMillingThermalTemplate(
   }
 
   ${
-    opts.showFooter && L.poweredBy
-      ? `
-  <div class="inama-footer">
-    ${esc(L.poweredBy)}
-  </div>`
+    opts.showFooter
+      ? renderUniversalFooter(companyProfile, rtl, true)
       : ""
   }
   <div style="text-align:center;font-size:7.5px;color:#9ca3af;padding:2px 0">${COMPANY_RIGHTS_TEXT}</div>

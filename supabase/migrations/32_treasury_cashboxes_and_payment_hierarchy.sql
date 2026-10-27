@@ -7,7 +7,7 @@
 --   1. إنشاء جدول الصناديق والخزائن (cashboxes) مع ربط مباشر بحسابات الأصول النقدية.
 --   2. إنشاء جدول الحسابات البنكية والمحافظ (company_bank_accounts) للمنشأة.
 --   3. إنشاء جدول سجل الشيكات وأوراق القبض (cheques_register) مع دورة الصرف والارتداد.
---   4. تأسيس حساب «أوراق قبض — شيكات برسم التحصيل» (1221) تحت الحساب التجميعي (1200).
+--   4. ربط بنية الخزينة بحساب أوراق القبض التاريخي 1221، المزروع في بذرة دليل الحسابات.
 --   5. توسيع جداول الفواتير والتحصيلات والمصروفات بحقول التوجيه المالي الدقيق.
 --   6. توفير دالة التوجيه المالي (resolve_document_settlement_account).
 --   7. ترقية دوال الترحيل (post_sales_invoice, record_customer_payment) لترحيل النقد
@@ -18,27 +18,7 @@
 
 BEGIN;
 
--- ── 1. تأسيس حساب أوراق القبض (1221) في دليل الحسابات ───────────────────────
-INSERT INTO public.accounts (
-  code, name_ar, account_type, parent_id, is_system, is_postable, requires_reconciliation, notes
-)
-VALUES (
-  '1221',
-  'أوراق قبض — شيكات برسم التحصيل',
-  'ASSET',
-  (SELECT id FROM public.accounts WHERE code = '1200'),
-  true,
-  true,
-  true,
-  'شيكات وأوراق قبض مستلمة من العملاء برسم التحصيل بالبنك'
-)
-ON CONFLICT (code) DO UPDATE SET
-  parent_id = COALESCE(EXCLUDED.parent_id, (SELECT id FROM public.accounts WHERE code = '1200')),
-  requires_reconciliation = true,
-  is_postable = true;
-
-
--- ── 2. جدول الصناديق والخزائن (cashboxes) ──────────────────────────────────
+-- ── 1. جدول الصناديق والخزائن (cashboxes) ──────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.cashboxes (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name_ar text NOT NULL,
@@ -173,75 +153,7 @@ ALTER TABLE public.purchase_returns
   ADD COLUMN IF NOT EXISTS payment_reference text;
 
 
--- ── 6. بذور بيانات أساسية للصناديق والبنوك والمحافظ ────────────────────────
-DO $$
-DECLARE
-  v_cash_acct uuid;
-  v_kuraimi_acct uuid;
-  v_yemen_bank_acct uuid;
-  v_jawali_acct uuid;
-  v_jaib_acct uuid;
-  v_floosak_acct uuid;
-  v_one_cash_acct uuid;
-BEGIN
-  SELECT id INTO v_cash_acct FROM public.accounts WHERE code = '1101';
-  SELECT id INTO v_kuraimi_acct FROM public.accounts WHERE code = '1111';
-  SELECT id INTO v_yemen_bank_acct FROM public.accounts WHERE code = '1121';
-  SELECT id INTO v_jawali_acct FROM public.accounts WHERE code = '1131';
-  SELECT id INTO v_jaib_acct FROM public.accounts WHERE code = '1132';
-  SELECT id INTO v_floosak_acct FROM public.accounts WHERE code = '1133';
-  SELECT id INTO v_one_cash_acct FROM public.accounts WHERE code = '1134';
-
-  -- الصندوق الرئيسي الافتراضي
-  IF v_cash_acct IS NOT NULL THEN
-    INSERT INTO public.cashboxes (name_ar, name_en, code, account_id, is_default, is_active)
-    VALUES ('الصندوق الرئيسي', 'Main Cashbox', 'CASH-MAIN', v_cash_acct, true, true)
-    ON CONFLICT (code) DO UPDATE SET
-      account_id = v_cash_acct,
-      is_default = true;
-  END IF;
-
-  -- الحسابات البنكية للمنشأة
-  IF v_kuraimi_acct IS NOT NULL THEN
-    INSERT INTO public.company_bank_accounts (name_ar, kind, bank_name, account_id, is_default, is_active)
-    VALUES ('بنك الكريمي — الحساب الجاري', 'BANK', 'بنك الكريمي للتمويل الأصغر', v_kuraimi_acct, true, true)
-    ON CONFLICT DO NOTHING;
-  END IF;
-
-  IF v_yemen_bank_acct IS NOT NULL THEN
-    INSERT INTO public.company_bank_accounts (name_ar, kind, bank_name, account_id, is_default, is_active)
-    VALUES ('بنك اليمن الدولي', 'BANK', 'بنك اليمن الدولي', v_yemen_bank_acct, false, true)
-    ON CONFLICT DO NOTHING;
-  END IF;
-
-  -- المحافظ الإلكترونية للمنشأة
-  IF v_jaib_acct IS NOT NULL THEN
-    INSERT INTO public.company_bank_accounts (name_ar, kind, bank_name, account_id, is_default, is_active)
-    VALUES ('محفظة جيب', 'WALLET', 'شركة الأهدل المالية', v_jaib_acct, false, true)
-    ON CONFLICT DO NOTHING;
-  END IF;
-
-  IF v_one_cash_acct IS NOT NULL THEN
-    INSERT INTO public.company_bank_accounts (name_ar, kind, bank_name, account_id, is_default, is_active)
-    VALUES ('محفظة ون كاش', 'WALLET', 'ون كاش', v_one_cash_acct, false, true)
-    ON CONFLICT DO NOTHING;
-  END IF;
-
-  IF v_jawali_acct IS NOT NULL THEN
-    INSERT INTO public.company_bank_accounts (name_ar, kind, bank_name, account_id, is_default, is_active)
-    VALUES ('محفظة جوالي', 'WALLET', 'يمن موبايل', v_jawali_acct, false, true)
-    ON CONFLICT DO NOTHING;
-  END IF;
-
-  IF v_floosak_acct IS NOT NULL THEN
-    INSERT INTO public.company_bank_accounts (name_ar, kind, bank_name, account_id, is_default, is_active)
-    VALUES ('محفظة فلوسك', 'WALLET', 'بنك اليمن والكويت', v_floosak_acct, false, true)
-    ON CONFLICT DO NOTHING;
-  END IF;
-END $$;
-
-
--- ── 7. دالة حل الحساب المحاسبي للتسوية والترحيل ─────────────────────────────
+-- ── 6. دالة حل الحساب المحاسبي للتسوية والترحيل ─────────────────────────────
 CREATE OR REPLACE FUNCTION public.resolve_document_settlement_account(
   p_payment_method text,
   p_cashbox_id uuid DEFAULT NULL,

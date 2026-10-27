@@ -206,37 +206,43 @@ function AuthPage() {
 
     setLoading(true);
     try {
-      let lastError: any = null;
-      let sessionEstablished = false;
       const trimmed = phoneNumber.trim();
 
-      // 1) الهاتف الحقيقي بصيغه المحتملة (المسار المباشر)
-      const phoneCandidates = resolvePhoneCandidates(trimmed, country.dialCode);
-      for (const phone of phoneCandidates) {
-        const { data: phoneData, error: phoneError } = await supabase.auth.signInWithPassword({
-          phone,
+      // تسجيل الدخول السريع: نجرّب كل الصيغ المحتملة **بالتوازي** بدل التتابع.
+      // التتابع كان يجعل الدخول يتأخر (كل صيغة فاشلة تنتظر استجابة الشبكة كاملة)،
+      // أما التوازي فيُنجز كل المحاولات في زمن محاولة واحدة وأول نجاح يفوز.
+      const attempt = async (params: {
+        email?: string;
+        phone?: string;
+      }): Promise<{ session: unknown }> => {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          ...params,
           password: phonePassword,
-        });
-        if (!phoneError && phoneData?.session) {
+        } as Parameters<typeof supabase.auth.signInWithPassword>[0]);
+        if (!error && data?.session) {
+          return data as unknown as { session: unknown };
+        }
+        throw error ?? new Error("no-session");
+      };
+
+      const attempts: Promise<{ session: unknown }>[] = [
+        ...resolvePhoneCandidates(trimmed, country.dialCode).map((phone) => attempt({ phone })),
+        // احتياط: التوافق مع الحسابات القديمة المسجلة بالبريد الوهمي @vortex.local
+        ...resolveCandidates(trimmed, country.dialCode).map((email) => attempt({ email })),
+      ];
+
+      let lastError: any = null;
+      let sessionEstablished = false;
+
+      const results = await Promise.allSettled(attempts);
+      for (const result of results) {
+        if (result.status === "fulfilled" && result.value?.session) {
           sessionEstablished = true;
           break;
         }
-        if (phoneError) lastError = phoneError;
-      }
-
-      // 2) احتياط: التوافق مع الحسابات القديمة المسجلة بالبريد الوهمي @vortex.local
-      if (!sessionEstablished) {
-        const emailCandidates = resolveCandidates(trimmed, country.dialCode);
-        for (const email of emailCandidates) {
-          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-            email,
-            password: phonePassword,
-          });
-          if (!signInError && signInData?.session) {
-            sessionEstablished = true;
-            break;
-          }
-          if (signInError) lastError = signInError;
+        if (result.status === "rejected") {
+          // نحتفظ بأول خطأ حقيقي (ليس "no-session") لعرض رسالة واضحة
+          lastError = lastError ?? result.reason;
         }
       }
 

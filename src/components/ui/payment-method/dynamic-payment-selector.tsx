@@ -55,7 +55,6 @@ export function DynamicPaymentSelector({
 
   const { methods, isLoading: methodsLoading } = usePaymentMethodsForContext(context, {
     includeCredit,
-    includeSplit: true,
   });
 
   const { activeCashboxes, defaultCashbox, isLoading: cashboxesLoading } = useCashboxes();

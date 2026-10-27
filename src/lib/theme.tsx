@@ -19,14 +19,18 @@ import {
   GUEST_PREFERENCES_KEY,
   THEME_SYNC_BROADCAST_CHANNEL,
   applyAccentThemeVariables,
+  applyModeVariant,
   getUserThemeStorageKey,
+  MODE_VARIANT_STORAGE_KEY,
   parseUserThemePreferences,
   readStoredAccentTheme,
   readStoredColorArchive,
   readStoredCustomHex,
+  readStoredModeVariant,
   serializeUserThemePreferences,
   type AccentThemeId,
   type ArchivedColor,
+  type ModeVariantId,
   type UserThemePreferences,
 } from "./color-theme";
 
@@ -41,6 +45,10 @@ export interface ThemeContextValue {
   theme: Theme;
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
+
+  /** درجة عرض العرض الحالية (الافتراضي/الفخم/النقي/الرمادي/المعتم) */
+  modeVariant: ModeVariantId;
+  setModeVariant: (variant: ModeVariantId) => void;
 
   // Accent Themes & Custom Color System
   accentTheme: AccentThemeId;
@@ -82,6 +90,7 @@ function readPreferencesForUserOrGuest(userId: string | null): UserThemePreferen
       accentTheme: DEFAULT_ACCENT_THEME,
       customColor: DEFAULT_CUSTOM_HEX,
       colorArchive: DEFAULT_COLOR_ARCHIVE,
+      modeVariant: "default",
       updatedAt: Date.now(),
     };
   }
@@ -103,6 +112,7 @@ function readPreferencesForUserOrGuest(userId: string | null): UserThemePreferen
     accentTheme: readStoredAccentTheme(),
     customColor: readStoredCustomHex(),
     colorArchive: readStoredColorArchive(),
+    modeVariant: readStoredModeVariant(),
     updatedAt: Date.now(),
   };
 }
@@ -119,6 +129,7 @@ function persistPreferencesLocally(userId: string | null, prefs: UserThemePrefer
     localStorage.setItem(ACCENT_STORAGE_KEY, prefs.accentTheme);
     localStorage.setItem(CUSTOM_COLOR_STORAGE_KEY, prefs.customColor);
     localStorage.setItem(ARCHIVE_STORAGE_KEY, JSON.stringify(prefs.colorArchive));
+    localStorage.setItem(MODE_VARIANT_STORAGE_KEY, prefs.modeVariant || "default");
   } catch {
     /* quota or private mode */
   }
@@ -129,6 +140,7 @@ export function applyTheme(
   theme: Theme,
   accentId: AccentThemeId = readStoredAccentTheme(),
   customHex: string = readStoredCustomHex(),
+  modeVariant: ModeVariantId = readStoredModeVariant(),
 ): void {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
@@ -139,7 +151,10 @@ export function applyTheme(
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute("content", theme === "dark" ? "#0A0A0B" : "#FBFAF9");
 
-  // تطبيق متغيرات لون الثيم (الأزرق، الزمرد، الأرجوان، الياقوت، الذهب، التوباز أو المخصص)
+  // تطبيق درجة العرض (فخم/نقي/رمادي/معتم) — الافتراضي بدون كلاس
+  applyModeVariant(modeVariant);
+
+  // تطبيق متغيرات لون الثيم
   applyAccentThemeVariables(accentId, theme, customHex);
 }
 
@@ -159,9 +174,15 @@ export const THEME_BOOT_SCRIPT = `(function(){
     var m = document.querySelector('meta[name="theme-color"]');
     if (m) { m.setAttribute("content", t === "dark" ? "#0A0A0B" : "#FBFAF9"); }
 
+    // درجة عرض العرض (فخم/نقي/رمادي/معتم)
+    var v = localStorage.getItem("${MODE_VARIANT_STORAGE_KEY}") || "default";
+    var vc = { "luxe": "light-luxe", "pure": "light-pure", "sand": "light-sand", "mist": "light-mist", "slate": "dark-slate", "deep": "dark-deep", "navy": "dark-navy", "cocoa": "dark-cocoa" };
+    if (vc[v]) { r.classList.add(vc[v]); }
+    r.dataset.modeVariant = v;
+
     var a = localStorage.getItem("${ACCENT_STORAGE_KEY}") || "${DEFAULT_ACCENT_THEME}";
     r.dataset.accent = a;
-    
+
     var presets = {
       emerald: {
         dark: { p: "oklch(0.68 0.20 155)", fg: "oklch(1 0 0)", r: "oklch(0.68 0.20 155 / 0.6)", sp: "oklch(0.68 0.20 155)", tp: "oklch(0.68 0.20 155 / 0.20)" },
@@ -219,6 +240,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const initialPrefs = readPreferencesForUserOrGuest(null);
 
   const [theme, setThemeState] = useState<Theme>(initialPrefs.theme);
+  const [modeVariant, setModeVariantState] = useState<ModeVariantId>(
+    initialPrefs.modeVariant || readStoredModeVariant(),
+  );
   const [accentTheme, setAccentThemeState] = useState<AccentThemeId>(initialPrefs.accentTheme);
   const [customColor, setCustomColorState] = useState<string>(initialPrefs.customColor);
   const [colorArchive, setColorArchive] = useState<ArchivedColor[]>(initialPrefs.colorArchive);
@@ -229,14 +253,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const cloudSyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const broadcastChannelRef = useRef<BroadcastChannel | null>(null);
-  const stateRef = useRef({ theme, accentTheme, customColor, colorArchive, userId });
+  const stateRef = useRef({ theme, modeVariant, accentTheme, customColor, colorArchive, userId });
 
-  stateRef.current = { theme, accentTheme, customColor, colorArchive, userId };
+  stateRef.current = { theme, modeVariant, accentTheme, customColor, colorArchive, userId };
 
-  // 1. تطبيق الثيم فورياً على DOM عند أي تغيير
+  // 1. تطبيق الثيم فورياً على DOM عند أي تغيير (مع درجة العرض)
   useEffect(() => {
-    applyTheme(theme, accentTheme, customColor);
-  }, [theme, accentTheme, customColor]);
+    applyTheme(theme, accentTheme, customColor, modeVariant);
+  }, [theme, accentTheme, customColor, modeVariant]);
 
   // دالة المزامنة السحابية المؤجلة (Debounced Cloud Sync)
   const syncToCloud = useCallback((targetUserId: string, prefs: UserThemePreferences) => {
@@ -319,6 +343,24 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       setThemeState(next);
       const prefs: UserThemePreferences = {
         theme: next,
+        modeVariant: stateRef.current.modeVariant,
+        accentTheme: stateRef.current.accentTheme,
+        customColor: stateRef.current.customColor,
+        colorArchive: stateRef.current.colorArchive,
+        updatedAt: Date.now(),
+      };
+      commitPreferences(prefs, stateRef.current.userId);
+    },
+    [commitPreferences],
+  );
+
+  /** تحديث درجة عرض النظام (الافتراضي/الفخم/النقي/الرمادي/المعتم) */
+  const setModeVariant = useCallback(
+    (variant: ModeVariantId) => {
+      setModeVariantState(variant);
+      const prefs: UserThemePreferences = {
+        theme: stateRef.current.theme,
+        modeVariant: variant,
         accentTheme: stateRef.current.accentTheme,
         customColor: stateRef.current.customColor,
         colorArchive: stateRef.current.colorArchive,
@@ -357,6 +399,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       setCustomColorState(formatted);
       const prefs: UserThemePreferences = {
         theme: stateRef.current.theme,
+        modeVariant: stateRef.current.modeVariant,
         accentTheme: stateRef.current.accentTheme,
         customColor: formatted,
         colorArchive: stateRef.current.colorArchive,
@@ -423,6 +466,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setColorArchive(DEFAULT_COLOR_ARCHIVE);
     const prefs: UserThemePreferences = {
       theme: stateRef.current.theme,
+      modeVariant: stateRef.current.modeVariant,
       accentTheme: stateRef.current.accentTheme,
       customColor: stateRef.current.customColor,
       colorArchive: DEFAULT_COLOR_ARCHIVE,
@@ -523,6 +567,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
     const currentPrefs: UserThemePreferences = {
       theme: stateRef.current.theme,
+      modeVariant: stateRef.current.modeVariant,
       accentTheme: stateRef.current.accentTheme,
       customColor: stateRef.current.customColor,
       colorArchive: stateRef.current.colorArchive,
@@ -619,6 +664,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         theme,
         setTheme,
         toggleTheme,
+        modeVariant,
+        setModeVariant,
         accentTheme,
         setAccentTheme,
         customColor,
@@ -651,6 +698,8 @@ export function useTheme(): ThemeContextValue {
       const next = fallbackPrefs.theme === "dark" ? "light" : "dark";
       applyTheme(next, fallbackPrefs.accentTheme, fallbackPrefs.customColor);
     },
+    modeVariant: fallbackPrefs.modeVariant || "default",
+    setModeVariant: (variant: ModeVariantId) => applyModeVariant(variant),
     accentTheme: fallbackPrefs.accentTheme,
     setAccentTheme: (id) =>
       applyAccentThemeVariables(id, fallbackPrefs.theme, fallbackPrefs.customColor),

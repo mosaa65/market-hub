@@ -1,4 +1,4 @@
-﻿import {
+import {
   UnifiedDocumentData,
   InvoiceLabels,
   escapeHtml,
@@ -6,9 +6,8 @@
   CustomFieldOptions,
 } from "./types";
 import { getCachedCompanyProfile } from "@/lib/printing/company-profile";
-import { COMPANY_RIGHTS_TEXT } from "@/lib/printing/footer";
+import { COMPANY_RIGHTS_TEXT, UNIVERSAL_FOOTER_CSS, renderUniversalFooter } from "@/lib/printing/footer";
 import { formatPrintedDateTime } from "@/lib/printing/date-time";
-import { UNIVERSAL_FOOTER_CSS } from "@/lib/printing/footer";
 import { numberToArabicWords } from "./tafqeet";
 import { generateBarcodeSvg, generateQrCodeSvg } from "@/lib/printing/barcode-qr";
 
@@ -39,7 +38,7 @@ export function renderMillingCleanTemplate(
     showPaymentInfo: true,
     showNotes: true,
     showSignatures: false,
-    showFooter: false,
+    showFooter: true,
     showBarcode: true,
     showQrCode: false,
     ...options,
@@ -428,7 +427,7 @@ export function renderMillingCleanTemplate(
           : ""
       }
     </div>
-    ${opts.showFooter ? `<div style="margin-top:8px;text-align:center;font-size:10px">${esc(L.thanks)}</div>` : ""}
+    ${opts.showFooter ? `<div style="margin-top:8px;text-align:center;font-size:10px">${esc(L.thanks)}</div>${renderUniversalFooter(company, rtl, true)}` : ""}
     <div style="margin-top:4px;text-align:center;font-size:7.5px;color:#9ca3af">${COMPANY_RIGHTS_TEXT}</div>
   </div>
 </body>

@@ -67,7 +67,7 @@ import {
 } from "@/lib/payments/payment-methods";
 
 export const Route = createFileRoute("/_app/purchases")({
-  head: () => ({ meta: [{ title: "Purchases — Vortex ERP" }] }),
+  head: () => ({ meta: [{ title: "المشتريات — فورتيكس ERP" }] }),
   component: () => (
     <ModuleGuard moduleId="purchases">
       <PurchasesPage />
@@ -112,6 +112,7 @@ interface Product {
   category_id?: string | null;
   cost_price: number;
   tax_rate: number;
+  tracking?: string | null;
   unit?: { short_name?: string | null; name?: string | null; name_ar?: string | null } | null;
   category?: { id?: string; name?: string | null; name_ar?: string | null } | null;
   inventory?: { warehouse_id: string; quantity: number }[] | null;
@@ -134,6 +135,9 @@ interface CartLine {
   unit_cost: number;
   tax_rate: number;
   quantity: number;
+  tracking: string;
+  batch_number: string;
+  expiry_date: string;
 }
 
 function PurchasesPage() {
@@ -186,8 +190,9 @@ function PurchasesPage() {
       return;
     }
     const remaining = Math.max(0, Number(inv.total) - Number(inv.paid));
+    const dateStr = new Date(inv.created_at).toLocaleDateString(isRtl ? "ar" : "en-GB");
     const text = isRtl
-      ? `فاتورة مشتريات رقم ${inv.invoice_number}\nالمورد: ${inv.suppliers?.name || ""}\nالتاريخ: ${new Date(inv.created_at).toLocaleDateString("ar-YE")}\nالإجمالي: ${money(Number(inv.total))}\nالمدفوع: ${money(Number(inv.paid))}${remaining > 0 ? `\nالمتبقي: ${money(remaining)}` : ""}`
+      ? `فاتورة مشتريات رقم ${inv.invoice_number}\nالمورد: ${inv.suppliers?.name || ""}\nالتاريخ: ${dateStr}\nالإجمالي: ${money(Number(inv.total))}\nالمدفوع: ${money(Number(inv.paid))}${remaining > 0 ? `\nالمتبقي: ${money(remaining)}` : ""}`
       : `Purchase Invoice #${inv.invoice_number}\nSupplier: ${inv.suppliers?.name || ""}\nTotal: ${money(Number(inv.total))}\nPaid: ${money(Number(inv.paid))}${remaining > 0 ? `\nRemaining: ${money(remaining)}` : ""}`;
     const clean = phone.replace(/[^\d+]/g, "");
     const target = clean.startsWith("+") ? clean.slice(1) : clean;
@@ -224,11 +229,28 @@ function PurchasesPage() {
         .limit(200);
       if (error) {
         console.error("Error loading purchases:", error);
-        toast.error(isRtl ? "تعذر تحميل فواتير المشتريات" : "Failed to load purchases");
+        toast.error(
+          translateRpcError(
+            error,
+            isRtl ? "ar" : "en",
+            isRtl
+              ? "تعذر تحميل فواتير المشتريات. تحقق من الاتصال وأعد المحاولة."
+              : "Could not load purchase invoices. Check connectivity and retry.",
+          ),
+        );
       }
       setRows((data ?? []) as any);
     } catch (err) {
       console.error("Failed to load purchases:", err);
+      toast.error(
+        translateRpcError(
+          err,
+          isRtl ? "ar" : "en",
+          isRtl
+            ? "تعذر تحميل فواتير المشتريات. تحقق من الاتصال وأعد المحاولة."
+            : "Could not load purchase invoices. Check connectivity and retry.",
+        ),
+      );
     } finally {
       setLoading(false);
     }
@@ -248,10 +270,24 @@ function PurchasesPage() {
         .eq("invoice_id", inv.id);
       if (error) {
         console.error("Error loading purchase items:", error);
+        toast.error(
+          translateRpcError(
+            error,
+            isRtl ? "ar" : "en",
+            isRtl
+              ? "تعذر تحميل بنود الفاتورة. أغلق النافذة وأعد فتحها."
+              : "Could not load invoice items. Close and reopen the invoice.",
+          ),
+        );
       }
       setLines((data ?? []) as any);
     } catch (err) {
       console.error("Failed to load invoice items:", err);
+      toast.error(
+        isRtl
+          ? "تعذر تحميل بنود الفاتورة. أغلق النافذة وأعد فتحها."
+          : "Could not load invoice items. Close and reopen the invoice.",
+      );
       setLines([]);
     } finally {
       setLoadingLines(false);
@@ -321,6 +357,8 @@ function PurchasesPage() {
       bg: "bg-surface-2",
       text: "text-foreground",
       dot: "bg-foreground",
+      // حالة غير معروفة: نص خام إنجليزي (مثل drafted) — عُرضه كما هو لكن ضمن
+      // الشارة الموحدة بدل كسر التخطيط، مع تفادي ظهوره في مسارات أخرى.
       label: s,
     };
     return (
@@ -346,8 +384,8 @@ function PurchasesPage() {
         type: "select",
         options: [
           { value: "cash", label: t("pos.pm.cash") },
-          { value: "card", label: t("pos.pm.card") },
           { value: "bank_transfer", label: t("pos.pm.bank") },
+          { value: "mobile_money", label: isRtl ? "محفظة إلكترونية" : "Mobile wallet" },
           { value: "credit", label: t("pos.pm.credit") },
         ],
       },
@@ -409,8 +447,11 @@ function PurchasesPage() {
         list = list.filter((r) => new Date(r.created_at).getTime() >= fromDate);
       }
       if (to) {
-        const toDate = new Date(to).getTime();
-        list = list.filter((r) => new Date(r.created_at).getTime() <= toDate);
+        // شمول اليوم الأخير: نهاية اليوم 23:59:59.999 بدلاً من منتصف الليل،
+        // وإلا تُستبعد فواتير اليوم الأخير من النتيجة.
+        const toDate = new Date(to);
+        toDate.setHours(23, 59, 59, 999);
+        list = list.filter((r) => new Date(r.created_at).getTime() <= toDate.getTime());
       }
     }
 
@@ -1775,12 +1816,13 @@ function CreateDialog({
   useEffect(() => {
     void (async () => {
       const [{ data: ps }, { data: ss }, { data: ws }] = await Promise.all([
-        supabase
-          .from("products")
+        (supabase.from("products") as any)
           .select(
-            "id,name,name_ar,sku,barcode,cost_price,tax_rate,category_id,unit:units!products_unit_id_fkey(short_name,name,name_ar),category:categories(id,name,name_ar),inventory!inventory_product_id_fkey(warehouse_id,quantity)",
+            "id,name,name_ar,sku,barcode,cost_price,tax_rate,tracking,is_custody_item,is_purchasable,category_id,unit:units!products_unit_id_fkey(short_name,name,name_ar),category:categories(id,name,name_ar),inventory!inventory_product_id_fkey(warehouse_id,quantity)",
           )
           .eq("is_active", true)
+          .eq("is_purchasable", true)
+          .eq("is_custody_item", false)
           .order("name")
           .limit(500),
         supabase.from("suppliers").select("id,name").eq("is_active", true).order("name"),
@@ -1878,6 +1920,9 @@ function CreateDialog({
           unit_cost: Number(p.cost_price),
           tax_rate: Number(p.tax_rate ?? 0),
           quantity: 1,
+          tracking: p.tracking ?? "NONE",
+          batch_number: "",
+          expiry_date: "",
         },
       ];
     });
@@ -1927,6 +1972,16 @@ function CreateDialog({
           : "Quantity, cost, and tax must be valid positive numbers.",
       );
     }
+    const missingBatch = cart.find(
+      (line) => line.tracking === "BATCH" && !line.batch_number.trim(),
+    );
+    if (missingBatch) {
+      return toast.error(
+        lang === "ar"
+          ? `أدخل رقم الدفعة للصنف: ${missingBatch.name}`
+          : `Enter a batch number for: ${missingBatch.name}`,
+      );
+    }
 
     setLoading(true);
     try {
@@ -1949,6 +2004,8 @@ function CreateDialog({
             quantity: Number(l.quantity),
             unit_cost: Number(l.unit_cost),
             tax_rate: Number(l.tax_rate),
+            batch_number: l.batch_number.trim() || null,
+            expiry_date: l.expiry_date || null,
           })),
           _cashbox_id: paymentSelection.cashboxId || null,
           _bank_account_id: paymentSelection.bankAccountId || null,
@@ -1971,6 +2028,8 @@ function CreateDialog({
             quantity: Number(l.quantity),
             unit_cost: Number(l.unit_cost),
             tax_rate: Number(l.tax_rate),
+            batch_number: l.batch_number.trim() || null,
+            expiry_date: l.expiry_date || null,
           })),
         });
         invId = res.data;
@@ -2000,8 +2059,17 @@ function CreateDialog({
       toast.success(t("purchases.recorded"));
       onDone();
     } catch (e: any) {
-      // P1-4: ترجمة موحدة لأخطاء RPC قبل العرض.
-      toast.error(translateRpcError(e, "ar", t("common.failed")));
+      // P1-4: ترجمة موحدة لأخطاء RPC قبل العرض — بلغة المستخدم الحالية
+      // (كانت مُشفرة "ar" مما كان يعرض العربية للمستخدم الإنجليزي والعكس).
+      toast.error(
+        translateRpcError(
+          e,
+          lang === "ar" ? "ar" : "en",
+          lang === "ar"
+            ? "تعذر حفظ فاتورة الشراء. لم تُحفظ أي كمية أو يتغير أي رصيد."
+            : "Could not save the purchase invoice. No quantity was saved and no balance changed.",
+        ),
+      );
     } finally {
       setLoading(false);
     }
@@ -2305,6 +2373,33 @@ function CreateDialog({
                         onChange={(v) => update(l.product_id, { tax_rate: v })}
                       />
                     </div>
+                    {l.tracking === "BATCH" && (
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        <label className="space-y-1 text-[11px] text-muted-foreground">
+                          <span>{lang === "ar" ? "رقم الدفعة *" : "Batch number *"}</span>
+                          <input
+                            required
+                            dir="ltr"
+                            value={l.batch_number}
+                            onChange={(event) =>
+                              update(l.product_id, { batch_number: event.target.value })
+                            }
+                            className="h-9 w-full rounded-md border border-input bg-surface px-2 text-sm text-foreground"
+                          />
+                        </label>
+                        <label className="space-y-1 text-[11px] text-muted-foreground">
+                          <span>{lang === "ar" ? "تاريخ الانتهاء" : "Expiry date"}</span>
+                          <input
+                            type="date"
+                            value={l.expiry_date}
+                            onChange={(event) =>
+                              update(l.product_id, { expiry_date: event.target.value })
+                            }
+                            className="h-9 w-full rounded-md border border-input bg-surface px-2 text-sm text-foreground"
+                          />
+                        </label>
+                      </div>
+                    )}
                   </div>
                 ))
               )}

@@ -74,7 +74,7 @@ export interface CompanyItemPolicy {
 export const DEFAULT_ITEM_POLICY: ItemPolicy = {
   item_nature: "GOOD",
   inventory_policy: "TRACKED",
-  tracking: "NONE",
+  tracking: "BATCH",
   costing_method: "MOVING_AVERAGE",
   is_sellable: true,
   is_purchasable: true,
@@ -197,11 +197,31 @@ export function validateItemPolicy(policy: ItemPolicy): PolicyValidationResult {
     errors.push("الصنف غير المتتبع لا يمكن أن يطلب تتبع دفعات أو أرقام تسلسلية.");
   }
 
-  if (policy.costing_method === "NONE" && policy.inventory_policy !== "UNTRACKED") {
-    errors.push("طريقة التكلفة NONE صحيحة فقط للصنف غير المتتبع.");
+  if (
+    policy.inventory_policy === "CUSTOMER_OWNED" &&
+    (policy.item_nature !== "GOOD" ||
+      policy.tracking !== "NONE" ||
+      policy.costing_method !== "NONE" ||
+      policy.is_sellable ||
+      policy.is_purchasable)
+  ) {
+    errors.push(
+      "صنف الأمانات يجب أن يكون سلعة مملوكة للعميل بلا تتبع فردي أو تكلفة تجارية أو بيع وشراء.",
+    );
   }
 
-  if (!policy.is_sellable && !policy.is_purchasable) {
+  if (
+    policy.costing_method === "NONE" &&
+    !["UNTRACKED", "CUSTOMER_OWNED"].includes(policy.inventory_policy)
+  ) {
+    errors.push("طريقة التكلفة NONE صحيحة فقط للصنف غير المتتبع أو المملوك للعميل.");
+  }
+
+  if (
+    !policy.is_sellable &&
+    !policy.is_purchasable &&
+    policy.inventory_policy !== "CUSTOMER_OWNED"
+  ) {
     errors.push("يجب أن يكون الصنف قابلًا للبيع أو الشراء أو كليهما.");
   }
 

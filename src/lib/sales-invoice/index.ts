@@ -90,6 +90,12 @@ export interface CreateSalesInvoiceInput {
   chequeBank?: string | null;
   chequeDueDate?: string | null;
   chequeDrawer?: string | null;
+  paymentSplits?: {
+    method: string;
+    amount: number;
+    payment_method_id?: string;
+    reference?: string | null;
+  }[] | null;
 }
 
 export interface SalesInvoiceResult {
@@ -212,12 +218,15 @@ export async function createSalesInvoice(
           },
     );
 
+    const paymentSplits = (input.paymentSplits ?? []).filter((line) => Number(line.amount) > 0);
+
     // A credit sale collects nothing; every other method records what was
     // actually received and leaves the remainder as a receivable. Deriving
     // this here rather than trusting the form keeps the ledger and the invoice
     // from disagreeing.
-    const paid =
-      input.paymentMethod === "credit"
+    const paid = paymentSplits.length
+      ? Math.round(paymentSplits.reduce((sum, line) => sum + Number(line.amount), 0) * 100) / 100
+      : input.paymentMethod === "credit"
         ? 0
         : Math.max(0, Math.min(Number(input.paid) || 0, Number.MAX_SAFE_INTEGER));
 
@@ -225,21 +234,36 @@ export async function createSalesInvoice(
     // invoice is dated by the engine when it is created. Passing _sale_date
     // would be ignored silently by PostgREST, so the form's date field is a
     // display value and the function is called without it.
-    const { data, error } = await db.rpc("create_sale", {
+    const saleArgs = {
       _warehouse_id: input.warehouseId,
       _customer_id: input.customerId || null,
-      _payment_method: input.paymentMethod,
+      _payment_method: paymentSplits.length > 1 ? "split" : input.paymentMethod,
       _paid: paid,
       _discount: Number(input.discount ?? 0),
       _note: input.note ?? null,
       _items: items,
-    });
+    };
+    const { data, error } = paymentSplits.length > 0
+      ? await db.rpc("create_sale", {
+          ...saleArgs,
+          _sale_date: input.saleDate ?? new Date().toISOString().slice(0, 10),
+          _payment_splits: paymentSplits.map((line) => ({
+            method: line.method,
+            amount: Number(line.amount),
+            payment_method_id: line.payment_method_id || line.method,
+            reference: line.reference || null,
+          })),
+        })
+      : await db.rpc("create_sale", saleArgs);
     if (error) throw new Error(error.message);
 
     const invoiceId = data as string;
 
     // Update invoice with specific treasury & settlement routing metadata
-    if (input.cashboxId || input.bankAccountId || input.paymentMethodId || input.paymentReference) {
+    if (
+      paymentSplits.length === 0 &&
+      (input.cashboxId || input.bankAccountId || input.paymentMethodId || input.paymentReference)
+    ) {
       try {
         await db
           .from("sales_invoices")

@@ -120,38 +120,25 @@ export function useFinancialPosting() {
             data = res.data;
             error = res.error;
           } else {
-            // Try enhanced 13-parameter signature first to ensure atomic treasury routing & cheque registration
-            try {
-              const res = await (supabase as any).rpc("record_customer_payment", {
-                _customer_id: partyId,
-                _invoice_id: invoiceId || null,
-                _amount: amount,
-                _method: params.paymentMethodId || method,
-                _payment_date: paymentDate,
-                _note: fullNote || null,
-                _cashbox_id: params.cashboxId || null,
-                _bank_account_id: params.bankAccountId || null,
-                _payment_method_id: params.paymentMethodId || method || null,
-                _cheque_number: params.chequeNumber || null,
-                _cheque_bank: params.chequeBank || null,
-                _cheque_due_date: params.chequeDueDate || null,
-                _cheque_drawer: params.chequeDrawer || null,
-              });
-              data = res.data;
-              error = res.error;
-            } catch {
-              // Backward-compatible fallback to 6-parameter signature
-              const res = await (supabase as any).rpc("record_customer_payment", {
-                _customer_id: partyId,
-                _amount: amount,
-                _method: method,
-                _payment_date: paymentDate,
-                _note: fullNote || null,
-                _invoice_id: invoiceId || null,
-              });
-              data = res.data;
-              error = res.error;
-            }
+            // Use the full signature so treasury routing and cheque details are
+            // posted atomically with the customer receipt.
+            const res = await (supabase as any).rpc("record_customer_payment", {
+              _customer_id: partyId,
+              _invoice_id: invoiceId || null,
+              _amount: amount,
+              _method: params.paymentMethodId || method,
+              _payment_date: paymentDate,
+              _note: fullNote || null,
+              _cashbox_id: params.cashboxId || null,
+              _bank_account_id: params.bankAccountId || null,
+              _payment_method_id: params.paymentMethodId || method || null,
+              _cheque_number: params.chequeNumber || null,
+              _cheque_bank: params.chequeBank || null,
+              _cheque_due_date: params.chequeDueDate || null,
+              _cheque_drawer: params.chequeDrawer || null,
+            });
+            data = res.data;
+            error = res.error;
           }
 
           if (error) {
@@ -159,6 +146,13 @@ export function useFinancialPosting() {
             throw error;
           }
           paymentId = typeof data === "string" ? data : data?.id || undefined;
+          if (!paymentId) {
+            throw new Error(
+              lang === "ar"
+                ? "لم يرجع النظام رقم سند التحصيل؛ تحقق من سجل العميل قبل إعادة المحاولة."
+                : "The collection returned no receipt ID. Verify the customer ledger before retrying.",
+            );
+          }
 
           // Persist treasury link into customer_payments row
           if (

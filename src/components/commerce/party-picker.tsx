@@ -14,6 +14,7 @@ import { money } from "@/lib/format";
 type PartyOption = {
   id: string;
   name: string;
+  is_system?: boolean | null;
   phone?: string | null;
   balance?: number | null;
 };
@@ -44,6 +45,9 @@ export function PartyPicker({
   const selected = options.find((option) => option.id === value);
   const fallbackLabel = emptyLabel ?? (isArabic ? "اختر جهة" : "Select party");
   const PartyIcon = kind === "customer" ? UserRound : Truck;
+  // A system cash party is the explicit counterpart for the blank/walk-in
+  // choice. Showing both creates two entries that perform the same role.
+  const showEmptyItem = Boolean(emptyLabel && !options.some((option) => option.is_system));
 
   const select = (nextValue: string) => {
     onChange(nextValue);
@@ -107,7 +111,7 @@ export function PartyPicker({
             <CommandEmpty className="py-8 text-xs text-muted-foreground">
               {isArabic ? "لا توجد نتائج مطابقة" : "No matching results"}
             </CommandEmpty>
-            {emptyLabel && (
+            {showEmptyItem && (
               <CommandItem
                 value={`__empty__ ${emptyLabel}`}
                 onSelect={() => select("")}

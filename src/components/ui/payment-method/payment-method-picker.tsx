@@ -237,6 +237,14 @@ export function PaymentMethodPicker({
               </span>
             </SelectItem>
           ))}
+          {allowedLegacyValues?.includes("split") && (
+            <SelectItem value="split" className="gap-2 py-2 ps-2 pe-8">
+              <span className="flex min-w-0 items-center gap-2">
+                <PaymentMethodIcon iconKey="split" methodId="split" className="size-5" />
+                <span>{isRtl ? "دفع بأكثر من طريقة" : "Split payment"}</span>
+              </span>
+            </SelectItem>
+          )}
         </SelectContent>
       </Select>
       {selectedDefinition && (

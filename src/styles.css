@@ -288,6 +288,252 @@
   --tone-primary-fg: oklch(0.38 0.18 258);
 }
 
+/* ============================================================
+ * Mode Variants — درجات أوضاع العرض (نهاري/ليلي)
+ * الافتراضي: بدون كلاس إضافي (نفس القيم أعلاه تماماً — لا تغيير).
+ * تُضاف الكلاسات على عنصر <html> بجانب .light أو .dark.
+ * ========================================================== */
+
+/* ---- النهاري الفخم: عاجي دافئ أنيق ---- */
+:root.light-luxe,
+.light-luxe {
+  --background: oklch(0.962 0.014 60);
+  --foreground: oklch(0.20 0.030 258);
+  --surface: oklch(0.942 0.016 60);
+  --surface-elevated: oklch(0.978 0.012 60);
+  --card: oklch(0.975 0.012 60);
+  --card-foreground: oklch(0.20 0.030 258);
+  --popover: oklch(0.980 0.010 60);
+  --popover-foreground: oklch(0.20 0.030 258);
+  --secondary: oklch(0.925 0.018 60);
+  --secondary-foreground: oklch(0.24 0.030 258);
+  --muted: oklch(0.925 0.018 60);
+  --muted-foreground: oklch(0.47 0.024 258);
+  --accent: oklch(0.905 0.020 60);
+  --accent-foreground: oklch(0.24 0.030 258);
+  --border: oklch(0.30 0.030 50 / 0.11);
+  --input: oklch(0.30 0.030 50 / 0.13);
+  --sidebar: oklch(0.950 0.014 60);
+  --sidebar-foreground: oklch(0.24 0.030 258);
+  --sidebar-accent: oklch(0.915 0.018 60);
+  --sidebar-accent-foreground: oklch(0.24 0.030 258);
+  --sidebar-border: oklch(0.30 0.030 50 / 0.10);
+  --surface-2: oklch(0.915 0.020 60);
+  --surface-3: oklch(0.880 0.024 60);
+  --scrollbar-thumb: oklch(0.30 0.03 50 / 0.24);
+  --scrollbar-thumb-hover: oklch(0.30 0.03 50 / 0.40);
+}
+
+/* ---- النهاري الأبيض النقي: أعلى وضوح ---- */
+:root.light-pure,
+.light-pure {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.16 0.030 258);
+  --surface: oklch(0.985 0.003 60);
+  --surface-elevated: oklch(1 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.16 0.030 258);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.16 0.030 258);
+  --secondary: oklch(0.960 0.006 60);
+  --secondary-foreground: oklch(0.20 0.030 258);
+  --muted: oklch(0.960 0.006 60);
+  --muted-foreground: oklch(0.46 0.024 258);
+  --accent: oklch(0.945 0.008 60);
+  --accent-foreground: oklch(0.20 0.030 258);
+  --border: oklch(0.20 0.02 258 / 0.08);
+  --input: oklch(0.20 0.02 258 / 0.10);
+  --sidebar: oklch(0.990 0.003 60);
+  --sidebar-foreground: oklch(0.20 0.030 258);
+  --sidebar-accent: oklch(0.955 0.006 60);
+  --sidebar-accent-foreground: oklch(0.20 0.030 258);
+  --sidebar-border: oklch(0.20 0.02 258 / 0.08);
+  --surface-2: oklch(0.950 0.008 60);
+  --surface-3: oklch(0.920 0.010 60);
+  --scrollbar-thumb: oklch(0.20 0.02 258 / 0.22);
+  --scrollbar-thumb-hover: oklch(0.20 0.02 258 / 0.38);
+}
+
+/* ---- الليلي الرمادي الفحمي: متوسط بين الوضعين ---- */
+:root.dark-slate,
+.dark-slate {
+  --background: oklch(0.215 0.012 260);
+  --foreground: oklch(0.975 0.006 60);
+  --surface: oklch(0.255 0.014 260);
+  --surface-elevated: oklch(0.295 0.016 260);
+  --surface-2: oklch(0.335 0.016 260);
+  --surface-3: oklch(0.380 0.018 260);
+  --card: oklch(0.265 0.014 260);
+  --card-foreground: oklch(0.975 0.006 60);
+  --popover: oklch(0.285 0.014 260);
+  --popover-foreground: oklch(0.975 0.006 60);
+  --secondary: oklch(0.310 0.014 260);
+  --secondary-foreground: oklch(0.955 0.008 260);
+  --muted: oklch(0.295 0.012 260);
+  --muted-foreground: oklch(0.735 0.014 260);
+  --accent: oklch(0.325 0.016 260);
+  --accent-foreground: oklch(0.975 0.006 260);
+  --border: oklch(1 0 0 / 0.10);
+  --input: oklch(1 0 0 / 0.12);
+  --sidebar: oklch(0.195 0.010 260);
+  --sidebar-foreground: oklch(0.870 0.012 260);
+  --sidebar-accent: oklch(0.255 0.012 260);
+  --sidebar-accent-foreground: oklch(0.975 0.006 260);
+  --sidebar-border: oklch(1 0 0 / 0.09);
+  --scrollbar-thumb: oklch(1 0 0 / 0.15);
+  --scrollbar-thumb-hover: oklch(1 0 0 / 0.30);
+}
+
+/* ---- الليلي المعتم العميق: أسود ملكي ---- */
+:root.dark-deep,
+.dark-deep {
+  --background: oklch(0.070 0.008 260);
+  --foreground: oklch(0.985 0.006 60);
+  --surface: oklch(0.100 0.010 260);
+  --surface-elevated: oklch(0.135 0.012 260);
+  --surface-2: oklch(0.165 0.012 260);
+  --surface-3: oklch(0.200 0.014 260);
+  --card: oklch(0.112 0.010 260);
+  --card-foreground: oklch(0.985 0.006 60);
+  --popover: oklch(0.130 0.010 260);
+  --popover-foreground: oklch(0.985 0.006 60);
+  --secondary: oklch(0.155 0.012 260);
+  --secondary-foreground: oklch(0.960 0.008 260);
+  --muted: oklch(0.130 0.010 260);
+  --muted-foreground: oklch(0.640 0.014 260);
+  --accent: oklch(0.170 0.014 260);
+  --accent-foreground: oklch(0.985 0.006 260);
+  --border: oklch(1 0 0 / 0.07);
+  --input: oklch(1 0 0 / 0.08);
+  --sidebar: oklch(0.055 0.006 260);
+  --sidebar-foreground: oklch(0.850 0.012 260);
+  --sidebar-accent: oklch(0.115 0.010 260);
+  --sidebar-accent-foreground: oklch(0.985 0.006 260);
+  --sidebar-border: oklch(1 0 0 / 0.06);
+  --scrollbar-thumb: oklch(1 0 0 / 0.11);
+  --scrollbar-thumb-hover: oklch(1 0 0 / 0.24);
+}
+
+/* ---- النهاري الرملي الدافئ: بيج صحراوي أصيل ---- */
+:root.light-sand,
+.light-sand {
+  --background: oklch(0.952 0.022 82);
+  --foreground: oklch(0.22 0.028 60);
+  --surface: oklch(0.928 0.026 82);
+  --surface-elevated: oklch(0.968 0.018 82);
+  --card: oklch(0.965 0.018 82);
+  --card-foreground: oklch(0.22 0.028 60);
+  --popover: oklch(0.972 0.016 82);
+  --popover-foreground: oklch(0.22 0.028 60);
+  --secondary: oklch(0.910 0.028 82);
+  --secondary-foreground: oklch(0.26 0.028 60);
+  --muted: oklch(0.910 0.028 82);
+  --muted-foreground: oklch(0.46 0.024 60);
+  --accent: oklch(0.888 0.030 82);
+  --accent-foreground: oklch(0.26 0.028 60);
+  --border: oklch(0.35 0.035 70 / 0.13);
+  --input: oklch(0.35 0.035 70 / 0.15);
+  --sidebar: oklch(0.940 0.024 82);
+  --sidebar-foreground: oklch(0.26 0.028 60);
+  --sidebar-accent: oklch(0.900 0.028 82);
+  --sidebar-accent-foreground: oklch(0.26 0.028 60);
+  --sidebar-border: oklch(0.35 0.035 70 / 0.12);
+  --surface-2: oklch(0.900 0.030 82);
+  --surface-3: oklch(0.865 0.034 82);
+  --scrollbar-thumb: oklch(0.35 0.035 70 / 0.24);
+  --scrollbar-thumb-hover: oklch(0.35 0.035 70 / 0.40);
+}
+
+/* ---- النهاري الرمادي الناعم: ضبابي هادئ بارد ---- */
+:root.light-mist,
+.light-mist {
+  --background: oklch(0.958 0.008 255);
+  --foreground: oklch(0.18 0.026 258);
+  --surface: oklch(0.932 0.010 255);
+  --surface-elevated: oklch(0.975 0.008 255);
+  --card: oklch(0.972 0.008 255);
+  --card-foreground: oklch(0.18 0.026 258);
+  --popover: oklch(0.978 0.006 255);
+  --popover-foreground: oklch(0.18 0.026 258);
+  --secondary: oklch(0.908 0.012 255);
+  --secondary-foreground: oklch(0.22 0.026 258);
+  --muted: oklch(0.908 0.012 255);
+  --muted-foreground: oklch(0.46 0.022 258);
+  --accent: oklch(0.885 0.014 255);
+  --accent-foreground: oklch(0.22 0.026 258);
+  --border: oklch(0.25 0.025 258 / 0.11);
+  --input: oklch(0.25 0.025 258 / 0.13);
+  --sidebar: oklch(0.945 0.010 255);
+  --sidebar-foreground: oklch(0.22 0.026 258);
+  --sidebar-accent: oklch(0.895 0.012 255);
+  --sidebar-accent-foreground: oklch(0.22 0.026 258);
+  --sidebar-border: oklch(0.25 0.025 258 / 0.10);
+  --surface-2: oklch(0.895 0.014 255);
+  --surface-3: oklch(0.860 0.016 255);
+  --scrollbar-thumb: oklch(0.25 0.025 258 / 0.24);
+  --scrollbar-thumb-hover: oklch(0.25 0.025 258 / 0.40);
+}
+
+/* ---- الليلي الأزرق النيلي: ليل فلكي عميق ---- */
+:root.dark-navy,
+.dark-navy {
+  --background: oklch(0.145 0.030 265);
+  --foreground: oklch(0.985 0.006 60);
+  --surface: oklch(0.180 0.032 265);
+  --surface-elevated: oklch(0.215 0.034 265);
+  --surface-2: oklch(0.245 0.034 265);
+  --surface-3: oklch(0.280 0.034 265);
+  --card: oklch(0.190 0.032 265);
+  --card-foreground: oklch(0.985 0.006 60);
+  --popover: oklch(0.210 0.032 265);
+  --popover-foreground: oklch(0.985 0.006 60);
+  --secondary: oklch(0.235 0.032 265);
+  --secondary-foreground: oklch(0.960 0.008 260);
+  --muted: oklch(0.218 0.030 265);
+  --muted-foreground: oklch(0.700 0.018 260);
+  --accent: oklch(0.255 0.034 265);
+  --accent-foreground: oklch(0.985 0.006 260);
+  --border: oklch(1 0 0 / 0.10);
+  --input: oklch(1 0 0 / 0.11);
+  --sidebar: oklch(0.125 0.026 265);
+  --sidebar-foreground: oklch(0.860 0.012 260);
+  --sidebar-accent: oklch(0.185 0.030 265);
+  --sidebar-accent-foreground: oklch(0.985 0.006 260);
+  --sidebar-border: oklch(1 0 0 / 0.08);
+  --scrollbar-thumb: oklch(1 0 0 / 0.13);
+  --scrollbar-thumb-hover: oklch(1 0 0 / 0.27);
+}
+
+/* ---- الليلي القهوة الدافئة: بني إسبريسو فاخر ---- */
+:root.dark-cocoa,
+.dark-cocoa {
+  --background: oklch(0.150 0.022 58);
+  --foreground: oklch(0.985 0.006 60);
+  --surface: oklch(0.185 0.024 58);
+  --surface-elevated: oklch(0.220 0.026 58);
+  --surface-2: oklch(0.250 0.026 58);
+  --surface-3: oklch(0.288 0.026 58);
+  --card: oklch(0.196 0.024 58);
+  --card-foreground: oklch(0.985 0.006 60);
+  --popover: oklch(0.216 0.024 58);
+  --popover-foreground: oklch(0.985 0.006 60);
+  --secondary: oklch(0.240 0.024 58);
+  --secondary-foreground: oklch(0.960 0.008 60);
+  --muted: oklch(0.222 0.022 58);
+  --muted-foreground: oklch(0.710 0.016 60);
+  --accent: oklch(0.260 0.026 58);
+  --accent-foreground: oklch(0.985 0.006 60);
+  --border: oklch(1 0 0 / 0.10);
+  --input: oklch(1 0 0 / 0.12);
+  --sidebar: oklch(0.128 0.018 58);
+  --sidebar-foreground: oklch(0.860 0.012 60);
+  --sidebar-accent: oklch(0.190 0.022 58);
+  --sidebar-accent-foreground: oklch(0.985 0.006 60);
+  --sidebar-border: oklch(1 0 0 / 0.09);
+  --scrollbar-thumb: oklch(1 0 0 / 0.13);
+  --scrollbar-thumb-hover: oklch(1 0 0 / 0.28);
+}
+
 @layer base {
   * {
     border-color: var(--color-border);
@@ -638,10 +884,52 @@
     background-position: 200% 0;
   }
 }
+
+/*
+ * موجة التحميل الموحدة (shimmer):
+ * لمسة لون أساسي (primary) فاخرة بدل الوميض الأبيض الشفاف القديم —
+ * واضحة وأنيقة في الوضعين النهاري والليلي، وبلطف متدرّج غير مُزعج.
+ */
 .shimmer {
-  background: linear-gradient(90deg, transparent, oklch(1 0 0 / 0.05), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, var(--primary) 26%, transparent),
+    transparent
+  );
   background-size: 200% 100%;
   animation: shimmer 1.6s linear infinite;
+}
+
+/* النهاري: توهج أهدأ لأن الخلفية فاتحة أصلًا — لمعان حريري راقٍ */
+.light .shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, var(--primary) 16%, transparent),
+    color-mix(in oklab, var(--primary) 4%, transparent)
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+/* الليلي: توهج أوضح قليلاً مع ذيل ناعم يبرز الموجة على الخلفية الداكنة */
+.dark .shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, var(--primary) 30%, transparent),
+    color-mix(in oklab, var(--primary) 6%, transparent)
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+/* احترام تفضيل تقليل الحركة */
+@media (prefers-reduced-motion: reduce) {
+  .shimmer {
+    animation: none;
+  }
 }
 
 /* Universal sleek minimalist scrollbar: track completely transparent everywhere */
@@ -712,4 +1000,22 @@
 
 .table-row-mullak:hover {
   background-color: color-mix(in oklab, var(--surface-2) 75%, transparent);
+}
+
+/* ============================================================
+ * إلغاء أيقونة (X) وأزرار الإلغاء والتفريغ المدمجة في المتصفحات
+ * (Chrome / Edge / Windows / Safari) لكافة الحقول الرقمية والمدخلات
+ * ========================================================== */
+input::-webkit-search-cancel-button,
+input::-webkit-search-decoration,
+input::-webkit-cancel-button,
+input::-ms-clear,
+input::-ms-reveal {
+  display: none !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }

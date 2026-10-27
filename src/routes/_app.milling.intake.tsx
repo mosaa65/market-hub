@@ -35,6 +35,7 @@ import {
   Coins,
   BadgePercent,
   ShoppingBag,
+  Layers,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
@@ -61,6 +62,7 @@ import {
 } from "@/lib/milling";
 import { PaymentPanel, usePaymentPanel } from "@/components/payments/payment-panel";
 import { DynamicPaymentSelector } from "@/components/ui/payment-method/dynamic-payment-selector";
+import { PaymentSplitCatalogDialog, type PaymentSplitTender } from "@/components/ui/payment-method";
 import { useFormNavigationScope } from "@/hooks/use-form-navigation";
 import { AmountInput } from "@/components/ui/amount-input";
 import { QuantityInput } from "@/components/ui/quantity-input";
@@ -142,6 +144,8 @@ function MillingIntakePage() {
     paymentMethodId: "cash",
   });
   const [paid, setPaid] = useState("");
+  const [splitEditorOpen, setSplitEditorOpen] = useState(false);
+  const [splitPayments, setSplitPayments] = useState<PaymentSplitTender[]>([]);
   /**
    * تعبئة تلقائية للمبلغ المستلم: يتبع صافي الفاتورة لحظياً حتى يعدّله المستخدم يدوياً،
    * ويعود للتبعية التلقائية عند بدء عملية جديدة أو التحول للطريقة الآجلة.
@@ -306,6 +310,7 @@ function MillingIntakePage() {
 
   const currentDiscount = Number(discount) || 0;
   const grandTotal = Math.max(0, currentSubtotal - currentDiscount);
+  const paymentSplits = splitPayments;
 
   const payment = usePaymentPanel({
     total: grandTotal,
@@ -362,6 +367,7 @@ function MillingIntakePage() {
         discount: currentDiscount,
         paymentMethod: toLegacyPaymentValue(paymentMethod),
         paid: currentPaid,
+        paymentSplits: paymentSplits.length > 1 ? paymentSplits : null,
         notes: notes.trim() || undefined,
       });
     },
@@ -394,6 +400,8 @@ function MillingIntakePage() {
       setLines([{ itemId: "", bags: "", kg: "" }]);
       setNotes("");
       setPaid("");
+      setSplitPayments([]);
+      setPaymentMethod("cash");
       setPaidAuto(true);
       setDiscount("");
 
@@ -773,12 +781,12 @@ function MillingIntakePage() {
               {/* ملاحظات الاستلام */}
               <MillingField
                 label="ملاحظات الاستلام"
-                hint="اختيارية — رقم الشاحنة/القاطبة، اسم السائق، أو أي تفاصيل خاصة بالدفعة."
+                hint="اختيارية — أي تفاصيل أو ملاحظات خاصة بالدفعة المستلمة."
               >
                 <MillingInput
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="مثال: شاحنة نقل رقم 4589 — تفريغ مستعجل"
+                  placeholder="مثال: دفعة حبوب خام — تفريغ مستعجل"
                 />
               </MillingField>
 
@@ -948,21 +956,38 @@ function MillingIntakePage() {
                       </button>
                     </div>
                   </div>
-                  <DynamicPaymentSelector
-                    context="sales"
-                    value={paymentMethod}
-                    settlement={settlement}
-                    onSettlementChange={setSettlement}
-                    compact
-                    includeCredit
-                    onChange={(method) => {
-                      setPaymentMethod(method);
-                      if (getPaymentMethodDefinition(method)?.isCreditTerm) {
-                        setPaid("");
-                      }
-                    }}
-                    disabled={submit.isPending}
-                  />
+                  {paymentMethod !== "split" ? (
+                    <DynamicPaymentSelector
+                      context="sales"
+                      value={paymentMethod}
+                      settlement={settlement}
+                      onSettlementChange={setSettlement}
+                      compact
+                      includeCredit
+                      onChange={(method) => {
+                        setPaymentMethod(method);
+                        setSplitPayments([]);
+                        if (getPaymentMethodDefinition(method)?.isCreditTerm) {
+                          setPaid("");
+                        }
+                      }}
+                      disabled={submit.isPending}
+                    />
+                  ) : (
+                    <div className="flex min-h-9 items-center justify-between rounded-xl border border-primary/20 bg-primary/[0.04] px-3 text-xs font-semibold text-primary">
+                      <span>الدفع موزع على عدة طرق</span>
+                      <button type="button" onClick={() => { setSplitPayments([]); setPaymentMethod("cash"); setSettlement((current) => ({ ...current, method: "cash", paymentMethodId: "cash" })); }} className="underline underline-offset-2">إلغاء التجزئة</button>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    disabled={submit.isPending || grandTotal <= 0}
+                    onClick={() => setSplitEditorOpen(true)}
+                    className="mt-1 inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg border border-primary/25 bg-primary/[0.04] px-2.5 text-[10px] font-semibold text-primary transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Layers className="size-3.5" />
+                    توزيع الدفع على أكثر من طريقة
+                  </button>
                 </div>
 
                 {/* المبلغ المدفوع */}
@@ -1143,6 +1168,21 @@ function MillingIntakePage() {
                 }
               : undefined
           }
+        />
+
+        <PaymentSplitCatalogDialog
+          open={splitEditorOpen}
+          onOpenChange={setSplitEditorOpen}
+          total={grandTotal}
+          context="sales"
+          onConfirm={(splits) => {
+            setSplitPayments(splits);
+            setPaymentMethod(
+              splits.length > 1 ? "split" : (splits[0]?.method ?? "credit"),
+            );
+            setPaid(String(splits.reduce((sum, line) => sum + line.amount, 0)));
+            setPaidAuto(false);
+          }}
         />
 
         {/* نافذة إضافة عميل جديد سريعاً دون مغادرة الكاونتر */}

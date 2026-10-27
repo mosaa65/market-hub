@@ -192,7 +192,7 @@ export async function runScheduledBackup(
         key_version: DEFAULT_KEY_VERSION,
         created_at: serverPayload.exported_at,
         backup_type: "auto_scheduled" as const,
-        storage_type: (destination === "cloud" ? "cloud" : "local") as const,
+        storage_type: destination === "cloud" ? "cloud" : "local",
         file_size_bytes: 0,
         auth_tag: "",
         checksum_sha256: "",
