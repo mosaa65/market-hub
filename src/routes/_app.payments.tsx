@@ -1,6 +1,6 @@
 import { ModuleGuard } from "@/lib/modules";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowUpRight,
   CalendarDays,
@@ -24,7 +24,10 @@ import { money } from "@/lib/format";
 import { paymentMethodLabel, requiresPaymentReference } from "@/lib/payments/payment-methods";
 import { PaymentMethodPicker, DynamicPaymentSelector } from "@/components/ui/payment-method";
 import { AmountInput } from "@/components/ui/amount-input";
-import { SplitPaymentDialog, type SplitPaymentValues } from "@/components/ui/payment-method/split-payment-dialog";
+import {
+  SplitPaymentDialog,
+  type SplitPaymentValues,
+} from "@/components/ui/payment-method/split-payment-dialog";
 import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
 import { usePaymentMethodsForContext } from "@/hooks/use-payment-methods";
 import { useCashboxes } from "@/hooks/use-cashboxes";
@@ -115,6 +118,7 @@ function PaymentsPage() {
   const [note, setNote] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const [paymentFormOpen, setPaymentFormOpen] = useState(false);
   const [splitCollectionOpen, setSplitCollectionOpen] = useState(false);
   const [splitCollectionValues, setSplitCollectionValues] = useState<SplitPaymentValues>({
@@ -241,18 +245,20 @@ function PaymentsPage() {
     setPayments(payData as Payment[]);
   }
 
-  async function refresh() {
-    if (!selected) return;
+  async function refresh(customerId: string = selected?.id ?? ""): Promise<Customer | null> {
+    if (!customerId) return null;
     const { data: c } = await supabase
       .from("customers")
       .select("id,name,phone,balance")
-      .eq("id", selected.id)
+      .eq("id", customerId)
       .maybeSingle();
-    if (c) {
-      setSelected(c as Customer);
-      setCustomers((prev) => prev.map((x) => (x.id === c.id ? (c as Customer) : x)));
+    const customer = c ? (c as Customer) : null;
+    if (customer) {
+      setSelected(customer);
+      setCustomers((prev) => prev.map((x) => (x.id === customer.id ? customer : x)));
+      await loadCustomer(customer);
     }
-    await loadCustomer(selected);
+    return customer;
   }
 
   const outstanding = invoices.filter((i) => Number(i.total) - Number(i.paid) > 0.001);
@@ -262,10 +268,12 @@ function PaymentsPage() {
     : 0;
 
   async function submit() {
-    if (saving || !selected) return;
+    if (savingRef.current || !selected) return;
+    savingRef.current = true;
     setSaving(true);
     const amt = Number(amount);
     if (!amt || amt <= 0) {
+      savingRef.current = false;
       setSaving(false);
       return toast.error(
         t("payments.invalid_amount") || (lang === "ar" ? "أدخل مبلغ صحيح" : "Enter a valid amount"),
@@ -273,6 +281,7 @@ function PaymentsPage() {
     }
     const payableAmount = selectedInvoice ? remaining : Math.max(Number(selected.balance), 0);
     if (amt > payableAmount + 0.001) {
+      savingRef.current = false;
       setSaving(false);
       return toast.error(
         t("payments.exceeds_remaining") ||
@@ -280,6 +289,7 @@ function PaymentsPage() {
       );
     }
     if (!isSplitCollection && needsReference && !reference.trim()) {
+      savingRef.current = false;
       setSaving(false);
       return toast.error(
         lang === "ar" ? "أدخل رقم الحوالة أو المرجع" : "Enter the payment reference",
@@ -294,6 +304,7 @@ function PaymentsPage() {
         .join(" | ");
 
       let error: any = null;
+      let resultPaymentId: string | null = null;
       if (isSplitCollection) {
         const splitRows = [
           { method: "cash", methodId: "cash", amount: splitCollectionValues.cash },
@@ -311,6 +322,7 @@ function PaymentsPage() {
           },
         ].filter((line) => line.amount > 0);
         if (splitRows.length < 2) {
+          savingRef.current = false;
           setSaving(false);
           return toast.error(
             lang === "ar"
@@ -327,39 +339,40 @@ function PaymentsPage() {
           _splits: splitRows,
         });
         error = res.error;
+        resultPaymentId = typeof res.data === "string" ? res.data : null;
       } else {
-        try {
-          const res = await supabase.rpc("record_customer_payment" as any, {
-            _customer_id: selected.id,
-            _invoice_id: invoiceId || null,
-            _amount: amt,
-            // The RPC validates this exact catalogue id (including its enabled
-            // state and allowed context), then stores its legacy ENUM value.
-            _method: settlement.paymentMethodId || method,
-            _payment_date: date,
-            _note: paymentNote || null,
-            _cashbox_id: settlement.cashboxId || null,
-            _bank_account_id: settlement.bankAccountId || null,
-            _payment_method_id: settlement.paymentMethodId || null,
-            _cheque_number: settlement.chequeNumber || settlement.cheque?.chequeNumber || null,
-            _cheque_bank: settlement.chequeBank || settlement.cheque?.bankName || null,
-            _cheque_due_date: settlement.chequeDueDate || settlement.cheque?.dueDate || null,
-            _cheque_drawer: settlement.chequeDrawer || settlement.cheque?.drawerName || null,
-          });
-          error = res.error;
-        } catch {
-          throw new Error(
-            lang === "ar"
-              ? "تعذر التحقق من إصدار خدمة التحصيل. لم يتم تسجيل الدفعة؛ حدّث الصفحة أو تواصل مع الدعم."
-              : "Could not verify the collection service version. No payment was recorded; refresh or contact support.",
-          );
-        }
+        const res = await supabase.rpc("record_customer_payment" as any, {
+          _customer_id: selected.id,
+          _invoice_id: invoiceId || null,
+          _amount: amt,
+          // The RPC validates this exact catalogue id (including its enabled
+          // state and allowed context), then stores its legacy ENUM value.
+          _method: settlement.paymentMethodId || method,
+          _payment_date: date,
+          _note: paymentNote || null,
+          _cashbox_id: settlement.cashboxId || null,
+          _bank_account_id: settlement.bankAccountId || null,
+          _payment_method_id: settlement.paymentMethodId || null,
+          _cheque_number: settlement.chequeNumber || settlement.cheque?.chequeNumber || null,
+          _cheque_bank: settlement.chequeBank || settlement.cheque?.bankName || null,
+          _cheque_due_date: settlement.chequeDueDate || settlement.cheque?.dueDate || null,
+          _cheque_drawer: settlement.chequeDrawer || settlement.cheque?.drawerName || null,
+        });
+        error = res.error;
+        resultPaymentId = typeof res.data === "string" ? res.data : null;
       }
 
       if (error) throw error;
-      const receiptNumber = selectedInvoice
-        ? `REC-${selectedInvoice.invoice_number}`
-        : `REC-${String(Date.now()).slice(-6)}`;
+      if (!resultPaymentId) {
+        throw new Error(
+          lang === "ar"
+            ? "لم يتم إرجاع رقم سند القبض؛ لم يتم تأكيد التحصيل. حدّث الصفحة وتحقق من سجل العميل قبل إعادة المحاولة."
+            : "No receipt ID was returned. Verify the customer ledger before retrying.",
+        );
+      }
+      const updatedCustomer = await refresh(selected.id);
+      const updatedBalance = Math.max(Number(updatedCustomer?.balance ?? selected.balance), 0);
+      const receiptNumber = resultPaymentId;
       const resolvedMethodLabel = settlement.bankAccountName
         ? `${pmLabel(method)} (${settlement.bankAccountName})`
         : settlement.cashboxName
@@ -382,7 +395,7 @@ function PaymentsPage() {
         cashboxName: settlement.cashboxName,
         bankAccountName: settlement.bankAccountName,
         notes: paymentNote || undefined,
-        remainingBalance: Math.max(Number(selected.balance) - amt, 0),
+        remainingBalance: updatedBalance,
       });
       setPaymentFormOpen(false);
       setAmount("");
@@ -390,10 +403,10 @@ function PaymentsPage() {
       setNote("");
       setIsSplitCollection(false);
       setSplitCollectionValues({ cash: 0, credit: 0, bank_transfer: 0, mobile_money: 0 });
-      await refresh();
     } catch (e: any) {
       toast.error(e.message ?? t("common.failed"));
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }
@@ -759,7 +772,9 @@ function PaymentsPage() {
                       </button>
                       {isSplitCollection && (
                         <p className="mt-1 text-[11px] font-medium text-primary">
-                          {lang === "ar" ? "تم اختيار توزيع التحصيل على عدة طرق" : "Multiple collection tenders selected"}
+                          {lang === "ar"
+                            ? "تم اختيار توزيع التحصيل على عدة طرق"
+                            : "Multiple collection tenders selected"}
                         </p>
                       )}
                     </div>
@@ -1035,9 +1050,7 @@ function PaymentsPage() {
           setSplitCollectionValues(values);
           setAmount(
             String(
-              Math.round(
-                (values.cash + values.bank_transfer + values.mobile_money) * 100,
-              ) / 100,
+              Math.round((values.cash + values.bank_transfer + values.mobile_money) * 100) / 100,
             ),
           );
           setIsSplitCollection(true);

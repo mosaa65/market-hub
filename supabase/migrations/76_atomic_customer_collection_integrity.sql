@@ -1,8 +1,6 @@
--- Keep customer collections atomic, balanced and safe from accidental retries.
+-- Correct customer collection posting: validate limits, allocate the customer
+-- balance and post one balanced journal entry atomically for each tender.
 BEGIN;
-
--- Migration 19 already enforces one active journal entry per source across all
--- document types; preserve and rely on that guard here.
 
 CREATE OR REPLACE FUNCTION public.record_customer_payment(
   _customer_id uuid,
@@ -32,12 +30,11 @@ DECLARE
   v_account text;
   v_payment_id uuid;
   v_customer_balance numeric;
-  v_customer_outstanding numeric := 0;
   v_invoice record;
   v_inv_cur record;
   v_remaining numeric;
   v_allocation numeric;
-  v_lines jsonb := '[]'::jsonb;
+  v_lines jsonb;
 BEGIN
   IF v_user IS NULL THEN
     RAISE EXCEPTION 'Not authenticated';
@@ -53,6 +50,9 @@ BEGIN
   IF _customer_id IS NULL OR v_amount <= 0 THEN
     RAISE EXCEPTION 'A customer and a positive amount are required';
   END IF;
+  IF v_amount <> coalesce(_amount, 0) THEN
+    RAISE EXCEPTION 'Payment amount must not have more than two decimal places';
+  END IF;
 
   v_method_id := coalesce(_payment_method_id, _method);
   v_stored_method := public.resolve_writable_payment_method(
@@ -62,8 +62,7 @@ BEGIN
     RAISE EXCEPTION 'A collection cannot record آجل — that is a deferred sale, not a receipt';
   END IF;
 
-  -- Serialize all receipts for this customer. This ensures the current
-  -- outstanding amount and invoice allocations cannot be raced by concurrent calls.
+  -- Serialize collections by locking the customer row before checking balances.
   SELECT balance INTO v_customer_balance
     FROM public.customers
    WHERE id = _customer_id AND is_active = true
@@ -91,17 +90,11 @@ BEGIN
     IF v_invoice.total - v_invoice.paid <= 0 THEN
       RAISE EXCEPTION 'Invoice has no outstanding balance';
     END IF;
-    IF v_amount > (v_invoice.total - v_invoice.paid + 0.001) THEN
+    IF v_amount > v_invoice.total - v_invoice.paid + 0.001 THEN
       RAISE EXCEPTION 'Payment exceeds the invoice outstanding balance';
     END IF;
   ELSE
-    SELECT round(coalesce(sum(total - paid), 0), 2)
-      INTO v_customer_outstanding
-      FROM public.sales_invoices
-     WHERE customer_id = _customer_id
-       AND total > paid
-       AND status NOT IN ('cancelled'::public.invoice_status, 'returned'::public.invoice_status);
-    IF v_amount > v_customer_outstanding + 0.001 THEN
+    IF v_amount > greatest(coalesce(v_customer_balance, 0), 0) + 0.001 THEN
       RAISE EXCEPTION 'Payment exceeds the customer outstanding balance';
     END IF;
   END IF;
@@ -109,37 +102,35 @@ BEGIN
   INSERT INTO public.customer_payments (
     customer_id, invoice_id, amount, payment_method, payment_date, note, created_by,
     cashbox_id, bank_account_id, payment_method_id, payment_reference
-  )
-  VALUES (
+  ) VALUES (
     _customer_id, _invoice_id, v_amount, v_stored_method::public.payment_method,
     coalesce(_payment_date, current_date), nullif(trim(_note), ''), v_user,
     _cashbox_id, _bank_account_id, v_method_id, _cheque_number
-  )
-  RETURNING id INTO v_payment_id;
+  ) RETURNING id INTO v_payment_id;
+
+  INSERT INTO public.customer_ledger(
+    customer_id, entry_type, credit, reference_id, reference_type,
+    occurred_at, created_by, source_key, note
+  ) VALUES (
+    _customer_id, 'payment', v_amount, v_payment_id, 'customer_payment',
+    coalesce(_payment_date, current_date)::timestamptz, v_user,
+    'payment:' || v_payment_id,
+    coalesce(nullif(trim(_note), ''), 'دفعة عميل')
+  );
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Customer ledger posting failed';
+  END IF;
 
   IF (v_stored_method = 'cheque' OR v_method_id = 'cheque') AND _cheque_number IS NOT NULL THEN
     INSERT INTO public.cheques_register (
       cheque_number, bank_name, drawer_name, due_date, amount, status,
       customer_id, invoice_id, payment_id, notes, created_by
-    )
-    VALUES (
+    ) VALUES (
       _cheque_number, coalesce(_cheque_bank, 'شيك مصرفي'), _cheque_drawer,
       coalesce(_cheque_due_date, CURRENT_DATE), v_amount, 'UNDER_COLLECTION',
       _customer_id, _invoice_id, v_payment_id, _note, v_user
     );
   END IF;
-
-  INSERT INTO public.customer_ledger(
-    customer_id, entry_type, credit, reference_id, reference_type,
-    occurred_at, created_by, source_key, note
-  )
-  VALUES (
-    _customer_id, 'payment', v_amount, v_payment_id, 'customer_payment',
-    coalesce(_payment_date, current_date)::timestamptz, v_user,
-    'payment:' || v_payment_id,
-    coalesce(nullif(trim(_note), ''), 'دفعة عميل')
-  )
-  ON CONFLICT (source_key) DO NOTHING;
 
   IF _invoice_id IS NOT NULL THEN
     UPDATE public.sales_invoices
@@ -153,8 +144,7 @@ BEGIN
     FOR v_inv_cur IN
       SELECT id, total, paid
         FROM public.sales_invoices
-       WHERE customer_id = _customer_id
-         AND total > paid
+       WHERE customer_id = _customer_id AND total > paid
          AND status NOT IN ('cancelled'::public.invoice_status, 'returned'::public.invoice_status)
        ORDER BY created_at ASC
        FOR UPDATE
@@ -169,10 +159,12 @@ BEGIN
        WHERE id = v_inv_cur.id;
       v_remaining := v_remaining - v_allocation;
     END LOOP;
-    IF v_remaining > 0.001 THEN
-      RAISE EXCEPTION 'Payment exceeds the customer outstanding balance';
-    END IF;
   END IF;
+
+  UPDATE public.customers
+     SET balance = round(greatest(coalesce(balance, 0) - v_amount, 0), 2),
+         updated_at = now()
+   WHERE id = _customer_id;
 
   v_lines := jsonb_build_array(
     jsonb_build_object(
@@ -184,14 +176,11 @@ BEGIN
       'account_code', '1211', 'credit', v_amount,
       'memo', 'تحصيل ذمة عميل', 'partner_type', 'customer', 'partner_id', _customer_id)
   );
-
-  -- Posting is required; failures roll back the receipt, ledger and allocation.
+  -- A posting error aborts the whole RPC, including receipt and invoice updates.
   PERFORM public.create_journal_entry(
     'تحصيل من عميل — ' || coalesce(nullif(trim(_note), ''), ''),
-    coalesce(_payment_date, current_date),
-    'customer_payment', v_payment_id, true, v_lines
+    coalesce(_payment_date, current_date), 'customer_payment', v_payment_id, true, v_lines
   );
-
   RETURN v_payment_id;
 END
 $function$;
@@ -239,9 +228,9 @@ AS $function$
 DECLARE
   v_user uuid := auth.uid();
   v_customer_balance numeric;
+  v_customer_outstanding numeric := 0;
   v_total numeric := 0;
   v_split_total numeric := 0;
-  v_split_count integer := 0;
   v_method_id text;
   v_stored_method text;
   v_account text;
@@ -249,7 +238,6 @@ DECLARE
   v_payment_id uuid;
   v_last_id uuid;
   v_remaining numeric;
-  v_customer_outstanding numeric := 0;
   v_invoice record;
   v_inv_cur record;
   v_allocation numeric;
@@ -270,11 +258,15 @@ BEGIN
   IF _customer_id IS NULL THEN
     RAISE EXCEPTION 'A customer is required';
   END IF;
+  IF _amount IS NULL OR _amount <= 0 OR round(_amount, 2) <> _amount THEN
+    RAISE EXCEPTION 'A positive collection total with at most two decimals is required';
+  END IF;
   IF coalesce(jsonb_typeof(_splits), '') <> 'array'
      OR jsonb_array_length(_splits) < 2 THEN
     RAISE EXCEPTION 'A split collection requires at least two tenders';
   END IF;
 
+  -- Serialize against single and split receipts for the same customer.
   SELECT balance INTO v_customer_balance
     FROM public.customers
    WHERE id = _customer_id AND is_active = true
@@ -304,10 +296,13 @@ BEGIN
       RAISE EXCEPTION 'A collection cannot record آجل — that is a deferred sale, not a receipt';
     END IF;
     v_split_total := v_split_total + r_split.amount;
-    v_split_count := v_split_count + 1;
   END LOOP;
+  IF v_split_total <> round(v_split_total, 2) THEN
+    RAISE EXCEPTION 'Each payment tender must not have more than two decimal places';
+  END IF;
   v_total := round(v_split_total, 2);
-  IF v_total <= 0 OR (_amount IS NOT NULL AND round(_amount, 2) <> v_total) THEN
+  IF v_total <= 0 OR v_split_total <> v_total
+     OR (_amount IS NOT NULL AND round(_amount, 2) <> v_total) THEN
     RAISE EXCEPTION 'Collection total (%) does not match the sum of its tenders (%)',
       round(coalesce(_amount, 0), 2), v_total;
   END IF;
@@ -319,7 +314,8 @@ BEGIN
       RAISE EXCEPTION 'Invoice not found for this customer';
     END IF;
     IF v_invoice.total - v_invoice.paid <= 0
-       OR v_total > v_invoice.total - v_invoice.paid + 0.001 THEN
+       OR v_total > v_invoice.total - v_invoice.paid + 0.001
+       OR v_total > greatest(coalesce(v_customer_balance, 0), 0) + 0.001 THEN
       RAISE EXCEPTION 'Payment exceeds the invoice outstanding balance';
     END IF;
   ELSE
@@ -328,7 +324,8 @@ BEGIN
       FROM public.sales_invoices
      WHERE customer_id = _customer_id AND total > paid
        AND status NOT IN ('cancelled'::public.invoice_status, 'returned'::public.invoice_status);
-    IF v_total > v_customer_outstanding + 0.001 THEN
+    IF v_total > greatest(coalesce(v_customer_balance, 0), 0) + 0.001
+       OR (v_customer_outstanding > 0 AND v_total > v_customer_outstanding + 0.001) THEN
       RAISE EXCEPTION 'Payment exceeds the customer outstanding balance';
     END IF;
   END IF;
@@ -372,22 +369,25 @@ BEGIN
       occurred_at, created_by, source_key, note
     ) VALUES (
       _customer_id, 'payment', v_amount, v_payment_id, 'customer_payment',
-        coalesce(_payment_date, current_date)::timestamptz, v_user,
-        'payment:' || v_payment_id,
-        coalesce(nullif(trim(_note), ''), 'دفعة عميل (دفع مجزأ)')
-      ) ON CONFLICT (source_key) DO NOTHING;
+      coalesce(_payment_date, current_date)::timestamptz, v_user,
+      'payment:' || v_payment_id,
+      coalesce(nullif(trim(_note), ''), 'دفعة عميل (دفع مجزأ)')
+    );
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'Customer ledger posting failed';
+    END IF;
 
-      IF (v_stored_method = 'cheque' OR v_method_id = 'cheque') AND r_split.reference IS NOT NULL THEN
-        INSERT INTO public.cheques_register (
-          cheque_number, bank_name, due_date, amount, status,
-          customer_id, invoice_id, payment_id, notes, created_by
-        ) VALUES (
-          r_split.reference, 'شيك مصرفي', coalesce(_payment_date, current_date), v_amount,
-          'UNDER_COLLECTION', _customer_id, _invoice_id, v_payment_id, _note, v_user
-        );
-      END IF;
+    IF (v_stored_method = 'cheque' OR v_method_id = 'cheque') AND r_split.reference IS NOT NULL THEN
+      INSERT INTO public.cheques_register (
+        cheque_number, bank_name, due_date, amount, status,
+        customer_id, invoice_id, payment_id, notes, created_by
+      ) VALUES (
+        r_split.reference, 'شيك مصرفي', coalesce(_payment_date, current_date), v_amount,
+        'UNDER_COLLECTION', _customer_id, _invoice_id, v_payment_id, _note, v_user
+      );
+    END IF;
 
-      v_tender_lines := jsonb_build_array(
+    v_tender_lines := jsonb_build_array(
       jsonb_build_object(
         'account_code', v_account, 'debit', v_amount,
         'memo', 'تحصيل من عميل (دفع مجزأ) — ' || v_stored_method),
@@ -400,16 +400,6 @@ BEGIN
       coalesce(_payment_date, current_date),
       'customer_payment', v_payment_id, true, v_tender_lines
     );
-
-    IF (v_stored_method = 'cheque' OR v_method_id = 'cheque') AND r_split.reference IS NOT NULL THEN
-      INSERT INTO public.cheques_register (
-        cheque_number, bank_name, due_date, amount, status,
-        customer_id, invoice_id, payment_id, notes, created_by
-      ) VALUES (
-        r_split.reference, 'شيك مصرفي', coalesce(_payment_date, current_date), v_amount,
-        'UNDER_COLLECTION', _customer_id, _invoice_id, v_payment_id, _note, v_user
-      );
-    END IF;
   END LOOP;
 
   IF _invoice_id IS NOT NULL THEN
@@ -438,11 +428,12 @@ BEGIN
        WHERE id = v_inv_cur.id;
       v_remaining := v_remaining - v_allocation;
     END LOOP;
-    IF v_remaining > 0.001 THEN
-      RAISE EXCEPTION 'Payment exceeds the customer outstanding balance';
-    END IF;
   END IF;
 
+  UPDATE public.customers
+     SET balance = round(greatest(coalesce(balance, 0) - v_total, 0), 2),
+         updated_at = now()
+   WHERE id = _customer_id;
   RETURN v_last_id;
 END
 $function$;
