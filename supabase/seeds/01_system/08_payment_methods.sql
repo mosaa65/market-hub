@@ -55,6 +55,18 @@
 
 BEGIN;
 
+-- ترحيل توافقي من إصدارات قديمة كانت تزرع خيارات مسماة/بطاقة/شيك وتتركها
+-- نشطة. عطّلها واحذف إعداداتها حتى لا تفشل البذرة أو تظهر خارج الخيارات
+-- الأربعة. نحتفظ بصفوف الكتالوج نفسها عند وجود مراجع تاريخية في قواعد قائمة.
+UPDATE public.payment_methods
+   SET is_active = false,
+       updated_at = now()
+ WHERE is_active
+   AND id NOT IN ('cash','credit','bank_transfer','mobile_money','split');
+
+DELETE FROM public.payment_method_settings
+ WHERE payment_method_id NOT IN ('cash','credit','bank_transfer','mobile_money');
+
 INSERT INTO public.payment_methods (
   id, name_ar, name_en, icon_key, is_active, sort_order, allowed_contexts,
   ledger_kind, default_account_code, is_credit_term, requires_reference,
