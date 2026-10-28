@@ -591,6 +591,25 @@ export function ExpenseFormDialog({
           </div>
 
           {/* حقل المبلغ البارز */}
+          {/* تنبيه واضح عند تعديل مصروف يحتوي على عدة بنود تفصيلية */}
+          {editing && editing.lines.length > 1 && (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-600 dark:text-amber-400 flex items-start gap-2.5">
+              <Info className="size-4 shrink-0 mt-0.5" />
+              <div className="space-y-1 flex-1">
+                <p className="font-bold">
+                  {ar
+                    ? `تنبيه: يحتوي هذا المصروف على (${editing.lines.length}) بنود تفصيلية`
+                    : `Note: This expense contains (${editing.lines.length}) item lines`}
+                </p>
+                <p className="text-[11px] leading-relaxed opacity-90">
+                  {ar
+                    ? "النمط السريع هنا يقوم بتعديل إجمالي المصروف والتصنيف الأساسي. يتم الحفاظ على البنود الأخرى متناسقة مع الإجمالي المعدل."
+                    : "The quick entry mode updates total amount and primary category while preserving line integrity."}
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="rounded-2xl border border-primary/25 bg-primary/5 p-4 space-y-1.5">
             <label className="text-xs font-bold text-foreground flex items-center justify-between">
               <span>{ar ? "مبلغ المصروف المطلوب صرفه *" : "Expense Amount *"}</span>

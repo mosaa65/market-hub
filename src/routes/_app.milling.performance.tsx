@@ -65,10 +65,11 @@ interface LedgerRow {
 }
 
 interface ExpenseRow {
-  amount: number | null;
+  total_amount: number | null;
   expense_date: string | null;
   created_at: string;
-  expense_categories: { name: string; name_ar: string } | null;
+  status: string;
+  reversal_of: string | null;
 }
 
 /** مفتاح الشهر YYYY-MM */
@@ -177,9 +178,10 @@ function MillingPerformancePage() {
     queryKey: ["milling", "perf-expenses"],
     queryFn: async () => {
       const { data, error } = await db
-        .from("expenses")
-        .select("amount, expense_date, created_at, expense_categories(name, name_ar)")
+        .from("expense_entries")
+        .select("total_amount, expense_date, created_at, status, reversal_of")
         .gte("created_at", cutoff)
+        .in("status", ["POSTED", "PARTIALLY_PAID", "PAID", "CLOSED", "REVERSED"])
         .order("created_at", { ascending: true });
       if (error) throw error;
       return (data ?? []) as unknown as ExpenseRow[];
@@ -209,8 +211,11 @@ function MillingPerformancePage() {
       m.milledBags += Number(r.bags_out ?? 0);
     }
     for (const e of expenses.data ?? []) {
+      // Reversal documents reduce expense; the original REVERSED document is excluded.
+      if (e.status === "REVERSED") continue;
       const m = ensure(monthKey(e.expense_date || e.created_at));
-      m.expenses += Number(e.amount ?? 0);
+      const sign = e.reversal_of ? -1 : 1;
+      m.expenses += sign * Number(e.total_amount ?? 0);
     }
 
     return [...map.values()].sort((a, b) => a.key.localeCompare(b.key));
