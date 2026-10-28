@@ -224,4 +224,158 @@ GRANT EXECUTE ON FUNCTION public.record_expense_payment(uuid,numeric,date,paymen
 GRANT EXECUTE ON FUNCTION public.post_expense(uuid,integer,boolean,payment_method,text,date,text,uuid,uuid,uuid,text) TO authenticated,service_role;
 GRANT EXECUTE ON FUNCTION public.post_expense(uuid,integer,boolean,payment_method,text,date,text,uuid) TO authenticated,service_role;
 GRANT EXECUTE ON FUNCTION public.reverse_expense_payment(uuid,text) TO authenticated,service_role;
+
+
+-- ── Reparation of list_expenses: Accurate total_count matching all active filters ──
+CREATE OR REPLACE FUNCTION public.list_expenses(
+  p_search text DEFAULT NULL::text,
+  p_status expense_status[] DEFAULT NULL::expense_status[],
+  p_category_id uuid DEFAULT NULL::uuid,
+  p_warehouse_id uuid DEFAULT NULL::uuid,
+  p_cost_center_id uuid DEFAULT NULL::uuid,
+  p_project_id uuid DEFAULT NULL::uuid,
+  p_supplier_id uuid DEFAULT NULL::uuid,
+  p_employee_id uuid DEFAULT NULL::uuid,
+  p_payment_state text DEFAULT NULL::text,
+  p_date_from date DEFAULT NULL::date,
+  p_date_to date DEFAULT NULL::date,
+  p_amount_min numeric DEFAULT NULL::numeric,
+  p_amount_max numeric DEFAULT NULL::numeric,
+  p_category_ids uuid[] DEFAULT NULL::uuid[],
+  p_limit integer DEFAULT 50,
+  p_cursor_date date DEFAULT NULL::date,
+  p_cursor_id uuid DEFAULT NULL::uuid
+)
+RETURNS TABLE(
+  id uuid,
+  reference text,
+  status expense_status,
+  entry_type expense_entry_type,
+  payee_type expense_payee_type,
+  payee_name text,
+  supplier_id uuid,
+  supplier_name text,
+  employee_id uuid,
+  employee_name text,
+  warehouse_id uuid,
+  warehouse_name text,
+  cost_center_id uuid,
+  cost_center_name text,
+  project_id uuid,
+  project_name text,
+  expense_date date,
+  due_date date,
+  posting_date date,
+  description text,
+  note text,
+  total_amount numeric,
+  paid_amount numeric,
+  remaining_amount numeric,
+  line_count integer,
+  primary_category text,
+  primary_category_ar text,
+  version integer,
+  created_by uuid,
+  created_by_name text,
+  created_at timestamp with time zone,
+  approved_at timestamp with time zone,
+  posted_at timestamp with time zone,
+  total_count bigint,
+  next_cursor_date date,
+  next_cursor_id uuid
+)
+LANGUAGE sql
+STABLE
+SET search_path TO 'public'
+AS $function$
+  WITH all_matching AS (
+    SELECT
+      e.id, e.reference, e.status, e.entry_type, e.payee_type, e.payee_name,
+      e.supplier_id, e.employee_id, e.warehouse_id, e.cost_center_id, e.project_id,
+      e.expense_date, e.due_date, e.posting_date, e.description, e.note,
+      e.total_amount, e.paid_amount, e.remaining_amount, e.line_count,
+      e.version, e.created_by, e.created_at, e.approved_at, e.posted_at,
+      count(*) OVER () AS full_count
+    FROM public.expense_entries e
+    WHERE
+      (p_search IS NULL OR btrim(p_search) = '' OR
+        e.reference ILIKE '%' || btrim(p_search) || '%' OR
+        COALESCE(e.description, '') ILIKE '%' || btrim(p_search) || '%' OR
+        COALESCE(e.note, '')        ILIKE '%' || btrim(p_search) || '%' OR
+        COALESCE(e.payee_name, '')  ILIKE '%' || btrim(p_search) || '%')
+      AND (p_status IS NULL OR e.status = ANY (p_status))
+      AND (p_warehouse_id   IS NULL OR e.warehouse_id   = p_warehouse_id)
+      AND (p_cost_center_id IS NULL OR e.cost_center_id = p_cost_center_id)
+      AND (p_project_id     IS NULL OR e.project_id     = p_project_id)
+      AND (p_supplier_id    IS NULL OR e.supplier_id    = p_supplier_id)
+      AND (p_employee_id    IS NULL OR e.employee_id    = p_employee_id)
+      AND (p_date_from IS NULL OR e.expense_date >= p_date_from)
+      AND (p_date_to   IS NULL OR e.expense_date <= p_date_to)
+      AND (p_amount_min IS NULL OR e.total_amount >= p_amount_min)
+      AND (p_amount_max IS NULL OR e.total_amount <= p_amount_max)
+      AND (
+        p_payment_state IS NULL
+        OR (p_payment_state = 'unpaid'  AND e.paid_amount <= 0)
+        OR (p_payment_state = 'partial' AND e.paid_amount > 0
+                                        AND e.paid_amount < e.total_amount - 0.005)
+        OR (p_payment_state = 'paid'    AND e.paid_amount >= e.total_amount - 0.005)
+      )
+      AND (
+        p_category_id IS NULL
+        OR EXISTS (SELECT 1 FROM public.expense_lines l
+                   WHERE l.entry_id = e.id AND l.category_id = p_category_id)
+      )
+      AND (
+        p_category_ids IS NULL OR cardinality(p_category_ids) = 0
+        OR EXISTS (SELECT 1 FROM public.expense_lines l
+                   WHERE l.entry_id = e.id AND l.category_id = ANY (p_category_ids))
+      )
+  ),
+  paged AS (
+    SELECT *
+    FROM all_matching m
+    WHERE (
+      p_cursor_date IS NULL
+      OR (m.expense_date, m.id) < (p_cursor_date, COALESCE(p_cursor_id, m.id))
+    )
+    ORDER BY m.expense_date DESC, m.id DESC
+    LIMIT LEAST(GREATEST(COALESCE(p_limit, 50), 1), 200)
+  )
+  SELECT
+    c.id, c.reference, c.status, c.entry_type, c.payee_type, c.payee_name,
+    c.supplier_id, s.name,
+    c.employee_id, pr.full_name,
+    c.warehouse_id, w.name,
+    c.cost_center_id, cc.name,
+    c.project_id, pj.name,
+    c.expense_date, c.due_date, c.posting_date, c.description, c.note,
+    c.total_amount, c.paid_amount, c.remaining_amount, c.line_count,
+    cat.name, cat.name_ar,
+    c.version, c.created_by, pr2.full_name, c.created_at, c.approved_at, c.posted_at,
+    COALESCE(c.full_count, 0::bigint) AS total_count,
+    c.expense_date AS next_cursor_date,
+    c.id AS next_cursor_id
+  FROM paged c
+  LEFT JOIN public.suppliers s        ON s.id = c.supplier_id
+  LEFT JOIN public.profiles  pr       ON pr.id = c.employee_id
+  LEFT JOIN public.profiles  pr2      ON pr2.id = c.created_by
+  LEFT JOIN public.warehouses w       ON w.id = c.warehouse_id
+  LEFT JOIN public.expense_cost_centers cc ON cc.id = c.cost_center_id
+  LEFT JOIN public.expense_projects pj ON pj.id = c.project_id
+  LEFT JOIN LATERAL (
+    SELECT l.category_id
+    FROM public.expense_lines l
+    WHERE l.entry_id = c.id
+    ORDER BY l.gross_amount DESC, l.line_no ASC
+    LIMIT 1
+  ) prim ON true
+  LEFT JOIN public.expense_categories cat ON cat.id = prim.category_id
+  ORDER BY c.expense_date DESC, c.id DESC;
+$function$;
+
+GRANT EXECUTE ON FUNCTION public.list_expenses(
+  text, expense_status[], uuid, uuid, uuid, uuid, uuid, uuid, text,
+  date, date, numeric, numeric, uuid[], integer, date, uuid
+) TO authenticated, service_role;
+
 COMMIT;
