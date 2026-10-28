@@ -461,24 +461,11 @@ export function useExpenseMutations() {
         p_payment_date: input.paymentDate || null,
         p_idempotency_key: input.payNow ? makeIdempotencyKey(`post:${input.id}`) : null,
         p_account_id: input.accountId || null,
+        p_cashbox_id: input.cashboxId || null,
+        p_bank_account_id: input.bankAccountId || null,
+        p_payment_method_id: input.paymentMethodId || null,
       });
       if (error) throw error;
-
-      // Persist treasury cashbox/bank settlement link if settled now
-      if (input.payNow && (input.cashboxId || input.bankAccountId || input.paymentMethodId)) {
-        try {
-          await (supabase as any)
-            .from("expense_payments")
-            .update({
-              cashbox_id: input.cashboxId || null,
-              bank_account_id: input.bankAccountId || null,
-              payment_method_id: input.paymentMethodId || input.paymentMethod || null,
-            })
-            .eq("entry_id", input.id);
-        } catch (e) {
-          console.warn("Could not link expense payment to treasury hierarchy:", e);
-        }
-      }
 
       return data as ExpenseEntry;
     },
@@ -521,24 +508,11 @@ export function useExpenseMutations() {
         p_note: input.note || null,
         p_idempotency_key: makeIdempotencyKey(`pay:${input.id}`),
         p_account_id: input.accountId || null,
+        p_cashbox_id: input.cashboxId || null,
+        p_bank_account_id: input.bankAccountId || null,
+        p_payment_method_id: input.paymentMethodId || null,
       });
       if (error) throw error;
-
-      // Persist treasury cashbox/bank settlement link
-      if (input.cashboxId || input.bankAccountId || input.paymentMethodId) {
-        try {
-          await (supabase as any)
-            .from("expense_payments")
-            .update({
-              cashbox_id: input.cashboxId || null,
-              bank_account_id: input.bankAccountId || null,
-              payment_method_id: input.paymentMethodId || input.paymentMethod || null,
-            })
-            .eq("entry_id", input.id);
-        } catch (e) {
-          console.warn("Could not link expense payment to treasury hierarchy:", e);
-        }
-      }
 
       return data as ExpenseEntry;
     },
