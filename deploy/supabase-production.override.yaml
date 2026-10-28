@@ -1,0 +1,14 @@
+services:
+  # Caddy reaches the gateway over the private Docker network, so do not
+  # publish Supabase's API gateway on a host interface.
+  api-gw:
+    ports: !override []
+
+  # Do not publish Supavisor's database ports. Migrations and backups use the
+  # direct Postgres port below, bound to loopback only.
+  supavisor:
+    ports: !override []
+
+  db:
+    ports: !override
+      - "127.0.0.1:5433:5432"

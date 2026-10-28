@@ -19,6 +19,7 @@
     "db:backup": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/local_backup.ps1",
     "db:types": "node scripts/update-supabase-types.mjs",
     "db:cloud:push": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/push-cloud.ps1",
+    "db:selfhosted:push": "bash deploy/push-selfhosted-migrations.sh",
     "format": "prettier --write .",
     "test:statements": "npx tsx src/lib/statements/__tests__/engine.test.ts",
     "test:print-engine": "npx tsx src/lib/templates/__tests__/print-engine.test.ts",

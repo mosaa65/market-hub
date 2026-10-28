@@ -19,6 +19,7 @@ services:
       - "3000"
     networks:
       - app_private
+      - supabase_backend
     init: true
     read_only: true
     tmpfs:
@@ -46,6 +47,7 @@ services:
         condition: service_healthy
     environment:
       APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN in deploy/.env.production}
+      SUPABASE_DOMAIN: ${SUPABASE_DOMAIN:?Set SUPABASE_DOMAIN in deploy/.env.production}
     ports:
       - "80:80"
       - "443:443"
@@ -56,11 +58,17 @@ services:
       - caddy_config:/config
     networks:
       - app_private
+      - supabase_backend
     security_opt:
       - no-new-privileges:true
 
 networks:
   app_private:
+  # The official self-hosted Supabase Compose project creates this network
+  # from its top-level `name: supabase`. The app only reaches the API gateway.
+  supabase_backend:
+    external: true
+    name: supabase_default
 
 volumes:
   caddy_data:
