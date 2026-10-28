@@ -167,5 +167,17 @@ export function canAccessRoute(pathname: string, ctx: AccessContext): boolean {
 
   // Role lookup failures and unassigned users must fail closed on restricted routes.
   if (normalizedRoles.length === 0) return false;
+
+  // المالك يملك حق الوصول لجميع صفحات المتجر التشغيلية دون استثناء
+  if (normalizedRoles.includes("owner")) return true;
+
+  // المدير يرث صلاحية الوصول لصفحات الكاشير وأمين المستودع
+  if (
+    normalizedRoles.includes("manager") &&
+    (rule.allowedRoles.includes("cashier") || rule.allowedRoles.includes("warehouse"))
+  ) {
+    return true;
+  }
+
   return rule.allowedRoles.some((role) => normalizedRoles.includes(role));
 }

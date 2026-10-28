@@ -17,7 +17,7 @@ interface CachedAuthData {
 }
 
 const AUTH_CACHE_KEY = "vortex_auth_permissions_cache";
-const CACHE_TTL_MS = 1000 * 60 * 60 * 24; // 24 hours
+const CACHE_TTL_MS = 1000 * 60 * 5; // 5 minutes
 
 function normalizeRole(value: unknown): Role | null {
   if (typeof value !== "string") return null;
@@ -207,6 +207,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
+      if (event === "TOKEN_REFRESHED" || event === "USER_UPDATED") {
+        clearCachedAuth();
+      }
       setTimeout(() => void applySession(s, event === "INITIAL_SESSION"), 0);
     });
 
@@ -310,7 +313,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isActive,
     loading,
     isRefreshingPermissions,
-    hasRole: (r) => roles.includes(r),
+    hasRole: (r) => {
+      // سوبر أدمن المنصة يملك كافة الصلاحيات
+      if (isPlatformSuperadmin) return true;
+      // المالك يملك صلاحيات كافة الأدوار التشغيلية تلقائياً
+      if (roles.includes("owner")) return true;
+      // المدير يملك صلاحيات الكاشير وأمين المستودع تلقائياً
+      if (roles.includes("manager") && (r === "cashier" || r === "warehouse")) return true;
+      return roles.includes(r);
+    },
     signOut: async () => {
       clearCachedAuth();
       clearSessionQueryCache(queryClient);
