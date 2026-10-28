@@ -9,6 +9,17 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 function Invoke-Supabase {
   param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
 
+  $displayArguments = [System.Collections.Generic.List[string]]::new()
+  for ($index = 0; $index -lt $Arguments.Count; $index++) {
+    if ($Arguments[$index] -eq "--db-url" -and $index + 1 -lt $Arguments.Count) {
+      $displayArguments.Add("--db-url")
+      $displayArguments.Add("<redacted database URL>")
+      $index++
+      continue
+    }
+    $displayArguments.Add($Arguments[$index])
+  }
+
   $previousPreference = $ErrorActionPreference
   $ErrorActionPreference = "Continue"
   $output = & supabase @Arguments 2>&1
@@ -17,13 +28,13 @@ function Invoke-Supabase {
 
   foreach ($line in $output) {
     $text = [string]$line
-    if ($text -match 'ANON_KEY|PUBLISHABLE_KEY|SECRET_KEY|SERVICE_ROLE_KEY|JWT_SECRET|S3_PROTOCOL_ACCESS_KEY') {
+    if ($text -match 'ANON_KEY|PUBLISHABLE_KEY|SECRET_KEY|SERVICE_ROLE_KEY|JWT_SECRET|S3_PROTOCOL_ACCESS_KEY|postgres(?:ql)?://\S+') {
       continue
     }
     Write-Host $text
   }
   if ($exitCode -ne 0) {
-    throw "Supabase CLI command failed: supabase $($Arguments -join ' ')"
+    throw "Supabase CLI command failed: supabase $($displayArguments -join ' ')"
   }
 }
 
@@ -86,7 +97,10 @@ try {
     throw "Cloud deployment cancelled. No database changes were made."
   }
 
-  Invoke-Supabase db push --linked
+  # Use the validated direct connection URI from SUPABASE_DB_URL. `--linked`
+  # can select a pooler endpoint independently and fail even when this URI is
+  # valid; this also keeps schema deployment on the exact verified target.
+  Invoke-Supabase db push --db-url $env:SUPABASE_DB_URL
 
   if ($IncludeDemoData) {
     Write-Host "WARNING: this adds test platform accounts and fictitious mill business data." -ForegroundColor Red
@@ -102,7 +116,7 @@ try {
   if ($LASTEXITCODE -ne 0) { throw "Cloud seed application failed. The database URL was not printed." }
 
   Write-Host "Cloud migrations and safe reference seeds completed for $linkedRef." -ForegroundColor Green
-  Write-Host "Verify with: supabase db push --linked --dry-run"
+  Write-Host "The migration push used the validated direct database URL."
 }
 finally {
   Pop-Location

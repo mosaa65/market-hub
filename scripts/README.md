@@ -17,4 +17,6 @@
 | `functions-local-start.ps1` | تشغيل دوال الحافة (Edge Functions) محلياً | محلي | `npm run db:functions:start` |
 | `update-supabase-types.mjs` | تحديث ملف أنواع TypeScript المستخرجة من جداول Supabase | محلي/سحابي | يدوي |
 
+`push-cloud.ps1` يتحقق أن `SUPABASE_DB_URL` تخص المشروع المرتبط، ثم يستخدم عنوان قاعدة البيانات هذا مباشرةً للترحيلات والبذور؛ لا يطبع بيانات الاتصال.
+
 > **تنبيه:** يمكنك تنفيذ كافة هذه العمليات بسهولة تامة عن طريق تشغيل `db-control.bat` في جذر المشروع.
