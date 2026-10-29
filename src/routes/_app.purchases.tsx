@@ -97,6 +97,11 @@ type StatusTab = "all" | "paid" | "partial" | "unpaid" | "cancelled";
 interface Line {
   id: string;
   quantity: number;
+  entered_quantity?: number | null;
+  entered_unit_cost?: number | null;
+  uom_id?: string | null;
+  uom_conversion_factor?: number | null;
+  uom?: { name?: string | null; name_ar?: string | null } | null;
   unit_cost: number;
   tax: number;
   total: number;
@@ -111,11 +116,23 @@ interface Product {
   barcode: string | null;
   category_id?: string | null;
   cost_price: number;
+  unit_id?: string | null;
+  purchase_uoms?: PurchaseUomOption[];
   tax_rate: number;
   tracking?: string | null;
   unit?: { short_name?: string | null; name?: string | null; name_ar?: string | null } | null;
   category?: { id?: string; name?: string | null; name_ar?: string | null } | null;
   inventory?: { warehouse_id: string; quantity: number }[] | null;
+}
+
+interface PurchaseUomOption {
+  unit_id: string;
+  factor_to_base: number;
+  purchase_price: number;
+  label: string;
+  quantity_increment: number;
+  is_default_purchase: boolean;
+  barcodes: string[];
 }
 
 interface Supplier {
@@ -130,11 +147,17 @@ interface Warehouse {
 }
 
 interface CartLine {
+  line_id: string;
   product_id: string;
   name: string;
   unit_cost: number;
   tax_rate: number;
   quantity: number;
+  quantity_increment: number;
+  uom_id: string | null;
+  uom_factor: number;
+  uom_label: string;
+  purchase_uoms: PurchaseUomOption[];
   tracking: string;
   batch_number: string;
   expiry_date: string;
@@ -266,7 +289,7 @@ function PurchasesPage() {
     try {
       const { data, error } = await supabase
         .from("purchase_invoice_items")
-        .select("id,quantity,unit_cost,tax,total,products(id,name,name_ar,sku)")
+        .select("id,quantity,unit_cost,tax,total,entered_quantity,entered_unit_cost,uom_id,uom_conversion_factor,products(id,name,name_ar,sku),uom:units!purchase_invoice_items_uom_id_fkey(name,name_ar)")
         .eq("invoice_id", inv.id);
       if (error) {
         console.error("Error loading purchase items:", error);
@@ -299,7 +322,7 @@ function PurchasesPage() {
     try {
       const { data } = await supabase
         .from("purchase_invoice_items")
-        .select("id,quantity,unit_cost,tax,total,products(id,name,name_ar,sku)")
+        .select("id,quantity,unit_cost,tax,total,entered_quantity,entered_unit_cost,uom_id,uom_conversion_factor,products(id,name,name_ar,sku),uom:units!purchase_invoice_items_uom_id_fkey(name,name_ar)")
         .eq("invoice_id", inv.id);
       setDirectPrintLines((data ?? []) as any);
     } catch (err) {
@@ -1333,8 +1356,9 @@ function PurchasesPage() {
           name: l.products?.name || "—",
           name_ar: l.products?.name_ar,
           sku: l.products?.sku,
-          quantity: l.quantity,
-          unitPrice: l.unit_cost,
+          quantity: l.entered_quantity ?? l.quantity,
+          unit: (l as any).uom?.name_ar || (l as any).uom?.name || null,
+          unitPrice: l.entered_unit_cost ?? l.unit_cost,
           total: l.total,
         }))}
         loadingItems={loadingLines}
@@ -1376,8 +1400,9 @@ function PurchasesPage() {
             status: statusLabel(directPrintInvoice.status),
             lines: directPrintLines.map((l) => ({
               product: l.products?.name_ar || l.products?.name || "—",
-              qty: Number(l.quantity),
-              price: Number(l.unit_cost),
+              qty: Number(l.entered_quantity ?? l.quantity),
+              unit: l.uom?.name_ar || l.uom?.name || undefined,
+              price: Number(l.entered_unit_cost ?? l.unit_cost),
               total: Number(l.total),
               code: l.products?.sku || undefined,
             })),
@@ -1753,8 +1778,9 @@ function ViewDialog({
             status: statusLabel(invoice.status),
             lines: lines.map((l) => ({
               product: l.products?.name_ar || l.products?.name || "—",
-              qty: Number(l.quantity),
-              price: Number(l.unit_cost),
+              qty: Number(l.entered_quantity ?? l.quantity),
+              unit: l.uom?.name_ar || l.uom?.name || undefined,
+              price: Number(l.entered_unit_cost ?? l.unit_cost),
               total: Number(l.total),
               code: l.products?.sku || undefined,
             })),
@@ -1798,6 +1824,7 @@ function CreateDialog({
   const [productView, setProductView] = usePersistedViewMode("purchase-product-picker", "list");
   const [stockMap, setStockMap] = useState<Record<string, number>>({});
   const [cart, setCart] = useState<CartLine[]>([]);
+  const [purchaseUomsReady, setPurchaseUomsReady] = useState(false);
   const [paid, setPaid] = useState("");
   const [discount, setDiscount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<string>("bank_transfer");
@@ -1815,10 +1842,11 @@ function CreateDialog({
 
   useEffect(() => {
     void (async () => {
+      setPurchaseUomsReady(false);
       const [{ data: ps }, { data: ss }, { data: ws }] = await Promise.all([
         (supabase.from("products") as any)
           .select(
-            "id,name,name_ar,sku,barcode,cost_price,tax_rate,tracking,is_custody_item,is_purchasable,category_id,unit:units!products_unit_id_fkey(short_name,name,name_ar),category:categories(id,name,name_ar),inventory!inventory_product_id_fkey(warehouse_id,quantity)",
+            "id,name,name_ar,sku,barcode,cost_price,tax_rate,tracking,is_custody_item,is_purchasable,category_id,unit_id,unit:units!products_unit_id_fkey(short_name,name,name_ar),category:categories(id,name,name_ar),inventory!inventory_product_id_fkey(warehouse_id,quantity)",
           )
           .eq("is_active", true)
           .eq("is_purchasable", true)
@@ -1828,13 +1856,96 @@ function CreateDialog({
         supabase.from("suppliers").select("id,name").eq("is_active", true).order("name"),
         supabase.from("warehouses").select("id,name,name_ar").eq("is_active", true).order("name"),
       ]);
-      setProducts((ps ?? []) as Product[]);
+      const productRows = (ps ?? []) as Product[];
+      let ready = true;
+      const unitsByProduct = new Map<string, PurchaseUomOption[]>();
+      if (productRows.length) {
+        try {
+          const ids = productRows.map((product) => product.id);
+          const [uomResult, costResult] = await Promise.all([
+            (supabase as any)
+              .from("product_uoms")
+              .select("id, product_id, unit_id, factor_to_base, quantity_increment, is_default_purchase, unit:units!product_uoms_unit_id_fkey(name, name_ar, short_name)")
+              .in("product_id", ids)
+              .eq("is_active", true)
+              .eq("can_purchase", true),
+            (supabase as any)
+              .from("company_items")
+              .select("item_id, default_cost")
+              .eq("company_id", 1)
+              .eq("is_active", true)
+              .in("item_id", ids),
+          ]);
+          const missingSchema = uomResult.error && ["42P01", "PGRST205"].includes(uomResult.error.code ?? "");
+          if (uomResult.error && !missingSchema) throw uomResult.error;
+          if (costResult.error) throw costResult.error;
+          if (!missingSchema && uomResult.data?.length) {
+            const uomIds = uomResult.data.map((row: any) => row.id);
+            const [priceResult, barcodeResult] = await Promise.all([
+              (supabase as any)
+                .from("product_uom_prices")
+                .select("product_uom_id, purchase_price")
+                .in("product_uom_id", uomIds)
+                .eq("company_id", 1),
+              (supabase as any)
+                .from("product_uom_barcodes")
+                .select("product_uom_id, barcode")
+                .in("product_uom_id", uomIds)
+                .eq("company_id", 1)
+                .eq("is_active", true),
+            ]);
+            if (priceResult.error) throw priceResult.error;
+            if (barcodeResult.error) throw barcodeResult.error;
+            const baseCostByProduct = new Map<string, number>();
+            for (const row of costResult.data ?? []) {
+              if (row.default_cost != null) baseCostByProduct.set(row.item_id, Number(row.default_cost));
+            }
+            const priceByUom = new Map<string, number>();
+            for (const row of priceResult.data ?? []) {
+              if (row.purchase_price != null) priceByUom.set(row.product_uom_id, Number(row.purchase_price));
+            }
+            const barcodesByUom = new Map<string, string[]>();
+            for (const row of barcodeResult.data ?? []) {
+              const list = barcodesByUom.get(row.product_uom_id) ?? [];
+              list.push(row.barcode);
+              barcodesByUom.set(row.product_uom_id, list);
+            }
+            for (const row of uomResult.data as any[]) {
+              const product = productRows.find((entry) => entry.id === row.product_id);
+              const factor = Number(row.factor_to_base);
+              const baseCost = baseCostByProduct.get(row.product_id) ?? Number(product?.cost_price ?? 0);
+              const unit = row.unit;
+              const options = unitsByProduct.get(row.product_id) ?? [];
+              options.push({
+                unit_id: row.unit_id,
+                factor_to_base: factor,
+                purchase_price: priceByUom.get(row.id) ?? baseCost * factor,
+                label: unit
+                  ? `${lang === "ar" ? unit.name_ar || unit.name : unit.name || unit.name_ar}${unit.short_name ? ` (${unit.short_name})` : ""}`
+                  : lang === "ar" ? "وحدة" : "Unit",
+                quantity_increment: Number(row.quantity_increment ?? 1),
+                is_default_purchase: row.is_default_purchase === true,
+                barcodes: barcodesByUom.get(row.id) ?? [],
+              });
+              unitsByProduct.set(row.product_id, options);
+            }
+          }
+        } catch (unitError) {
+          ready = false;
+          console.warn("[purchases] Item unit settings unavailable", unitError);
+        }
+      }
+      setProducts(productRows.map((product) => ({
+        ...product,
+        purchase_uoms: unitsByProduct.get(product.id) ?? [],
+      })));
+      setPurchaseUomsReady(ready);
       setSuppliers(ss ?? []);
       setWarehouses(ws ?? []);
-      if (ws?.[0]) setWarehouseId(ws[0].id);
-      if (ss?.[0]) setSupplierId(ss[0].id);
+      if (ws?.[0]) setWarehouseId((current) => current || ws[0].id);
+      if (ss?.[0]) setSupplierId((current) => current || ss[0].id);
     })();
-  }, []);
+  }, [lang]);
 
   useEffect(() => {
     if (!warehouseId) {
@@ -1879,7 +1990,7 @@ function CreateDialog({
     const matching = products.filter((p) => {
       const matchesSearch =
         !q ||
-        [p.name, p.name_ar, p.sku, p.barcode].some((value) =>
+        [p.name, p.name_ar, p.sku, p.barcode, ...(p.purchase_uoms ?? []).flatMap((uom) => uom.barcodes)].some((value) =>
           (value ?? "").toLowerCase().includes(q),
         );
       return matchesSearch && (!selectedCategory || p.category_id === selectedCategory);
@@ -1889,9 +2000,9 @@ function CreateDialog({
         case "name_desc":
           return (b.name_ar || b.name).localeCompare(a.name_ar || a.name, lang);
         case "cost_asc":
-          return Number(a.cost_price) - Number(b.cost_price);
+          return getDefaultPurchaseUom(a).purchase_price - getDefaultPurchaseUom(b).purchase_price;
         case "cost_desc":
-          return Number(b.cost_price) - Number(a.cost_price);
+          return getDefaultPurchaseUom(b).purchase_price - getDefaultPurchaseUom(a).purchase_price;
         case "stock_asc":
           return (stockMap[a.id] ?? 0) - (stockMap[b.id] ?? 0);
         case "stock_desc":
@@ -1903,9 +2014,18 @@ function CreateDialog({
   }, [products, search, selectedCategory, productSort, stockMap, lang]);
 
   function addToCart(p: Product) {
+    if (!purchaseUomsReady) {
+      toast.info(lang === "ar" ? "جارٍ تحميل وحدات الشراء؛ حاول مجددًا بعد لحظة" : "Loading purchase units; try again shortly.");
+      return;
+    }
+    const searchCode = search.trim().toLowerCase();
+    const scannedUnit = p.purchase_uoms?.find((uom) => uom.barcodes.some((code) => code.toLowerCase() === searchCode));
+    const purchaseUom = scannedUnit ?? getDefaultPurchaseUom(p);
     const available = Number(stockMap[p.id] ?? 0);
     setCart((prev) => {
-      const idx = prev.findIndex((l) => l.product_id === p.id);
+      const idx = p.tracking === "BATCH" || p.tracking === "SERIAL"
+        ? -1
+        : prev.findIndex((l) => l.product_id === p.id && l.uom_id === (purchaseUom.unit_id || null));
       if (idx >= 0) {
         const n = [...prev];
         const nextQty = n[idx].quantity + 1;
@@ -1915,11 +2035,17 @@ function CreateDialog({
       return [
         ...prev,
         {
+          line_id: crypto.randomUUID(),
           product_id: p.id,
           name: productLabel(p),
-          unit_cost: Number(p.cost_price),
+          unit_cost: purchaseUom.purchase_price,
           tax_rate: Number(p.tax_rate ?? 0),
           quantity: 1,
+          quantity_increment: purchaseUom.quantity_increment,
+          uom_id: purchaseUom.unit_id || null,
+          uom_factor: purchaseUom.factor_to_base,
+          uom_label: purchaseUom.label,
+          purchase_uoms: p.purchase_uoms ?? [],
           tracking: p.tracking ?? "NONE",
           batch_number: "",
           expiry_date: "",
@@ -1935,14 +2061,41 @@ function CreateDialog({
     }
   }
 
+  function getDefaultPurchaseUom(product: Product): PurchaseUomOption {
+    return product.purchase_uoms?.find((uom) => uom.is_default_purchase)
+      ?? product.purchase_uoms?.find((uom) => uom.unit_id === product.unit_id)
+      ?? {
+        unit_id: product.unit_id ?? "",
+        factor_to_base: 1,
+        purchase_price: Number(product.cost_price || 0),
+        label: product.unit?.short_name || (lang === "ar" ? "وحدة الأساس" : "Base unit"),
+        quantity_increment: 1,
+        is_default_purchase: true,
+        barcodes: product.barcode ? [product.barcode] : [],
+      };
+  }
+
   function clearCart() {
     setCart([]);
     setPaid("");
     setDiscount("");
   }
 
-  function update(pid: string, patch: Partial<CartLine>) {
-    setCart((c) => c.map((l) => (l.product_id === pid ? { ...l, ...patch } : l)));
+  function update(lineId: string, patch: Partial<CartLine>) {
+    setCart((c) => c.map((l) => (l.line_id === lineId ? { ...l, ...patch } : l)));
+  }
+
+  function changePurchaseUom(lineId: string, unitId: string) {
+    const line = cart.find((entry) => entry.line_id === lineId);
+    const unit = line?.purchase_uoms.find((option) => option.unit_id === unitId);
+    if (!line || !unit) return;
+    update(lineId, {
+      uom_id: unit.unit_id,
+      uom_factor: unit.factor_to_base,
+      uom_label: unit.label,
+      quantity_increment: unit.quantity_increment,
+      unit_cost: unit.purchase_price,
+    });
   }
 
   const subtotal = cart.reduce((s, l) => s + l.unit_cost * l.quantity, 0);
@@ -1960,6 +2113,7 @@ function CreateDialog({
       (line) =>
         !Number.isFinite(line.quantity) ||
         line.quantity <= 0 ||
+        Math.abs(line.quantity / (line.quantity_increment || 1) - Math.round(line.quantity / (line.quantity_increment || 1))) > 1e-8 ||
         !Number.isFinite(line.unit_cost) ||
         line.unit_cost < 0 ||
         !Number.isFinite(line.tax_rate) ||
@@ -1988,8 +2142,7 @@ function CreateDialog({
       let invId: string | null = null;
       let error: any = null;
 
-      try {
-        const res = await (supabase.rpc as any)("create_purchase", {
+      const res = await (supabase.rpc as any)("create_purchase", {
           _warehouse_id: warehouseId,
           _supplier_id: supplierId,
           // The picker holds a catalogue id. Convert at the boundary, exactly as
@@ -2006,35 +2159,12 @@ function CreateDialog({
             tax_rate: Number(l.tax_rate),
             batch_number: l.batch_number.trim() || null,
             expiry_date: l.expiry_date || null,
+            uom_id: l.uom_id,
           })),
-          _cashbox_id: paymentSelection.cashboxId || null,
-          _bank_account_id: paymentSelection.bankAccountId || null,
-          _payment_reference:
-            paymentSelection.reference || paymentSelection.paymentReference || null,
-          _payment_method_id: paymentSelection.paymentMethodId || paymentMethod,
+          _payment_splits: [],
         });
-        invId = res.data;
-        error = res.error;
-      } catch {
-        const res = await supabase.rpc("create_purchase", {
-          _warehouse_id: warehouseId,
-          _supplier_id: supplierId,
-          _payment_method: toLegacyPaymentValue(paymentMethod),
-          _paid: paymentMethod === "credit" ? 0 : paidN || total,
-          _discount: discountN,
-          _note: (note || null) as any,
-          _items: cart.map((l) => ({
-            product_id: l.product_id,
-            quantity: Number(l.quantity),
-            unit_cost: Number(l.unit_cost),
-            tax_rate: Number(l.tax_rate),
-            batch_number: l.batch_number.trim() || null,
-            expiry_date: l.expiry_date || null,
-          })),
-        });
-        invId = res.data;
-        error = res.error;
-      }
+      invId = res.data;
+      error = res.error;
 
       if (error) throw error;
 
@@ -2259,12 +2389,12 @@ function CreateDialog({
                       </span>
                       <span className="shrink-0 text-end">
                         <span className="block text-sm font-semibold text-primary">
-                          {money(Number(p.cost_price))}
+                          {money(getDefaultPurchaseUom(p).purchase_price)} / {getDefaultPurchaseUom(p).label}
                         </span>
                         <span className="block text-[10px] text-muted-foreground">
                           {lang === "ar"
-                            ? `المخزون: ${Number(stockMap[p.id] ?? 0)}`
-                            : `Stock: ${Number(stockMap[p.id] ?? 0)}`}
+                            ? `المخزون: ${Number(stockMap[p.id] ?? 0) / Math.max(getDefaultPurchaseUom(p).factor_to_base, 0.000000001)} ${getDefaultPurchaseUom(p).label}`
+                            : `Stock: ${Number(stockMap[p.id] ?? 0) / Math.max(getDefaultPurchaseUom(p).factor_to_base, 0.000000001)} ${getDefaultPurchaseUom(p).label}`}
                         </span>
                       </span>
                     </button>
@@ -2292,8 +2422,8 @@ function CreateDialog({
                           <td className="p-2 font-mono text-muted-foreground">
                             {p.sku || p.barcode || "—"}
                           </td>
-                          <td className="p-2 text-end">{money(Number(p.cost_price))}</td>
-                          <td className="p-2 text-end">{Number(stockMap[p.id] ?? 0)}</td>
+                          <td className="p-2 text-end">{money(getDefaultPurchaseUom(p).purchase_price)} / {getDefaultPurchaseUom(p).label}</td>
+                          <td className="p-2 text-end">{Number(stockMap[p.id] ?? 0) / Math.max(getDefaultPurchaseUom(p).factor_to_base, 0.000000001)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -2317,12 +2447,12 @@ function CreateDialog({
                       </span>
                       <span className="shrink-0 text-end">
                         <span className="block text-xs font-semibold text-primary">
-                          {money(Number(p.cost_price))}
+                          {money(getDefaultPurchaseUom(p).purchase_price)} / {getDefaultPurchaseUom(p).label}
                         </span>
                         <span className="block text-[10px] text-muted-foreground">
                           {lang === "ar"
-                            ? `المخزون: ${Number(stockMap[p.id] ?? 0)}`
-                            : `Stock: ${Number(stockMap[p.id] ?? 0)}`}
+                            ? `المخزون: ${Number(stockMap[p.id] ?? 0) / Math.max(getDefaultPurchaseUom(p).factor_to_base, 0.000000001)} ${getDefaultPurchaseUom(p).label}`
+                            : `Stock: ${Number(stockMap[p.id] ?? 0) / Math.max(getDefaultPurchaseUom(p).factor_to_base, 0.000000001)} ${getDefaultPurchaseUom(p).label}`}
                         </span>
                       </span>
                     </button>
@@ -2343,34 +2473,48 @@ function CreateDialog({
                 </div>
               ) : (
                 cart.map((l) => (
-                  <div key={l.product_id} className="rounded border border-border bg-surface p-2">
+                  <div key={l.line_id} className="rounded border border-border bg-surface p-2">
                     <div className="flex items-start justify-between gap-2">
                       <div className="truncate text-sm font-medium">{l.name}</div>
                       <button
                         onClick={() =>
-                          setCart((c) => c.filter((x) => x.product_id !== l.product_id))
+                          setCart((c) => c.filter((x) => x.line_id !== l.line_id))
                         }
                         className="text-muted-foreground hover:text-destructive"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
+                    {l.purchase_uoms.length > 1 && (
+                      <label className="mt-2 block space-y-1 text-[10px] text-muted-foreground">
+                        <span>{lang === "ar" ? "وحدة الشراء" : "Purchase unit"}</span>
+                        <select
+                          value={l.uom_id ?? ""}
+                          onChange={(event) => changePurchaseUom(l.line_id, event.target.value)}
+                          className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground"
+                        >
+                          {l.purchase_uoms.map((uom) => <option key={uom.unit_id} value={uom.unit_id}>{uom.label}</option>)}
+                        </select>
+                      </label>
+                    )}
                     <div className="mt-2 grid grid-cols-3 gap-1">
                       <NumberInput
                         label={t("common.qty")}
                         value={l.quantity}
-                        onChange={(v) => update(l.product_id, { quantity: v })}
+                        onChange={(v) => update(l.line_id, { quantity: v })}
+                        step={l.quantity_increment}
                       />
                       <NumberInput
                         label={t("common.cost")}
                         value={l.unit_cost}
-                        onChange={(v) => update(l.product_id, { unit_cost: v })}
-                        step={0.01}
+                        onChange={(v) => update(l.line_id, { unit_cost: v })}
+                        step={0.0001}
                       />
                       <NumberInput
                         label={t("purchases.tax_pct")}
                         value={l.tax_rate}
-                        onChange={(v) => update(l.product_id, { tax_rate: v })}
+                        onChange={(v) => update(l.line_id, { tax_rate: v })}
+                        step={0.01}
                       />
                     </div>
                     {l.tracking === "BATCH" && (
@@ -2382,7 +2526,7 @@ function CreateDialog({
                             dir="ltr"
                             value={l.batch_number}
                             onChange={(event) =>
-                              update(l.product_id, { batch_number: event.target.value })
+                              update(l.line_id, { batch_number: event.target.value })
                             }
                             className="h-9 w-full rounded-md border border-input bg-surface px-2 text-sm text-foreground"
                           />
@@ -2393,7 +2537,7 @@ function CreateDialog({
                             type="date"
                             value={l.expiry_date}
                             onChange={(event) =>
-                              update(l.product_id, { expiry_date: event.target.value })
+                              update(l.line_id, { expiry_date: event.target.value })
                             }
                             className="h-9 w-full rounded-md border border-input bg-surface px-2 text-sm text-foreground"
                           />
@@ -2482,17 +2626,20 @@ function NumberInput({
   value,
   onChange,
   step = 1,
+  decimals,
 }: {
   label: string;
   value: number;
   onChange: (v: number) => void;
   step?: number;
+  decimals?: number;
 }) {
+  const precision = decimals ?? Math.min(8, (String(step).split(".")[1] ?? "").length);
   return (
     <div>
       <label className="block text-[10px] uppercase text-muted-foreground">{label}</label>
       <QuantityInput
-        decimals={2}
+        decimals={precision}
         min={0}
         value={value}
         onValueChange={(v) => onChange(v ?? 0)}

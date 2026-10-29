@@ -32,7 +32,9 @@ export interface InvoiceProductFinderProps {
   isRtl: boolean;
   disabled?: boolean;
   /** يُستدعى عند اختيار صنف (Enter أو نقرة) */
-  onPick: (product: SellableProduct) => void;
+  onPick: (product: SellableProduct, uomId?: string) => void;
+  /** Tab من البحث: ينتقل إلى أول بند في المستند بدل الخروج من الشاشة. */
+  onTabForward?: () => void;
   /** الحد الأقصى لعدد النتائج المعروضة */
   limit?: number;
   className?: string;
@@ -47,7 +49,10 @@ function filterProducts(products: SellableProduct[], query: string, limit: numbe
       (p) =>
         p.name.toLowerCase().includes(q) ||
         (p.sku ?? "").toLowerCase().includes(q) ||
-        (p.barcode ?? "").toLowerCase().includes(q),
+        (p.barcode ?? "").toLowerCase().includes(q) ||
+        (p.sale_uoms ?? []).some((uom) =>
+          uom.barcodes.some((code) => code.toLowerCase().includes(q)),
+        ),
     )
     .slice(0, limit);
 }
@@ -57,6 +62,7 @@ export function InvoiceProductFinder({
   isRtl,
   disabled,
   onPick,
+  onTabForward,
   limit = 5,
   className,
 }: InvoiceProductFinderProps) {
@@ -83,7 +89,11 @@ export function InvoiceProductFinder({
   const optionId = (index: number) => `invoice-product-option-${index}`;
 
   function pick(product: SellableProduct) {
-    onPick(product);
+    const exactCode = query.trim().toLowerCase();
+    const scannedUom = product.sale_uoms?.find((uom) =>
+      uom.barcodes.some((code) => code.toLowerCase() === exactCode),
+    );
+    onPick(product, scannedUom?.unit_id);
     setQuery("");
     setOpen(false);
     setActiveIndex(0);
@@ -121,6 +131,15 @@ export function InvoiceProductFinder({
       event.preventDefault();
       const target = results[activeIndex] ?? results[0];
       if (target) pick(target);
+      return;
+    }
+
+    // Tab: لا يخرج من النموذج — يكمل إلى البنود ثم إلى عمود القرار.
+    if (event.key === "Tab" && !event.shiftKey) {
+      event.preventDefault();
+      setOpen(false);
+      if (onTabForward) onTabForward();
+      else inputRef.current?.blur();
     }
   }
 
@@ -207,6 +226,16 @@ export function InvoiceProductFinder({
                     id={optionId(index)}
                     role="option"
                     aria-selected={active}
+                    // كل نتيجة Tab-stop: من لا يستعمل الفأرة يجب أن يستطيع
+                    // الوصول إلى الجدول دون العودة إلى حقل البحث.
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        pick(product);
+                      }
+                    }}
                     onMouseEnter={() => setActiveIndex(index)}
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => pick(product)}
@@ -242,7 +271,14 @@ export function InvoiceProductFinder({
                             outOfStock ? "text-rose-500" : "text-emerald-600 dark:text-emerald-400"
                           }
                         >
-                          {isRtl ? "متاح" : "On hand"}: {toSystemDigits(String(product.on_hand))}
+                          {isRtl ? "متاح" : "On hand"}:{" "}
+                          {toSystemDigits(
+                            String(
+                              product.on_hand /
+                                Math.max(product.default_sales_factor || 1, 0.000000001),
+                            ),
+                          )}{" "}
+                          {product.default_unit_label || product.base_unit_label || ""}
                         </span>
                       </span>
                     </span>

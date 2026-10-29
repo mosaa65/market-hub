@@ -74,6 +74,7 @@ interface Product {
   category_id?: string | null;
   brand_id?: string | null;
   unit_id?: string | null;
+  purchase_uoms?: PurchaseUom[];
   origin_id?: string | null;
   quality_grade_id?: string | null;
   unit?: { short_name: string; name_ar: string | null; name: string } | null;
@@ -83,13 +84,28 @@ interface Product {
   quality?: { name: string; name_ar: string | null; code?: string } | null;
 }
 
+interface PurchaseUom {
+  unit_id: string;
+  factor_to_base: number;
+  purchase_price: number;
+  label: string;
+  quantity_increment: number;
+  is_default_purchase: boolean;
+}
+
 interface CartLine {
+  line_id: string;
   product_id: string;
   name: string;
   sku: string | null;
   unit_cost: number;
   tax_rate: number;
   quantity: number;
+  quantity_increment: number;
+  uom_id: string | null;
+  uom_factor: number;
+  uom_label: string;
+  purchase_uoms: PurchaseUom[];
   tracking: "NONE" | "BATCH" | "SERIAL";
   batch_number: string;
   expiry_date: string;
@@ -266,6 +282,8 @@ function PurchasePOSPage() {
     roles.includes("owner") || roles.includes("manager") || roles.includes("accountant");
 
   const [products, setProducts] = useState<Product[]>([]);
+  const [unitBarcodeMap, setUnitBarcodeMap] = useState<Record<string, { product_id: string; uom_id: string }>>({});
+  const [purchaseUomsLoaded, setPurchaseUomsLoaded] = useState(false);
   const [stockMap, setStockMap] = useState<Record<string, number>>({});
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -455,6 +473,7 @@ function PurchasePOSPage() {
   }, [warehouseId]);
 
   async function loadAll() {
+    setPurchaseUomsLoaded(false);
     try {
       const [
         { data: ws },
@@ -497,7 +516,91 @@ function PurchasePOSPage() {
       const loadedSuppliers = sups ?? [];
       setWarehouses(loadedWarehouses);
       setSuppliers(loadedSuppliers);
-      setProducts((ps as any) ?? []);
+      const productRows = ((ps as any) ?? []) as Product[];
+      const purchaseUomsByProduct = new Map<string, PurchaseUom[]>();
+      const barcodeLookup: Record<string, { product_id: string; uom_id: string }> = {};
+      let unitSettingsReady = true;
+      if (productRows.length) {
+        const ids = productRows.map((product) => product.id);
+        try {
+          const [uomResult, companyCostResult] = await Promise.all([
+            (supabase as any)
+              .from("product_uoms")
+              .select("id, product_id, unit_id, factor_to_base, quantity_increment, is_default_purchase, unit:units!product_uoms_unit_id_fkey(name, name_ar, short_name)")
+              .in("product_id", ids)
+              .eq("is_active", true)
+              .eq("can_purchase", true),
+            (supabase as any)
+              .from("company_items")
+              .select("item_id, default_cost")
+              .eq("company_id", 1)
+              .eq("is_active", true)
+              .in("item_id", ids),
+          ]);
+          const missingUomSchema = uomResult.error && ["42P01", "PGRST205"].includes(uomResult.error.code ?? "");
+          if (uomResult.error && !missingUomSchema) throw uomResult.error;
+          if (companyCostResult.error) throw companyCostResult.error;
+          if (!missingUomSchema && uomResult.data?.length) {
+            const baseCosts = new Map<string, number>();
+            for (const row of companyCostResult.data ?? []) {
+              if (row.default_cost != null) baseCosts.set(row.item_id, Number(row.default_cost));
+            }
+            const uomIds = uomResult.data.map((row: any) => row.id);
+            const [priceResult, barcodeResult] = await Promise.all([
+              (supabase as any)
+                .from("product_uom_prices")
+                .select("product_uom_id, purchase_price")
+                .in("product_uom_id", uomIds)
+                .eq("company_id", 1),
+              (supabase as any)
+                .from("product_uom_barcodes")
+                .select("product_uom_id, barcode")
+                .in("product_uom_id", uomIds)
+                .eq("company_id", 1)
+                .eq("is_active", true),
+            ]);
+            if (priceResult.error) throw priceResult.error;
+            if (barcodeResult.error) throw barcodeResult.error;
+            const priceById = new Map<string, number>();
+            for (const row of priceResult.data ?? []) {
+              if (row.purchase_price != null) priceById.set(row.product_uom_id, Number(row.purchase_price));
+            }
+            for (const row of uomResult.data as any[]) {
+              const product = productRows.find((item) => item.id === row.product_id);
+              const factor = Number(row.factor_to_base);
+              const unit = row.unit;
+              const baseCost = baseCosts.get(row.product_id) ?? Number(product?.cost_price ?? 0);
+              const label = unit
+                ? `${lang === "ar" ? unit.name_ar || unit.name : unit.name || unit.name_ar}${unit.short_name ? ` (${unit.short_name})` : ""}`
+                : lang === "ar" ? "وحدة" : "Unit";
+              const list = purchaseUomsByProduct.get(row.product_id) ?? [];
+              list.push({
+                unit_id: row.unit_id,
+                factor_to_base: factor,
+                purchase_price: priceById.get(row.id) ?? baseCost * factor,
+                label,
+                quantity_increment: Number(row.quantity_increment ?? 1),
+                is_default_purchase: row.is_default_purchase === true,
+              });
+              purchaseUomsByProduct.set(row.product_id, list);
+            }
+            const rowById = new Map((uomResult.data as any[]).map((row) => [row.id, row]));
+            for (const row of barcodeResult.data ?? []) {
+              const uom = rowById.get(row.product_uom_id);
+              if (uom) barcodeLookup[row.barcode] = { product_id: uom.product_id, uom_id: uom.unit_id };
+            }
+          }
+        } catch (uomError) {
+          unitSettingsReady = false;
+          console.warn("[purchase-pos] Item unit settings unavailable", uomError);
+        }
+      }
+      setUnitBarcodeMap(barcodeLookup);
+      setProducts(productRows.map((product) => ({
+        ...product,
+        purchase_uoms: purchaseUomsByProduct.get(product.id) ?? [],
+      })));
+      setPurchaseUomsLoaded(unitSettingsReady);
       setCategories(cats ?? []);
       setBrands(brs ?? []);
       setUnits(uns ?? []);
@@ -556,23 +659,45 @@ function PurchasePOSPage() {
   };
 
   // Add to purchase cart
-  function addToCart(p: Product) {
+  function addToCart(p: Product, requestedUom?: PurchaseUom | null) {
+    if (!purchaseUomsLoaded) {
+      toast.info(lang === "ar" ? "جارٍ تحميل وحدات الشراء؛ حاول مجددًا بعد لحظة" : "Loading purchase units; try again in a moment.");
+      return;
+    }
     const pName = lang === "ar" ? p.name_ar || p.name : p.name || p.name_ar || p.name;
-    const unitCost = Number(p.cost_price || 0);
+    const defaultUom = p.purchase_uoms?.find((unit) => unit.is_default_purchase)
+      ?? p.purchase_uoms?.find((unit) => unit.unit_id === p.unit_id)
+      ?? {
+        unit_id: p.unit_id ?? "",
+        factor_to_base: 1,
+        purchase_price: Number(p.cost_price || 0),
+        label: p.unit?.short_name || (lang === "ar" ? "وحدة الأساس" : "Base unit"),
+        quantity_increment: 1,
+        is_default_purchase: true,
+      };
+    const purchaseUom = requestedUom ?? defaultUom;
     setCart((prev) => {
-      const existing = prev.find((l) => l.product_id === p.id);
+      const existing = p.tracking === "BATCH" || p.tracking === "SERIAL"
+        ? undefined
+        : prev.find((l) => l.product_id === p.id && l.uom_id === (purchaseUom.unit_id || null));
       if (existing) {
-        return prev.map((l) => (l.product_id === p.id ? { ...l, quantity: l.quantity + 1 } : l));
+        return prev.map((l) => (l.line_id === existing.line_id ? { ...l, quantity: l.quantity + 1 } : l));
       }
       return [
         ...prev,
         {
+          line_id: crypto.randomUUID(),
           product_id: p.id,
           name: pName,
           sku: p.sku,
-          unit_cost: unitCost,
+          unit_cost: Number(purchaseUom.purchase_price),
           tax_rate: Number(p.tax_rate || 0),
           quantity: 1,
+          quantity_increment: purchaseUom.quantity_increment,
+          uom_id: purchaseUom.unit_id || null,
+          uom_factor: purchaseUom.factor_to_base,
+          uom_label: purchaseUom.label,
+          purchase_uoms: p.purchase_uoms ?? [],
           tracking: p.tracking ?? "NONE",
           batch_number: "",
           expiry_date: "",
@@ -581,44 +706,88 @@ function PurchasePOSPage() {
     });
   }
 
-  function updateCartLine(productId: string, patch: Partial<CartLine>) {
+  function getDefaultPurchaseUom(product: Product): PurchaseUom {
+    return product.purchase_uoms?.find((unit) => unit.is_default_purchase)
+      ?? product.purchase_uoms?.find((unit) => unit.unit_id === product.unit_id)
+      ?? {
+        unit_id: product.unit_id ?? "",
+        factor_to_base: 1,
+        purchase_price: Number(product.cost_price || 0),
+        label: product.unit?.short_name || (lang === "ar" ? "وحدة الأساس" : "Base unit"),
+        quantity_increment: 1,
+        is_default_purchase: true,
+      };
+  }
+
+  function updateCartLine(lineId: string, patch: Partial<CartLine>) {
     setCart((prev) =>
       prev.map((line) => {
-        if (line.product_id !== productId) return line;
+        if (line.line_id !== lineId) return line;
         return { ...line, ...patch };
       }),
     );
   }
 
   /** Commit a quantity. `null` (empty field mid-edit) leaves the line intact. */
-  function setQty(productId: string, qty: number | null) {
+  function setQty(lineId: string, qty: number | null) {
     if (qty === null || Number.isNaN(qty)) return;
     if (qty <= 0) {
-      setCart((prev) => prev.filter((l) => l.product_id !== productId));
+      setCart((prev) => prev.filter((l) => l.line_id !== lineId));
     } else {
       setCart((prev) =>
-        prev.map((l) => (l.product_id === productId ? { ...l, quantity: qty } : l)),
+        prev.map((l) => (l.line_id === lineId ? { ...l, quantity: qty } : l)),
       );
     }
   }
 
-  function setCost(productId: string, cost: number) {
+  function setCost(lineId: string, cost: number) {
     setCart((prev) =>
-      prev.map((l) => (l.product_id === productId ? { ...l, unit_cost: Math.max(0, cost) } : l)),
+      prev.map((l) => (l.line_id === lineId ? { ...l, unit_cost: Math.max(0, cost) } : l)),
     );
+  }
+
+  function changePurchaseUom(lineId: string, unitId: string) {
+    const line = cart.find((entry) => entry.line_id === lineId);
+    const option = line?.purchase_uoms.find((uom) => uom.unit_id === unitId);
+    if (!line || !option) return;
+    setCart((current) => current.map((entry) => entry.line_id === lineId ? {
+      ...entry,
+      uom_id: option.unit_id,
+      uom_factor: option.factor_to_base,
+      uom_label: option.label,
+      quantity_increment: option.quantity_increment,
+      unit_cost: option.purchase_price,
+    } : entry));
   }
 
   // Barcode Handler
   const handleBarcode = (code: string) => {
     const trimmed = code.trim();
     if (!trimmed) return;
+    if (!purchaseUomsLoaded) {
+      toast.info(lang === "ar" ? "جارٍ تحميل وحدات الشراء؛ حاول مجددًا بعد لحظة" : "Loading purchase units; try scanning again in a moment.");
+      return;
+    }
+    const mapped = unitBarcodeMap[trimmed];
+    if (mapped) {
+      const product = products.find((item) => item.id === mapped.product_id);
+      const uom = product?.purchase_uoms?.find((unit) => unit.unit_id === mapped.uom_id);
+      if (product && uom) {
+        addToCart(product, uom);
+        toast.success(lang === "ar" ? `تمت إضافة: ${product.name_ar || product.name} (${uom.label})` : `Added: ${product.name} (${uom.label})`);
+        return;
+      }
+    }
     const found = products.find(
       (p) =>
         (p.barcode && p.barcode.toLowerCase() === trimmed.toLowerCase()) ||
         (p.sku && p.sku.toLowerCase() === trimmed.toLowerCase()),
     );
     if (found) {
-      addToCart(found);
+      const baseUom = found.barcode?.toLowerCase() === trimmed.toLowerCase()
+        ? found.purchase_uoms?.find((unit) => unit.unit_id === found.unit_id)
+        : undefined;
+      addToCart(found, baseUom);
       toast.success(
         lang === "ar"
           ? `تمت إضافة: ${found.name_ar || found.name}`
@@ -705,9 +874,9 @@ function PurchasePOSPage() {
         case "name_desc":
           return (b.name_ar || b.name).localeCompare(a.name_ar || a.name, lang);
         case "cost_asc":
-          return Number(a.cost_price) - Number(b.cost_price);
+          return getDefaultPurchaseUom(a).purchase_price - getDefaultPurchaseUom(b).purchase_price;
         case "cost_desc":
-          return Number(b.cost_price) - Number(a.cost_price);
+          return getDefaultPurchaseUom(b).purchase_price - getDefaultPurchaseUom(a).purchase_price;
         case "stock_asc":
           return (stockMap[a.id] ?? 0) - (stockMap[b.id] ?? 0);
         case "stock_desc":
@@ -868,8 +1037,7 @@ function PurchasePOSPage() {
       let invoiceId: string | null = null;
       let error: any = null;
 
-      try {
-        const purchaseRpcArgs = {
+      const purchaseRpcArgs = {
           _warehouse_id: warehouseId,
           _supplier_id: supplierId,
           _payment_method:
@@ -886,55 +1054,15 @@ function PurchasePOSPage() {
             tax_rate: Number(l.tax_rate),
             batch_number: l.batch_number.trim() || null,
             expiry_date: l.expiry_date || null,
+            uom_id: l.uom_id,
           })),
-        };
-        const res =
-          paymentMethod === "split"
-            ? await (supabase.rpc as any)("create_purchase", {
-                ...purchaseRpcArgs,
-                _payment_splits: purchaseSplits,
-              })
-            : await (supabase.rpc as any)("create_purchase", {
-                ...purchaseRpcArgs,
-                _cashbox_id: paymentSelection.cashboxId || null,
-                _bank_account_id: paymentSelection.bankAccountId || null,
-                _payment_reference:
-                  paymentSelection.reference ||
-                  paymentSelection.paymentReference ||
-                  transferRef.trim() ||
-                  null,
-                _payment_method_id: paymentSelection.paymentMethodId || paymentMethod,
-              });
-        invoiceId = res.data;
-        error = res.error;
-      } catch {
-        if (paymentMethod === "split") {
-          throw new Error(
-            lang === "ar"
-              ? "تعذر تسجيل الدفع المجزأ؛ لم تُنشأ فاتورة ناقصة"
-              : "The split payment could not be recorded; no partial invoice was created",
-          );
-        }
-        const res = await supabase.rpc("create_purchase", {
-          _warehouse_id: warehouseId,
-          _supplier_id: supplierId,
-          _payment_method: (selectedPurchasePaymentMethod?.legacyValue ??
-            toLegacyPaymentValue(paymentMethod)) as any,
-          _paid: paidN,
-          _discount: discountN,
-          _note: composedNote as any,
-          _items: cart.map((l) => ({
-            product_id: l.product_id,
-            quantity: Number(l.quantity),
-            unit_cost: Number(l.unit_cost),
-            tax_rate: Number(l.tax_rate),
-            batch_number: l.batch_number.trim() || null,
-            expiry_date: l.expiry_date || null,
-          })),
-        });
-        invoiceId = res.data;
-        error = res.error;
-      }
+        _payment_splits: paymentMethod === "split" ? purchaseSplits : [],
+      };
+      // Use the current atomic RPC signature for both split and single tenders;
+      // the old short overload does not accept UOM snapshots.
+      const res = await (supabase.rpc as any)("create_purchase", purchaseRpcArgs);
+      invoiceId = res.data;
+      error = res.error;
 
       if (error) throw error;
 
@@ -1043,7 +1171,7 @@ function PurchasePOSPage() {
           balance: Math.max(0, total - paidN),
           notes: composedNote ?? undefined,
           lines: cart.map((l) => ({
-            product: l.name,
+            product: l.uom_label ? `${l.name} (${l.uom_label})` : l.name,
             qty: l.quantity,
             price: l.unit_cost,
             total: Math.round(l.unit_cost * l.quantity * (1 + l.tax_rate / 100) * 100) / 100,
@@ -1110,7 +1238,7 @@ function PurchasePOSPage() {
             ? "هذه معاينة لأسعار الشراء فقط ولا تسجل أي عملية."
             : "Preview only. No purchase is recorded.",
         lines: cart.map((line) => ({
-          product: line.name,
+          product: line.uom_label ? `${line.name} (${line.uom_label})` : line.name,
           qty: line.quantity,
           price: line.unit_cost,
           total: line.unit_cost * line.quantity * (1 + line.tax_rate / 100),
@@ -1428,6 +1556,8 @@ function PurchasePOSPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">
                   {filtered.map((p) => {
                     const stock = stockMap[p.id] ?? 0;
+                    const purchaseUom = getDefaultPurchaseUom(p);
+                    const stockInPurchaseUnit = stock / Math.max(purchaseUom.factor_to_base, 0.000000001);
                     const catLabel =
                       lang === "ar"
                         ? p.category?.name_ar || p.category?.name
@@ -1478,8 +1608,9 @@ function PurchasePOSPage() {
                               {lang === "ar" ? "سعر التكلفة:" : "Cost:"}
                             </span>
                             <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                              {money(p.cost_price || 0)}
+                              {money(purchaseUom.purchase_price)}
                             </span>
+                            <span className="block truncate text-[9px] text-muted-foreground">{purchaseUom.label}</span>
                           </div>
 
                           {/* Warehouse Stock */}
@@ -1490,7 +1621,7 @@ function PurchasePOSPage() {
                             <span
                               className={`font-mono text-xs font-semibold ${stock <= 0 ? "text-amber-500" : "text-muted-foreground"}`}
                             >
-                              {stock}
+                              {stockInPurchaseUnit}
                             </span>
                           </div>
                         </div>
@@ -1523,12 +1654,12 @@ function PurchasePOSPage() {
                       </span>
                       <span className="shrink-0 text-end">
                         <span className="block text-xs font-semibold text-primary">
-                          {money(Number(product.cost_price || 0))}
+                          {money(getDefaultPurchaseUom(product).purchase_price)}
                         </span>
                         <span className="block text-[10px] text-muted-foreground">
                           {lang === "ar"
-                            ? `المخزون: ${stockMap[product.id] ?? 0}`
-                            : `Stock: ${stockMap[product.id] ?? 0}`}
+                            ? `المخزون: ${(stockMap[product.id] ?? 0) / Math.max(getDefaultPurchaseUom(product).factor_to_base, 0.000000001)} ${getDefaultPurchaseUom(product).label}`
+                            : `Stock: ${(stockMap[product.id] ?? 0) / Math.max(getDefaultPurchaseUom(product).factor_to_base, 0.000000001)} ${getDefaultPurchaseUom(product).label}`}
                         </span>
                       </span>
                     </button>
@@ -1624,8 +1755,8 @@ function PurchasePOSPage() {
                           <td className="p-2 font-mono text-muted-foreground">
                             {product.sku || product.barcode || "—"}
                           </td>
-                          <td className="p-2 text-end">{money(Number(product.cost_price || 0))}</td>
-                          <td className="p-2 text-end">{stockMap[product.id] ?? 0}</td>
+                          <td className="p-2 text-end">{money(getDefaultPurchaseUom(product).purchase_price)} <span className="text-muted-foreground">/{getDefaultPurchaseUom(product).label}</span></td>
+                          <td className="p-2 text-end">{(stockMap[product.id] ?? 0) / Math.max(getDefaultPurchaseUom(product).factor_to_base, 0.000000001)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1693,28 +1824,32 @@ function PurchasePOSPage() {
                 </div>
               ) : (
                 cart.map((line) => (
-                  <div key={line.product_id} className="space-y-2">
+                  <div key={line.line_id} className="space-y-2">
                     <CartLineRow
                       line={{
-                        id: line.product_id,
+                        id: line.line_id,
                         name: line.name,
                         quantity: line.quantity,
                         unitPrice: line.unit_cost,
                         taxRate: line.tax_rate,
-                        stock: stockMap[line.product_id],
+                        stock: Math.max(0, Number(stockMap[line.product_id] ?? 0) / (line.uom_factor || 1)),
+                        unitId: line.uom_id,
+                        unit: line.uom_label,
+                        unitOptions: line.purchase_uoms.map((uom) => ({ id: uom.unit_id, label: uom.label })),
+                        quantityStep: line.quantity_increment,
                         unboundedQuantity: true,
                       }}
                       labels={{
                         price: lang === "ar" ? "سعر الشراء" : "Cost",
                         quantity: lang === "ar" ? "الكمية" : "Qty",
                         remove: lang === "ar" ? "حذف" : "Remove",
+                        stockLabel: lang === "ar" ? "الرصيد التقريبي" : "Current stock",
                       }}
                       formatMoney={money}
-                      onQuantityCommit={(next) => setQty(line.product_id, next)}
-                      onPriceChange={(next) => setCost(line.product_id, next)}
-                      onRemove={() =>
-                        setCart((c) => c.filter((x) => x.product_id !== line.product_id))
-                      }
+                      onQuantityCommit={(next) => setQty(line.line_id, next)}
+                      onPriceChange={(next) => setCost(line.line_id, next)}
+                      onUnitChange={(unitId) => changePurchaseUom(line.line_id, unitId)}
+                      onRemove={() => setCart((c) => c.filter((x) => x.line_id !== line.line_id))}
                     />
                     {line.tracking === "BATCH" && (
                       <div className="grid grid-cols-2 gap-2 ps-2">
@@ -1725,7 +1860,7 @@ function PurchasePOSPage() {
                             dir="ltr"
                             value={line.batch_number}
                             onChange={(event) =>
-                              updateCartLine(line.product_id, { batch_number: event.target.value })
+                              updateCartLine(line.line_id, { batch_number: event.target.value })
                             }
                             className="h-9 w-full rounded-md border border-input bg-surface px-2 text-sm text-foreground"
                           />
@@ -1736,7 +1871,7 @@ function PurchasePOSPage() {
                             type="date"
                             value={line.expiry_date}
                             onChange={(event) =>
-                              updateCartLine(line.product_id, { expiry_date: event.target.value })
+                              updateCartLine(line.line_id, { expiry_date: event.target.value })
                             }
                             className="h-9 w-full rounded-md border border-input bg-surface px-2 text-sm text-foreground"
                           />
@@ -1989,8 +2124,8 @@ function PurchasePOSPage() {
           id: p.id,
           name: (lang === "ar" ? p.name_ar || p.name : p.name || p.name_ar) || "—",
           meta: p.sku || p.barcode || null,
-          value: money(Number(p.cost_price || 0)),
-          sub: `${t("pos.stock")}: ${stockMap[p.id] ?? 0}`,
+          value: money(getDefaultPurchaseUom(p).purchase_price),
+          sub: `${t("pos.stock")}: ${(stockMap[p.id] ?? 0) / Math.max(getDefaultPurchaseUom(p).factor_to_base, 0.000000001)} ${getDefaultPurchaseUom(p).label}`,
         }))}
         onSelect={(id) => {
           const product = products.find((p) => p.id === id);

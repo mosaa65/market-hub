@@ -494,6 +494,126 @@ export type Database = {
           },
         ];
       };
+      product_uom_barcodes: {
+        Row: {
+          barcode: string;
+          company_id: number;
+          created_at: string;
+          id: string;
+          is_active: boolean;
+          is_primary: boolean;
+          product_id: string;
+          product_uom_id: string;
+        };
+        Insert: {
+          barcode: string;
+          company_id?: number;
+          created_at?: string;
+          id?: string;
+          is_active?: boolean;
+          is_primary?: boolean;
+          product_id: string;
+          product_uom_id: string;
+        };
+        Update: {
+          barcode?: string;
+          company_id?: number;
+          created_at?: string;
+          id?: string;
+          is_active?: boolean;
+          is_primary?: boolean;
+          product_id?: string;
+          product_uom_id?: string;
+        };
+        Relationships: [];
+      };
+      product_uom_prices: {
+        Row: {
+          company_id: number;
+          id: string;
+          product_id: string;
+          product_uom_id: string;
+          purchase_price: number | null;
+          sale_price: number | null;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          company_id?: number;
+          id?: string;
+          product_id: string;
+          product_uom_id: string;
+          purchase_price?: number | null;
+          sale_price?: number | null;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          company_id?: number;
+          id?: string;
+          product_id?: string;
+          product_uom_id?: string;
+          purchase_price?: number | null;
+          sale_price?: number | null;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [];
+      };
+      product_uoms: {
+        Row: {
+          can_purchase: boolean;
+          can_sell: boolean;
+          conversion_basis: string;
+          conversion_note: string | null;
+          created_at: string;
+          factor_to_base: number;
+          id: string;
+          is_active: boolean;
+          is_base: boolean;
+          is_default_purchase: boolean;
+          is_default_sale: boolean;
+          product_id: string;
+          quantity_increment: number;
+          unit_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          can_purchase?: boolean;
+          can_sell?: boolean;
+          conversion_basis?: string;
+          conversion_note?: string | null;
+          created_at?: string;
+          factor_to_base: number;
+          id?: string;
+          is_active?: boolean;
+          is_base?: boolean;
+          is_default_purchase?: boolean;
+          is_default_sale?: boolean;
+          product_id: string;
+          quantity_increment?: number;
+          unit_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          can_purchase?: boolean;
+          can_sell?: boolean;
+          conversion_basis?: string;
+          conversion_note?: string | null;
+          created_at?: string;
+          factor_to_base?: number;
+          id?: string;
+          is_active?: boolean;
+          is_base?: boolean;
+          is_default_purchase?: boolean;
+          is_default_sale?: boolean;
+          product_id?: string;
+          quantity_increment?: number;
+          unit_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       products: {
         Row: {
           barcode: string | null;
@@ -620,7 +740,11 @@ export type Database = {
       };
       purchase_invoice_items: {
         Row: {
+          base_unit_cost: number | null;
+          base_quantity: number | null;
           discount: number;
+          entered_quantity: number | null;
+          entered_unit_cost: number | null;
           id: string;
           invoice_id: string;
           product_id: string;
@@ -628,9 +752,16 @@ export type Database = {
           tax: number;
           total: number;
           unit_cost: number;
+          uom_conversion_factor: number | null;
+          uom_id: string | null;
+          uom_quantity_increment: number | null;
         };
         Insert: {
+          base_unit_cost?: number | null;
+          base_quantity?: number | null;
           discount?: number;
+          entered_quantity?: number | null;
+          entered_unit_cost?: number | null;
           id?: string;
           invoice_id: string;
           product_id: string;
@@ -638,9 +769,16 @@ export type Database = {
           tax?: number;
           total: number;
           unit_cost: number;
+          uom_conversion_factor?: number | null;
+          uom_id?: string | null;
+          uom_quantity_increment?: number | null;
         };
         Update: {
+          base_unit_cost?: number | null;
+          base_quantity?: number | null;
           discount?: number;
+          entered_quantity?: number | null;
+          entered_unit_cost?: number | null;
           id?: string;
           invoice_id?: string;
           product_id?: string;
@@ -648,6 +786,9 @@ export type Database = {
           tax?: number;
           total?: number;
           unit_cost?: number;
+          uom_conversion_factor?: number | null;
+          uom_id?: string | null;
+          uom_quantity_increment?: number | null;
         };
         Relationships: [
           {
@@ -737,31 +878,52 @@ export type Database = {
       };
       purchase_return_items: {
         Row: {
+          base_quantity: number | null;
+          entered_quantity: number | null;
+          entered_unit_cost: number | null;
           id: string;
+          invoice_item_id: string | null;
           product_id: string;
           quantity: number;
           return_id: string;
           tax: number;
           total: number;
           unit_cost: number;
+          uom_conversion_factor: number | null;
+          uom_id: string | null;
+          uom_quantity_increment: number | null;
         };
         Insert: {
+          base_quantity?: number | null;
+          entered_quantity?: number | null;
+          entered_unit_cost?: number | null;
           id?: string;
+          invoice_item_id?: string | null;
           product_id: string;
           quantity: number;
           return_id: string;
           tax?: number;
           total?: number;
           unit_cost: number;
+          uom_conversion_factor?: number | null;
+          uom_id?: string | null;
+          uom_quantity_increment?: number | null;
         };
         Update: {
+          base_quantity?: number | null;
+          entered_quantity?: number | null;
+          entered_unit_cost?: number | null;
           id?: string;
+          invoice_item_id?: string | null;
           product_id?: string;
           quantity?: number;
           return_id?: string;
           tax?: number;
           total?: number;
           unit_cost?: number;
+          uom_conversion_factor?: number | null;
+          uom_id?: string | null;
+          uom_quantity_increment?: number | null;
         };
         Relationships: [
           {
@@ -849,7 +1011,11 @@ export type Database = {
       };
       sales_invoice_items: {
         Row: {
+          base_unit_price: number | null;
+          base_quantity: number | null;
           discount: number;
+          entered_quantity: number | null;
+          entered_unit_price: number | null;
           id: string;
           invoice_id: string;
           product_id: string;
@@ -857,9 +1023,16 @@ export type Database = {
           tax: number;
           total: number;
           unit_price: number;
+          uom_conversion_factor: number | null;
+          uom_id: string | null;
+          uom_quantity_increment: number | null;
         };
         Insert: {
+          base_unit_price?: number | null;
+          base_quantity?: number | null;
           discount?: number;
+          entered_quantity?: number | null;
+          entered_unit_price?: number | null;
           id?: string;
           invoice_id: string;
           product_id: string;
@@ -867,9 +1040,16 @@ export type Database = {
           tax?: number;
           total: number;
           unit_price: number;
+          uom_conversion_factor?: number | null;
+          uom_id?: string | null;
+          uom_quantity_increment?: number | null;
         };
         Update: {
+          base_unit_price?: number | null;
+          base_quantity?: number | null;
           discount?: number;
+          entered_quantity?: number | null;
+          entered_unit_price?: number | null;
           id?: string;
           invoice_id?: string;
           product_id?: string;
@@ -877,6 +1057,9 @@ export type Database = {
           tax?: number;
           total?: number;
           unit_price?: number;
+          uom_conversion_factor?: number | null;
+          uom_id?: string | null;
+          uom_quantity_increment?: number | null;
         };
         Relationships: [
           {
@@ -966,31 +1149,52 @@ export type Database = {
       };
       sales_return_items: {
         Row: {
+          base_quantity: number | null;
+          entered_quantity: number | null;
+          entered_unit_price: number | null;
           id: string;
+          invoice_item_id: string | null;
           product_id: string;
           quantity: number;
           return_id: string;
           tax: number;
           total: number;
           unit_price: number;
+          uom_conversion_factor: number | null;
+          uom_id: string | null;
+          uom_quantity_increment: number | null;
         };
         Insert: {
+          base_quantity?: number | null;
+          entered_quantity?: number | null;
+          entered_unit_price?: number | null;
           id?: string;
+          invoice_item_id?: string | null;
           product_id: string;
           quantity: number;
           return_id: string;
           tax?: number;
           total?: number;
           unit_price: number;
+          uom_conversion_factor?: number | null;
+          uom_id?: string | null;
+          uom_quantity_increment?: number | null;
         };
         Update: {
+          base_quantity?: number | null;
+          entered_quantity?: number | null;
+          entered_unit_price?: number | null;
           id?: string;
+          invoice_item_id?: string | null;
           product_id?: string;
           quantity?: number;
           return_id?: string;
           tax?: number;
           total?: number;
           unit_price?: number;
+          uom_conversion_factor?: number | null;
+          uom_id?: string | null;
+          uom_quantity_increment?: number | null;
         };
         Relationships: [
           {
@@ -1268,6 +1472,8 @@ export type Database = {
       units: {
         Row: {
           created_at: string;
+          dimension_code: string;
+          factor_to_reference: number | null;
           id: string;
           name: string;
           name_ar: string | null;
@@ -1275,6 +1481,8 @@ export type Database = {
         };
         Insert: {
           created_at?: string;
+          dimension_code?: string;
+          factor_to_reference?: number | null;
           id?: string;
           name: string;
           name_ar?: string | null;
@@ -1282,6 +1490,8 @@ export type Database = {
         };
         Update: {
           created_at?: string;
+          dimension_code?: string;
+          factor_to_reference?: number | null;
           id?: string;
           name?: string;
           name_ar?: string | null;
@@ -1984,6 +2194,27 @@ export type Database = {
           p_as_of?: string;
         };
         Returns: number;
+      };
+      resolve_product_barcode: {
+        Args: {
+          _barcode: string;
+          _company_id?: number;
+        };
+        Returns: {
+          product_id: string;
+          uom_id: string | null;
+          factor_to_base: number;
+          sale_price: number;
+        }[];
+      };
+      save_product_uom_settings: {
+        Args: {
+          _product_id: string;
+          _units: Json;
+          _barcodes?: Json;
+          _company_id?: number;
+        };
+        Returns: undefined;
       };
       reverse_expense: {
         Args: {

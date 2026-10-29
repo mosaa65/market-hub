@@ -131,6 +131,10 @@ interface Invoice {
 interface Line {
   id: string;
   quantity: number;
+  entered_quantity?: number | null;
+  entered_unit_price?: number | null;
+  uom_id?: string | null;
+  uom_conversion_factor?: number | null;
   unit_price: number;
   tax: number;
   total: number;
@@ -320,7 +324,7 @@ export function SalesPage() {
       const { data, error } = await supabase
         .from("sales_invoice_items")
         .select(
-          "id,quantity,unit_price,tax,total,line_type,stock_effect,products(name,name_ar,sku)",
+          "id,quantity,unit_price,tax,total,line_type,stock_effect,entered_quantity,entered_unit_price,uom_id,uom_conversion_factor,products(name,name_ar,sku),uom:units!sales_invoice_items_uom_id_fkey(name,name_ar)",
         )
         .eq("invoice_id", inv.id);
 
@@ -339,7 +343,7 @@ export function SalesPage() {
       const { data, error } = await supabase
         .from("sales_invoice_items")
         .select(
-          "id,quantity,unit_price,tax,total,line_type,stock_effect,products(name,name_ar,sku)",
+          "id,quantity,unit_price,tax,total,line_type,stock_effect,entered_quantity,entered_unit_price,uom_id,uom_conversion_factor,products(name,name_ar,sku),uom:units!sales_invoice_items_uom_id_fkey(name,name_ar)",
         )
         .eq("invoice_id", inv.id);
       if (error) throw error;
@@ -564,8 +568,9 @@ export function SalesPage() {
       status: statusLabel(invoice.status),
       lines: invoiceLines.map((l) => ({
         product: l.products?.name_ar || l.products?.name || "—",
-        qty: Number(l.quantity),
-        price: Number(l.unit_price),
+        qty: Number(l.entered_quantity ?? l.quantity),
+        unit: (l as any).uom?.name_ar || (l as any).uom?.name || undefined,
+        price: Number(l.entered_unit_price ?? l.unit_price),
         total: Number(l.total),
       })),
       subtotal: Number(invoice.subtotal),
@@ -1810,8 +1815,9 @@ export function SalesPage() {
           name: l.products?.name || "—",
           name_ar: l.products?.name_ar,
           sku: l.products?.sku,
-          quantity: l.quantity,
-          unitPrice: l.unit_price,
+          quantity: l.entered_quantity ?? l.quantity,
+          unit: (l as any).uom?.name_ar || (l as any).uom?.name || null,
+          unitPrice: l.entered_unit_price ?? l.unit_price,
           total: l.total,
           line_type: l.line_type,
         }))}

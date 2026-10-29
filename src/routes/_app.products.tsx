@@ -92,6 +92,10 @@ import {
   type ItemClass,
 } from "@/components/item-role-badge";
 import { ProductFieldSettings } from "@/components/products/product-field-settings";
+import {
+  ProductUomSettingsEditor,
+  type ProductUomDraft,
+} from "@/components/products/product-uom-settings-editor";
 import { useProductFieldVisibility } from "@/hooks/use-product-field-visibility";
 import { usePersistedViewMode } from "@/hooks/use-persisted-view-mode";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
@@ -150,6 +154,9 @@ type ProductRow = {
   category_id: string | null;
   brand_id: string | null;
   unit_id: string | null;
+  base_uom_id?: string | null;
+  sales_uom_id?: string | null;
+  purchase_uom_id?: string | null;
   /**
    * The role the item plays — raw grain, finished flour, a by-product, a
    * service or a consumable. Selected alongside item_nature so the screen can
@@ -336,7 +343,7 @@ function ProductsPage() {
       // disappear from the grid.
       const { data: page, error: productError } = await (supabase.from("products") as any)
         .select(
-          "id, name, name_ar, sku, barcode, sale_price, cost_price, tax_rate, min_stock, package_weight_kg, is_active, category_id, brand_id, unit_id, item_nature, item_class, inventory_policy, tracking, costing_method, batch_dispatch_strategy, is_sellable, is_purchasable",
+          "id, name, name_ar, sku, barcode, sale_price, cost_price, tax_rate, min_stock, package_weight_kg, is_active, category_id, brand_id, unit_id, base_uom_id, sales_uom_id, purchase_uom_id, item_nature, item_class, inventory_policy, tracking, costing_method, batch_dispatch_strategy, is_sellable, is_purchasable",
         )
         // أصناف أمانات المطحنة تُدار من واجهتها المستقلة، وليست ضمن كتالوج الشركة.
         .eq("is_custody_item", false)
@@ -483,10 +490,13 @@ function ProductsPage() {
     queryKey: productKeys.meta(),
     staleTime: 10 * 60 * 1000,
     queryFn: async () => {
-      const [c, b, u, origins, qualities] = await Promise.all([
+      const [c, b, uResponse, origins, qualities] = await Promise.all([
         supabase.from("categories").select("id, name, name_ar").order("name"),
         supabase.from("brands").select("id, name, name_ar").order("name"),
-        supabase.from("units").select("id, name, name_ar, short_name").order("name_ar"),
+        (supabase as any)
+          .from("units")
+          .select("id, name, name_ar, short_name, dimension_code, factor_to_reference")
+          .order("name_ar"),
         (supabase as any)
           .from("countries_of_origin")
           .select("id, code, name, name_ar")
@@ -496,6 +506,9 @@ function ProductsPage() {
           .select("id, code, name, name_ar, sort_order")
           .order("sort_order"),
       ]);
+      const u = uResponse.error
+        ? await supabase.from("units").select("id, name, name_ar, short_name").order("name_ar")
+        : uResponse;
       return {
         categories: c.data ?? [],
         brands: b.data ?? [],
@@ -2327,6 +2340,7 @@ function ProductsPage() {
           initialBarcode={prefillBarcode}
           userId={user?.id ?? null}
           canViewCost={canViewCost}
+          canManageUoms={hasRole("owner") || hasRole("manager")}
           companyCostingMethod={companyCostingMethod}
           meta={
             meta ?? {
@@ -2478,6 +2492,7 @@ function ProductDialog({
   initialBarcode,
   userId,
   canViewCost = true,
+  canManageUoms = false,
   companyCostingMethod,
   meta,
   onClose,
@@ -2487,11 +2502,19 @@ function ProductDialog({
   initialBarcode?: string;
   userId: string | null;
   canViewCost?: boolean;
+  canManageUoms?: boolean;
   companyCostingMethod: CostingMethod;
   meta: {
     categories: { id: string; name: string; name_ar: string | null }[];
     brands: { id: string; name: string; name_ar: string | null }[];
-    units: { id: string; name: string; name_ar: string | null; short_name: string }[];
+    units: {
+      id: string;
+      name: string;
+      name_ar: string | null;
+      short_name: string;
+      dimension_code?: string;
+      factor_to_reference?: number | null;
+    }[];
     origins: { id: string; code: string; name: string; name_ar: string }[];
     qualities: { id: string; name: string; name_ar: string; code?: string; sort_order?: number }[];
   };
@@ -2516,6 +2539,8 @@ function ProductDialog({
   const [quickAddNameEn, setQuickAddNameEn] = useState("");
   const [quickAddCode, setQuickAddCode] = useState("");
   const [quickAddShortName, setQuickAddShortName] = useState("");
+  const [quickAddUnitDimension, setQuickAddUnitDimension] = useState("CUSTOM");
+  const [quickAddUnitFactor, setQuickAddUnitFactor] = useState("1");
   const [savingQuickAdd, setSavingQuickAdd] = useState(false);
   const policyFromProduct = (product: ProductRow): UserItemPolicyPreferences => {
     const inventoryPolicy = product.inventory_policy ?? "TRACKED";
@@ -2549,7 +2574,7 @@ function ProductDialog({
     barcode: initial?.barcode ?? initialBarcode ?? "",
     category_id: initial?.category_id ?? "",
     brand_id: initial?.brand_id ?? "",
-    unit_id: initial?.unit_id ?? "",
+    unit_id: initial?.base_uom_id ?? initial?.unit_id ?? "",
     cost_price: initial?.cost_price != null ? String(initial.cost_price) : "",
     sale_price: initial?.sale_price != null ? String(initial.sale_price) : "",
     tax_rate: initial?.tax_rate != null ? String(initial.tax_rate) : "",
@@ -2561,7 +2586,59 @@ function ProductDialog({
     quality_grade_id: initial?.quality_grade_id ?? "",
     is_active: initial?.is_active ?? true,
   });
+  const [salesUomId, setSalesUomId] = useState(
+    initial?.sales_uom_id ?? initial?.base_uom_id ?? initial?.unit_id ?? "",
+  );
+  const [purchaseUomId, setPurchaseUomId] = useState(
+    initial?.purchase_uom_id ?? initial?.base_uom_id ?? initial?.unit_id ?? "",
+  );
+  const [alternateUoms, setAlternateUoms] = useState<ProductUomDraft[]>([]);
   const [saving, setSaving] = useState(false);
+
+  const productUomSchemaQuery = useQuery({
+    queryKey: ["product-uom-schema-ready"],
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+    queryFn: async () => {
+      const { error } = await (supabase as any).from("product_uoms").select("id").limit(1);
+      return !error;
+    },
+  });
+  const productUomSchemaReady = productUomSchemaQuery.data === true;
+  const productUomSettingsQuery = useQuery({
+    queryKey: ["product-uom-settings", initial?.id],
+    enabled: !!initial?.id && productUomSchemaReady,
+    retry: false,
+    queryFn: async () => {
+      if (!initial?.id) return { rows: [], prices: [], barcodes: [] };
+      const { data: rows, error: rowsError } = await (supabase as any)
+        .from("product_uoms")
+        .select("id, unit_id, factor_to_base, conversion_basis, conversion_note, quantity_increment, can_purchase, can_sell, is_default_purchase, is_default_sale, is_base")
+        .eq("product_id", initial.id)
+        .order("is_base", { ascending: false });
+      if (rowsError) throw rowsError;
+      const ids = (rows ?? []).map((row: { id: string }) => row.id);
+      if (!ids.length) return { rows: rows ?? [], prices: [], barcodes: [] };
+      const [priceResult, barcodeResult] = await Promise.all([
+        (supabase as any)
+          .from("product_uom_prices")
+          .select("product_uom_id, sale_price, purchase_price")
+          .in("product_uom_id", ids),
+        (supabase as any)
+          .from("product_uom_barcodes")
+          .select("product_uom_id, barcode, is_primary, is_active")
+          .in("product_uom_id", ids)
+          .eq("is_active", true),
+      ]);
+      if (priceResult.error) throw priceResult.error;
+      if (barcodeResult.error) throw barcodeResult.error;
+      return {
+        rows: rows ?? [],
+        prices: priceResult.data ?? [],
+        barcodes: barcodeResult.data ?? [],
+      };
+    },
+  });
 
   useEffect(() => {
     setPolicy(
@@ -2573,6 +2650,60 @@ function ProductDialog({
     );
     setBatchDispatchStrategy(initial?.batch_dispatch_strategy ?? "INHERIT");
   }, [initial, userId]);
+
+  useEffect(() => {
+    const productId = initial?.id ?? null;
+    const data = productUomSettingsQuery.data;
+    if (!productId || !data) {
+      setSalesUomId(initial?.sales_uom_id ?? initial?.base_uom_id ?? initial?.unit_id ?? "");
+      setPurchaseUomId(initial?.purchase_uom_id ?? initial?.base_uom_id ?? initial?.unit_id ?? "");
+      setAlternateUoms([]);
+      return;
+    }
+    const priceById = new Map(
+      data.prices.map((price: any) => [price.product_uom_id, price]),
+    );
+    const codesById = new Map<string, { barcode: string; is_primary: boolean }[]>();
+    for (const code of data.barcodes as any[]) {
+      const current = codesById.get(code.product_uom_id) ?? [];
+      current.push({ barcode: code.barcode, is_primary: code.is_primary });
+      codesById.set(code.product_uom_id, current);
+    }
+    const base = (data.rows as any[]).find((row) => row.is_base);
+    setSalesUomId(initial?.sales_uom_id ?? base?.unit_id ?? initial?.base_uom_id ?? initial?.unit_id ?? "");
+    setPurchaseUomId(initial?.purchase_uom_id ?? base?.unit_id ?? initial?.base_uom_id ?? initial?.unit_id ?? "");
+    setAlternateUoms(
+      (data.rows as any[])
+        .filter((row) => !row.is_base)
+        .map((row) => {
+          const price = priceById.get(row.id) as any;
+          const codes = (codesById.get(row.id) ?? []).sort((a, b) => Number(b.is_primary) - Number(a.is_primary));
+          return {
+            unit_id: row.unit_id,
+            factor_to_base: String(row.factor_to_base),
+            conversion_basis: row.conversion_basis,
+            conversion_note: row.conversion_note ?? "",
+            quantity_increment: String(row.quantity_increment),
+            can_purchase: row.can_purchase,
+            can_sell: row.can_sell,
+            sale_price: price?.sale_price == null ? "" : String(price.sale_price),
+            purchase_price: price?.purchase_price == null ? "" : String(price.purchase_price),
+            barcodes: codes.map((code) => code.barcode).join("\n"),
+          } as ProductUomDraft;
+        }),
+    );
+  }, [initial, productUomSettingsQuery.data]);
+
+  useEffect(() => {
+    const salesEnabled = alternateUoms.some((row) => row.unit_id === salesUomId && row.can_sell);
+    const purchaseEnabled = alternateUoms.some((row) => row.unit_id === purchaseUomId && row.can_purchase);
+    if (policy.is_sellable && form.unit_id && (!salesUomId || (salesUomId !== form.unit_id && !salesEnabled))) {
+      setSalesUomId(form.unit_id);
+    }
+    if (policy.is_purchasable && form.unit_id && (!purchaseUomId || (purchaseUomId !== form.unit_id && !purchaseEnabled))) {
+      setPurchaseUomId(form.unit_id);
+    }
+  }, [form.unit_id, salesUomId, purchaseUomId, alternateUoms, policy.is_sellable, policy.is_purchasable]);
 
   useKeyboardWedge({
     onScan: (barcode) => {
@@ -2598,6 +2729,25 @@ function ProductDialog({
       toast.error(lang === "ar" ? policyCheck.errors[0] : "The selected item policy is not valid.");
       return;
     }
+    if (canManageUoms && productUomSchemaReady && initial && productUomSettingsQuery.isLoading) {
+      toast.error(lang === "ar" ? "انتظر تحميل وحدات الصنف أولًا" : "Wait for the item's units to load first.");
+      return;
+    }
+    if (canManageUoms && productUomSchemaReady && initial && productUomSettingsQuery.isError) {
+      toast.error(lang === "ar" ? "تعذر تحميل إعدادات الوحدات؛ لم يُحفظ الصنف" : "Could not load unit settings; the item was not saved.");
+      return;
+    }
+    if (canManageUoms && productUomSchemaReady && alternateUoms.length > 0 && !form.unit_id) {
+      toast.error(lang === "ar" ? "اختر وحدة أساس قبل حفظ الوحدات البديلة" : "Choose a base unit before saving alternate units.");
+      return;
+    }
+    if (
+      canManageUoms && productUomSchemaReady && form.unit_id &&
+      ((policy.is_sellable && !salesUomId) || (policy.is_purchasable && !purchaseUomId))
+    ) {
+      toast.error(lang === "ar" ? "حدد وحدة افتراضية للبيع والشراء المفعّلين" : "Choose a default unit for each enabled sales or purchase direction.");
+      return;
+    }
     setSaving(true);
     /*
      * `try/finally` is what actually guarantees the form unlocks.
@@ -2619,6 +2769,13 @@ function ProductDialog({
         item_class: form.item_class || null,
         brand_id: config.enableBrands ? form.brand_id || null : null,
         unit_id: config.enableUnits ? form.unit_id || null : null,
+        ...(productUomSchemaReady
+          ? {
+              base_uom_id: config.enableUnits ? form.unit_id || null : null,
+              sales_uom_id: policy.is_sellable ? salesUomId || form.unit_id || null : null,
+              purchase_uom_id: policy.is_purchasable ? purchaseUomId || form.unit_id || null : null,
+            }
+          : {}),
         cost_price: Number(form.cost_price) || 0,
         sale_price: Number(form.sale_price) || 0,
         tax_rate: Number(form.tax_rate) || 0,
@@ -2659,7 +2816,7 @@ function ProductDialog({
             .select("id")
             .single()
         : (supabase.from("products") as any).insert(payload).select("id").single();
-      const { error: writeError } = await request;
+      const { data: savedProduct, error: writeError } = await request;
 
       if (writeError) {
         const databaseError = writeError as { code?: string; message?: string };
@@ -2676,6 +2833,79 @@ function ProductDialog({
         }
         toast.error(databaseError.message ?? "Unable to save the product.");
         return;
+      }
+
+      if (canManageUoms && productUomSchemaReady && config.enableUnits && form.unit_id) {
+        const baseUnit = meta.units.find((unit) => unit.id === form.unit_id);
+        const baseIncrement = ["COUNT", "PACKAGING"].includes(baseUnit?.dimension_code ?? "") ? 1 : 0.001;
+        const allowedSalesId = alternateUoms.some((row) => row.unit_id === salesUomId && row.can_sell)
+          ? salesUomId
+          : form.unit_id;
+        const allowedPurchaseId = alternateUoms.some((row) => row.unit_id === purchaseUomId && row.can_purchase)
+          ? purchaseUomId
+          : form.unit_id;
+        const unitPayload = [
+          {
+            unit_id: form.unit_id,
+            factor_to_base: 1,
+            conversion_basis: "STANDARD",
+            conversion_note: null,
+            quantity_increment: baseIncrement,
+            can_sell: policy.is_sellable,
+            can_purchase: policy.is_purchasable,
+            default_sale: policy.is_sellable && allowedSalesId === form.unit_id,
+            default_purchase: policy.is_purchasable && allowedPurchaseId === form.unit_id,
+            is_base: true,
+            sale_price: null,
+            purchase_price: null,
+          },
+          ...alternateUoms
+            .filter((row) => row.unit_id && row.unit_id !== form.unit_id)
+            .map((row) => ({
+              unit_id: row.unit_id,
+              factor_to_base: Number(row.factor_to_base),
+              conversion_basis: row.conversion_basis,
+              conversion_note: row.conversion_note.trim() || null,
+              quantity_increment: Number(row.quantity_increment),
+              can_sell: policy.is_sellable && row.can_sell,
+              can_purchase: policy.is_purchasable && row.can_purchase,
+              default_sale: policy.is_sellable && row.can_sell && allowedSalesId === row.unit_id,
+              default_purchase: policy.is_purchasable && row.can_purchase && allowedPurchaseId === row.unit_id,
+              is_base: false,
+              sale_price: row.sale_price.trim() === "" ? null : Number(row.sale_price),
+              purchase_price: row.purchase_price.trim() === "" ? null : Number(row.purchase_price),
+            })),
+        ];
+        const barcodePayload = [
+          ...(form.barcode.trim()
+            ? [{ unit_id: form.unit_id, barcode: form.barcode.trim(), is_primary: true }]
+            : []),
+          ...alternateUoms.flatMap((row) =>
+            row.unit_id && row.unit_id !== form.unit_id
+              ? row.barcodes
+                  .split(/\r?\n/)
+                  .map((barcode) => barcode.trim())
+                  .filter(Boolean)
+                  .map((barcode, index) => ({ unit_id: row.unit_id, barcode, is_primary: index === 0 }))
+              : [],
+          ),
+        ];
+        const { error: uomError } = await (supabase as any).rpc("save_product_uom_settings", {
+          _product_id: savedProduct.id,
+          _units: unitPayload,
+          _barcodes: barcodePayload,
+          _company_id: 1,
+        });
+        if (uomError) {
+          console.error("[products] item unit settings save failed", uomError);
+          toast.error(
+            lang === "ar"
+              ? `حُفظت بيانات الصنف، لكن تعذر حفظ وحداته: ${uomError.message}`
+              : `The item was saved, but its units were not: ${uomError.message}`,
+          );
+          onSaved();
+          return;
+        }
       }
 
       if (userId) saveUserItemPolicyPreferences(userId, policy);
@@ -2751,6 +2981,8 @@ function ProductDialog({
     setQuickAddNameEn("");
     setQuickAddCode("");
     setQuickAddShortName("");
+    setQuickAddUnitDimension("CUSTOM");
+    setQuickAddUnitFactor("1");
   }
 
   async function addCatalogOptionQuickly() {
@@ -2762,6 +2994,11 @@ function ProductDialog({
     }
     if (kind === "unit" && !quickAddShortName.trim()) {
       toast.error(lang === "ar" ? "أدخل اختصار الوحدة" : "Enter the unit abbreviation");
+      return;
+    }
+    if (kind === "unit" && !["PACKAGING", "CUSTOM"].includes(quickAddUnitDimension) &&
+      (!Number.isFinite(Number(quickAddUnitFactor)) || Number(quickAddUnitFactor) <= 0)) {
+      toast.error(lang === "ar" ? "أدخل معامل تحويل قياسيًا أكبر من صفر" : "Enter a positive standard conversion factor.");
       return;
     }
     if (kind === "origin" && !/^[a-z]{2}$/i.test(quickAddCode.trim())) {
@@ -2782,7 +3019,13 @@ function ProductDialog({
     const nameAr = quickAddNameAr.trim() || quickAddNameEn.trim();
     const name = quickAddNameEn.trim() || quickAddNameAr.trim();
     const payload: Record<string, unknown> = { name, name_ar: nameAr };
-    if (kind === "unit") payload.short_name = quickAddShortName.trim();
+    if (kind === "unit") {
+      payload.short_name = quickAddShortName.trim();
+      payload.dimension_code = quickAddUnitDimension;
+      payload.factor_to_reference = ["PACKAGING", "CUSTOM"].includes(quickAddUnitDimension)
+        ? null
+        : Number(quickAddUnitFactor);
+    }
     if (kind === "origin") payload.code = quickAddCode.trim().toUpperCase();
     if (kind === "quality") {
       payload.code = quickAddCode.trim();
@@ -2849,13 +3092,50 @@ function ProductDialog({
             aria-label={lang === "ar" ? "الاسم بالإنجليزية" : "English name"}
           />
           {kind === "unit" && (
-            <VortexTextInput
-              value={quickAddShortName}
-              onChange={(event) => setQuickAddShortName(event.target.value)}
-              dir="auto"
-              placeholder={lang === "ar" ? "اختصار الوحدة، مثل كجم" : "Unit abbreviation, e.g. kg"}
-              aria-label={lang === "ar" ? "اختصار الوحدة" : "Unit abbreviation"}
-            />
+            <>
+              <VortexTextInput
+                value={quickAddShortName}
+                onChange={(event) => setQuickAddShortName(event.target.value)}
+                dir="auto"
+                placeholder={lang === "ar" ? "اختصار الوحدة، مثل كجم" : "Unit abbreviation, e.g. kg"}
+                aria-label={lang === "ar" ? "اختصار الوحدة" : "Unit abbreviation"}
+              />
+              <select
+                value={quickAddUnitDimension}
+                onChange={(event) => setQuickAddUnitDimension(event.target.value)}
+                className={cn(fieldSurfaceClass, "h-10 min-w-0 px-3 text-sm")}
+                aria-label={lang === "ar" ? "بُعد الوحدة" : "Unit dimension"}
+              >
+                {[
+                  ["CUSTOM", lang === "ar" ? "مخصص للصنف" : "Item-specific"],
+                  ["PACKAGING", lang === "ar" ? "عبوة" : "Packaging"],
+                  ["COUNT", lang === "ar" ? "عدد" : "Count"],
+                  ["MASS", lang === "ar" ? "كتلة" : "Mass"],
+                  ["VOLUME", lang === "ar" ? "حجم" : "Volume"],
+                  ["LENGTH", lang === "ar" ? "طول" : "Length"],
+                  ["AREA", lang === "ar" ? "مساحة" : "Area"],
+                ].map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+              {!(["CUSTOM", "PACKAGING"].includes(quickAddUnitDimension)) && (
+                <VortexTextInput
+                  value={quickAddUnitFactor}
+                  onChange={(event) => setQuickAddUnitFactor(event.target.value)}
+                  dir="ltr"
+                  type="number"
+                  min="0.000000000001"
+                  step="any"
+                  placeholder={lang === "ar" ? "المعامل إلى وحدة البعد المرجعية" : "Factor to the dimension reference unit"}
+                  aria-label={lang === "ar" ? "معامل التحويل القياسي" : "Standard conversion factor"}
+                />
+              )}
+              {(["CUSTOM", "PACKAGING"].includes(quickAddUnitDimension)) && (
+                <p className="text-[11px] leading-5 text-muted-foreground sm:col-span-2">
+                  {lang === "ar"
+                    ? "حدد محتوى هذه العبوة أو معاملها الخاص لكل صنف في قسم الوحدات أدناه."
+                    : "Set this package's contents or item-specific factor in the unit settings below."}
+                </p>
+              )}
+            </>
           )}
           {(kind === "origin" || kind === "quality") && (
             <VortexTextInput
@@ -2899,7 +3179,11 @@ function ProductDialog({
           <button
             type="submit"
             form="product-form"
-            disabled={saving}
+            disabled={
+              saving ||
+              (canManageUoms && productUomSchemaReady && !!initial &&
+                (productUomSettingsQuery.isLoading || productUomSettingsQuery.isError))
+            }
             className="flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-foreground text-xs font-bold text-background shadow-lg shadow-foreground/15 transition hover:opacity-95 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 sm:text-sm"
           >
             <Check className="size-4 text-primary" />
@@ -3139,6 +3423,43 @@ function ProductDialog({
                   </>
                 )}
               </FormField>
+            )}
+
+            {config.enableUnits && canManageUoms && productUomSchemaReady && (
+              <div className="sm:col-span-2">
+                {productUomSettingsQuery.isLoading && initial ? (
+                  <div className="rounded-xl border border-border/60 bg-card/70 p-4 text-xs text-muted-foreground">
+                    {lang === "ar" ? "جارٍ تحميل وحدات الصنف وأسعاره وباركوداته..." : "Loading item units, prices and barcodes..."}
+                  </div>
+                ) : productUomSettingsQuery.isError && initial ? (
+                  <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-xs text-destructive">
+                    {lang === "ar" ? "تعذر تحميل إعدادات وحدات هذا الصنف، لذلك لن يمكن حفظ التغييرات حتى إعادة المحاولة." : "This item's unit settings could not be loaded, so changes cannot be saved until they load successfully."}
+                  </div>
+                ) : (
+                  <ProductUomSettingsEditor
+                    lang={lang}
+                    units={meta.units}
+                    baseUnitId={form.unit_id}
+                    rows={alternateUoms}
+                    onRowsChange={setAlternateUoms}
+                    salesUnitId={salesUomId}
+                    onSalesUnitChange={setSalesUomId}
+                    purchaseUnitId={purchaseUomId}
+                    onPurchaseUnitChange={setPurchaseUomId}
+                    canSell={policy.is_sellable}
+                    canPurchase={policy.is_purchasable}
+                    disabled={saving || productUomSchemaQuery.isLoading}
+                  />
+                )}
+              </div>
+            )}
+
+            {config.enableUnits && canManageUoms && !productUomSchemaReady && !productUomSchemaQuery.isLoading && (
+              <p className="sm:col-span-2 rounded-xl border border-warning/40 bg-warning/10 p-3 text-xs leading-5 text-warning">
+                {lang === "ar"
+                  ? "إعداد الوحدات المتعددة غير متاح بعد في قاعدة البيانات. أُبقي اختيار وحدة الأساس الحالي فقط حتى تطبيق migrations 101–102."
+                  : "Multiple item units are not available in this database yet. The base-unit field remains available until migrations 101–102 are applied."}
+              </p>
             )}
 
             {showForm("sku") && (

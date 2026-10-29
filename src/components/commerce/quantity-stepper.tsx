@@ -8,6 +8,7 @@ export interface QuantityStepperProps {
   max?: number;
   unbounded?: boolean;
   min?: number;
+  step?: number;
   disabled?: boolean;
   ariaLabel?: string;
   className?: string;
@@ -20,6 +21,7 @@ export function QuantityStepper({
   max,
   unbounded = false,
   min = 1,
+  step = 1,
   disabled = false,
   ariaLabel,
   className,
@@ -51,7 +53,8 @@ export function QuantityStepper({
       setText("0");
       return;
     }
-    let next = parsed;
+    const safeStep = Number.isFinite(step) && step > 0 ? step : 1;
+    let next = Number((Math.round(parsed / safeStep) * safeStep).toFixed(12));
     if (next < min) next = min;
     if (ceiling != null && Number.isFinite(ceiling) && next > ceiling) next = ceiling;
     onCommit(next);
@@ -76,7 +79,9 @@ export function QuantityStepper({
       <button
         type="button"
         disabled={disabled}
-        onClick={() => onCommit(value <= min ? 0 : value - 1)}
+        onClick={() =>
+          onCommit(value <= min ? 0 : Number(Math.max(min, value - step).toFixed(12)))
+        }
         aria-label="decrease"
         className={cn(
           btnClass,
@@ -119,7 +124,7 @@ export function QuantityStepper({
         type="button"
         disabled={disabled}
         onClick={() => {
-          const next = value + 1;
+          const next = Number((value + step).toFixed(12));
           if (!unbounded && ceiling != null && next > ceiling) return;
           onCommit(next);
         }}

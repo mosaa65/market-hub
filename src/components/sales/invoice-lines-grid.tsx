@@ -27,16 +27,31 @@ import type { PosCartLine } from "@/components/sales/invoice-pos-types";
  * في الكمية، لأن الإدخال المتسلسل هو الحالة الغالبة في الفاتورة.
  */
 
+export interface UnitOption {
+  id: string | null;
+  label: string;
+  factor: number;
+}
+
 export interface InvoiceLinesGridProps {
   lines: PosCartLine[];
   isRtl: boolean;
   currencySymbol: string;
   onUpdate: (index: number, patch: Partial<PosCartLine>) => void;
+  /** وحدات البيع المتاحة للسطر (من `product.sale_uoms` + الأساسية). */
+  unitOptionsFor?: (line: PosCartLine) => UnitOption[];
+  /** تغيير وحدة السطر — الشاشة تعيد سعر الوحدة وتحدّث الكمية. */
+  onUnitChange?: (index: number, uomId: string | null) => void;
   onRemove: (index: number) => void;
   onMove: (index: number, direction: -1 | 1) => void;
   onAppend: () => void;
   /** يُركّز البحث لإضافة بند أوّل عندما يكون المستند فارغًا. */
   onRequestAdd?: () => void;
+  /**
+   * Enter بعد آخر سعر: الرحلة تكتمل إلى عمود القرار (السداد ← الإصدار)
+   * بدل أن تعود إلى البحث. هذا ما يجعل المستند يُملأ ويُصدَر بلا فأرة.
+   */
+  onExitForward?: () => void;
 }
 
 interface CellHandle {
@@ -50,10 +65,13 @@ export function InvoiceLinesGrid({
   isRtl,
   currencySymbol,
   onUpdate,
+  unitOptionsFor,
+  onUnitChange,
   onRemove,
   onMove,
   onAppend,
   onRequestAdd,
+  onExitForward,
 }: InvoiceLinesGridProps) {
   const cellRefs = React.useRef<Map<string, CellHandle>>(new Map());
   const [activeRow, setActiveRow] = React.useState<number | null>(null);
@@ -81,9 +99,11 @@ export function InvoiceLinesGrid({
     if (!backwards) {
       if (field === "qty") return focusCell(row, "price");
       if (row + 1 < lines.length) return focusCell(row + 1, "qty");
+      // نهاية الجدول: إلى عمود القرار — لا نضيف سطرًا فارغًا هنا، ولا نعيد
+      // المؤشر إلى البحث فيضيع ترتيب الرحلة.
       if (row + 1 === lines.length) {
-        // نهاية المستند: البند التالي يُضاف من البحث، فلا نضيف سطرًا فارغًا.
-        onRequestAdd?.();
+        if (onExitForward) onExitForward();
+        else onRequestAdd?.();
         return;
       }
     } else {
@@ -152,9 +172,10 @@ export function InvoiceLinesGrid({
         return {
           qty: acc.qty + qty,
           amount: acc.amount + qty * price,
+          units: new Set([...acc.units, line.uomLabel || line.product.default_unit_label || ""]),
         };
       },
-      { qty: 0, amount: 0 },
+      { qty: 0, amount: 0, units: new Set<string>() as Set<string> },
     );
   }, [lines]);
 
@@ -195,6 +216,9 @@ export function InvoiceLinesGrid({
               <th className="w-[92px] px-2 py-2.5 text-center font-semibold">
                 {isRtl ? "الكمية" : "Qty"}
               </th>
+              <th className="w-[84px] px-1 py-2.5 text-center font-semibold">
+                {isRtl ? "الوحدة" : "Unit"}
+              </th>
               <th className="w-[120px] px-2 py-2.5 text-center font-semibold">
                 {isRtl ? "السعر" : "Price"}
               </th>
@@ -208,6 +232,7 @@ export function InvoiceLinesGrid({
             {lines.map((line, index) => {
               const lineAmount = (Number(line.quantity) || 0) * (Number(line.unitPrice) || 0);
               const active = activeRow === index;
+              const unitOptions = unitOptionsFor?.(line) ?? [];
               return (
                 <tr
                   key={line.key ?? `${line.product.id}-${index}`}
@@ -243,22 +268,35 @@ export function InvoiceLinesGrid({
                           {isRtl ? "مواصفات" : "Spec"}
                         </span>
                       )}
-                      {Number(line.quantity) > Number(line.product.on_hand) && (
-                        <span className="rounded border border-amber-500/30 bg-amber-500/10 px-1 text-[9px] font-semibold text-amber-700 dark:text-amber-300">
-                          {isRtl
-                            ? `يتجاوز المتاح ${toSystemDigits(String(line.product.on_hand))}`
-                            : `over stock ${toSystemDigits(String(line.product.on_hand))}`}
-                        </span>
-                      )}
+                      {(() => {
+                        // مقارنة بالوحدة الأساسية: الكمية × عامل التحويل
+                        const factor = line.uomFactor ?? 1;
+                        if ((Number(line.quantity) || 0) * factor <= Number(line.product.on_hand))
+                          return null;
+                        const available = line.product.on_hand / Math.max(factor, 1e-9);
+                        return (
+                          <span className="rounded border border-amber-500/30 bg-amber-500/10 px-1 text-[9px] font-semibold text-amber-700 dark:text-amber-300">
+                            {isRtl
+                              ? `يتجاوز المتاح ${toSystemDigits(String(Math.round(available * 100) / 100))} ${line.uomLabel || ""}`
+                              : `over stock ${toSystemDigits(String(Math.round(available * 100) / 100))} ${line.uomLabel || ""}`}
+                          </span>
+                        );
+                      })()}
                     </span>
                   </td>
 
                   <td className="px-2 py-1.5 align-middle">
                     <QuantityInput
                       ref={register(index, "qty")}
-                      decimals={3}
+                      // خانات عشرية حسب خطوة الوحدة: شوال (1) لا يحتاج كسورًا،
+                      // والكيلو قد يحتاج 3.
+                      decimals={Math.min(
+                        6,
+                        (String(line.quantityStep ?? 0.001).split(".")[1] ?? "").length,
+                      )}
                       min={0}
                       value={line.quantity === "" ? null : Number(line.quantity)}
+                      unit={line.uomLabel || undefined}
                       onValueChange={(v) =>
                         onUpdate(index, { quantity: v == null ? "" : String(v) })
                       }
@@ -275,12 +313,40 @@ export function InvoiceLinesGrid({
                     />
                   </td>
 
+                  {/*
+                   * الوحدة: الكمية وحدها لا تعني شيئًا على مستند (5 كيلو أم
+                   * 5 شوال؟). تغييرها يعيد تثبيت سعر الوحدة من الكتالوج.
+                   */}
+                  <td className="px-1 py-1.5 align-middle text-center">
+                    {unitOptions.length > 1 && onUnitChange ? (
+                      <select
+                        value={line.uomId ?? unitOptions[0]?.id ?? ""}
+                        onChange={(e) => onUnitChange(index, e.target.value || null)}
+                        data-form-nav
+                        aria-label={isRtl ? `وحدة البند ${index + 1}` : `Unit of line ${index + 1}`}
+                        className="h-8 w-full rounded-lg border border-border/70 bg-surface px-1 text-center text-[11px] font-semibold text-foreground outline-none transition focus:border-primary/60 focus:ring-2 focus:ring-primary/15"
+                      >
+                        {unitOptions.map((unit) => (
+                          <option key={unit.id ?? "base"} value={unit.id ?? ""}>
+                            {unit.label}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="inline-block rounded-md border border-border/60 bg-surface-2/60 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                        {line.uomLabel || line.product.base_unit_label || "—"}
+                      </span>
+                    )}
+                  </td>
+
                   <td className="px-2 py-1.5 align-middle">
                     <AmountInput
                       ref={register(index, "price")}
                       min={0}
+                      disabled={!line.priceEditable}
                       showInWords={false}
                       value={line.unitPrice === "" ? null : Number(line.unitPrice)}
+                      /* السعر قابل للتعديل ما لم يمنعه العميل صراحة. */
                       onValueChange={(v) =>
                         onUpdate(index, { unitPrice: v == null ? "" : String(v) })
                       }
@@ -293,6 +359,11 @@ export function InvoiceLinesGrid({
                       containerClassName="[&_input]:h-8"
                       aria-label={isRtl ? `سعر البند ${index + 1}` : `Price of line ${index + 1}`}
                     />
+                    <span className="sr-only">
+                      {isRtl
+                        ? "Enter: التالي · Alt+السهمين: تحريك البند · حذف: إزالة"
+                        : "Enter: next · Alt+arrows: move · Delete: remove"}
+                    </span>
                   </td>
 
                   <td className="px-3 py-1.5 align-middle text-end">
@@ -326,9 +397,15 @@ export function InvoiceLinesGrid({
                   : `${toSystemDigits(lines.length)} line(s)`}
               </td>
               <td className="px-2 py-2 text-center font-mono font-semibold text-foreground">
-                {toSystemDigits(String(Math.round(totals.qty * 1000) / 1000))}
+                {/* الكمية تُجمع فقط إذا كانت كل البنود بنفس الوحدة — جمع كيلو مع
+                    شوال يعطي رقمًا بلا معنى، فنعرض شرطة بدل رقم مضلّل. */}
+                {totals.units.size <= 1
+                  ? toSystemDigits(String(Math.round(totals.qty * 1000) / 1000))
+                  : "—"}
               </td>
-              <td />
+              <td className="px-1 py-2 text-center text-[10px] font-semibold text-muted-foreground">
+                {totals.units.size === 1 ? [...totals.units][0] : isRtl ? "مختلطة" : "mixed"}
+              </td>
               <td className="px-3 py-2 text-end font-mono text-sm font-black text-foreground">
                 {toSystemDigits(money(totals.amount))}
                 <span className="ms-1 text-[9px] font-normal text-muted-foreground">

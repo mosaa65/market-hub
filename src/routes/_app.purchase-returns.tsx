@@ -62,6 +62,7 @@ import { RecordsViewToggle } from "@/components/ui/records-view-toggle";
 import { usePersistedViewMode } from "@/hooks/use-persisted-view-mode";
 import { type DataTableColumn, type DataTableSort } from "@/components/ui/data-table";
 import { useBreakpoint } from "@/design/breakpoints";
+import { addReturnableQuantities, quantityIncrementDecimals } from "@/lib/invoice-returnable-quantities";
 
 export const Route = createFileRoute("/_app/purchase-returns")({
   head: () => ({ meta: [{ title: "مرتجعات المشتريات — Vortex ERP" }] }),
@@ -73,11 +74,16 @@ export const Route = createFileRoute("/_app/purchase-returns")({
 });
 
 interface Line {
+  invoice_item_id: string;
   product_id: string;
   name: string;
   quantity: number;
+  max_quantity: number;
+  uom_id: string | null;
+  unit_label: string;
+  quantity_step: number;
   unit_cost: number;
-  tax_rate: number;
+  tax_per_unit: number;
 }
 
 interface PurchaseReturn {
@@ -612,7 +618,6 @@ function NewPurchaseReturn({
   const [open, setOpen] = useState(false);
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
   const [warehouseId, setWarehouseId] = useState("");
   const [supplierId, setSupplierId] = useState<string>("");
   const [refundMethod, setRefundMethod] = useState("cash");
@@ -623,6 +628,7 @@ function NewPurchaseReturn({
   const [note, setNote] = useState("");
   const [search, setSearch] = useState("");
   const [supplierInvoiceId, setSupplierInvoiceId] = useState<string>("");
+  const [invoiceDiscountFactor, setInvoiceDiscountFactor] = useState(1);
   const [supplierInvoices, setSupplierInvoices] = useState<any[]>([]);
   const [invoiceItems, setInvoiceItems] = useState<any[]>([]);
   const [lines, setLines] = useState<Line[]>([]);
@@ -632,16 +638,9 @@ function NewPurchaseReturn({
     Promise.all([
       supabase.from("warehouses").select("id,name,name_ar").eq("is_active", true).order("name"),
       supabase.from("suppliers").select("id,name").eq("is_active", true).order("name"),
-      supabase
-        .from("products")
-        .select("id,name,name_ar,sku,cost_price,tax_rate")
-        .eq("is_active", true)
-        .order("name")
-        .limit(200),
-    ]).then(([w, s, p]) => {
+    ]).then(([w, s]) => {
       setWarehouses(w.data ?? []);
       setSuppliers(s.data ?? []);
-      setProducts(p.data ?? []);
       if (!warehouseId && w.data?.[0]) setWarehouseId(w.data[0].id);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- مقصود: تحديد المستودع الافتراضي مرة واحدة عند الفتح
@@ -659,7 +658,7 @@ function NewPurchaseReturn({
       const { data, error } = await supabase
         .from("purchase_invoices")
         .select(
-          "id,invoice_number,total,created_at,purchase_invoice_items(quantity,unit_cost,tax_rate,product_id,products(id,name,name_ar,sku))",
+          "id,invoice_number,total,subtotal,discount,created_at,purchase_invoice_items(id,quantity,unit_cost,base_unit_cost,tax,product_id,uom_id,entered_quantity,entered_unit_cost,uom_conversion_factor,uom_quantity_increment,products(id,name,name_ar,sku),uom:units!purchase_invoice_items_uom_id_fkey(name,name_ar))",
         )
         .eq("supplier_id", supplierId)
         .order("created_at", { ascending: false });
@@ -668,20 +667,23 @@ function NewPurchaseReturn({
       setSupplierInvoices(rows);
       const firstId = rows[0]?.id ?? "";
       setSupplierInvoiceId(firstId);
-      const nextItems = (rows[0]?.purchase_invoice_items ?? []) as any[];
+      setInvoiceDiscountFactor(
+        Number(rows[0]?.subtotal) > 0
+          ? 1 - Math.min(1, Number(rows[0]?.discount ?? 0) / Number(rows[0]?.subtotal))
+          : 1,
+      );
+      const rawItems = (rows[0]?.purchase_invoice_items ?? []) as any[];
+      let nextItems = rawItems;
+      if (firstId) {
+        try {
+          nextItems = await addReturnableQuantities("purchase", firstId, rawItems);
+        } catch (returnError) {
+          toast.error(translateRpcError(returnError, isRtl ? "ar" : "en"));
+          return;
+        }
+      }
       setInvoiceItems(nextItems);
-      const selectedItems = nextItems.map((item) => ({
-        product_id: item.product_id ?? item.products?.id ?? "",
-        name:
-          lang === "ar"
-            ? item.products?.name_ar || item.products?.name
-            : item.products?.name || item.products?.name_ar,
-        quantity: Math.min(1, Math.max(1, Number(item.quantity ?? 1))),
-        max_quantity: Number(item.quantity ?? 9999),
-        unit_cost: Number(item.unit_cost ?? 0),
-        tax_rate: Number(item.tax_rate ?? 0),
-      }));
-      setLines(selectedItems.filter((item) => item.product_id));
+      setLines([]);
     })();
   }, [supplierId, lang]);
 
@@ -695,71 +697,91 @@ function NewPurchaseReturn({
       const { data, error } = await supabase
         .from("purchase_invoices")
         .select(
-          "id,invoice_number,purchase_invoice_items(quantity,unit_cost,tax_rate,product_id,products(id,name,name_ar,sku))",
+          "id,invoice_number,subtotal,discount,purchase_invoice_items(id,quantity,unit_cost,base_unit_cost,tax,product_id,uom_id,entered_quantity,entered_unit_cost,uom_conversion_factor,uom_quantity_increment,products(id,name,name_ar,sku),uom:units!purchase_invoice_items_uom_id_fkey(name,name_ar))",
         )
         .eq("id", supplierInvoiceId)
         .maybeSingle();
       if (error || !data) return;
-      const nextItems = (data.purchase_invoice_items ?? []) as any[];
+      let nextItems: any[];
+      try {
+        nextItems = await addReturnableQuantities(
+          "purchase",
+          supplierInvoiceId,
+          (data.purchase_invoice_items ?? []) as any[],
+        );
+      } catch (returnError) {
+        toast.error(translateRpcError(returnError, isRtl ? "ar" : "en"));
+        return;
+      }
       setInvoiceItems(nextItems);
-      const selectedItems = nextItems.map((item) => ({
-        product_id: item.product_id ?? item.products?.id ?? "",
-        name:
-          lang === "ar"
-            ? item.products?.name_ar || item.products?.name
-            : item.products?.name || item.products?.name_ar,
-        quantity: Math.min(1, Math.max(1, Number(item.quantity ?? 1))),
-        max_quantity: Number(item.quantity ?? 9999),
-        unit_cost: Number(item.unit_cost ?? 0),
-        tax_rate: Number(item.tax_rate ?? 0),
-      }));
-      setLines(selectedItems.filter((item) => item.product_id));
+      setInvoiceDiscountFactor(
+        Number(data.subtotal) > 0
+          ? 1 - Math.min(1, Number(data.discount ?? 0) / Number(data.subtotal))
+          : 1,
+      );
+      setLines([]);
     })();
   }, [supplierInvoiceId, lang]);
 
   const filtered = useMemo(
     () =>
-      products
+      invoiceItems
         .filter(
-          (p) =>
+          (item) => {
+            const p = item.products;
+            if (!p || Number(item.returnable_entered_quantity ?? item.entered_quantity ?? item.quantity ?? 0) <= 0) return false;
+            return (
             !search ||
-            p.name.toLowerCase().includes(search.toLowerCase()) ||
+            (p.name ?? "").toLowerCase().includes(search.toLowerCase()) ||
             (p.name_ar ?? "").includes(search) ||
-            p.sku?.toLowerCase().includes(search.toLowerCase()),
+            p.sku?.toLowerCase().includes(search.toLowerCase())
+            );
+          },
         )
         .slice(0, 8),
-    [products, search],
+    [invoiceItems, search],
   );
 
-  function addLine(p: any) {
+  function addLine(item: any) {
+    const p = item.products;
+    if (!p || !item.id) return;
     setLines((l) => {
-      const ex = l.find((x) => x.product_id === p.id);
-      if (ex) return l.map((x) => (x.product_id === p.id ? { ...x, quantity: x.quantity + 1 } : x));
+      const ex = l.find((x) => x.invoice_item_id === item.id);
+      if (ex) return l.map((x) => (x.invoice_item_id === item.id ? { ...x, quantity: Math.min(x.max_quantity, x.quantity + x.quantity_step) } : x));
+      const maxQuantity = Number(item.returnable_entered_quantity ?? item.entered_quantity ?? item.quantity ?? 9999);
+      const quantityStep = Number(item.returnable_quantity_increment ?? item.uom_quantity_increment ?? 0.001);
+      const initialQuantity = Math.min(maxQuantity, Math.ceil(1 / quantityStep) * quantityStep);
       return [
         ...l,
         {
-          product_id: p.id,
+          invoice_item_id: item.id,
+          product_id: item.product_id ?? p.id,
           name: lang === "ar" ? p.name_ar || p.name : p.name || p.name_ar,
-          quantity: 1,
-          unit_cost: Number(p.cost_price),
-          tax_rate: Number(p.tax_rate ?? 0),
+          quantity: initialQuantity,
+          max_quantity: maxQuantity,
+          uom_id: item.uom_id ?? null,
+          unit_label: item.uom?.name_ar || item.uom?.name || (lang === "ar" ? "وحدة الفاتورة" : "Invoice unit"),
+          quantity_step: quantityStep,
+          unit_cost: Number(item.entered_unit_cost ?? item.unit_cost ?? 0),
+          tax_per_unit:
+            (Number(item.tax ?? 0) / Math.max(Number(item.quantity ?? 0), 0.000001)) *
+            Number(item.uom_conversion_factor ?? 1),
         },
       ];
     });
     setSearch("");
   }
 
-  function removeLine(pid: string) {
-    setLines((l) => l.filter((x) => x.product_id !== pid));
+  function removeLine(invoiceItemId: string) {
+    setLines((l) => l.filter((x) => x.invoice_item_id !== invoiceItemId));
   }
 
-  function updateQty(pid: string, qty: number) {
-    if (qty < 1) return removeLine(pid);
+  function updateQty(invoiceItemId: string, qty: number) {
+    if (qty <= 0) return removeLine(invoiceItemId);
     setLines((l) =>
       l.map((x) => {
-        if (x.product_id !== pid) return x;
-        const maxQ = (x as any).max_quantity;
-        const validQty = typeof maxQ === "number" && maxQ > 0 ? Math.min(qty, maxQ) : qty;
+        if (x.invoice_item_id !== invoiceItemId) return x;
+        const validQty = x.max_quantity > 0 ? Math.min(qty, x.max_quantity) : qty;
         return { ...x, quantity: validQty };
       }),
     );
@@ -767,10 +789,14 @@ function NewPurchaseReturn({
 
   const total =
     Math.round(
-      lines.reduce((a, l) => a + l.quantity * l.unit_cost * (1 + l.tax_rate / 100), 0) * 100,
+      lines.reduce((a, l) => a + l.quantity * (l.unit_cost * invoiceDiscountFactor + l.tax_per_unit), 0) * 100,
     ) / 100;
 
   async function save() {
+    if (lines.some((line) => Math.abs(line.quantity / line.quantity_step - Math.round(line.quantity / line.quantity_step)) > 1e-7)) {
+      toast.error(isRtl ? "الكمية يجب أن تطابق خطوة الوحدة المسجلة في الفاتورة الأصلية" : "Quantity must follow the unit increment saved on the original invoice");
+      return;
+    }
     if (!warehouseId || !supplierId || lines.length === 0) {
       toast.error(t("common.fill_form"));
       return;
@@ -915,16 +941,16 @@ function NewPurchaseReturn({
             />
             {search && filtered.length > 0 && (
               <div className="absolute z-20 mt-1 w-full rounded-md border border-border bg-popover shadow-lg max-h-60 overflow-auto">
-                {filtered.map((p) => (
+                {filtered.map((item) => (
                   <button
-                    key={p.id}
+                    key={item.id}
                     type="button"
                     className="flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-accent text-start"
-                    onClick={() => addLine(p)}
+                    onClick={() => addLine(item)}
                   >
-                    <span>{lang === "ar" ? p.name_ar || p.name : p.name || p.name_ar}</span>
+                    <span>{lang === "ar" ? item.products?.name_ar || item.products?.name : item.products?.name || item.products?.name_ar}</span>
                     <span className="font-mono text-xs text-muted-foreground">
-                      {money(Number(p.cost_price))}
+                      {money(Number(item.entered_unit_cost ?? item.unit_cost ?? 0))}
                     </span>
                   </button>
                 ))}
@@ -933,31 +959,22 @@ function NewPurchaseReturn({
             {invoiceItems.length > 0 && !search && (
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
                 {invoiceItems.map((item: any) => {
-                  const productId = item.product_id ?? item.products?.id ?? "";
                   const label =
                     lang === "ar"
                       ? item.products?.name_ar || item.products?.name
                       : item.products?.name || item.products?.name_ar;
                   return (
                     <button
-                      key={productId}
+                      key={item.id}
                       type="button"
-                      onClick={() =>
-                        addLine({
-                          id: productId,
-                          name: label,
-                          sku: item.products?.sku,
-                          cost_price: Number(item.unit_cost ?? 0),
-                          tax_rate: Number(item.tax_rate ?? 0),
-                        })
-                      }
+                      onClick={() => addLine(item)}
                       className="rounded-xl border border-border bg-surface px-3 py-2 text-left text-sm hover:border-primary/40 hover:bg-primary/5"
                     >
                       <div className="font-medium">{label}</div>
                       <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
                         <span>{item.products?.sku ?? "—"}</span>
                         <span>
-                          {item.quantity} {lang === "ar" ? "قطعة" : "pcs"}
+                          {Number(item.returnable_entered_quantity ?? item.entered_quantity ?? item.quantity)} {item.uom?.name_ar || item.uom?.name || (lang === "ar" ? "وحدة الفاتورة" : "Invoice unit")}
                         </span>
                       </div>
                     </button>
@@ -983,27 +1000,28 @@ function NewPurchaseReturn({
                 </TableHeader>
                 <TableBody>
                   {lines.map((l) => (
-                    <TableRow key={l.product_id}>
-                      <TableCell className="font-medium">{l.name}</TableCell>
+                    <TableRow key={l.invoice_item_id}>
+                      <TableCell className="font-medium">{l.name}<span className="ms-2 text-xs text-muted-foreground">{l.unit_label}</span></TableCell>
                       <TableCell>
                         {/* الكمية المُوحّدة: أرقام في المنتصف، بلا عجلة ماوس. */}
                         <QuantityInput
-                          decimals={0}
-                          min={1}
+                          decimals={quantityIncrementDecimals(l.quantity_step)}
+                          displayDecimals={quantityIncrementDecimals(l.quantity_step)}
+                          min={l.quantity_step}
                           aria-label={lang === "ar" ? "الكمية" : "Quantity"}
                           value={l.quantity}
-                          onValueChange={(v) => updateQty(l.product_id, v == null ? 1 : v)}
+                          onValueChange={(v) => updateQty(l.invoice_item_id, v == null ? l.quantity_step : v)}
                           className="h-8 w-20"
                         />
                       </TableCell>
                       <TableCell className="font-mono">{money(l.unit_cost)}</TableCell>
                       <TableCell className="text-end font-mono font-semibold">
-                        {money(l.quantity * l.unit_cost * (1 + l.tax_rate / 100))}
+                        {money(l.quantity * (l.unit_cost * invoiceDiscountFactor + l.tax_per_unit))}
                       </TableCell>
                       <TableCell className="text-end">
                         <button
                           type="button"
-                          onClick={() => removeLine(l.product_id)}
+                          onClick={() => removeLine(l.invoice_item_id)}
                           className="text-destructive hover:opacity-80"
                         >
                           <Trash2 className="h-4 w-4" />

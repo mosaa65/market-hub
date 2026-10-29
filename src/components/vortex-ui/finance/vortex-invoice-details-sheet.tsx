@@ -48,6 +48,7 @@ export interface VortexInvoiceItem {
   name_ar?: string | null;
   sku?: string | null;
   quantity: number | string;
+  unit?: string | null;
   unitPrice: number | string;
   total: number | string;
   line_type?: string | null;
@@ -550,6 +551,7 @@ export function VortexInvoiceDetailsSheet({
                             </td>
                             <td className="px-3.5 py-2.5 text-center font-mono font-bold text-foreground">
                               {toSystemDigits(item.quantity.toString())}
+                              {item.unit && <span className="ms-1 text-xs font-normal text-muted-foreground">{item.unit}</span>}
                             </td>
                             <td className="px-3.5 py-2.5 text-end font-mono text-muted-foreground">
                               {toSystemDigits(formatSystemNumber(Number(item.unitPrice)))}

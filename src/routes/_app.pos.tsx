@@ -105,6 +105,7 @@ interface Product {
   category_id?: string | null;
   brand_id?: string | null;
   unit_id?: string | null;
+  sale_uoms?: SaleUom[];
   origin_id?: string | null;
   quality_grade_id?: string | null;
   is_service?: boolean | null;
@@ -118,19 +119,33 @@ interface Product {
   origin?: { name: string; name_ar: string | null; code?: string } | null;
   quality?: { name: string; name_ar: string | null; code?: string } | null;
 }
+interface SaleUom {
+  unit_id: string;
+  factor_to_base: number;
+  sale_price: number;
+  label: string;
+  quantity_increment: number;
+  is_default_sale: boolean;
+}
 interface CartLine {
+  line_id: string;
   product_id: string;
   name: string;
   unit_price: number;
   base_price?: number;
   tax_rate: number;
   quantity: number;
+  quantity_increment?: number;
   is_service?: boolean;
   item_nature?: string;
   inventory_policy?: string;
   batch_id?: string | null;
   batch_number?: string | null;
   expiry_date?: string | null;
+  uom_id?: string | null;
+  uom_factor?: number;
+  uom_label?: string;
+  sale_uoms?: SaleUom[];
 }
 interface Warehouse {
   id: string;
@@ -303,9 +318,12 @@ function POSPage() {
     paymentMethodId: "cash",
   });
   const [batchPendingProduct, setBatchPendingProduct] = useState<Product | null>(null);
+  const [batchPendingUom, setBatchPendingUom] = useState<SaleUom | null>(null);
   const [batchModalOpen, setBatchModalOpen] = useState(false);
   const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
+  const [unitBarcodeMap, setUnitBarcodeMap] = useState<Record<string, { product_id: string; uom_id: string }>>({});
+  const [saleUomsLoaded, setSaleUomsLoaded] = useState(false);
   /*
    * قائمة المنتجات تُجلب في مسار منفصل سريع وتُعرض لحظة وصولها — قبل اكتمال
    * بقية بيانات السياق (التصنيفات، الماركات، الموديلات…) التي تُثرى لاحقاً.
@@ -546,6 +564,7 @@ function POSPage() {
   }, [warehouseId]);
 
   async function loadAll() {
+    setSaleUomsLoaded(false);
     try {
       /*
        * مسار سريع للمنتجات: يُطلق قبل كل شيء ويُعرض فور وصوله، حتى لا ينتظر
@@ -680,8 +699,91 @@ function POSPage() {
         }
       }
 
+      const saleUomsByProduct = new Map<string, SaleUom[]>();
+      const baseSalePrices = new Map<string, number>();
+      let unitSettingsReady = true;
+      setUnitBarcodeMap({});
+      if (rawProducts.length) {
+        const productIds = rawProducts.map((product: any) => product.id);
+        try {
+          const [uomResult, companyPriceResult] = await Promise.all([
+            (supabase as any)
+              .from("product_uoms")
+              .select("id, product_id, unit_id, factor_to_base, quantity_increment, is_default_sale, unit:units!product_uoms_unit_id_fkey(name, name_ar, short_name)")
+              .in("product_id", productIds)
+              .eq("is_active", true)
+              .eq("can_sell", true),
+            (supabase as any)
+              .from("company_items")
+              .select("item_id, default_sale_price")
+              .eq("company_id", 1)
+              .eq("is_active", true)
+              .in("item_id", productIds),
+          ]);
+          for (const priceRow of companyPriceResult.data ?? []) {
+            if (priceRow.default_sale_price != null) {
+              baseSalePrices.set(priceRow.item_id, Number(priceRow.default_sale_price));
+            }
+          }
+          const missingUomSchema = uomResult.error && ["42P01", "PGRST205"].includes(uomResult.error.code ?? "");
+          if (uomResult.error && !missingUomSchema) throw uomResult.error;
+          if (companyPriceResult.error) throw companyPriceResult.error;
+          if (missingUomSchema) {
+            unitSettingsReady = true;
+          } else if (uomResult.data?.length) {
+            const uomIds = uomResult.data.map((row: any) => row.id);
+            const { data: priceRows, error: priceError } = await (supabase as any)
+              .from("product_uom_prices")
+              .select("product_uom_id, sale_price")
+              .in("product_uom_id", uomIds)
+              .eq("company_id", 1);
+            if (priceError) throw priceError;
+            const { data: barcodeRows, error: barcodeError } = await (supabase as any)
+              .from("product_uom_barcodes")
+              .select("product_uom_id, barcode")
+              .in("product_uom_id", uomIds)
+              .eq("company_id", 1)
+              .eq("is_active", true);
+            if (barcodeError) throw barcodeError;
+            const priceByUom = new Map<string, number>();
+            for (const priceRow of priceRows ?? []) {
+              if (priceRow.sale_price != null) priceByUom.set(priceRow.product_uom_id, Number(priceRow.sale_price));
+            }
+            for (const row of uomResult.data as any[]) {
+              const basePrice = baseSalePrices.get(row.product_id) ?? Number(rawProducts.find((product: any) => product.id === row.product_id)?.sale_price ?? 0);
+              const unitPrice = priceByUom.get(row.id) ?? basePrice * Number(row.factor_to_base);
+              const unit = row.unit ?? unitMap.get(row.unit_id);
+              const label = unit
+                ? (lang === "ar" ? unit.name_ar || unit.name : unit.name || unit.name_ar) + (unit.short_name ? ` (${unit.short_name})` : "")
+                : "";
+              const list = saleUomsByProduct.get(row.product_id) ?? [];
+              list.push({
+                unit_id: row.unit_id,
+                factor_to_base: Number(row.factor_to_base),
+                sale_price: unitPrice,
+                label,
+                quantity_increment: Number(row.quantity_increment ?? 1),
+                is_default_sale: row.is_default_sale === true,
+              });
+              saleUomsByProduct.set(row.product_id, list);
+            }
+            const unitRowById = new Map<string, { product_id: string; uom_id: string }>();
+            for (const barcodeRow of barcodeRows ?? []) {
+              const uomRow = (uomResult.data as any[]).find((row) => row.id === barcodeRow.product_uom_id);
+              if (uomRow) unitRowById.set(barcodeRow.barcode, { product_id: uomRow.product_id, uom_id: uomRow.unit_id });
+            }
+            setUnitBarcodeMap(Object.fromEntries(unitRowById));
+          }
+        } catch (uomLoadError) {
+          unitSettingsReady = false;
+          console.warn("[pos] Item unit settings unavailable; using base units", uomLoadError);
+        }
+      }
+
       const enrichedProducts = rawProducts.map((p: any) => ({
         ...p,
+        sale_price: baseSalePrices.get(p.id) ?? Number(p.sale_price ?? 0),
+        sale_uoms: saleUomsByProduct.get(p.id) ?? [],
         category: p.category_id ? catMap.get(p.category_id) || null : null,
         brand: p.brand_id ? brandMap.get(p.brand_id) || null : null,
         unit: p.unit_id ? unitMap.get(p.unit_id) || null : null,
@@ -690,6 +792,7 @@ function POSPage() {
       }));
 
       setProducts(enrichedProducts);
+      setSaleUomsLoaded(unitSettingsReady);
       setCatalogLoading(false);
       setCategories(cats ?? []);
       setBrands(brs ?? []);
@@ -1004,9 +1107,9 @@ function POSPage() {
         case "name_desc":
           return (b.name_ar || b.name).localeCompare(a.name_ar || a.name, lang);
         case "price_asc":
-          return Number(a.sale_price) - Number(b.sale_price);
+          return getDefaultSaleUom(a).sale_price - getDefaultSaleUom(b).sale_price;
         case "price_desc":
-          return Number(b.sale_price) - Number(a.sale_price);
+          return getDefaultSaleUom(b).sale_price - getDefaultSaleUom(a).sale_price;
         case "stock_asc":
           return (stockMap[a.id] ?? 0) - (stockMap[b.id] ?? 0);
         case "stock_desc":
@@ -1037,7 +1140,7 @@ function POSPage() {
     const label = (product: Product, key: string): string | number => {
       if (key === "code") return product.barcode || product.sku || "";
       if (key === "stock") return stockMap[product.id] ?? 0;
-      if (key === "price") return Number(product.sale_price) || 0;
+      if (key === "price") return getDefaultSaleUom(product).sale_price || 0;
       if (key === "category") {
         const category =
           lang === "ar"
@@ -1068,9 +1171,18 @@ function POSPage() {
   function addToCart(
     p: Product,
     selectedBatch?: { id: string; batch_number: string; expiry_date: string | null } | null,
+    requestedUom?: SaleUom | null,
   ) {
     const prodName = lang === "ar" && p.name_ar ? p.name_ar : p.name;
     const isService = p.is_service === true;
+    if (!isService && !saleUomsLoaded) {
+      toast.info(lang === "ar" ? "جارٍ تحميل وحدات البيع للصنف؛ حاول مجددًا بعد لحظة" : "Loading this item's sales units; try again in a moment.");
+      return;
+    }
+    const baseUomLabel = p.unit?.short_name || (lang === "ar" ? "وحدة الأساس" : "Base unit");
+    const defaultUom = getDefaultSaleUom(p);
+    const saleUom = requestedUom ?? defaultUom;
+    const uomFactor = saleUom.factor_to_base > 0 ? saleUom.factor_to_base : 1;
 
     if (!isService) {
       // التحقق من سياسة المخزون وتتبع الدفعات (BATCH):
@@ -1091,14 +1203,20 @@ function POSPage() {
           return;
         }
         setBatchPendingProduct(p);
+        setBatchPendingUom(saleUom);
         setBatchModalOpen(true);
         return;
       }
 
       const stock = stockMap[p.id] ?? 0;
-      if (stock <= 0) {
+      const reservedBase = cart
+        .filter((line) => line.product_id === p.id)
+        .reduce((sum, line) => sum + line.quantity * (line.uom_factor ?? 1), 0);
+      if (stock - reservedBase < uomFactor) {
         return toast.error(
-          lang === "ar" ? `نفد المخزون من: ${prodName}` : `${p.name} ${t("pos.out_of_stock")}`,
+          lang === "ar"
+            ? `الكمية المتاحة لا تكفي لوحدة ${saleUom.label || baseUomLabel}: ${Math.max(0, (stock - reservedBase) / uomFactor)}`
+            : `Not enough stock for ${saleUom.label || baseUomLabel}: ${Math.max(0, (stock - reservedBase) / uomFactor)}`,
         );
       }
 
@@ -1107,13 +1225,16 @@ function POSPage() {
       const expiryDate = selectedBatch?.expiry_date ?? null;
 
       setCart((c) => {
-        const existing = c.find((l) => l.product_id === p.id && (l.batch_id || null) === batchId);
+        const existing = c.find((l) => l.product_id === p.id && l.uom_id === (saleUom.unit_id || null) && (l.batch_id || null) === batchId);
         if (existing) {
-          if (existing.quantity >= stock) {
+          const otherReservedBase = c
+            .filter((l) => l.product_id === p.id && l.line_id !== existing.line_id)
+            .reduce((sum, line) => sum + line.quantity * (line.uom_factor ?? 1), 0);
+          if (stock - otherReservedBase < (existing.quantity + 1) * uomFactor) {
             toast.error(
               lang === "ar"
-                ? `الحد الأقصى المتاح في المخزون: ${stock}`
-                : `${t("pos.max_stock")}: ${stock}`,
+                ? `الحد الأقصى المتاح في المخزون: ${Math.max(0, (stock - otherReservedBase) / uomFactor)}`
+                : `${t("pos.max_stock")}: ${Math.max(0, (stock - otherReservedBase) / uomFactor)}`,
             );
             return c;
           }
@@ -1123,12 +1244,18 @@ function POSPage() {
           ...c,
           {
             product_id: p.id,
+            line_id: crypto.randomUUID(),
             name: prodName,
-            unit_price: Number(p.sale_price),
-            base_price: Number(p.sale_price),
+            unit_price: Number(saleUom.sale_price),
+            base_price: Number(saleUom.sale_price),
             tax_rate: Number(p.tax_rate ?? 0),
             quantity: 1,
+            quantity_increment: saleUom.quantity_increment,
             is_service: false,
+            uom_id: saleUom.unit_id || null,
+            uom_factor: uomFactor,
+            uom_label: saleUom.label || baseUomLabel,
+            sale_uoms: p.sale_uoms,
             batch_id: batchId,
             batch_number: batchNumber,
             expiry_date: expiryDate,
@@ -1140,23 +1267,42 @@ function POSPage() {
 
     // مسار الخدمة: بلا فحص مخزون، والحمولة تحمل is_service = true.
     setCart((c) => {
-      const existing = c.find((l) => l.product_id === p.id);
+      const existing = c.find((l) => l.product_id === p.id && l.uom_id === (saleUom.unit_id || null));
       if (existing) {
-        return c.map((l) => (l.product_id === p.id ? { ...l, quantity: l.quantity + 1 } : l));
+        return c.map((l) => (l.line_id === existing.line_id ? { ...l, quantity: l.quantity + 1 } : l));
       }
       return [
         ...c,
         {
           product_id: p.id,
+          line_id: crypto.randomUUID(),
           name: prodName,
           unit_price: Number(p.sale_price),
           base_price: Number(p.sale_price),
           tax_rate: Number(p.tax_rate ?? 0),
           quantity: 1,
+          quantity_increment: saleUom.quantity_increment,
           is_service: true,
+          uom_id: saleUom.unit_id || null,
+          uom_factor: uomFactor,
+          uom_label: saleUom.label || baseUomLabel,
+          sale_uoms: p.sale_uoms,
         },
       ];
     });
+  }
+
+  function getDefaultSaleUom(product: Product): SaleUom {
+    return product.sale_uoms?.find((uom) => uom.is_default_sale)
+      ?? product.sale_uoms?.find((uom) => uom.unit_id === product.unit_id)
+      ?? {
+        unit_id: product.unit_id ?? "",
+        factor_to_base: 1,
+        sale_price: Number(product.sale_price),
+        label: product.unit?.short_name || (lang === "ar" ? "وحدة الأساس" : "Base unit"),
+        quantity_increment: 1,
+        is_default_sale: true,
+      };
   }
 
   /**
@@ -1168,44 +1314,69 @@ function POSPage() {
    * services are uncapped, physical items are capped by stock, and a quantity
    * below the minimum removes the line.
    */
-  function setQty(pid: string, qty: number | null) {
-    const line = cart.find((l) => l.product_id === pid);
+  function setQty(lineId: string, qty: number | null) {
+    const line = cart.find((l) => l.line_id === lineId);
     if (!line) return;
 
     // Empty commit: leave the line untouched, the stepper restores the number.
     if (qty === null || Number.isNaN(qty)) return;
 
-    if (qty < 1) {
-      setCart((c) => c.filter((l) => l.product_id !== pid));
+    if (qty <= 0) {
+      setCart((c) => c.filter((l) => l.line_id !== lineId));
       return;
     }
 
     if (!line.is_service) {
-      const stock = stockMap[pid] ?? 0;
-      if (qty > stock) {
+      const stock = stockMap[line.product_id] ?? 0;
+      const reservedByOtherLines = cart
+        .filter((l) => l.product_id === line.product_id && l.line_id !== lineId)
+        .reduce((sum, item) => sum + item.quantity * (item.uom_factor ?? 1), 0);
+      const factor = line.uom_factor ?? 1;
+      if (qty * factor + reservedByOtherLines > stock + 1e-9) {
         toast.error(
           lang === "ar"
-            ? `الحد الأقصى المتاح في المخزون: ${stock}`
-            : `${t("pos.max_stock")}: ${stock}`,
+            ? `الحد الأقصى المتاح: ${Math.max(0, (stock - reservedByOtherLines) / factor)}`
+            : `${t("pos.max_stock")}: ${Math.max(0, (stock - reservedByOtherLines) / factor)}`,
         );
         return;
       }
     }
 
-    setCart((c) => c.map((l) => (l.product_id === pid ? { ...l, quantity: qty } : l)));
+    setCart((c) => c.map((l) => (l.line_id === lineId ? { ...l, quantity: qty } : l)));
   }
 
-  /**
-   * setPrice — override the per-transaction price for a single cart line.
-   *
-   * This NEVER writes back to `products.sale_price`; it only changes
-   * `CartLine.unit_price`, which is what `create_sale` already receives. The
-   * product's permanent price is therefore untouched.
-   */
-  function setPrice(pid: string, price: number) {
-    setCart((c) =>
-      c.map((l) => (l.product_id === pid ? { ...l, unit_price: Math.max(0, price) } : l)),
-    );
+  /** Negotiated ad-hoc service fees are per-ticket; catalogue prices come from the unit price table. */
+  function setPrice(lineId: string, price: number) {
+    setCart((current) => current.map((line) =>
+      line.line_id === lineId && line.is_service
+        ? { ...line, unit_price: Math.max(0, price) }
+        : line,
+    ));
+  }
+
+  function changeLineUom(lineId: string, unitId: string) {
+    const line = cart.find((entry) => entry.line_id === lineId);
+    const option = line?.sale_uoms?.find((uom) => uom.unit_id === unitId);
+    if (!line || !option) return;
+    if (!line.is_service) {
+      const stock = stockMap[line.product_id] ?? 0;
+      const reservedByOtherLines = cart
+        .filter((entry) => entry.product_id === line.product_id && entry.line_id !== lineId)
+        .reduce((sum, entry) => sum + entry.quantity * (entry.uom_factor ?? 1), 0);
+      if (line.quantity * option.factor_to_base + reservedByOtherLines > stock + 1e-9) {
+        toast.error(lang === "ar" ? "الكمية الحالية تتجاوز المتاح بهذه الوحدة" : "The current quantity exceeds stock in this unit.");
+        return;
+      }
+    }
+    setCart((current) => current.map((entry) => entry.line_id === lineId ? {
+      ...entry,
+      uom_id: option.unit_id,
+      uom_factor: option.factor_to_base,
+      uom_label: option.label,
+      quantity_increment: option.quantity_increment,
+      unit_price: option.sale_price,
+      base_price: option.sale_price,
+    } : entry));
   }
 
   function addService() {
@@ -1222,12 +1393,14 @@ function POSPage() {
       ...c,
       {
         product_id: id,
+        line_id: id,
         name: serviceNote.trim()
           ? `${serviceName.trim()} — ${serviceNote.trim()}`
           : serviceName.trim(),
         unit_price: price,
         tax_rate: 0,
         quantity: 1,
+        quantity_increment: 1,
         is_service: true,
       },
     ]);
@@ -1251,9 +1424,27 @@ function POSPage() {
   function handleCode(code: string): boolean {
     const q = code.trim();
     if (!q) return false;
+    if (!saleUomsLoaded) {
+      toast.info(lang === "ar" ? "جارٍ تحميل وحدات الأصناف؛ حاول مجددًا بعد لحظة" : "Loading item units; try scanning again in a moment.");
+      return false;
+    }
+    const mappedBarcode = unitBarcodeMap[q];
+    if (mappedBarcode) {
+      const product = products.find((p) => p.id === mappedBarcode.product_id);
+      const uom = product?.sale_uoms?.find((option) => option.unit_id === mappedBarcode.uom_id);
+      if (product && uom) {
+        addToCart(product, undefined, uom);
+        confirmScan();
+        setSearch("");
+        return true;
+      }
+    }
     const exact = products.find((p) => p.barcode === q || p.sku === q);
     if (exact) {
-      addToCart(exact);
+      const baseUom = exact.barcode === q
+        ? exact.sale_uoms?.find((option) => option.unit_id === exact.unit_id)
+        : undefined;
+      addToCart(exact, undefined, baseUom);
       confirmScan();
       setSearch("");
       return true;
@@ -1665,6 +1856,7 @@ function POSPage() {
             name: l.name,
             batch_id: l.batch_id ?? null,
             batch_number: l.batch_number ?? null,
+            uom_id: l.uom_id ?? null,
           })),
         });
         if (error) throw error;
@@ -1735,7 +1927,7 @@ function POSPage() {
         total,
         paid: Math.min(Math.max(effectivePaid, 0), total),
         lines: cart.map((l) => ({
-          product: l.name,
+          product: l.uom_label ? `${l.name} (${l.uom_label})` : l.name,
           qty: l.quantity,
           price: l.unit_price,
           total: Math.round(l.unit_price * l.quantity * (1 + l.tax_rate / 100) * 100) / 100,
@@ -1915,7 +2107,7 @@ function POSPage() {
             ? "هذا عرض أسعار وليس فاتورة — الأسعار صالحة حسب الاتفاق."
             : "This is a price quotation, not an invoice.",
         lines: cart.map((l) => ({
-          product: l.name,
+          product: l.uom_label ? `${l.name} (${l.uom_label})` : l.name,
           qty: l.quantity,
           price: l.unit_price,
           total: Math.round(l.unit_price * l.quantity * (1 + l.tax_rate / 100) * 100) / 100,
@@ -2327,6 +2519,8 @@ function POSPage() {
                   <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2.5">
                     {filtered.map((p) => {
                       const stock = stockMap[p.id] ?? 0;
+                      const saleUom = getDefaultSaleUom(p);
+                      const stockInSaleUnit = stock / Math.max(saleUom.factor_to_base, 0.000000001);
                       const low = p.is_service !== true && stock <= 0;
                       const catLabel =
                         lang === "ar"
@@ -2435,7 +2629,7 @@ function POSPage() {
                             <span
                               className={`text-xs sm:text-sm font-black font-mono [unicode-bidi:isolate] ${low ? "text-muted-foreground" : "text-primary"}`}
                             >
-                              {money(Number(p.sale_price))}
+                              {money(saleUom.sale_price)}
                             </span>
                             <span
                               className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-semibold ${
@@ -2446,7 +2640,7 @@ function POSPage() {
                                     : "bg-muted text-muted-foreground"
                               }`}
                             >
-                              {`${stock} ${unitLabel ? `· ${unitLabel}` : ""}`}
+                              {`${stockInSaleUnit} · ${saleUom.label || unitLabel || ""}`}
                             </span>
                           </div>
                         </button>
@@ -2458,6 +2652,8 @@ function POSPage() {
                   <div className="space-y-1.5">
                     {filtered.map((p) => {
                       const stock = stockMap[p.id] ?? 0;
+                      const saleUom = getDefaultSaleUom(p);
+                      const stockInSaleUnit = stock / Math.max(saleUom.factor_to_base, 0.000000001);
                       const low = p.is_service !== true && stock <= 0;
                       const catLabel =
                         lang === "ar"
@@ -2504,13 +2700,13 @@ function POSPage() {
                                     : "bg-muted/70 text-muted-foreground"
                               }`}
                             >
-                              {low ? (lang === "ar" ? "نفد" : "0") : `${stock}`}
+                              {low ? (lang === "ar" ? "نفد" : "0") : `${stockInSaleUnit} ${saleUom.label}`}
                             </span>
                           </div>
 
                           {/* Price */}
                           <div className="shrink-0 text-end font-mono text-xs sm:text-sm font-extrabold text-primary min-w-[4.5rem] [unicode-bidi:isolate]">
-                            {money(Number(p.sale_price))}
+                            {money(saleUom.sale_price)}
                           </div>
 
                           {/* Quick Add Button */}
@@ -2622,6 +2818,8 @@ function POSPage() {
                       <tbody className="divide-y divide-border/50">
                         {tableRows.map((p) => {
                           const stock = stockMap[p.id] ?? 0;
+                          const saleUom = getDefaultSaleUom(p);
+                          const stockInSaleUnit = stock / Math.max(saleUom.factor_to_base, 0.000000001);
                           const low = p.is_service !== true && stock <= 0;
                           const catLabel =
                             lang === "ar"
@@ -2658,11 +2856,11 @@ function POSPage() {
                                         : "bg-muted/70 text-foreground"
                                   }`}
                                 >
-                                  {low ? (lang === "ar" ? "نفد" : "0") : stock}
+                                  {low ? (lang === "ar" ? "نفد" : "0") : stockInSaleUnit}
                                 </span>
                               </td>
                               <td className="py-2 px-3 text-end font-mono font-bold text-primary [unicode-bidi:isolate]">
-                                {money(Number(p.sale_price))}
+                                {money(saleUom.sale_price)}
                               </td>
                               <td className="py-2 px-3 text-center">
                                 <button
@@ -2797,18 +2995,29 @@ function POSPage() {
                 ) : (
                   cart.map((l) => (
                     <CartLineRow
-                      key={l.product_id}
+                      key={l.line_id}
                       line={{
-                        id: l.product_id,
+                        id: l.line_id,
                         name: l.name,
                         quantity: l.quantity,
                         unitPrice: l.unit_price,
                         taxRate: l.tax_rate,
                         isService: l.is_service,
+                        priceEditable: l.line_id.startsWith("service-"),
+                        unitId: l.uom_id,
+                        unit: l.uom_label,
+                        unitOptions: l.sale_uoms?.map((uom) => ({ id: uom.unit_id, label: uom.label })),
+                        quantityStep: l.quantity_increment ?? 1,
                         priceModified:
                           l.base_price != null &&
                           Math.round(l.base_price * 100) !== Math.round(l.unit_price * 100),
-                        stock: l.is_service ? undefined : (stockMap[l.product_id] ?? 0),
+                        stock: l.is_service
+                          ? undefined
+                          : Math.max(0, (
+                              (stockMap[l.product_id] ?? 0) - cart
+                                .filter((other) => other.product_id === l.product_id && other.line_id !== l.line_id)
+                                .reduce((sum, other) => sum + other.quantity * (other.uom_factor ?? 1), 0)
+                            ) / (l.uom_factor ?? 1)),
                       }}
                       labels={{
                         price: t("pos.price"),
@@ -2818,11 +3027,10 @@ function POSPage() {
                         stockLabel: t("pos.stock_available"),
                       }}
                       formatMoney={money}
-                      onQuantityCommit={(next) => setQty(l.product_id, next)}
-                      onPriceChange={(next) => setPrice(l.product_id, next)}
-                      onRemove={() =>
-                        setCart((c) => c.filter((x) => x.product_id !== l.product_id))
-                      }
+                      onQuantityCommit={(next) => setQty(l.line_id, next)}
+                      onPriceChange={(next) => setPrice(l.line_id, next)}
+                      onUnitChange={(unitId) => changeLineUom(l.line_id, unitId)}
+                      onRemove={() => setCart((c) => c.filter((x) => x.line_id !== l.line_id))}
                     />
                   ))
                 )}
@@ -2961,7 +3169,7 @@ function POSPage() {
 
               <PosTotalsCard
                 countLabel={lang === "ar" ? "عدد الأصناف" : "Items"}
-                count={cart.reduce((sum, item) => sum + item.quantity, 0)}
+                count={cart.length}
                 rows={[
                   { label: t("pos.subtotal"), value: money(subtotal) },
                   ...(taxTotal > 0
@@ -3359,12 +3567,14 @@ function POSPage() {
         inputRef={searchRef}
         products={filtered.slice(0, 200).map((p) => {
           const stock = stockMap[p.id] ?? 0;
+          const saleUom = getDefaultSaleUom(p);
+          const stockInSaleUnit = stock / Math.max(saleUom.factor_to_base, 0.000000001);
           return {
             id: p.id,
             name: lang === "ar" && p.name_ar ? p.name_ar : p.name,
             meta: p.barcode || p.sku || null,
-            value: money(Number(p.sale_price)),
-            sub: `${t("pos.stock")}: ${stock}`,
+            value: money(saleUom.sale_price),
+            sub: `${t("pos.stock")}: ${stockInSaleUnit} ${saleUom.label}`,
             disabled: p.is_service !== true && stock <= 0,
           };
         })}
@@ -3393,7 +3603,10 @@ function POSPage() {
           open={batchModalOpen}
           onOpenChange={(open) => {
             setBatchModalOpen(open);
-            if (!open) setBatchPendingProduct(null);
+            if (!open) {
+              setBatchPendingProduct(null);
+              setBatchPendingUom(null);
+            }
           }}
           productId={batchPendingProduct.id}
           productName={
@@ -3404,9 +3617,10 @@ function POSPage() {
           warehouseId={warehouseId}
           dispatchStrategy={batchPendingProduct.batch_dispatch_strategy}
           onSelectBatch={(batch) => {
-            addToCart(batchPendingProduct, batch);
+            addToCart(batchPendingProduct, batch, batchPendingUom);
             setBatchModalOpen(false);
             setBatchPendingProduct(null);
+            setBatchPendingUom(null);
           }}
         />
       ) : null}

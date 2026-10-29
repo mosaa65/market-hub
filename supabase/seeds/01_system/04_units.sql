@@ -34,31 +34,33 @@
 
 BEGIN;
 
-INSERT INTO public.units (name, short_name, name_ar) VALUES
+INSERT INTO public.units (name, short_name, name_ar, dimension_code, factor_to_reference) VALUES
   -- ── العدّ ──────────────────────────────────────────────────────────────────
-  ('Piece',       'pc',  'قطعة'),
-  ('Dozen',       'dz',  'دستة'),
-  ('Set',         'st',  'طقم'),
+  ('Piece',       'pc',  'قطعة',       'COUNT',     1),
+  ('Dozen',       'dz',  'دستة',       'COUNT',    12),
+  ('Set',         'st',  'طقم',        'PACKAGING', NULL),
 
   -- ── الوزن ──────────────────────────────────────────────────────────────────
-  ('Gram',        'g',   'جرام'),
-  ('Kilogram',    'kg',  'كيلوجرام'),
-  ('Ton',         't',   'طن متري'),
+  ('Gram',        'g',   'جرام',       'MASS',      1),
+  ('Kilogram',    'kg',  'كيلوجرام',   'MASS',   1000),
+  ('Ton',         't',   'طن متري',    'MASS',1000000),
 
   -- ── الحجم ──────────────────────────────────────────────────────────────────
-  ('Millilitre',  'ml',  'مليلتر'),
-  ('Litre',       'L',   'لتر'),
+  ('Millilitre',  'ml',  'مليلتر',     'VOLUME',    1),
+  ('Litre',       'L',   'لتر',        'VOLUME', 1000),
 
   -- ── الطول والمساحة ─────────────────────────────────────────────────────────
-  ('Metre',       'm',   'متر'),
-  ('SquareMetre', 'm2',  'متر مربع'),
+  ('Metre',       'm',   'متر',        'LENGTH',    1),
+  ('SquareMetre', 'm2',  'متر مربع',   'AREA',       1),
 
   -- ── التعبئة القياسية ───────────────────────────────────────────────────────
   -- هذه أنواع تغليف عامة، لا عبوات بوزن محدّد. «صندوق» و«حزمة» و«رزمة»
   -- مفاهيم يستخدمها كل نشاط تجاري تقريبًا.
-  ('Box',         'bx',  'صندوق'),
-  ('Pack',        'pk',  'حزمة'),
-  ('Ream',        'rm',  'رزمة ورق')
-ON CONFLICT (name) DO NOTHING;
+  ('Box',         'bx',  'صندوق',      'PACKAGING', NULL),
+  ('Pack',        'pk',  'حزمة',       'PACKAGING', NULL),
+  ('Ream',        'rm',  'رزمة ورق',   'PACKAGING', NULL)
+ON CONFLICT (name) DO UPDATE
+  SET dimension_code = EXCLUDED.dimension_code,
+      factor_to_reference = EXCLUDED.factor_to_reference;
 
 COMMIT;

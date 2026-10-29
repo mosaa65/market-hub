@@ -35,6 +35,7 @@ import { Loader2, Plus, Printer, RotateCcw, Search, Trash2, Truck, Wallet } from
 import { LuxuryPrintPreviewModal } from "@/components/luxury-print-preview-modal";
 import type { UnifiedDocumentData } from "@/lib/templates";
 import { translateRpcError } from "@/lib/errors/rpc-errors";
+import { addReturnableQuantities, quantityIncrementDecimals } from "@/lib/invoice-returnable-quantities";
 import { IconButton } from "@/components/ui/icon-button";
 import { VortexMetricCard } from "@/components/vortex-ui";
 import { RecordsView, type RecordsViewMode } from "@/components/ui/records-view";
@@ -59,11 +60,16 @@ export const Route = createFileRoute("/_app/sales-returns")({
 });
 
 interface Line {
+  invoice_item_id: string;
   product_id: string;
   name: string;
   quantity: number;
+  max_quantity: number;
+  uom_id: string | null;
+  unit_label: string;
+  quantity_step: number;
   unit_price: number;
-  tax_rate: number;
+  tax_per_unit: number;
 }
 
 interface SalesReturn {
@@ -393,7 +399,7 @@ function SalesReturnsPage() {
   async function openReturnPrint(r: SalesReturn) {
     const { data: items } = await supabase
       .from("sales_return_items")
-      .select("quantity, unit_price, tax_rate, products(name, name_ar, sku)")
+      .select("quantity, unit_price, total, tax, entered_quantity, entered_unit_price, uom_id, products(name, name_ar, sku), uom:units!sales_return_items_uom_id_fkey(name,name_ar)")
       .eq("return_id", r.id);
 
     setPreviewDoc({
@@ -408,9 +414,11 @@ function SalesReturnsPage() {
       status: isRtl ? "معتمد ومسترد" : "Approved & Refunded",
       lines: (items || []).map((it: any) => ({
         product: (isRtl ? it.products?.name_ar : it.products?.name) || it.products?.name || "صنف",
-        qty: Number(it.quantity || 1),
-        price: Number(it.unit_price || 0),
-        total: Number(it.quantity || 1) * Number(it.unit_price || 0),
+        qty: Number(it.entered_quantity ?? it.quantity ?? 1),
+        unit: it.uom?.name_ar || it.uom?.name || undefined,
+        price: Number(it.entered_unit_price ?? it.unit_price ?? 0),
+        total: Number(it.total ?? 0),
+        tax: Number(it.tax ?? 0),
         code: it.products?.sku || undefined,
       })),
       subtotal: Number(r.subtotal || r.total || 0),
@@ -715,7 +723,6 @@ function NewSalesReturn({
   const isAr = lang === "ar";
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
   const [warehouseId, setWarehouseId] = useState("");
   const [customerId, setCustomerId] = useState<string>("");
   const [refundMethod, setRefundMethod] = useState("cash");
@@ -726,6 +733,7 @@ function NewSalesReturn({
   const [note, setNote] = useState("");
   const [search, setSearch] = useState("");
   const [customerInvoiceId, setCustomerInvoiceId] = useState<string>("");
+  const [invoiceDiscountFactor, setInvoiceDiscountFactor] = useState(1);
   const [customerInvoices, setCustomerInvoices] = useState<any[]>([]);
   const [invoiceItems, setInvoiceItems] = useState<any[]>([]);
   const [lines, setLines] = useState<Line[]>([]);
@@ -736,16 +744,9 @@ function NewSalesReturn({
     Promise.all([
       supabase.from("warehouses").select("id,name,name_ar").eq("is_active", true).order("name"),
       supabase.from("customers").select("id,name").eq("is_active", true).order("name"),
-      supabase
-        .from("products")
-        .select("id,name,name_ar,sku,sale_price,tax_rate")
-        .eq("is_active", true)
-        .order("name")
-        .limit(200),
-    ]).then(([w, c, p]) => {
+    ]).then(([w, c]) => {
       setWarehouses(w.data ?? []);
       setCustomers(c.data ?? []);
-      setProducts(p.data ?? []);
       if (!warehouseId && w.data?.[0]) setWarehouseId(w.data[0].id);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- مقصود: تحديد المستودع الافتراضي مرة واحدة عند الفتح
@@ -763,7 +764,7 @@ function NewSalesReturn({
       const { data, error } = await supabase
         .from("sales_invoices")
         .select(
-          "id,invoice_number,total,created_at,sales_invoice_items(quantity,unit_price,tax_rate,product_id,products(id,name,name_ar,sku))",
+          "id,invoice_number,total,subtotal,discount,created_at,sales_invoice_items(id,quantity,unit_price,base_unit_price,tax,product_id,uom_id,entered_quantity,entered_unit_price,uom_conversion_factor,uom_quantity_increment,products(id,name,name_ar,sku),uom:units!sales_invoice_items_uom_id_fkey(name,name_ar))",
         )
         .eq("customer_id", customerId)
         .order("created_at", { ascending: false });
@@ -772,20 +773,24 @@ function NewSalesReturn({
       setCustomerInvoices(rows);
       const firstId = rows[0]?.id ?? "";
       setCustomerInvoiceId(firstId);
-      const nextItems = (rows[0]?.sales_invoice_items ?? []) as any[];
+      const firstInvoice = rows[0];
+      setInvoiceDiscountFactor(
+        firstInvoice?.subtotal > 0
+          ? 1 - Math.min(1, Number(firstInvoice.discount ?? 0) / Number(firstInvoice.subtotal))
+          : 1,
+      );
+      const rawItems = (rows[0]?.sales_invoice_items ?? []) as any[];
+      let nextItems = rawItems;
+      if (firstId) {
+        try {
+          nextItems = await addReturnableQuantities("sales", firstId, rawItems);
+        } catch (returnError) {
+          toast.error(translateRpcError(returnError, isAr ? "ar" : "en"));
+          return;
+        }
+      }
       setInvoiceItems(nextItems);
-      const selectedItems = nextItems.map((item) => ({
-        product_id: item.product_id ?? item.products?.id ?? "",
-        name:
-          lang === "ar"
-            ? item.products?.name_ar || item.products?.name
-            : item.products?.name || item.products?.name_ar,
-        quantity: Math.min(1, Math.max(1, Number(item.quantity ?? 1))),
-        max_quantity: Number(item.quantity ?? 9999),
-        unit_price: Number(item.unit_price ?? 0),
-        tax_rate: Number(item.tax_rate ?? 0),
-      }));
-      setLines(selectedItems.filter((item) => item.product_id));
+      setLines([]);
     })();
   }, [customerId, lang]);
 
@@ -799,71 +804,91 @@ function NewSalesReturn({
       const { data, error } = await supabase
         .from("sales_invoices")
         .select(
-          "id,invoice_number,sales_invoice_items(quantity,unit_price,tax_rate,product_id,products(id,name,name_ar,sku))",
+          "id,invoice_number,subtotal,discount,sales_invoice_items(id,quantity,unit_price,base_unit_price,tax,product_id,uom_id,entered_quantity,entered_unit_price,uom_conversion_factor,uom_quantity_increment,products(id,name,name_ar,sku),uom:units!sales_invoice_items_uom_id_fkey(name,name_ar))",
         )
         .eq("id", customerInvoiceId)
         .maybeSingle();
       if (error || !data) return;
-      const nextItems = (data.sales_invoice_items ?? []) as any[];
+      let nextItems: any[];
+      try {
+        nextItems = await addReturnableQuantities(
+          "sales",
+          customerInvoiceId,
+          (data.sales_invoice_items ?? []) as any[],
+        );
+      } catch (returnError) {
+        toast.error(translateRpcError(returnError, isAr ? "ar" : "en"));
+        return;
+      }
       setInvoiceItems(nextItems);
-      const selectedItems = nextItems.map((item) => ({
-        product_id: item.product_id ?? item.products?.id ?? "",
-        name:
-          lang === "ar"
-            ? item.products?.name_ar || item.products?.name
-            : item.products?.name || item.products?.name_ar,
-        quantity: Math.min(1, Math.max(1, Number(item.quantity ?? 1))),
-        max_quantity: Number(item.quantity ?? 9999),
-        unit_price: Number(item.unit_price ?? 0),
-        tax_rate: Number(item.tax_rate ?? 0),
-      }));
-      setLines(selectedItems.filter((item) => item.product_id));
+      setInvoiceDiscountFactor(
+        Number(data.subtotal) > 0
+          ? 1 - Math.min(1, Number(data.discount ?? 0) / Number(data.subtotal))
+          : 1,
+      );
+      setLines([]);
     })();
   }, [customerInvoiceId, lang]);
 
   const filtered = useMemo(
     () =>
-      products
+      invoiceItems
         .filter(
-          (p) =>
+          (item) => {
+            const p = item.products;
+            if (!p || Number(item.returnable_entered_quantity ?? item.entered_quantity ?? item.quantity ?? 0) <= 0) return false;
+            return (
             !search ||
-            p.name.toLowerCase().includes(search.toLowerCase()) ||
+            (p.name ?? "").toLowerCase().includes(search.toLowerCase()) ||
             (p.name_ar ?? "").includes(search) ||
-            p.sku?.toLowerCase().includes(search.toLowerCase()),
+            p.sku?.toLowerCase().includes(search.toLowerCase())
+            );
+          },
         )
         .slice(0, 8),
-    [products, search],
+    [invoiceItems, search],
   );
 
-  function addLine(p: any) {
+  function addLine(item: any) {
+    const p = item.products;
+    if (!p || !item.id) return;
     setLines((l) => {
-      const ex = l.find((x) => x.product_id === p.id);
-      if (ex) return l.map((x) => (x.product_id === p.id ? { ...x, quantity: x.quantity + 1 } : x));
+      const ex = l.find((x) => x.invoice_item_id === item.id);
+      if (ex) return l.map((x) => (x.invoice_item_id === item.id ? { ...x, quantity: Math.min(x.max_quantity, x.quantity + x.quantity_step) } : x));
+      const maxQuantity = Number(item.returnable_entered_quantity ?? item.entered_quantity ?? item.quantity ?? 9999);
+      const quantityStep = Number(item.returnable_quantity_increment ?? item.uom_quantity_increment ?? 0.001);
+      const initialQuantity = Math.min(maxQuantity, Math.ceil(1 / quantityStep) * quantityStep);
       return [
         ...l,
         {
-          product_id: p.id,
+          invoice_item_id: item.id,
+          product_id: item.product_id ?? p.id,
           name: lang === "ar" ? p.name_ar || p.name : p.name || p.name_ar,
-          quantity: 1,
-          unit_price: Number(p.sale_price),
-          tax_rate: Number(p.tax_rate ?? 0),
+          quantity: initialQuantity,
+          max_quantity: maxQuantity,
+          uom_id: item.uom_id ?? null,
+          unit_label: item.uom?.name_ar || item.uom?.name || (lang === "ar" ? "وحدة الفاتورة" : "Invoice unit"),
+          quantity_step: quantityStep,
+          unit_price: Number(item.entered_unit_price ?? item.unit_price ?? 0),
+          tax_per_unit:
+            (Number(item.tax ?? 0) / Math.max(Number(item.quantity ?? 0), 0.000001)) *
+            Number(item.uom_conversion_factor ?? 1),
         },
       ];
     });
     setSearch("");
   }
 
-  function removeLine(pid: string) {
-    setLines((l) => l.filter((x) => x.product_id !== pid));
+  function removeLine(invoiceItemId: string) {
+    setLines((l) => l.filter((x) => x.invoice_item_id !== invoiceItemId));
   }
 
-  function updateQty(pid: string, qty: number) {
-    if (qty < 1) return removeLine(pid);
+  function updateQty(invoiceItemId: string, qty: number) {
+    if (qty <= 0) return removeLine(invoiceItemId);
     setLines((l) =>
       l.map((x) => {
-        if (x.product_id !== pid) return x;
-        const maxQ = (x as any).max_quantity;
-        const validQty = typeof maxQ === "number" && maxQ > 0 ? Math.min(qty, maxQ) : qty;
+        if (x.invoice_item_id !== invoiceItemId) return x;
+        const validQty = x.max_quantity > 0 ? Math.min(qty, x.max_quantity) : qty;
         return { ...x, quantity: validQty };
       }),
     );
@@ -871,11 +896,15 @@ function NewSalesReturn({
 
   const total =
     Math.round(
-      lines.reduce((a, l) => a + l.quantity * l.unit_price * (1 + l.tax_rate / 100), 0) * 100,
+      lines.reduce((a, l) => a + l.quantity * (l.unit_price * invoiceDiscountFactor + l.tax_per_unit), 0) * 100,
     ) / 100;
 
   async function save() {
     if (saving) return;
+    if (lines.some((line) => Math.abs(line.quantity / line.quantity_step - Math.round(line.quantity / line.quantity_step)) > 1e-7)) {
+      toast.error(isAr ? "الكمية يجب أن تطابق خطوة الوحدة المسجلة في الفاتورة الأصلية" : "Quantity must follow the unit increment saved on the original invoice");
+      return;
+    }
     if (!warehouseId || lines.length === 0) {
       toast.error(t("common.fill_form"));
       return;
@@ -1024,16 +1053,16 @@ function NewSalesReturn({
             </div>
             {search && filtered.length > 0 && (
               <div className="absolute z-20 mt-1 w-full rounded-md border border-border bg-popover shadow-lg max-h-60 overflow-auto">
-                {filtered.map((p) => (
+                {filtered.map((item) => (
                   <button
-                    key={p.id}
+                    key={item.id}
                     type="button"
                     className="flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-accent text-start"
-                    onClick={() => addLine(p)}
+                    onClick={() => addLine(item)}
                   >
-                    <span>{isAr ? p.name_ar || p.name : p.name || p.name_ar}</span>
+                    <span>{isAr ? item.products?.name_ar || item.products?.name : item.products?.name || item.products?.name_ar}</span>
                     <span className="font-mono text-xs text-muted-foreground">
-                      {money(Number(p.sale_price))}
+                      {money(Number(item.entered_unit_price ?? item.unit_price ?? 0))}
                     </span>
                   </button>
                 ))}
@@ -1042,31 +1071,22 @@ function NewSalesReturn({
             {invoiceItems.length > 0 && !search && (
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
                 {invoiceItems.map((item: any) => {
-                  const productId = item.product_id ?? item.products?.id ?? "";
                   const label =
                     lang === "ar"
                       ? item.products?.name_ar || item.products?.name
                       : item.products?.name || item.products?.name_ar;
                   return (
                     <button
-                      key={productId}
+                      key={item.id}
                       type="button"
-                      onClick={() =>
-                        addLine({
-                          id: productId,
-                          name: label,
-                          sku: item.products?.sku,
-                          sale_price: Number(item.unit_price ?? 0),
-                          tax_rate: Number(item.tax_rate ?? 0),
-                        })
-                      }
+                      onClick={() => addLine(item)}
                       className="rounded-xl border border-border bg-surface px-3 py-2 text-left text-sm hover:border-primary/40 hover:bg-primary/5"
                     >
                       <div className="font-medium">{label}</div>
                       <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
                         <span>{item.products?.sku ?? "—"}</span>
                         <span>
-                          {item.quantity} {lang === "ar" ? "قطعة" : "pcs"}
+                          {Number(item.returnable_entered_quantity ?? item.entered_quantity ?? item.quantity)} {item.uom?.name_ar || item.uom?.name || (lang === "ar" ? "وحدة الفاتورة" : "Invoice unit")}
                         </span>
                       </div>
                     </button>
@@ -1098,27 +1118,28 @@ function NewSalesReturn({
                 </thead>
                 <tbody>
                   {lines.map((l) => (
-                    <tr key={l.product_id} className="border-t border-border/60">
-                      <td className="px-3 py-2 font-medium">{l.name}</td>
+                    <tr key={l.invoice_item_id} className="border-t border-border/60">
+                      <td className="px-3 py-2 font-medium">{l.name}<span className="ms-2 text-xs text-muted-foreground">{l.unit_label}</span></td>
                       <td className="px-3 py-2">
                         {/* الكمية المُوحّدة: أرقام في المنتصف، بلا عجلة ماوس. */}
                         <QuantityInput
-                          decimals={0}
-                          min={1}
+                          decimals={quantityIncrementDecimals(l.quantity_step)}
+                          displayDecimals={quantityIncrementDecimals(l.quantity_step)}
+                          min={l.quantity_step}
                           aria-label={lang === "ar" ? "الكمية" : "Quantity"}
                           value={l.quantity}
-                          onValueChange={(v) => updateQty(l.product_id, v == null ? 1 : v)}
+                          onValueChange={(v) => updateQty(l.invoice_item_id, v == null ? l.quantity_step : v)}
                           className="h-8 w-20"
                         />
                       </td>
                       <td className="px-3 py-2 font-mono">{money(l.unit_price)}</td>
                       <td className="px-3 py-2 text-end font-mono font-semibold">
-                        {money(l.quantity * l.unit_price * (1 + l.tax_rate / 100))}
+                        {money(l.quantity * (l.unit_price * invoiceDiscountFactor + l.tax_per_unit))}
                       </td>
                       <td className="px-3 py-2 text-end">
                         <button
                           type="button"
-                          onClick={() => removeLine(l.product_id)}
+                          onClick={() => removeLine(l.invoice_item_id)}
                           className="text-destructive hover:opacity-80"
                           aria-label={lang === "ar" ? "حذف السطر" : "Remove line"}
                         >

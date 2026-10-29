@@ -63,6 +63,15 @@ type Party = {
   credit_limit?: number | null;
 };
 type WarehouseRow = { id: string; name: string; name_ar?: string | null };
+type ProductUomOption = {
+  unit_id: string;
+  factor_to_base: number;
+  price: number;
+  label: string;
+  quantity_increment: number;
+  is_default: boolean;
+  barcodes: string[];
+};
 type ProductRow = {
   id: string;
   name: string;
@@ -78,11 +87,34 @@ type ProductRow = {
   is_custody_item?: boolean;
   is_purchasable?: boolean;
   unit?: { short_name?: string | null; name?: string | null; name_ar?: string | null } | null;
+  sale_uoms?: ProductUomOption[];
+  purchase_uoms?: ProductUomOption[];
 };
+function getProductUnitOptions(product: ProductRow, sales: boolean, ar: boolean): ProductUomOption[] {
+  const options = sales ? product.sale_uoms ?? [] : product.purchase_uoms ?? [];
+  if (options.length) return options;
+  const baseLabel = product.unit?.short_name
+    || (ar ? product.unit?.name_ar || product.unit?.name : product.unit?.name || product.unit?.name_ar)
+    || (ar ? "وحدة الأساس" : "Base unit");
+  return [{
+    unit_id: product.unit_id ?? "",
+    factor_to_base: 1,
+    price: Number(sales ? product.sale_price : product.cost_price) || 0,
+    label: baseLabel,
+    quantity_increment: 1,
+    is_default: true,
+    barcodes: product.barcode ? [product.barcode] : [],
+  }];
+}
 type CartLine = {
+  line_key: string;
   product: ProductRow;
   quantity: number;
   price: number;
+  uom_id: string | null;
+  uom_factor: number;
+  uom_label: string;
+  quantity_increment: number;
   tax_rate: number;
   batch_number: string;
   expiry_date: string;
@@ -127,6 +159,7 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [batchProduct, setBatchProduct] = useState<ProductRow | null>(null);
+  const [batchLineKey, setBatchLineKey] = useState<string | null>(null);
   const [batchModalOpen, setBatchModalOpen] = useState(false);
   const { settings: batchSettings } = useBatchSettings();
   const sales = kind === "sales";
@@ -144,10 +177,23 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
   const label = (p: ProductRow) => (ar ? p.name_ar || p.name : p.name || p.name_ar || "—");
   const warehouseName = (w: WarehouseRow) =>
     ar ? w.name_ar || w.name : w.name || w.name_ar || "—";
-  const unitName = (p: ProductRow) =>
-    ar
-      ? p.unit?.short_name || p.unit?.name_ar || p.unit?.name
-      : p.unit?.short_name || p.unit?.name || p.unit?.name_ar;
+  const unitOptions = (product: ProductRow) => {
+    return getProductUnitOptions(product, sales, ar);
+  };
+  const defaultUnit = (product: ProductRow) => {
+    const options = unitOptions(product);
+    return options.find((option) => option.is_default)
+      ?? options.find((option) => option.unit_id === product.unit_id)
+      ?? options[0];
+  };
+
+  function quantityDecimals(increment: number) {
+    const text = String(increment);
+    const decimals = text.includes("e-")
+      ? Number(text.split("e-")[1])
+      : (text.split(".")[1]?.length ?? 0);
+    return Math.min(6, decimals);
+  }
 
   useEffect(() => {
     let live = true;
@@ -183,7 +229,7 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
         .order("name")
         .limit(200),
       productQuery.order("name").limit(1000),
-    ]).then(([partyRes, whRes, productRes]) => {
+    ]).then(async ([partyRes, whRes, productRes]) => {
       if (!live) return;
       if (partyRes.error || whRes.error || productRes.error) {
         toast.error(ar ? "تعذر تحميل بيانات الفاتورة" : "Could not load invoice data");
@@ -192,9 +238,87 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
       const whRows = (whRes.data ?? []) as WarehouseRow[];
       setParties(partyRows);
       setWarehouses(whRows);
-      setProducts((productRes.data ?? []) as ProductRow[]);
+      const productRows = (productRes.data ?? []) as ProductRow[];
+      const uomsByProduct = new Map<string, { sale: ProductUomOption[]; purchase: ProductUomOption[] }>();
+      const baseSalePrice = new Map<string, number>();
+      const basePurchasePrice = new Map<string, number>();
+      if (productRows.length) {
+        const ids = productRows.map((product) => product.id);
+        const [uomResult, companyItemsResult] = await Promise.all([
+          (supabase as any)
+            .from("product_uoms")
+            .select("id,product_id,unit_id,factor_to_base,quantity_increment,can_sell,can_purchase,is_default_sale,is_default_purchase,unit:units!product_uoms_unit_id_fkey(short_name,name,name_ar)")
+            .in("product_id", ids)
+            .eq("is_active", true),
+          (supabase as any)
+            .from("company_items")
+            .select("item_id,default_sale_price,default_cost")
+            .eq("company_id", 1)
+            .eq("is_active", true)
+            .in("item_id", ids),
+        ]);
+        const missingUomSchema = uomResult.error && ["42P01", "PGRST205"].includes(uomResult.error.code ?? "");
+        if (uomResult.error && !missingUomSchema) throw uomResult.error;
+        if (companyItemsResult.error) throw companyItemsResult.error;
+        for (const row of companyItemsResult.data ?? []) {
+          if (row.default_sale_price != null) baseSalePrice.set(row.item_id, Number(row.default_sale_price));
+          if (row.default_cost != null) basePurchasePrice.set(row.item_id, Number(row.default_cost));
+        }
+        const uomRows = missingUomSchema ? [] : (uomResult.data ?? []) as any[];
+        const uomIds = uomRows.map((row: any) => row.id);
+        const [priceResult, barcodeResult] = uomIds.length
+          ? await Promise.all([
+              (supabase as any).from("product_uom_prices").select("product_uom_id,sale_price,purchase_price").in("product_uom_id", uomIds).eq("company_id", 1),
+              (supabase as any).from("product_uom_barcodes").select("product_uom_id,barcode").in("product_uom_id", uomIds).eq("company_id", 1).eq("is_active", true),
+            ])
+          : [{ data: [], error: null }, { data: [], error: null }];
+        if (priceResult.error) throw priceResult.error;
+        if (barcodeResult.error) throw barcodeResult.error;
+        const prices = new Map<string, { sale?: number; purchase?: number }>();
+        for (const row of priceResult.data ?? []) prices.set(row.product_uom_id, {
+          sale: row.sale_price == null ? undefined : Number(row.sale_price),
+          purchase: row.purchase_price == null ? undefined : Number(row.purchase_price),
+        });
+        const barcodes = new Map<string, string[]>();
+        for (const row of barcodeResult.data ?? []) barcodes.set(row.product_uom_id, [...(barcodes.get(row.product_uom_id) ?? []), row.barcode]);
+        for (const row of uomRows) {
+          const product = productRows.find((entry) => entry.id === row.product_id);
+          if (!product) continue;
+          const factor = Number(row.factor_to_base);
+          const configured = prices.get(row.id);
+          const unitName = ar ? row.unit?.name_ar || row.unit?.name : row.unit?.name || row.unit?.name_ar;
+          const label = unitName
+            ? `${unitName}${row.unit?.short_name ? ` (${row.unit.short_name})` : ""}`
+            : (ar ? "وحدة" : "Unit");
+          const bucket = uomsByProduct.get(row.product_id) ?? { sale: [], purchase: [] };
+          const baseSale = baseSalePrice.get(row.product_id) ?? Number(product.sale_price ?? 0);
+          const basePurchase = basePurchasePrice.get(row.product_id) ?? Number(product.cost_price ?? 0);
+          if (row.can_sell) bucket.sale.push({ unit_id: row.unit_id, factor_to_base: factor, price: configured?.sale ?? baseSale * factor, label, quantity_increment: Number(row.quantity_increment ?? 1), is_default: row.is_default_sale === true, barcodes: barcodes.get(row.id) ?? [] });
+          if (row.can_purchase) bucket.purchase.push({ unit_id: row.unit_id, factor_to_base: factor, price: configured?.purchase ?? basePurchase * factor, label, quantity_increment: Number(row.quantity_increment ?? 1), is_default: row.is_default_purchase === true, barcodes: barcodes.get(row.id) ?? [] });
+          if (row.unit_id === product.unit_id && product.barcode) {
+            const saleOption = bucket.sale.find((option) => option.unit_id === row.unit_id);
+            const purchaseOption = bucket.purchase.find((option) => option.unit_id === row.unit_id);
+            if (saleOption && !saleOption.barcodes.includes(product.barcode)) saleOption.barcodes.push(product.barcode);
+            if (purchaseOption && !purchaseOption.barcodes.includes(product.barcode)) purchaseOption.barcodes.push(product.barcode);
+          }
+          uomsByProduct.set(row.product_id, bucket);
+        }
+      }
+      if (!live) return;
+      setProducts(productRows.map((product) => ({
+        ...product,
+        sale_price: baseSalePrice.get(product.id) ?? product.sale_price,
+        cost_price: basePurchasePrice.get(product.id) ?? product.cost_price,
+        sale_uoms: uomsByProduct.get(product.id)?.sale ?? [],
+        purchase_uoms: uomsByProduct.get(product.id)?.purchase ?? [],
+      })));
       setPartyId(partyRows[0]?.id ?? "");
       setWarehouseId(whRows[0]?.id ?? "");
+      setLoading(false);
+    }).catch((error) => {
+      if (!live) return;
+      console.error("Failed to load invoice units and products:", error);
+      toast.error(ar ? "تعذر تحميل وحدات الأصناف وأسعارها" : "Could not load item units and prices");
       setLoading(false);
     });
     return () => {
@@ -229,12 +353,14 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
     if (!q) return [];
     return products
       .filter((p) =>
-        [p.name, p.name_ar, p.sku, p.barcode].some((v) =>
+        [p.name, p.name_ar, p.sku, p.barcode,
+          ...getProductUnitOptions(p, sales, ar).flatMap((unit) => unit.barcodes),
+        ].some((v) =>
           (v ?? "").toLocaleLowerCase().includes(q),
         ),
       )
       .slice(0, 5);
-  }, [products, search]);
+  }, [products, search, sales, ar]);
   useEffect(() => setSelectedIndex(0), [search]);
   const subtotal = cart.reduce((s, l) => s + l.price * l.quantity, 0);
   const tax = cart.reduce(
@@ -249,18 +375,33 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
   const selectedWarehouse = warehouses.find((w) => w.id === warehouseId);
 
   function addProduct(product: ProductRow) {
+    const exactCode = search.trim().toLocaleLowerCase();
+    const options = unitOptions(product);
+    const selectedUnit = (product.barcode?.toLocaleLowerCase() === exactCode
+      ? options.find((option) => option.unit_id === product.unit_id)
+      : undefined)
+      ?? options.find((option) => option.barcodes.some((code) => code.toLocaleLowerCase() === exactCode))
+      ?? defaultUnit(product);
+    const scannedQuantity = Math.ceil(1 / selectedUnit.quantity_increment) * selectedUnit.quantity_increment;
     setCart((previous) => {
-      const found = previous.findIndex((line) => line.product.id === product.id);
+      const found = product.tracking === "BATCH" || product.tracking === "SERIAL"
+        ? -1
+        : previous.findIndex((line) => line.product.id === product.id && line.uom_id === (selectedUnit.unit_id || null));
       if (found >= 0)
         return previous.map((line, i) =>
-          i === found ? { ...line, quantity: line.quantity + 1 } : line,
+          i === found ? { ...line, quantity: line.quantity + scannedQuantity } : line,
         );
       return [
         ...previous,
         {
+          line_key: crypto.randomUUID(),
           product,
-          quantity: 1,
-          price: Number(sales ? product.sale_price : product.cost_price) || 0,
+          quantity: scannedQuantity,
+          price: selectedUnit.price,
+          uom_id: selectedUnit.unit_id || null,
+          uom_factor: selectedUnit.factor_to_base,
+          uom_label: selectedUnit.label,
+          quantity_increment: selectedUnit.quantity_increment,
           tax_rate: Number(product.tax_rate) || 0,
           batch_number: "",
           expiry_date: "",
@@ -269,6 +410,25 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
     });
     setSearch("");
     searchRef.current?.focus();
+  }
+
+  function changeLineUnit(lineKey: string, unitId: string) {
+    const line = cart.find((item) => item.line_key === lineKey);
+    const option = line && unitOptions(line.product).find((unit) => unit.unit_id === unitId);
+    if (!line || !option) return;
+    const quantity = line.quantity * line.uom_factor / option.factor_to_base;
+    const steps = quantity / option.quantity_increment;
+    if (Math.abs(steps - Math.round(steps)) > 1e-7) {
+      toast.error(ar
+        ? `لا يمكن تمثيل هذه الكمية بوحدة ${option.label} وفق خطوة الكمية المحددة`
+        : `This quantity cannot be represented in ${option.label} using its configured increment`);
+      return;
+    }
+    setCart((previous) => previous.map((item) => item.line_key === lineKey
+      ? { ...item, uom_id: option.unit_id || null, uom_factor: option.factor_to_base,
+          uom_label: option.label, quantity_increment: option.quantity_increment,
+          quantity: Number(quantity.toFixed(9)), price: option.price }
+      : item));
   }
 
   async function submit() {
@@ -285,6 +445,7 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
         (line) =>
           !Number.isFinite(line.quantity) ||
           line.quantity <= 0 ||
+          Math.abs(line.quantity / line.quantity_increment - Math.round(line.quantity / line.quantity_increment)) > 1e-7 ||
           !Number.isFinite(line.price) ||
           line.price < 0,
       )
@@ -319,12 +480,14 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
       return toast.error(
         ar ? "الخصم أكبر من قيمة الفاتورة" : "Discount cannot exceed invoice value",
       );
+    const requestedBaseByProduct = cart.reduce<Record<string, number>>((totals, line) => {
+      totals[line.product.id] = (totals[line.product.id] ?? 0) + line.quantity * line.uom_factor;
+      return totals;
+    }, {});
     if (
       sales &&
-      cart.some(
-        (line) =>
-          Object.hasOwn(stockMap, line.product.id) &&
-          line.quantity > (stockMap[line.product.id] ?? 0),
+      Object.entries(requestedBaseByProduct).some(([productId, quantity]) =>
+        Object.hasOwn(stockMap, productId) && quantity > (stockMap[productId] ?? 0),
       )
     ) {
       return toast.error(
@@ -350,7 +513,7 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
       let invoiceId = "";
       let invoiceNumber = "";
       if (sales) {
-        const lines: InvoiceLine[] = cart.map(({ product, quantity, price, batch_id, batch_number }) => ({
+        const lines: InvoiceLine[] = cart.map(({ product, quantity, price, batch_id, batch_number, uom_id, uom_label }) => ({
           kind: "catalog",
           product_id: product.id,
           name: label(product),
@@ -358,6 +521,8 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
           quantity,
           unit_price: price,
           tax_rate: Number(product.tax_rate) || 0,
+          uom_id,
+          unit_label: uom_label,
           batch_id,
           batch_number,
         }));
@@ -401,10 +566,11 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
           _paid: credit ? 0 : (paid ?? total),
           _discount: discount ?? 0,
           _note: note || null,
-          _items: cart.map(({ product, quantity, price, batch_number, expiry_date }) => ({
+          _items: cart.map(({ product, quantity, price, batch_number, expiry_date, uom_id }) => ({
             product_id: product.id,
             quantity,
             unit_cost: price,
+            uom_id,
             tax_rate: Number(product.tax_rate) || 0,
             batch_number: batch_number.trim() || null,
             expiry_date: expiry_date || null,
@@ -469,7 +635,7 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
               ? "مدفوع"
               : "Paid",
         lines: cart.map((line) => ({
-          product: label(line.product),
+          product: `${label(line.product)} (${line.uom_label})`,
           qty: line.quantity,
           price: line.price,
           total: line.quantity * line.price,
@@ -695,17 +861,17 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
                           <div className="truncate text-sm font-semibold">{label(p)}</div>
                           <div className="mt-0.5 text-[11px] text-muted-foreground">
                             {p.sku || p.barcode || (ar ? "بدون رمز" : "No code")}
-                            {unitName(p) ? ` · ${unitName(p)}` : ""}
+                            {` · ${defaultUnit(p).label}`}
                           </div>
                         </div>
                         <span className="shrink-0 text-end">
                           <span className="block font-mono text-sm font-bold text-primary">
-                            {money(Number(sales ? p.sale_price : p.cost_price))}
+                            {money(defaultUnit(p).price)}
                           </span>
                           <span className="text-[10px] text-muted-foreground">
                             {ar
-                              ? `المتاح ${toSystemDigits(String(stockMap[p.id] ?? 0))} · اضغط للإضافة`
-                              : `${stockMap[p.id] ?? 0} available · click to add`}
+                              ? `المتاح ${toSystemDigits(String((stockMap[p.id] ?? 0) / Math.max(defaultUnit(p).factor_to_base, 0.000000001)))} ${defaultUnit(p).label} · اضغط للإضافة`
+                              : `${(stockMap[p.id] ?? 0) / Math.max(defaultUnit(p).factor_to_base, 0.000000001)} ${defaultUnit(p).label} available · click to add`}
                           </span>
                         </span>
                       </button>
@@ -759,16 +925,28 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
                     </thead>
                     <tbody>
                       {cart.map((line, i) => (
-                        <tr key={line.product.id} className="border-t border-border/60">
+                        <tr key={line.line_key} className="border-t border-border/60">
                           <td className="px-4 py-3">
                             <div className="font-semibold">{label(line.product)}</div>
                             <div className="mt-0.5 text-[10px] text-muted-foreground">
                               {line.product.sku || line.product.barcode || "—"}
-                              {unitName(line.product) ? ` · ${unitName(line.product)}` : ""}
+                              {` · ${line.uom_label}`}
                               {sales
-                                ? ` · ${ar ? "المتاح" : "Stock"}: ${toSystemDigits(String(stockMap[line.product.id] ?? 0))}`
+                                ? ` · ${ar ? "المتاح" : "Stock"}: ${toSystemDigits(String((stockMap[line.product.id] ?? 0) / Math.max(line.uom_factor, 0.000000001)))} ${line.uom_label}`
                                 : ""}
                             </div>
+                            {unitOptions(line.product).length > 1 && (
+                              <select
+                                aria-label={ar ? "وحدة الفاتورة" : "Invoice unit"}
+                                value={line.uom_id ?? ""}
+                                onChange={(event) => changeLineUnit(line.line_key, event.target.value)}
+                                className="mt-2 h-8 max-w-52 rounded-md border border-input bg-background px-2 text-xs"
+                              >
+                                {unitOptions(line.product).map((unit) => (
+                                  <option key={unit.unit_id} value={unit.unit_id}>{unit.label}</option>
+                                ))}
+                              </select>
+                            )}
                             {!sales && line.product.tracking === "BATCH" && (
                               <div className="mt-2 grid grid-cols-2 gap-2">
                                 <input
@@ -808,6 +986,7 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
                                 className="mt-2 inline-flex h-8 items-center rounded-md border border-input px-2 text-xs hover:bg-muted"
                                 onClick={() => {
                                   setBatchProduct(line.product);
+                                  setBatchLineKey(line.line_key);
                                   setBatchModalOpen(true);
                                 }}
                               >
@@ -820,14 +999,15 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
                           <td className="px-3 py-2">
                             <QuantityInput
                               data-form-nav
-                              decimals={2}
-                              min={0.01}
+                              decimals={quantityDecimals(line.quantity_increment)}
+                              min={line.quantity_increment}
                               value={line.quantity}
                               onValueChange={(v) =>
                                 setCart((prev) =>
-                                  prev.map((r, j) => (j === i ? { ...r, quantity: v ?? 1 } : r)),
+                                  prev.map((r) => (r.line_key === line.line_key ? { ...r, quantity: v ?? line.quantity_increment } : r)),
                                 )
                               }
+                              unit={line.uom_label}
                               className="h-9"
                             />
                           </td>
@@ -835,9 +1015,10 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
                             <AmountInput
                               data-form-nav
                               value={line.price}
+                              disabled={sales}
                               onValueChange={(v) =>
                                 setCart((prev) =>
-                                  prev.map((r, j) => (j === i ? { ...r, price: v ?? 0 } : r)),
+                                  prev.map((r) => (r.line_key === line.line_key ? { ...r, price: v ?? 0 } : r)),
                                 )
                               }
                               className="h-9"
@@ -849,7 +1030,7 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
                           <td className="px-2 py-2">
                             <button
                               type="button"
-                              onClick={() => setCart((prev) => prev.filter((_, j) => j !== i))}
+                              onClick={() => setCart((prev) => prev.filter((r) => r.line_key !== line.line_key))}
                               className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-rose-500/10 hover:text-rose-600"
                               aria-label={ar ? "حذف الصنف" : "Remove item"}
                             >
@@ -1110,12 +1291,12 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
           productId={batchProduct.id}
           productName={label(batchProduct)}
           warehouseId={warehouseId}
-          currentBatchId={cart.find((line) => line.product.id === batchProduct.id)?.batch_id}
+          currentBatchId={cart.find((line) => line.line_key === batchLineKey)?.batch_id}
           dispatchStrategy={batchProduct.batch_dispatch_strategy}
           onSelectBatch={(batch) => {
             setCart((previous) =>
               previous.map((line) =>
-                line.product.id === batchProduct.id
+                line.line_key === batchLineKey
                   ? {
                       ...line,
                       batch_id: batch?.id ?? null,

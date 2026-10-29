@@ -15,6 +15,10 @@ export interface CartLineData {
   stock?: number;
   barcode?: string;
   unit?: string;
+  unitId?: string | null;
+  unitOptions?: { id: string; label: string }[];
+  quantityStep?: number;
+  priceEditable?: boolean;
 }
 
 export interface CartLineLabels {
@@ -31,6 +35,7 @@ export interface CartLineProps {
   formatMoney: (n: number) => string;
   onQuantityCommit: (next: number | null) => void;
   onPriceChange: (next: number) => void;
+  onUnitChange?: (unitId: string) => void;
   onRemove: () => void;
 }
 
@@ -40,6 +45,7 @@ export function CartLine({
   formatMoney,
   onQuantityCommit,
   onPriceChange,
+  onUnitChange,
   onRemove,
 }: CartLineProps) {
   const lineTotal = line.quantity * line.unitPrice;
@@ -70,6 +76,18 @@ export function CartLine({
               {line.unit ? ` · ${line.unit}` : ""}
             </span>
           ) : null}
+          {line.unitOptions && line.unitOptions.length > 1 && onUnitChange ? (
+            <select
+              aria-label={line.unit || "Unit"}
+              value={line.unitId ?? ""}
+              onChange={(event) => onUnitChange(event.target.value)}
+              className="mt-0.5 h-6 max-w-full rounded-md border border-border/70 bg-background px-1.5 text-[10px] text-foreground"
+            >
+              {line.unitOptions.map((option) => (
+                <option key={option.id} value={option.id}>{option.label}</option>
+              ))}
+            </select>
+          ) : null}
         </div>
 
         {line.priceModified ? (
@@ -88,17 +106,25 @@ export function CartLine({
           value={line.quantity}
           onCommit={onQuantityCommit}
           max={line.stock}
+          min={line.quantityStep ?? 1}
+          step={line.quantityStep ?? 1}
           unbounded={line.isService || line.unboundedQuantity}
           ariaLabel={labels.quantity}
         />
         <span className="text-[10px] text-muted-foreground">×</span>
-        <PriceField
-          value={line.unitPrice}
-          onChange={onPriceChange}
-          modified={line.priceModified}
-          ariaLabel={labels.price}
-          className="h-7 w-[3.5rem] px-1 text-[11px]"
-        />
+        {line.priceEditable === false ? (
+          <span className="min-w-[3.5rem] text-end font-mono text-[11px] tabular-nums text-foreground [unicode-bidi:isolate]">
+            {formatMoney(line.unitPrice)}
+          </span>
+        ) : (
+          <PriceField
+            value={line.unitPrice}
+            onChange={onPriceChange}
+            modified={line.priceModified}
+            ariaLabel={labels.price}
+            className="h-7 w-[3.5rem] px-1 text-[11px]"
+          />
+        )}
       </div>
 
       <span className="min-w-[3.25rem] text-end font-mono text-[11px] font-bold tabular-nums text-primary [unicode-bidi:isolate] sm:min-w-[4rem] sm:text-xs">
