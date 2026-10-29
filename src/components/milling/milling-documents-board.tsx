@@ -111,33 +111,37 @@ function DocumentRow({
           {meta.label}
         </span>
       </td>
-      <td className="px-3 py-2.5 whitespace-nowrap text-xs">
-        {feeInfo ? (
-          <span className="text-muted-foreground">{feeInfo}</span>
-        ) : (
-          <span className="text-muted-foreground/50">—</span>
-        )}
-      </td>
-      <td className="px-3 py-2.5 text-left whitespace-nowrap">
-        {invoice ? (
-          <div>
-            <div className="font-mono text-xs font-semibold">{invoice.invoice_number}</div>
-            <div className="text-xs">
-              {money(invoice.total)}{" "}
-              <span
-                className={cn(
-                  "text-[11px]",
-                  invoice.payment_status === "PAID" ? "text-emerald-600" : "text-amber-600",
-                )}
-              >
-                ({invoice.payment_status === "PAID" ? "مسدد" : "عليه متبقي"})
-              </span>
-            </div>
-          </div>
-        ) : (
-          <span className="text-muted-foreground/50 text-xs">—</span>
-        )}
-      </td>
+      {focus === "delivery" && (
+        <>
+          <td className="px-3 py-2.5 whitespace-nowrap text-xs">
+            {feeInfo ? (
+              <span className="text-muted-foreground">{feeInfo}</span>
+            ) : (
+              <span className="text-muted-foreground/50">—</span>
+            )}
+          </td>
+          <td className="px-3 py-2.5 text-left whitespace-nowrap">
+            {invoice ? (
+              <div>
+                <div className="font-mono text-xs font-semibold">{invoice.invoice_number}</div>
+                <div className="text-xs">
+                  {money(invoice.total)}{" "}
+                  <span
+                    className={cn(
+                      "text-[11px]",
+                      invoice.payment_status === "PAID" ? "text-emerald-600" : "text-amber-600",
+                    )}
+                  >
+                    ({invoice.payment_status === "PAID" ? "مسدد" : "عليه متبقي"})
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <span className="text-muted-foreground/50 text-xs">—</span>
+            )}
+          </td>
+        </>
+      )}
     </tr>
   );
 }
@@ -195,7 +199,11 @@ export function MillingDocumentsBoard({
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="بحث برقم المستند / العميل / الفاتورة…"
+              placeholder={
+                focus === "milling"
+                  ? "بحث برقم العملية / العميل…"
+                  : "بحث برقم المستند / العميل / الفاتورة…"
+              }
               className="w-56 rounded-xl border border-border bg-background py-1.5 ps-8 pe-3 text-xs focus:outline-none focus:ring-2 focus:ring-amber-500/40"
             />
           </div>
@@ -234,7 +242,7 @@ export function MillingDocumentsBoard({
               لا توجد مستندات مطابقة.
             </div>
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[720px] text-sm">
               <thead>
                 <tr className="bg-muted/60 text-xs text-muted-foreground">
                   <th className="px-3 py-2 text-start font-bold">المستند</th>
@@ -244,8 +252,12 @@ export function MillingDocumentsBoard({
                     {focus === "milling" ? "الطحن" : "التسليم"}
                   </th>
                   <th className="px-3 py-2 text-start font-bold">الحالة</th>
-                  <th className="px-3 py-2 text-start font-bold">أساس الأجور</th>
-                  <th className="px-3 py-2 text-end font-bold">الفاتورة</th>
+                  {focus === "delivery" && (
+                    <>
+                      <th className="px-3 py-2 text-start font-bold">أساس الأجور</th>
+                      <th className="px-3 py-2 text-end font-bold">الفاتورة</th>
+                    </>
+                  )}
                 </tr>
               </thead>
               <tbody>
