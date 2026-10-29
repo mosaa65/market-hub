@@ -37,6 +37,8 @@ export interface RecordsToolbarProps {
   searchPlaceholder?: string;
   /** Number shown beside the search box. Must be the *match* count. */
   resultCount?: number;
+  /** Optional formatted text override (e.g. "60 / 1500"). */
+  resultCountText?: string;
   searchLoading?: boolean;
   /** Slot rendered inside the search row, before the controls (e.g. a hint). */
   searchAdornment?: React.ReactNode;
@@ -88,6 +90,7 @@ export function RecordsToolbar({
   onSearchChange,
   searchPlaceholder,
   resultCount,
+  resultCountText,
   searchLoading,
   searchAdornment,
   searchRef,
@@ -166,7 +169,13 @@ export function RecordsToolbar({
             value={searchValue}
             onValueChange={onSearchChange}
             placeholder={searchPlaceholder}
-            resultCountText={resultCount == null ? undefined : String(resultCount)}
+            resultCountText={
+              resultCountText !== undefined
+                ? resultCountText
+                : resultCount == null
+                  ? undefined
+                  : String(resultCount)
+            }
             clearLabel={t("common.clear")}
             loading={searchLoading}
             enableSlashShortcut

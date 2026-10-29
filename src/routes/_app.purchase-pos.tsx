@@ -22,6 +22,7 @@ import { PageGuideButton, type PageGuideConfig } from "@/components/page-guide";
 import { DollarSign, Archive, Zap, Truck } from "lucide-react";
 import { toast } from "sonner";
 import { BarcodeScanner } from "@/components/barcode-scanner";
+import { fuzzyMatch } from "@/lib/fuzzy-search";
 import { useKeyboardWedge } from "@/hooks/use-keyboard-wedge";
 import { useCatalogModules } from "@/lib/catalog-modules";
 import { useIsDesktop, useMediaQuery } from "@/hooks/use-media-query";
@@ -316,6 +317,11 @@ function PurchasePOSPage() {
     direction: "asc",
   });
   const [viewMode, setViewMode] = usePersistedViewMode("purchase-pos-catalog", "cards");
+  const [catalogVisibleLimit, setCatalogVisibleLimit] = useState(60);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogComplete, setCatalogComplete] = useState(false);
+  const catalogScrollRootRef = useRef<HTMLDivElement | null>(null);
+  const catalogSentinelRef = useRef<HTMLDivElement | null>(null);
 
   // Filter States
   const [selectedCategory, setSelectedCategory] = useState("");
@@ -423,9 +429,20 @@ function PurchasePOSPage() {
           return;
         }
         setProducts((current) =>
-          current.some((entry) => entry.id === product.id)
-            ? current.map((entry) => (entry.id === product.id ? { ...entry, ...product } : entry))
-            : [product, ...current],
+          current.map((entry) =>
+            entry.id === product.id
+              ? {
+                  ...entry,
+                  ...product,
+                  purchase_uoms: entry.purchase_uoms,
+                  category: entry.category,
+                  brand: entry.brand,
+                  unit: entry.unit,
+                  origin: entry.origin,
+                  quality: entry.quality,
+                }
+              : entry,
+          ),
         );
         setCart((current) =>
           current.map((line) =>
@@ -480,31 +497,78 @@ function PurchasePOSPage() {
 
   async function loadAll() {
     setPurchaseUomsLoaded(false);
+    setCatalogComplete(false);
     try {
+      /*
+       * Fast product path for purchases: loads the first 500 items immediately
+       * so the operator can start right away while the full catalog is fetched.
+       */
+      const fastProductQuery = (supabase.from("products") as any)
+        .select(
+          "id,sku,barcode,name,name_ar,cost_price,sale_price,tax_rate,tracking,is_custody_item,is_purchasable,image_url,category_id,brand_id,unit_id,origin_id,quality_grade_id,unit:units!products_unit_id_fkey(short_name,name,name_ar),category:categories(name,name_ar),brand:brands!products_brand_id_fkey(name,name_ar),origin:countries_of_origin(name,name_ar,code),quality:quality_grades(name,name_ar,code)",
+        )
+        .eq("is_active", true)
+        .eq("is_custody_item", false)
+        .eq("is_purchasable", true);
+
+      void fastProductQuery
+        .order("name")
+        .order("id")
+        .range(0, 499)
+        .then(({ data }: { data: any[] | null }) => {
+          if (data?.length) {
+            setProducts((prev) => (prev.length === 0 ? (data as Product[]) : prev));
+            setCatalogLoading(false);
+          }
+        });
+
       const [
-        { data: ws },
-        { data: sups },
-        { data: ps },
-        { data: cats },
-        { data: brs },
-        { data: uns },
-        { data: origs },
-        { data: quals },
-        { data: vMakes },
-        { data: vModels },
-        { data: compats },
-      ] = await Promise.all([
+        wsRes,
+        supsRes,
+        psRes,
+        catsRes,
+        brsRes,
+        unsRes,
+        origsRes,
+        qualsRes,
+        vMakesRes,
+        vModelsRes,
+        compatsRes,
+      ] = await Promise.allSettled([
         supabase.from("warehouses").select("id,name,name_ar").eq("is_active", true).order("name"),
         supabase.from("suppliers").select("id,name,phone,balance,is_system").order("name"),
-        (supabase.from("products") as any)
-          .select(
-            "id,sku,barcode,name,name_ar,cost_price,sale_price,tax_rate,tracking,is_custody_item,is_purchasable,image_url,category_id,brand_id,unit_id,origin_id,quality_grade_id,unit:units!products_unit_id_fkey(short_name,name,name_ar),category:categories(name,name_ar),brand:brands!products_brand_id_fkey(name,name_ar),origin:countries_of_origin(name,name_ar,code),quality:quality_grades(name,name_ar,code)",
-          )
-          .eq("is_active", true)
-          .eq("is_custody_item", false)
-          .eq("is_purchasable", true)
-          .order("name")
-          .limit(500),
+        (async () => {
+          // Complete catalog pagination with deterministic ordering
+          const allItems: any[] = [];
+          const pageSize = 500;
+          let from = 0;
+          let selectCols =
+            "id,sku,barcode,name,name_ar,cost_price,sale_price,tax_rate,tracking,is_custody_item,is_purchasable,image_url,category_id,brand_id,unit_id,origin_id,quality_grade_id,unit:units!products_unit_id_fkey(short_name,name,name_ar),category:categories(name,name_ar),brand:brands!products_brand_id_fkey(name,name_ar),origin:countries_of_origin(name,name_ar,code),quality:quality_grades(name,name_ar,code)";
+
+          while (true) {
+            const query = (supabase.from("products") as any)
+              .select(selectCols)
+              .eq("is_active", true)
+              .eq("is_custody_item", false)
+              .eq("is_purchasable", true);
+
+            const { data, error } = await query
+              .order("name", { ascending: true })
+              .order("id", { ascending: true })
+              .range(from, from + pageSize - 1);
+
+            if (error && from === 0 && selectCols.includes("origin_id")) {
+              selectCols =
+                "id,sku,barcode,name,name_ar,cost_price,sale_price,tax_rate,tracking,is_custody_item,is_purchasable,image_url,category_id,brand_id,unit_id";
+              continue;
+            }
+            if (error) return { data: null, error };
+            allItems.push(...(data ?? []));
+            if (!data || data.length < pageSize) break;
+            from += pageSize;
+          }
+          return { data: allItems, error: null };
+        })(),
         supabase.from("categories").select("id,name,name_ar").order("name"),
         supabase.from("brands").select("id,name,name_ar").order("name"),
         supabase.from("units").select("id,name,name_ar,short_name").order("name"),
@@ -518,6 +582,24 @@ function PurchasePOSPage() {
         (supabase as any).from("product_compatibilities").select("product_id,vehicle_model_id"),
       ]);
 
+      const ws = wsRes.status === "fulfilled" ? wsRes.value.data : null;
+      const sups = supsRes.status === "fulfilled" ? supsRes.value.data : null;
+      const ps = psRes.status === "fulfilled" && !psRes.value.error ? psRes.value.data : null;
+      if (psRes.status === "rejected" || (psRes.status === "fulfilled" && psRes.value.error)) {
+        console.error(
+          "[purchase-pos] Failed to load the purchase product catalog:",
+          psRes.status === "rejected" ? psRes.reason : psRes.value.error,
+        );
+      }
+      const cats = catsRes.status === "fulfilled" ? catsRes.value.data : null;
+      const brs = brsRes.status === "fulfilled" ? brsRes.value.data : null;
+      const uns = unsRes.status === "fulfilled" ? unsRes.value.data : null;
+      const origs = origsRes.status === "fulfilled" ? origsRes.value.data : [];
+      const quals = qualsRes.status === "fulfilled" ? qualsRes.value.data : [];
+      const vMakes = vMakesRes.status === "fulfilled" ? vMakesRes.value.data : [];
+      const vModels = vModelsRes.status === "fulfilled" ? vModelsRes.value.data : [];
+      const compats = compatsRes.status === "fulfilled" ? compatsRes.value.data : [];
+
       const loadedWarehouses = ws ?? [];
       const loadedSuppliers = sups ?? [];
       setWarehouses(loadedWarehouses);
@@ -525,57 +607,74 @@ function PurchasePOSPage() {
       const productRows = ((ps as any) ?? []) as Product[];
       const purchaseUomsByProduct = new Map<string, PurchaseUom[]>();
       const barcodeLookup: Record<string, { product_id: string; uom_id: string }> = {};
+      const chunked = <T,>(items: T[], size = 400): T[][] => {
+        const chunks: T[][] = [];
+        for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size));
+        return chunks;
+      };
       let unitSettingsReady = true;
       if (productRows.length) {
         const ids = productRows.map((product) => product.id);
         try {
-          const [uomResult, companyCostResult] = await Promise.all([
-            (supabase as any)
-              .from("product_uoms")
-              .select(
-                "id, product_id, unit_id, factor_to_base, quantity_increment, is_default_purchase, unit:units!product_uoms_unit_id_fkey(name, name_ar, short_name)",
-              )
-              .in("product_id", ids)
-              .eq("is_active", true)
-              .eq("can_purchase", true),
-            (supabase as any)
-              .from("company_items")
-              .select("item_id, default_cost")
-              .eq("company_id", 1)
-              .eq("is_active", true)
-              .in("item_id", ids),
-          ]);
-          const missingUomSchema =
-            uomResult.error && ["42P01", "PGRST205"].includes(uomResult.error.code ?? "");
-          if (uomResult.error && !missingUomSchema) throw uomResult.error;
-          if (companyCostResult.error) throw companyCostResult.error;
-          if (!missingUomSchema && uomResult.data?.length) {
+          const idChunks = chunked(ids, 400);
+          const uomRows: any[] = [];
+          const companyCostRows: any[] = [];
+          for (const chunk of idChunks) {
+            const [uomResult, companyCostResult] = await Promise.all([
+              (supabase as any)
+                .from("product_uoms")
+                .select(
+                  "id, product_id, unit_id, factor_to_base, quantity_increment, is_default_purchase, unit:units!product_uoms_unit_id_fkey(name, name_ar, short_name)",
+                )
+                .in("product_id", chunk)
+                .eq("is_active", true)
+                .eq("can_purchase", true),
+              (supabase as any)
+                .from("company_items")
+                .select("item_id, default_cost")
+                .eq("company_id", 1)
+                .eq("is_active", true)
+                .in("item_id", chunk),
+            ]);
+            if (uomResult.error) throw uomResult.error;
+            if (companyCostResult.error) throw companyCostResult.error;
+            uomRows.push(...(uomResult.data ?? []));
+            companyCostRows.push(...(companyCostResult.data ?? []));
+          }
+
+          if (uomRows.length) {
             const baseCosts = new Map<string, number>();
-            for (const row of companyCostResult.data ?? []) {
+            for (const row of companyCostRows) {
               if (row.default_cost != null) baseCosts.set(row.item_id, Number(row.default_cost));
             }
-            const uomIds = uomResult.data.map((row: any) => row.id);
-            const [priceResult, barcodeResult] = await Promise.all([
-              (supabase as any)
-                .from("product_uom_prices")
-                .select("product_uom_id, purchase_price")
-                .in("product_uom_id", uomIds)
-                .eq("company_id", 1),
-              (supabase as any)
-                .from("product_uom_barcodes")
-                .select("product_uom_id, barcode")
-                .in("product_uom_id", uomIds)
-                .eq("company_id", 1)
-                .eq("is_active", true),
-            ]);
-            if (priceResult.error) throw priceResult.error;
-            if (barcodeResult.error) throw barcodeResult.error;
+            const uomIds = uomRows.map((row: any) => row.id);
+            const priceRows: any[] = [];
+            const barcodeRows: any[] = [];
+            for (const chunk of chunked(uomIds, 400)) {
+              const [priceResult, barcodeResult] = await Promise.all([
+                (supabase as any)
+                  .from("product_uom_prices")
+                  .select("product_uom_id, purchase_price")
+                  .in("product_uom_id", chunk)
+                  .eq("company_id", 1),
+                (supabase as any)
+                  .from("product_uom_barcodes")
+                  .select("product_uom_id, barcode")
+                  .in("product_uom_id", chunk)
+                  .eq("company_id", 1)
+                  .eq("is_active", true),
+              ]);
+              if (priceResult.error) throw priceResult.error;
+              if (barcodeResult.error) throw barcodeResult.error;
+              priceRows.push(...(priceResult.data ?? []));
+              barcodeRows.push(...(barcodeResult.data ?? []));
+            }
             const priceById = new Map<string, number>();
-            for (const row of priceResult.data ?? []) {
+            for (const row of priceRows) {
               if (row.purchase_price != null)
                 priceById.set(row.product_uom_id, Number(row.purchase_price));
             }
-            for (const row of uomResult.data as any[]) {
+            for (const row of uomRows as any[]) {
               const product = productRows.find((item) => item.id === row.product_id);
               const factor = Number(row.factor_to_base);
               const unit = row.unit;
@@ -596,8 +695,8 @@ function PurchasePOSPage() {
               });
               purchaseUomsByProduct.set(row.product_id, list);
             }
-            const rowById = new Map((uomResult.data as any[]).map((row) => [row.id, row]));
-            for (const row of barcodeResult.data ?? []) {
+            const rowById = new Map((uomRows as any[]).map((row) => [row.id, row]));
+            for (const row of barcodeRows) {
               const uom = rowById.get(row.product_uom_id);
               if (uom)
                 barcodeLookup[row.barcode] = { product_id: uom.product_id, uom_id: uom.unit_id };
@@ -616,6 +715,8 @@ function PurchasePOSPage() {
         })),
       );
       setPurchaseUomsLoaded(unitSettingsReady);
+      setCatalogComplete(true);
+      setCatalogLoading(false);
       setCategories(cats ?? []);
       setBrands(brs ?? []);
       setUnits(uns ?? []);
@@ -637,6 +738,7 @@ function PurchasePOSPage() {
         setSupplierId((current) => current || cashSupplier?.id || loadedSuppliers[0].id);
       }
     } catch (err: any) {
+      setCatalogLoading(false);
       console.error("Error loading POP meta:", err);
       toast.error(
         translateRpcError(
@@ -812,6 +914,16 @@ function PurchasePOSPage() {
         return;
       }
     }
+    // Do not report a false miss while later catalog pages are still loading.
+    if (!catalogComplete) {
+      toast.info(
+        lang === "ar"
+          ? "جارٍ تحميل بقية أصناف المشتريات؛ أعد المسح بعد لحظة"
+          : "Purchase catalog is still loading; scan again in a moment.",
+      );
+      return;
+    }
+
     const found = products.find(
       (p) =>
         (p.barcode && p.barcode.toLowerCase() === trimmed.toLowerCase()) ||
@@ -882,14 +994,15 @@ function PurchasePOSPage() {
 
   // Filter products
   const filtered = useMemo(() => {
+    const q = search.trim();
     const matching = products.filter((p) => {
-      if (search) {
-        const s = search.toLowerCase();
-        const matchesName = (p.name || "").toLowerCase().includes(s);
-        const matchesNameAr = (p.name_ar || "").toLowerCase().includes(s);
-        const matchesSku = (p.sku || "").toLowerCase().includes(s);
-        const matchesBarcode = (p.barcode || "").toLowerCase().includes(s);
-        if (!matchesName && !matchesNameAr && !matchesSku && !matchesBarcode) return false;
+      if (q) {
+        const matchesFuzzy =
+          fuzzyMatch(p.name_ar ?? p.name, q) ||
+          fuzzyMatch(p.name, q) ||
+          fuzzyMatch(p.sku, q) ||
+          fuzzyMatch(p.barcode, q);
+        if (!matchesFuzzy) return false;
       }
       if (selectedCategory && p.category_id !== selectedCategory) return false;
       if (catalogConfig.enableBrands && selectedBrand && p.brand_id !== selectedBrand) return false;
@@ -934,6 +1047,47 @@ function PurchasePOSPage() {
     lang,
   ]);
 
+  // Progressive rendering: 60 items per batch on desktop & mobile
+  useEffect(() => {
+    setCatalogVisibleLimit(60);
+  }, [
+    search,
+    selectedCategory,
+    selectedBrand,
+    selectedUnit,
+    selectedOrigin,
+    selectedQuality,
+    selectedMake,
+    selectedModel,
+    catalogSort,
+    viewMode,
+  ]);
+
+  const visibleFiltered = useMemo(
+    () => filtered.slice(0, catalogVisibleLimit),
+    [filtered, catalogVisibleLimit],
+  );
+
+  useEffect(() => {
+    const sentinel = catalogSentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setCatalogVisibleLimit((prev) => Math.min(prev + 60, filtered.length));
+        }
+      },
+      {
+        root: catalogScrollRootRef.current,
+        rootMargin: "300px",
+      },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [filtered.length, catalogVisibleLimit, viewMode]);
+
   const tableRows = useMemo(() => {
     const valueFor = (product: Product): string | number => {
       switch (catalogTableSort.key) {
@@ -950,14 +1104,14 @@ function PurchasePOSPage() {
       }
     };
     const factor = catalogTableSort.direction === "asc" ? 1 : -1;
-    return [...filtered].sort((left, right) => {
+    return [...visibleFiltered].sort((left, right) => {
       const a = valueFor(left);
       const b = valueFor(right);
       return typeof a === "number" && typeof b === "number"
         ? (a - b) * factor
         : String(a).localeCompare(String(b), lang, { numeric: true, sensitivity: "base" }) * factor;
     });
-  }, [filtered, catalogTableSort, stockMap, lang]);
+  }, [visibleFiltered, catalogTableSort, stockMap, lang]);
 
   // Create Supplier — the SAME form used by the Suppliers page.
   function handleSupplierSaved(record: { id: string; name: string; phone?: string | null }) {
@@ -1415,6 +1569,14 @@ function PurchasePOSPage() {
                     ? "ابحث باسم المنتج، SKU، أو امسح الباركود (F2)..."
                     : "Search by product name, SKU, or scan barcode (F2)...",
                 resultCount: filtered.length,
+                resultCountText: !catalogComplete
+                  ? lang === "ar"
+                    ? `${filtered.length} مطابقة • ${products.length} محمّل`
+                    : `${filtered.length} matches • ${products.length} loaded`
+                  : visibleFiltered.length < filtered.length
+                    ? `${visibleFiltered.length} / ${filtered.length}`
+                    : String(filtered.length),
+                loading: !catalogComplete,
               }}
               filters={{
                 definitions: [
@@ -1570,7 +1732,10 @@ function PurchasePOSPage() {
             </TableToolbar>
 
             {/* Products Grid */}
-            <div className="flex-1 min-h-0 overflow-y-auto p-3 custom-scrollbar">
+            <div
+              ref={catalogScrollRootRef}
+              className="flex-1 min-h-0 overflow-y-auto p-3 custom-scrollbar"
+            >
               {filtered.length === 0 ? (
                 <div className="grid place-items-center py-16 text-center text-muted-foreground">
                   <ShoppingBag className="h-10 w-10 opacity-30 mb-2" />
@@ -1589,7 +1754,7 @@ function PurchasePOSPage() {
                 </div>
               ) : viewMode === "cards" ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">
-                  {filtered.map((p) => {
+                  {visibleFiltered.map((p) => {
                     const stock = stockMap[p.id] ?? 0;
                     const purchaseUom = getDefaultPurchaseUom(p);
                     const stockInPurchaseUnit =
@@ -1669,7 +1834,7 @@ function PurchasePOSPage() {
                 </div>
               ) : viewMode === "list" ? (
                 <div className="space-y-1.5">
-                  {filtered.map((product) => (
+                  {visibleFiltered.map((product) => (
                     <button
                       key={product.id}
                       type="button"
@@ -1807,6 +1972,21 @@ function PurchasePOSPage() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+
+              {/* Infinite scroll sentinel */}
+              {visibleFiltered.length < filtered.length && (
+                <div
+                  ref={catalogSentinelRef}
+                  className="py-4 text-center text-xs text-muted-foreground flex items-center justify-center gap-2"
+                >
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  <span>
+                    {lang === "ar"
+                      ? `جارٍ تحميل المزيد (${visibleFiltered.length} من ${filtered.length})...`
+                      : `Loading more (${visibleFiltered.length} of ${filtered.length})...`}
+                  </span>
                 </div>
               )}
             </div>
@@ -2168,7 +2348,8 @@ function PurchasePOSPage() {
         searchPlaceholder={t("pos.search_product")}
         emptyLabel={lang === "ar" ? "لا توجد منتجات مطابقة" : "No matching products"}
         inputRef={searchRef}
-        products={filtered.slice(0, 200).map((p) => ({
+        pageSize={60}
+        products={filtered.map((p) => ({
           id: p.id,
           name: (lang === "ar" ? p.name_ar || p.name : p.name || p.name_ar) || "—",
           meta: p.sku || p.barcode || null,
