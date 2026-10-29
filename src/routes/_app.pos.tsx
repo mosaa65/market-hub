@@ -45,6 +45,7 @@ import { toast } from "sonner";
 import { BarcodeScanner } from "@/components/barcode-scanner";
 import { useKeyboardWedge } from "@/hooks/use-keyboard-wedge";
 import { useCatalogModules } from "@/lib/catalog-modules";
+import { useMillingMode } from "@/lib/milling-mode";
 import { useIsDesktop, useMediaQuery } from "@/hooks/use-media-query";
 import { usePersistedViewMode } from "@/hooks/use-persisted-view-mode";
 import { CartLine as CartLineRow } from "@/components/commerce/cart-line";
@@ -284,6 +285,7 @@ const posGuideConfig: PageGuideConfig = {
 function POSPage() {
   const { isModuleEnabled } = useModules();
   const { t, lang } = useI18n();
+  const { mode: millingMode } = useMillingMode();
   const { settings: batchSettings } = useBatchSettings();
   const { config: catalogConfig } = useCatalogModules();
   const { methods: posPaymentMethods } = usePaymentMethodsForContext("pos", {
@@ -449,7 +451,7 @@ function POSPage() {
       .then(({ data }) => {
         if (data) setCompanySettings(data);
       });
-  }, []);
+  }, [millingMode]);
 
   useEffect(() => {
     if (warehouseId) void loadStock(warehouseId);
@@ -550,16 +552,23 @@ function POSPage() {
        * الكاشير اكتمال جلب التصنيفات والماركات والموديلات… (تظهر العناصر
        * المساعدة لحظة اكتمالها عبر إعادة الإثراء أدناه).
        */
-      void (supabase.from("products") as any)
+      const fastProductQuery = (supabase.from("products") as any)
         .select(
           "id,sku,barcode,name,name_ar,sale_price,tax_rate,image_url,category_id,brand_id,unit_id,origin_id,quality_grade_id,is_active,is_service,item_nature,inventory_policy,tracking,batch_dispatch_strategy,is_custody_item",
         )
         .eq("is_active", true)
         .eq("is_sellable", true)
-        .eq("is_custody_item", false)
-        .neq("item_class", "RAW_MATERIAL")
-        .neq("item_class", "PACKAGING")
-        .neq("item_class", "SERVICE")
+        .eq("is_custody_item", false);
+      // Milling services and custody inputs use dedicated operational screens.
+      // General ERP POS eligibility is determined by is_sellable, not an
+      // activity-specific item_class value.
+      if (millingMode === "simplified") {
+        fastProductQuery
+          .neq("item_class", "RAW_MATERIAL")
+          .neq("item_class", "PACKAGING")
+          .neq("item_class", "SERVICE");
+      }
+      void fastProductQuery
         .order("name")
         .limit(1000)
         .then(({ data }: { data: any[] | null }) => {
@@ -591,20 +600,23 @@ function POSPage() {
           .from("customers")
           .select("id,name,phone,balance,credit_limit,is_system")
           .order("name"),
-        (supabase.from("products") as any)
-          .select(
-            "id,sku,barcode,name,name_ar,sale_price,tax_rate,image_url,category_id,brand_id,unit_id,origin_id,quality_grade_id,is_active,is_service,item_nature,inventory_policy,tracking,is_custody_item",
-          )
-          // خدمة الطحن لا تباع من POS: تحتاج بيانات الاستلام والأكياس والأمانة
-          // الموجودة حصراً في كاونتر المطحنة. تظل الخدمة الحرة في زرها المخصص.
+        (() => {
+          const salesProductQuery = (supabase.from("products") as any)
+            .select(
+              "id,sku,barcode,name,name_ar,sale_price,tax_rate,image_url,category_id,brand_id,unit_id,origin_id,quality_grade_id,is_active,is_service,item_nature,inventory_policy,tracking,is_custody_item",
+            )
+            // In general mode the business sellability flag controls POS access.
           .eq("is_active", true)
           .eq("is_sellable", true)
-          .eq("is_custody_item", false)
-          .neq("item_class", "RAW_MATERIAL")
-          .neq("item_class", "PACKAGING")
-          .neq("item_class", "SERVICE")
-          .order("name")
-          .limit(1000),
+            .eq("is_custody_item", false);
+          if (millingMode === "simplified") {
+            salesProductQuery
+              .neq("item_class", "RAW_MATERIAL")
+              .neq("item_class", "PACKAGING")
+              .neq("item_class", "SERVICE");
+          }
+          return salesProductQuery.order("name").limit(1000);
+        })(),
         supabase.from("categories").select("id,name,name_ar").order("name"),
         supabase.from("brands").select("id,name,name_ar").order("name"),
         supabase.from("units").select("id,name,name_ar,short_name").order("name"),
@@ -648,11 +660,20 @@ function POSPage() {
       // Fallback query if the first returned empty due to column discrepancy
       if (!rawProducts.length) {
         try {
-          const { data: fallbackPs } = await (supabase.from("products") as any)
+          const fallbackQuery = (supabase.from("products") as any)
             .select(
               "id,sku,barcode,name,name_ar,sale_price,tax_rate,image_url,category_id,brand_id,unit_id",
             )
-            .limit(1000);
+            .eq("is_active", true)
+            .eq("is_sellable", true)
+            .eq("is_custody_item", false);
+          if (millingMode === "simplified") {
+            fallbackQuery
+              .neq("item_class", "RAW_MATERIAL")
+              .neq("item_class", "PACKAGING")
+              .neq("item_class", "SERVICE");
+          }
+          const { data: fallbackPs } = await fallbackQuery.limit(1000);
           if (fallbackPs && fallbackPs.length) rawProducts = fallbackPs;
         } catch (e) {
           console.warn("Fallback products query error:", e);

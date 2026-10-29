@@ -246,11 +246,11 @@ export function PurchaseFormSheet({
         const line = next[idx];
         if (line.buy_by_bags) {
           const nextBags = (line.bags_count ?? 1) + 1;
-          const cap = line.package_weight_kg || pkgKg || 50;
+          const cap = Number(line.package_weight_kg) || pkgKg;
           next[idx] = {
             ...line,
             bags_count: nextBags,
-            quantity: nextBags * cap,
+            quantity: cap > 0 ? nextBags * cap : line.quantity,
           };
         } else {
           next[idx] = { ...line, quantity: line.quantity + 1 };
@@ -267,7 +267,7 @@ export function PurchaseFormSheet({
           quantity: isPackaged ? pkgKg : 1,
           buy_by_bags: isPackaged,
           bags_count: isPackaged ? 1 : undefined,
-          package_weight_kg: isPackaged ? pkgKg : 50,
+          package_weight_kg: isPackaged ? pkgKg : undefined,
           bag_cost: isPackaged ? (Number(p.cost_price) || 0) * pkgKg : undefined,
           tracking: p.tracking ?? "NONE",
           batch_number: "",
@@ -310,10 +310,19 @@ export function PurchaseFormSheet({
       !Number.isFinite(line.tax_rate) ||
       line.tax_rate < 0,
   );
+  const missingPackageCapacity = cart.find(
+    (line) => line.buy_by_bags && !(Number(line.package_weight_kg) > 0),
+  );
   const missingBatch = cart.find((line) => line.tracking === "BATCH" && !line.batch_number.trim());
 
   const canSubmit =
-    !saving && cart.length > 0 && !!warehouseId && !!supplierId && !invalidLine && !missingBatch;
+    !saving &&
+    cart.length > 0 &&
+    !!warehouseId &&
+    !!supplierId &&
+    !invalidLine &&
+    !missingPackageCapacity &&
+    !missingBatch;
 
   async function submit() {
     if (saving) return;
@@ -328,6 +337,13 @@ export function PurchaseFormSheet({
         isAr
           ? "يجب أن تكون الكمية والتكلفة والضريبة أرقامًا صحيحة غير سالبة"
           : "Quantity, cost and tax must be valid non-negative numbers.",
+      );
+    }
+    if (missingPackageCapacity) {
+      return toast.error(
+        isAr
+          ? `حدد سعة العبوة بالكيلوغرام للصنف: ${missingPackageCapacity.name}`
+          : `Enter the package capacity in kilograms for: ${missingPackageCapacity.name}`,
       );
     }
     if (missingBatch) {
@@ -563,15 +579,15 @@ export function PurchaseFormSheet({
                             type="button"
                             onClick={() => {
                               const willBeBags = !l.buy_by_bags;
-                              const cap = l.package_weight_kg || 50;
+                              const cap = Number(l.package_weight_kg) || 0;
                               if (willBeBags) {
-                                const bags = Math.max(1, Math.round(l.quantity / cap));
+                                const bags = cap > 0 ? Math.max(1, Math.round(l.quantity / cap)) : 1;
                                 updateLine(l.product_id, {
                                   buy_by_bags: true,
                                   bags_count: bags,
-                                  package_weight_kg: cap,
-                                  quantity: bags * cap,
-                                  bag_cost: l.unit_cost * cap,
+                                  package_weight_kg: cap > 0 ? cap : undefined,
+                                  quantity: cap > 0 ? bags * cap : 0,
+                                  bag_cost: cap > 0 ? l.unit_cost * cap : undefined,
                                 });
                               } else {
                                 updateLine(l.product_id, { buy_by_bags: false });
@@ -654,10 +670,10 @@ export function PurchaseFormSheet({
                                   type="button"
                                   onClick={() => {
                                     const nextBags = Math.max(1, (l.bags_count ?? 1) - 1);
-                                    const cap = l.package_weight_kg || 50;
+                                    const cap = Number(l.package_weight_kg) || 0;
                                     updateLine(l.product_id, {
                                       bags_count: nextBags,
-                                      quantity: nextBags * cap,
+                                      quantity: cap > 0 ? nextBags * cap : l.quantity,
                                     });
                                   }}
                                   aria-label="-"
@@ -671,10 +687,10 @@ export function PurchaseFormSheet({
                                   value={l.bags_count ?? 1}
                                   onValueChange={(v) => {
                                     const nextBags = Number(v ?? 0);
-                                    const cap = l.package_weight_kg || 50;
+                                    const cap = Number(l.package_weight_kg) || 0;
                                     updateLine(l.product_id, {
                                       bags_count: nextBags,
-                                      quantity: nextBags * cap,
+                                      quantity: cap > 0 ? nextBags * cap : l.quantity,
                                     });
                                   }}
                                 />
@@ -682,10 +698,10 @@ export function PurchaseFormSheet({
                                   type="button"
                                   onClick={() => {
                                     const nextBags = (l.bags_count ?? 1) + 1;
-                                    const cap = l.package_weight_kg || 50;
+                                    const cap = Number(l.package_weight_kg) || 0;
                                     updateLine(l.product_id, {
                                       bags_count: nextBags,
-                                      quantity: nextBags * cap,
+                                      quantity: cap > 0 ? nextBags * cap : l.quantity,
                                     });
                                   }}
                                   aria-label="+"
@@ -703,15 +719,15 @@ export function PurchaseFormSheet({
                               <NumberInput
                                 decimal
                                 className="text-center"
-                                value={l.package_weight_kg ?? 50}
+                                value={l.package_weight_kg ?? null}
                                 onValueChange={(v) => {
                                   const cap = Number(v ?? 0);
                                   const bags = l.bags_count ?? 1;
-                                  const bagCost = l.bag_cost ?? l.unit_cost * cap;
+                                  const bagCost = l.bag_cost ?? (cap > 0 ? l.unit_cost * cap : 0);
                                   updateLine(l.product_id, {
-                                    package_weight_kg: cap,
-                                    quantity: bags * cap,
-                                    unit_cost: cap > 0 ? bagCost / cap : 0,
+                                    package_weight_kg: cap > 0 ? cap : undefined,
+                                    quantity: cap > 0 ? bags * cap : 0,
+                                    unit_cost: cap > 0 ? bagCost / cap : l.unit_cost,
                                   });
                                 }}
                               />
@@ -724,13 +740,15 @@ export function PurchaseFormSheet({
                               <NumberInput
                                 decimal
                                 className="text-end"
-                                value={l.bag_cost ?? l.unit_cost * (l.package_weight_kg || 50)}
+                                value={
+                                  l.bag_cost ?? l.unit_cost * (Number(l.package_weight_kg) || 0)
+                                }
                                 onValueChange={(v) => {
                                   const bagCost = Number(v ?? 0);
-                                  const cap = l.package_weight_kg || 50;
+                                  const cap = Number(l.package_weight_kg) || 0;
                                   updateLine(l.product_id, {
                                     bag_cost: bagCost,
-                                    unit_cost: cap > 0 ? bagCost / cap : 0,
+                                    unit_cost: cap > 0 ? bagCost / cap : l.unit_cost,
                                   });
                                 }}
                               />

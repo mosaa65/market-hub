@@ -24,9 +24,9 @@ import { useI18n } from "@/lib/i18n";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { fieldSurfaceClass } from "@/components/ui/input";
+import { getStockSettings } from "@/lib/stock-settings";
 import { Package, Wrench, Check, ArrowLeft } from "lucide-react";
 import {
-  COSTING_METHOD_LABELS,
   DEFAULT_ITEM_POLICY,
   INVENTORY_POLICY_LABELS,
   ITEM_NATURE_LABELS,
@@ -36,7 +36,6 @@ import {
   describeItemPolicy,
   policyFromWizard,
   validateItemPolicy,
-  type CostingMethod,
   type ItemNature,
   type ItemPolicy,
   type ItemTracking,
@@ -71,12 +70,11 @@ export function GuidedItemDialog({ onClose, onCreated, units, categories }: Guid
   const [referenceCost, setReferenceCost] = useState("");
   const [taxRate, setTaxRate] = useState("");
   const [baseUomId, setBaseUomId] = useState("");
-  // سعة العبوة الرسمية بالكجم (package_weight_kg) — نفس الحقل الذي يعرّفه
-  // فهرس مستلزمات التعبئة. يُعرض هنا فقط لصنف مخزني، ويغذّي الوزن الإجمالي
-  // التلقائي في الطحن. (G16 في 04_القرارات_التكميلية)
+  const [minStock, setMinStock] = useState(() => String(getStockSettings().defaultMinStock));
+  // وزن المحتوى الصافي الثابت للعبوة بالكجم. هذا ليس تحويلًا عامًا للوحدات؛
+  // تستخدمه شاشة شراء الأكياس وبعض مسارات الطحن لاقتراح الكمية بالكيلوجرام.
   const [packageWeightKg, setPackageWeightKg] = useState("");
   const [tracking, setTracking] = useState<ItemTracking>(DEFAULT_ITEM_POLICY.tracking);
-  const [costingMethod, setCostingMethod] = useState<CostingMethod>("MOVING_AVERAGE");
 
   const [saving, setSaving] = useState(false);
 
@@ -93,7 +91,6 @@ export function GuidedItemDialog({ onClose, onCreated, units, categories }: Guid
       // A service is never tracked, so that question is skipped entirely.
       setTrackInventory(false);
       setTracking("NONE");
-      setCostingMethod("NONE");
       setStep(3);
     } else {
       setTrackInventory(null);
@@ -104,12 +101,7 @@ export function GuidedItemDialog({ onClose, onCreated, units, categories }: Guid
 
   function chooseTracking(value: boolean) {
     setTrackInventory(value);
-    if (value) {
-      setCostingMethod("MOVING_AVERAGE");
-    } else {
-      setTracking("NONE");
-      setCostingMethod("NONE");
-    }
+    if (!value) setTracking("NONE");
     setStep(3);
   }
 
@@ -119,7 +111,9 @@ export function GuidedItemDialog({ onClose, onCreated, units, categories }: Guid
     const finalPolicy = {
       ...policy,
       tracking: tracksStock ? tracking : "NONE",
-      costing_method: tracksStock ? costingMethod : "NONE",
+      // The company valuation method is central; this field remains only for
+      // compatibility with the current product schema.
+      costing_method: tracksStock ? DEFAULT_ITEM_POLICY.costing_method : "NONE",
     } as ItemPolicy;
 
     const check = validateItemPolicy(finalPolicy);
@@ -136,6 +130,13 @@ export function GuidedItemDialog({ onClose, onCreated, units, categories }: Guid
     setSaving(true);
 
     try {
+      const { data: costingSettings, error: costingSettingsError } = await (supabase as any)
+        .from("company_costing_settings")
+        .select("costing_method")
+        .eq("id", 1)
+        .maybeSingle();
+      if (costingSettingsError) throw costingSettingsError;
+
       // 1. Create the catalogue row with its policy axes.
       const { data, error } = await supabase
         .from("products")
@@ -152,13 +153,17 @@ export function GuidedItemDialog({ onClose, onCreated, units, categories }: Guid
           item_nature: finalPolicy.item_nature as never,
           inventory_policy: finalPolicy.inventory_policy as never,
           tracking: finalPolicy.tracking as never,
-          costing_method: finalPolicy.costing_method as never,
+          costing_method: tracksStock
+            ? (costingSettings?.costing_method ?? DEFAULT_ITEM_POLICY.costing_method)
+            : "NONE",
           is_sellable: finalPolicy.is_sellable,
           is_purchasable: finalPolicy.is_purchasable,
           base_uom_id: baseUomId || null,
           sales_uom_id: baseUomId || null,
           purchase_uom_id: baseUomId || null,
-          package_weight_kg: packageWeightKg.trim() !== "" ? Number(packageWeightKg) : null,
+          min_stock: tracksStock ? Number(minStock) || 0 : 0,
+          package_weight_kg:
+            tracksStock && Number(packageWeightKg) > 0 ? Number(packageWeightKg) : null,
 
           // Kept in sync so any legacy reader still sees a truthful value.
           is_service: finalPolicy.item_nature === "SERVICE",
@@ -452,24 +457,16 @@ export function GuidedItemDialog({ onClose, onCreated, units, categories }: Guid
               {/* These fields appear ONLY for a tracked good. */}
               {tracksStock && (
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <Field
-                    label={ar ? "طريقة التكلفة" : "Costing method"}
-                    hint={
-                      ar ? "كيف تُقيَّم الكمية المتاحة." : "How the on-hand quantity is valued."
-                    }
-                  >
-                    <select
-                      value={costingMethod}
-                      onChange={(event) => setCostingMethod(event.target.value as CostingMethod)}
-                      className={inputClass}
-                    >
-                      {(["MOVING_AVERAGE"] as CostingMethod[]).map((method) => (
-                        <option key={method} value={method}>
-                          {COSTING_METHOD_LABELS[method][ar ? "ar" : "en"]}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
+                  <div className="rounded-xl border border-border/70 bg-muted/30 p-3">
+                    <p className="text-xs font-semibold text-foreground">
+                      {ar ? "تقييم المخزون" : "Inventory valuation"}
+                    </p>
+                    <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                      {ar
+                        ? "يُحدد مركزيًا من إعدادات المخزون ويطبق على الأصناف المخزنية؛ لا يُختار لكل صنف."
+                        : "Configured centrally in Stock Settings and applied to tracked items; it is not selected per item."}
+                    </p>
+                  </div>
                   <Field label={ar ? "التتبع الدقيق" : "Detailed tracking"}>
                     <select
                       value={tracking}
@@ -483,14 +480,33 @@ export function GuidedItemDialog({ onClose, onCreated, units, categories }: Guid
                       ))}
                     </select>
                   </Field>
-                  {/* سعة العبوة الرسمية بالكجم — نفس حقل فهرس مستلزمات التعبئة،
-                        وتغذّي الوزن الإجمالي التلقائي في الطحن (أكياس × السعة). */}
                   <Field
-                    label={ar ? "سعة العبوة (كجم)" : "Packaging capacity (kg)"}
+                    label={
+                      ar
+                        ? "حد التنبيه الأدنى لهذا المنتج في المخزون"
+                        : "This product's minimum stock alert threshold"
+                    }
                     hint={
                       ar
-                        ? "اختياري — مثل 50 لكيس 50 كجم. يُستخدم لحساب الوزن الإجمالي في الطحن."
-                        : "Optional — e.g. 50 for a 50 kg bag. Used to compute milling total weight."
+                        ? "يظهر تنبيه النقص عندما يساوي الرصيد بوحدة قياس الصنف هذا الحد أو يقل عنه. الصفر يعني عدم تحديد حد تنبيه."
+                        : "A low-stock alert appears when on-hand quantity in the item's unit reaches or falls below this value. Zero means no threshold is set."
+                    }
+                  >
+                    <QuantityInput
+                      value={minStock === "" ? null : Number(minStock)}
+                      onValueChange={(value) => setMinStock(value == null ? "" : String(value))}
+                      decimals={3}
+                      min={0}
+                      placeholder="0"
+                    />
+                  </Field>
+                  {/* اختياري لأي سلعة مخزنية ذات محتوى ثابت الوزن. */}
+                  <Field
+                    label={ar ? "الوزن الصافي المعتاد للعبوة (كجم)" : "Usual net package weight (kg)"}
+                    hint={
+                      ar
+                        ? "اختياري لأي سلعة مخزنية لها وزن صافٍ ثابت لكل كيس أو عبوة. يفيد في شراء الأكياس وبعض عمليات الطحن. لا يعرّف تحويلًا عامًا مثل كرتون إلى حبة."
+                        : "Optional for any tracked good with a fixed net weight per bag or package. Used in bag purchases and some milling flows. It does not define general conversions such as carton to piece."
                     }
                   >
                     <QuantityInput

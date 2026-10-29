@@ -119,10 +119,10 @@ registerSettingsSection({
 
 registerSettingsSection({
   id: "stock-settings",
-  titleAr: "إعدادات المخزون والرموز (Stacks)",
-  titleEn: "Stock & Stacks Settings",
-  descriptionAr: "التحكم ببادئات الرموز (SKU, Stacks)، قواعد الترقيم، والتنبيهات المخزنية",
-  descriptionEn: "Manage stock prefixes (SKU, Stacks), numbering rules, and stock thresholds",
+  titleAr: "المخزون والتقييم",
+  titleEn: "Inventory & Valuation",
+  descriptionAr: "طريقة التقييم المركزية، بادئات الرموز، قواعد الترقيم، والتنبيهات المخزنية",
+  descriptionEn: "Central valuation method, stock codes, numbering rules, and stock thresholds",
   icon: Boxes,
   component: StockSettingsSection,
 });

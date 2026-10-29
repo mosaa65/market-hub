@@ -101,6 +101,7 @@ import { useBreakpoint } from "@/design/breakpoints";
 import { useRealtimeTable } from "@/lib/realtime";
 import { registerRealtimeRowPatcher } from "@/lib/realtime";
 import { productKeys } from "@/lib/query-keys";
+import { getStockSettings } from "@/lib/stock-settings";
 import {
   DEFAULT_USER_ITEM_POLICY_PREFERENCES,
   readUserItemPolicyPreferences,
@@ -140,11 +141,7 @@ type ProductRow = {
   cost_price: number;
   tax_rate: number;
   min_stock: number;
-  /**
-   * سعة العبوة الافتراضية بالكيلوجرام (مثال 50 أو 25).
-   * تُستخدم فقط لتعبئة "الوزن الافتراضي" في شاشات الطحن والتسليم —
-   * لا تدخل في أي حساب مخزون أو تكلفة.
-   */
+  /** الوزن الصافي الثابت للعبوة؛ يستخدم لاقتراح كمية الكيس في الشراء والطحن. */
   package_weight_kg: number | null;
   shelf_location: string | null;
   origin_id: string | null;
@@ -506,6 +503,20 @@ function ProductsPage() {
         origins: origins.data ?? [],
         qualities: qualities.data ?? [],
       };
+    },
+  });
+
+  const { data: companyCostingMethod = "MOVING_AVERAGE" } = useQuery<CostingMethod>({
+    queryKey: ["company-costing-method"],
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("company_costing_settings")
+        .select("costing_method")
+        .eq("id", 1)
+        .maybeSingle();
+      if (error) throw error;
+      return (data?.costing_method ?? "MOVING_AVERAGE") as CostingMethod;
     },
   });
 
@@ -1323,7 +1334,8 @@ function ProductsPage() {
                   const primary = lang === "ar" ? p.name_ar || p.name : p.name || p.name_ar || "—";
                   const other = lang === "ar" ? p.name : p.name_ar;
                   const categoryName = categoryLabel(p.category);
-                  const isLowStock = p.min_stock != null && Number(p.min_stock) > 0;
+                  const hasMinStockThreshold =
+                    p.inventory_policy === "TRACKED" && p.min_stock != null && Number(p.min_stock) > 0;
 
                   return (
                     <div
@@ -1334,9 +1346,7 @@ function ProductsPage() {
                       className={`card-mullak group relative overflow-hidden rounded-2xl p-3 sm:p-4.5 flex flex-col justify-between cursor-pointer border transition-all duration-200 hover:shadow-md ${
                         !p.is_active
                           ? "border-r-4 border-r-muted-foreground/40 hover:border-border"
-                          : isLowStock
-                            ? "border-r-4 border-r-amber-500 hover:border-amber-500/60 shadow-amber-500/5"
-                            : "border-r-4 border-r-emerald-500 hover:border-primary/50 shadow-emerald-500/5"
+                          : "border-r-4 border-r-emerald-500 hover:border-primary/50 shadow-emerald-500/5"
                       }`}
                     >
                       {/* Top Badges Row */}
@@ -1399,9 +1409,7 @@ function ProductsPage() {
                             className={`size-2 shrink-0 rounded-full ${
                               !p.is_active
                                 ? "bg-muted-foreground/40"
-                                : isLowStock
-                                  ? "bg-amber-500 ring-2 ring-amber-500/20"
-                                  : "bg-emerald-500 ring-2 ring-emerald-500/20"
+                                : "bg-emerald-500 ring-2 ring-emerald-500/20"
                             }`}
                             title={p.is_active ? t("common.active") : t("common.inactive")}
                           />
@@ -1436,10 +1444,13 @@ function ProductsPage() {
                             <span className="truncate max-w-[60px]">{p.shelf_location}</span>
                           </span>
                         )}
-                        {show("minStock") && isLowStock && (
+                        {show("minStock") && hasMinStockThreshold && (
                           <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/10 text-amber-500 border border-amber-500/20 px-1.5 py-0.2 font-mono">
                             <Boxes className="size-2" />
-                            <span>{qtyCell(p.min_stock)}</span>
+                            <span>
+                              {lang === "ar" ? "تنبيه ≤ " : "Alert ≤ "}
+                              {qtyCell(p.min_stock)}
+                            </span>
                           </span>
                         )}
                       </div>
@@ -1564,12 +1575,11 @@ function ProductsPage() {
                       : null;
                   const categoryName = categoryLabel(p.category);
 
-                  const isLowStock = p.min_stock != null && Number(p.min_stock) > 0;
+                  const hasMinStockThreshold =
+                    p.inventory_policy === "TRACKED" && p.min_stock != null && Number(p.min_stock) > 0;
                   const barColor = !p.is_active
                     ? "bg-muted-foreground/30"
-                    : isLowStock
-                      ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]"
-                      : "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]";
+                    : "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]";
 
                   return (
                     <div
@@ -1654,10 +1664,13 @@ function ProductsPage() {
                           </div>
                         )}
 
-                        {show("minStock") && isLowStock && (
+                        {show("minStock") && hasMinStockThreshold && (
                           <div className="flex items-center gap-1 text-amber-500 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-xl text-[11px] font-mono">
                             <Boxes className="size-3" />
-                            <span>{qtyCell(p.min_stock)}</span>
+                            <span>
+                              {lang === "ar" ? "تنبيه ≤ " : "Alert ≤ "}
+                              {qtyCell(p.min_stock)}
+                            </span>
                           </div>
                         )}
 
@@ -1911,14 +1924,20 @@ function ProductsPage() {
                     </div>
                   )}
 
+                  {selectedProductDetail.inventory_policy === "TRACKED" && (
                   <div className="rounded-2xl border border-border/70 bg-card p-3.5 space-y-0.5">
                     <span className="text-[11px] font-bold text-muted-foreground block">
-                      {lang === "ar" ? "حد أدنى المخزون" : "Min Stock Alert"}
+                      {lang === "ar" ? "حد التنبيه الأدنى للمخزون" : "Minimum stock alert threshold"}
                     </span>
                     <p className="font-mono text-lg sm:text-xl font-black text-amber-500">
-                      {qtyCell(selectedProductDetail.min_stock)}
+                      {selectedProductDetail.min_stock > 0
+                        ? qtyCell(selectedProductDetail.min_stock)
+                        : lang === "ar"
+                          ? "غير محدد"
+                          : "Not set"}
                     </p>
                   </div>
+                  )}
 
                   <div className="rounded-2xl border border-border/70 bg-card p-3.5 space-y-0.5">
                     <span className="text-[11px] font-bold text-muted-foreground block">
@@ -1929,10 +1948,13 @@ function ProductsPage() {
                     </p>
                   </div>
 
-                  {selectedProductDetail.package_weight_kg != null && (
+                  {selectedProductDetail.inventory_policy === "TRACKED" &&
+                    selectedProductDetail.package_weight_kg != null && (
                     <div className="rounded-2xl border border-border/70 bg-card p-3.5 space-y-0.5">
                       <span className="text-[11px] font-bold text-muted-foreground block">
-                        {lang === "ar" ? "وزن العبوة (كجم)" : "Package Weight (kg)"}
+                        {lang === "ar"
+                          ? "الوزن الصافي المعتاد للعبوة (كجم)"
+                          : "Usual net package weight (kg)"}
                       </span>
                       <p className="font-mono text-lg sm:text-xl font-black text-foreground">
                         {toSystemDigits(selectedProductDetail.package_weight_kg.toString())}{" "}
@@ -2170,15 +2192,15 @@ function ProductsPage() {
                       </div>
                     )}
 
-                    {selectedProductDetail.costing_method && (
+                    {selectedProductDetail.inventory_policy === "TRACKED" && (
                       <div className="flex items-center justify-between">
                         <span className="text-muted-foreground">
-                          {lang === "ar" ? "طريقة حساب التكلفة" : "Costing Method"}
+                          {lang === "ar" ? "تقييم المخزون (إعداد الشركة)" : "Stock valuation (company setting)"}
                         </span>
                         <span className="font-semibold text-foreground">
-                          {COSTING_METHOD_LABELS[selectedProductDetail.costing_method]?.[
+                          {COSTING_METHOD_LABELS[companyCostingMethod]?.[
                             lang === "ar" ? "ar" : "en"
-                          ] || selectedProductDetail.costing_method}
+                          ] || companyCostingMethod}
                         </span>
                       </div>
                     )}
@@ -2305,6 +2327,7 @@ function ProductsPage() {
           initialBarcode={prefillBarcode}
           userId={user?.id ?? null}
           canViewCost={canViewCost}
+          companyCostingMethod={companyCostingMethod}
           meta={
             meta ?? {
               categories: [],
@@ -2455,6 +2478,7 @@ function ProductDialog({
   initialBarcode,
   userId,
   canViewCost = true,
+  companyCostingMethod,
   meta,
   onClose,
   onSaved,
@@ -2463,6 +2487,7 @@ function ProductDialog({
   initialBarcode?: string;
   userId: string | null;
   canViewCost?: boolean;
+  companyCostingMethod: CostingMethod;
   meta: {
     categories: { id: string; name: string; name_ar: string | null }[];
     brands: { id: string; name: string; name_ar: string | null }[];
@@ -2473,6 +2498,7 @@ function ProductDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  type QuickAddKind = "brand" | "unit" | "origin" | "quality";
   const { t, lang } = useI18n();
   const { config } = useCatalogModules();
   const dialogQc = useQueryClient();
@@ -2485,6 +2511,12 @@ function ProductDialog({
   const [categoryNameAr, setCategoryNameAr] = useState("");
   const [categoryNameEn, setCategoryNameEn] = useState("");
   const [savingCategory, setSavingCategory] = useState(false);
+  const [quickAddKind, setQuickAddKind] = useState<QuickAddKind | null>(null);
+  const [quickAddNameAr, setQuickAddNameAr] = useState("");
+  const [quickAddNameEn, setQuickAddNameEn] = useState("");
+  const [quickAddCode, setQuickAddCode] = useState("");
+  const [quickAddShortName, setQuickAddShortName] = useState("");
+  const [savingQuickAdd, setSavingQuickAdd] = useState(false);
   const policyFromProduct = (product: ProductRow): UserItemPolicyPreferences => {
     const inventoryPolicy = product.inventory_policy ?? "TRACKED";
     return {
@@ -2521,7 +2553,8 @@ function ProductDialog({
     cost_price: initial?.cost_price != null ? String(initial.cost_price) : "",
     sale_price: initial?.sale_price != null ? String(initial.sale_price) : "",
     tax_rate: initial?.tax_rate != null ? String(initial.tax_rate) : "",
-    min_stock: initial?.min_stock != null ? String(initial.min_stock) : "",
+    min_stock:
+      initial?.min_stock != null ? String(initial.min_stock) : String(getStockSettings().defaultMinStock),
     package_weight_kg: initial?.package_weight_kg != null ? String(initial.package_weight_kg) : "",
     shelf_location: initial?.shelf_location ?? "",
     origin_id: initial?.origin_id ?? "",
@@ -2582,18 +2615,24 @@ function ProductDialog({
         sku: form.sku.trim() || null,
         barcode: form.barcode.trim() || null,
         category_id: form.category_id || null,
-        // دور الصنف (مادة خام / منتج نهائي / ناتج طحن / خدمة / مستهلكات) —
-        // القيمة الفارغة تترك للخادم قيمته الافتراضية.
+        // تصنيف عام للعرض والتقارير؛ سياسة المخزون وأهلية الشراء/البيع حقول مستقلة.
         item_class: form.item_class || null,
         brand_id: config.enableBrands ? form.brand_id || null : null,
         unit_id: config.enableUnits ? form.unit_id || null : null,
         cost_price: Number(form.cost_price) || 0,
         sale_price: Number(form.sale_price) || 0,
         tax_rate: Number(form.tax_rate) || 0,
-        min_stock: Number(form.min_stock) || 1,
+        min_stock:
+          policy.item_nature === "GOOD" && policy.inventory_policy === "TRACKED"
+            ? Number(form.min_stock) || 0
+            : 0,
         track_expiry: policy.tracking === "BATCH",
         package_weight_kg:
-          form.package_weight_kg.trim() === "" ? null : Number(form.package_weight_kg) || null,
+          policy.item_nature === "GOOD" && policy.inventory_policy === "TRACKED"
+            ? form.package_weight_kg.trim() === ""
+              ? null
+              : Number(form.package_weight_kg) || null
+            : null,
         shelf_location: form.shelf_location.trim() || null,
         origin_id: config.enableOrigins ? form.origin_id || null : null,
         quality_grade_id: config.enableQualityGrades ? form.quality_grade_id || null : null,
@@ -2601,7 +2640,10 @@ function ProductDialog({
         item_nature: policy.item_nature,
         inventory_policy: policy.inventory_policy,
         tracking: policy.tracking,
-        costing_method: policy.costing_method,
+        costing_method:
+          policy.inventory_policy === "TRACKED"
+            ? companyCostingMethod
+            : "NONE",
         is_sellable: policy.is_sellable,
         is_purchasable: policy.is_purchasable,
         batch_dispatch_strategy:
@@ -2701,6 +2743,141 @@ function ProductDialog({
     } finally {
       setSavingCategory(false);
     }
+  }
+
+  function openQuickAdd(kind: QuickAddKind) {
+    setQuickAddKind((current) => (current === kind ? null : kind));
+    setQuickAddNameAr("");
+    setQuickAddNameEn("");
+    setQuickAddCode("");
+    setQuickAddShortName("");
+  }
+
+  async function addCatalogOptionQuickly() {
+    const kind = quickAddKind;
+    if (!kind || savingQuickAdd) return;
+    if (!quickAddNameAr.trim() && !quickAddNameEn.trim()) {
+      toast.error(lang === "ar" ? "أدخل اسمًا للعنصر" : "Enter a name");
+      return;
+    }
+    if (kind === "unit" && !quickAddShortName.trim()) {
+      toast.error(lang === "ar" ? "أدخل اختصار الوحدة" : "Enter the unit abbreviation");
+      return;
+    }
+    if (kind === "origin" && !/^[a-z]{2}$/i.test(quickAddCode.trim())) {
+      toast.error(lang === "ar" ? "أدخل رمز بلد من حرفين" : "Enter a two-letter country code");
+      return;
+    }
+    if (kind === "quality" && !quickAddCode.trim()) {
+      toast.error(lang === "ar" ? "أدخل رمز درجة الجودة" : "Enter a quality grade code");
+      return;
+    }
+
+    const tableByKind: Record<QuickAddKind, string> = {
+      brand: "brands",
+      unit: "units",
+      origin: "countries_of_origin",
+      quality: "quality_grades",
+    };
+    const nameAr = quickAddNameAr.trim() || quickAddNameEn.trim();
+    const name = quickAddNameEn.trim() || quickAddNameAr.trim();
+    const payload: Record<string, unknown> = { name, name_ar: nameAr };
+    if (kind === "unit") payload.short_name = quickAddShortName.trim();
+    if (kind === "origin") payload.code = quickAddCode.trim().toUpperCase();
+    if (kind === "quality") {
+      payload.code = quickAddCode.trim();
+      payload.sort_order = Math.max(0, ...meta.qualities.map((item) => item.sort_order ?? 0)) + 1;
+    }
+
+    setSavingQuickAdd(true);
+    try {
+      const { data, error } = await (supabase as any)
+        .from(tableByKind[kind])
+        .insert(payload)
+        .select("*")
+        .single();
+      if (error) throw error;
+      const inserted = data as { id: string; name: string; name_ar: string | null };
+      const metaKey =
+        kind === "brand" ? "brands" : kind === "unit" ? "units" : kind === "origin" ? "origins" : "qualities";
+      dialogQc.setQueryData(productKeys.meta(), (current: typeof meta | undefined) => {
+        const next = { ...(current ?? meta) };
+        const rows = [...next[metaKey], data] as (typeof meta)[typeof metaKey];
+        rows.sort((a: any, b: any) => {
+          if (kind === "quality") return (a.sort_order ?? 0) - (b.sort_order ?? 0);
+          return String(a.name_ar || a.name).localeCompare(String(b.name_ar || b.name), "ar");
+        });
+        (next as any)[metaKey] = rows;
+        return next;
+      });
+      setForm((current) => ({
+        ...current,
+        ...(kind === "brand" ? { brand_id: inserted.id } : {}),
+        ...(kind === "unit" ? { unit_id: inserted.id } : {}),
+        ...(kind === "origin" ? { origin_id: inserted.id } : {}),
+        ...(kind === "quality" ? { quality_grade_id: inserted.id } : {}),
+      }));
+      setQuickAddKind(null);
+      toast.success(lang === "ar" ? "تمت الإضافة واختيار العنصر" : "Added and selected");
+    } catch (error) {
+      toast.error(
+        (error as { message?: string })?.message ||
+          (lang === "ar" ? "تعذرت إضافة العنصر" : "Could not add the item"),
+      );
+    } finally {
+      setSavingQuickAdd(false);
+    }
+  }
+
+  function quickAddPanel(kind: QuickAddKind) {
+    if (quickAddKind !== kind) return null;
+    return (
+      <div className="mt-2 space-y-2 rounded-2xl border border-primary/20 bg-primary/[0.035] p-3">
+        <div className="grid gap-2 sm:grid-cols-2">
+          <VortexTextInput
+            value={quickAddNameAr}
+            onChange={(event) => setQuickAddNameAr(event.target.value)}
+            dir="rtl"
+            placeholder={lang === "ar" ? "الاسم بالعربية" : "Arabic name"}
+            aria-label={lang === "ar" ? "الاسم بالعربية" : "Arabic name"}
+          />
+          <VortexTextInput
+            value={quickAddNameEn}
+            onChange={(event) => setQuickAddNameEn(event.target.value)}
+            dir="ltr"
+            placeholder={lang === "ar" ? "الاسم بالإنجليزية (اختياري)" : "English name (optional)"}
+            aria-label={lang === "ar" ? "الاسم بالإنجليزية" : "English name"}
+          />
+          {kind === "unit" && (
+            <VortexTextInput
+              value={quickAddShortName}
+              onChange={(event) => setQuickAddShortName(event.target.value)}
+              dir="auto"
+              placeholder={lang === "ar" ? "اختصار الوحدة، مثل كجم" : "Unit abbreviation, e.g. kg"}
+              aria-label={lang === "ar" ? "اختصار الوحدة" : "Unit abbreviation"}
+            />
+          )}
+          {(kind === "origin" || kind === "quality") && (
+            <VortexTextInput
+              value={quickAddCode}
+              onChange={(event) => setQuickAddCode(event.target.value)}
+              dir="ltr"
+              placeholder={kind === "origin" ? "رمز البلد (YE)" : "رمز الجودة"}
+              aria-label={kind === "origin" ? "رمز البلد" : "رمز الجودة"}
+              maxLength={kind === "origin" ? 2 : undefined}
+            />
+          )}
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="ghost" size="sm" onClick={() => setQuickAddKind(null)}>
+            {t("common.cancel")}
+          </Button>
+          <Button type="button" size="sm" loading={savingQuickAdd} onClick={() => void addCatalogOptionQuickly()}>
+            {lang === "ar" ? "إضافة واختيار" : "Add and select"}
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -2807,7 +2984,14 @@ function ProductDialog({
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {showForm("role") && (
-              <FormField label={lang === "ar" ? "دور الصنف" : "Item role"}>
+              <FormField
+                label={lang === "ar" ? "تصنيف الصنف" : "Item classification"}
+                hint={
+                  lang === "ar"
+                    ? "للعرض والتقارير؛ لا يحدد وحده صلاحية البيع أو الشراء أو سياسة المخزون."
+                    : "For display and reporting. This alone does not control selling, purchasing, or stock policy."
+                }
+              >
                 {(p) => (
                   <select
                     id={p.id}
@@ -2921,22 +3105,38 @@ function ProductDialog({
             {config.enableUnits && showForm("unit") && (
               <FormField label={t("products.unit")}>
                 {(p) => (
-                  <select
-                    id={p.id}
-                    aria-describedby={p["aria-describedby"]}
-                    value={form.unit_id}
-                    onChange={(e) => setForm({ ...form, unit_id: e.target.value })}
-                    className={cn(fieldSurfaceClass, "h-10 px-4 text-sm font-medium")}
-                  >
-                    <option value="">
-                      {lang === "ar" ? "اختر وحدة القياس..." : "Select unit..."}
-                    </option>
-                    {meta.units.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {labelOf(u.name, u.name_ar)}
-                      </option>
-                    ))}
-                  </select>
+                  <>
+                    <div className="flex gap-2">
+                      <select
+                        id={p.id}
+                        aria-describedby={p["aria-describedby"]}
+                        value={form.unit_id}
+                        onChange={(e) => setForm({ ...form, unit_id: e.target.value })}
+                        className={cn(fieldSurfaceClass, "h-10 min-w-0 flex-1 px-4 text-sm font-medium")}
+                      >
+                        <option value="">
+                          {lang === "ar" ? "اختر وحدة القياس..." : "Select unit..."}
+                        </option>
+                        {meta.units.map((u) => (
+                          <option key={u.id} value={u.id}>
+                            {labelOf(u.name, u.name_ar)}
+                          </option>
+                        ))}
+                      </select>
+                      <IconButton
+                        type="button"
+                        size="lg"
+                        round
+                        variant="outline"
+                        tooltip
+                        ariaLabel={lang === "ar" ? "إضافة وحدة قياس" : "Add a unit"}
+                        aria-expanded={quickAddKind === "unit"}
+                        onClick={() => openQuickAdd("unit")}
+                        icon={<Plus />}
+                      />
+                    </div>
+                    {quickAddPanel("unit")}
+                  </>
                 )}
               </FormField>
             )}
@@ -3080,8 +3280,21 @@ function ProductDialog({
             title={lang === "ar" ? "المخزون والمواصفات" : "Inventory & specifications"}
           />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {showForm("minStock") && (
-              <FormField label={t("products.min")}>
+            {policy.item_nature === "GOOD" &&
+              policy.inventory_policy === "TRACKED" &&
+              showForm("minStock") && (
+              <FormField
+                label={
+                  lang === "ar"
+                    ? "حد التنبيه الأدنى لهذا المنتج في المخزون"
+                    : "This product's minimum stock alert threshold"
+                }
+                hint={
+                  lang === "ar"
+                    ? "يظهر تنبيه النقص عندما يساوي رصيد المنتج بوحدة قياسه هذا الحد أو يقل عنه. لا ينشئ هذا الحقل طلب شراء تلقائيًا."
+                    : "A low-stock alert appears when this product's on-hand quantity in its unit reaches or falls below this value. This does not create a purchase order."
+                }
+              >
                 {(p) => (
                   <NumberInput
                     {...p}
@@ -3091,14 +3304,27 @@ function ProductDialog({
                     }
                     min={0}
                     decimal={false}
-                    placeholder="1"
+                    placeholder="0"
                   />
                 )}
               </FormField>
             )}
 
-            {showForm("packageWeight") && (
-              <FormField label={lang === "ar" ? "سعة العبوة (كجم)" : "Package size (kg)"}>
+            {policy.item_nature === "GOOD" &&
+              policy.inventory_policy === "TRACKED" &&
+              showForm("packageWeight") && (
+              <FormField
+                label={
+                  lang === "ar"
+                    ? "الوزن الصافي المعتاد للعبوة (كجم)"
+                    : "Usual net package weight (kg)"
+                }
+                hint={
+                  lang === "ar"
+                    ? "اختياري لأي سلعة مخزنية لها وزن صافٍ ثابت لكل كيس أو عبوة. يفيد في شراء الأكياس وبعض عمليات الطحن. لا يغيّر وحدة الصنف ولا يعرّف تحويلًا عامًا مثل كرتون إلى حبة."
+                    : "Optional for any tracked good with a fixed net weight per bag or package. Used in bag purchases and some milling flows. It does not change the stock unit or define general conversions such as carton to piece."
+                }
+              >
                 {(p) => (
                   <NumberInput
                     {...p}
@@ -3108,7 +3334,7 @@ function ProductDialog({
                     }
                     min={0}
                     decimal
-                    placeholder={lang === "ar" ? "مثال: 50" : "e.g. 50"}
+                    placeholder={lang === "ar" ? "مثال: 25" : "e.g. 25"}
                   />
                 )}
               </FormField>
@@ -3117,22 +3343,38 @@ function ProductDialog({
             {config.enableBrands && showForm("brand") && (
               <FormField label={t("products.brand")}>
                 {(p) => (
-                  <select
-                    id={p.id}
-                    aria-describedby={p["aria-describedby"]}
-                    value={form.brand_id}
-                    onChange={(e) => setForm({ ...form, brand_id: e.target.value })}
-                    className={cn(fieldSurfaceClass, "h-10 px-4 text-sm font-medium")}
-                  >
-                    <option value="">
-                      {lang === "ar" ? "اختر العلامة التجارية..." : "Select brand..."}
-                    </option>
-                    {meta.brands.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {labelOf(b.name, b.name_ar)}
-                      </option>
-                    ))}
-                  </select>
+                  <>
+                    <div className="flex gap-2">
+                      <select
+                        id={p.id}
+                        aria-describedby={p["aria-describedby"]}
+                        value={form.brand_id}
+                        onChange={(e) => setForm({ ...form, brand_id: e.target.value })}
+                        className={cn(fieldSurfaceClass, "h-10 min-w-0 flex-1 px-4 text-sm font-medium")}
+                      >
+                        <option value="">
+                          {lang === "ar" ? "اختر العلامة التجارية..." : "Select brand..."}
+                        </option>
+                        {meta.brands.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {labelOf(b.name, b.name_ar)}
+                          </option>
+                        ))}
+                      </select>
+                      <IconButton
+                        type="button"
+                        size="lg"
+                        round
+                        variant="outline"
+                        tooltip
+                        ariaLabel={lang === "ar" ? "إضافة علامة تجارية" : "Add a brand"}
+                        aria-expanded={quickAddKind === "brand"}
+                        onClick={() => openQuickAdd("brand")}
+                        icon={<Plus />}
+                      />
+                    </div>
+                    {quickAddPanel("brand")}
+                  </>
                 )}
               </FormField>
             )}
@@ -3142,45 +3384,84 @@ function ProductDialog({
             {config.enableOrigins && (
               <FormField label={lang === "ar" ? "بلد المنشأ" : "Country of origin"}>
                 {(p) => (
-                  <select
-                    id={p.id}
-                    aria-describedby={p["aria-describedby"]}
-                    value={form.origin_id}
-                    onChange={(e) => setForm({ ...form, origin_id: e.target.value })}
-                    className={cn(fieldSurfaceClass, "h-10 px-4 text-sm font-medium")}
-                  >
-                    <option value="">
-                      {lang === "ar" ? "اختر بلد المنشأ..." : "Select origin..."}
-                    </option>
-                    {meta.origins.map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {lang === "ar" ? o.name_ar : o.name}
-                      </option>
-                    ))}
-                  </select>
+                  <>
+                    <div className="flex gap-2">
+                      <select
+                        id={p.id}
+                        aria-describedby={p["aria-describedby"]}
+                        value={form.origin_id}
+                        onChange={(e) => setForm({ ...form, origin_id: e.target.value })}
+                        className={cn(fieldSurfaceClass, "h-10 min-w-0 flex-1 px-4 text-sm font-medium")}
+                      >
+                        <option value="">
+                          {lang === "ar" ? "اختر بلد المنشأ..." : "Select origin..."}
+                        </option>
+                        {meta.origins.map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {lang === "ar" ? o.name_ar : o.name}
+                          </option>
+                        ))}
+                      </select>
+                      <IconButton
+                        type="button"
+                        size="lg"
+                        round
+                        variant="outline"
+                        tooltip
+                        ariaLabel={lang === "ar" ? "إضافة بلد منشأ" : "Add a country of origin"}
+                        aria-expanded={quickAddKind === "origin"}
+                        onClick={() => openQuickAdd("origin")}
+                        icon={<Plus />}
+                      />
+                    </div>
+                    {quickAddPanel("origin")}
+                  </>
                 )}
               </FormField>
             )}
 
             {config.enableQualityGrades && (
-              <FormField label={lang === "ar" ? "درجة الجودة" : "Quality grade"}>
+              <FormField
+                label={lang === "ar" ? "درجة الجودة" : "Quality grade"}
+                hint={
+                  lang === "ar"
+                    ? "صفة افتراضية ثابتة للصنف؛ تسجيل جودة مختلفة لكل توريد/دفعة غير متاح في مسار الشراء الحالي."
+                    : "A fixed default for the item. The current purchase flow cannot record a different grade per receipt or batch."
+                }
+              >
                 {(p) => (
-                  <select
-                    id={p.id}
-                    aria-describedby={p["aria-describedby"]}
-                    value={form.quality_grade_id}
-                    onChange={(e) => setForm({ ...form, quality_grade_id: e.target.value })}
-                    className={cn(fieldSurfaceClass, "h-10 px-4 text-sm font-medium")}
-                  >
-                    <option value="">
-                      {lang === "ar" ? "اختر درجة الجودة..." : "Select quality grade..."}
-                    </option>
-                    {meta.qualities.map((q) => (
-                      <option key={q.id} value={q.id}>
-                        {lang === "ar" ? q.name_ar : q.name}
-                      </option>
-                    ))}
-                  </select>
+                  <>
+                    <div className="flex gap-2">
+                      <select
+                        id={p.id}
+                        aria-describedby={p["aria-describedby"]}
+                        value={form.quality_grade_id}
+                        onChange={(e) => setForm({ ...form, quality_grade_id: e.target.value })}
+                        className={cn(fieldSurfaceClass, "h-10 min-w-0 flex-1 px-4 text-sm font-medium")}
+                      >
+                        <option value="">
+                          {lang === "ar" ? "اختر درجة الجودة..." : "Select quality grade..."}
+                        </option>
+                        {meta.qualities.map((q) => (
+                          <option key={q.id} value={q.id}>
+                            {lang === "ar" ? q.name_ar : q.name}
+                          </option>
+                        ))}
+                      </select>
+                      <IconButton
+                        type="button"
+                        size="lg"
+                        round
+                        variant="outline"
+                        tooltip
+                        ariaLabel={lang === "ar" ? "إضافة درجة جودة" : "Add a quality grade"}
+                        aria-expanded={quickAddKind === "quality"}
+                        onClick={() => openQuickAdd("quality")}
+                        icon={<Plus />}
+                      />
+                    </div>
+                    {quickAddPanel("quality")}
+                  </>
                 )}
               </FormField>
             )}
@@ -3202,15 +3483,15 @@ function ProductDialog({
           >
             {policy.item_nature === "SERVICE"
               ? lang === "ar"
-                ? "خدمة: تظهر في الفواتير المناسبة ولا تنشئ رصيدًا أو تكلفة مخزنية."
+                ? "خدمة أو عمل: تظهر كسطر خدمة ولا تُسجّل لها كمية مستودع أو قيمة مخزون."
                 : "Service: available on relevant invoices without stock balance or stock valuation."
               : policy.inventory_policy === "UNTRACKED"
                 ? lang === "ar"
-                  ? "صنف مادي بلا رصيد مخزني: يظهر في الفواتير ولا يزيد أو ينقص رصيد المستودع."
-                  : "Physical item without a stock balance: it appears on invoices but does not change warehouse quantities."
+                  ? "سلعة فعلية تُعد للبيع أو الشراء أو كليهما، لكن بلا حفظ كمية بالمستودع أو تقييمها كرصيد مخزني؛ هذا الخيار لا يحولها إلى خدمة."
+                  : "A physical good configured for purchase, sale, or both without a warehouse quantity or inventory valuation; it remains a good, not a service."
                 : lang === "ar"
-                  ? "سلعة مخزنية: حركات الفواتير تحدّث الرصيد والتكلفة تلقائيًا."
-                  : "Stocked good: invoices update its stock balance and cost automatically."}
+                  ? "سلعة ضمن مخزون المنشأة: يزيد رصيدها عند الاستلام وينقص عند الصرف أو البيع، ويسجل النظام كميتها وقيمتها."
+                  : "Company stock: receipts increase on-hand quantity and issues or sales decrease it; the system records its quantity and value."}
           </p>
           <div className="space-y-4">
             <SettingsChoice
@@ -3283,14 +3564,6 @@ function ProductDialog({
               />
             )}
 
-            {policy.item_nature === "GOOD" && (
-              <p className="-mt-2 text-[11px] leading-relaxed text-muted-foreground">
-                {lang === "ar"
-                  ? "أصناف الأمانات المملوكة للعملاء تُنشأ وتُدار من شاشة منتجات أمانات المطحنة."
-                  : "Customer-owned custody items are created and managed from the Milling Custody Products screen."}
-              </p>
-            )}
-
             {policy.item_nature === "GOOD" && policy.inventory_policy === "TRACKED" && (
               <>
                 <SettingsChoice
@@ -3317,49 +3590,39 @@ function ProductDialog({
                 />
                 <p className="-mt-2 text-[11px] leading-relaxed text-muted-foreground">
                   {lang === "ar"
-                    ? "الدفعات تُسجّل عند الشراء وتُخصم عند البيع. تتبع الأرقام التسلسلية غير مدعوم حالياً."
-                    : "Batches are recorded on purchases and deducted on sales. Serial-number tracking is not currently supported."}
+                    ? "عند اختيار تتبّع الدفعات، يسجل الشراء رقم الدفعة وتاريخ الانتهاء إن توفر؛ ويُخصّص البيع من الدفعات وفق ترتيب الصنف أو الاختيار اليدوي. هذا مستقل عن تقييم تكلفة المخزون."
+                    : "With batch tracking enabled, purchases record a batch number and expiry date when available; sales allocate batches by the item's dispatch rule or manual selection. This is separate from inventory cost valuation."}
                 </p>
               </>
             )}
 
             {policy.item_nature === "GOOD" && policy.inventory_policy === "TRACKED" && (
-              <>
-                <SettingsChoice
-                  label={lang === "ar" ? "طريقة تقييم المخزون" : "Stock valuation method"}
-                  value={policy.costing_method}
-                  options={[
-                    {
-                      value: "MOVING_AVERAGE",
-                      label: COSTING_METHOD_LABELS.MOVING_AVERAGE[lang === "ar" ? "ar" : "en"],
-                    },
-                    {
-                      value: "FIFO",
-                      label:
-                        lang === "ar"
-                          ? "FIFO — غير متاح كتقييم تكلفة حالياً"
-                          : "FIFO — unavailable as a costing method",
-                      disabled: true,
-                    },
-                    {
-                      value: "STANDARD",
-                      label: lang === "ar" ? "قياسي — إعداد مركزي" : "Standard — company setting",
-                      disabled: true,
-                    },
-                  ]}
-                  onChange={(value) =>
-                    setPolicy((current) => ({
-                      ...current,
-                      costing_method: value as CostingMethod,
-                    }))
-                  }
-                />
-                <p className="-mt-2 text-[11px] leading-relaxed text-muted-foreground">
+              <div className="space-y-2 rounded-2xl border border-border/70 bg-surface/60 p-3">
+                <div className="flex items-center justify-between gap-3 text-xs">
+                  <span className="font-medium text-muted-foreground">
+                    {lang === "ar" ? "تقييم المخزون المركزي" : "Central stock valuation"}
+                  </span>
+                  <span className="font-semibold text-foreground">
+                    {COSTING_METHOD_LABELS[companyCostingMethod]?.[lang === "ar" ? "ar" : "en"] ??
+                      companyCostingMethod}
+                  </span>
+                </div>
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
                   {lang === "ar"
-                    ? "المتوسط المتحرك هو تقييم التكلفة المستخدم حالياً. إعداد FIFO في صفحة الدفعات يحدد ترتيب صرف الدفعات للأصناف التي فعّلت تتبعها، ولا يغيّر طريقة تقييم التكلفة."
-                    : "Moving average is the active costing method. FIFO in batch settings controls batch dispatch for items with batch tracking; it does not change stock valuation."}
+                    ? "تُحدد طريقة التقييم على مستوى المنشأة وتطبق على الأصناف المخزنية؛ FIFO في إعداد الدفعات يعني ترتيب الصرف فقط ولا يغير تكلفة المخزون."
+                    : "Valuation is controlled centrally for the company and applies to tracked items. FIFO in batch settings controls lot dispatch only; it does not change inventory cost."}
                 </p>
-              </>
+                {companyCostingMethod !== "MOVING_AVERAGE" && (
+                  <p
+                    role="alert"
+                    className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-2 text-[11px] leading-relaxed text-amber-700 dark:text-amber-300"
+                  >
+                    {lang === "ar"
+                      ? "إعداد المنشأة الحالي غير مكتمل في محرك التكلفة. استخدم المتوسط المرجح المتحرك من إعدادات المخزون حتى يكتمل دعم الطريقة المحفوظة."
+                      : "The saved company method is incomplete in the cost engine. Switch to moving weighted average in Stock Settings until this method is fully supported."}
+                  </p>
+                )}
+              </div>
             )}
 
             {policy.item_nature === "GOOD" &&

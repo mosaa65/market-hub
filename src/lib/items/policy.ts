@@ -232,7 +232,9 @@ export function validateItemPolicy(policy: ItemPolicy): PolicyValidationResult {
   }
 
   if (policy.item_nature === "GOOD" && policy.inventory_policy === "UNTRACKED") {
-    warnings.push("هذا صنف مادي غير متتبع: سيظهر في الفواتير لكن لن يُدار له رصيد أو تقييم مخزني.");
+    warnings.push(
+      "هذه سلعة فعلية، لكن النظام لن يحفظ لها كمية بالمستودع أو يقيّمها كرصيد مخزني. استخدم هذا الخيار فقط إذا كنت لا تريد تتبع كميتها.",
+    );
   }
 
   return { valid: errors.length === 0, errors, warnings };
@@ -246,21 +248,21 @@ export const ITEM_NATURE_LABELS: Record<ItemNature, { ar: string; en: string }> 
 };
 
 export const INVENTORY_POLICY_LABELS: Record<InventoryPolicy, { ar: string; en: string }> = {
-  TRACKED: { ar: "يُدار ضمن مخزون الشركة", en: "Managed in company stock" },
-  UNTRACKED: { ar: "لا يُدار له رصيد مخزني", en: "No stock balance managed" },
-  CUSTOMER_OWNED: { ar: "أمانة مملوكة للعميل", en: "Customer-owned custody" },
+  TRACKED: { ar: "تتبّع رصيد مخزون الشركة", en: "Track company stock" },
+  UNTRACKED: { ar: "سلعة بلا تتبّع للرصيد", en: "Physical good without stock tracking" },
+  CUSTOMER_OWNED: { ar: "مخزون أمانة (ملكية العميل)", en: "Customer-owned custody stock" },
 };
 
 export const TRACKING_LABELS: Record<ItemTracking, { ar: string; en: string }> = {
-  NONE: { ar: "بدون دفعات أو أرقام تسلسلية", en: "No batch or serial tracking" },
+  NONE: { ar: "بدون تتبّع دفعات أو أرقام تسلسلية", en: "No batch or serial tracking" },
   BATCH: { ar: "دفعات", en: "Batch" },
   SERIAL: { ar: "أرقام تسلسلية", en: "Serial" },
 };
 
 export const COSTING_METHOD_LABELS: Record<CostingMethod, { ar: string; en: string }> = {
-  MOVING_AVERAGE: { ar: "المتوسط المتحرك", en: "Moving average" },
-  FIFO: { ar: "الوارد أولًا صادر أولًا (FIFO)", en: "FIFO" },
-  STANDARD: { ar: "التكلفة القياسية", en: "Standard cost" },
+  MOVING_AVERAGE: { ar: "المتوسط المرجح المتحرك", en: "Moving weighted average" },
+  FIFO: { ar: "الوارد أولًا، صادر أولًا (FIFO)", en: "First in, first out (FIFO)" },
+  STANDARD: { ar: "التكلفة المعيارية", en: "Standard cost" },
   NONE: { ar: "بدون تقييم", en: "None" },
 };
 
@@ -276,29 +278,28 @@ export const LINE_TYPE_LABELS: Record<InvoiceLineType, { ar: string; en: string 
 export function describeItemPolicy(policy: ItemPolicy, lang: string): string {
   const ar = lang === "ar";
   const effective = policy;
-  const effect = itemStockEffect(effective, "out");
 
   if (effective.item_nature === "SERVICE") {
     return ar
-      ? "خدمة: تظهر كسطر خدمة في الفاتورة، ولا يوجد لها رصيد أو تقييم مخزني."
+      ? "خدمة أو عمل: تظهر كسطر خدمة في الفاتورة، ولا تُسجّل لها كمية مستودع أو قيمة مخزون."
       : "Service: appears as a service line, with no stock balance or valuation.";
   }
 
   if (effective.inventory_policy === "TRACKED") {
     return ar
-      ? `سلعة متتبعة: تُخصم من المخزون عند البيع (${effect})، وتُقيَّم حسب طريقة التكلفة المختارة.`
-      : `Tracked good: deducted from stock on sale (${effect}) and valued by the chosen costing method.`;
+      ? "سلعة ضمن مخزون المنشأة: يزيد رصيدها عند الاستلام وينقص عند الصرف أو البيع، ويسجل النظام كميتها وقيمتها وفق طريقة التقييم المركزية."
+      : "Company stock: receipts increase on-hand quantity and issues or sales decrease it; inventory value follows the company's central valuation method.";
   }
 
   if (effective.inventory_policy === "CUSTOMER_OWNED") {
     return ar
-      ? "مادة مملوكة للعميل: تُحفظ في موقعنا لكنها لا تدخل في قيمة مخزون الشركة."
+      ? "مادة موجودة بعهدة المنشأة لكنها مملوكة للعميل؛ لا تُعامل كشراء أو بيع ولا تدخل في قيمة مخزون الشركة."
       : "Customer-owned material: held at our location but excluded from company stock valuation.";
   }
 
   return ar
-    ? "سلعة مادية غير متتبعة: تظهر في الفواتير بدون إدارة رصيد مخزني."
-    : "Untracked physical good: appears on invoices with no stock balance managed.";
+    ? "سلعة فعلية يمكن إعدادها للبيع أو الشراء أو كليهما، لكن النظام لا يحفظ لها كمية بالمستودع ولا يقيّمها كرصيد مخزني. هذا الخيار لا يحولها إلى خدمة."
+    : "A physical good configured for purchase, sale, or both, without a warehouse quantity or inventory valuation. It remains a good, not a service.";
 }
 
 /* --------------------------------------------------- guided wizard helpers */

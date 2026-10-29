@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Market-Hub ERP — Sales invoice, two selling modes on one screen.
  *
  * WHY THIS SCREEN EXISTS SEPARATELY FROM THE POS
@@ -30,7 +30,7 @@
  */
 import { ModuleGuard } from "@/lib/modules";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ShoppingBag,
   Wrench,
@@ -42,6 +42,8 @@ import {
   Search,
   X,
   Receipt,
+  FileText,
+  ArrowUpDown,
   Warehouse as WarehouseIcon,
   User,
   Printer,
@@ -72,7 +74,12 @@ import {
   type ServiceLineInput,
 } from "@/lib/sales-invoice";
 import { MILLING_BAG_SIZES } from "@/components/milling/milling-terms-fields";
-import { PaymentPanel, usePaymentPanel } from "@/components/payments/payment-panel";
+import { usePaymentPanel } from "@/components/payments/payment-panel";
+import { InvoiceProductFinder } from "@/components/sales/invoice-product-finder";
+import { InvoiceLinesGrid } from "@/components/sales/invoice-lines-grid";
+import { InvoiceSummaryPanel } from "@/components/sales/invoice-summary-panel";
+import { newLineKey, type PosCartLine } from "@/components/sales/invoice-pos-types";
+import { useCompanyCurrency } from "@/hooks/use-company-currency";
 import { useFormNavigationScope } from "@/hooks/use-form-navigation";
 import { DynamicPaymentSelector } from "@/components/ui/payment-method/dynamic-payment-selector";
 import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
@@ -91,65 +98,6 @@ export const Route = createFileRoute("/_app/sales-invoice")({
   ),
 });
 
-type Mode = "pos" | "ticket";
-
-const MILLING_TYPES = [
-  { value: "FLOUR_GRADE_1", ar: "دقيق نمرة 1 (فاخر)", en: "Flour grade 1" },
-  { value: "FLOUR_GRADE_2", ar: "دقيق نمرة 2 (بر)", en: "Flour grade 2" },
-  { value: "SEMOLINA", ar: "سمولينا", en: "Semolina" },
-  { value: "BRAN", ar: "نخالة (ردة)", en: "Bran" },
-] as const;
-
-const FEE_BASES = [
-  { value: "PER_BAG", ar: "لكل شوال", en: "Per sack" },
-  { value: "PER_TON", ar: "لكل طن", en: "Per ton" },
-  { value: "LUMP_SUM", ar: "مبلغ مقطوع", en: "Lump sum" },
-] as const;
-
-const BAG_SIZES = [50, 40, 25, 10] as const;
-
-/** Free-form ticket terms. Kept as strings so the operator can type freely. */
-interface TicketForm {
-  customerName: string;
-  customerId: string;
-  customerPhone: string;
-  grainType: string;
-  grade: string;
-  millingType: string;
-  bagCount: string;
-  bagSizeKg: string;
-  bagSource: "CUSTOMER" | "MILL";
-  bagType: string;
-  bagCondition: string;
-  feeBasis: string;
-  feePerBag: string;
-  feePerTon: string;
-  lumpSum: string;
-  expectedExtraction: string;
-  allowedLoss: string;
-  note: string;
-}
-
-const EMPTY_TICKET: TicketForm = {
-  customerName: "",
-  customerId: "",
-  customerPhone: "",
-  grainType: "",
-  grade: "",
-  millingType: "FLOUR_GRADE_1",
-  bagCount: "",
-  bagSizeKg: "50",
-  bagSource: "CUSTOMER",
-  bagType: "",
-  bagCondition: "سليم",
-  feeBasis: "PER_BAG",
-  feePerBag: "",
-  feePerTon: "",
-  lumpSum: "",
-  expectedExtraction: "",
-  allowedLoss: "",
-  note: "",
-};
 interface Warehouse {
   id: string;
   name: string;
@@ -164,14 +112,6 @@ interface Customer {
   credit_limit?: number;
   /** P1-6: the seeded cash customer, which must never carry debt. */
   is_system?: boolean | null;
-}
-
-interface PosCartLine {
-  product: SellableProduct;
-  quantity: string;
-  unitPrice: string;
-  /** The sale specification chosen for this line, printed under it. */
-  spec?: ProductSpec;
 }
 
 /**
@@ -193,6 +133,14 @@ export interface ProductSpec {
   bagType: string;
   bagSizeKg: string;
 }
+
+/** أنماط الطحن التي قد يحملها بند بيع (وصفية فقط، لا تفصل مخزونًا). */
+const MILLING_TYPES = [
+  { value: "FLOUR_GRADE_1", ar: "دقيق نمرة 1 (فاخر)", en: "Flour grade 1" },
+  { value: "FLOUR_GRADE_2", ar: "دقيق نمرة 2 (بر)", en: "Flour grade 2" },
+  { value: "SEMOLINA", ar: "سمولينا", en: "Semolina" },
+  { value: "BRAN", ar: "نخالة (ردة)", en: "Bran" },
+] as const;
 
 const SPEC_MILLING_TYPES = [
   { value: "", ar: "بدون طحن (صنف جاهز)", en: "No milling (ready item)" },
@@ -224,8 +172,6 @@ function SalesInvoicePage() {
   const isRtl = lang === "ar";
   const hasMultiWarehouse = isModuleEnabled("multi_warehouse");
 
-  // وضع تذكرة الطحن لم يعد متاحاً من الفواتير العامة؛ كاونتر المطحنة هو مصدره الوحيد.
-  const [mode] = useState<Mode>("pos");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
@@ -263,19 +209,16 @@ function SalesInvoicePage() {
     { method: string; amount: number; payment_method_id: string; reference?: string }[]
   >([]);
 
-  // Keyboard-only operation: arrows/Enter walk the payment block in order
-  // (customer → warehouse → method → reference → paid → discount → note),
-  // so a counter never needs a mouse. See src/lib/keyboard/form-navigation.ts.
-  const paymentScopeRef = useFormNavigationScope<HTMLDivElement>();
   const [discount, setDiscount] = useState("");
   const [note, setNote] = useState("");
 
-  // POS mode
+  // Document lines
   const [cart, setCart] = useState<PosCartLine[]>([]);
-  const [search, setSearch] = useState("");
-
-  // Ticket mode
-  const [ticket, setTicket] = useState<TicketForm>(EMPTY_TICKET);
+  const finderRef = useRef<HTMLDivElement | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const { currencySymbol } = useCompanyCurrency();
+  /** آخر نسخة من `submit`، حتى يصل إليها اختصار Ctrl+Enter دون إعادة تسجيل. */
+  const submitRef = useRef<(() => Promise<void> | Promise<unknown>) | null>(null);
 
   const [lastInvoice, setLastInvoice] = useState<{
     id: string;
@@ -285,9 +228,6 @@ function SalesInvoicePage() {
   } | null>(null);
   const [successModalOpen, setSuccessModalOpen] = useState(false);
   const [luxuryPreviewOpen, setLuxuryPreviewOpen] = useState(false);
-
-  const setT = <K extends keyof TicketForm>(key: K, value: TicketForm[K]) =>
-    setTicket((current) => ({ ...current, [key]: value }));
 
   /* ------------------------------------------------------------ loading */
 
@@ -346,37 +286,25 @@ function SalesInvoicePage() {
 
   /* --------------------------------------------------------------- POS */
 
-  const filteredProducts = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return products;
-    return products.filter(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        (p.sku ?? "").toLowerCase().includes(q) ||
-        (p.barcode ?? "").toLowerCase().includes(q),
-    );
-  }, [products, search]);
-
-  function addProduct(product: SellableProduct) {
-    setCart((current) => {
-      const existing = current.find((l) => l.product.id === product.id && !l.spec);
-      if (existing) {
-        return current.map((l) =>
-          l.product.id === product.id && !l.spec
-            ? { ...l, quantity: String(Number(l.quantity || 0) + 1) }
-            : l,
-        );
-      }
-      return [
-        ...current,
-        {
-          product,
-          quantity: "1",
-          unitPrice: String(product.sale_price ?? 0),
-        },
-      ];
-    });
-  }
+  /**
+   * Picking an item appends a document line — it never bumps a quantity.
+   *
+   * A formal invoice is a list of what was delivered; a repeat item is a repeat
+   * line the operator can price or describe separately. Silently merging would
+   * hide a line from the printed document and make the two entries impossible
+   * to tell apart. The same product sold twice stays two lines.
+   */
+  const addProduct = useCallback((product: SellableProduct) => {
+    setCart((current) => [
+      ...current,
+      {
+        key: newLineKey(),
+        product,
+        quantity: "1",
+        unitPrice: String(product.sale_price ?? 0),
+      },
+    ]);
+  }, []);
 
   /**
    * Lines are identified by position, not by product id. Once a product can
@@ -387,76 +315,58 @@ function SalesInvoicePage() {
     setCart((current) => current.filter((_, i) => i !== index));
   }
 
+  function updateLine(index: number, patch: Partial<PosCartLine>) {
+    setCart((current) => current.map((l, i) => (i === index ? { ...l, ...patch } : l)));
+  }
+
+  /** Alt+↑/↓ — the order of lines is the order printed on the document. */
+  function moveLine(index: number, direction: -1 | 1) {
+    setCart((current) => {
+      const target = index + direction;
+      if (target < 0 || target >= current.length) return current;
+      const next = [...current];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  }
+
   function updateSpec(index: number, spec: ProductSpec) {
     setCart((current) => current.map((l, i) => (i === index ? { ...l, spec } : l)));
   }
 
-  /* ------------------------------------------------------------ ticket */
+  /** يضع المؤشر في حقل البحث — أول ما يفعله المستخدم، وبعد كل بند. */
+  const focusFinder = useCallback(() => {
+    const input = finderRef.current?.querySelector("input");
+    input?.focus();
+    input?.select();
+  }, []);
 
-  const ticketQty = Math.max(0, Number(ticket.bagCount) || 0);
-  const ticketFeePerUnit = (() => {
-    switch (ticket.feeBasis) {
-      case "PER_TON":
-        return Number(ticket.feePerTon) || 0;
-      case "LUMP_SUM":
-        return Number(ticket.lumpSum) || 0;
-      default:
-        return Number(ticket.feePerBag) || 0;
-    }
-  })();
-
-  // The fee the customer reads at the scale, before they leave the truck.
-  const ticketFee =
-    ticket.feeBasis === "PER_TON"
-      ? Math.round(
-          ((ticketQty * (Number(ticket.bagSizeKg) || 0)) / 1000) * ticketFeePerUnit * 100,
-        ) / 100
-      : ticket.feeBasis === "LUMP_SUM"
-        ? ticketFeePerUnit
-        : Math.round(ticketQty * ticketFeePerUnit * 100) / 100;
-
-  const ticketDetail = useMemo(() => {
-    const parts: string[] = [];
-    if (ticket.grainType.trim()) parts.push(ticket.grainType.trim());
-    if (ticket.grade.trim()) parts.push(`${isRtl ? "درجة" : "grade"}: ${ticket.grade.trim()}`);
-    const milling = MILLING_TYPES.find((m) => m.value === ticket.millingType);
-    if (milling) parts.push(isRtl ? milling.ar : milling.en);
-    if (ticketQty > 0) {
-      parts.push(
-        `${toSystemDigits(String(ticketQty))} × ${toSystemDigits(ticket.bagSizeKg)} ${isRtl ? "كجم" : "kg"}`,
-      );
-    }
-    parts.push(
-      ticket.bagSource === "MILL"
-        ? isRtl
-          ? "أكياس المطحنة"
-          : "mill bags"
-        : isRtl
-          ? "أكياس العميل"
-          : "customer bags",
-    );
-    if (ticket.bagType.trim()) parts.push(ticket.bagType.trim());
-    if (ticket.bagCondition.trim()) parts.push(ticket.bagCondition.trim());
-    const basis = FEE_BASES.find((b) => b.value === ticket.feeBasis);
-    if (basis) parts.push(isRtl ? basis.ar : basis.en);
-    if (ticket.expectedExtraction.trim())
-      parts.push(`${isRtl ? "استخلاص" : "extraction"}: ${ticket.expectedExtraction.trim()}%`);
-    if (ticket.allowedLoss.trim())
-      parts.push(`${isRtl ? "فاقد مسموح" : "allowed loss"}: ${ticket.allowedLoss.trim()}%`);
-    return parts.join(" • ");
-  }, [ticket, ticketQty, isRtl]);
-
-  const ticketLineName = (() => {
-    const milling = MILLING_TYPES.find((m) => m.value === ticket.millingType);
-    const label = milling ? (isRtl ? milling.ar : milling.en) : isRtl ? "طحن" : "Milling";
-    return isRtl ? `أجرة طحن — ${label}` : `Milling fee — ${label}`;
-  })();
+  /**
+   * اختصارات المستند — تُسجّل على الشاشة فقط، فلا تتعارض مع الكاشير.
+   *   F2          حقل البحث عن صنف
+   *   Ctrl+Enter  إصدار الفاتورة
+   */
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === "F2") {
+        event.preventDefault();
+        focusFinder();
+        return;
+      }
+      if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+        event.preventDefault();
+        void submitRef.current?.();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [focusFinder]);
 
   /* ------------------------------------------------------------- totals */
 
-  const lines: InvoiceLine[] = useMemo(() => {
-    if (mode === "pos") {
-      return cart.map((l) => ({
+  const lines: InvoiceLine[] = useMemo(
+    () =>
+      cart.map((l) => ({
         kind: "catalog" as const,
         product_id: l.product.id,
         // The specification rides on the line name so it is visible on the
@@ -468,20 +378,9 @@ function SalesInvoicePage() {
         unit_price: Number(l.unitPrice) || 0,
         tax_rate: Number(l.product.tax_rate) || 0,
         unit_label: null,
-      }));
-    }
-    if (ticketFee <= 0 || ticketQty <= 0) return [];
-    return [
-      {
-        kind: "service" as const,
-        name: ticketLineName,
-        quantity: ticketQty,
-        unit_price: ticketFee / ticketQty,
-        tax_rate: 0,
-        detail: ticketDetail,
-      } satisfies ServiceLineInput,
-    ];
-  }, [mode, cart, ticketFee, ticketQty, ticketDetail, ticketLineName, isRtl]);
+      })),
+    [cart, isRtl],
+  );
 
   const subtotal = useMemo(
     () => Math.round(lines.reduce((s, l) => s + lineTotal(l), 0) * 100) / 100,
@@ -491,14 +390,12 @@ function SalesInvoicePage() {
   const total = Math.max(0, Math.round((subtotal - discountN) * 100) / 100);
 
   /**
-   * The party the invoice is booked to.
-   *
-   * POS mode books to the selected party and defaults that to the seeded system
-   * cash customer; ticket mode books to the registered customer on the ticket.
-   * `partyId` is what the submit path sends as `customer_id` and what the shared
-   * payment rules evaluate (so the cash customer is blocked from carrying debt).
+   * The party the invoice is booked to — the selected party, defaulting to the
+   * seeded system cash customer. It is what the submit path sends as
+   * `customer_id` and what the shared payment rules evaluate (so the cash
+   * customer is blocked from carrying debt).
    */
-  const partyId = mode === "ticket" ? ticket.customerId : customerId;
+  const partyId = customerId;
   const selectedCustomer = customers.find((c) => c.id === partyId) || null;
   const isCashParty = Boolean(selectedCustomer?.is_system);
 
@@ -519,22 +416,7 @@ function SalesInvoicePage() {
       return toast.error(isRtl ? "يرجى اختيار المستودع أولاً" : "Select a warehouse first");
     }
     if (lines.length === 0) {
-      return toast.error(
-        mode === "pos"
-          ? isRtl
-            ? "أضف صنفاً واحداً على الأقل"
-            : "Add at least one item"
-          : isRtl
-            ? "أدخل الكمية والأجرة قبل الإصدار"
-            : "Enter the quantity and fee before posting",
-      );
-    }
-    if (mode === "ticket" && !ticket.customerId) {
-      return toast.error(
-        isRtl
-          ? "تذكرة الطحن تتطلب عميلاً مسجلاً"
-          : "A milling ticket requires a registered customer",
-      );
+      return toast.error(isRtl ? "أضف بندًا واحدًا على الأقل" : "Add at least one line item");
     }
     if (remaining > 0 && !partyId) {
       return toast.error(
@@ -572,11 +454,11 @@ function SalesInvoicePage() {
         paid: effectivePaid,
         discount: discountN,
         paymentSplits: paymentSplits.length > 1 ? paymentSplits : null,
-        // On a ticket the negotiated terms belong on the document, not only on
-        // the line, so the receipt the customer keeps can be re-read later.
+        // The settlement trail (split allocation, transfer reference) belongs on
+        // the document, not only in a screen state, so the receipt the customer
+        // keeps can be re-read later.
         note:
           [
-            mode === "ticket" ? ticketDetail : "",
             paymentSplits.length > 1
               ? `[${isRtl ? "الدفع بأكثر من طريقة" : "Split"}: ${paymentSplits
                   .map(
@@ -610,8 +492,7 @@ function SalesInvoicePage() {
 
       // The name on the document is the party actually booked on the invoice —
       // never a second, made-up "عميل نقدي" when the real cash row exists.
-      const customerName =
-        selectedCustomer?.name || ticket.customerName.trim() || (isRtl ? "عميل نقدي" : "Walk-in");
+      const customerName = selectedCustomer?.name || (isRtl ? "عميل نقدي" : "Walk-in");
       const warehouse = warehouses.find((w) => w.id === warehouseId);
 
       const resolvedPaymentLabel =
@@ -626,14 +507,7 @@ function SalesInvoicePage() {
               : pmLabel(paymentMethod, isRtl);
 
       const doc: InvoiceDoc = {
-        title:
-          mode === "ticket"
-            ? isRtl
-              ? "فاتورة أجرة طحن"
-              : "Milling Fee Invoice"
-            : isRtl
-              ? "فاتورة مبيعات"
-              : "Sales Invoice",
+        title: isRtl ? "فاتورة مبيعات" : "Sales Invoice",
         number: result.invoiceNumber ?? "",
         date: new Date().toISOString(),
         partyLabel: isRtl ? "العميل" : "Bill To",
@@ -681,11 +555,6 @@ function SalesInvoicePage() {
       // Reset the form but keep the warehouse and the mode, so a counter that
       // serves several customers in a row does not re-select them each time.
       setCart([]);
-      setTicket((current) => ({
-        ...EMPTY_TICKET,
-        bagSizeKg: current.bagSizeKg,
-        millingType: current.millingType,
-      }));
       setPaid("");
       setPaymentSplits([]);
       if (paymentSplits.length > 1) {
@@ -695,7 +564,9 @@ function SalesInvoicePage() {
       setDiscount("");
       setNote("");
       setPaymentReference("");
-      setSearch("");
+      // The party stays selected so a counter can serve the next sale at once,
+      // and the cursor returns to the item search for the next document.
+      focusFinder();
     } catch (err: any) {
       toast.error(
         translateRpcError(
@@ -708,6 +579,7 @@ function SalesInvoicePage() {
       setSubmitting(false);
     }
   }
+  submitRef.current = submit;
 
   function printLast(template: InvoiceTemplate) {
     if (!lastInvoice) return;
@@ -814,774 +686,165 @@ function SalesInvoicePage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_400px]">
-        {/* ------------------------------------------------------ left pane */}
-        <div className="order-2 space-y-4 lg:order-1">
-          {loading ? (
-            <div className="panel-elevated flex min-h-[240px] items-center justify-center gap-3 text-muted-foreground">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              <span className="text-sm">{isRtl ? "جارٍ التحميل..." : "Loading..."}</span>
-            </div>
-          ) : mode === "pos" ? (
-            <>
-              <div className="panel-elevated rounded-2xl border border-border/80 bg-surface/90 p-3">
-                <div className="flex items-center gap-2 rounded-full border border-input/80 bg-surface px-3.5 h-10 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
-                  <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder={isRtl ? "ابحث بالاسم أو الكود..." : "Search by name or code..."}
-                    className="w-full flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                  />
-                  {search && (
-                    <button
-                      type="button"
-                      onClick={() => setSearch("")}
-                      className="rounded-full p-1 text-muted-foreground hover:bg-surface-2"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  )}
+      {/*
+       * ════════════════════════════════════════════════════════════════════
+       *  مساحة المستند — عرضان في عمودين
+       * ════════════════════════════════════════════════════════════════════
+       *  اليمين (الأول قراءةً): البحث عن صنف ← جدول البنود.
+       *  اليسار (ثابت): الجهة ← السداد ← الإجماليات ← الإصدار.
+       *
+       *  لا شبكة منتجات: المستند يُبنى بالبحث، والخمسة الأقرب تظهر أسفل الحقل
+       *  وتُختار بالأسهم وEnter. كل الحقول داخل نطاق واحد فيعمل Tab/Enter
+       *  بترتيب منطقي من البحث إلى الإصدار.
+       */}
+      <div
+        ref={rootRef}
+        data-form-nav-scope
+        className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_380px]"
+      >
+        {/* ───────────────────────────── عمود المستند */}
+        <div className="order-2 min-w-0 space-y-4 lg:order-1">
+          <div className="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm">
+            {/* ترويسة المستند */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 bg-gradient-to-b from-muted/40 to-transparent px-4 py-3">
+              <div className="flex items-center gap-2.5">
+                <span className="grid size-9 place-items-center rounded-xl border border-border/70 bg-surface text-primary">
+                  <FileText className="size-4" />
+                </span>
+                <div>
+                  <h2 className="text-sm font-bold text-foreground">
+                    {isRtl ? "بنود المستند" : "Document lines"}
+                  </h2>
+                  <p className="text-[11px] text-muted-foreground">
+                    {hasMultiWarehouse && warehouses.length > 1 ? (
+                      <select
+                        value={warehouseId}
+                        onChange={(e) => setWarehouseId(e.target.value)}
+                        data-form-nav
+                        aria-label={t("common.warehouse")}
+                        className="mt-0.5 rounded-md border border-border/70 bg-surface px-1.5 py-0.5 text-[11px] text-foreground outline-none focus:border-primary"
+                      >
+                        {warehouses.map((w) => (
+                          <option key={w.id} value={w.id}>
+                            {isRtl ? w.name_ar || w.name : w.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      (isRtl ? "المستودع / الفرع: " : "Warehouse: ") +
+                      (warehouses.find((w) => w.id === warehouseId)
+                        ? isRtl
+                          ? warehouses.find((w) => w.id === warehouseId)?.name_ar ||
+                            warehouses.find((w) => w.id === warehouseId)?.name
+                          : warehouses.find((w) => w.id === warehouseId)?.name
+                        : "—")
+                    )}
+                  </p>
                 </div>
               </div>
-
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                {filteredProducts.length === 0 ? (
-                  <div className="col-span-full rounded-2xl border border-border/80 bg-surface p-6 text-center text-sm text-muted-foreground">
-                    {isRtl ? "لا توجد أصناف قابلة للبيع" : "No sellable products"}
-                  </div>
-                ) : (
-                  filteredProducts.map((p) => {
-                    const lowStock = p.on_hand <= 0;
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => addProduct(p)}
-                        className="group flex flex-col justify-between rounded-2xl border border-border/80 bg-surface p-3 text-start transition hover:border-primary/40 hover:shadow-sm"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <span className="line-clamp-2 text-sm font-medium text-foreground">
-                            {p.name}
-                          </span>
-                          <Plus className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary" />
-                        </div>
-                        <div className="mt-2 flex items-center justify-between text-xs">
-                          <span className="font-mono font-semibold text-foreground">
-                            {toSystemDigits(money(p.sale_price))}
-                          </span>
-                          <span
-                            className={`font-mono ${lowStock ? "text-rose-500" : "text-emerald-500"}`}
-                          >
-                            {isRtl ? "متاح: " : "On hand: "}
-                            {toSystemDigits(String(p.on_hand))}
-                          </span>
-                        </div>
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-            </>
-          ) : (
-            /* ------------------------------------------------- ticket mode */
-            <div className="panel-elevated space-y-4 rounded-2xl border border-border/80 bg-surface/90 p-4">
-              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                <Wrench className="h-4 w-4 text-violet-500" />
-                {isRtl
-                  ? "شروط الطحن — تُكتب بحرية على التذكرة"
-                  : "Milling terms — free-form on the ticket"}
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label={isRtl ? "العميل المسجّل" : "Registered customer"} required>
-                  <select
-                    value={ticket.customerId}
-                    data-form-nav
-                    onChange={(e) => {
-                      const c = customers.find((x) => x.id === e.target.value);
-                      setT("customerId", e.target.value);
-                      setT("customerName", c?.name ?? "");
-                      setT("customerPhone", c?.phone ?? "");
-                    }}
-                    className={inputClass}
-                  >
-                    <option value="">{isRtl ? "— اختر عميلاً —" : "— Select a customer —"}</option>
-                    {customers.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                        {c.phone ? ` — ${c.phone}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-
-                <Field label={isRtl ? "اسم العميل (طباعة)" : "Customer name (printed)"}>
-                  <input
-                    value={ticket.customerName}
-                    onChange={(e) => setT("customerName", e.target.value)}
-                    className={inputClass}
-                    placeholder={isRtl ? "كما سيظهر على السند" : "As it appears on the ticket"}
-                  />
-                </Field>
-
-                <Field label={isRtl ? "نوع الحبوب" : "Grain type"}>
-                  <input
-                    value={ticket.grainType}
-                    onChange={(e) => setT("grainType", e.target.value)}
-                    className={inputClass}
-                    placeholder={isRtl ? "قمح / ذرة / شعير..." : "Wheat / maize / barley..."}
-                  />
-                </Field>
-
-                <Field label={isRtl ? "الدرجة" : "Grade"}>
-                  <input
-                    value={ticket.grade}
-                    onChange={(e) => setT("grade", e.target.value)}
-                    className={inputClass}
-                    placeholder={isRtl ? "نمرة 1 / نمرة 2..." : "Grade 1 / Grade 2..."}
-                  />
-                </Field>
-
-                <Field label={isRtl ? "نوع الطحن" : "Milling type"}>
-                  <select
-                    value={ticket.millingType}
-                    onChange={(e) => setT("millingType", e.target.value)}
-                    className={inputClass}
-                  >
-                    {MILLING_TYPES.map((m) => (
-                      <option key={m.value} value={m.value}>
-                        {isRtl ? m.ar : m.en}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-
-                <Field label={isRtl ? "عدد الأكياس" : "Sack count"}>
-                  <QuantityInput
-                    decimals={0}
-                    min={0}
-                    value={ticket.bagCount === "" ? null : Number(ticket.bagCount)}
-                    onValueChange={(v) => setT("bagCount", v == null ? "" : String(v))}
-                    placeholder="0"
-                    containerClassName="[&_input]:h-10 [&_input]:rounded-xl"
-                  />
-                </Field>
-
-                <Field label={isRtl ? "سعة الكيس (كجم)" : "Bag size (kg)"}>
-                  <select
-                    value={ticket.bagSizeKg}
-                    onChange={(e) => setT("bagSizeKg", e.target.value)}
-                    className={inputClass}
-                  >
-                    {BAG_SIZES.map((s) => (
-                      <option key={s} value={String(s)}>
-                        {toSystemDigits(String(s))} {isRtl ? "كجم" : "kg"}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-
-                <Field label={isRtl ? "مصدر الأكياس" : "Bag source"}>
-                  <select
-                    value={ticket.bagSource}
-                    onChange={(e) => setT("bagSource", e.target.value as "CUSTOMER" | "MILL")}
-                    className={inputClass}
-                  >
-                    <option value="CUSTOMER">{isRtl ? "أكياس العميل" : "Customer's bags"}</option>
-                    <option value="MILL">{isRtl ? "أكياس المطحنة" : "Mill's bags"}</option>
-                  </select>
-                </Field>
-
-                <Field label={isRtl ? "نوع الكيس" : "Bag type"}>
-                  <input
-                    value={ticket.bagType}
-                    onChange={(e) => setT("bagType", e.target.value)}
-                    className={inputClass}
-                    placeholder={isRtl ? "خيش / بلاستيك..." : "Jute / plastic..."}
-                  />
-                </Field>
-
-                <Field label={isRtl ? "حالة الكيس" : "Bag condition"}>
-                  <input
-                    value={ticket.bagCondition}
-                    onChange={(e) => setT("bagCondition", e.target.value)}
-                    className={inputClass}
-                    placeholder={isRtl ? "سليم / ممزق..." : "Sound / torn..."}
-                  />
-                </Field>
-
-                <Field label={isRtl ? "أساس الأجرة" : "Fee basis"}>
-                  <select
-                    value={ticket.feeBasis}
-                    onChange={(e) => setT("feeBasis", e.target.value)}
-                    className={inputClass}
-                  >
-                    {FEE_BASES.map((b) => (
-                      <option key={b.value} value={b.value}>
-                        {isRtl ? b.ar : b.en}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-
-                {ticket.feeBasis === "PER_BAG" && (
-                  <Field label={isRtl ? "الأجرة لكل شوال" : "Fee per sack"}>
-                    <AmountInput
-                      value={ticket.feePerBag === "" ? null : Number(ticket.feePerBag)}
-                      onValueChange={(v) => setT("feePerBag", v == null ? "" : String(v))}
-                      min={0}
-                      containerClassName="[&_input]:h-10 [&_input]:rounded-xl"
-                    />
-                  </Field>
-                )}
-                {ticket.feeBasis === "PER_TON" && (
-                  <Field label={isRtl ? "الأجرة لكل طن" : "Fee per ton"}>
-                    <AmountInput
-                      value={ticket.feePerTon === "" ? null : Number(ticket.feePerTon)}
-                      onValueChange={(v) => setT("feePerTon", v == null ? "" : String(v))}
-                      min={0}
-                      containerClassName="[&_input]:h-10 [&_input]:rounded-xl"
-                    />
-                  </Field>
-                )}
-                {ticket.feeBasis === "LUMP_SUM" && (
-                  <Field label={isRtl ? "مبلغ مقطوع" : "Lump sum"}>
-                    <AmountInput
-                      value={ticket.lumpSum === "" ? null : Number(ticket.lumpSum)}
-                      onValueChange={(v) => setT("lumpSum", v == null ? "" : String(v))}
-                      min={0}
-                      containerClassName="[&_input]:h-10 [&_input]:rounded-xl"
-                    />
-                  </Field>
-                )}
-
-                <Field label={isRtl ? "الاستخلاص المتوقع %" : "Expected extraction %"}>
-                  <QuantityInput
-                    value={
-                      ticket.expectedExtraction === "" ? null : Number(ticket.expectedExtraction)
-                    }
-                    onValueChange={(v) => setT("expectedExtraction", v == null ? "" : String(v))}
-                    decimals={2}
-                    min={0}
-                    max={100}
-                    unit="%"
-                    containerClassName="[&_input]:h-10 [&_input]:rounded-xl"
-                  />
-                </Field>
-
-                <Field label={isRtl ? "الفاقد المسموح %" : "Allowed loss %"}>
-                  <QuantityInput
-                    value={ticket.allowedLoss === "" ? null : Number(ticket.allowedLoss)}
-                    onValueChange={(v) => setT("allowedLoss", v == null ? "" : String(v))}
-                    decimals={2}
-                    min={0}
-                    max={100}
-                    unit="%"
-                    containerClassName="[&_input]:h-10 [&_input]:rounded-xl"
-                  />
-                </Field>
-              </div>
-
-              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-[11px] leading-relaxed text-amber-700 dark:text-amber-300">
-                <AlertCircle className="mb-1 inline h-3.5 w-3.5" />{" "}
-                {isRtl
-                  ? "هذه بيعة خدمة: المطحنة تتقاضى أجر الطحن ولا تنقل ملكية مخزون. العميل الذي يودع حبوبه ويستلم دقيقه أمانة تُدار من مكتب المطحنة بمستنداتها."
-                  : "This is a service sale: the mill charges a grinding fee and transfers no stock ownership. Grain deposited and collected as flour is custody, handled by the milling desk with its own documents."}
-              </div>
+              <span className="rounded-full border border-border/70 bg-surface px-2.5 py-1 font-mono text-[11px] font-semibold text-muted-foreground">
+                {toSystemDigits(cart.length)} {isRtl ? "بند" : "lines"}
+              </span>
             </div>
-          )}
-        </div>
 
-        {/* ----------------------------------------------------- right pane */}
-        <div className="order-1 space-y-4 lg:order-2 lg:sticky lg:top-4">
-          {/*
-           * Party — in front, above every other field.
-           *
-           * The invoice is addressed to a party, and that party decides what the
-           * cashier may do next (cash settles in full, a named account may carry
-           * a balance). So it sits at the top of the pane, with the seeded cash
-           * customer pre-selected and shown as a distinct "default" card rather
-           * than as one more name in a dropdown.
-           */}
-          {mode === "pos" && (
-            <div className="panel-elevated space-y-2.5 rounded-2xl border border-border/80 bg-surface/90 p-4">
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-xs font-bold text-foreground">
-                  <User className="size-3.5 text-primary" />
-                  {isRtl ? "العميل / الجهة" : "Customer / party"}
-                </span>
-                {isCashParty && (
-                  <span className="rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
-                    {isRtl ? "بيع نقدي" : "Cash sale"}
-                  </span>
-                )}
+            {/* البحث + إضافة */}
+            <div className="space-y-3 p-4">
+              <div ref={finderRef}>
+                <InvoiceProductFinder
+                  products={products}
+                  isRtl={isRtl}
+                  disabled={loading}
+                  onPick={addProduct}
+                />
               </div>
 
-              {isCashParty ? (
-                <div className="flex items-center gap-2.5 rounded-xl border border-primary/30 bg-gradient-to-l from-primary/[0.08] to-transparent px-3 py-2.5">
-                  <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary/15 text-primary">
-                    <ShoppingBag className="size-4" />
+              {loading ? (
+                <div className="flex min-h-[200px] items-center justify-center gap-3 rounded-xl border border-border/70 bg-surface/50 text-muted-foreground">
+                  <Loader2 className="size-5 animate-spin text-primary" />
+                  <span className="text-sm">
+                    {isRtl ? "جارٍ تحميل الأصناف…" : "Loading items…"}
                   </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-bold text-foreground">
-                      {selectedCustomer?.name ?? (isRtl ? "عميل نقدي" : "Walk-in")}
-                    </p>
-                    <p className="truncate text-[10px] text-muted-foreground">
-                      {isRtl
-                        ? "الجهة الافتراضية للبيع الفوري — لا تحمل أرصدة آجلة"
-                        : "Default walk-in party — cannot carry a balance"}
-                    </p>
-                  </div>
                 </div>
               ) : (
-                <div className="flex items-center gap-2 rounded-xl border border-border/70 bg-surface px-3 py-2.5">
-                  <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-surface-2 text-muted-foreground">
-                    <User className="size-4" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-foreground">
-                      {selectedCustomer?.name ?? (isRtl ? "لم يُختر عميل" : "No party selected")}
-                    </p>
-                    {selectedCustomer?.phone && (
-                      <p className="truncate font-mono text-[10px] text-muted-foreground">
-                        {toSystemDigits(selectedCustomer.phone)}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-                <select
-                  value={customerId}
-                  data-form-nav
-                  onChange={(e) => setCustomerId(e.target.value)}
-                  className={inputClass}
-                  aria-label={isRtl ? "اختيار العميل" : "Select customer"}
-                >
-                  {/* The default party is the first option and is labelled as
-                      the default so it is never confused with a named account. */}
-                  {cashCustomerId && (
-                    <option value={cashCustomerId}>
-                      {(customers.find((c) => c.id === cashCustomerId)?.name ??
-                        (isRtl ? "عميل نقدي" : "Walk-in")) + (isRtl ? " — افتراضي" : " — default")}
-                    </option>
-                  )}
-                  {customers
-                    .filter((c) => c.id !== cashCustomerId)
-                    .map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                        {c.phone ? ` — ${c.phone}` : ""}
-                      </option>
-                    ))}
-                </select>
-                {cashCustomerId && customerId !== cashCustomerId && (
-                  <button
-                    type="button"
-                    onClick={() => setCustomerId(cashCustomerId)}
-                    className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-primary/30 bg-primary/5 px-3 text-xs font-semibold text-primary transition hover:bg-primary/10"
-                  >
-                    <ShoppingBag className="size-3.5" />
-                    {isRtl ? "رجوع للبيع النقدي" : "Back to cash sale"}
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
-          <div
-            ref={paymentScopeRef}
-            data-form-nav-scope
-            className="panel-elevated space-y-3 rounded-2xl border border-border/80 bg-surface/90 p-4"
-          >
-            {hasMultiWarehouse && warehouses.length > 1 && (
-              <Field label={t("common.warehouse")} icon={<WarehouseIcon className="h-3.5 w-3.5" />}>
-                <select
-                  value={warehouseId}
-                  onChange={(e) => setWarehouseId(e.target.value)}
-                  data-form-nav
-                  className={inputClass}
-                >
-                  {warehouses.map((w) => (
-                    <option key={w.id} value={w.id}>
-                      {isRtl ? w.name_ar || w.name : w.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-            )}
-
-            {mode === "pos" ? (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
-                  <span>{isRtl ? "بنود الفاتورة" : "Invoice lines"}</span>
-                  {cart.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setCart([])}
-                      className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-rose-500"
-                    >
-                      <RotateCcw className="h-3 w-3" />
-                      {isRtl ? "تفريغ" : "Clear"}
-                    </button>
-                  )}
-                </div>
-
-                {cart.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-border py-8 text-center text-xs text-muted-foreground">
-                    {isRtl ? "اضغط صنفاً لإضافته" : "Tap a product to add it"}
-                  </div>
-                ) : (
-                  cart.map((l, index) => (
-                    <div
-                      key={`${l.product.id}-${index}`}
-                      className="rounded-xl border border-border/70 bg-surface-2/40 p-2.5"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="line-clamp-2 text-xs font-medium text-foreground">
-                          {l.product.name}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => removeLine(index)}
-                          className="rounded p-0.5 text-muted-foreground hover:text-rose-500"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-
-                      {/*
-                       * The specification panel. One product, sold several
-                       * ways: the mill's flour goes out as a 10 kg bag of fine
-                       * grade and as a 50 kg sack of whole-grain without
-                       * becoming two catalogue rows. The chosen spec rides on
-                       * the sale line and prints under it.
-                       */}
-                      <div className="mt-2 rounded-lg border border-border/50 bg-surface/60 p-2">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            updateSpec(index, {
-                              grainOrGrade: l.spec?.grainOrGrade ?? "",
-                              millingType: l.spec?.millingType ?? "",
-                              bagType: l.spec?.bagType ?? "شوال",
-                              bagSizeKg: l.spec?.bagSizeKg ?? "50",
-                            })
-                          }
-                          className="flex w-full items-center justify-between text-[10px] font-semibold text-muted-foreground hover:text-foreground"
-                        >
-                          <span>
-                            {l.spec
-                              ? isRtl
-                                ? `${l.spec.grainOrGrade || "—"} • ${specLabel(l.spec, isRtl)}`
-                                : specLabel(l.spec, isRtl)
-                              : isRtl
-                                ? "خيارات البيع (حجم • نوع • كيس)"
-                                : "Sale options (size • grade • bag)"}
-                          </span>
-                          <SlidersHorizontal className="h-3 w-3" />
-                        </button>
-
-                        {l.spec && (
-                          <div className="mt-2 grid grid-cols-2 gap-1.5">
-                            <input
-                              value={l.spec.grainOrGrade}
-                              onChange={(e) =>
-                                updateSpec(index, { ...l.spec!, grainOrGrade: e.target.value })
-                              }
-                              placeholder={isRtl ? "الدرجة/النوع" : "Grade / type"}
-                              className="h-7 w-full rounded-md border border-border bg-surface px-1.5 text-[10px] outline-none focus:border-primary"
-                            />
-                            <select
-                              value={l.spec.millingType}
-                              onChange={(e) =>
-                                updateSpec(index, { ...l.spec!, millingType: e.target.value })
-                              }
-                              className="h-7 w-full rounded-md border border-border bg-surface px-1.5 text-[10px] outline-none focus:border-primary"
-                            >
-                              {SPEC_MILLING_TYPES.map((m) => (
-                                <option key={m.value} value={m.value}>
-                                  {isRtl ? m.ar : m.en}
-                                </option>
-                              ))}
-                            </select>
-                            <select
-                              value={l.spec.bagType}
-                              onChange={(e) =>
-                                updateSpec(index, { ...l.spec!, bagType: e.target.value })
-                              }
-                              className="h-7 w-full rounded-md border border-border bg-surface px-1.5 text-[10px] outline-none focus:border-primary"
-                            >
-                              {SPEC_BAG_TYPES.map((b) => (
-                                <option key={b.value} value={b.value}>
-                                  {isRtl ? b.ar : b.en}
-                                </option>
-                              ))}
-                            </select>
-                            <select
-                              value={l.spec.bagSizeKg}
-                              onChange={(e) =>
-                                updateSpec(index, { ...l.spec!, bagSizeKg: e.target.value })
-                              }
-                              className="h-7 w-full rounded-md border border-border bg-surface px-1.5 text-[10px] outline-none focus:border-primary"
-                            >
-                              {MILLING_BAG_SIZES.map((b) => (
-                                <option key={b.kg} value={String(b.kg)}>
-                                  {b.kg} {isRtl ? "كجم" : "kg"}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="mt-2 grid grid-cols-3 gap-1.5">
-                        <label className="space-y-0.5">
-                          <span className="block text-[10px] text-muted-foreground">
-                            {t("common.qty")}
-                          </span>
-                          <QuantityInput
-                            decimals={0}
-                            min={0}
-                            emptyAsZero
-                            aria-label={t("common.qty")}
-                            value={l.quantity === "" ? null : Number(l.quantity)}
-                            onValueChange={(v) =>
-                              setCart((current) =>
-                                current.map((x, i) =>
-                                  i === index ? { ...x, quantity: v == null ? "" : String(v) } : x,
-                                ),
-                              )
-                            }
-                            className="h-8 text-xs"
-                          />
-                        </label>
-                        <div className="space-y-0.5">
-                          <span className="block text-[10px] text-muted-foreground">
-                            {t("common.price")}
-                          </span>
-                          <AmountInput
-                            min={0}
-                            showInWords={false}
-                            aria-label={t("common.price")}
-                            value={l.unitPrice === "" ? null : Number(l.unitPrice)}
-                            onValueChange={(v) =>
-                              setCart((current) =>
-                                current.map((x, i) =>
-                                  i === index ? { ...x, unitPrice: v == null ? "" : String(v) } : x,
-                                ),
-                              )
-                            }
-                            className="h-8 text-xs"
-                          />
-                        </div>
-                        <div className="space-y-0.5">
-                          <span className="block text-[10px] text-muted-foreground">
-                            {t("common.total")}
-                          </span>
-                          <div className="flex h-8 items-center justify-end px-1 font-mono text-xs font-semibold">
-                            {toSystemDigits(
-                              money((Number(l.quantity) || 0) * (Number(l.unitPrice) || 0)),
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      {Number(l.quantity) > Number(l.product.on_hand) && (
-                        <div className="mt-1.5 flex items-center gap-1 text-[10px] text-amber-500">
-                          <AlertCircle className="h-3 w-3" />
-                          {isRtl
-                            ? `الكمية تتجاوز المتاح (${toSystemDigits(String(l.product.on_hand))})`
-                            : `Exceeds stock on hand (${toSystemDigits(String(l.product.on_hand))})`}
-                        </div>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            ) : (
-              <div className="space-y-2 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">{isRtl ? "الكمية" : "Quantity"}</span>
-                  <span className="font-mono">
-                    {toSystemDigits(String(ticketQty))} × {toSystemDigits(ticket.bagSizeKg)}{" "}
-                    {isRtl ? "كجم" : "kg"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">{isRtl ? "الأجرة" : "Fee"}</span>
-                  <span className="font-mono font-semibold">
-                    {toSystemDigits(money(ticketFee))}
-                  </span>
-                </div>
-                <div className="rounded-xl border border-border/70 bg-surface-2/40 p-2 text-[11px] leading-relaxed text-muted-foreground">
-                  {ticketDetail || (isRtl ? "لم تُدخل شروط بعد" : "No terms entered yet")}
-                </div>
-              </div>
-            )}
-
-            <div className="h-px bg-border" />
-
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-muted-foreground">
-                  {isRtl ? "طريقة السداد والتوجيه المالي" : "Payment method & settlement"}
-                </label>
-                {paymentMethod !== "split" && (
-                  <DynamicPaymentSelector
-                    context="sales"
-                    value={paymentMethod}
-                    onChange={(method) => {
-                      setPaymentSplits([]);
-                      setPaymentMethod(method);
-                      if (getPaymentMethodDefinition(method)?.isCreditTerm) setPaid("0");
-                    }}
-                    settlement={settlement}
-                    onSettlementChange={setSettlement}
-                    includeCredit
-                  />
-                )}
-                {paymentMethod === "split" && (
-                  <div className="flex min-h-9 items-center justify-between rounded-xl border border-primary/20 bg-primary/[0.04] px-3 text-xs font-semibold text-primary">
-                    <span>{isRtl ? "الدفع موزع على عدة طرق" : "Payment split across methods"}</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPaymentSplits([]);
-                        setPaymentMethod("cash");
-                        setSettlement((current) => ({
-                          ...current,
-                          method: "cash",
-                          paymentMethodId: "cash",
-                        }));
-                      }}
-                      className="underline underline-offset-2"
-                    >
-                      {isRtl ? "إلغاء التجزئة" : "Cancel split"}
-                    </button>
-                  </div>
-                )}
-              </div>
-              <PaymentPanel
-                context="sales"
-                total={total}
-                method={paymentMethod}
-                onMethodChange={(next) => {
-                  setPaymentMethod(next);
-                  if (next !== "split") setPaymentSplits([]);
-                }}
-                paid={paid}
-                onPaidChange={setPaid}
-                customerId={partyId}
-                customers={customers}
-                reference={paymentReference}
-                onReferenceChange={setPaymentReference}
-                onSplitChange={(splits) => setPaymentSplits(splits.length > 1 ? splits : [])}
-                showMethodPicker={false}
-                showShortcuts={false}
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <Field label={t("common.discount")}>
-                  <AmountInput
-                    value={discount === "" ? null : Number(discount)}
-                    onValueChange={(v) => setDiscount(v == null ? "" : String(v))}
-                    min={0}
-                    data-form-nav
-                    containerClassName="[&_input]:h-10 [&_input]:rounded-xl"
-                  />
-                </Field>
-                <Field label={t("common.note")}>
-                  <input
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                    data-form-nav
-                    className={inputClass}
-                    placeholder={isRtl ? "ملاحظة على الفاتورة" : "Invoice note"}
-                  />
-                </Field>
-              </div>
-            </div>
-
-            <div className="h-px bg-border" />
-
-            <div className="space-y-1.5 text-sm">
-              <Row label={t("common.subtotal")} value={toSystemDigits(money(subtotal))} />
-              {discountN > 0 && (
-                <Row
-                  label={t("common.discount")}
-                  value={`− ${toSystemDigits(money(discountN))}`}
-                  muted
+                <InvoiceLinesGrid
+                  lines={cart}
+                  isRtl={isRtl}
+                  currencySymbol={currencySymbol}
+                  onUpdate={updateLine}
+                  onRemove={removeLine}
+                  onMove={moveLine}
+                  onAppend={focusFinder}
+                  onRequestAdd={focusFinder}
                 />
               )}
-              <div className="flex items-center justify-between border-t border-border pt-2 text-base font-bold">
-                <span>{isRtl ? "الإجمالي" : "Total"}</span>
-                <span className="font-mono text-primary">{toSystemDigits(money(total))}</span>
-              </div>
-              <Row label={t("common.paid")} value={toSystemDigits(money(effectivePaid))} muted />
-              {remaining > 0 && (
-                <div className="flex items-center justify-between text-xs font-semibold text-rose-500">
-                  <span>{isRtl ? "المتبقي (آجل)" : "Remaining (credit)"}</span>
-                  <span className="font-mono">{toSystemDigits(money(remaining))}</span>
+
+              {cart.length > 0 && (
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-[10px] text-muted-foreground">
+                  <button
+                    type="button"
+                    onClick={() => setCart([])}
+                    className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 transition hover:bg-rose-500/10 hover:text-rose-500"
+                  >
+                    <RotateCcw className="size-3" />
+                    {isRtl ? "تفريغ البنود" : "Clear lines"}
+                  </button>
+                  <span className="inline-flex items-center gap-2">
+                    <kbd className="rounded border border-border/70 bg-surface px-1">Alt</kbd>
+                    <ArrowUpDown className="size-3" />
+                    {isRtl ? "ترتيب البنود" : "reorder"}
+                  </span>
                 </div>
               )}
             </div>
-
-            {remaining > 0 && isCashParty && (
-              <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-2 text-[11px] text-rose-700 dark:text-rose-300">
-                {isRtl
-                  ? "العميل النقدي لا يحمل ديناً — حصّل كامل المبلغ أو اختر عميلاً مسجلاً."
-                  : "The cash customer cannot carry a balance — collect in full or pick a registered customer."}
-              </div>
-            )}
-
-            {remaining > 0 && !selectedCustomer && (
-              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-2 text-[11px] text-amber-700 dark:text-amber-300">
-                {mode === "ticket"
-                  ? isRtl
-                    ? "اختر العميل المسجّل — تذكرة الطحن لا تكون نقدية."
-                    : "Select the registered customer — a milling ticket cannot be a walk-in."
-                  : isRtl
-                    ? "سيُسجَّل المتبقي ديناً على العميل المختار."
-                    : "The remainder will be recorded as customer debt."}
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={() => void submit()}
-              disabled={submitting || lines.length === 0}
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {submitting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <CheckCircle2 className="h-4 w-4" />
-              )}
-              {isRtl ? "إصدار الفاتورة" : "Post invoice"}
-            </button>
           </div>
+        </div>
 
-          {mode === "ticket" && selectedCustomer && (
-            <div className="rounded-2xl border border-border/80 bg-surface/90 p-3 text-[11px]">
-              <div className="flex items-center gap-1.5 font-semibold text-foreground">
-                <User className="h-3.5 w-3.5" />
-                {selectedCustomer.name}
-              </div>
-              <div className="mt-1.5 flex items-center justify-between text-muted-foreground">
-                <span>{isRtl ? "الرصيد الحالي" : "Current balance"}</span>
-                <span className="font-mono">
-                  {toSystemDigits(money(Number(selectedCustomer.balance) || 0))}
-                </span>
-              </div>
-              <div className="mt-1 flex items-center justify-between text-muted-foreground">
-                <span>{isRtl ? "حد الائتمان" : "Credit limit"}</span>
-                <span className="font-mono">
-                  {toSystemDigits(money(Number(selectedCustomer.credit_limit) || 0))}
-                </span>
-              </div>
-            </div>
-          )}
+        {/* ───────────────────────────── عمود المستند الرسمي */}
+        <div className="order-1 lg:sticky lg:top-4 lg:order-2">
+          <InvoiceSummaryPanel
+            isRtl={isRtl}
+            customers={customers}
+            cashCustomerId={cashCustomerId}
+            customerId={customerId}
+            onCustomerChange={setCustomerId}
+            paymentMethod={paymentMethod}
+            onPaymentMethodChange={(method) => {
+              setPaymentSplits([]);
+              setPaymentMethod(method);
+              if (getPaymentMethodDefinition(method)?.isCreditTerm) setPaid("0");
+            }}
+            settlement={settlement}
+            onSettlementChange={setSettlement}
+            paid={paid}
+            onPaidChange={setPaid}
+            subtotal={subtotal}
+            discount={discount}
+            onDiscountChange={setDiscount}
+            total={total}
+            effectivePaid={effectivePaid}
+            remaining={remaining}
+            change={payment.change}
+            currencySymbol={currencySymbol}
+            remainingError={
+              remaining > 0
+                ? payment.isPayable
+                  ? remaining > 0 && isCashParty
+                    ? isRtl
+                      ? "العميل النقدي لا يحمل ديناً — حصّل كامل المبلغ أو اختر عميلاً مسجلاً."
+                      : "The cash customer cannot carry a balance — collect in full or pick a registered customer."
+                    : isRtl
+                      ? "سيُسجَّل المتبقي ديناً على العميل المختار."
+                      : "The remainder will be recorded as customer debt."
+                  : (payment.blockingReason ?? null)
+                : null
+            }
+            lineCount={lines.length}
+            submitting={submitting}
+            canSubmit={lines.length > 0 && payment.isPayable}
+            onSubmit={() => void submit()}
+            note={note}
+            onNoteChange={setNote}
+          />
         </div>
       </div>
 
@@ -1643,40 +906,6 @@ function SalesInvoicePage() {
           customerName={selectedCustomer?.name || undefined}
         />
       )}
-    </div>
-  );
-}
-
-function Field({
-  label,
-  children,
-  required,
-  icon,
-}: {
-  label: string;
-  children: React.ReactNode;
-  required?: boolean;
-  icon?: React.ReactNode;
-}) {
-  return (
-    <label className="block space-y-1">
-      <span className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
-        {icon}
-        {label}
-        {required && <span className="text-rose-500">*</span>}
-      </span>
-      {children}
-    </label>
-  );
-}
-
-function Row({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
-  return (
-    <div className="flex items-center justify-between text-xs">
-      <span className="text-muted-foreground">{label}</span>
-      <span className={`font-mono ${muted ? "text-muted-foreground" : "text-foreground"}`}>
-        {value}
-      </span>
     </div>
   );
 }

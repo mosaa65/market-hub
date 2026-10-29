@@ -10,27 +10,19 @@
  *   item_class         RAW_MATERIAL | FINISHED_GOOD | BY_PRODUCT |
  *                      SERVICE | NON_STOCK_ITEM  — what role it plays
  *
- * A mill's operator does not think in those words. They think "grain", "flour",
- * "bran", "milling fee", "sack". Reading raw enum codes in a table is how a
- * column ends up ignored, and then the operator cannot tell a sack of wheat from
- * a sack of flour at a glance — which is the one distinction that matters most
- * on a screen full of milled goods.
- *
- * So each class gets a colour and an Arabic name, and both the products and
- * inventory screens use these badges. The colour is not decoration: it is how
- * the eye separates raw grain from finished flour without reading a word.
- *
- * THE FOUR ROLES THAT MATTER ON A MILL FLOOR
- *   RAW_MATERIAL    ماكينة     grain received, waiting to be milled
- *   FINISHED_GOOD   منتجات نهائية  flour the mill sells
- *   BY_PRODUCT      نواتج     bran and semolina — produced BY milling
- *   SERVICE         خدمات      the milling fee itself, and sacks sold
- *   NON_STOCK_ITEM  مستهلكات    consumables that are not the product
+ * These labels are the general ERP vocabulary. Activity-specific workflows
+ * may present more specific wording in their own screens, but a shared product
+ * form must not assume that every business is a mill.
  */
 import type { ReactNode } from "react";
 
 export type ItemClass =
-  "RAW_MATERIAL" | "FINISHED_GOOD" | "BY_PRODUCT" | "SERVICE" | "NON_STOCK_ITEM";
+  | "RAW_MATERIAL"
+  | "FINISHED_GOOD"
+  | "BY_PRODUCT"
+  | "SERVICE"
+  | "NON_STOCK_ITEM"
+  | "PACKAGING";
 
 export interface ItemRoleStyle {
   labelAr: string;
@@ -44,21 +36,21 @@ export interface ItemRoleStyle {
 
 export const ITEM_ROLE_STYLES: Record<ItemClass, ItemRoleStyle> = {
   RAW_MATERIAL: {
-    labelAr: "مادة خام",
+    labelAr: "مادة أولية",
     labelEn: "Raw material",
     chip: "bg-amber-500/15 text-amber-600 border-amber-500/30 dark:text-amber-300",
     dot: "bg-amber-500",
     mark: "◆",
   },
   FINISHED_GOOD: {
-    labelAr: "منتج نهائي",
+    labelAr: "منتج تام",
     labelEn: "Finished good",
     chip: "bg-emerald-500/15 text-emerald-600 border-emerald-500/30 dark:text-emerald-300",
     dot: "bg-emerald-500",
     mark: "●",
   },
   BY_PRODUCT: {
-    labelAr: "ناتج طحن",
+    labelAr: "ناتج ثانوي",
     labelEn: "By-product",
     chip: "bg-orange-500/15 text-orange-600 border-orange-500/30 dark:text-orange-300",
     dot: "bg-orange-500",
@@ -72,11 +64,18 @@ export const ITEM_ROLE_STYLES: Record<ItemClass, ItemRoleStyle> = {
     mark: "◇",
   },
   NON_STOCK_ITEM: {
-    labelAr: "مستهلكات",
-    labelEn: "Non-stock",
+    labelAr: "صنف غير مخزني",
+    labelEn: "Non-stock item",
     chip: "bg-slate-500/15 text-slate-600 border-slate-500/30 dark:text-slate-300",
     dot: "bg-slate-500",
     mark: "○",
+  },
+  PACKAGING: {
+    labelAr: "مواد تعبئة",
+    labelEn: "Packaging materials",
+    chip: "bg-cyan-500/15 text-cyan-700 border-cyan-500/30 dark:text-cyan-300",
+    dot: "bg-cyan-500",
+    mark: "□",
   },
 };
 

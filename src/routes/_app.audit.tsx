@@ -169,7 +169,7 @@ const FIELD_TRANSLATIONS: Record<string, string> = {
   quantity: "الكمية",
   qty: "الكمية",
   stock: "الرصيد المخزني",
-  min_stock: "الحد الأدنى للطلب",
+  min_stock: "حد التنبيه الأدنى للمخزون",
   barcode: "رمز الباركود",
   sku: "رمز الصنف (SKU)",
   unit: "الوحدة",

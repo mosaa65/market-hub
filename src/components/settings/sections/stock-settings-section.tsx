@@ -5,8 +5,11 @@ import { QuantityInput } from "@/components/ui/quantity-input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Boxes, Check, Hash, Layers, ShieldAlert, Sparkles } from "lucide-react";
+import { Boxes, Check, Hash, Layers, Scale, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { COSTING_METHOD_LABELS, type CostingMethod } from "@/lib/items";
 import {
   getStockSettings,
   saveStockSettings,
@@ -22,9 +25,14 @@ interface StockSettingsSectionProps {
 
 export function StockSettingsSection({ canEdit = true, lang = "ar" }: StockSettingsSectionProps) {
   const isAr = lang === "ar";
+  const queryClient = useQueryClient();
   const [settings, setSettings] = useState<StockSettings>(() => getStockSettings());
   const [isSaving, setIsSaving] = useState(false);
   const [savedSnapshot, setSavedSnapshot] = useState(() => getStockSettings());
+  const [costingMethod, setCostingMethod] = useState<CostingMethod>("MOVING_AVERAGE");
+  const [savedCostingMethod, setSavedCostingMethod] = useState<CostingMethod>("MOVING_AVERAGE");
+  const [costingLoadState, setCostingLoadState] = useState<"loading" | "ready" | "error">("loading");
+  const [costingSaveState, setCostingSaveState] = useState<"idle" | "saving">("idle");
 
   const isDirty = useMemo(
     () => JSON.stringify(settings) !== JSON.stringify(savedSnapshot),
@@ -35,6 +43,33 @@ export function StockSettingsSection({ canEdit = true, lang = "ar" }: StockSetti
     const s = getStockSettings();
     setSettings(s);
     setSavedSnapshot(s);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const { data, error } = await (supabase as any)
+          .from("company_costing_settings")
+          .select("costing_method")
+          .eq("id", 1)
+          .maybeSingle();
+        if (!active) return;
+        if (error) {
+          setCostingLoadState("error");
+          return;
+        }
+        const method = (data?.costing_method ?? "MOVING_AVERAGE") as CostingMethod;
+        setCostingMethod(method);
+        setSavedCostingMethod(method);
+        setCostingLoadState("ready");
+      } catch {
+        if (active) setCostingLoadState("error");
+      }
+    })();
+    return () => {
+      active = false;
+    };
   }, []);
 
   function handleSave() {
@@ -54,11 +89,127 @@ export function StockSettingsSection({ canEdit = true, lang = "ar" }: StockSetti
     }
   }
 
+  async function saveCostingMethod() {
+    if (!canEdit || costingLoadState !== "ready" || costingSaveState === "saving") return;
+    if (costingMethod !== "MOVING_AVERAGE") {
+      toast.error(
+        isAr
+          ? "طريقة التقييم هذه غير مدعومة بالكامل حاليًا. اختر المتوسط المرجح المتحرك حتى يكتمل ربط FIFO والتكلفة المعيارية بالمحاسبة."
+          : "This valuation method is not fully supported yet. Choose moving weighted average until FIFO and standard costing are integrated with accounting.",
+      );
+      return;
+    }
+    if (costingMethod === savedCostingMethod) return;
+    setCostingSaveState("saving");
+    try {
+      const { error } = await (supabase as any).rpc("set_company_costing_method", {
+        _method: costingMethod,
+        _source: "stock_settings",
+        _notes: "Changed from company stock settings",
+      });
+      if (error) throw error;
+      setSavedCostingMethod(costingMethod);
+      await queryClient.invalidateQueries({ queryKey: ["company-costing-method"] });
+      toast.success(isAr ? "تم حفظ طريقة تقييم المخزون" : "Inventory valuation method saved");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(message || (isAr ? "تعذر حفظ طريقة تقييم المخزون" : "Could not save valuation method"));
+    } finally {
+      setCostingSaveState("idle");
+    }
+  }
+
   const previewStackCode = useMemo(() => generateStackCode(1, settings), [settings]);
   const previewSkuCode = useMemo(() => generateSkuCode(101, settings), [settings]);
 
   return (
     <div className="space-y-6">
+      <Card className="overflow-hidden rounded-3xl border border-border/80 bg-card shadow-sm">
+        <CardHeader className="border-b border-border/80 bg-muted/30 pb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="rounded-2xl bg-primary/10 p-2 text-primary">
+              <Scale className="h-5 w-5" />
+            </div>
+            <div>
+              <CardTitle className="text-base font-bold">
+                {isAr ? "طريقة تقييم المخزون للمنشأة" : "Company inventory valuation"}
+              </CardTitle>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {isAr
+                  ? "إعداد مركزي يحدد تكلفة المخزون وحركة تكلفة المبيعات للأصناف المخزنية."
+                  : "A central setting for inventory value and cost of sales across tracked items."}
+              </p>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4 pt-5">
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+            <div className="space-y-1.5">
+              <Label>{isAr ? "طريقة التقييم" : "Valuation method"}</Label>
+              <select
+                value={costingMethod}
+                onChange={(event) => setCostingMethod(event.target.value as CostingMethod)}
+                disabled={!canEdit || costingLoadState !== "ready" || costingSaveState === "saving"}
+                className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+              >
+                <option value="MOVING_AVERAGE">
+                  {COSTING_METHOD_LABELS.MOVING_AVERAGE[isAr ? "ar" : "en"]}
+                </option>
+                <option value="FIFO" disabled={savedCostingMethod !== "FIFO"}>
+                  {COSTING_METHOD_LABELS.FIFO[isAr ? "ar" : "en"]}
+                  {isAr ? " — غير متاح كتقييم تكلفة بعد" : " — not available for cost valuation yet"}
+                </option>
+                <option value="STANDARD" disabled={savedCostingMethod !== "STANDARD"}>
+                  {COSTING_METHOD_LABELS.STANDARD[isAr ? "ar" : "en"]}
+                  {isAr ? " — غير مكتمل محاسبيًا" : " — accounting integration incomplete"}
+                </option>
+              </select>
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                {isAr
+                  ? "المتوسط المرجح المتحرك يعيد حساب تكلفة الوحدة عند كل استلام: (قيمة الرصيد + قيمة الاستلام) ÷ (كمية الرصيد + كمية الاستلام). تغيّر التكلفة لا يغيّر سعر البيع تلقائيًا؛ التسعير سياسة مستقلة."
+                  : "Moving weighted average recalculates unit cost on each receipt: (current inventory value + receipt value) ÷ (current quantity + receipt quantity). Cost changes do not automatically change sales prices; pricing is separate."}
+              </p>
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                {isAr
+                  ? "FIFO كتقييم تكلفة يصرف القيمة من أقدم طبقات الاستلام. أما FIFO أو FEFO في إعداد الدفعات فيحددان أي دفعة تُصرف، ولا يغيران تقييم التكلفة. التكلفة المعيارية تستخدم تكلفة معتمدة ثابتة وتتطلب تسجيل فرق سعر الشراء الفعلي في حسابات الفروقات."
+                  : "FIFO cost valuation issues value from the oldest receipt-cost layers. FIFO or FEFO batch dispatch only selects which batch is issued; it does not change cost valuation. Standard cost uses an approved fixed cost and requires purchase price variances to be posted to variance accounts."}
+              </p>
+            </div>
+            {canEdit && (
+              <Button
+                type="button"
+                onClick={saveCostingMethod}
+                disabled={
+                  costingLoadState !== "ready" ||
+                  costingSaveState === "saving" ||
+                  costingMethod === savedCostingMethod
+                }
+              >
+                <Check className="h-4 w-4" />
+                {costingSaveState === "saving"
+                  ? isAr ? "جارٍ الحفظ..." : "Saving..."
+                  : isAr ? "حفظ طريقة التقييم" : "Save valuation method"}
+              </Button>
+            )}
+          </div>
+          {costingLoadState === "loading" && (
+            <p className="text-xs text-muted-foreground">{isAr ? "جارٍ تحميل إعداد المنشأة..." : "Loading company setting..."}</p>
+          )}
+          {costingLoadState === "error" && (
+            <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
+              {isAr ? "تعذر قراءة طريقة التقييم المركزية. لم يتم تعديلها." : "Could not read the central valuation method. It was not changed."}
+            </p>
+          )}
+          {(costingMethod === "FIFO" || costingMethod === "STANDARD") && (
+            <p role="alert" className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
+              {isAr
+                ? "الإعداد المحفوظ يشير إلى طريقة غير مكتملة في محرك المخزون والمحاسبة. لا تعتمد عليها قبل التحويل إلى المتوسط المرجح المتحرك وإكمال دعم طبقات FIFO أو فروقات التكلفة المعيارية."
+                : "The saved method is not fully implemented in inventory and accounting. Do not rely on it until switched to moving weighted average and FIFO layers or standard cost variances are completed."}
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
       <Card className="rounded-3xl border border-border/80 bg-card shadow-sm overflow-hidden">
         <CardHeader className="bg-muted/30 border-b border-border/80 pb-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -263,8 +414,8 @@ export function StockSettingsSection({ canEdit = true, lang = "ar" }: StockSetti
               <div className="space-y-1.5 rounded-2xl border border-border/70 bg-surface/60 p-4">
                 <Label className="text-xs font-bold text-foreground">
                   {isAr
-                    ? "حد التنبيه الافتراضي لأدنى مخزون (Default Min Stock)"
-                    : "Default Minimum Stock Level"}
+                    ? "حد التنبيه الافتراضي للمخزون"
+                    : "Default minimum stock alert threshold"}
                 </Label>
                 <QuantityInput
                   decimals={3}
@@ -272,13 +423,13 @@ export function StockSettingsSection({ canEdit = true, lang = "ar" }: StockSetti
                   value={settings.defaultMinStock}
                   disabled={!canEdit}
                   onValueChange={(v) => setSettings({ ...settings, defaultMinStock: v ?? 0 })}
-                  aria-label={isAr ? "حد التنبيه الافتراضي لأدنى مخزون" : "Default min stock"}
+                  aria-label={isAr ? "حد التنبيه الافتراضي للمخزون" : "Default minimum stock alert threshold"}
                   className="h-10 text-xs font-bold"
                 />
                 <p className="text-[11px] text-muted-foreground">
                   {isAr
-                    ? "العدد الأدنى الذي يُرسل عنده النظام إشعار نقص المخزون"
-                    : "Threshold triggers low stock alerts when quantity dips below"}
+                    ? "يُستخدم عند إنشاء سلعة مخزنية جديدة بوحدة قياسها؛ ويظهر تنبيه النقص عند وصول الرصيد إلى هذا الحد أو أقل."
+                    : "Used for new tracked goods in their stock unit. A low-stock alert appears when quantity reaches or falls below this value."}
                 </p>
               </div>
 

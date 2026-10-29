@@ -38,6 +38,16 @@
 
 export const FORM_NAVIGATION_ATTRIBUTE = "data-form-nav";
 
+/**
+ * A field that owns its keys itself (a combobox with an active option, a grid
+ * cell with row navigation). The layer below must not steal Enter/arrows from
+ * it — its own handler decides, and stops propagation when it has acted.
+ *
+ * Declared as an attribute rather than a special case so a new control opts
+ * out without touching this file.
+ */
+export const FORM_NAVIGATION_SKIP_ATTRIBUTE = "data-form-nav-skip";
+
 /** العناصر التي تُعتبر حقولاً قابلة للتنقل، بترتيب ظهورها في الصفحة. */
 const FIELD_SELECTOR = [
   `input[${FORM_NAVIGATION_ATTRIBUTE}]`,
@@ -165,6 +175,11 @@ export function attachFormNavigation(scope: HTMLElement): () => void {
   const handler = (event: KeyboardEvent) => {
     const active = document.activeElement as HTMLElement | null;
     if (!active || !scope.contains(active)) return;
+
+    // A control that manages its own keys keeps them entirely (see the
+    // attribute's comment). Checked on the element and on any wrapper, so a
+    // combobox can mark its outer box instead of every inner input.
+    if (active.closest(`[${FORM_NAVIGATION_SKIP_ATTRIBUTE}]`)) return;
 
     // Escape is deliberately NOT intercepted: the browser reverts the field's
     // pending edit and leaves focus where it is (see rule 6 above).
