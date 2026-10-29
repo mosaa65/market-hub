@@ -1226,9 +1226,11 @@ export const executeExceptionsReport = createServerFn({ method: "POST" })
     }
 
     if (data.source === "inventory_low_stock" || data.source === "inventory_slow_moving") {
+      const valuationSource =
+        data.source === "inventory_low_stock" ? "inventory_low_stock" : "inventory_valuation";
       const valuation = await fetchAllReportRows<Record<string, any>>(() => {
         let query = supabase
-          .from("inventory_valuation")
+          .from(valuationSource)
           .select(
             "item_id,item_name,item_name_ar,sku,warehouse_id,warehouse_name,quantity,costing_method,reference_unit_cost,reference_valuation,valuation_is_reference_based,base_uom_id,base_uom_name,base_uom_name_ar,min_stock",
             { count: "exact" },

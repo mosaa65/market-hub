@@ -1118,20 +1118,18 @@ BEGIN
       'memo', 'عكس ذم العميل');
   END IF;
 
-  -- عكس COGS بقيمة الحركة الفعلية التي أعادتها post_stock_delta.
+  -- عكس COGS وقيمة المخزون مباشرة من حركات المرتجع، بلا ربط مضاعف بأسطر الصنف.
   FOR r IN
     SELECT p.item_class,
            sum(coalesce(sm.total_cost, 0)) AS cost
-      FROM public.sales_return_items ri
-      JOIN public.products p ON p.id = ri.product_id
-      LEFT JOIN public.stock_movements sm
-        ON sm.product_id = ri.product_id
-       AND sm.source_type = 'sales_return'
+      FROM public.stock_movements sm
+      JOIN public.products p ON p.id = sm.product_id
+     WHERE sm.source_type = 'sales_return'
        AND sm.source_id = v_id
        AND sm.warehouse_id = v_inv.warehouse_id
-     WHERE ri.return_id = v_id
-       AND public.item_stock_effect(ri.product_id, 'in') = 'STOCK_RECEIPT'
+       AND sm.movement_kind = 'RECEIPT'::public.stock_movement_kind
      GROUP BY p.item_class
+    HAVING sum(coalesce(sm.total_cost, 0)) <> 0
   LOOP
     IF r.cost IS NULL OR r.cost = 0 THEN
       CONTINUE;
@@ -1394,24 +1392,45 @@ BEGIN
 
   -- ── T-08(ب): قيد المرتجع — أطراف قيد المشتريات المقلوبة ──────────────────
   IF v_tot <> 0 THEN
-    -- عكس المخزون/مصروف المشتريات (صافي ضريبة البند)، مجمّعًا حسب النوع.
+    -- المخزون يُخفض بقيمته الدفترية الفعلية المحسوبة بالمحرك، لا بسعر الشراء التاريخي.
+    -- اجمع حركات الصرف مباشرة لتجنب تكرار القيمة عند تعدد أسطر الصنف.
     FOR r IN
       SELECT p.item_class,
-             sum(ri.total - coalesce(ri.tax, 0)) AS net_amount
-        FROM public.purchase_return_items ri
-        LEFT JOIN public.products p ON p.id = ri.product_id
-       WHERE ri.return_id = v_id
+             sum(coalesce(sm.total_cost, 0)) AS book_value
+        FROM public.stock_movements sm
+        JOIN public.products p ON p.id = sm.product_id
+       WHERE sm.source_type = 'purchase_return'
+         AND sm.source_id = v_id
+         AND sm.movement_kind = 'ISSUE'::public.stock_movement_kind
        GROUP BY p.item_class
-      HAVING sum(ri.total - coalesce(ri.tax, 0)) <> 0
+      HAVING sum(coalesce(sm.total_cost, 0)) <> 0
     LOOP
       v_lines := v_lines || jsonb_build_object(
         'account_code', CASE r.item_class
                           WHEN 'RAW_MATERIAL' THEN '1311'
                           WHEN 'BY_PRODUCT'   THEN '1314'
-                          WHEN 'SERVICE'      THEN '5911'
-                          ELSE '1313' END,
-        'credit', round(r.net_amount, 2),
+                          WHEN 'FINISHED_GOOD' THEN '1313'
+                          ELSE '1315' END,
+        'credit', round(r.book_value, 2),
         'memo', 'مرتجع مشتريات ' || coalesce(r.item_class, 'GOOD'));
+    END LOOP;
+
+    -- الخدمة والسلعة غير المتتبعة لا تخفضان أصل المخزون؛ اعكس مصروف الشراء
+    -- بالقيمة التاريخية التي استُخدمت في ترحيل الفاتورة الأصلية.
+    FOR r IN
+      SELECT p.item_class,
+             sum(ri.total - coalesce(ri.tax, 0)) AS expense_amount
+        FROM public.purchase_return_items ri
+        LEFT JOIN public.products p ON p.id = ri.product_id
+       WHERE ri.return_id = v_id
+         AND public.item_stock_effect(ri.product_id, 'out') <> 'STOCK_ISSUE'
+       GROUP BY p.item_class
+      HAVING sum(ri.total - coalesce(ri.tax, 0)) <> 0
+    LOOP
+      v_lines := v_lines || jsonb_build_object(
+        'account_code', '5911',
+        'credit', round(r.expense_amount, 2),
+        'memo', 'عكس مصروف شراء ' || coalesce(r.item_class, 'GOOD'));
     END LOOP;
 
     IF v_tax <> 0 THEN

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { paymentMethodLabel as arabicPaymentMethodLabel } from "@/lib/payments/payment-methods";
 import {
   Printer,
   X,
@@ -144,18 +145,10 @@ export function documentDetailsToTicketData(
     remainingKg: out.kgRemaining,
   }));
 
-  const paymentMethodLabel =
-    inv?.payment_method === "cash"
-      ? "نقداً"
-      : inv?.payment_method === "credit"
-        ? "آجل"
-        : inv?.payment_method === "card"
-          ? "بطاقة/شبكة"
-          : inv?.payment_method === "bank_transfer"
-            ? "تحويل بنكي"
-            : inv?.payment_method === "mobile_money"
-              ? "محفظة إلكترونية"
-              : "نقداً";
+  //
+  // اسم الطريقة من الكتالوج — نفس السلسلة الشرطية كانت تكتب «نقداً» و«بطاقة/شبكة»
+  // بينما الفاتورة المطبوعة من الكاشير تكتب اسماً آخر لنفس الوثيقة.
+  const methodLabelAr = inv?.payment_method ? arabicPaymentMethodLabel(inv.payment_method) : "—";
 
   return {
     stage:
@@ -187,7 +180,7 @@ export function documentDetailsToTicketData(
     grandTotal,
     paidAmount,
     remainingAmount,
-    paymentMethodLabel,
+    paymentMethodLabel: methodLabelAr,
     notes: (details as any).notes || undefined,
     // اسم المنشأة من إعدادات المنشأة (company_settings) حصراً — بلا أسماء
     // عشوائية من الكود. الحقول الفارغة تُعرض فارغة كما هي.
@@ -254,7 +247,7 @@ export function unifiedDocToTicketData(doc: UnifiedDocumentData): UnifiedTicketP
     grandTotal,
     paidAmount,
     remainingAmount,
-    paymentMethodLabel: doc.payment || "نقداً",
+    paymentMethodLabel: doc.payment || "—",
     notes: doc.notes,
     // اسم المنشأة من إعدادات المنشأة حصراً (doc.company ← القالب، أو الكاش المحلي)
     companyName:
@@ -756,7 +749,7 @@ export function UnifiedPrintModal({
                     </span>
                   </div>
                   <div className="flex justify-between text-slate-700 font-semibold">
-                    <span>المدفوع ({data.paymentMethodLabel || "نقداً"}):</span>
+                    <span>المدفوع ({data.paymentMethodLabel || "—"}):</span>
                     <span className="font-mono font-black text-emerald-700">
                       {data.paidAmount.toLocaleString()} ر.ي
                     </span>
@@ -1264,7 +1257,7 @@ function renderThermalHtml(d: UnifiedTicketPrintData, width: ThermalWidth = "80m
   ${(d.discount || 0) > 0 ? `<div class="flex" style="color: #059669;"><span>الخصم:</span><span style="font-family: monospace;">-${d.discount?.toLocaleString()} ر.ي</span></div>` : ""}
   <div class="dashed"></div>
   <div class="flex" style="font-size: 14px; font-weight: 900;"><span>الإجمالي المستحق:</span><span style="font-family: monospace;">${d.grandTotal.toLocaleString()} ر.ي</span></div>
-  <div class="flex"><span>المدفوع (${d.paymentMethodLabel || "نقداً"}):</span><span class="bold" style="color: #059669; font-family: monospace;">${d.paidAmount.toLocaleString()} ر.ي</span></div>
+  <div class="flex"><span>المدفوع (${d.paymentMethodLabel || "—"}):</span><span class="bold" style="color: #059669; font-family: monospace;">${d.paidAmount.toLocaleString()} ر.ي</span></div>
   ${d.remainingAmount > 0 ? `<div class="flex" style="color: #dc2626; font-weight: bold;"><span>المتبقي ذمة:</span><span style="font-family: monospace;">${d.remainingAmount.toLocaleString()} ر.ي</span></div>` : ""}`
       : ""
   }

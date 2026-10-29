@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { paymentMethodLabel } from "@/lib/payments/payment-methods";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -441,7 +442,7 @@ export function BankAccountsManagement() {
                 )}
               >
                 <Smartphone className="h-4 w-4 text-sky-600" />
-                <span>{isAr ? "محفظة إلكترونية" : "Electronic Wallet"}</span>
+                <span>{paymentMethodLabel("mobile_money", isAr ? "ar" : "en")}</span>
               </button>
             </div>
           </div>

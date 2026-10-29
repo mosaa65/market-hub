@@ -31,7 +31,9 @@ export function StockSettingsSection({ canEdit = true, lang = "ar" }: StockSetti
   const [savedSnapshot, setSavedSnapshot] = useState(() => getStockSettings());
   const [costingMethod, setCostingMethod] = useState<CostingMethod>("MOVING_AVERAGE");
   const [savedCostingMethod, setSavedCostingMethod] = useState<CostingMethod>("MOVING_AVERAGE");
-  const [costingLoadState, setCostingLoadState] = useState<"loading" | "ready" | "error">("loading");
+  const [costingLoadState, setCostingLoadState] = useState<"loading" | "ready" | "error">(
+    "loading",
+  );
   const [costingSaveState, setCostingSaveState] = useState<"idle" | "saving">("idle");
 
   const isDirty = useMemo(
@@ -113,7 +115,9 @@ export function StockSettingsSection({ canEdit = true, lang = "ar" }: StockSetti
       toast.success(isAr ? "تم حفظ طريقة تقييم المخزون" : "Inventory valuation method saved");
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      toast.error(message || (isAr ? "تعذر حفظ طريقة تقييم المخزون" : "Could not save valuation method"));
+      toast.error(
+        message || (isAr ? "تعذر حفظ طريقة تقييم المخزون" : "Could not save valuation method"),
+      );
     } finally {
       setCostingSaveState("idle");
     }
@@ -157,7 +161,9 @@ export function StockSettingsSection({ canEdit = true, lang = "ar" }: StockSetti
                 </option>
                 <option value="FIFO" disabled={savedCostingMethod !== "FIFO"}>
                   {COSTING_METHOD_LABELS.FIFO[isAr ? "ar" : "en"]}
-                  {isAr ? " — غير متاح كتقييم تكلفة بعد" : " — not available for cost valuation yet"}
+                  {isAr
+                    ? " — غير متاح كتقييم تكلفة بعد"
+                    : " — not available for cost valuation yet"}
                 </option>
                 <option value="STANDARD" disabled={savedCostingMethod !== "STANDARD"}>
                   {COSTING_METHOD_LABELS.STANDARD[isAr ? "ar" : "en"]}
@@ -187,21 +193,35 @@ export function StockSettingsSection({ canEdit = true, lang = "ar" }: StockSetti
               >
                 <Check className="h-4 w-4" />
                 {costingSaveState === "saving"
-                  ? isAr ? "جارٍ الحفظ..." : "Saving..."
-                  : isAr ? "حفظ طريقة التقييم" : "Save valuation method"}
+                  ? isAr
+                    ? "جارٍ الحفظ..."
+                    : "Saving..."
+                  : isAr
+                    ? "حفظ طريقة التقييم"
+                    : "Save valuation method"}
               </Button>
             )}
           </div>
           {costingLoadState === "loading" && (
-            <p className="text-xs text-muted-foreground">{isAr ? "جارٍ تحميل إعداد المنشأة..." : "Loading company setting..."}</p>
+            <p className="text-xs text-muted-foreground">
+              {isAr ? "جارٍ تحميل إعداد المنشأة..." : "Loading company setting..."}
+            </p>
           )}
           {costingLoadState === "error" && (
-            <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
-              {isAr ? "تعذر قراءة طريقة التقييم المركزية. لم يتم تعديلها." : "Could not read the central valuation method. It was not changed."}
+            <p
+              role="alert"
+              className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive"
+            >
+              {isAr
+                ? "تعذر قراءة طريقة التقييم المركزية. لم يتم تعديلها."
+                : "Could not read the central valuation method. It was not changed."}
             </p>
           )}
           {(costingMethod === "FIFO" || costingMethod === "STANDARD") && (
-            <p role="alert" className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
+            <p
+              role="alert"
+              className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 text-xs leading-relaxed text-amber-700 dark:text-amber-300"
+            >
               {isAr
                 ? "الإعداد المحفوظ يشير إلى طريقة غير مكتملة في محرك المخزون والمحاسبة. لا تعتمد عليها قبل التحويل إلى المتوسط المرجح المتحرك وإكمال دعم طبقات FIFO أو فروقات التكلفة المعيارية."
                 : "The saved method is not fully implemented in inventory and accounting. Do not rely on it until switched to moving weighted average and FIFO layers or standard cost variances are completed."}
@@ -413,9 +433,7 @@ export function StockSettingsSection({ canEdit = true, lang = "ar" }: StockSetti
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5 rounded-2xl border border-border/70 bg-surface/60 p-4">
                 <Label className="text-xs font-bold text-foreground">
-                  {isAr
-                    ? "حد التنبيه الافتراضي للمخزون"
-                    : "Default minimum stock alert threshold"}
+                  {isAr ? "حد التنبيه الافتراضي للمخزون" : "Default minimum stock alert threshold"}
                 </Label>
                 <QuantityInput
                   decimals={3}
@@ -423,7 +441,9 @@ export function StockSettingsSection({ canEdit = true, lang = "ar" }: StockSetti
                   value={settings.defaultMinStock}
                   disabled={!canEdit}
                   onValueChange={(v) => setSettings({ ...settings, defaultMinStock: v ?? 0 })}
-                  aria-label={isAr ? "حد التنبيه الافتراضي للمخزون" : "Default minimum stock alert threshold"}
+                  aria-label={
+                    isAr ? "حد التنبيه الافتراضي للمخزون" : "Default minimum stock alert threshold"
+                  }
                   className="h-10 text-xs font-bold"
                 />
                 <p className="text-[11px] text-muted-foreground">

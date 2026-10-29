@@ -12,6 +12,7 @@ import {
   Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PAYMENT_METHOD_CATALOG } from "@/lib/payments/payment-methods";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -73,12 +74,20 @@ const optionSourceByControl = {
   product_select: "products",
 } as const;
 
-const PAYMENT_METHODS = [
-  { value: "cash", label: "نقدي" },
-  { value: "card", label: "شبكة / بطاقة" },
-  { value: "bank_transfer", label: "تحويل بنكي" },
-  { value: "credit", label: "آجل" },
-];
+/**
+ * خيارات فلتر طريقة الدفع — من الكتالوج لا من قائمة محلية.
+ *
+ * القائمة السابقة كانت أربعة عناصر فقط وتسمّي البطاقة «شبكة / بطاقة» وتنسى
+ * الشيك والمحفظة، فتقارير مبنية على فلتر الدفع لا تستطيع عزل هذه الطرق.
+ */
+const PAYMENT_METHODS = Array.from(
+  new Map(
+    PAYMENT_METHOD_CATALOG.map((method) => [
+      method.legacyValue,
+      { value: method.legacyValue, label: method.nameAr },
+    ]),
+  ).values(),
+);
 
 const INVOICE_STATUSES = [
   { value: "draft", label: "مسودة" },

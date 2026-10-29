@@ -686,6 +686,26 @@ export function toCatalogId(legacy: string | null | undefined): string | undefin
   return CATALOG_BY_LEGACY.get(legacy)?.id;
 }
 
+/**
+ * هل هذه القيمة قيمة `payment_method` يعرفها الكتالوج؟
+ *
+ * تستخدمها سجلات تدقيق عامة تحمل قيمًا من أنواع كثيرة، فتسأل أولًا «أهذه
+ * طريقة دفع؟» ثم تترجمها بالكتالوج، بدل تكرار أسماء الطرق في كل سجل.
+ */
+export function isPaymentMethodValue(value: string | null | undefined): boolean {
+  if (!value) return false;
+  return CATALOG_BY_LEGACY.has(value.trim().toLowerCase());
+}
+
+/**
+ * البحث عن تعريف الكتالوج بقيمة ENUM مخزّنة.
+ *
+ * مشتق من نفس فهرس `CATALOG_BY_LEGACY`، ومُصدَّر حتى تقرأ الشاشات التي تحتاج
+ * «ما حساب هذه الطريقة؟» من الكتالوج بدل كتابة الكود في نص الشرح.
+ */
+export const CATALOG_BY_LEGACY_VALUE: ReadonlyMap<string, PaymentMethodDefinition> =
+  CATALOG_BY_LEGACY;
+
 /* ============================================================================
    Icons — one registry, resolved locally, with a fallback chain
    ============================================================================ */

@@ -29,6 +29,8 @@ import { VortexDrawerDialog } from "@/components/vortex-ui";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import {
+  CATALOG_BY_LEGACY_VALUE,
+  paymentMethodLabel,
   PAYMENT_CONTEXTS,
   PAYMENT_CONTEXT_LABELS,
   PAYMENT_ICON_CHOICES,
@@ -38,29 +40,22 @@ import {
 import { useCreateTenantPaymentMethod, usePaymentMethods } from "@/hooks/use-payment-methods";
 import { PaymentMethodIcon } from "./payment-method-icon";
 
-/** The ways a business may actually collect. `credit` and `split` excluded, on purpose. */
+/**
+ * كيف تُحصَّل النقود فعليًا. `credit` و`split` مستبعدان: الأول غياب تحصيل،
+ * والثاني نتيجة تجزئة لا طريقة يختارها المستخدم.
+ *
+ * الأسماء والأكواد تُقرأ من الكتالوج ولا تُكتب هنا: النسخة السابقة كانت تقول
+ * إن المحفظة تُسوّى على (1111) وإن الشيك على (1111) — وكلاهما خطأ محاسبي حقيقي
+ * (المحفظة 1131، والشيك 1221 برسم التحصيل). شرح خاطئ تحت زر الإنشاء ينتج عنه
+ * طريقة دفع مربوطة بحساب لا يطابق قيودها.
+ */
 const COLLECTION_OPTIONS: readonly {
   value: LegacyPaymentValue;
-  ar: string;
-  en: string;
   hint: string;
-}[] = [
-  {
-    value: "bank_transfer",
-    ar: "حوالة بنكية",
-    en: "Bank transfer",
-    hint: "تُسوّى على الحساب البنكي (1111)",
-  },
-  {
-    value: "mobile_money",
-    ar: "محفظة إلكترونية",
-    en: "Mobile wallet",
-    hint: "تُسوّى على الحساب البنكي/المحافظ (1111)",
-  },
-  { value: "card", ar: "بطاقة / شبكة", en: "Card", hint: "تُسوّى على الشبكة (1111)" },
-  { value: "cheque", ar: "شيك", en: "Cheque", hint: "تُسوّى على الحساب البنكي (1111)" },
-  { value: "cash", ar: "نقداً", en: "Cash", hint: "تُسوّى على الصندوق (1101)" },
-];
+}[] = (["bank_transfer", "mobile_money", "card", "cheque", "cash"] as const).map((value) => {
+  const code = CATALOG_BY_LEGACY_VALUE.get(value)?.defaultAccountCode ?? null;
+  return { value, hint: code ? `تُسوّى على الحساب (${code})` : "لا تحصيل نقدي" };
+});
 
 export interface AddPaymentMethodDialogProps {
   open: boolean;
@@ -214,7 +209,7 @@ export function AddPaymentMethodDialog({
                   )}
                 >
                   <span className="block text-[11px] font-bold text-foreground">
-                    {ar ? option.ar : option.en}
+                    {paymentMethodLabel(option.value, ar ? "ar" : "en")}
                   </span>
                   <span className="mt-0.5 block text-[10px] text-muted-foreground">
                     {option.hint}

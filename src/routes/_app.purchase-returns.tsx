@@ -62,7 +62,10 @@ import { RecordsViewToggle } from "@/components/ui/records-view-toggle";
 import { usePersistedViewMode } from "@/hooks/use-persisted-view-mode";
 import { type DataTableColumn, type DataTableSort } from "@/components/ui/data-table";
 import { useBreakpoint } from "@/design/breakpoints";
-import { addReturnableQuantities, quantityIncrementDecimals } from "@/lib/invoice-returnable-quantities";
+import {
+  addReturnableQuantities,
+  quantityIncrementDecimals,
+} from "@/lib/invoice-returnable-quantities";
 import { translateRpcError } from "@/lib/errors/rpc-errors";
 
 export const Route = createFileRoute("/_app/purchase-returns")({
@@ -729,18 +732,22 @@ function NewPurchaseReturn({
   const filtered = useMemo(
     () =>
       invoiceItems
-        .filter(
-          (item) => {
-            const p = item.products;
-            if (!p || Number(item.returnable_entered_quantity ?? item.entered_quantity ?? item.quantity ?? 0) <= 0) return false;
-            return (
+        .filter((item) => {
+          const p = item.products;
+          if (
+            !p ||
+            Number(
+              item.returnable_entered_quantity ?? item.entered_quantity ?? item.quantity ?? 0,
+            ) <= 0
+          )
+            return false;
+          return (
             !search ||
             (p.name ?? "").toLowerCase().includes(search.toLowerCase()) ||
             (p.name_ar ?? "").includes(search) ||
             p.sku?.toLowerCase().includes(search.toLowerCase())
-            );
-          },
-        )
+          );
+        })
         .slice(0, 8),
     [invoiceItems, search],
   );
@@ -750,9 +757,18 @@ function NewPurchaseReturn({
     if (!p || !item.id) return;
     setLines((l) => {
       const ex = l.find((x) => x.invoice_item_id === item.id);
-      if (ex) return l.map((x) => (x.invoice_item_id === item.id ? { ...x, quantity: Math.min(x.max_quantity, x.quantity + x.quantity_step) } : x));
-      const maxQuantity = Number(item.returnable_entered_quantity ?? item.entered_quantity ?? item.quantity ?? 9999);
-      const quantityStep = Number(item.returnable_quantity_increment ?? item.uom_quantity_increment ?? 0.001);
+      if (ex)
+        return l.map((x) =>
+          x.invoice_item_id === item.id
+            ? { ...x, quantity: Math.min(x.max_quantity, x.quantity + x.quantity_step) }
+            : x,
+        );
+      const maxQuantity = Number(
+        item.returnable_entered_quantity ?? item.entered_quantity ?? item.quantity ?? 9999,
+      );
+      const quantityStep = Number(
+        item.returnable_quantity_increment ?? item.uom_quantity_increment ?? 0.001,
+      );
       const initialQuantity = Math.min(maxQuantity, Math.ceil(1 / quantityStep) * quantityStep);
       return [
         ...l,
@@ -763,7 +779,10 @@ function NewPurchaseReturn({
           quantity: initialQuantity,
           max_quantity: maxQuantity,
           uom_id: item.uom_id ?? null,
-          unit_label: item.uom?.name_ar || item.uom?.name || (lang === "ar" ? "وحدة الفاتورة" : "Invoice unit"),
+          unit_label:
+            item.uom?.name_ar ||
+            item.uom?.name ||
+            (lang === "ar" ? "وحدة الفاتورة" : "Invoice unit"),
           quantity_step: quantityStep,
           unit_cost: Number(item.entered_unit_cost ?? item.unit_cost ?? 0),
           tax_per_unit:
@@ -792,12 +811,26 @@ function NewPurchaseReturn({
 
   const total =
     Math.round(
-      lines.reduce((a, l) => a + l.quantity * (l.unit_cost * invoiceDiscountFactor + l.tax_per_unit), 0) * 100,
+      lines.reduce(
+        (a, l) => a + l.quantity * (l.unit_cost * invoiceDiscountFactor + l.tax_per_unit),
+        0,
+      ) * 100,
     ) / 100;
 
   async function save() {
-    if (lines.some((line) => Math.abs(line.quantity / line.quantity_step - Math.round(line.quantity / line.quantity_step)) > 1e-7)) {
-      toast.error(isRtl ? "الكمية يجب أن تطابق خطوة الوحدة المسجلة في الفاتورة الأصلية" : "Quantity must follow the unit increment saved on the original invoice");
+    if (
+      lines.some(
+        (line) =>
+          Math.abs(
+            line.quantity / line.quantity_step - Math.round(line.quantity / line.quantity_step),
+          ) > 1e-7,
+      )
+    ) {
+      toast.error(
+        isRtl
+          ? "الكمية يجب أن تطابق خطوة الوحدة المسجلة في الفاتورة الأصلية"
+          : "Quantity must follow the unit increment saved on the original invoice",
+      );
       return;
     }
     if (!warehouseId || !supplierId || lines.length === 0) {
@@ -951,7 +984,11 @@ function NewPurchaseReturn({
                     className="flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-accent text-start"
                     onClick={() => addLine(item)}
                   >
-                    <span>{lang === "ar" ? item.products?.name_ar || item.products?.name : item.products?.name || item.products?.name_ar}</span>
+                    <span>
+                      {lang === "ar"
+                        ? item.products?.name_ar || item.products?.name
+                        : item.products?.name || item.products?.name_ar}
+                    </span>
                     <span className="font-mono text-xs text-muted-foreground">
                       {money(Number(item.entered_unit_cost ?? item.unit_cost ?? 0))}
                     </span>
@@ -977,7 +1014,14 @@ function NewPurchaseReturn({
                       <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
                         <span>{item.products?.sku ?? "—"}</span>
                         <span>
-                          {Number(item.returnable_entered_quantity ?? item.entered_quantity ?? item.quantity)} {item.uom?.name_ar || item.uom?.name || (lang === "ar" ? "وحدة الفاتورة" : "Invoice unit")}
+                          {Number(
+                            item.returnable_entered_quantity ??
+                              item.entered_quantity ??
+                              item.quantity,
+                          )}{" "}
+                          {item.uom?.name_ar ||
+                            item.uom?.name ||
+                            (lang === "ar" ? "وحدة الفاتورة" : "Invoice unit")}
                         </span>
                       </div>
                     </button>
@@ -1004,7 +1048,10 @@ function NewPurchaseReturn({
                 <TableBody>
                   {lines.map((l) => (
                     <TableRow key={l.invoice_item_id}>
-                      <TableCell className="font-medium">{l.name}<span className="ms-2 text-xs text-muted-foreground">{l.unit_label}</span></TableCell>
+                      <TableCell className="font-medium">
+                        {l.name}
+                        <span className="ms-2 text-xs text-muted-foreground">{l.unit_label}</span>
+                      </TableCell>
                       <TableCell>
                         {/* الكمية المُوحّدة: أرقام في المنتصف، بلا عجلة ماوس. */}
                         <QuantityInput
@@ -1013,7 +1060,9 @@ function NewPurchaseReturn({
                           min={l.quantity_step}
                           aria-label={lang === "ar" ? "الكمية" : "Quantity"}
                           value={l.quantity}
-                          onValueChange={(v) => updateQty(l.invoice_item_id, v == null ? l.quantity_step : v)}
+                          onValueChange={(v) =>
+                            updateQty(l.invoice_item_id, v == null ? l.quantity_step : v)
+                          }
                           className="h-8 w-20"
                         />
                       </TableCell>

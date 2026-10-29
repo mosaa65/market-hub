@@ -68,6 +68,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { NumberInput, fieldSurfaceClass } from "@/components/ui/input";
+import { QuantityInput } from "@/components/ui/quantity-input";
 import { FormField } from "@/components/ui/form-field";
 import { Modal, ConfirmDialog } from "@/components/ui/modal";
 import { DataTable, type DataTableColumn, type DataTableSort } from "@/components/ui/data-table";
@@ -145,6 +146,7 @@ type ProductRow = {
   cost_price: number;
   tax_rate: number;
   min_stock: number;
+  package_type_id: string | null;
   /** الوزن الصافي الثابت للعبوة؛ يستخدم لاقتراح كمية الكيس في الشراء والطحن. */
   package_weight_kg: number | null;
   shelf_location: string | null;
@@ -196,6 +198,15 @@ type ProductBaseRow = Omit<
   | "quality"
   | "compatibilities"
 >;
+
+type PackagingTypeRow = {
+  id: string;
+  code: string;
+  name_ar: string;
+  name_en: string | null;
+  is_active: boolean;
+  sort_order: number;
+};
 
 /** Neutral reference counts — used before the guard has answered. */
 const EMPTY_COUNTS: ReferenceCounts = {
@@ -343,7 +354,7 @@ function ProductsPage() {
       // disappear from the grid.
       const { data: page, error: productError } = await (supabase.from("products") as any)
         .select(
-          "id, name, name_ar, sku, barcode, sale_price, cost_price, tax_rate, min_stock, package_weight_kg, is_active, category_id, brand_id, unit_id, base_uom_id, sales_uom_id, purchase_uom_id, item_nature, item_class, inventory_policy, tracking, costing_method, batch_dispatch_strategy, is_sellable, is_purchasable",
+          "id, name, name_ar, sku, barcode, sale_price, cost_price, tax_rate, min_stock, package_type_id, package_weight_kg, is_active, category_id, brand_id, unit_id, base_uom_id, sales_uom_id, purchase_uom_id, item_nature, item_class, inventory_policy, tracking, costing_method, batch_dispatch_strategy, is_sellable, is_purchasable",
         )
         // أصناف أمانات المطحنة تُدار من واجهتها المستقلة، وليست ضمن كتالوج الشركة.
         .eq("is_custody_item", false)
@@ -490,7 +501,7 @@ function ProductsPage() {
     queryKey: productKeys.meta(),
     staleTime: 10 * 60 * 1000,
     queryFn: async () => {
-      const [c, b, uResponse, origins, qualities] = await Promise.all([
+      const [c, b, uResponse, origins, qualities, packagingTypes] = await Promise.all([
         supabase.from("categories").select("id, name, name_ar").order("name"),
         supabase.from("brands").select("id, name, name_ar").order("name"),
         (supabase as any)
@@ -505,6 +516,11 @@ function ProductsPage() {
           .from("quality_grades")
           .select("id, code, name, name_ar, sort_order")
           .order("sort_order"),
+        (supabase as any)
+          .from("packaging_types")
+          .select("id, code, name_ar, name_en, is_active, sort_order")
+          .order("sort_order")
+          .order("code"),
       ]);
       const u = uResponse.error
         ? await supabase.from("units").select("id, name, name_ar, short_name").order("name_ar")
@@ -515,6 +531,7 @@ function ProductsPage() {
         units: u.data ?? [],
         origins: origins.data ?? [],
         qualities: qualities.data ?? [],
+        packagingTypes: (packagingTypes.data ?? []) as PackagingTypeRow[],
       };
     },
   });
@@ -695,7 +712,8 @@ function ProductsPage() {
         options: (meta.units as { id: string; name: string; name_ar?: string | null }[]).map(
           (unit) => ({
             value: unit.id,
-            label: (lang === "ar" ? unit.name_ar || unit.name : unit.name || unit.name_ar) || unit.id,
+            label:
+              (lang === "ar" ? unit.name_ar || unit.name : unit.name || unit.name_ar) || unit.id,
           }),
         ),
       });
@@ -1352,7 +1370,9 @@ function ProductsPage() {
                   const other = lang === "ar" ? p.name : p.name_ar;
                   const categoryName = categoryLabel(p.category);
                   const hasMinStockThreshold =
-                    p.inventory_policy === "TRACKED" && p.min_stock != null && Number(p.min_stock) > 0;
+                    p.inventory_policy === "TRACKED" &&
+                    p.min_stock != null &&
+                    Number(p.min_stock) > 0;
 
                   return (
                     <div
@@ -1593,7 +1613,9 @@ function ProductsPage() {
                   const categoryName = categoryLabel(p.category);
 
                   const hasMinStockThreshold =
-                    p.inventory_policy === "TRACKED" && p.min_stock != null && Number(p.min_stock) > 0;
+                    p.inventory_policy === "TRACKED" &&
+                    p.min_stock != null &&
+                    Number(p.min_stock) > 0;
                   const barColor = !p.is_active
                     ? "bg-muted-foreground/30"
                     : "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]";
@@ -1942,18 +1964,20 @@ function ProductsPage() {
                   )}
 
                   {selectedProductDetail.inventory_policy === "TRACKED" && (
-                  <div className="rounded-2xl border border-border/70 bg-card p-3.5 space-y-0.5">
-                    <span className="text-[11px] font-bold text-muted-foreground block">
-                      {lang === "ar" ? "حد التنبيه الأدنى للمخزون" : "Minimum stock alert threshold"}
-                    </span>
-                    <p className="font-mono text-lg sm:text-xl font-black text-amber-500">
-                      {selectedProductDetail.min_stock > 0
-                        ? qtyCell(selectedProductDetail.min_stock)
-                        : lang === "ar"
-                          ? "غير محدد"
-                          : "Not set"}
-                    </p>
-                  </div>
+                    <div className="rounded-2xl border border-border/70 bg-card p-3.5 space-y-0.5">
+                      <span className="text-[11px] font-bold text-muted-foreground block">
+                        {lang === "ar"
+                          ? "حد التنبيه الأدنى للمخزون"
+                          : "Minimum stock alert threshold"}
+                      </span>
+                      <p className="font-mono text-lg sm:text-xl font-black text-amber-500">
+                        {selectedProductDetail.min_stock > 0
+                          ? qtyCell(selectedProductDetail.min_stock)
+                          : lang === "ar"
+                            ? "غير محدد"
+                            : "Not set"}
+                      </p>
+                    </div>
                   )}
 
                   <div className="rounded-2xl border border-border/70 bg-card p-3.5 space-y-0.5">
@@ -1966,19 +1990,42 @@ function ProductsPage() {
                   </div>
 
                   {selectedProductDetail.inventory_policy === "TRACKED" &&
-                    selectedProductDetail.package_weight_kg != null && (
-                    <div className="rounded-2xl border border-border/70 bg-card p-3.5 space-y-0.5">
-                      <span className="text-[11px] font-bold text-muted-foreground block">
-                        {lang === "ar"
-                          ? "الوزن الصافي المعتاد للعبوة (كجم)"
-                          : "Usual net package weight (kg)"}
-                      </span>
-                      <p className="font-mono text-lg sm:text-xl font-black text-foreground">
-                        {toSystemDigits(selectedProductDetail.package_weight_kg.toString())}{" "}
-                        {lang === "ar" ? "كجم" : "kg"}
-                      </p>
-                    </div>
-                  )}
+                    showDetail("packageWeight") &&
+                    (selectedProductDetail.package_type_id != null ||
+                      selectedProductDetail.package_weight_kg != null) && (
+                      <div className="rounded-2xl border border-border/70 bg-card p-3.5 space-y-0.5">
+                        <span className="text-[11px] font-bold text-muted-foreground block">
+                          {lang === "ar" ? "معلومات العبوة" : "Package details"}
+                        </span>
+                        {selectedProductDetail.package_type_id && (
+                          <p className="text-sm font-semibold text-foreground">
+                            {lang === "ar" ? "النوع: " : "Type: "}
+                            {(() => {
+                              const packageType = meta?.packagingTypes.find(
+                                (item) => item.id === selectedProductDetail.package_type_id,
+                              );
+                              if (!packageType) {
+                                return lang === "ar"
+                                  ? "نوع محفوظ غير متاح"
+                                  : "Saved type unavailable";
+                              }
+                              return lang === "ar"
+                                ? packageType.name_ar || packageType.name_en || packageType.code
+                                : packageType.name_en || packageType.name_ar || packageType.code;
+                            })()}
+                          </p>
+                        )}
+                        {selectedProductDetail.package_weight_kg != null && (
+                          <p className="font-mono text-lg sm:text-xl font-black text-foreground">
+                            {lang === "ar" ? "الوزن الصافي المعتاد: " : "Usual net weight: "}
+                            {toSystemDigits(
+                              selectedProductDetail.package_weight_kg.toString(),
+                            )}{" "}
+                            {lang === "ar" ? "كجم" : "kg"}
+                          </p>
+                        )}
+                      </div>
+                    )}
 
                   <div className="rounded-2xl border border-border/70 bg-card p-3.5 space-y-0.5">
                     <span className="text-[11px] font-bold text-muted-foreground block">
@@ -2212,7 +2259,9 @@ function ProductsPage() {
                     {selectedProductDetail.inventory_policy === "TRACKED" && (
                       <div className="flex items-center justify-between">
                         <span className="text-muted-foreground">
-                          {lang === "ar" ? "تقييم المخزون (إعداد الشركة)" : "Stock valuation (company setting)"}
+                          {lang === "ar"
+                            ? "تقييم المخزون (إعداد الشركة)"
+                            : "Stock valuation (company setting)"}
                         </span>
                         <span className="font-semibold text-foreground">
                           {COSTING_METHOD_LABELS[companyCostingMethod]?.[
@@ -2353,8 +2402,10 @@ function ProductsPage() {
               units: [],
               origins: [],
               qualities: [],
+              packagingTypes: [],
             }
           }
+          canManageReferenceData={hasRole("owner") || hasRole("manager")}
           onClose={() => {
             setOpen(false);
             setPrefillBarcode(undefined);
@@ -2497,6 +2548,7 @@ function ProductDialog({
   userId,
   canViewCost = true,
   canManageUoms = false,
+  canManageReferenceData = false,
   companyCostingMethod,
   meta,
   onClose,
@@ -2521,11 +2573,13 @@ function ProductDialog({
     }[];
     origins: { id: string; code: string; name: string; name_ar: string }[];
     qualities: { id: string; name: string; name_ar: string; code?: string; sort_order?: number }[];
+    packagingTypes: PackagingTypeRow[];
   };
+  canManageReferenceData?: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
-  type QuickAddKind = "brand" | "unit" | "origin" | "quality";
+  type QuickAddKind = "brand" | "unit" | "origin" | "quality" | "packagingType";
   const { t, lang } = useI18n();
   const { config } = useCatalogModules();
   const dialogQc = useQueryClient();
@@ -2583,8 +2637,11 @@ function ProductDialog({
     sale_price: initial?.sale_price != null ? String(initial.sale_price) : "",
     tax_rate: initial?.tax_rate != null ? String(initial.tax_rate) : "",
     min_stock:
-      initial?.min_stock != null ? String(initial.min_stock) : String(getStockSettings().defaultMinStock),
+      initial?.min_stock != null
+        ? String(initial.min_stock)
+        : String(getStockSettings().defaultMinStock),
     package_weight_kg: initial?.package_weight_kg != null ? String(initial.package_weight_kg) : "",
+    package_type_id: initial?.package_type_id ?? "",
     shelf_location: initial?.shelf_location ?? "",
     origin_id: initial?.origin_id ?? "",
     quality_grade_id: initial?.quality_grade_id ?? "",
@@ -2617,7 +2674,9 @@ function ProductDialog({
       if (!initial?.id) return { rows: [], prices: [], barcodes: [] };
       const { data: rows, error: rowsError } = await (supabase as any)
         .from("product_uoms")
-        .select("id, unit_id, factor_to_base, conversion_basis, conversion_note, quantity_increment, can_purchase, can_sell, is_default_purchase, is_default_sale, is_base")
+        .select(
+          "id, unit_id, factor_to_base, conversion_basis, conversion_note, quantity_increment, can_purchase, can_sell, is_default_purchase, is_default_sale, is_base",
+        )
         .eq("product_id", initial.id)
         .order("is_base", { ascending: false });
       if (rowsError) throw rowsError;
@@ -2664,9 +2723,7 @@ function ProductDialog({
       setAlternateUoms([]);
       return;
     }
-    const priceById = new Map(
-      data.prices.map((price: any) => [price.product_uom_id, price]),
-    );
+    const priceById = new Map(data.prices.map((price: any) => [price.product_uom_id, price]));
     const codesById = new Map<string, { barcode: string; is_primary: boolean }[]>();
     for (const code of data.barcodes as any[]) {
       const current = codesById.get(code.product_uom_id) ?? [];
@@ -2674,14 +2731,20 @@ function ProductDialog({
       codesById.set(code.product_uom_id, current);
     }
     const base = (data.rows as any[]).find((row) => row.is_base);
-    setSalesUomId(initial?.sales_uom_id ?? base?.unit_id ?? initial?.base_uom_id ?? initial?.unit_id ?? "");
-    setPurchaseUomId(initial?.purchase_uom_id ?? base?.unit_id ?? initial?.base_uom_id ?? initial?.unit_id ?? "");
+    setSalesUomId(
+      initial?.sales_uom_id ?? base?.unit_id ?? initial?.base_uom_id ?? initial?.unit_id ?? "",
+    );
+    setPurchaseUomId(
+      initial?.purchase_uom_id ?? base?.unit_id ?? initial?.base_uom_id ?? initial?.unit_id ?? "",
+    );
     setAlternateUoms(
       (data.rows as any[])
         .filter((row) => !row.is_base)
         .map((row) => {
           const price = priceById.get(row.id) as any;
-          const codes = (codesById.get(row.id) ?? []).sort((a, b) => Number(b.is_primary) - Number(a.is_primary));
+          const codes = (codesById.get(row.id) ?? []).sort(
+            (a, b) => Number(b.is_primary) - Number(a.is_primary),
+          );
           return {
             unit_id: row.unit_id,
             factor_to_base: String(row.factor_to_base),
@@ -2700,14 +2763,31 @@ function ProductDialog({
 
   useEffect(() => {
     const salesEnabled = alternateUoms.some((row) => row.unit_id === salesUomId && row.can_sell);
-    const purchaseEnabled = alternateUoms.some((row) => row.unit_id === purchaseUomId && row.can_purchase);
-    if (policy.is_sellable && form.unit_id && (!salesUomId || (salesUomId !== form.unit_id && !salesEnabled))) {
+    const purchaseEnabled = alternateUoms.some(
+      (row) => row.unit_id === purchaseUomId && row.can_purchase,
+    );
+    if (
+      policy.is_sellable &&
+      form.unit_id &&
+      (!salesUomId || (salesUomId !== form.unit_id && !salesEnabled))
+    ) {
       setSalesUomId(form.unit_id);
     }
-    if (policy.is_purchasable && form.unit_id && (!purchaseUomId || (purchaseUomId !== form.unit_id && !purchaseEnabled))) {
+    if (
+      policy.is_purchasable &&
+      form.unit_id &&
+      (!purchaseUomId || (purchaseUomId !== form.unit_id && !purchaseEnabled))
+    ) {
       setPurchaseUomId(form.unit_id);
     }
-  }, [form.unit_id, salesUomId, purchaseUomId, alternateUoms, policy.is_sellable, policy.is_purchasable]);
+  }, [
+    form.unit_id,
+    salesUomId,
+    purchaseUomId,
+    alternateUoms,
+    policy.is_sellable,
+    policy.is_purchasable,
+  ]);
 
   useKeyboardWedge({
     onScan: (barcode) => {
@@ -2734,22 +2814,40 @@ function ProductDialog({
       return;
     }
     if (canManageUoms && productUomSchemaReady && initial && productUomSettingsQuery.isLoading) {
-      toast.error(lang === "ar" ? "انتظر تحميل وحدات الصنف أولًا" : "Wait for the item's units to load first.");
+      toast.error(
+        lang === "ar"
+          ? "انتظر تحميل وحدات الصنف أولًا"
+          : "Wait for the item's units to load first.",
+      );
       return;
     }
     if (canManageUoms && productUomSchemaReady && initial && productUomSettingsQuery.isError) {
-      toast.error(lang === "ar" ? "تعذر تحميل إعدادات الوحدات؛ لم يُحفظ الصنف" : "Could not load unit settings; the item was not saved.");
+      toast.error(
+        lang === "ar"
+          ? "تعذر تحميل إعدادات الوحدات؛ لم يُحفظ الصنف"
+          : "Could not load unit settings; the item was not saved.",
+      );
       return;
     }
     if (canManageUoms && productUomSchemaReady && alternateUoms.length > 0 && !form.unit_id) {
-      toast.error(lang === "ar" ? "اختر وحدة أساس قبل حفظ الوحدات البديلة" : "Choose a base unit before saving alternate units.");
+      toast.error(
+        lang === "ar"
+          ? "اختر وحدة أساس قبل حفظ الوحدات البديلة"
+          : "Choose a base unit before saving alternate units.",
+      );
       return;
     }
     if (
-      canManageUoms && productUomSchemaReady && form.unit_id &&
+      canManageUoms &&
+      productUomSchemaReady &&
+      form.unit_id &&
       ((policy.is_sellable && !salesUomId) || (policy.is_purchasable && !purchaseUomId))
     ) {
-      toast.error(lang === "ar" ? "حدد وحدة افتراضية للبيع والشراء المفعّلين" : "Choose a default unit for each enabled sales or purchase direction.");
+      toast.error(
+        lang === "ar"
+          ? "حدد وحدة افتراضية للبيع والشراء المفعّلين"
+          : "Choose a default unit for each enabled sales or purchase direction.",
+      );
       return;
     }
     setSaving(true);
@@ -2794,6 +2892,10 @@ function ProductDialog({
               ? null
               : Number(form.package_weight_kg) || null
             : null,
+        package_type_id:
+          policy.item_nature === "GOOD" && policy.inventory_policy === "TRACKED"
+            ? form.package_type_id || null
+            : null,
         shelf_location: form.shelf_location.trim() || null,
         origin_id: config.enableOrigins ? form.origin_id || null : null,
         quality_grade_id: config.enableQualityGrades ? form.quality_grade_id || null : null,
@@ -2801,10 +2903,7 @@ function ProductDialog({
         item_nature: policy.item_nature,
         inventory_policy: policy.inventory_policy,
         tracking: policy.tracking,
-        costing_method:
-          policy.inventory_policy === "TRACKED"
-            ? companyCostingMethod
-            : "NONE",
+        costing_method: policy.inventory_policy === "TRACKED" ? companyCostingMethod : "NONE",
         is_sellable: policy.is_sellable,
         is_purchasable: policy.is_purchasable,
         batch_dispatch_strategy:
@@ -2841,11 +2940,17 @@ function ProductDialog({
 
       if (canManageUoms && productUomSchemaReady && config.enableUnits && form.unit_id) {
         const baseUnit = meta.units.find((unit) => unit.id === form.unit_id);
-        const baseIncrement = ["COUNT", "PACKAGING"].includes(baseUnit?.dimension_code ?? "") ? 1 : 0.001;
-        const allowedSalesId = alternateUoms.some((row) => row.unit_id === salesUomId && row.can_sell)
+        const baseIncrement = ["COUNT", "PACKAGING"].includes(baseUnit?.dimension_code ?? "")
+          ? 1
+          : 0.001;
+        const allowedSalesId = alternateUoms.some(
+          (row) => row.unit_id === salesUomId && row.can_sell,
+        )
           ? salesUomId
           : form.unit_id;
-        const allowedPurchaseId = alternateUoms.some((row) => row.unit_id === purchaseUomId && row.can_purchase)
+        const allowedPurchaseId = alternateUoms.some(
+          (row) => row.unit_id === purchaseUomId && row.can_purchase,
+        )
           ? purchaseUomId
           : form.unit_id;
         const unitPayload = [
@@ -2874,7 +2979,8 @@ function ProductDialog({
               can_sell: policy.is_sellable && row.can_sell,
               can_purchase: policy.is_purchasable && row.can_purchase,
               default_sale: policy.is_sellable && row.can_sell && allowedSalesId === row.unit_id,
-              default_purchase: policy.is_purchasable && row.can_purchase && allowedPurchaseId === row.unit_id,
+              default_purchase:
+                policy.is_purchasable && row.can_purchase && allowedPurchaseId === row.unit_id,
               is_base: false,
               sale_price: row.sale_price.trim() === "" ? null : Number(row.sale_price),
               purchase_price: row.purchase_price.trim() === "" ? null : Number(row.purchase_price),
@@ -2890,7 +2996,11 @@ function ProductDialog({
                   .split(/\r?\n/)
                   .map((barcode) => barcode.trim())
                   .filter(Boolean)
-                  .map((barcode, index) => ({ unit_id: row.unit_id, barcode, is_primary: index === 0 }))
+                  .map((barcode, index) => ({
+                    unit_id: row.unit_id,
+                    barcode,
+                    is_primary: index === 0,
+                  }))
               : [],
           ),
         ];
@@ -3000,9 +3110,16 @@ function ProductDialog({
       toast.error(lang === "ar" ? "أدخل اختصار الوحدة" : "Enter the unit abbreviation");
       return;
     }
-    if (kind === "unit" && !["PACKAGING", "CUSTOM"].includes(quickAddUnitDimension) &&
-      (!Number.isFinite(Number(quickAddUnitFactor)) || Number(quickAddUnitFactor) <= 0)) {
-      toast.error(lang === "ar" ? "أدخل معامل تحويل قياسيًا أكبر من صفر" : "Enter a positive standard conversion factor.");
+    if (
+      kind === "unit" &&
+      !["PACKAGING", "CUSTOM"].includes(quickAddUnitDimension) &&
+      (!Number.isFinite(Number(quickAddUnitFactor)) || Number(quickAddUnitFactor) <= 0)
+    ) {
+      toast.error(
+        lang === "ar"
+          ? "أدخل معامل تحويل قياسيًا أكبر من صفر"
+          : "Enter a positive standard conversion factor.",
+      );
       return;
     }
     if (kind === "origin" && !/^[a-z]{2}$/i.test(quickAddCode.trim())) {
@@ -3013,16 +3130,46 @@ function ProductDialog({
       toast.error(lang === "ar" ? "أدخل رمز درجة الجودة" : "Enter a quality grade code");
       return;
     }
+    if (kind === "packagingType" && !/^[a-z0-9_-]{1,20}$/i.test(quickAddCode.trim())) {
+      toast.error(
+        lang === "ar"
+          ? "أدخل رمزًا لنوع العبوة من 1 إلى 20 حرفًا أو رقمًا أو شرطة"
+          : "Enter a package type code using 1–20 letters, numbers, underscores or hyphens",
+      );
+      return;
+    }
+    if (
+      kind === "packagingType" &&
+      ((quickAddNameAr.trim() || quickAddNameEn.trim()).length > 60 ||
+        quickAddNameEn.trim().length > 60)
+    ) {
+      toast.error(
+        lang === "ar"
+          ? "يجب ألا يتجاوز اسم نوع العبوة 60 حرفًا"
+          : "Package type names must be 60 characters or fewer",
+      );
+      return;
+    }
 
     const tableByKind: Record<QuickAddKind, string> = {
       brand: "brands",
       unit: "units",
       origin: "countries_of_origin",
       quality: "quality_grades",
+      packagingType: "packaging_types",
     };
     const nameAr = quickAddNameAr.trim() || quickAddNameEn.trim();
     const name = quickAddNameEn.trim() || quickAddNameAr.trim();
-    const payload: Record<string, unknown> = { name, name_ar: nameAr };
+    const payload: Record<string, unknown> =
+      kind === "packagingType"
+        ? {
+            code: quickAddCode.trim().toUpperCase(),
+            name_ar: nameAr,
+            name_en: quickAddNameEn.trim() || null,
+            is_active: true,
+            sort_order: Math.max(0, ...meta.packagingTypes.map((item) => item.sort_order)) + 1,
+          }
+        : { name, name_ar: nameAr };
     if (kind === "unit") {
       payload.short_name = quickAddShortName.trim();
       payload.dimension_code = quickAddUnitDimension;
@@ -3045,13 +3192,21 @@ function ProductDialog({
         .single();
       if (error) throw error;
       const inserted = data as { id: string; name: string; name_ar: string | null };
-      const metaKey =
-        kind === "brand" ? "brands" : kind === "unit" ? "units" : kind === "origin" ? "origins" : "qualities";
+      const metaKeyByKind: Record<QuickAddKind, keyof typeof meta> = {
+        brand: "brands",
+        unit: "units",
+        origin: "origins",
+        quality: "qualities",
+        packagingType: "packagingTypes",
+      };
+      const metaKey = metaKeyByKind[kind];
       dialogQc.setQueryData(productKeys.meta(), (current: typeof meta | undefined) => {
         const next = { ...(current ?? meta) };
-        const rows = [...next[metaKey], data] as (typeof meta)[typeof metaKey];
+        const rows = [...(next[metaKey] as unknown[]), data] as any[];
         rows.sort((a: any, b: any) => {
-          if (kind === "quality") return (a.sort_order ?? 0) - (b.sort_order ?? 0);
+          if (kind === "quality" || kind === "packagingType") {
+            return (a.sort_order ?? 0) - (b.sort_order ?? 0);
+          }
           return String(a.name_ar || a.name).localeCompare(String(b.name_ar || b.name), "ar");
         });
         (next as any)[metaKey] = rows;
@@ -3063,6 +3218,7 @@ function ProductDialog({
         ...(kind === "unit" ? { unit_id: inserted.id } : {}),
         ...(kind === "origin" ? { origin_id: inserted.id } : {}),
         ...(kind === "quality" ? { quality_grade_id: inserted.id } : {}),
+        ...(kind === "packagingType" ? { package_type_id: inserted.id } : {}),
       }));
       setQuickAddKind(null);
       toast.success(lang === "ar" ? "تمت الإضافة واختيار العنصر" : "Added and selected");
@@ -3101,7 +3257,9 @@ function ProductDialog({
                 value={quickAddShortName}
                 onChange={(event) => setQuickAddShortName(event.target.value)}
                 dir="auto"
-                placeholder={lang === "ar" ? "اختصار الوحدة، مثل كجم" : "Unit abbreviation, e.g. kg"}
+                placeholder={
+                  lang === "ar" ? "اختصار الوحدة، مثل كجم" : "Unit abbreviation, e.g. kg"
+                }
                 aria-label={lang === "ar" ? "اختصار الوحدة" : "Unit abbreviation"}
               />
               <select
@@ -3118,21 +3276,36 @@ function ProductDialog({
                   ["VOLUME", lang === "ar" ? "حجم" : "Volume"],
                   ["LENGTH", lang === "ar" ? "طول" : "Length"],
                   ["AREA", lang === "ar" ? "مساحة" : "Area"],
-                ].map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                ].map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
               </select>
-              {!(["CUSTOM", "PACKAGING"].includes(quickAddUnitDimension)) && (
-                <VortexTextInput
-                  value={quickAddUnitFactor}
-                  onChange={(event) => setQuickAddUnitFactor(event.target.value)}
+              {!["CUSTOM", "PACKAGING"].includes(quickAddUnitDimension) && (
+                /*
+                 * معامل تحويل الوحدة رقم مخزون حقيقي لا يُكتب بالخطأ: حقل
+                 * `type="number"` يتغيّر بعجلة الفاوس فوقه بلا إرادة المستخدم،
+                 * فيفسد معامل كل كمية تُرحَّل بهذه الوحدة. `QuantityInput`
+                 * يمنع ذلك ويضبط الخانات العشرية والحد الأدنى.
+                 */
+                <QuantityInput
+                  value={quickAddUnitFactor === "" ? null : Number(quickAddUnitFactor)}
+                  onValueChange={(next) => setQuickAddUnitFactor(next == null ? "" : String(next))}
+                  decimals={6}
+                  min={0.000000000001}
                   dir="ltr"
-                  type="number"
-                  min="0.000000000001"
-                  step="any"
-                  placeholder={lang === "ar" ? "المعامل إلى وحدة البعد المرجعية" : "Factor to the dimension reference unit"}
-                  aria-label={lang === "ar" ? "معامل التحويل القياسي" : "Standard conversion factor"}
+                  placeholder={
+                    lang === "ar"
+                      ? "المعامل إلى وحدة البعد المرجعية"
+                      : "Factor to the dimension reference unit"
+                  }
+                  aria-label={
+                    lang === "ar" ? "معامل التحويل القياسي" : "Standard conversion factor"
+                  }
                 />
               )}
-              {(["CUSTOM", "PACKAGING"].includes(quickAddUnitDimension)) && (
+              {["CUSTOM", "PACKAGING"].includes(quickAddUnitDimension) && (
                 <p className="text-[11px] leading-5 text-muted-foreground sm:col-span-2">
                   {lang === "ar"
                     ? "حدد محتوى هذه العبوة أو معاملها الخاص لكل صنف في قسم الوحدات أدناه."
@@ -3141,14 +3314,30 @@ function ProductDialog({
               )}
             </>
           )}
-          {(kind === "origin" || kind === "quality") && (
+          {(kind === "origin" || kind === "quality" || kind === "packagingType") && (
             <VortexTextInput
               value={quickAddCode}
               onChange={(event) => setQuickAddCode(event.target.value)}
               dir="ltr"
-              placeholder={kind === "origin" ? "رمز البلد (YE)" : "رمز الجودة"}
-              aria-label={kind === "origin" ? "رمز البلد" : "رمز الجودة"}
-              maxLength={kind === "origin" ? 2 : undefined}
+              placeholder={
+                kind === "origin"
+                  ? "رمز البلد (YE)"
+                  : kind === "quality"
+                    ? "رمز الجودة"
+                    : lang === "ar"
+                      ? "رمز نوع العبوة (BAG)"
+                      : "Package type code (BAG)"
+              }
+              aria-label={
+                kind === "origin"
+                  ? "رمز البلد"
+                  : kind === "quality"
+                    ? "رمز الجودة"
+                    : lang === "ar"
+                      ? "رمز نوع العبوة"
+                      : "Package type code"
+              }
+              maxLength={kind === "origin" ? 2 : kind === "packagingType" ? 20 : undefined}
             />
           )}
         </div>
@@ -3156,7 +3345,12 @@ function ProductDialog({
           <Button type="button" variant="ghost" size="sm" onClick={() => setQuickAddKind(null)}>
             {t("common.cancel")}
           </Button>
-          <Button type="button" size="sm" loading={savingQuickAdd} onClick={() => void addCatalogOptionQuickly()}>
+          <Button
+            type="button"
+            size="sm"
+            loading={savingQuickAdd}
+            onClick={() => void addCatalogOptionQuickly()}
+          >
             {lang === "ar" ? "إضافة واختيار" : "Add and select"}
           </Button>
         </div>
@@ -3185,7 +3379,9 @@ function ProductDialog({
             form="product-form"
             disabled={
               saving ||
-              (canManageUoms && productUomSchemaReady && !!initial &&
+              (canManageUoms &&
+                productUomSchemaReady &&
+                !!initial &&
                 (productUomSettingsQuery.isLoading || productUomSettingsQuery.isError))
             }
             className="flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-foreground text-xs font-bold text-background shadow-lg shadow-foreground/15 transition hover:opacity-95 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 sm:text-sm"
@@ -3400,7 +3596,10 @@ function ProductDialog({
                         aria-describedby={p["aria-describedby"]}
                         value={form.unit_id}
                         onChange={(e) => setForm({ ...form, unit_id: e.target.value })}
-                        className={cn(fieldSurfaceClass, "h-10 min-w-0 flex-1 px-4 text-sm font-medium")}
+                        className={cn(
+                          fieldSurfaceClass,
+                          "h-10 min-w-0 flex-1 px-4 text-sm font-medium",
+                        )}
                       >
                         <option value="">
                           {lang === "ar" ? "اختر وحدة القياس..." : "Select unit..."}
@@ -3433,11 +3632,15 @@ function ProductDialog({
               <div className="sm:col-span-2">
                 {productUomSettingsQuery.isLoading && initial ? (
                   <div className="rounded-xl border border-border/60 bg-card/70 p-4 text-xs text-muted-foreground">
-                    {lang === "ar" ? "جارٍ تحميل وحدات الصنف وأسعاره وباركوداته..." : "Loading item units, prices and barcodes..."}
+                    {lang === "ar"
+                      ? "جارٍ تحميل وحدات الصنف وأسعاره وباركوداته..."
+                      : "Loading item units, prices and barcodes..."}
                   </div>
                 ) : productUomSettingsQuery.isError && initial ? (
                   <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-xs text-destructive">
-                    {lang === "ar" ? "تعذر تحميل إعدادات وحدات هذا الصنف، لذلك لن يمكن حفظ التغييرات حتى إعادة المحاولة." : "This item's unit settings could not be loaded, so changes cannot be saved until they load successfully."}
+                    {lang === "ar"
+                      ? "تعذر تحميل إعدادات وحدات هذا الصنف، لذلك لن يمكن حفظ التغييرات حتى إعادة المحاولة."
+                      : "This item's unit settings could not be loaded, so changes cannot be saved until they load successfully."}
                   </div>
                 ) : (
                   <ProductUomSettingsEditor
@@ -3458,13 +3661,16 @@ function ProductDialog({
               </div>
             )}
 
-            {config.enableUnits && canManageUoms && !productUomSchemaReady && !productUomSchemaQuery.isLoading && (
-              <p className="sm:col-span-2 rounded-xl border border-warning/40 bg-warning/10 p-3 text-xs leading-5 text-warning">
-                {lang === "ar"
-                  ? "إعداد الوحدات المتعددة غير متاح بعد في قاعدة البيانات. أُبقي اختيار وحدة الأساس الحالي فقط حتى تطبيق migrations 101–102."
-                  : "Multiple item units are not available in this database yet. The base-unit field remains available until migrations 101–102 are applied."}
-              </p>
-            )}
+            {config.enableUnits &&
+              canManageUoms &&
+              !productUomSchemaReady &&
+              !productUomSchemaQuery.isLoading && (
+                <p className="sm:col-span-2 rounded-xl border border-warning/40 bg-warning/10 p-3 text-xs leading-5 text-warning">
+                  {lang === "ar"
+                    ? "إعداد الوحدات المتعددة غير متاح بعد في قاعدة البيانات. أُبقي اختيار وحدة الأساس الحالي فقط حتى تطبيق migrations 101–102."
+                    : "Multiple item units are not available in this database yet. The base-unit field remains available until migrations 101–102 are applied."}
+                </p>
+              )}
 
             {showForm("sku") && (
               <FormField label={t("products.sku")}>
@@ -3608,62 +3814,133 @@ function ProductDialog({
             {policy.item_nature === "GOOD" &&
               policy.inventory_policy === "TRACKED" &&
               showForm("minStock") && (
-              <FormField
-                label={
-                  lang === "ar"
-                    ? "حد التنبيه الأدنى لهذا المنتج في المخزون"
-                    : "This product's minimum stock alert threshold"
-                }
-                hint={
-                  lang === "ar"
-                    ? "يظهر تنبيه النقص عندما يساوي رصيد المنتج بوحدة قياسه هذا الحد أو يقل عنه. لا ينشئ هذا الحقل طلب شراء تلقائيًا."
-                    : "A low-stock alert appears when this product's on-hand quantity in its unit reaches or falls below this value. This does not create a purchase order."
-                }
-              >
-                {(p) => (
-                  <NumberInput
-                    {...p}
-                    value={form.min_stock === "" ? null : Number(form.min_stock)}
-                    onValueChange={(v) =>
-                      setForm({ ...form, min_stock: v == null ? "" : String(v) })
-                    }
-                    min={0}
-                    decimal={false}
-                    placeholder="0"
-                  />
-                )}
-              </FormField>
-            )}
+                <FormField
+                  label={
+                    lang === "ar"
+                      ? "حد التنبيه الأدنى لهذا المنتج في المخزون"
+                      : "This product's minimum stock alert threshold"
+                  }
+                  hint={
+                    lang === "ar"
+                      ? "يظهر تنبيه النقص عندما يساوي رصيد المنتج بوحدة قياسه هذا الحد أو يقل عنه. لا ينشئ هذا الحقل طلب شراء تلقائيًا."
+                      : "A low-stock alert appears when this product's on-hand quantity in its unit reaches or falls below this value. This does not create a purchase order."
+                  }
+                >
+                  {(p) => (
+                    <NumberInput
+                      {...p}
+                      value={form.min_stock === "" ? null : Number(form.min_stock)}
+                      onValueChange={(v) =>
+                        setForm({ ...form, min_stock: v == null ? "" : String(v) })
+                      }
+                      min={0}
+                      decimal={false}
+                      placeholder="0"
+                    />
+                  )}
+                </FormField>
+              )}
 
             {policy.item_nature === "GOOD" &&
               policy.inventory_policy === "TRACKED" &&
               showForm("packageWeight") && (
-              <FormField
-                label={
-                  lang === "ar"
-                    ? "الوزن الصافي المعتاد للعبوة (كجم)"
-                    : "Usual net package weight (kg)"
-                }
-                hint={
-                  lang === "ar"
-                    ? "اختياري لأي سلعة مخزنية لها وزن صافٍ ثابت لكل كيس أو عبوة. يفيد في شراء الأكياس وبعض عمليات الطحن. لا يغيّر وحدة الصنف ولا يعرّف تحويلًا عامًا مثل كرتون إلى حبة."
-                    : "Optional for any tracked good with a fixed net weight per bag or package. Used in bag purchases and some milling flows. It does not change the stock unit or define general conversions such as carton to piece."
-                }
-              >
-                {(p) => (
-                  <NumberInput
-                    {...p}
-                    value={form.package_weight_kg === "" ? null : Number(form.package_weight_kg)}
-                    onValueChange={(v) =>
-                      setForm({ ...form, package_weight_kg: v == null ? "" : String(v) })
+                <>
+                  <FormField
+                    label={lang === "ar" ? "نوع العبوة" : "Package type"}
+                    hint={
+                      lang === "ar"
+                        ? "وصف العبوة فقط؛ معاملات التحويل والباركود والسعر لكل وحدة تُضبط في وحدات الصنف."
+                        : "Describes the package only. Unit conversions, barcodes and unit prices are configured under item units."
                     }
-                    min={0}
-                    decimal
-                    placeholder={lang === "ar" ? "مثال: 25" : "e.g. 25"}
-                  />
-                )}
-              </FormField>
-            )}
+                  >
+                    {(p) => (
+                      <div className="flex gap-2">
+                        <select
+                          id={p.id}
+                          aria-describedby={p["aria-describedby"]}
+                          value={form.package_type_id}
+                          onChange={(event) =>
+                            setForm({ ...form, package_type_id: event.target.value })
+                          }
+                          className={cn(
+                            fieldSurfaceClass,
+                            "h-10 min-w-0 flex-1 px-4 text-sm font-medium",
+                          )}
+                        >
+                          <option value="">{lang === "ar" ? "بدون تحديد" : "Not specified"}</option>
+                          {form.package_type_id &&
+                            !meta.packagingTypes.some(
+                              (item) => item.id === form.package_type_id,
+                            ) && (
+                              <option value={form.package_type_id}>
+                                {lang === "ar" ? "نوع محفوظ غير متاح" : "Saved type unavailable"}
+                              </option>
+                            )}
+                          {meta.packagingTypes.map((item) => (
+                            <option
+                              key={item.id}
+                              value={item.id}
+                              disabled={!item.is_active && item.id !== form.package_type_id}
+                            >
+                              {lang === "ar"
+                                ? item.name_ar || item.name_en || item.code
+                                : item.name_en || item.name_ar || item.code}
+                              {!item.is_active
+                                ? lang === "ar"
+                                  ? " (غير نشط)"
+                                  : " (inactive)"
+                                : ""}
+                            </option>
+                          ))}
+                        </select>
+                        {canManageReferenceData && (
+                          <IconButton
+                            type="button"
+                            size="lg"
+                            round
+                            variant="outline"
+                            tooltip
+                            ariaLabel={lang === "ar" ? "إضافة نوع عبوة" : "Add package type"}
+                            aria-expanded={quickAddKind === "packagingType"}
+                            onClick={() => openQuickAdd("packagingType")}
+                            icon={<Plus />}
+                          />
+                        )}
+                      </div>
+                    )}
+                  </FormField>
+                  {quickAddKind === "packagingType" && (
+                    <div className="sm:col-span-2">{quickAddPanel("packagingType")}</div>
+                  )}
+                  <FormField
+                    label={
+                      lang === "ar"
+                        ? "الوزن الصافي المعتاد للعبوة (كجم)"
+                        : "Usual net package weight (kg)"
+                    }
+                    hint={
+                      lang === "ar"
+                        ? "اختياري للعبوات ذات وزن صافٍ ثابت، مثل كيس حبوب. تستخدمه مسارات شراء الأكياس والطحن فقط؛ التحويل التجاري العام يضبط بوحدات الصنف."
+                        : "Optional for packages with a fixed net weight, such as grain sacks. Bag purchasing and milling use it; general trade conversions belong to item units."
+                    }
+                  >
+                    {(p) => (
+                      <NumberInput
+                        {...p}
+                        value={
+                          form.package_weight_kg === "" ? null : Number(form.package_weight_kg)
+                        }
+                        onValueChange={(v) =>
+                          setForm({ ...form, package_weight_kg: v == null ? "" : String(v) })
+                        }
+                        min={0}
+                        decimal
+                        placeholder={lang === "ar" ? "مثال: 25" : "e.g. 25"}
+                      />
+                    )}
+                  </FormField>
+                </>
+              )}
 
             {config.enableBrands && showForm("brand") && (
               <FormField label={t("products.brand")}>
@@ -3675,7 +3952,10 @@ function ProductDialog({
                         aria-describedby={p["aria-describedby"]}
                         value={form.brand_id}
                         onChange={(e) => setForm({ ...form, brand_id: e.target.value })}
-                        className={cn(fieldSurfaceClass, "h-10 min-w-0 flex-1 px-4 text-sm font-medium")}
+                        className={cn(
+                          fieldSurfaceClass,
+                          "h-10 min-w-0 flex-1 px-4 text-sm font-medium",
+                        )}
                       >
                         <option value="">
                           {lang === "ar" ? "اختر العلامة التجارية..." : "Select brand..."}
@@ -3716,7 +3996,10 @@ function ProductDialog({
                         aria-describedby={p["aria-describedby"]}
                         value={form.origin_id}
                         onChange={(e) => setForm({ ...form, origin_id: e.target.value })}
-                        className={cn(fieldSurfaceClass, "h-10 min-w-0 flex-1 px-4 text-sm font-medium")}
+                        className={cn(
+                          fieldSurfaceClass,
+                          "h-10 min-w-0 flex-1 px-4 text-sm font-medium",
+                        )}
                       >
                         <option value="">
                           {lang === "ar" ? "اختر بلد المنشأ..." : "Select origin..."}
@@ -3762,7 +4045,10 @@ function ProductDialog({
                         aria-describedby={p["aria-describedby"]}
                         value={form.quality_grade_id}
                         onChange={(e) => setForm({ ...form, quality_grade_id: e.target.value })}
-                        className={cn(fieldSurfaceClass, "h-10 min-w-0 flex-1 px-4 text-sm font-medium")}
+                        className={cn(
+                          fieldSurfaceClass,
+                          "h-10 min-w-0 flex-1 px-4 text-sm font-medium",
+                        )}
                       >
                         <option value="">
                           {lang === "ar" ? "اختر درجة الجودة..." : "Select quality grade..."}
@@ -3955,13 +4241,36 @@ function ProductDialog({
               policy.tracking === "BATCH" && (
                 <>
                   <SettingsChoice
-                    label={lang === "ar" ? "ترتيب صرف دفعات هذا الصنف" : "Batch dispatch for this item"}
+                    label={
+                      lang === "ar" ? "ترتيب صرف دفعات هذا الصنف" : "Batch dispatch for this item"
+                    }
                     value={batchDispatchStrategy}
                     options={[
-                      { value: "INHERIT", label: lang === "ar" ? "استخدام إعداد الشركة" : "Use company setting" },
-                      { value: "FEFO", label: lang === "ar" ? "الأقرب انتهاءً أولاً (FEFO)" : "Earliest expiry first (FEFO)" },
-                      { value: "FIFO", label: lang === "ar" ? "الأقدم استلاماً أولاً (FIFO)" : "Oldest receipt first (FIFO)" },
-                      { value: "MANUAL", label: lang === "ar" ? "اختيار الدفعة يدوياً عند البيع" : "Choose batch manually at sale" },
+                      {
+                        value: "INHERIT",
+                        label: lang === "ar" ? "استخدام إعداد الشركة" : "Use company setting",
+                      },
+                      {
+                        value: "FEFO",
+                        label:
+                          lang === "ar"
+                            ? "الأقرب انتهاءً أولاً (FEFO)"
+                            : "Earliest expiry first (FEFO)",
+                      },
+                      {
+                        value: "FIFO",
+                        label:
+                          lang === "ar"
+                            ? "الأقدم استلاماً أولاً (FIFO)"
+                            : "Oldest receipt first (FIFO)",
+                      },
+                      {
+                        value: "MANUAL",
+                        label:
+                          lang === "ar"
+                            ? "اختيار الدفعة يدوياً عند البيع"
+                            : "Choose batch manually at sale",
+                      },
                     ]}
                     onChange={(value) =>
                       setBatchDispatchStrategy(value as "INHERIT" | "FEFO" | "FIFO" | "MANUAL")

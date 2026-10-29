@@ -104,7 +104,11 @@ function buildDraft(methods: ResolvedPaymentMethod[]): DraftState {
     // the very screen whose job is to configure them.
     // A method the developers retired is not offered at all; showing it as a
     // switch the operator cannot use would be noise.
-    if (!method.isActive || !CORE_PAYMENT_METHOD_IDS.includes(method.id as (typeof CORE_PAYMENT_METHOD_IDS)[number])) continue;
+    if (
+      !method.isActive ||
+      !CORE_PAYMENT_METHOD_IDS.includes(method.id as (typeof CORE_PAYMENT_METHOD_IDS)[number])
+    )
+      continue;
     rows[method.id] = {
       id: method.id,
       enabled: method.enabled,
@@ -151,7 +155,12 @@ export function PaymentMethodsSection() {
 
   /** Active methods only — the retired ones belong to history, not to a menu. */
   const businessMethods = useMemo(
-    () => methods.filter((method) => method.isActive && CORE_PAYMENT_METHOD_IDS.includes(method.id as (typeof CORE_PAYMENT_METHOD_IDS)[number])),
+    () =>
+      methods.filter(
+        (method) =>
+          method.isActive &&
+          CORE_PAYMENT_METHOD_IDS.includes(method.id as (typeof CORE_PAYMENT_METHOD_IDS)[number]),
+      ),
     [methods],
   );
 

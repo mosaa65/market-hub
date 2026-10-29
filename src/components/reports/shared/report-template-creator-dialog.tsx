@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { paymentMethodLabel } from "@/lib/payments/payment-methods";
 import {
   Select,
   SelectContent,
@@ -73,14 +74,10 @@ export function ReportTemplateCreatorDialog({
         ? {
             key: "paymentMethod",
             value: paymentMethodFilter,
-            label:
-              paymentMethodFilter === "cash"
-                ? "نقدي فقط"
-                : paymentMethodFilter === "card"
-                  ? "بطاقة فقط"
-                  : paymentMethodFilter === "credit"
-                    ? "آجل فقط"
-                    : "تحويل بنكي",
+            //
+            // الاسم من الكتالوج ثم «فقط»: سلسلة الشروط كانت تُسمّي نفس القيم
+            // بصيغة أخرى وتُسقط أي طريقة غير الأربع المذكورة إلى «تحويل بنكي».
+            label: `${paymentMethodLabel(paymentMethodFilter, "ar")} — فقط`,
           }
         : undefined;
 

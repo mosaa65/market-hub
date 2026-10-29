@@ -39,6 +39,11 @@ import { VortexDateBadge } from "../display/vortex-date-badge";
 import { WhatsAppIcon } from "@/components/whatsapp-icon";
 import { useCompanyCurrency } from "@/hooks/use-company-currency";
 import { toSystemDigits, formatSystemNumber } from "@/lib/format-preferences";
+import {
+  CATALOG_BY_LEGACY_VALUE,
+  isPaymentMethodValue,
+  paymentMethodLabel,
+} from "@/lib/payments/payment-methods";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -156,43 +161,53 @@ export function VortexInvoiceDetailsSheet({
 
   const isCopied = copiedInvoiceId ? copiedInvoiceId === invoice.id : localCopied;
 
+  /**
+   * وصف طريقة السداد — من الكتالوج، لا سلسلة شروط محلية.
+   *
+   * النسخة السابقة كانت تكتب أسماءها الخاصة («نقدي (كاش)»، «شبكة / بطاقة»)
+   * وتُطابق نصوصًا عربية مخزّنة، وتُسقط كل طريقة لا تعرفها إلى النص الخام.
+   * الآن: الأيقونة من `iconKey`، والاسم من الكتالوج، والانقسام يُعرض عبر
+   * `pmLabel` الذي يعرف تفاصيل تفريعات الدفع.
+   */
   const getPaymentMethodInfo = () => {
-    const pm = (invoice.payment_method || "").toLowerCase();
-    if (pm === "cash" || pm === "نقدي") {
+    const raw = (invoice.payment_method || "").trim().toLowerCase();
+    const label = pmLabel ? pmLabel(invoice.payment_method, invoice.note) : null;
+
+    if (raw === "split" || raw === "مقسم") {
       return {
-        icon: <Banknote className="size-4 text-emerald-500 shrink-0" />,
-        label: isRtl ? "نقدي (كاش)" : "Cash",
+        icon: <Split className="size-4 shrink-0 text-indigo-500" />,
+        label: label || (isRtl ? "دفع مقسم / متعدد" : "Split payment"),
       };
     }
-    if (pm === "card" || pm === "شبكة" || pm === "بطاقة") {
+
+    if (isPaymentMethodValue(raw)) {
+      const definition = CATALOG_BY_LEGACY_VALUE.get(raw);
+      const kind = definition?.ledgerKind ?? "OTHER";
+      const Icon =
+        kind === "CASH"
+          ? Banknote
+          : kind === "BANK"
+            ? Building2
+            : kind === "CREDIT"
+              ? Clock
+              : CreditCard;
+      const tone =
+        kind === "CASH"
+          ? "text-emerald-500"
+          : kind === "CREDIT"
+            ? "text-amber-500"
+            : kind === "BANK"
+              ? "text-purple-500"
+              : "text-blue-500";
       return {
-        icon: <CreditCard className="size-4 text-blue-500 shrink-0" />,
-        label: isRtl ? "شبكة / بطاقة" : "Card / POS",
+        icon: <Icon className={`size-4 shrink-0 ${tone}`} />,
+        label: label || paymentMethodLabel(raw, isRtl ? "ar" : "en"),
       };
     }
-    if (pm === "bank" || pm === "تحويل" || pm === "حوالة") {
-      return {
-        icon: <Building2 className="size-4 text-purple-500 shrink-0" />,
-        label: isRtl ? "تحويل بنكي" : "Bank Transfer",
-      };
-    }
-    if (pm === "credit" || pm === "آجل") {
-      return {
-        icon: <Clock className="size-4 text-amber-500 shrink-0" />,
-        label: isRtl ? "آجل (على الحساب)" : "Credit (Due)",
-      };
-    }
-    if (pm === "split" || pm === "مقسم") {
-      return {
-        icon: <Split className="size-4 text-indigo-500 shrink-0" />,
-        label: isRtl ? "دفع مقسم / متعدد" : "Split Payment",
-      };
-    }
+
     return {
-      icon: <CreditCard className="size-4 text-muted-foreground shrink-0" />,
-      label: pmLabel
-        ? pmLabel(invoice.payment_method, invoice.note)
-        : invoice.payment_method || "—",
+      icon: <CreditCard className="size-4 shrink-0 text-muted-foreground" />,
+      label: label || invoice.payment_method || "—",
     };
   };
 
@@ -551,7 +566,11 @@ export function VortexInvoiceDetailsSheet({
                             </td>
                             <td className="px-3.5 py-2.5 text-center font-mono font-bold text-foreground">
                               {toSystemDigits(item.quantity.toString())}
-                              {item.unit && <span className="ms-1 text-xs font-normal text-muted-foreground">{item.unit}</span>}
+                              {item.unit && (
+                                <span className="ms-1 text-xs font-normal text-muted-foreground">
+                                  {item.unit}
+                                </span>
+                              )}
                             </td>
                             <td className="px-3.5 py-2.5 text-end font-mono text-muted-foreground">
                               {toSystemDigits(formatSystemNumber(Number(item.unitPrice)))}

@@ -1720,13 +1720,25 @@ export function SalesPage() {
         {/* Payment Method */}
         <VortexFilterSection title={isRtl ? "طريقة السداد" : "Payment Method"}>
           <div className="grid grid-cols-2 gap-2 text-xs">
+            {/*
+              نفس خيارات الفلترة أعلاه — مشتقة من الكتالوج.
+              كانت هنا قائمة ثانية مكتوبة يدويًا («نقداً»، «دفع مجزأ») تختلف
+              عن القائمة الأولى في نفس الشاشة، وعن الأسماء المطبوعة على
+              الفواتير. الآن المصدر واحد.
+            */}
             {[
               { id: "all", label: isRtl ? "الكل" : "All" },
-              { id: "cash", label: isRtl ? "نقداً" : "Cash" },
-              { id: "bank_transfer", label: isRtl ? "تحويل بنكي" : "Bank Transfer" },
-              { id: "mobile_money", label: isRtl ? "محفظة إلكترونية" : "Mobile wallet" },
-              { id: "credit", label: isRtl ? "آجل" : "Credit" },
-              { id: "split", label: isRtl ? "دفع مجزأ" : "Split" },
+              ...Array.from(
+                new Map(
+                  PAYMENT_METHOD_CATALOG.map((method) => [
+                    method.legacyValue,
+                    {
+                      id: method.legacyValue,
+                      label: isRtl ? method.nameAr : (method.nameEn ?? method.nameAr),
+                    },
+                  ]),
+                ).values(),
+              ),
             ].map((m) => (
               <button
                 key={m.id}

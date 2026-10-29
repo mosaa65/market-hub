@@ -62,6 +62,7 @@ import { QuantityInput } from "@/components/ui/quantity-input";
 import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
 import {
   getPaymentMethodDefinition,
+  PAYMENT_METHOD_CATALOG,
   paymentMethodLabel,
   toLegacyPaymentValue,
 } from "@/lib/payments/payment-methods";
@@ -289,7 +290,9 @@ function PurchasesPage() {
     try {
       const { data, error } = await supabase
         .from("purchase_invoice_items")
-        .select("id,quantity,unit_cost,tax,total,entered_quantity,entered_unit_cost,uom_id,uom_conversion_factor,products(id,name,name_ar,sku),uom:units!purchase_invoice_items_uom_id_fkey(name,name_ar)")
+        .select(
+          "id,quantity,unit_cost,tax,total,entered_quantity,entered_unit_cost,uom_id,uom_conversion_factor,products(id,name,name_ar,sku),uom:units!purchase_invoice_items_uom_id_fkey(name,name_ar)",
+        )
         .eq("invoice_id", inv.id);
       if (error) {
         console.error("Error loading purchase items:", error);
@@ -322,7 +325,9 @@ function PurchasesPage() {
     try {
       const { data } = await supabase
         .from("purchase_invoice_items")
-        .select("id,quantity,unit_cost,tax,total,entered_quantity,entered_unit_cost,uom_id,uom_conversion_factor,products(id,name,name_ar,sku),uom:units!purchase_invoice_items_uom_id_fkey(name,name_ar)")
+        .select(
+          "id,quantity,unit_cost,tax,total,entered_quantity,entered_unit_cost,uom_id,uom_conversion_factor,products(id,name,name_ar,sku),uom:units!purchase_invoice_items_uom_id_fkey(name,name_ar)",
+        )
         .eq("invoice_id", inv.id);
       setDirectPrintLines((data ?? []) as any);
     } catch (err) {
@@ -405,12 +410,19 @@ function PurchasesPage() {
         key: "payment_method",
         label: isRtl ? "طريقة السداد" : "Payment Method",
         type: "select",
-        options: [
-          { value: "cash", label: t("pos.pm.cash") },
-          { value: "bank_transfer", label: t("pos.pm.bank") },
-          { value: "mobile_money", label: isRtl ? "محفظة إلكترونية" : "Mobile wallet" },
-          { value: "credit", label: t("pos.pm.credit") },
-        ],
+        // الأسماء من الكتالوج الموحّد: مفتاح `pos.pm.bank` يكتب «بنك» بينما
+        // المبيعات تكتب «تحويل بنكي» لنفس القيمة المخزّنة.
+        options: Array.from(
+          new Map(
+            PAYMENT_METHOD_CATALOG.map((method) => [
+              method.legacyValue,
+              {
+                value: method.legacyValue,
+                label: isRtl ? method.nameAr : (method.nameEn ?? method.nameAr),
+              },
+            ]),
+          ).values(),
+        ),
       },
       {
         key: "status",
@@ -1865,7 +1877,9 @@ function CreateDialog({
           const [uomResult, costResult] = await Promise.all([
             (supabase as any)
               .from("product_uoms")
-              .select("id, product_id, unit_id, factor_to_base, quantity_increment, is_default_purchase, unit:units!product_uoms_unit_id_fkey(name, name_ar, short_name)")
+              .select(
+                "id, product_id, unit_id, factor_to_base, quantity_increment, is_default_purchase, unit:units!product_uoms_unit_id_fkey(name, name_ar, short_name)",
+              )
               .in("product_id", ids)
               .eq("is_active", true)
               .eq("can_purchase", true),
@@ -1876,7 +1890,8 @@ function CreateDialog({
               .eq("is_active", true)
               .in("item_id", ids),
           ]);
-          const missingSchema = uomResult.error && ["42P01", "PGRST205"].includes(uomResult.error.code ?? "");
+          const missingSchema =
+            uomResult.error && ["42P01", "PGRST205"].includes(uomResult.error.code ?? "");
           if (uomResult.error && !missingSchema) throw uomResult.error;
           if (costResult.error) throw costResult.error;
           if (!missingSchema && uomResult.data?.length) {
@@ -1898,11 +1913,13 @@ function CreateDialog({
             if (barcodeResult.error) throw barcodeResult.error;
             const baseCostByProduct = new Map<string, number>();
             for (const row of costResult.data ?? []) {
-              if (row.default_cost != null) baseCostByProduct.set(row.item_id, Number(row.default_cost));
+              if (row.default_cost != null)
+                baseCostByProduct.set(row.item_id, Number(row.default_cost));
             }
             const priceByUom = new Map<string, number>();
             for (const row of priceResult.data ?? []) {
-              if (row.purchase_price != null) priceByUom.set(row.product_uom_id, Number(row.purchase_price));
+              if (row.purchase_price != null)
+                priceByUom.set(row.product_uom_id, Number(row.purchase_price));
             }
             const barcodesByUom = new Map<string, string[]>();
             for (const row of barcodeResult.data ?? []) {
@@ -1913,7 +1930,8 @@ function CreateDialog({
             for (const row of uomResult.data as any[]) {
               const product = productRows.find((entry) => entry.id === row.product_id);
               const factor = Number(row.factor_to_base);
-              const baseCost = baseCostByProduct.get(row.product_id) ?? Number(product?.cost_price ?? 0);
+              const baseCost =
+                baseCostByProduct.get(row.product_id) ?? Number(product?.cost_price ?? 0);
               const unit = row.unit;
               const options = unitsByProduct.get(row.product_id) ?? [];
               options.push({
@@ -1922,7 +1940,9 @@ function CreateDialog({
                 purchase_price: priceByUom.get(row.id) ?? baseCost * factor,
                 label: unit
                   ? `${lang === "ar" ? unit.name_ar || unit.name : unit.name || unit.name_ar}${unit.short_name ? ` (${unit.short_name})` : ""}`
-                  : lang === "ar" ? "وحدة" : "Unit",
+                  : lang === "ar"
+                    ? "وحدة"
+                    : "Unit",
                 quantity_increment: Number(row.quantity_increment ?? 1),
                 is_default_purchase: row.is_default_purchase === true,
                 barcodes: barcodesByUom.get(row.id) ?? [],
@@ -1935,10 +1955,12 @@ function CreateDialog({
           console.warn("[purchases] Item unit settings unavailable", unitError);
         }
       }
-      setProducts(productRows.map((product) => ({
-        ...product,
-        purchase_uoms: unitsByProduct.get(product.id) ?? [],
-      })));
+      setProducts(
+        productRows.map((product) => ({
+          ...product,
+          purchase_uoms: unitsByProduct.get(product.id) ?? [],
+        })),
+      );
       setPurchaseUomsReady(ready);
       setSuppliers(ss ?? []);
       setWarehouses(ws ?? []);
@@ -1990,9 +2012,13 @@ function CreateDialog({
     const matching = products.filter((p) => {
       const matchesSearch =
         !q ||
-        [p.name, p.name_ar, p.sku, p.barcode, ...(p.purchase_uoms ?? []).flatMap((uom) => uom.barcodes)].some((value) =>
-          (value ?? "").toLowerCase().includes(q),
-        );
+        [
+          p.name,
+          p.name_ar,
+          p.sku,
+          p.barcode,
+          ...(p.purchase_uoms ?? []).flatMap((uom) => uom.barcodes),
+        ].some((value) => (value ?? "").toLowerCase().includes(q));
       return matchesSearch && (!selectedCategory || p.category_id === selectedCategory);
     });
     return [...matching].sort((a, b) => {
@@ -2015,17 +2041,26 @@ function CreateDialog({
 
   function addToCart(p: Product) {
     if (!purchaseUomsReady) {
-      toast.info(lang === "ar" ? "جارٍ تحميل وحدات الشراء؛ حاول مجددًا بعد لحظة" : "Loading purchase units; try again shortly.");
+      toast.info(
+        lang === "ar"
+          ? "جارٍ تحميل وحدات الشراء؛ حاول مجددًا بعد لحظة"
+          : "Loading purchase units; try again shortly.",
+      );
       return;
     }
     const searchCode = search.trim().toLowerCase();
-    const scannedUnit = p.purchase_uoms?.find((uom) => uom.barcodes.some((code) => code.toLowerCase() === searchCode));
+    const scannedUnit = p.purchase_uoms?.find((uom) =>
+      uom.barcodes.some((code) => code.toLowerCase() === searchCode),
+    );
     const purchaseUom = scannedUnit ?? getDefaultPurchaseUom(p);
     const available = Number(stockMap[p.id] ?? 0);
     setCart((prev) => {
-      const idx = p.tracking === "BATCH" || p.tracking === "SERIAL"
-        ? -1
-        : prev.findIndex((l) => l.product_id === p.id && l.uom_id === (purchaseUom.unit_id || null));
+      const idx =
+        p.tracking === "BATCH" || p.tracking === "SERIAL"
+          ? -1
+          : prev.findIndex(
+              (l) => l.product_id === p.id && l.uom_id === (purchaseUom.unit_id || null),
+            );
       if (idx >= 0) {
         const n = [...prev];
         const nextQty = n[idx].quantity + 1;
@@ -2062,9 +2097,9 @@ function CreateDialog({
   }
 
   function getDefaultPurchaseUom(product: Product): PurchaseUomOption {
-    return product.purchase_uoms?.find((uom) => uom.is_default_purchase)
-      ?? product.purchase_uoms?.find((uom) => uom.unit_id === product.unit_id)
-      ?? {
+    return (
+      product.purchase_uoms?.find((uom) => uom.is_default_purchase) ??
+      product.purchase_uoms?.find((uom) => uom.unit_id === product.unit_id) ?? {
         unit_id: product.unit_id ?? "",
         factor_to_base: 1,
         purchase_price: Number(product.cost_price || 0),
@@ -2072,7 +2107,8 @@ function CreateDialog({
         quantity_increment: 1,
         is_default_purchase: true,
         barcodes: product.barcode ? [product.barcode] : [],
-      };
+      }
+    );
   }
 
   function clearCart() {
@@ -2113,7 +2149,10 @@ function CreateDialog({
       (line) =>
         !Number.isFinite(line.quantity) ||
         line.quantity <= 0 ||
-        Math.abs(line.quantity / (line.quantity_increment || 1) - Math.round(line.quantity / (line.quantity_increment || 1))) > 1e-8 ||
+        Math.abs(
+          line.quantity / (line.quantity_increment || 1) -
+            Math.round(line.quantity / (line.quantity_increment || 1)),
+        ) > 1e-8 ||
         !Number.isFinite(line.unit_cost) ||
         line.unit_cost < 0 ||
         !Number.isFinite(line.tax_rate) ||
@@ -2143,26 +2182,26 @@ function CreateDialog({
       let error: any = null;
 
       const res = await (supabase.rpc as any)("create_purchase", {
-          _warehouse_id: warehouseId,
-          _supplier_id: supplierId,
-          // The picker holds a catalogue id. Convert at the boundary, exactly as
-          // the POS screen does, so `create_purchase` receives the stored value it
-          // casts into the ENUM.
-          _payment_method: toLegacyPaymentValue(paymentMethod),
-          _paid: paymentMethod === "credit" ? 0 : paidN || total,
-          _discount: discountN,
-          _note: (note || null) as any,
-          _items: cart.map((l) => ({
-            product_id: l.product_id,
-            quantity: Number(l.quantity),
-            unit_cost: Number(l.unit_cost),
-            tax_rate: Number(l.tax_rate),
-            batch_number: l.batch_number.trim() || null,
-            expiry_date: l.expiry_date || null,
-            uom_id: l.uom_id,
-          })),
-          _payment_splits: [],
-        });
+        _warehouse_id: warehouseId,
+        _supplier_id: supplierId,
+        // The picker holds a catalogue id. Convert at the boundary, exactly as
+        // the POS screen does, so `create_purchase` receives the stored value it
+        // casts into the ENUM.
+        _payment_method: toLegacyPaymentValue(paymentMethod),
+        _paid: paymentMethod === "credit" ? 0 : paidN || total,
+        _discount: discountN,
+        _note: (note || null) as any,
+        _items: cart.map((l) => ({
+          product_id: l.product_id,
+          quantity: Number(l.quantity),
+          unit_cost: Number(l.unit_cost),
+          tax_rate: Number(l.tax_rate),
+          batch_number: l.batch_number.trim() || null,
+          expiry_date: l.expiry_date || null,
+          uom_id: l.uom_id,
+        })),
+        _payment_splits: [],
+      });
       invId = res.data;
       error = res.error;
 
@@ -2389,7 +2428,8 @@ function CreateDialog({
                       </span>
                       <span className="shrink-0 text-end">
                         <span className="block text-sm font-semibold text-primary">
-                          {money(getDefaultPurchaseUom(p).purchase_price)} / {getDefaultPurchaseUom(p).label}
+                          {money(getDefaultPurchaseUom(p).purchase_price)} /{" "}
+                          {getDefaultPurchaseUom(p).label}
                         </span>
                         <span className="block text-[10px] text-muted-foreground">
                           {lang === "ar"
@@ -2422,8 +2462,14 @@ function CreateDialog({
                           <td className="p-2 font-mono text-muted-foreground">
                             {p.sku || p.barcode || "—"}
                           </td>
-                          <td className="p-2 text-end">{money(getDefaultPurchaseUom(p).purchase_price)} / {getDefaultPurchaseUom(p).label}</td>
-                          <td className="p-2 text-end">{Number(stockMap[p.id] ?? 0) / Math.max(getDefaultPurchaseUom(p).factor_to_base, 0.000000001)}</td>
+                          <td className="p-2 text-end">
+                            {money(getDefaultPurchaseUom(p).purchase_price)} /{" "}
+                            {getDefaultPurchaseUom(p).label}
+                          </td>
+                          <td className="p-2 text-end">
+                            {Number(stockMap[p.id] ?? 0) /
+                              Math.max(getDefaultPurchaseUom(p).factor_to_base, 0.000000001)}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -2447,7 +2493,8 @@ function CreateDialog({
                       </span>
                       <span className="shrink-0 text-end">
                         <span className="block text-xs font-semibold text-primary">
-                          {money(getDefaultPurchaseUom(p).purchase_price)} / {getDefaultPurchaseUom(p).label}
+                          {money(getDefaultPurchaseUom(p).purchase_price)} /{" "}
+                          {getDefaultPurchaseUom(p).label}
                         </span>
                         <span className="block text-[10px] text-muted-foreground">
                           {lang === "ar"
@@ -2477,9 +2524,7 @@ function CreateDialog({
                     <div className="flex items-start justify-between gap-2">
                       <div className="truncate text-sm font-medium">{l.name}</div>
                       <button
-                        onClick={() =>
-                          setCart((c) => c.filter((x) => x.line_id !== l.line_id))
-                        }
+                        onClick={() => setCart((c) => c.filter((x) => x.line_id !== l.line_id))}
                         className="text-muted-foreground hover:text-destructive"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -2493,7 +2538,11 @@ function CreateDialog({
                           onChange={(event) => changePurchaseUom(l.line_id, event.target.value)}
                           className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground"
                         >
-                          {l.purchase_uoms.map((uom) => <option key={uom.unit_id} value={uom.unit_id}>{uom.label}</option>)}
+                          {l.purchase_uoms.map((uom) => (
+                            <option key={uom.unit_id} value={uom.unit_id}>
+                              {uom.label}
+                            </option>
+                          ))}
                         </select>
                       </label>
                     )}

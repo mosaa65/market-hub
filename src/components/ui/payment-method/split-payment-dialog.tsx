@@ -18,7 +18,12 @@ import {
 } from "@/components/ui/dialog";
 import { AmountInput } from "@/components/ui/amount-input";
 import { money } from "@/lib/format";
-import { defaultAccountName, paymentUiText } from "@/lib/payments/payment-methods";
+import {
+  CATALOG_BY_LEGACY_VALUE,
+  defaultAccountName,
+  paymentMethodLabel,
+  paymentUiText,
+} from "@/lib/payments/payment-methods";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -198,7 +203,7 @@ export function SplitPaymentDialog({
                   </div>
                   <div>
                     <span className="text-xs font-bold text-foreground block leading-tight">
-                      {isAr ? "نقدًا" : "Cash"}
+                      {paymentMethodLabel("cash", isAr ? "ar" : "en")}
                     </span>
                     <span className="text-[10px] text-muted-foreground font-mono">
                       {/* اسم الحساب الحقيقي من الدليل، لا تسمية محلية. */}
@@ -366,10 +371,12 @@ export function SplitPaymentDialog({
                   </div>
                   <div>
                     <span className="text-xs font-bold text-foreground block leading-tight">
-                      {isAr ? "محفظة إلكترونية" : "E-Wallet"}
+                      {paymentMethodLabel("mobile_money", isAr ? "ar" : "en")}
                     </span>
                     <span className="text-[10px] text-muted-foreground font-mono">
-                      {isAr ? "المحافظ (1131)" : "E-Wallets (1131)"}
+                      {isAr
+                        ? `المحافظ (${CATALOG_BY_LEGACY_VALUE.get("mobile_money")?.defaultAccountCode ?? "—"})`
+                        : `E-Wallets (${CATALOG_BY_LEGACY_VALUE.get("mobile_money")?.defaultAccountCode ?? "—"})`}
                     </span>
                   </div>
                 </div>

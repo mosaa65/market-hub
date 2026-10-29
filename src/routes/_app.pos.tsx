@@ -262,7 +262,7 @@ const posGuideConfig: PageGuideConfig = {
       {
         badge: { label: "تحويل", variant: "amber" },
         fields: {
-          paymentType: "حوالة بنكية",
+          paymentType: paymentMethodLabel("bank_transfer", "ar"),
           inventoryImpact: "خصم الكمية",
           accountingImpact: "إثبات التحصيل البنكي",
           controls: "حفظ مرجع الحوالة",

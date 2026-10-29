@@ -9,6 +9,8 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
+    "check:payment-unification": "node scripts/check-payment-unification.mjs",
+    "verify:payments": "node scripts/check-payment-unification.mjs && npx tsx src/lib/payments/__tests__/payment-methods.test.ts && npx tsx src/lib/payments/__tests__/payment-rules.test.ts",
     "db:local:start": "supabase start",
     "db:local:stop": "supabase stop",
     "db:functions:start": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/functions-local-start.ps1",

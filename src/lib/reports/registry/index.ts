@@ -572,7 +572,7 @@ export const REPORT_INVENTORY_LOW_STOCK: ReportDefinition = {
   titleEn: "Low & Out-of-Stock Items",
   descriptionAr: "يعرض الأصناف ذات الرصيد الصفري أو السالب التي تحتاج إلى إجراء مخزني.",
   dataProviderId: "dp-inventory-valuation",
-  dataSourceName: "inventory_valuation",
+  dataSourceName: "inventory_low_stock",
   rowGrainAr: "رصيد صنف في مستودع",
   defaultSortField: "quantity",
   defaultSortOrder: "asc",

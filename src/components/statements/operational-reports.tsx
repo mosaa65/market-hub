@@ -22,7 +22,11 @@ import {
 } from "@/components/statements/report-tools";
 import type { ReportType } from "@/lib/statements/report-registry";
 import type { StatementFieldKey } from "@/lib/statements/types";
-import { LEGACY_PAYMENT_VALUES, paymentMethodLabel } from "@/lib/payments/payment-methods";
+import {
+  isPaymentMethodValue,
+  LEGACY_PAYMENT_VALUES,
+  paymentMethodLabel,
+} from "@/lib/payments/payment-methods";
 
 type AnyRow = Record<string, unknown>;
 
@@ -569,11 +573,12 @@ function formatPaymentMethod(value: unknown, ar: boolean, note?: unknown): strin
     return ar ? "دفع مجزأ" : "Split payment";
   }
   if (!raw || raw === "—") return "—";
-  if (raw === "cash") return ar ? "نقدي" : "Cash";
-  if (raw === "card") return ar ? "بطاقة" : "Card";
-  if (raw === "bank_transfer" || raw === "bank") return ar ? "تحويل بنكي" : "Bank transfer";
-  if (raw === "credit") return ar ? "آجل" : "Credit";
-  if (raw === "mobile_money") return ar ? "محفظة إلكترونية" : "Mobile money";
+  //
+  // الاسم من الكتالوج، بما في ذلك `cheque` وكل طريقة تضيفها المنشأة.
+  // السلسلة الشرطية هنا كانت تغطي خمس قيم وتُرجع المخزّن الخام لما عداها،
+  // فيظهر `cheque` أو `kuraimi_bank` كما هي في تقرير عربي.
+  if (isPaymentMethodValue(raw)) return paymentMethodLabel(raw, ar ? "ar" : "en");
+  if (raw === "bank") return paymentMethodLabel("bank_transfer", ar ? "ar" : "en");
   return raw;
 }
 

@@ -49,6 +49,7 @@ import {
 import { toSystemDigits, formatLuxuryDate } from "@/lib/format-preferences";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { isPaymentMethodValue, paymentMethodLabel } from "@/lib/payments/payment-methods";
 
 export const Route = createFileRoute("/_app/audit")({
   head: () => ({ meta: [{ title: "سجل الأحداث — Vortex ERP" }] }),
@@ -236,19 +237,13 @@ const VALUE_TRANSLATIONS: Record<string, string> = {
   cancelled: "ملغي",
   draft: "مسودة غير معتمدة",
   posted: "مرحل ومعتمد",
-  // Payment ENUM values, mirroring the `audit.value.*` keys in the i18n
-  // dictionary. This is a generic value dictionary for the audit log — the same
-  // table also translates statuses, roles and booleans — not an option list, so
-  // it stays a lookup rather than calling the catalogue (an audit row can carry
-  // any value, payment or not). `split` is included so the two dictionaries
-  // cannot drift: it was the one ENUM value missing from the pair.
-  cash: "نقداً (كاش)",
-  card: "بطاقة مدى / شبكة",
-  bank_transfer: "حوالة بنكية",
-  credit: "آجل / ذمم",
-  mobile_money: "محفظة إلكترونية",
-  cheque: "شيك مصرفي",
-  split: "دفع بأكثر من طريقة",
+  //
+  // قيم طرق الدفع تُترجم الآن من الكتالوج (`paymentMethodLabel`) في موضع العرض،
+  // لا من خريطة محلية. الخريطة القديمة كانت تكتب «حوالة بنكية» و«شيك مصرفي»
+  // بينما الفاتورة المطبوعة تكتب «تحويل بنكي» و«شيك» — فسجل التدقيق يسمّي
+  // العملية بشكل يخالف المستند الذي يصفه. حُذفت المدخلات من هنا لتبقى في
+  // مصدر واحد.
+  //
   admin: "مدير النظام",
   manager: "مشرف عام",
   cashier: "كاشير / بائع",
@@ -288,6 +283,13 @@ export function translateValue(val: any): string {
   const str = String(val).trim().toLowerCase();
   if (VALUE_TRANSLATIONS[str]) {
     return VALUE_TRANSLATIONS[str];
+  }
+  //
+  // طرق الدفع تُترجم من الكتالوج. سجل التدقيق يخزّن قيمة ENUM عارية
+  // ("bank_transfer")، والخريطة المحلية لم تعد تحملها، فبدون هذا السطر
+  // كان السجل سيعرض `bank_transfer` كما هي للمستخدم العربي.
+  if (isPaymentMethodValue(str)) {
+    return paymentMethodLabel(str, "ar");
   }
   return String(val);
 }
