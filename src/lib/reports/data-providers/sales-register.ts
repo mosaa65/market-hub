@@ -19,6 +19,14 @@ export interface SalesRegisterRow {
   sku: string | null;
   quantity: number;
   unit_price: number;
+  entered_quantity: number;
+  entered_unit_price: number;
+  uom_conversion_factor: number;
+  uom_name: string | null;
+  uom_name_ar: string | null;
+  base_uom_id: string | null;
+  base_uom_name: string | null;
+  base_uom_name_ar: string | null;
   discount: number;
   tax: number;
   total: number;

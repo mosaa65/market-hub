@@ -27,7 +27,11 @@ import { PaymentMethodPicker } from "@/components/ui/payment-method";
 import { DynamicPaymentSelector } from "@/components/ui/payment-method/dynamic-payment-selector";
 import { AmountInput } from "@/components/ui/amount-input";
 import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
-import { paymentMethodLabel, requiresPaymentReference } from "@/lib/payments/payment-methods";
+import {
+  paymentMethodLabel,
+  paymentReferenceLabel,
+  requiresPaymentReference,
+} from "@/lib/payments/payment-methods";
 
 /** Catalogue id from the business's configured payment-method list. */
 export type PaymentMethod = string;
@@ -150,12 +154,8 @@ export function VortexCollectionSheet({
   };
 
   const methodLabel = labelForMethod(receipt?.method || method);
-  const referenceLabel =
-    selectedPaymentMethod?.legacyValue === "cheque"
-      ? "رقم الشيك"
-      : selectedPaymentMethod?.ledgerKind === "WALLET"
-        ? "رقم عملية المحفظة"
-        : "رقم الحوالة / المرجع";
+  // اسم حقل المرجع من الكتالوج الموحّد — لا نسخة محلية ثانية.
+  const referenceLabel = paymentReferenceLabel(selectedPaymentMethod, "ar");
 
   const buildTemplateMessage = (r: CollectionReceipt, tpl: MessageTemplateType) => {
     const formattedAmount = money(r.amount);

@@ -72,6 +72,11 @@ import { resolvePaidAmount } from "@/lib/payments/payment-rules";
 import { useFormNavigationScope } from "@/hooks/use-form-navigation";
 import { DynamicPaymentSelector } from "@/components/ui/payment-method/dynamic-payment-selector";
 import {
+  paymentMethodLabel,
+  paymentUiText,
+  type LegacyPaymentValue,
+} from "@/lib/payments/payment-methods";
+import {
   Dialog,
   DialogContent,
   DialogFooter,
@@ -322,7 +327,9 @@ function POSPage() {
   const [batchModalOpen, setBatchModalOpen] = useState(false);
   const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
-  const [unitBarcodeMap, setUnitBarcodeMap] = useState<Record<string, { product_id: string; uom_id: string }>>({});
+  const [unitBarcodeMap, setUnitBarcodeMap] = useState<
+    Record<string, { product_id: string; uom_id: string }>
+  >({});
   const [saleUomsLoaded, setSaleUomsLoaded] = useState(false);
   /*
    * قائمة المنتجات تُجلب في مسار منفصل سريع وتُعرض لحظة وصولها — قبل اكتمال
@@ -625,8 +632,8 @@ function POSPage() {
               "id,sku,barcode,name,name_ar,sale_price,tax_rate,image_url,category_id,brand_id,unit_id,origin_id,quality_grade_id,is_active,is_service,item_nature,inventory_policy,tracking,is_custody_item",
             )
             // In general mode the business sellability flag controls POS access.
-          .eq("is_active", true)
-          .eq("is_sellable", true)
+            .eq("is_active", true)
+            .eq("is_sellable", true)
             .eq("is_custody_item", false);
           if (millingMode === "simplified") {
             salesProductQuery
@@ -709,7 +716,9 @@ function POSPage() {
           const [uomResult, companyPriceResult] = await Promise.all([
             (supabase as any)
               .from("product_uoms")
-              .select("id, product_id, unit_id, factor_to_base, quantity_increment, is_default_sale, unit:units!product_uoms_unit_id_fkey(name, name_ar, short_name)")
+              .select(
+                "id, product_id, unit_id, factor_to_base, quantity_increment, is_default_sale, unit:units!product_uoms_unit_id_fkey(name, name_ar, short_name)",
+              )
               .in("product_id", productIds)
               .eq("is_active", true)
               .eq("can_sell", true),
@@ -725,7 +734,8 @@ function POSPage() {
               baseSalePrices.set(priceRow.item_id, Number(priceRow.default_sale_price));
             }
           }
-          const missingUomSchema = uomResult.error && ["42P01", "PGRST205"].includes(uomResult.error.code ?? "");
+          const missingUomSchema =
+            uomResult.error && ["42P01", "PGRST205"].includes(uomResult.error.code ?? "");
           if (uomResult.error && !missingUomSchema) throw uomResult.error;
           if (companyPriceResult.error) throw companyPriceResult.error;
           if (missingUomSchema) {
@@ -747,14 +757,21 @@ function POSPage() {
             if (barcodeError) throw barcodeError;
             const priceByUom = new Map<string, number>();
             for (const priceRow of priceRows ?? []) {
-              if (priceRow.sale_price != null) priceByUom.set(priceRow.product_uom_id, Number(priceRow.sale_price));
+              if (priceRow.sale_price != null)
+                priceByUom.set(priceRow.product_uom_id, Number(priceRow.sale_price));
             }
             for (const row of uomResult.data as any[]) {
-              const basePrice = baseSalePrices.get(row.product_id) ?? Number(rawProducts.find((product: any) => product.id === row.product_id)?.sale_price ?? 0);
+              const basePrice =
+                baseSalePrices.get(row.product_id) ??
+                Number(
+                  rawProducts.find((product: any) => product.id === row.product_id)?.sale_price ??
+                    0,
+                );
               const unitPrice = priceByUom.get(row.id) ?? basePrice * Number(row.factor_to_base);
               const unit = row.unit ?? unitMap.get(row.unit_id);
               const label = unit
-                ? (lang === "ar" ? unit.name_ar || unit.name : unit.name || unit.name_ar) + (unit.short_name ? ` (${unit.short_name})` : "")
+                ? (lang === "ar" ? unit.name_ar || unit.name : unit.name || unit.name_ar) +
+                  (unit.short_name ? ` (${unit.short_name})` : "")
                 : "";
               const list = saleUomsByProduct.get(row.product_id) ?? [];
               list.push({
@@ -769,8 +786,14 @@ function POSPage() {
             }
             const unitRowById = new Map<string, { product_id: string; uom_id: string }>();
             for (const barcodeRow of barcodeRows ?? []) {
-              const uomRow = (uomResult.data as any[]).find((row) => row.id === barcodeRow.product_uom_id);
-              if (uomRow) unitRowById.set(barcodeRow.barcode, { product_id: uomRow.product_id, uom_id: uomRow.unit_id });
+              const uomRow = (uomResult.data as any[]).find(
+                (row) => row.id === barcodeRow.product_uom_id,
+              );
+              if (uomRow)
+                unitRowById.set(barcodeRow.barcode, {
+                  product_id: uomRow.product_id,
+                  uom_id: uomRow.unit_id,
+                });
             }
             setUnitBarcodeMap(Object.fromEntries(unitRowById));
           }
@@ -1176,7 +1199,11 @@ function POSPage() {
     const prodName = lang === "ar" && p.name_ar ? p.name_ar : p.name;
     const isService = p.is_service === true;
     if (!isService && !saleUomsLoaded) {
-      toast.info(lang === "ar" ? "جارٍ تحميل وحدات البيع للصنف؛ حاول مجددًا بعد لحظة" : "Loading this item's sales units; try again in a moment.");
+      toast.info(
+        lang === "ar"
+          ? "جارٍ تحميل وحدات البيع للصنف؛ حاول مجددًا بعد لحظة"
+          : "Loading this item's sales units; try again in a moment.",
+      );
       return;
     }
     const baseUomLabel = p.unit?.short_name || (lang === "ar" ? "وحدة الأساس" : "Base unit");
@@ -1225,7 +1252,12 @@ function POSPage() {
       const expiryDate = selectedBatch?.expiry_date ?? null;
 
       setCart((c) => {
-        const existing = c.find((l) => l.product_id === p.id && l.uom_id === (saleUom.unit_id || null) && (l.batch_id || null) === batchId);
+        const existing = c.find(
+          (l) =>
+            l.product_id === p.id &&
+            l.uom_id === (saleUom.unit_id || null) &&
+            (l.batch_id || null) === batchId,
+        );
         if (existing) {
           const otherReservedBase = c
             .filter((l) => l.product_id === p.id && l.line_id !== existing.line_id)
@@ -1267,9 +1299,13 @@ function POSPage() {
 
     // مسار الخدمة: بلا فحص مخزون، والحمولة تحمل is_service = true.
     setCart((c) => {
-      const existing = c.find((l) => l.product_id === p.id && l.uom_id === (saleUom.unit_id || null));
+      const existing = c.find(
+        (l) => l.product_id === p.id && l.uom_id === (saleUom.unit_id || null),
+      );
       if (existing) {
-        return c.map((l) => (l.line_id === existing.line_id ? { ...l, quantity: l.quantity + 1 } : l));
+        return c.map((l) =>
+          l.line_id === existing.line_id ? { ...l, quantity: l.quantity + 1 } : l,
+        );
       }
       return [
         ...c,
@@ -1293,16 +1329,17 @@ function POSPage() {
   }
 
   function getDefaultSaleUom(product: Product): SaleUom {
-    return product.sale_uoms?.find((uom) => uom.is_default_sale)
-      ?? product.sale_uoms?.find((uom) => uom.unit_id === product.unit_id)
-      ?? {
+    return (
+      product.sale_uoms?.find((uom) => uom.is_default_sale) ??
+      product.sale_uoms?.find((uom) => uom.unit_id === product.unit_id) ?? {
         unit_id: product.unit_id ?? "",
         factor_to_base: 1,
         sale_price: Number(product.sale_price),
         label: product.unit?.short_name || (lang === "ar" ? "وحدة الأساس" : "Base unit"),
         quantity_increment: 1,
         is_default_sale: true,
-      };
+      }
+    );
   }
 
   /**
@@ -1347,11 +1384,13 @@ function POSPage() {
 
   /** Negotiated ad-hoc service fees are per-ticket; catalogue prices come from the unit price table. */
   function setPrice(lineId: string, price: number) {
-    setCart((current) => current.map((line) =>
-      line.line_id === lineId && line.is_service
-        ? { ...line, unit_price: Math.max(0, price) }
-        : line,
-    ));
+    setCart((current) =>
+      current.map((line) =>
+        line.line_id === lineId && line.is_service
+          ? { ...line, unit_price: Math.max(0, price) }
+          : line,
+      ),
+    );
   }
 
   function changeLineUom(lineId: string, unitId: string) {
@@ -1364,19 +1403,29 @@ function POSPage() {
         .filter((entry) => entry.product_id === line.product_id && entry.line_id !== lineId)
         .reduce((sum, entry) => sum + entry.quantity * (entry.uom_factor ?? 1), 0);
       if (line.quantity * option.factor_to_base + reservedByOtherLines > stock + 1e-9) {
-        toast.error(lang === "ar" ? "الكمية الحالية تتجاوز المتاح بهذه الوحدة" : "The current quantity exceeds stock in this unit.");
+        toast.error(
+          lang === "ar"
+            ? "الكمية الحالية تتجاوز المتاح بهذه الوحدة"
+            : "The current quantity exceeds stock in this unit.",
+        );
         return;
       }
     }
-    setCart((current) => current.map((entry) => entry.line_id === lineId ? {
-      ...entry,
-      uom_id: option.unit_id,
-      uom_factor: option.factor_to_base,
-      uom_label: option.label,
-      quantity_increment: option.quantity_increment,
-      unit_price: option.sale_price,
-      base_price: option.sale_price,
-    } : entry));
+    setCart((current) =>
+      current.map((entry) =>
+        entry.line_id === lineId
+          ? {
+              ...entry,
+              uom_id: option.unit_id,
+              uom_factor: option.factor_to_base,
+              uom_label: option.label,
+              quantity_increment: option.quantity_increment,
+              unit_price: option.sale_price,
+              base_price: option.sale_price,
+            }
+          : entry,
+      ),
+    );
   }
 
   function addService() {
@@ -1425,7 +1474,11 @@ function POSPage() {
     const q = code.trim();
     if (!q) return false;
     if (!saleUomsLoaded) {
-      toast.info(lang === "ar" ? "جارٍ تحميل وحدات الأصناف؛ حاول مجددًا بعد لحظة" : "Loading item units; try scanning again in a moment.");
+      toast.info(
+        lang === "ar"
+          ? "جارٍ تحميل وحدات الأصناف؛ حاول مجددًا بعد لحظة"
+          : "Loading item units; try scanning again in a moment.",
+      );
       return false;
     }
     const mappedBarcode = unitBarcodeMap[q];
@@ -1441,9 +1494,10 @@ function POSPage() {
     }
     const exact = products.find((p) => p.barcode === q || p.sku === q);
     if (exact) {
-      const baseUom = exact.barcode === q
-        ? exact.sale_uoms?.find((option) => option.unit_id === exact.unit_id)
-        : undefined;
+      const baseUom =
+        exact.barcode === q
+          ? exact.sale_uoms?.find((option) => option.unit_id === exact.unit_id)
+          : undefined;
       addToCart(exact, undefined, baseUom);
       confirmScan();
       setSearch("");
@@ -1897,17 +1951,14 @@ function POSPage() {
         partyLabel: lang === "ar" ? "العميل" : "Bill To",
         partyName: customer?.name ?? (lang === "ar" ? "عميل نقدي" : "Walk-in Customer"),
         warehouse: lang === "ar" ? (warehouse as any)?.name_ar || warehouse?.name : warehouse?.name,
-        payment:
-          lang === "ar"
-            ? ({
-                cash: "نقدًا",
-                card: "بطاقة",
-                bank_transfer: "حوالة",
-                credit: "آجل",
-                split: "الدفع بأكثر من طريقة",
-                mobile_money: "محفظة",
-              }[finalMethod] ?? finalMethod)
-            : finalMethod.replace("_", " "),
+        //
+        // الاسم من الكتالوج لا من خريطة محلية.
+        //
+        // كانت الخريطة هنا تكتب «حوالة» و«محفظة» و«نقدًا»، بينما بقية الشاشات
+        // تكتب «تحويل بنكي» و«نقدي» — فالفاتورة المطبوعة من الكاشير تسمّي
+        // الطريقة بشكل يخالف سجل الفواتير لنفس العملية. الكتالوج هو المصدر
+        // الوحيد الذي يضمن اسماً واحداً في كل الشاشات والمستندات.
+        payment: paymentMethodLabel(finalMethod as LegacyPaymentValue, lang === "ar" ? "ar" : "en"),
         status:
           remainingDebt > 0
             ? effectivePaid > 0
@@ -2700,7 +2751,11 @@ function POSPage() {
                                     : "bg-muted/70 text-muted-foreground"
                               }`}
                             >
-                              {low ? (lang === "ar" ? "نفد" : "0") : `${stockInSaleUnit} ${saleUom.label}`}
+                              {low
+                                ? lang === "ar"
+                                  ? "نفد"
+                                  : "0"
+                                : `${stockInSaleUnit} ${saleUom.label}`}
                             </span>
                           </div>
 
@@ -2819,7 +2874,8 @@ function POSPage() {
                         {tableRows.map((p) => {
                           const stock = stockMap[p.id] ?? 0;
                           const saleUom = getDefaultSaleUom(p);
-                          const stockInSaleUnit = stock / Math.max(saleUom.factor_to_base, 0.000000001);
+                          const stockInSaleUnit =
+                            stock / Math.max(saleUom.factor_to_base, 0.000000001);
                           const low = p.is_service !== true && stock <= 0;
                           const catLabel =
                             lang === "ar"
@@ -3006,18 +3062,31 @@ function POSPage() {
                         priceEditable: l.line_id.startsWith("service-"),
                         unitId: l.uom_id,
                         unit: l.uom_label,
-                        unitOptions: l.sale_uoms?.map((uom) => ({ id: uom.unit_id, label: uom.label })),
+                        unitOptions: l.sale_uoms?.map((uom) => ({
+                          id: uom.unit_id,
+                          label: uom.label,
+                        })),
                         quantityStep: l.quantity_increment ?? 1,
                         priceModified:
                           l.base_price != null &&
                           Math.round(l.base_price * 100) !== Math.round(l.unit_price * 100),
                         stock: l.is_service
                           ? undefined
-                          : Math.max(0, (
-                              (stockMap[l.product_id] ?? 0) - cart
-                                .filter((other) => other.product_id === l.product_id && other.line_id !== l.line_id)
-                                .reduce((sum, other) => sum + other.quantity * (other.uom_factor ?? 1), 0)
-                            ) / (l.uom_factor ?? 1)),
+                          : Math.max(
+                              0,
+                              ((stockMap[l.product_id] ?? 0) -
+                                cart
+                                  .filter(
+                                    (other) =>
+                                      other.product_id === l.product_id &&
+                                      other.line_id !== l.line_id,
+                                  )
+                                  .reduce(
+                                    (sum, other) => sum + other.quantity * (other.uom_factor ?? 1),
+                                    0,
+                                  )) /
+                                (l.uom_factor ?? 1),
+                            ),
                       }}
                       labels={{
                         price: t("pos.price"),
@@ -3133,14 +3202,13 @@ function POSPage() {
                     value={transferRef}
                     onChange={(e) => setTransferRef(e.target.value)}
                     data-form-nav
+                    // النص من الكتالوج الموحّد بدل نسخة محلية لكل شاشة.
                     placeholder={
                       paymentMethod === "mobile_money"
-                        ? lang === "ar"
-                          ? "رقم عملية المحفظة / المرجع الإلكتروني"
-                          : "Wallet transaction / reference number"
+                        ? paymentUiText("walletReference", lang === "ar" ? "ar" : "en")
                         : t("pos.pm.transfer_ref")
                     }
-                    aria-label={lang === "ar" ? "مرجع الحوالة" : "Transfer reference"}
+                    aria-label={paymentUiText("reference", lang === "ar" ? "ar" : "en")}
                     className="h-9 w-full rounded-xl border border-input/80 bg-background px-3 text-xs outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
                   />
                 )}

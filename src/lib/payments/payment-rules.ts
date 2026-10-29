@@ -132,9 +132,7 @@ export function resolvePayment({
   const projectedBalance = roundMoney(Number(customer?.balance ?? 0) + remaining);
   const rawLimit = customer?.credit_limit;
   const creditLimit =
-    rawLimit === null || rawLimit === undefined || Number(rawLimit) <= 0
-      ? null
-      : Number(rawLimit);
+    rawLimit === null || rawLimit === undefined || Number(rawLimit) <= 0 ? null : Number(rawLimit);
   const exceedsCreditLimit =
     remaining > 0 &&
     !debtOnSystemCustomer &&

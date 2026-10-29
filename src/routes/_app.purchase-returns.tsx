@@ -63,6 +63,7 @@ import { usePersistedViewMode } from "@/hooks/use-persisted-view-mode";
 import { type DataTableColumn, type DataTableSort } from "@/components/ui/data-table";
 import { useBreakpoint } from "@/design/breakpoints";
 import { addReturnableQuantities, quantityIncrementDecimals } from "@/lib/invoice-returnable-quantities";
+import { translateRpcError } from "@/lib/errors/rpc-errors";
 
 export const Route = createFileRoute("/_app/purchase-returns")({
   head: () => ({ meta: [{ title: "مرتجعات المشتريات — Vortex ERP" }] }),
@@ -615,6 +616,8 @@ function NewPurchaseReturn({
   hasMultiWarehouse?: boolean;
 }) {
   const { t, lang } = useI18n();
+  // `isRtl` كان معرّفًا في المكوّن الأب فقط، فكان استخدامه هنا مرجعًا مفقودًا.
+  const isRtl = lang === "ar";
   const [open, setOpen] = useState(false);
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);

@@ -20,6 +20,9 @@ export interface InventoryMovementRow {
   product_name?: string;
   product_name_ar?: string;
   sku?: string;
+  base_uom_id: string | null;
+  base_uom_name: string | null;
+  base_uom_name_ar: string | null;
   warehouse_name?: string;
 }
 

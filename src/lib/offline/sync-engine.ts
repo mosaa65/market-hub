@@ -14,6 +14,9 @@ export class SyncEngine {
   private adapter: IOfflineStorageAdapter;
   private isSyncing = false;
   private isOnline = typeof navigator !== "undefined" ? navigator.onLine : true;
+  private pendingCount = 0;
+  private conflictedCount = 0;
+  private rejectedCount = 0;
   private listeners: Set<SyncListener> = new Set();
   private deviceId: string;
   private lastError: string | null = null;
@@ -23,6 +26,7 @@ export class SyncEngine {
     this.adapter = adapter || getOfflineStorageAdapter();
     this.deviceId = getOrCreateDeviceId();
     this.initNetworkListeners();
+    void this.refreshQueueCounts().then(() => this.notifyListeners());
   }
 
   private initNetworkListeners(): void {
@@ -57,13 +61,24 @@ export class SyncEngine {
     return {
       is_online: this.isOnline,
       is_syncing: this.isSyncing,
-      pending_count: 0, // Calculated dynamically during queue check
-      conflicted_count: 0,
-      rejected_count: 0,
+      pending_count: this.pendingCount,
+      conflicted_count: this.conflictedCount,
+      rejected_count: this.rejectedCount,
       last_successful_sync: this.lastSyncSuccess,
       last_error: this.lastError,
       device_id: this.deviceId,
     };
+  }
+
+  private async refreshQueueCounts(): Promise<void> {
+    try {
+      const queue = await this.adapter.getOutboxQueue();
+      this.pendingCount = queue.filter((item) => item.status === "pending").length;
+      this.conflictedCount = queue.filter((item) => item.status === "conflicted").length;
+      this.rejectedCount = queue.filter((item) => item.status === "rejected").length;
+    } catch {
+      // Preserve the last known counts if storage is temporarily unavailable.
+    }
   }
 
   /**
@@ -104,6 +119,7 @@ export class SyncEngine {
     };
 
     await this.adapter.enqueueOutbox(envelope);
+    await this.refreshQueueCounts();
     this.notifyListeners();
 
     // Trigger immediate background sync attempt if online
@@ -124,10 +140,12 @@ export class SyncEngine {
     this.notifyListeners();
 
     try {
+      await this.refreshQueueCounts();
       const queue = await this.adapter.getOutboxQueue();
       const pendingItems = queue.filter((q) => q.status === "pending" || q.status === "rejected");
 
       if (pendingItems.length === 0) {
+        await this.refreshQueueCounts();
         this.isSyncing = false;
         this.lastSyncSuccess = new Date().toISOString();
         this.notifyListeners();
@@ -166,9 +184,11 @@ export class SyncEngine {
       }
 
       this.lastSyncSuccess = new Date().toISOString();
+      await this.refreshQueueCounts();
     } catch (err: any) {
       this.lastError = err?.message || "Sync loop unexpected error";
     } finally {
+      await this.refreshQueueCounts();
       this.isSyncing = false;
       this.notifyListeners();
     }

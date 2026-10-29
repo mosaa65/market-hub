@@ -50,7 +50,7 @@ import { useCashboxes } from "@/hooks/use-cashboxes";
 import { useCompanyBankAccounts } from "@/hooks/use-company-bank-accounts";
 import { DynamicPaymentSelector } from "@/components/ui/payment-method";
 import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
-import { toLegacyPaymentValue } from "@/lib/payments/payment-methods";
+import { defaultAccountName, toLegacyPaymentValue } from "@/lib/payments/payment-methods";
 
 export const Route = createFileRoute("/_app/supplier-ledger")({
   head: () => ({
@@ -725,11 +725,11 @@ function SupplierLedgerPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="font-mono text-xs">
-                        {v.account_code === "1101"
-                          ? "1101 — الصندوق الرئيسي"
-                          : v.account_code === "1111"
-                            ? "1111 — البنك التجاري"
-                            : v.account_code}
+                        {/* اسم الحساب من الكتالوج، لا نص ثابت: «1111» هو
+                            «حسابات البنوك» التجميعي، لا «البنك التجاري». */}
+                        {v.account_code
+                          ? `${v.account_code} — ${defaultAccountName(v.account_code, "ar")}`
+                          : "—"}
                       </TableCell>
                       <TableCell className="font-mono font-bold text-emerald-600">
                         {money(v.amount)}

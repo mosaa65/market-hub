@@ -160,7 +160,9 @@ const splitDef = getPaymentMethodDefinition("split");
 assert.ok(splitDef, "split must stay in the catalogue so historic invoices render");
 assert.equal(isSelectableTender(splitDef), false);
 assert.deepEqual(
-  PAYMENT_METHOD_CATALOG.filter((method) => method.isActive && isSelectableTender(method)).map((method) => method.id).sort(),
+  PAYMENT_METHOD_CATALOG.filter((method) => method.isActive && isSelectableTender(method))
+    .map((method) => method.id)
+    .sort(),
   [...CORE_PAYMENT_METHOD_IDS].sort(),
   "only cash, credit, bank transfer and mobile wallet may be selected for new transactions",
 );
@@ -243,7 +245,13 @@ assert.equal(new Set(SHIPPED_PAYMENT_METHOD_ORDER).size, SHIPPED_PAYMENT_METHOD_
 
 // Only the approved operator choices and the non-selectable split state are
 // in the order list. Other catalogue identities remain for historical labels.
-assert.deepEqual(SHIPPED_PAYMENT_METHOD_ORDER, ["cash", "credit", "bank_transfer", "mobile_money", "split"]);
+assert.deepEqual(SHIPPED_PAYMENT_METHOD_ORDER, [
+  "cash",
+  "credit",
+  "bank_transfer",
+  "mobile_money",
+  "split",
+]);
 
 // ── 9. Named institutions keep their own identity for display ────────────
 //

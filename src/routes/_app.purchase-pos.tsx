@@ -46,7 +46,11 @@ import {
   type SplitPaymentEditorLine,
 } from "@/components/payments/split-payment-editor";
 import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
-import { toLegacyPaymentValue, getPaymentMethodDefinition } from "@/lib/payments/payment-methods";
+import {
+  toLegacyPaymentValue,
+  getPaymentMethodDefinition,
+  paymentUiText,
+} from "@/lib/payments/payment-methods";
 
 export const Route = createFileRoute("/_app/purchase-pos")({
   head: () => ({ meta: [{ title: "نقطة المشتريات — فورتيكس ERP" }] }),
@@ -282,7 +286,9 @@ function PurchasePOSPage() {
     roles.includes("owner") || roles.includes("manager") || roles.includes("accountant");
 
   const [products, setProducts] = useState<Product[]>([]);
-  const [unitBarcodeMap, setUnitBarcodeMap] = useState<Record<string, { product_id: string; uom_id: string }>>({});
+  const [unitBarcodeMap, setUnitBarcodeMap] = useState<
+    Record<string, { product_id: string; uom_id: string }>
+  >({});
   const [purchaseUomsLoaded, setPurchaseUomsLoaded] = useState(false);
   const [stockMap, setStockMap] = useState<Record<string, number>>({});
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -526,7 +532,9 @@ function PurchasePOSPage() {
           const [uomResult, companyCostResult] = await Promise.all([
             (supabase as any)
               .from("product_uoms")
-              .select("id, product_id, unit_id, factor_to_base, quantity_increment, is_default_purchase, unit:units!product_uoms_unit_id_fkey(name, name_ar, short_name)")
+              .select(
+                "id, product_id, unit_id, factor_to_base, quantity_increment, is_default_purchase, unit:units!product_uoms_unit_id_fkey(name, name_ar, short_name)",
+              )
               .in("product_id", ids)
               .eq("is_active", true)
               .eq("can_purchase", true),
@@ -537,7 +545,8 @@ function PurchasePOSPage() {
               .eq("is_active", true)
               .in("item_id", ids),
           ]);
-          const missingUomSchema = uomResult.error && ["42P01", "PGRST205"].includes(uomResult.error.code ?? "");
+          const missingUomSchema =
+            uomResult.error && ["42P01", "PGRST205"].includes(uomResult.error.code ?? "");
           if (uomResult.error && !missingUomSchema) throw uomResult.error;
           if (companyCostResult.error) throw companyCostResult.error;
           if (!missingUomSchema && uomResult.data?.length) {
@@ -563,7 +572,8 @@ function PurchasePOSPage() {
             if (barcodeResult.error) throw barcodeResult.error;
             const priceById = new Map<string, number>();
             for (const row of priceResult.data ?? []) {
-              if (row.purchase_price != null) priceById.set(row.product_uom_id, Number(row.purchase_price));
+              if (row.purchase_price != null)
+                priceById.set(row.product_uom_id, Number(row.purchase_price));
             }
             for (const row of uomResult.data as any[]) {
               const product = productRows.find((item) => item.id === row.product_id);
@@ -572,7 +582,9 @@ function PurchasePOSPage() {
               const baseCost = baseCosts.get(row.product_id) ?? Number(product?.cost_price ?? 0);
               const label = unit
                 ? `${lang === "ar" ? unit.name_ar || unit.name : unit.name || unit.name_ar}${unit.short_name ? ` (${unit.short_name})` : ""}`
-                : lang === "ar" ? "وحدة" : "Unit";
+                : lang === "ar"
+                  ? "وحدة"
+                  : "Unit";
               const list = purchaseUomsByProduct.get(row.product_id) ?? [];
               list.push({
                 unit_id: row.unit_id,
@@ -587,7 +599,8 @@ function PurchasePOSPage() {
             const rowById = new Map((uomResult.data as any[]).map((row) => [row.id, row]));
             for (const row of barcodeResult.data ?? []) {
               const uom = rowById.get(row.product_uom_id);
-              if (uom) barcodeLookup[row.barcode] = { product_id: uom.product_id, uom_id: uom.unit_id };
+              if (uom)
+                barcodeLookup[row.barcode] = { product_id: uom.product_id, uom_id: uom.unit_id };
             }
           }
         } catch (uomError) {
@@ -596,10 +609,12 @@ function PurchasePOSPage() {
         }
       }
       setUnitBarcodeMap(barcodeLookup);
-      setProducts(productRows.map((product) => ({
-        ...product,
-        purchase_uoms: purchaseUomsByProduct.get(product.id) ?? [],
-      })));
+      setProducts(
+        productRows.map((product) => ({
+          ...product,
+          purchase_uoms: purchaseUomsByProduct.get(product.id) ?? [],
+        })),
+      );
       setPurchaseUomsLoaded(unitSettingsReady);
       setCategories(cats ?? []);
       setBrands(brs ?? []);
@@ -661,13 +676,16 @@ function PurchasePOSPage() {
   // Add to purchase cart
   function addToCart(p: Product, requestedUom?: PurchaseUom | null) {
     if (!purchaseUomsLoaded) {
-      toast.info(lang === "ar" ? "جارٍ تحميل وحدات الشراء؛ حاول مجددًا بعد لحظة" : "Loading purchase units; try again in a moment.");
+      toast.info(
+        lang === "ar"
+          ? "جارٍ تحميل وحدات الشراء؛ حاول مجددًا بعد لحظة"
+          : "Loading purchase units; try again in a moment.",
+      );
       return;
     }
     const pName = lang === "ar" ? p.name_ar || p.name : p.name || p.name_ar || p.name;
-    const defaultUom = p.purchase_uoms?.find((unit) => unit.is_default_purchase)
-      ?? p.purchase_uoms?.find((unit) => unit.unit_id === p.unit_id)
-      ?? {
+    const defaultUom = p.purchase_uoms?.find((unit) => unit.is_default_purchase) ??
+      p.purchase_uoms?.find((unit) => unit.unit_id === p.unit_id) ?? {
         unit_id: p.unit_id ?? "",
         factor_to_base: 1,
         purchase_price: Number(p.cost_price || 0),
@@ -677,11 +695,14 @@ function PurchasePOSPage() {
       };
     const purchaseUom = requestedUom ?? defaultUom;
     setCart((prev) => {
-      const existing = p.tracking === "BATCH" || p.tracking === "SERIAL"
-        ? undefined
-        : prev.find((l) => l.product_id === p.id && l.uom_id === (purchaseUom.unit_id || null));
+      const existing =
+        p.tracking === "BATCH" || p.tracking === "SERIAL"
+          ? undefined
+          : prev.find((l) => l.product_id === p.id && l.uom_id === (purchaseUom.unit_id || null));
       if (existing) {
-        return prev.map((l) => (l.line_id === existing.line_id ? { ...l, quantity: l.quantity + 1 } : l));
+        return prev.map((l) =>
+          l.line_id === existing.line_id ? { ...l, quantity: l.quantity + 1 } : l,
+        );
       }
       return [
         ...prev,
@@ -707,16 +728,17 @@ function PurchasePOSPage() {
   }
 
   function getDefaultPurchaseUom(product: Product): PurchaseUom {
-    return product.purchase_uoms?.find((unit) => unit.is_default_purchase)
-      ?? product.purchase_uoms?.find((unit) => unit.unit_id === product.unit_id)
-      ?? {
+    return (
+      product.purchase_uoms?.find((unit) => unit.is_default_purchase) ??
+      product.purchase_uoms?.find((unit) => unit.unit_id === product.unit_id) ?? {
         unit_id: product.unit_id ?? "",
         factor_to_base: 1,
         purchase_price: Number(product.cost_price || 0),
         label: product.unit?.short_name || (lang === "ar" ? "وحدة الأساس" : "Base unit"),
         quantity_increment: 1,
         is_default_purchase: true,
-      };
+      }
+    );
   }
 
   function updateCartLine(lineId: string, patch: Partial<CartLine>) {
@@ -734,9 +756,7 @@ function PurchasePOSPage() {
     if (qty <= 0) {
       setCart((prev) => prev.filter((l) => l.line_id !== lineId));
     } else {
-      setCart((prev) =>
-        prev.map((l) => (l.line_id === lineId ? { ...l, quantity: qty } : l)),
-      );
+      setCart((prev) => prev.map((l) => (l.line_id === lineId ? { ...l, quantity: qty } : l)));
     }
   }
 
@@ -750,14 +770,20 @@ function PurchasePOSPage() {
     const line = cart.find((entry) => entry.line_id === lineId);
     const option = line?.purchase_uoms.find((uom) => uom.unit_id === unitId);
     if (!line || !option) return;
-    setCart((current) => current.map((entry) => entry.line_id === lineId ? {
-      ...entry,
-      uom_id: option.unit_id,
-      uom_factor: option.factor_to_base,
-      uom_label: option.label,
-      quantity_increment: option.quantity_increment,
-      unit_cost: option.purchase_price,
-    } : entry));
+    setCart((current) =>
+      current.map((entry) =>
+        entry.line_id === lineId
+          ? {
+              ...entry,
+              uom_id: option.unit_id,
+              uom_factor: option.factor_to_base,
+              uom_label: option.label,
+              quantity_increment: option.quantity_increment,
+              unit_cost: option.purchase_price,
+            }
+          : entry,
+      ),
+    );
   }
 
   // Barcode Handler
@@ -765,7 +791,11 @@ function PurchasePOSPage() {
     const trimmed = code.trim();
     if (!trimmed) return;
     if (!purchaseUomsLoaded) {
-      toast.info(lang === "ar" ? "جارٍ تحميل وحدات الشراء؛ حاول مجددًا بعد لحظة" : "Loading purchase units; try scanning again in a moment.");
+      toast.info(
+        lang === "ar"
+          ? "جارٍ تحميل وحدات الشراء؛ حاول مجددًا بعد لحظة"
+          : "Loading purchase units; try scanning again in a moment.",
+      );
       return;
     }
     const mapped = unitBarcodeMap[trimmed];
@@ -774,7 +804,11 @@ function PurchasePOSPage() {
       const uom = product?.purchase_uoms?.find((unit) => unit.unit_id === mapped.uom_id);
       if (product && uom) {
         addToCart(product, uom);
-        toast.success(lang === "ar" ? `تمت إضافة: ${product.name_ar || product.name} (${uom.label})` : `Added: ${product.name} (${uom.label})`);
+        toast.success(
+          lang === "ar"
+            ? `تمت إضافة: ${product.name_ar || product.name} (${uom.label})`
+            : `Added: ${product.name} (${uom.label})`,
+        );
         return;
       }
     }
@@ -784,9 +818,10 @@ function PurchasePOSPage() {
         (p.sku && p.sku.toLowerCase() === trimmed.toLowerCase()),
     );
     if (found) {
-      const baseUom = found.barcode?.toLowerCase() === trimmed.toLowerCase()
-        ? found.purchase_uoms?.find((unit) => unit.unit_id === found.unit_id)
-        : undefined;
+      const baseUom =
+        found.barcode?.toLowerCase() === trimmed.toLowerCase()
+          ? found.purchase_uoms?.find((unit) => unit.unit_id === found.unit_id)
+          : undefined;
       addToCart(found, baseUom);
       toast.success(
         lang === "ar"
@@ -1038,24 +1073,24 @@ function PurchasePOSPage() {
       let error: any = null;
 
       const purchaseRpcArgs = {
-          _warehouse_id: warehouseId,
-          _supplier_id: supplierId,
-          _payment_method:
-            paymentMethod === "split"
-              ? "split"
-              : (selectedPurchasePaymentMethod?.legacyValue ?? toLegacyPaymentValue(paymentMethod)),
-          _paid: paidN,
-          _discount: discountN,
-          _note: composedNote as any,
-          _items: cart.map((l) => ({
-            product_id: l.product_id,
-            quantity: Number(l.quantity),
-            unit_cost: Number(l.unit_cost),
-            tax_rate: Number(l.tax_rate),
-            batch_number: l.batch_number.trim() || null,
-            expiry_date: l.expiry_date || null,
-            uom_id: l.uom_id,
-          })),
+        _warehouse_id: warehouseId,
+        _supplier_id: supplierId,
+        _payment_method:
+          paymentMethod === "split"
+            ? "split"
+            : (selectedPurchasePaymentMethod?.legacyValue ?? toLegacyPaymentValue(paymentMethod)),
+        _paid: paidN,
+        _discount: discountN,
+        _note: composedNote as any,
+        _items: cart.map((l) => ({
+          product_id: l.product_id,
+          quantity: Number(l.quantity),
+          unit_cost: Number(l.unit_cost),
+          tax_rate: Number(l.tax_rate),
+          batch_number: l.batch_number.trim() || null,
+          expiry_date: l.expiry_date || null,
+          uom_id: l.uom_id,
+        })),
         _payment_splits: paymentMethod === "split" ? purchaseSplits : [],
       };
       // Use the current atomic RPC signature for both split and single tenders;
@@ -1557,7 +1592,8 @@ function PurchasePOSPage() {
                   {filtered.map((p) => {
                     const stock = stockMap[p.id] ?? 0;
                     const purchaseUom = getDefaultPurchaseUom(p);
-                    const stockInPurchaseUnit = stock / Math.max(purchaseUom.factor_to_base, 0.000000001);
+                    const stockInPurchaseUnit =
+                      stock / Math.max(purchaseUom.factor_to_base, 0.000000001);
                     const catLabel =
                       lang === "ar"
                         ? p.category?.name_ar || p.category?.name
@@ -1610,7 +1646,9 @@ function PurchasePOSPage() {
                             <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
                               {money(purchaseUom.purchase_price)}
                             </span>
-                            <span className="block truncate text-[9px] text-muted-foreground">{purchaseUom.label}</span>
+                            <span className="block truncate text-[9px] text-muted-foreground">
+                              {purchaseUom.label}
+                            </span>
                           </div>
 
                           {/* Warehouse Stock */}
@@ -1755,8 +1793,16 @@ function PurchasePOSPage() {
                           <td className="p-2 font-mono text-muted-foreground">
                             {product.sku || product.barcode || "—"}
                           </td>
-                          <td className="p-2 text-end">{money(getDefaultPurchaseUom(product).purchase_price)} <span className="text-muted-foreground">/{getDefaultPurchaseUom(product).label}</span></td>
-                          <td className="p-2 text-end">{(stockMap[product.id] ?? 0) / Math.max(getDefaultPurchaseUom(product).factor_to_base, 0.000000001)}</td>
+                          <td className="p-2 text-end">
+                            {money(getDefaultPurchaseUom(product).purchase_price)}{" "}
+                            <span className="text-muted-foreground">
+                              /{getDefaultPurchaseUom(product).label}
+                            </span>
+                          </td>
+                          <td className="p-2 text-end">
+                            {(stockMap[product.id] ?? 0) /
+                              Math.max(getDefaultPurchaseUom(product).factor_to_base, 0.000000001)}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -1832,10 +1878,16 @@ function PurchasePOSPage() {
                         quantity: line.quantity,
                         unitPrice: line.unit_cost,
                         taxRate: line.tax_rate,
-                        stock: Math.max(0, Number(stockMap[line.product_id] ?? 0) / (line.uom_factor || 1)),
+                        stock: Math.max(
+                          0,
+                          Number(stockMap[line.product_id] ?? 0) / (line.uom_factor || 1),
+                        ),
                         unitId: line.uom_id,
                         unit: line.uom_label,
-                        unitOptions: line.purchase_uoms.map((uom) => ({ id: uom.unit_id, label: uom.label })),
+                        unitOptions: line.purchase_uoms.map((uom) => ({
+                          id: uom.unit_id,
+                          label: uom.label,
+                        })),
                         quantityStep: line.quantity_increment,
                         unboundedQuantity: true,
                       }}
@@ -1974,16 +2026,12 @@ function PurchasePOSPage() {
                 }}
                 placeholder={
                   paymentMethod === "mobile_money"
-                    ? lang === "ar"
-                      ? "رقم عملية المحفظة / المرجع"
-                      : "Wallet transaction / reference number"
+                    ? paymentUiText("walletReference", lang === "ar" ? "ar" : "en")
                     : t("pos.pm.transfer_ref")
                 }
                 aria-label={
                   paymentMethod === "mobile_money"
-                    ? lang === "ar"
-                      ? "مرجع المحفظة"
-                      : "Wallet reference"
+                    ? paymentUiText("walletReference", lang === "ar" ? "ar" : "en")
                     : t("pos.pm.transfer_ref")
                 }
                 className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2.5 text-xs text-foreground outline-none transition focus:border-primary"

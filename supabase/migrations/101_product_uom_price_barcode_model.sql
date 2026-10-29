@@ -507,6 +507,11 @@ BEGIN
       RAISE EXCEPTION 'Every item unit needs a unit, positive factor, and positive quantity step'
         USING ERRCODE = '22023';
     END IF;
+    IF v_factor * v_increment <> round(v_factor * v_increment, 3) THEN
+      RAISE EXCEPTION
+        'This unit step does not convert exactly to the current 0.001 base-stock precision; increase the step or choose a finer base unit'
+        USING ERRCODE = '22023';
+    END IF;
     IF v_is_base AND (v_factor <> 1 OR v_basis <> 'STANDARD' OR v_conversion_note IS NOT NULL) THEN
       RAISE EXCEPTION 'The base unit conversion factor must equal 1' USING ERRCODE = '22023';
     END IF;

@@ -60,7 +60,7 @@ function defaultQuantityIncrement(
   unit: ProductUomChoice | undefined,
   conversionFactor: string,
 ) {
-  if (["COUNT", "PACKAGING"].includes(unit?.dimension_code ?? "")) return "1";
+  if (["COUNT", "PACKAGING", "CUSTOM"].includes(unit?.dimension_code ?? "")) return "1";
   const factor = Number(conversionFactor);
   if (!Number.isFinite(factor) || factor <= 0) return "0.001";
   // Inventory and batch quantities currently retain three base-unit decimals.
@@ -152,8 +152,8 @@ export function ProductUomSettingsEditor({
           </h3>
           <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">
             {ar
-              ? "الرصيد والدفعات والتكلفة تحفظ بوحدة الأساس. أدخل معامل كل عبوة وسعرها وباركودها؛ لا يُستنتج محتوى العبوة تلقائيًا."
-              : "Stock, batches and valuation use the base unit. Set each package factor, price and barcode; package contents are never guessed."}
+            ? "الرصيد والدفعات والتكلفة تحفظ بوحدة الأساس. أدخل معامل كل عبوة وسعرها وباركودها؛ لا يُستنتج محتوى العبوة تلقائيًا. خطوة الكمية حتى 6 منازل ويجب أن تتحول بدقة إلى دقة المخزون الحالية (0.001)."
+              : "Stock, batches and valuation use the base unit. Set each package factor, price and barcode; package contents are never guessed. Quantity steps support up to 6 decimals and must convert exactly to the current base-stock precision (0.001)."}
           </p>
         </div>
         <Button type="button" variant="outline" size="sm" onClick={addUnit} disabled={disabled || !baseUnitId || units.length <= rows.length + 1}>

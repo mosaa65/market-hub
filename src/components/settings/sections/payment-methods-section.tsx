@@ -570,8 +570,15 @@ export function PaymentMethodsSection() {
                                   {isAr ? "يتطلب مرجعاً" : "Ref. required"}
                                 </Badge>
                               )}
+                              {/*
+                                عائلة الحساب تُعرض بالاسم البشري لا بمفتاح قاعدة
+                                البيانات: المستخدم كان يقرأ "CASH"/"BANK"
+                                بالإنجليزية في واجهة عربية، وهذا نص غير صحيح
+                                في سياق المستند النهائي.
+                              */}
                               <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
-                                {method.ledgerKind}
+                                {LEDGER_KIND_LABELS[method.ledgerKind]?.[isAr ? "ar" : "en"] ??
+                                  method.ledgerKind}
                               </Badge>
                               {/*
                         Two different things, deliberately two badges:

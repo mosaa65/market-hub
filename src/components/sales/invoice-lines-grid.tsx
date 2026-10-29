@@ -97,7 +97,7 @@ export function InvoiceLinesGrid({
   /** Enter داخل خلية: التالي منطقيًا (كمية ← سعر ← بند جديد/بحث). */
   function handleAdvance(row: number, field: "qty" | "price", backwards: boolean) {
     if (!backwards) {
-      if (field === "qty") return focusCell(row, "price");
+      if (field === "qty" && lines[row]?.priceEditable) return focusCell(row, "price");
       if (row + 1 < lines.length) return focusCell(row + 1, "qty");
       // نهاية الجدول: إلى عمود القرار — لا نضيف سطرًا فارغًا هنا، ولا نعيد
       // المؤشر إلى البحث فيضيع ترتيب الرحلة.
@@ -108,7 +108,9 @@ export function InvoiceLinesGrid({
       }
     } else {
       if (field === "price") return focusCell(row, "qty");
-      if (row - 1 >= 0) return focusCell(row - 1, "price");
+      if (row - 1 >= 0) {
+        return focusCell(row - 1, lines[row - 1]?.priceEditable ? "price" : "qty");
+      }
     }
   }
 

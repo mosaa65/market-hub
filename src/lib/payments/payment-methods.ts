@@ -93,6 +93,116 @@ export function isPaymentContext(value: string): value is PaymentContext {
 }
 
 /* ==========================================================================
+   عرض عائلة الحساب — النص العربي الوحيد لـ LedgerKind
+   ========================================================================== */
+
+/**
+ * اسم عائلة الحساب كما يقرأه المستخدم (الجدول في نهاية الملف).
+ *
+ * قبل هذا كانت شاشة الإعدادات تطبع `CASH` / `BANK` / `WALLET` كما هي — مفتاح
+ * تقني في واجهة عربية. أي مكان يعرض العائلة يستخدم `ledgerKindLabel`.
+ */
+/**
+ * الحساب الذي تُسوّى إليه عائلةُ الحساب في دليل الحسابات.
+ *
+ * طبق أصل `public.payment_method_ledger_account()` (migration 63) حرفيًا: صندوق
+ * 1101، بنك 1111، محفظة 1131، شيك 1221، وآجل بلا حساب تحصيل.
+ * إن اختلف هذا الجدول عن الدالة فأحدهما خطأ — والثاني هو المرجع المحاسبي.
+ */
+export const LEDGER_KIND_ACCOUNT_CODE: Record<LedgerKind, string | null> = {
+  CASH: "1101",
+  BANK: "1111",
+  WALLET: "1131",
+  CARD: "1111",
+  CREDIT: null,
+  OTHER: "1101",
+};
+
+/**
+ * أسماء الحسابات التجريبية في شجرة الحسابات المزروعة (`seeds/01_system/03`).
+ *
+ * تُستخدم **للعرض فقط** حين لا تُحمّل الشجرة: كان السجل يعرض «1111 — البنك
+ * التجاري» وهو اسم لا وجود له؛ الحساب 1111 هو «حسابات البنوك» التجميعي.
+ */
+export const DEFAULT_ACCOUNT_NAMES: Record<string, { ar: string; en: string }> = {
+  "1101": { ar: "النقدية بالصندوق", en: "Cash on hand" },
+  "1111": { ar: "حسابات البنوك", en: "Bank accounts" },
+  "1131": { ar: "المحافظ الإلكترونية", en: "E-wallets" },
+  "1211": { ar: "ذمم العملاء", en: "Customer receivables" },
+  "1221": { ar: "أوراق القبض", en: "Notes receivable" },
+};
+
+export function defaultAccountName(code: string | null | undefined, lang: "ar" | "en" = "ar") {
+  if (!code) return "";
+  return DEFAULT_ACCOUNT_NAMES[code]?.[lang] ?? code;
+}
+
+/* ==========================================================================
+   نصوص التسوية الموحّدة
+   ========================================================================== */
+
+/**
+ * كل جملة تظهر حول طريقة الدفع، في مكان واحد.
+ *
+ * الشاشات كانت تكتبها بنفسها ("لم يتم ربط حساب افتراضي بعد"، "بنك الكريمي
+ * (الحساب الافتراضي)"…) فتتغيّر الصياغة بين شاشة وأخرى ويظهر نص لا معنى له.
+ */
+export const PAYMENT_UI_TEXT = {
+  methodLabel: { ar: "طريقة الدفع", en: "Payment method" },
+  methodAndAccount: { ar: "طريقة الدفع والحساب", en: "Payment method and account" },
+  search: { ar: "ابحث عن طريقة الدفع…", en: "Search payment methods…" },
+  noResults: { ar: "لا توجد طريقة مطابقة", en: "No matching method" },
+  receivingCashbox: { ar: "الصندوق المستلم", en: "Receiving cash box" },
+  depositBank: { ar: "الحساب البنكي المودع فيه", en: "Deposit bank account" },
+  receivingWallet: { ar: "المحفظة المستلمة", en: "Receiving wallet" },
+  reference: { ar: "رقم المرجع / الإشعار", en: "Reference / receipt no." },
+  referencePlaceholder: {
+    ar: "رقم مرجع الحوالة أو الإشعار…",
+    en: "Transfer or receipt reference…",
+  },
+  chequeNumber: { ar: "رقم الشيك", en: "Cheque number" },
+  chequeBank: { ar: "البنك المسحوب عليه", en: "Drawn on bank" },
+  chequeDueDate: { ar: "تاريخ الاستحقاق", en: "Due date" },
+  chequeDrawer: { ar: "اسم الساحب", en: "Drawer" },
+  customerReceivable: {
+    ar: "ذمم العميل — لا يُحصَّل الآن",
+    en: "Customer receivable — nothing collected",
+  },
+  cardSettlesToBank: { ar: "تُسوّى عبر البنك مباشرة", en: "Settles through the bank" },
+  ledgerLinked: { ar: "مرتبط بالدليل", en: "Ledger linked" },
+  notLinked: { ar: "لا يوجد حساب في الدليل", en: "No linked ledger account" },
+  notLinkedHelp: {
+    ar: "هذه الطريقة بلا حساب في دليل الحسابات — لن تُرحَّل قيودها. اربطها من إعدادات المحاسبة.",
+    en: "This method has no ledger account, so its entries cannot post. Link it in accounting settings.",
+  },
+  defaultSuffix: { ar: "افتراضي", en: "default" },
+  walletReference: { ar: "رقم عملية المحفظة", en: "Wallet transaction reference" },
+  transferReference: { ar: "رقم الحوالة / المرجع", en: "Transfer / payment reference" },
+  defaultTill: { ar: "الصندوق الرئيسي", en: "Main till" },
+  requiredSuffix: { ar: "(مطلوب)", en: "(required)" },
+  optionalSuffix: { ar: "(اختياري)", en: "(optional)" },
+} as const;
+
+export function paymentUiText(key: keyof typeof PAYMENT_UI_TEXT, lang: "ar" | "en" = "ar") {
+  return PAYMENT_UI_TEXT[key][lang];
+}
+
+/**
+ * اسم حقل المرجع كما يختلف بحسب الطريقة (شيك / محفظة / حوالة).
+ *
+ * كان هذا الاختيار الثلاثي مكررًا حرفيًا في شاشة تحصيل العملاء وفي شيت
+ * التحصيل، فتختلف صياغة الحقل نفسه بين الشاشتين. الآن تعريف واحد.
+ */
+export function paymentReferenceLabel(
+  method: { legacyValue?: string | null; ledgerKind?: LedgerKind | null } | null | undefined,
+  lang: "ar" | "en" = "ar",
+): string {
+  if (method?.legacyValue === "cheque") return PAYMENT_UI_TEXT.chequeNumber[lang];
+  if (method?.ledgerKind === "WALLET") return PAYMENT_UI_TEXT.walletReference[lang];
+  return PAYMENT_UI_TEXT.transferReference[lang];
+}
+
+/* ==========================================================================
    Ledger kind — which pot the money lands in
    ========================================================================== */
 
@@ -183,8 +293,15 @@ export interface PaymentMethodDefinition {
   /** Contexts the developers allow. A tenant may narrow, never widen. */
   allowedContexts: readonly PaymentContext[];
   ledgerKind: LedgerKind;
-  /** Future accounting hook: the account this method should post to. */
-  defaultAccountCode?: string;
+  /**
+   * حساب الدليل الذي تُقيَّد عليه النقدية المستلمة بهذه الطريقة.
+   *
+   * `null` مقصود لِـ «آجل»: لا يُستلم مال الآن، فلا يوجد حساب صندوق أو بنك
+   * تُقيَّد فيه. القيمة هنا تطابق حرفياً `public.payment_method_ledger_account`
+   * في قاعدة البيانات — وهي السلطة عند الترحيل. أي اختلاف بينهما يعني أن
+   * الشاشة تعد بشيء لا تفعله القيود.
+   */
+  defaultAccountCode?: string | null;
   /** `credit` / آجل — nothing is collected now. */
   isCreditTerm?: boolean;
   /** Requires a transfer / wallet reference number to be captured. */
@@ -262,7 +379,8 @@ export const PAYMENT_METHOD_CATALOG: readonly PaymentMethodDefinition[] = [
     // collecting cash from a customer is meaningless.
     allowedContexts: ["pos", "sales", "purchases", "sales_returns", "purchase_returns"],
     ledgerKind: "CREDIT",
-    defaultAccountCode: "1211",
+    // لا حساب: آجل لا يُحصِّل نقدًا، وقاعدة البيانات تُرجع NULL لها.
+    defaultAccountCode: null,
     isCreditTerm: true,
     legacyValue: "credit",
   },
@@ -407,7 +525,12 @@ export const PAYMENT_METHOD_CATALOG: readonly PaymentMethodDefinition[] = [
     sortOrder: 120,
     allowedContexts: ["pos", "sales", "purchases", "expenses", "customer_collection"],
     ledgerKind: "BANK",
-    defaultAccountCode: "1111",
+    //
+    // 1221 لا 1111: الشيك ليس نقدًا في البنك بعد — هو ورقة برسم التحصيل.
+    // تقييده على حساب البنك مباشرةً يُظهر رصيدًا متاحًا لم يُحصَّل بعد،
+    // ويخالف ما تفعله قاعدة البيانات عند الترحيل (`payment_method_ledger_account`
+    // تُرجع 1221 للشيك). الترتيب الصحيح: 1221 ← يُحوَّل إلى 1111 عند التحصيل.
+    defaultAccountCode: "1221",
     requiresReference: true,
     legacyValue: "cheque",
     legacyIds: ["cheque"],
@@ -537,6 +660,26 @@ export function requiresPaymentReference(id: string | null | undefined): boolean
   return Boolean(CATALOG_BY_ID.get(id)?.requiresReference);
 }
 
+/**
+ * The chart-of-accounts code a method settles into, or `null` when nothing is
+ * collected by it.
+ *
+ * This mirrors `public.payment_method_ledger_account()` exactly. It exists so a
+ * screen can tell the operator *before* posting that a method has no ledger
+ * account — the alternative is discovering it at posting time from a database
+ * error, long after the customer has left.
+ */
+export function paymentLedgerAccountCode(method: {
+  id?: string | null;
+  legacyValue?: string | null;
+  defaultAccountCode?: string | null;
+}): string | null {
+  if (method.legacyValue === "credit" || method.legacyValue === "split") return null;
+  if (method.defaultAccountCode) return method.defaultAccountCode;
+  const shipped = method.id ?? method.legacyValue;
+  return (shipped && CATALOG_BY_ID.get(shipped)?.defaultAccountCode) || null;
+}
+
 /** The catalogue id that represents an ENUM value found on an old document. */
 export function toCatalogId(legacy: string | null | undefined): string | undefined {
   if (!legacy) return undefined;
@@ -629,6 +772,18 @@ export const LEDGER_KIND_LABELS: Record<LedgerKind, { ar: string; en: string }> 
   CREDIT: { ar: "آجل", en: "Credit" },
   OTHER: { ar: "أخرى", en: "Other" },
 };
+
+/**
+ * اسم عائلة الحساب بأي لغة، مع بديل آمن لمفتاح لا يعرفه هذا الإصدار.
+ * كل واجهة تعرض العائلة تمرّ من هنا بدل طباعة `CASH` / `BANK` كما هي.
+ */
+export function ledgerKindLabel(
+  kind: LedgerKind | string | null | undefined,
+  lang: "ar" | "en" = "ar",
+): string {
+  const key = (kind ?? "OTHER") as LedgerKind;
+  return LEDGER_KIND_LABELS[key]?.[lang] ?? LEDGER_KIND_LABELS.OTHER[lang];
+}
 
 /** Fallback by ledger kind, so a new method with an unknown key still looks right. */
 const LEDGER_KIND_ICON: Record<LedgerKind, LucideIcon> = {

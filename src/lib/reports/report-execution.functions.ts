@@ -102,6 +102,30 @@ function toNumber(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+const REPORT_QUERY_CHUNK_SIZE = 500;
+
+async function fetchAllReportRows<T>(createQuery: () => any, errorContext: string): Promise<T[]> {
+  const rows: T[] = [];
+  let offset = 0;
+
+  while (true) {
+    const { data, error, count } = await createQuery().range(
+      offset,
+      offset + REPORT_QUERY_CHUNK_SIZE - 1,
+    );
+    if (error) throw new Error(`[${errorContext}] ${error.message}`);
+
+    const page = (data ?? []) as T[];
+    if (page.length === 0) break;
+    rows.push(...page);
+    offset += page.length;
+
+    if (count != null ? offset >= count : page.length < REPORT_QUERY_CHUNK_SIZE) break;
+  }
+
+  return rows;
+}
+
 export const executeSalesRegisterReport = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: unknown) => salesRequestSchema.parse(data))
@@ -353,7 +377,7 @@ export const executeSalesGroupedReport = createServerFn({ method: "POST" })
     let query = supabase
       .from("sales_register")
       .select(
-        "invoice_id,customer_id,product_id,sku,item_name,item_name_ar,quantity,unit_price,discount,tax,total,line_cost,payment_method",
+        "invoice_id,customer_id,product_id,sku,item_name,item_name_ar,quantity,unit_price,discount,tax,total,line_cost,payment_method,base_uom_name_ar",
       );
     if (filters.startDate) query = query.gte("created_at", boundaries.startIso);
     if (filters.endDate) query = query.lte("created_at", boundaries.endIso);
@@ -476,6 +500,7 @@ export const executeSalesGroupedReport = createServerFn({ method: "POST" })
             base.sku = row.sku || "—";
             base.product_name = row.item_name_ar || row.item_name || "صنف غير محدد";
             base.item_name_ar = base.product_name;
+            base.base_uom_name_ar = row.base_uom_name_ar ?? null;
           }
           if (activeDimensions.includes("payment_method")) {
             base.payment_method = row.payment_method || "cash";
@@ -584,7 +609,7 @@ export const executePurchasesGroupedReport = createServerFn({ method: "POST" })
     let query = supabase
       .from("purchase_register")
       .select(
-        "invoice_id,supplier_id,product_id,sku,item_name,item_name_ar,quantity,unit_cost,discount,tax,total,payment_method",
+        "invoice_id,supplier_id,product_id,sku,item_name,item_name_ar,quantity,unit_cost,discount,tax,total,payment_method,base_uom_name_ar",
       );
     if (filters.startDate) query = query.gte("created_at", boundaries.startIso);
     if (filters.endDate) query = query.lte("created_at", boundaries.endIso);
@@ -700,6 +725,7 @@ export const executePurchasesGroupedReport = createServerFn({ method: "POST" })
             base.sku = row.sku || "—";
             base.product_name = row.item_name_ar || row.item_name || "صنف غير محدد";
             base.item_name_ar = base.product_name;
+            base.base_uom_name_ar = row.base_uom_name_ar ?? null;
           }
           if (activeDimensions.includes("payment_method")) {
             base.payment_method = row.payment_method || "credit";
@@ -782,56 +808,110 @@ export const executeInventoryMovementsReport = createServerFn({ method: "POST" }
     const pageSize = data.pagination?.pageSize ?? 50;
     const boundaries = resolveDateRangeBoundaries(filters.startDate, filters.endDate);
     const supabase: any = (context as any).supabase;
-    let openingBalance = 0;
+    if (!filters.productId) {
+      throw new Error("Select one item to view its inventory movement card.");
+    }
+
+    const { data: product, error: productError } = await supabase
+      .from("products")
+      .select("base_uom_id,unit_id")
+      .eq("id", filters.productId)
+      .maybeSingle();
+    if (productError) throw new Error(`[Inventory product unit] ${productError.message}`);
+    const baseUomId = product?.base_uom_id ?? product?.unit_id ?? null;
+    let baseUomName: string | null = null;
+    let baseUomNameAr: string | null = null;
+    if (baseUomId) {
+      const { data: unit, error: unitError } = await supabase
+        .from("units")
+        .select("name,name_ar")
+        .eq("id", baseUomId)
+        .maybeSingle();
+      if (unitError) throw new Error(`[Inventory base unit] ${unitError.message}`);
+      baseUomName = unit?.name ?? null;
+      baseUomNameAr = unit?.name_ar ?? baseUomName;
+    }
+
+    const openingByWarehouse = new Map<string, number>();
 
     if (filters.startDate && filters.productId) {
-      let beforeQuery = supabase
-        .from("stock_movements")
-        .select("movement_type,quantity")
-        .eq("product_id", filters.productId)
-        .lt("created_at", boundaries.startIso);
-      if (filters.warehouseId) beforeQuery = beforeQuery.eq("warehouse_id", filters.warehouseId);
-      const before = await beforeQuery;
-      if (before.error) throw new Error(`[Inventory opening balance] ${before.error.message}`);
-      for (const movement of before.data ?? []) {
+      const beforeRows = await fetchAllReportRows<Record<string, any>>(() => {
+        let query = supabase
+          .from("stock_movements")
+          .select("movement_type,quantity,warehouse_id", { count: "exact" })
+          .eq("product_id", filters.productId)
+          .eq("owner_type", "COMPANY")
+          .is("owner_id", null)
+          .lt("created_at", boundaries.startIso)
+          .order("created_at", { ascending: true })
+          .order("id", { ascending: true });
+        if (filters.warehouseId) query = query.eq("warehouse_id", filters.warehouseId);
+        return query;
+      }, "Inventory opening balance");
+      for (const movement of beforeRows) {
         const quantity = Math.abs(toNumber(movement.quantity));
-        openingBalance += isInboundMovement(movement.movement_type, quantity)
+        const delta = isInboundMovement(movement.movement_type, quantity)
           ? quantity
           : -quantity;
+        const warehouseId = movement.warehouse_id as string;
+        openingByWarehouse.set(
+          warehouseId,
+          round3((openingByWarehouse.get(warehouseId) ?? 0) + delta),
+        );
       }
     }
 
-    let query = supabase
-      .from("stock_movements")
-      .select(
-        "id,product_id,warehouse_id,movement_type,quantity,unit_cost,total_cost,reference,note,created_at,products(name,name_ar,sku),warehouses(name)",
-      )
-      .order("created_at", { ascending: true })
-      .order("id", { ascending: true });
-    if (filters.productId) query = query.eq("product_id", filters.productId);
-    if (filters.warehouseId) query = query.eq("warehouse_id", filters.warehouseId);
-    if (filters.movementType) query = query.eq("movement_type", filters.movementType as any);
-    if (filters.startDate) query = query.gte("created_at", boundaries.startIso);
-    if (filters.endDate) query = query.lte("created_at", boundaries.endIso);
-    const result = await query;
-    if (result.error) throw new Error(`[Inventory movements] ${result.error.message}`);
-
-    const rawRows = result.data ?? [];
-    const calculated = calculateRunningInventoryMovements(
-      rawRows.map((row: any) => ({
-        id: row.id,
-        createdAt: row.created_at,
-        kind: mapDbMovementTypeToKind(row.movement_type, toNumber(row.quantity)),
-        quantity: toNumber(row.quantity),
-      })) as RawStockMovement[],
-      round3(openingBalance),
+    const openingBalance = round3(
+      [...openingByWarehouse.values()].reduce((sum, balance) => sum + balance, 0),
     );
-    let totalInbound = 0,
-      totalOutbound = 0;
-    const rows = calculated.map((movement, index) => {
-      const source: any = rawRows[index];
-      totalInbound += movement.inQty;
-      totalOutbound += movement.outQty;
+
+    const rawRows = await fetchAllReportRows<Record<string, any>>(() => {
+      let query = supabase
+        .from("stock_movements")
+        .select(
+          "id,product_id,warehouse_id,movement_type,quantity,unit_cost,total_cost,reference,note,created_at,products(name,name_ar,sku),warehouses(name)",
+          { count: "exact" },
+        )
+        .eq("owner_type", "COMPANY")
+        .is("owner_id", null)
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true });
+      query = query.eq("product_id", filters.productId);
+      if (filters.warehouseId) query = query.eq("warehouse_id", filters.warehouseId);
+      if (filters.startDate) query = query.gte("created_at", boundaries.startIso);
+      if (filters.endDate) query = query.lte("created_at", boundaries.endIso);
+      return query;
+    }, "Inventory movements");
+    const rowsByWarehouse = new Map<string, any[]>();
+    for (const row of rawRows as Array<Record<string, any>>) {
+      const warehouseRows = rowsByWarehouse.get(row.warehouse_id) ?? [];
+      warehouseRows.push(row);
+      rowsByWarehouse.set(row.warehouse_id, warehouseRows);
+    }
+
+    const calculatedByMovementId = new Map<
+      string,
+      ReturnType<typeof calculateRunningInventoryMovements>[number]
+    >();
+    const closingByWarehouse = new Map(openingByWarehouse);
+    for (const [warehouseId, warehouseRows] of rowsByWarehouse) {
+      const calculated = calculateRunningInventoryMovements(
+        warehouseRows.map((row: any) => ({
+          id: row.id,
+          createdAt: row.created_at,
+          kind: mapDbMovementTypeToKind(row.movement_type, toNumber(row.quantity)),
+          quantity: toNumber(row.quantity),
+        })) as RawStockMovement[],
+        round3(openingByWarehouse.get(warehouseId) ?? 0),
+      );
+      for (const movement of calculated) calculatedByMovementId.set(movement.id, movement);
+      if (calculated.length > 0) {
+        closingByWarehouse.set(warehouseId, calculated.at(-1)!.runningBalance);
+      }
+    }
+
+    const rows = (rawRows as Array<Record<string, any>>).map((source) => {
+      const movement = calculatedByMovementId.get(source.id)!;
       return {
         id: movement.id,
         product_id: source.product_id,
@@ -849,20 +929,31 @@ export const executeInventoryMovementsReport = createServerFn({ method: "POST" }
         product_name: source.products?.name,
         product_name_ar: source.products?.name_ar,
         sku: source.products?.sku,
+        base_uom_id: baseUomId,
+        base_uom_name: baseUomName,
+        base_uom_name_ar: baseUomNameAr,
         warehouse_name: source.warehouses?.name,
       };
     });
-    const totalRowCount = rows.length;
+    const reportRows = filters.movementType
+      ? rows.filter((row) => row.movement_type === filters.movementType)
+      : rows;
+    const totalRowCount = reportRows.length;
+    const totalInbound = reportRows.reduce((sum, row) => sum + row.inbound_quantity, 0);
+    const totalOutbound = reportRows.reduce((sum, row) => sum + row.outbound_quantity, 0);
+    const closingBalance = round3(
+      [...closingByWarehouse.values()].reduce((sum, balance) => sum + balance, 0),
+    );
     return {
       reportId: data.reportId,
       executedAt: new Date().toISOString(),
       totalRowCount,
-      rows: rows.slice((page - 1) * pageSize, page * pageSize),
+      rows: reportRows.slice((page - 1) * pageSize, page * pageSize),
       metrics: {
         openingBalance: round3(openingBalance),
         totalInbound: round3(totalInbound),
         totalOutbound: round3(totalOutbound),
-        closingBalance: rows.at(-1)?.running_balance ?? round3(openingBalance),
+        closingBalance,
         totalRowCount,
       },
       meta: {
@@ -1135,23 +1226,27 @@ export const executeExceptionsReport = createServerFn({ method: "POST" })
     }
 
     if (data.source === "inventory_low_stock" || data.source === "inventory_slow_moving") {
-      let valuationQuery = supabase
-        .from("inventory_valuation")
-        .select(
-          "item_id,item_name,item_name_ar,sku,warehouse_id,warehouse_name,quantity,costing_method,reference_unit_cost,reference_valuation,valuation_is_reference_based",
-        );
-      if (filters.warehouseId)
-        valuationQuery = valuationQuery.eq("warehouse_id", filters.warehouseId);
-      if (filters.productId) valuationQuery = valuationQuery.eq("item_id", filters.productId);
-      const { data: valuation, error } = await valuationQuery;
-      if (error) throw new Error(`[Exceptions inventory] ${error.message}`);
+      const valuation = await fetchAllReportRows<Record<string, any>>(() => {
+        let query = supabase
+          .from("inventory_valuation")
+          .select(
+            "item_id,item_name,item_name_ar,sku,warehouse_id,warehouse_name,quantity,costing_method,reference_unit_cost,reference_valuation,valuation_is_reference_based,base_uom_id,base_uom_name,base_uom_name_ar,min_stock",
+            { count: "exact" },
+          )
+          .order("item_id", { ascending: true })
+          .order("warehouse_id", { ascending: true });
+        if (filters.warehouseId) query = query.eq("warehouse_id", filters.warehouseId);
+        if (filters.productId) query = query.eq("item_id", filters.productId);
+        if (data.source === "inventory_slow_moving") query = query.gt("quantity", 0);
+        return query;
+      }, "Exceptions inventory");
 
-      let allRows: Array<Record<string, any>> = (
-        (valuation ?? []) as Array<Record<string, any>>
-      ).map((row) => ({
+      let allRows: Array<Record<string, any>> = valuation.map((row) => ({
         ...row,
         quantity: toNumber(row.quantity),
         reference_valuation: toNumber(row.reference_valuation),
+        min_stock: toNumber(row.min_stock),
+        base_uom_name_ar: row.base_uom_name_ar ?? row.base_uom_name ?? null,
       }));
       const term = searchTerm(filters.search).toLowerCase();
       if (term) {
@@ -1165,23 +1260,30 @@ export const executeExceptionsReport = createServerFn({ method: "POST" })
       }
 
       if (data.source === "inventory_low_stock") {
-        const threshold = toNumber((filters as any).lowStockThreshold ?? 0);
-        allRows = allRows.filter((row) => row.quantity <= threshold);
+        allRows = allRows.filter((row) => row.quantity <= row.min_stock);
       } else {
         // الأصناف الراكدة: رصيد قائم دون أي حركة صادرة خلال الفترة المحددة.
-        const { data: movements, error: movementsError } = await supabase
-          .from("stock_movements")
-          .select("product_id")
-          .gte("created_at", boundaries.startIso)
-          .lte("created_at", boundaries.endIso)
-          .lt("quantity", 0);
-        if (movementsError) throw new Error(`[Exceptions slow moving] ${movementsError.message}`);
-        const activeIds = new Set(
-          ((movements ?? []) as Array<Record<string, any>>)
-            .map((movement) => movement.product_id)
-            .filter(Boolean),
+        const movements = await fetchAllReportRows<Record<string, any>>(
+          () =>
+            supabase
+              .from("stock_movements")
+              .select("product_id,warehouse_id", { count: "exact" })
+              .eq("owner_type", "COMPANY")
+              .is("owner_id", null)
+              .gte("created_at", boundaries.startIso)
+              .lte("created_at", boundaries.endIso)
+              .lt("quantity", 0)
+              .order("id", { ascending: true }),
+          "Exceptions slow moving",
         );
-        allRows = allRows.filter((row) => !activeIds.has(row.item_id));
+        const activeStockPositions = new Set(
+          movements
+            .filter((movement) => movement.product_id && movement.warehouse_id)
+            .map((movement) => `${movement.product_id}:${movement.warehouse_id}`),
+        );
+        allRows = allRows.filter(
+          (row) => !activeStockPositions.has(`${row.item_id}:${row.warehouse_id}`),
+        );
       }
 
       const totalRowCount = allRows.length;

@@ -1,3 +1,8 @@
+/**
+ * PaymentMethodSelect هو المكوّن الموحّد الوحيد لاختيار طريقة الدفع.
+ * البقية محفوظة كأغلفة للتوافق الخلفي فقط.
+ */
+export { PaymentMethodSelect, type PaymentMethodSelectProps } from "./payment-method-select";
 export {
   PaymentMethodPicker,
   PaymentMethodChip,
@@ -27,7 +32,4 @@ export {
   type SplitPaymentValues,
   type SplitMethodKey,
 } from "./split-payment-dialog";
-export {
-  PaymentSplitCatalogDialog,
-  type PaymentSplitTender,
-} from "./payment-split-catalog-dialog";
+export { PaymentSplitCatalogDialog, type PaymentSplitTender } from "./payment-split-catalog-dialog";

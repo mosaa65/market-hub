@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { AmountInput } from "@/components/ui/amount-input";
 import { money } from "@/lib/format";
+import { defaultAccountName, paymentUiText } from "@/lib/payments/payment-methods";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -200,7 +201,8 @@ export function SplitPaymentDialog({
                       {isAr ? "نقدًا" : "Cash"}
                     </span>
                     <span className="text-[10px] text-muted-foreground font-mono">
-                      {isAr ? "الصندوق الرئيسي (1101)" : "Till (1101)"}
+                      {/* اسم الحساب الحقيقي من الدليل، لا تسمية محلية. */}
+                      {`${defaultAccountName("1101", isAr ? "ar" : "en")} · 1101`}
                     </span>
                   </div>
                 </div>
@@ -399,15 +401,11 @@ export function SplitPaymentDialog({
                     type="text"
                     value={walletRef}
                     onChange={(e) => setWalletRef(e.target.value)}
-                    placeholder={
-                      isAr
-                        ? requireElectronicReferences
-                          ? "رقم عملية المحفظة (مطلوب)..."
-                          : "رقم عملية المحفظة (اختياري)..."
-                        : requireElectronicReferences
-                          ? "Wallet transaction reference (required)..."
-                          : "Wallet transaction reference..."
-                    }
+                    placeholder={`${paymentUiText("walletReference", isAr ? "ar" : "en")} ${
+                      requireElectronicReferences
+                        ? paymentUiText("requiredSuffix", isAr ? "ar" : "en")
+                        : paymentUiText("optionalSuffix", isAr ? "ar" : "en")
+                    }`}
                     className="h-8 w-full rounded-xl border border-sky-500/20 bg-background px-3 text-[11px] font-medium outline-none focus:border-sky-500"
                   />
                 )}

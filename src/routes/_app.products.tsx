@@ -689,11 +689,15 @@ function ProductsPage() {
         key: "unit",
         label: t("products.unit"),
         type: "select",
-        options: meta.units.map((unit) => ({
-          value: unit.id,
-          label:
-            (lang === "ar" ? unit.name_ar || unit.name : unit.name || unit.name_ar) ?? unit.name,
-        })),
+        // `meta.units` يصل من استعلامَين مختلفَين (`any`)، فيفقد النوع حقولًا
+        // موجودة فعلًا (`short_name`). القراءة عبر واجهة محلية تمنع السقوط إلى
+        // `?? unit.name` وتُبقي اسم الوحدة صحيحًا حتى لو كان الحقل ناقصًا.
+        options: (meta.units as { id: string; name: string; name_ar?: string | null }[]).map(
+          (unit) => ({
+            value: unit.id,
+            label: (lang === "ar" ? unit.name_ar || unit.name : unit.name || unit.name_ar) || unit.id,
+          }),
+        ),
       });
     }
     if (config.enableOrigins && meta?.origins?.length) {

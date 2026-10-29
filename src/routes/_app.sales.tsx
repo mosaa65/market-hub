@@ -79,7 +79,11 @@ import { IconButton } from "@/components/ui/icon-button";
 import { useBreakpoint } from "@/design/breakpoints";
 import { useRealtimeTable } from "@/lib/realtime";
 import { QUERY_KEYS } from "@/lib/query-keys";
-import { isSplitPaymentValue, paymentMethodLabel } from "@/lib/payments/payment-methods";
+import {
+  isSplitPaymentValue,
+  PAYMENT_METHOD_CATALOG,
+  paymentMethodLabel,
+} from "@/lib/payments/payment-methods";
 import { PaymentMethodChip } from "@/components/ui/payment-method";
 
 export const Route = createFileRoute("/_app/sales")({
@@ -675,13 +679,26 @@ export function SalesPage() {
         key: "payment_method",
         label: isRtl ? "طريقة السداد" : "Payment Method",
         type: "select",
-        options: [
-          { value: "cash", label: isRtl ? "نقدي (كاش)" : "Cash" },
-          { value: "bank_transfer", label: isRtl ? "تحويل بنكي" : "Bank Transfer" },
-          { value: "mobile_money", label: isRtl ? "محفظة إلكترونية" : "Mobile wallet" },
-          { value: "credit", label: isRtl ? "آجل" : "Credit" },
-          { value: "split", label: isRtl ? "دفع مجزأ" : "Split Payment" },
-        ],
+        //
+        // الخيارات من الكتالوج، لا قائمة مكتوبة هنا.
+        //
+        // القائمة اليدوية كانت خمسة عناصر تُكتب بصيغة تخالف بقية الشاشات
+        // («نقدي (كاش)» مقابل «نقدي»)، وتنسى الشيك تمامًا، فلا يمكن تصفية
+        // الشيكات في سجل الفواتير أبدًا. المستند يخزّن قيمة `legacyValue`،
+        // والخريطة منها إلى الاسم البشري موجودة في مكان واحد.
+        options: Array.from(
+          new Map(
+            PAYMENT_METHOD_CATALOG.filter(
+              (method) => method.id === "split" || method.legacyValue !== "split",
+            ).map((method) => [
+              method.legacyValue,
+              {
+                value: method.legacyValue,
+                label: isRtl ? method.nameAr : (method.nameEn ?? method.nameAr),
+              },
+            ]),
+          ).values(),
+        ),
       },
     ];
 

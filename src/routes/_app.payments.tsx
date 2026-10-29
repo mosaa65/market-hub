@@ -21,7 +21,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { useI18n } from "@/lib/i18n";
 import { money } from "@/lib/format";
-import { paymentMethodLabel, requiresPaymentReference } from "@/lib/payments/payment-methods";
+import {
+  paymentMethodLabel,
+  paymentReferenceLabel,
+  requiresPaymentReference,
+} from "@/lib/payments/payment-methods";
 import { PaymentMethodPicker, DynamicPaymentSelector } from "@/components/ui/payment-method";
 import { AmountInput } from "@/components/ui/amount-input";
 import {
@@ -134,18 +138,8 @@ function PaymentsPage() {
   });
   const selectedMethod = collectionMethods.find((item) => item.id === method);
   const needsReference = selectedMethod?.requiresReference ?? requiresPaymentReference(method);
-  const referenceLabel =
-    selectedMethod?.legacyValue === "cheque"
-      ? lang === "ar"
-        ? "رقم الشيك"
-        : "Cheque number"
-      : selectedMethod?.ledgerKind === "WALLET"
-        ? lang === "ar"
-          ? "رقم عملية المحفظة"
-          : "Wallet transaction reference"
-        : lang === "ar"
-          ? "رقم الحوالة / المرجع"
-          : "Transfer / payment reference";
+  // اسم حقل المرجع يُشتق من الكتالوج، لا من نسخة محلية — نفس الصياغة في كل شاشة.
+  const referenceLabel = paymentReferenceLabel(selectedMethod, lang === "ar" ? "ar" : "en");
 
   useEffect(() => {
     if (collectionMethods.length > 0 && !collectionMethods.some((item) => item.id === method)) {

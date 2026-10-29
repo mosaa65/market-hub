@@ -16,6 +16,15 @@ export interface PurchaseRegisterRow {
   sku: string | null;
   quantity: number;
   unit_cost: number;
+  uom_id: string | null;
+  entered_quantity: number;
+  entered_unit_cost: number;
+  uom_conversion_factor: number;
+  uom_name: string | null;
+  uom_name_ar: string | null;
+  base_uom_id: string | null;
+  base_uom_name: string | null;
+  base_uom_name_ar: string | null;
   discount: number;
   tax: number;
   total: number;
