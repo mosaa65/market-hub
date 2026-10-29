@@ -51,6 +51,8 @@ import { useI18n } from "@/lib/i18n";
 import { money } from "@/lib/format";
 import { toSystemDigits } from "@/lib/format-preferences";
 import { toast } from "sonner";
+import { PosBatchSelectorModal } from "@/components/batches/pos-batch-selector-modal";
+import { useBatchSettings } from "@/hooks/use-batch-settings";
 
 type Kind = "sales" | "purchase";
 type Party = {
@@ -72,6 +74,7 @@ type ProductRow = {
   sale_price: number;
   tax_rate: number;
   tracking?: "NONE" | "BATCH" | "SERIAL" | null;
+  batch_dispatch_strategy?: "FEFO" | "FIFO" | "MANUAL" | null;
   is_custody_item?: boolean;
   is_purchasable?: boolean;
   unit?: { short_name?: string | null; name?: string | null; name_ar?: string | null } | null;
@@ -83,6 +86,7 @@ type CartLine = {
   tax_rate: number;
   batch_number: string;
   expiry_date: string;
+  batch_id?: string | null;
 };
 type SavedInvoice = {
   id: string;
@@ -122,6 +126,9 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
   const [savedInvoice, setSavedInvoice] = useState<SavedInvoice | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [batchProduct, setBatchProduct] = useState<ProductRow | null>(null);
+  const [batchModalOpen, setBatchModalOpen] = useState(false);
+  const { settings: batchSettings } = useBatchSettings();
   const sales = kind === "sales";
   const title = sales
     ? ar
@@ -147,7 +154,7 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
     setLoading(true);
     let productQuery = (supabase.from("products") as any)
       .select(
-        "id,name,name_ar,sku,barcode,unit_id,cost_price,sale_price,tax_rate,tracking,is_custody_item,is_purchasable,unit:units!products_unit_id_fkey(short_name,name,name_ar)",
+        "id,name,name_ar,sku,barcode,unit_id,cost_price,sale_price,tax_rate,tracking,batch_dispatch_strategy,is_custody_item,is_purchasable,unit:units!products_unit_id_fkey(short_name,name,name_ar)",
       )
       .eq("is_active", true);
     if (!sales) {
@@ -294,6 +301,20 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
           : "Enter a batch number for each batch-tracked item",
       );
     }
+    if (
+      sales &&
+      cart.some(
+        (line) =>
+          line.product.tracking === "BATCH" &&
+          ((line.product.batch_dispatch_strategy ?? batchSettings.dispatch_strategy) === "MANUAL" ||
+            batchSettings.enforce_batch_selection_on_pos) &&
+          !line.batch_id,
+      )
+    ) {
+      return toast.error(
+        ar ? "اختر دفعة لكل صنف يتطلب صرفاً يدوياً" : "Choose a batch for each item requiring manual dispatch",
+      );
+    }
     if (discount && discount > subtotal + tax)
       return toast.error(
         ar ? "الخصم أكبر من قيمة الفاتورة" : "Discount cannot exceed invoice value",
@@ -329,7 +350,7 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
       let invoiceId = "";
       let invoiceNumber = "";
       if (sales) {
-        const lines: InvoiceLine[] = cart.map(({ product, quantity, price }) => ({
+        const lines: InvoiceLine[] = cart.map(({ product, quantity, price, batch_id, batch_number }) => ({
           kind: "catalog",
           product_id: product.id,
           name: label(product),
@@ -337,6 +358,8 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
           quantity,
           unit_price: price,
           tax_rate: Number(product.tax_rate) || 0,
+          batch_id,
+          batch_number,
         }));
         const result = await createSalesInvoice({
           warehouseId,
@@ -779,6 +802,20 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
                                 />
                               </div>
                             )}
+                            {sales && line.product.tracking === "BATCH" && (
+                              <button
+                                type="button"
+                                className="mt-2 inline-flex h-8 items-center rounded-md border border-input px-2 text-xs hover:bg-muted"
+                                onClick={() => {
+                                  setBatchProduct(line.product);
+                                  setBatchModalOpen(true);
+                                }}
+                              >
+                                {line.batch_number
+                                  ? `${ar ? "الدفعة" : "Batch"}: ${line.batch_number}`
+                                  : ar ? "اختيار دفعة الصرف" : "Choose dispatch batch"}
+                              </button>
+                            )}
                           </td>
                           <td className="px-3 py-2">
                             <QuantityInput
@@ -1066,6 +1103,31 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
           />
         </>
       )}
+      {sales && batchProduct && warehouseId ? (
+        <PosBatchSelectorModal
+          open={batchModalOpen}
+          onOpenChange={setBatchModalOpen}
+          productId={batchProduct.id}
+          productName={label(batchProduct)}
+          warehouseId={warehouseId}
+          currentBatchId={cart.find((line) => line.product.id === batchProduct.id)?.batch_id}
+          dispatchStrategy={batchProduct.batch_dispatch_strategy}
+          onSelectBatch={(batch) => {
+            setCart((previous) =>
+              previous.map((line) =>
+                line.product.id === batchProduct.id
+                  ? {
+                      ...line,
+                      batch_id: batch?.id ?? null,
+                      batch_number: batch?.batch_number ?? "",
+                      expiry_date: batch?.expiry_date ?? "",
+                    }
+                  : line,
+              ),
+            );
+          }}
+        />
+      ) : null}
     </div>
   );
 }

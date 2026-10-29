@@ -74,7 +74,7 @@ export interface CompanyItemPolicy {
 export const DEFAULT_ITEM_POLICY: ItemPolicy = {
   item_nature: "GOOD",
   inventory_policy: "TRACKED",
-  tracking: "BATCH",
+  tracking: "NONE",
   costing_method: "MOVING_AVERAGE",
   is_sellable: true,
   is_purchasable: true,
@@ -246,13 +246,13 @@ export const ITEM_NATURE_LABELS: Record<ItemNature, { ar: string; en: string }> 
 };
 
 export const INVENTORY_POLICY_LABELS: Record<InventoryPolicy, { ar: string; en: string }> = {
-  TRACKED: { ar: "متتبع مخزنيًا", en: "Tracked" },
-  UNTRACKED: { ar: "غير متتبع مخزنيًا", en: "Untracked" },
-  CUSTOMER_OWNED: { ar: "مملوك للعميل", en: "Customer-owned" },
+  TRACKED: { ar: "يُدار ضمن مخزون الشركة", en: "Managed in company stock" },
+  UNTRACKED: { ar: "لا يُدار له رصيد مخزني", en: "No stock balance managed" },
+  CUSTOMER_OWNED: { ar: "أمانة مملوكة للعميل", en: "Customer-owned custody" },
 };
 
 export const TRACKING_LABELS: Record<ItemTracking, { ar: string; en: string }> = {
-  NONE: { ar: "بدون", en: "None" },
+  NONE: { ar: "بدون دفعات أو أرقام تسلسلية", en: "No batch or serial tracking" },
   BATCH: { ar: "دفعات", en: "Batch" },
   SERIAL: { ar: "أرقام تسلسلية", en: "Serial" },
 };

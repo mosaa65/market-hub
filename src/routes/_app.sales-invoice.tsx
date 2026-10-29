@@ -233,6 +233,20 @@ function SalesInvoicePage() {
   const [warehouseId, setWarehouseId] = useState("");
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<SellableProduct[]>([]);
+  /**
+   * The seeded system cash customer (عميل نقدي, `customers.is_system`) — the one
+   * party a walk-in sale is actually booked to.
+   *
+   * This screen used to leave the invoice with `customer_id = null` until the
+   * operator picked someone, and the register then printed a made-up "عميل نقدي"
+   * for it. That made a second, phantom cash customer that only existed in the
+   * UI: the sale was invisible on the real cash account's statement, and any
+   * remaining amount was refused because there was no customer to carry it.
+   * The screen now uses the system row itself, selected by default, exactly as
+   * the POS does.
+   */
+  const [cashCustomerId, setCashCustomerId] = useState("");
+  const [customerId, setCustomerId] = useState("");
 
   //
   // Holds a CATALOGUE id (e.g. 'kuraimi_bank'), because that is what the picker
@@ -290,9 +304,16 @@ function SalesInvoicePage() {
       ]);
 
       const ws = (wsRes.status === "fulfilled" ? wsRes.value.data : null) ?? [];
-      const cs = (csRes.status === "fulfilled" ? csRes.value.data : null) ?? [];
+      const cs = ((csRes.status === "fulfilled" ? csRes.value.data : null) ?? []) as Customer[];
       setWarehouses(ws as Warehouse[]);
-      setCustomers(cs as Customer[]);
+      setCustomers(cs);
+      const cash = cs.find((customer) => customer.is_system);
+      if (cash) {
+        setCashCustomerId(cash.id);
+        // Default the party to the system cash customer without ever
+        // overriding a customer the operator already chose.
+        setCustomerId((current) => current || cash.id);
+      }
       setWarehouseId((current) =>
         ws.some((w: any) => w.id === current) ? current : ((ws[0] as any)?.id ?? ""),
       );
@@ -433,8 +454,6 @@ function SalesInvoicePage() {
 
   /* ------------------------------------------------------------- totals */
 
-  const customerId = mode === "ticket" ? ticket.customerId : "";
-
   const lines: InvoiceLine[] = useMemo(() => {
     if (mode === "pos") {
       return cart.map((l) => ({
@@ -471,10 +490,22 @@ function SalesInvoicePage() {
   const discountN = Math.max(0, Number(discount) || 0);
   const total = Math.max(0, Math.round((subtotal - discountN) * 100) / 100);
 
+  /**
+   * The party the invoice is booked to.
+   *
+   * POS mode books to the selected party and defaults that to the seeded system
+   * cash customer; ticket mode books to the registered customer on the ticket.
+   * `partyId` is what the submit path sends as `customer_id` and what the shared
+   * payment rules evaluate (so the cash customer is blocked from carrying debt).
+   */
+  const partyId = mode === "ticket" ? ticket.customerId : customerId;
+  const selectedCustomer = customers.find((c) => c.id === partyId) || null;
+  const isCashParty = Boolean(selectedCustomer?.is_system);
+
   // P1-4: the payment arithmetic is the shared panel's, not this screen's.
   const payment = usePaymentPanel({
     total,
-    state: { method: paymentMethod, paidRaw: paid, customerId },
+    state: { method: paymentMethod, paidRaw: paid, customerId: partyId },
     customers,
   });
   const effectivePaid = payment.paid;
@@ -505,11 +536,21 @@ function SalesInvoicePage() {
           : "A milling ticket requires a registered customer",
       );
     }
-    if (remaining > 0 && !customerId) {
+    if (remaining > 0 && !partyId) {
       return toast.error(
         isRtl
           ? "يرجى اختيار العميل لتسجيل المبلغ المتبقي كدين آجل"
           : "Select a customer so the unpaid balance can be recorded as debt",
+      );
+    }
+    // The seeded cash customer is the walk-in party: it may settle any method
+    // in full, but it can never carry a balance. On the cash party we simply
+    // collect the whole amount in cash, so no debt is ever posted to it.
+    if (remaining > 0 && isCashParty) {
+      return toast.error(
+        isRtl
+          ? "العميل النقدي لا يحمل ديناً — حصّل كامل المبلغ أو اختر عميلاً مسجلاً"
+          : "The cash customer cannot carry a balance — collect it in full or pick a registered customer",
       );
     }
     // The panel's rules (overpaid, debt on the cash customer, credit limit) are
@@ -524,8 +565,10 @@ function SalesInvoicePage() {
     try {
       const result = await createSalesInvoice({
         warehouseId,
-        customerId: customerId || null,
-        paymentMethod: toLegacyPaymentValue(paymentSplits.length > 1 ? "split" : paymentMethod) as PaymentMethod,
+        customerId: partyId || null,
+        paymentMethod: toLegacyPaymentValue(
+          paymentSplits.length > 1 ? "split" : paymentMethod,
+        ) as PaymentMethod,
         paid: effectivePaid,
         discount: discountN,
         paymentSplits: paymentSplits.length > 1 ? paymentSplits : null,
@@ -565,10 +608,10 @@ function SalesInvoicePage() {
         return;
       }
 
+      // The name on the document is the party actually booked on the invoice —
+      // never a second, made-up "عميل نقدي" when the real cash row exists.
       const customerName =
-        customers.find((c) => c.id === customerId)?.name ||
-        ticket.customerName.trim() ||
-        (isRtl ? "عميل نقدي" : "Walk-in");
+        selectedCustomer?.name || ticket.customerName.trim() || (isRtl ? "عميل نقدي" : "Walk-in");
       const warehouse = warehouses.find((w) => w.id === warehouseId);
 
       const resolvedPaymentLabel =
@@ -696,8 +739,6 @@ function SalesInvoicePage() {
   }
 
   /* -------------------------------------------------------- render bits */
-
-  const selectedCustomer = customers.find((c) => c.id === customerId) || null;
 
   const inputClass =
     "h-10 w-full rounded-xl border border-border/80 bg-surface px-3 text-sm text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20";
@@ -1054,6 +1095,102 @@ function SalesInvoicePage() {
 
         {/* ----------------------------------------------------- right pane */}
         <div className="order-1 space-y-4 lg:order-2 lg:sticky lg:top-4">
+          {/*
+           * Party — in front, above every other field.
+           *
+           * The invoice is addressed to a party, and that party decides what the
+           * cashier may do next (cash settles in full, a named account may carry
+           * a balance). So it sits at the top of the pane, with the seeded cash
+           * customer pre-selected and shown as a distinct "default" card rather
+           * than as one more name in a dropdown.
+           */}
+          {mode === "pos" && (
+            <div className="panel-elevated space-y-2.5 rounded-2xl border border-border/80 bg-surface/90 p-4">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-xs font-bold text-foreground">
+                  <User className="size-3.5 text-primary" />
+                  {isRtl ? "العميل / الجهة" : "Customer / party"}
+                </span>
+                {isCashParty && (
+                  <span className="rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
+                    {isRtl ? "بيع نقدي" : "Cash sale"}
+                  </span>
+                )}
+              </div>
+
+              {isCashParty ? (
+                <div className="flex items-center gap-2.5 rounded-xl border border-primary/30 bg-gradient-to-l from-primary/[0.08] to-transparent px-3 py-2.5">
+                  <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary/15 text-primary">
+                    <ShoppingBag className="size-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-bold text-foreground">
+                      {selectedCustomer?.name ?? (isRtl ? "عميل نقدي" : "Walk-in")}
+                    </p>
+                    <p className="truncate text-[10px] text-muted-foreground">
+                      {isRtl
+                        ? "الجهة الافتراضية للبيع الفوري — لا تحمل أرصدة آجلة"
+                        : "Default walk-in party — cannot carry a balance"}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 rounded-xl border border-border/70 bg-surface px-3 py-2.5">
+                  <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-surface-2 text-muted-foreground">
+                    <User className="size-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-foreground">
+                      {selectedCustomer?.name ?? (isRtl ? "لم يُختر عميل" : "No party selected")}
+                    </p>
+                    {selectedCustomer?.phone && (
+                      <p className="truncate font-mono text-[10px] text-muted-foreground">
+                        {toSystemDigits(selectedCustomer.phone)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                <select
+                  value={customerId}
+                  data-form-nav
+                  onChange={(e) => setCustomerId(e.target.value)}
+                  className={inputClass}
+                  aria-label={isRtl ? "اختيار العميل" : "Select customer"}
+                >
+                  {/* The default party is the first option and is labelled as
+                      the default so it is never confused with a named account. */}
+                  {cashCustomerId && (
+                    <option value={cashCustomerId}>
+                      {(customers.find((c) => c.id === cashCustomerId)?.name ??
+                        (isRtl ? "عميل نقدي" : "Walk-in")) + (isRtl ? " — افتراضي" : " — default")}
+                    </option>
+                  )}
+                  {customers
+                    .filter((c) => c.id !== cashCustomerId)
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                        {c.phone ? ` — ${c.phone}` : ""}
+                      </option>
+                    ))}
+                </select>
+                {cashCustomerId && customerId !== cashCustomerId && (
+                  <button
+                    type="button"
+                    onClick={() => setCustomerId(cashCustomerId)}
+                    className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-primary/30 bg-primary/5 px-3 text-xs font-semibold text-primary transition hover:bg-primary/10"
+                  >
+                    <ShoppingBag className="size-3.5" />
+                    {isRtl ? "رجوع للبيع النقدي" : "Back to cash sale"}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           <div
             ref={paymentScopeRef}
             data-form-nav-scope
@@ -1308,7 +1445,19 @@ function SalesInvoicePage() {
                 {paymentMethod === "split" && (
                   <div className="flex min-h-9 items-center justify-between rounded-xl border border-primary/20 bg-primary/[0.04] px-3 text-xs font-semibold text-primary">
                     <span>{isRtl ? "الدفع موزع على عدة طرق" : "Payment split across methods"}</span>
-                    <button type="button" onClick={() => { setPaymentSplits([]); setPaymentMethod("cash"); setSettlement((current) => ({ ...current, method: "cash", paymentMethodId: "cash" })); }} className="underline underline-offset-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPaymentSplits([]);
+                        setPaymentMethod("cash");
+                        setSettlement((current) => ({
+                          ...current,
+                          method: "cash",
+                          paymentMethodId: "cash",
+                        }));
+                      }}
+                      className="underline underline-offset-2"
+                    >
                       {isRtl ? "إلغاء التجزئة" : "Cancel split"}
                     </button>
                   </div>
@@ -1324,7 +1473,7 @@ function SalesInvoicePage() {
                 }}
                 paid={paid}
                 onPaidChange={setPaid}
-                customerId={customerId}
+                customerId={partyId}
                 customers={customers}
                 reference={paymentReference}
                 onReferenceChange={setPaymentReference}
@@ -1377,6 +1526,14 @@ function SalesInvoicePage() {
                 </div>
               )}
             </div>
+
+            {remaining > 0 && isCashParty && (
+              <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-2 text-[11px] text-rose-700 dark:text-rose-300">
+                {isRtl
+                  ? "العميل النقدي لا يحمل ديناً — حصّل كامل المبلغ أو اختر عميلاً مسجلاً."
+                  : "The cash customer cannot carry a balance — collect in full or pick a registered customer."}
+              </div>
+            )}
 
             {remaining > 0 && !selectedCustomer && (
               <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-2 text-[11px] text-amber-700 dark:text-amber-300">

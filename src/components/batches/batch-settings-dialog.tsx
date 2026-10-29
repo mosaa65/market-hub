@@ -161,8 +161,8 @@ export function BatchSettingsDialog({ open, onOpenChange }: BatchSettingsDialogP
                 </div>
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   {isAr
-                    ? "تحدد آلية خصم الدفعات تلقائياً عند البيع: FEFO (الأقرب انتهاءً أولاً للأغذية والأدوية)، أو FIFO (الأقدم وروداً)، أو يدوي."
-                    : "Controls how batches are allocated on sales: FEFO (Earliest expiry first), FIFO (Oldest batch first), or Manual selection."}
+                    ? "هذا هو الترتيب العام لأصناف الدفعات التي تستخدم إعداد الشركة. يمكن تخصيص FEFO أو FIFO أو الاختيار اليدوي من تفاصيل كل منتج."
+                    : "This is the default for batch-tracked products that inherit company settings. FEFO, FIFO, or manual dispatch can be set per product."}
                 </p>
               </div>
 
@@ -272,16 +272,11 @@ export function BatchSettingsDialog({ open, onOpenChange }: BatchSettingsDialogP
                 </div>
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
                   {isAr
-                    ? "إلزام إدخال رقم الدفعة وتاريخ الصلاحية عند توريد المنتجات المتبعة بالدفعات."
-                    : "Require batch number and expiry date when purchasing tracked products."}
+                    ? "رقم الدفعة مطلوب عند شراء صنف يتتبع الدفعات؛ تاريخ الانتهاء اختياري."
+                    : "A batch number is required when purchasing a batch-tracked item; expiry date is optional."}
                 </p>
               </div>
-              <Switch
-                checked={form.enforce_on_purchase}
-                onCheckedChange={(checked) =>
-                  setForm((f) => ({ ...f, enforce_on_purchase: checked }))
-                }
-              />
+              <Switch checked disabled aria-label={isAr ? "رقم الدفعة إلزامي" : "Batch number required"} />
             </div>
 
             {/* Auto-Sync Inventory */}

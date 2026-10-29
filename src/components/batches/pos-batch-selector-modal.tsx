@@ -34,6 +34,7 @@ interface PosBatchSelectorModalProps {
   productId: string;
   productName: string;
   warehouseId: string;
+  dispatchStrategy?: "FEFO" | "FIFO" | "MANUAL" | null;
   currentBatchId?: string | null;
   onSelectBatch: (
     batch: { id: string; batch_number: string; expiry_date: string | null } | null,
@@ -53,6 +54,7 @@ export function PosBatchSelectorModal({
   productId,
   productName,
   warehouseId,
+  dispatchStrategy,
   currentBatchId,
   onSelectBatch,
 }: PosBatchSelectorModalProps) {
@@ -65,6 +67,9 @@ export function PosBatchSelectorModal({
   const [selectedId, setSelectedId] = useState<string | null>(currentBatchId || null);
 
   const todayStr = getLocalDateString();
+  const effectiveStrategy = dispatchStrategy ?? settings.dispatch_strategy;
+  const manualSelectionRequired =
+    effectiveStrategy === "MANUAL" || settings.enforce_batch_selection_on_pos;
 
   useEffect(() => {
     if (!open || !productId || !warehouseId) return;
@@ -78,7 +83,15 @@ export function PosBatchSelectorModal({
         .eq("product_id", productId)
         .eq("warehouse_id", warehouseId)
         .gt("quantity", 0)
-        .order("expiry_date", { ascending: true, nullsFirst: false }),
+        .or(
+          settings.prevent_selling_expired
+            ? `expiry_date.is.null,expiry_date.gt.${todayStr}`
+            : "quantity.gt.0",
+        )
+        .order(effectiveStrategy === "FEFO" ? "expiry_date" : "created_at", {
+          ascending: true,
+          nullsFirst: false,
+        }),
     )
       .then(({ data, error }) => {
         if (!error && data) {
@@ -86,7 +99,17 @@ export function PosBatchSelectorModal({
         }
       })
       .finally(() => setLoading(false));
-  }, [open, productId, warehouseId, currentBatchId]);
+  }, [
+    open,
+    productId,
+    warehouseId,
+    currentBatchId,
+    effectiveStrategy,
+    dispatchStrategy,
+    settings.enforce_batch_selection_on_pos,
+    settings.prevent_selling_expired,
+    todayStr,
+  ]);
 
   const handleConfirm = () => {
     if (!selectedId) {
@@ -127,9 +150,12 @@ export function PosBatchSelectorModal({
           {/* Default Auto Allocation Option */}
           <button
             type="button"
+            disabled={manualSelectionRequired}
             onClick={() => setSelectedId(null)}
             className={`w-full text-start p-3 rounded-xl border transition flex items-center justify-between ${
-              selectedId === null
+              manualSelectionRequired
+                ? "cursor-not-allowed border-border/60 opacity-50"
+                : selectedId === null
                 ? "border-primary bg-primary/10 shadow-sm"
                 : "border-border/80 bg-surface hover:border-border"
             }`}
@@ -145,13 +171,21 @@ export function PosBatchSelectorModal({
                     variant="outline"
                     className="text-[9px] py-0 border-primary/40 text-primary"
                   >
-                    {settings.dispatch_strategy}
+                    {effectiveStrategy}
                   </Badge>
                 </div>
                 <div className="text-[11px] text-muted-foreground">
                   {isAr
-                    ? "يتم خصم الأقرب انتهاءً أولاً تلقائياً بحسب سياسة النظام"
-                    : "Automatically allocates earliest expiry batch"}
+                    ? manualSelectionRequired
+                      ? "اختيار دفعة محددة مطلوب حسب إعداد نقطة البيع."
+                      : effectiveStrategy === "FIFO"
+                        ? "يخصم أقدم دفعة استلاماً أولاً، ويمكن توزيع الكمية على عدة دفعات."
+                        : "يخصم الدفعة الأقرب انتهاءً أولاً، ويمكن توزيع الكمية على عدة دفعات."
+                    : manualSelectionRequired
+                      ? "Select a batch below; the POS settings require a specific batch."
+                      : effectiveStrategy === "FIFO"
+                        ? "Uses the oldest received batch first and can split the quantity across batches."
+                        : "Uses the earliest-expiring batch first and can split the quantity across batches."}
                 </div>
               </div>
             </div>
@@ -251,6 +285,7 @@ export function PosBatchSelectorModal({
             type="button"
             size="sm"
             onClick={handleConfirm}
+            disabled={manualSelectionRequired && !selectedId}
             className="text-xs px-4 font-bold"
           >
             {isAr ? "تأكيد الاختيار" : "Confirm"}

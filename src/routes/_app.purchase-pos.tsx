@@ -15,7 +15,6 @@ import {
   FileText,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { createPurchaseBatchNumber } from "@/lib/purchases/batch-number";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { money } from "@/lib/format";
@@ -575,7 +574,7 @@ function PurchasePOSPage() {
           tax_rate: Number(p.tax_rate || 0),
           quantity: 1,
           tracking: p.tracking ?? "NONE",
-          batch_number: p.tracking === "BATCH" ? createPurchaseBatchNumber() : "",
+          batch_number: "",
           expiry_date: "",
         },
       ];

@@ -17,7 +17,7 @@ export const DEFAULT_BATCH_SETTINGS: BatchSettings = {
   dispatch_strategy: "FEFO",
   prevent_selling_expired: true,
   warning_days: 30,
-  enforce_on_purchase: false,
+  enforce_on_purchase: true,
   enforce_batch_selection_on_pos: false,
   auto_sync_inventory: true,
 };
@@ -28,7 +28,7 @@ export function getLocalBatchSettings(): BatchSettings {
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (raw) {
-      return { ...DEFAULT_BATCH_SETTINGS, ...JSON.parse(raw) };
+      return { ...DEFAULT_BATCH_SETTINGS, ...JSON.parse(raw), enforce_on_purchase: true };
     }
   } catch {
     // ignore json error
@@ -71,6 +71,7 @@ export function useBatchSettings() {
         const merged: BatchSettings = {
           ...DEFAULT_BATCH_SETTINGS,
           ...dbSettings,
+          enforce_on_purchase: true,
         };
         setLocalBatchSettings(merged);
         return merged;
@@ -86,6 +87,7 @@ export function useBatchSettings() {
       const merged: BatchSettings = {
         ...settings,
         ...updated,
+        enforce_on_purchase: true,
       };
 
       // Save to localStorage immediately

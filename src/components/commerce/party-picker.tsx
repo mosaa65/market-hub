@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Check, ChevronsUpDown, Truck, UserRound } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Check, ChevronsUpDown, ShoppingBag, Sparkles, Truck, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -49,6 +49,22 @@ export function PartyPicker({
   // choice. Showing both creates two entries that perform the same role.
   const showEmptyItem = Boolean(emptyLabel && !options.some((option) => option.is_system));
 
+  /**
+   * The seeded system party (عميل نقدي / مورد نقدي) is pinned to the TOP of the
+   * list and rendered as its own card instead of as one more customer row.
+   *
+   * It is not a customer in the same sense as the rest — it is the "no name"
+   * party every counter sale is booked to, so it must be found first and never
+   * be mistaken for someone's account. Pinning it also means the operator does
+   * not have to search for a specific name to get the default.
+   */
+  const { pinned, regular } = useMemo(() => {
+    const pinnedOptions = options.filter((option) => option.is_system);
+    const rest = options.filter((option) => !option.is_system);
+    return { pinned: pinnedOptions, regular: rest };
+  }, [options]);
+  const isPinnedSelected = Boolean(selected?.is_system);
+
   const select = (nextValue: string) => {
     onChange(nextValue);
     setOpen(false);
@@ -69,8 +85,15 @@ export function PartyPicker({
             <PartyIcon className="size-4" />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-xs font-semibold text-foreground">
-              {selected?.name ?? fallbackLabel}
+            <span className="flex items-center gap-1.5">
+              <span className="block truncate text-xs font-semibold text-foreground">
+                {selected?.name ?? fallbackLabel}
+              </span>
+              {isPinnedSelected && (
+                <span className="shrink-0 rounded-full border border-primary/25 bg-primary/10 px-1.5 text-[9px] font-bold text-primary">
+                  {isArabic ? "افتراضي" : "Default"}
+                </span>
+              )}
             </span>
             {selected?.balance != null && (
               <span className="block truncate text-[10px] font-normal text-muted-foreground">
@@ -102,6 +125,42 @@ export function PartyPicker({
             {options.length}
           </span>
         </div>
+        {pinned.length > 0 && (
+          <div className="border-b border-border/70 bg-gradient-to-b from-primary/[0.07] to-transparent p-1.5">
+            <div className="mb-1 flex items-center gap-1 px-1.5 text-[10px] font-semibold uppercase tracking-wide text-primary/80">
+              <Sparkles className="size-3" />
+              {isArabic ? "الجهة الافتراضية" : "Default party"}
+            </div>
+            {pinned.map((option) => {
+              const active = value === option.id;
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => select(option.id)}
+                  className={`flex min-h-12 w-full items-center gap-2.5 rounded-xl border px-2.5 py-2 text-start transition ${active ? "border-primary/40 bg-primary/10" : "border-transparent hover:border-primary/20 hover:bg-primary/[0.06]"}`}
+                >
+                  <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-primary/15 text-primary">
+                    <ShoppingBag className="size-4" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-xs font-bold text-foreground">
+                      {option.name}
+                    </span>
+                    <span className="block truncate text-[10px] text-muted-foreground">
+                      {isArabic
+                        ? "بيع فوري نقدي — لا يُسجَّل عليه دين"
+                        : "Walk-in cash sale — cannot carry debt"}
+                    </span>
+                  </span>
+                  <Check
+                    className={`size-4 shrink-0 text-primary ${active ? "opacity-100" : "opacity-0"}`}
+                  />
+                </button>
+              );
+            })}
+          </div>
+        )}
         <Command dir={isArabic ? "rtl" : "ltr"} className="rounded-none bg-transparent">
           <CommandInput
             placeholder={isArabic ? "ابحث بالاسم أو الهاتف..." : "Search name or phone..."}
@@ -124,7 +183,7 @@ export function PartyPicker({
                 <Check className={`size-4 ${value ? "opacity-0" : "opacity-100"}`} />
               </CommandItem>
             )}
-            {options.map((option) => (
+            {regular.map((option) => (
               <CommandItem
                 key={option.id}
                 value={`${option.name} ${option.phone ?? ""} ${option.balance ?? ""}`}

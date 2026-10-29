@@ -53,6 +53,8 @@ export interface CatalogLine {
   unit_price: number;
   tax_rate: number;
   unit_label?: string | null;
+  batch_id?: string | null;
+  batch_number?: string | null;
 }
 
 /**
@@ -215,6 +217,8 @@ export async function createSalesInvoice(
             tax_rate: Number(l.tax_rate),
             is_service: false,
             name: l.name,
+            batch_id: l.batch_id ?? null,
+            batch_number: l.batch_number ?? null,
           },
     );
 

@@ -37,6 +37,7 @@ import {
   Wallet,
   Loader2,
   Scale,
+  ShoppingBag,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
@@ -93,7 +94,21 @@ interface CustomerInfo {
   id?: string;
   name: string;
   phone?: string | null;
+  /** The seeded cash customer — a walk-in sale, not a named account. */
+  is_system?: boolean | null;
 }
+
+/**
+ * The party an invoice is addressed to.
+ *
+ * The screen used to invent a "عميل نقدي" label whenever `customer_id` was
+ * null, which made a second cash customer that existed only in this list: the
+ * sale could not be found on the real cash account's statement. The system cash
+ * customer is now always linked, so the label is read from the invoice itself
+ * and only falls back for genuinely unlinked historic rows (shown muted, so it
+ * is obvious nobody's account holds them).
+ */
+const WALK_IN_FALLBACK = { ar: "عميل نقدي", en: "Walk-in" } as const;
 
 interface Invoice {
   id: string;
@@ -126,7 +141,7 @@ interface Line {
   products: { name: string; name_ar?: string | null; sku: string | null } | null;
 }
 
-type StatusTab = "all" | "paid" | "partial" | "unpaid" | "cancelled";
+type StatusTab = "all" | "paid" | "partial" | "unpaid" | "cancelled" | "cash";
 /** Unified records vocabulary — `cards` (was "cards"), list, table. */
 type ViewMode = RecordsViewMode;
 
@@ -184,6 +199,26 @@ export function SalesPage() {
 
   const isRtl = lang === "ar";
 
+  /** Party name + whether it is the seeded cash party (walk-in). */
+  const party = useCallback(
+    (inv: Invoice): { name: string; isCash: boolean; isLinked: boolean } => {
+      const linked = inv.customers;
+      if (linked) {
+        return {
+          name: linked.name,
+          isCash: Boolean(linked.is_system),
+          isLinked: true,
+        };
+      }
+      return {
+        name: isRtl ? WALK_IN_FALLBACK.ar : WALK_IN_FALLBACK.en,
+        isCash: true,
+        isLinked: false,
+      };
+    },
+    [isRtl],
+  );
+
   const whName = useCallback(
     (w: { name: string; name_ar: string | null } | null | undefined) =>
       !w ? undefined : lang === "ar" ? w.name_ar || w.name : w.name || w.name_ar || undefined,
@@ -207,7 +242,7 @@ export function SalesPage() {
       const { data, error } = await supabase
         .from("sales_invoices")
         .select(
-          "id,invoice_number,status,subtotal,discount,tax,total,paid,payment_method,note,created_at,customer_id,warehouse_id,customers(id,name,phone),warehouses(name,name_ar)",
+          "id,invoice_number,status,subtotal,discount,tax,total,paid,payment_method,note,created_at,customer_id,warehouse_id,customers(id,name,phone,is_system),warehouses(name,name_ar)",
         )
         .order("created_at", { ascending: false })
         .range(from, to);
@@ -504,7 +539,7 @@ export function SalesPage() {
     setCollectionTarget({
       invoiceId: inv.id,
       customerId: inv.customer_id,
-      customerName: inv.customers?.name || (isRtl ? "عميل نقدي" : "Walk-in"),
+      customerName: party(inv).name,
       phone: inv.customers?.phone || undefined,
       balance: remaining,
     });
@@ -523,7 +558,7 @@ export function SalesPage() {
       number: invoice.invoice_number,
       date: invoice.created_at,
       partyLabel: isRtl ? "العميل / المشترى:" : "Bill To:",
-      partyName: invoice.customers?.name ?? (isRtl ? "عميل نقدي" : "Walk-in"),
+      partyName: party(invoice).name,
       warehouse: hasMultiWarehouse ? (whName(invoice.warehouses) ?? undefined) : undefined,
       payment: pmLabel(invoice.payment_method, invoice.note),
       status: statusLabel(invoice.status),
@@ -659,6 +694,7 @@ export function SalesPage() {
 
   const salesSortOptions: SortOption[] = useMemo(
     () => [
+      { value: "cash_first", label: isRtl ? "البيع النقدي أولاً" : "Cash sales first" },
       { value: "date_desc", label: isRtl ? "الأحدث تاريخاً" : "Newest Date" },
       { value: "date_asc", label: isRtl ? "الأقدم تاريخاً" : "Oldest Date" },
       { value: "total_desc", label: isRtl ? "الأعلى قيمة (الإجمالي)" : "Highest Total" },
@@ -700,23 +736,29 @@ export function SalesPage() {
         header: isRtl ? "العميل" : "Customer",
         sortable: true,
         width: "w-[220px]",
-        sortValue: (inv) => inv.customers?.name ?? "",
+        sortValue: (inv) => party(inv).name,
         cell: (inv) => {
-          const customerName = inv.customers?.name ?? (isRtl ? "عميل نقدي" : "Walk-in");
+          const { name, isCash, isLinked } = party(inv);
           return (
             <div className="flex items-center gap-2 py-0.5">
-              <span className="grid size-7 shrink-0 place-items-center rounded-full bg-surface-2 text-[10px] font-bold text-muted-foreground">
-                {customerName.slice(0, 1).toUpperCase()}
+              <span
+                className={
+                  isCash
+                    ? "grid size-7 shrink-0 place-items-center rounded-full border border-primary/25 bg-primary/10 text-[10px] font-bold text-primary"
+                    : "grid size-7 shrink-0 place-items-center rounded-full bg-surface-2 text-[10px] font-bold text-muted-foreground"
+                }
+              >
+                {isCash ? <ShoppingBag className="size-3.5" /> : name.slice(0, 1).toUpperCase()}
               </span>
               <div className="min-w-0">
-                <span className="block truncate text-xs font-medium text-foreground">
-                  {customerName}
+                <span
+                  className={`block truncate text-xs ${isLinked ? "font-medium text-foreground" : "font-medium italic text-muted-foreground"}`}
+                >
+                  {name}
                 </span>
-                {inv.customers?.phone && (
-                  <span className="block truncate font-mono text-[10px] text-muted-foreground">
-                    {toSystemDigits(inv.customers.phone)}
-                  </span>
-                )}
+                <span className="block truncate text-[10px] text-muted-foreground">
+                  {isCash ? (isRtl ? "بيع نقدي" : "Cash sale") : (inv.customers?.phone ?? "")}
+                </span>
               </div>
             </div>
           );
@@ -859,8 +901,12 @@ export function SalesPage() {
   // Filter & Sort Rows
   const filteredRows = useMemo(() => {
     let list = rows.filter((r) => {
-      // 1. Status Tab
-      if (statusTab !== "all" && r.status !== statusTab) {
+      // 1. Status Tab — `cash` is a party segment, not an invoice status: it
+      //    gathers every sale booked to the seeded cash customer, which is what
+      //    an operator counting the day's walk-in takings actually needs.
+      if (statusTab === "cash") {
+        if (!party(r).isCash) return false;
+      } else if (statusTab !== "all" && r.status !== statusTab) {
         return false;
       }
 
@@ -970,7 +1016,7 @@ export function SalesPage() {
           case "invoice_number":
             return a.invoice_number.localeCompare(b.invoice_number) * dir;
           case "customer":
-            return (a.customers?.name ?? "").localeCompare(b.customers?.name ?? "", "ar") * dir;
+            return party(a).name.localeCompare(party(b).name, "ar") * dir;
           case "payment_method":
             return (
               pmLabel(a.payment_method, a.note).localeCompare(
@@ -992,6 +1038,13 @@ export function SalesPage() {
       }
 
       switch (sortKey) {
+        case "cash_first":
+          // Cash-party sales surface first; within each group the newest wins,
+          // so the strip reads as "today's walk-in takings" at the top.
+          return (
+            Number(party(b).isCash) - Number(party(a).isCash) ||
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          );
         case "date_desc":
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         case "date_asc":
@@ -1013,6 +1066,7 @@ export function SalesPage() {
   }, [
     rows,
     statusTab,
+    party,
     search,
     filters,
     sortKey,
@@ -1185,6 +1239,12 @@ export function SalesPage() {
               tone: "primary",
             },
             {
+              id: "cash",
+              label: isRtl ? "بيع نقدي" : "Cash sale",
+              count: rows.filter((r) => party(r).isCash).length,
+              tone: "info",
+            },
+            {
               id: "paid",
               label: isRtl ? "مسددة" : "Paid",
               count: metrics.paidCount,
@@ -1258,7 +1318,7 @@ export function SalesPage() {
           const total = Number(inv.total) || 0;
           const paid = Number(inv.paid) || 0;
           const remaining = Math.max(0, total - paid);
-          const customerName = inv.customers?.name ?? (isRtl ? "عميل نقدي" : "Walk-in");
+          const { name: customerName, isCash } = party(inv);
 
           return (
             <div
@@ -1299,11 +1359,28 @@ export function SalesPage() {
                 {/* Customer + Payment method */}
                 <div className="mt-3 flex items-center justify-between gap-2 border-t border-border/60 pt-2.5 text-xs">
                   <div className="flex min-w-0 items-center gap-1.5">
-                    <div className="grid size-6 shrink-0 place-items-center rounded-full bg-surface-2 text-[10px] font-bold">
-                      {customerName.slice(0, 1).toUpperCase()}
+                    <div
+                      className={
+                        isCash
+                          ? "grid size-6 shrink-0 place-items-center rounded-full border border-primary/25 bg-primary/10 text-primary"
+                          : "grid size-6 shrink-0 place-items-center rounded-full bg-surface-2 text-[10px] font-bold"
+                      }
+                    >
+                      {isCash ? (
+                        <ShoppingBag className="size-3" />
+                      ) : (
+                        customerName.slice(0, 1).toUpperCase()
+                      )}
                     </div>
                     <div className="min-w-0">
-                      <div className="truncate font-medium text-foreground">{customerName}</div>
+                      <div className="flex items-center gap-1 truncate font-medium text-foreground">
+                        <span className="truncate">{customerName}</span>
+                        {isCash && (
+                          <span className="shrink-0 rounded-full border border-primary/25 bg-primary/10 px-1.5 text-[9px] font-bold text-primary">
+                            {isRtl ? "نقدي" : "Cash"}
+                          </span>
+                        )}
+                      </div>
                       {inv.customers?.phone && (
                         <div className="dir-ltr truncate font-mono text-[10px] text-muted-foreground">
                           {toSystemDigits(inv.customers.phone)}
@@ -1437,7 +1514,7 @@ export function SalesPage() {
           const total = Number(inv.total) || 0;
           const paid = Number(inv.paid) || 0;
           const remaining = Math.max(0, total - paid);
-          const customerName = inv.customers?.name ?? (isRtl ? "عميل نقدي" : "Walk-in");
+          const { name: customerName, isCash } = party(inv);
           const barColor = invoiceStatusMeta(inv.status).bar;
 
           return (
@@ -1463,7 +1540,16 @@ export function SalesPage() {
                     )}
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
-                    <span className="truncate font-medium text-foreground">{customerName}</span>
+                    <span
+                      className={
+                        isCash
+                          ? "inline-flex items-center gap-1 truncate rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary"
+                          : "truncate font-medium text-foreground"
+                      }
+                    >
+                      {isCash && <ShoppingBag className="size-2.5" />}
+                      {customerName}
+                    </span>
                     {inv.customers?.phone && (
                       <span className="dir-ltr truncate font-mono text-muted-foreground/80">
                         {toSystemDigits(inv.customers.phone)}

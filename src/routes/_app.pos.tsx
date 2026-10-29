@@ -59,6 +59,7 @@ import type { InvoiceDoc } from "@/lib/pdf";
 import { getUnifiedPrintSettings, printUnifiedDocument, type PrintRequest } from "@/lib/printing";
 import { OperationSuccessModal } from "@/components/communication";
 import { PosBatchSelectorModal } from "@/components/batches/pos-batch-selector-modal";
+import { useBatchSettings } from "@/hooks/use-batch-settings";
 import { useCashboxes } from "@/hooks/use-cashboxes";
 import { useCompanyBankAccounts } from "@/hooks/use-company-bank-accounts";
 import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
@@ -109,6 +110,7 @@ interface Product {
   item_nature?: string | null;
   inventory_policy?: string | null;
   tracking?: string | null;
+  batch_dispatch_strategy?: "FEFO" | "FIFO" | "MANUAL" | null;
   unit?: { short_name: string; name_ar: string | null; name: string } | null;
   category?: { name: string; name_ar: string | null } | null;
   brand?: { name: string; name_ar: string | null } | null;
@@ -282,6 +284,7 @@ const posGuideConfig: PageGuideConfig = {
 function POSPage() {
   const { isModuleEnabled } = useModules();
   const { t, lang } = useI18n();
+  const { settings: batchSettings } = useBatchSettings();
   const { config: catalogConfig } = useCatalogModules();
   const { methods: posPaymentMethods } = usePaymentMethodsForContext("pos", {
     includeCredit: true,
@@ -549,7 +552,7 @@ function POSPage() {
        */
       void (supabase.from("products") as any)
         .select(
-          "id,sku,barcode,name,name_ar,sale_price,tax_rate,image_url,category_id,brand_id,unit_id,origin_id,quality_grade_id,is_active,is_service,item_nature,inventory_policy,tracking,is_custody_item",
+          "id,sku,barcode,name,name_ar,sale_price,tax_rate,image_url,category_id,brand_id,unit_id,origin_id,quality_grade_id,is_active,is_service,item_nature,inventory_policy,tracking,batch_dispatch_strategy,is_custody_item",
         )
         .eq("is_active", true)
         .eq("is_sellable", true)
@@ -1052,7 +1055,12 @@ function POSPage() {
       // التحقق من سياسة المخزون وتتبع الدفعات (BATCH):
       const isBatchTracked = p.tracking === "BATCH";
 
-      if (isBatchTracked && selectedBatch === undefined) {
+      if (
+        isBatchTracked &&
+        selectedBatch === undefined &&
+        ((p.batch_dispatch_strategy ?? batchSettings.dispatch_strategy) === "MANUAL" ||
+          batchSettings.enforce_batch_selection_on_pos)
+      ) {
         if (!warehouseId) {
           toast.error(
             lang === "ar"
@@ -1634,6 +1642,8 @@ function POSPage() {
             tax_rate: l.tax_rate,
             is_service: !!l.is_service,
             name: l.name,
+            batch_id: l.batch_id ?? null,
+            batch_number: l.batch_number ?? null,
           })),
         });
         if (error) throw error;
@@ -3371,6 +3381,7 @@ function POSPage() {
               : batchPendingProduct.name
           }
           warehouseId={warehouseId}
+          dispatchStrategy={batchPendingProduct.batch_dispatch_strategy}
           onSelectBatch={(batch) => {
             addToCart(batchPendingProduct, batch);
             setBatchModalOpen(false);

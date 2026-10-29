@@ -1,12 +1,17 @@
-import {
+﻿import {
   VortexMetricCard,
   VortexCollectionSheet,
-  VortexFilterSheet,
-  VortexFilterSection,
+  VortexDrawerDialog,
+  VortexDateBadge,
 } from "@/components/vortex-ui";
 import { paymentMethodLabel } from "@/lib/payments/payment-methods";
-import { SlidersHorizontal, Wallet, AlertTriangle, UserCheck, Check } from "lucide-react";
 import { QuickFilterBar } from "@/components/ui/quick-filter-bar";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { money } from "@/lib/format";
+import { toSystemDigits } from "@/lib/format-preferences";
+import type { ReactNode } from "react";
+
 /**
  * شاشة الديون — تعرض الأرصدة **من الدفتر** لا من العمود المخزَّن.
  *
@@ -14,23 +19,47 @@ import { QuickFilterBar } from "@/components/ui/quick-filter-bar";
  *   - حذف printStatement() المكتوب يدويًا (كان قالبًا ثالثًا بمجاميع مختلفة)
  *   - استخدام useDebtsOverview() كمصدر واحد للأرصدة
  *   - زر «كشف حساب» ينقل مباشرة إلى مستند الكشف النهائي
+ *
+ * توحيد التصميم مع شاشة المنتجات — نظام السجلات الموحّد:
+ *   - `RecordsToolbar`: بحث + فلترة + ترتيب + تبديل عرض (بطاقات / قائمة / جدول)
+ *   - `RecordsFilterPanel` و`RecordsSortPanel`: نفس شيتات الفلترة والترتيب
+ *   - `RecordsView` بثلاثة أوضاع: بطاقات، قائمة صفوف، جدول `DataTable` قابل للفرز
+ *   - بقية العناصر من `vortex-ui` (بطاقات المؤشرات، درج التفاصيل، شارات التاريخ)
  */
 
 import { ModuleGuard } from "@/lib/modules";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Search, Users, X, AlertCircle, FileText } from "lucide-react";
+import {
+  AlertCircle,
+  AlertTriangle,
+  ArrowUpRight,
+  FileText,
+  Phone,
+  Users,
+  UserCheck,
+  Wallet,
+} from "lucide-react";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
-import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
-import { money } from "@/lib/format";
 import { useDebtIndex } from "@/hooks/use-debts-overview";
 import { StatementIntegrityBadge } from "@/components/statements/statement-integrity-badge";
 import { WhatsAppButton } from "@/components/whatsapp-button";
 import { debtReminderMessage } from "@/lib/whatsapp-templates";
 import { Ltr } from "@/components/ltr-value";
+import {
+  applyFilters,
+  type FilterDefinition,
+  type FilterValues,
+  type SortOption,
+} from "@/components/ui/table-toolbar";
+import type { DataTableColumn, DataTableSort } from "@/components/ui/data-table";
+import { RecordsToolbar } from "@/components/ui/records-toolbar";
+import { RecordsView, type RecordsViewMode } from "@/components/ui/records-view";
+import { RecordsFilterPanel, RecordsSortPanel } from "@/components/ui/records-panels";
+import { usePersistedViewMode } from "@/hooks/use-persisted-view-mode";
 
 const debtsSearchSchema = z.object({
   customerId: z.string().optional(),
@@ -73,17 +102,66 @@ interface Payment {
   sales_invoices?: { invoice_number: string } | null;
 }
 
+/**
+ * صف السجل — العميل + الرصيد المعتمد من الدفتر محسوبًا مرة واحدة، حتى لا
+ * تحسب كل عارضة (بطاقة/صف/جدول) الرصيد بطريقتها.
+ */
+type DebtRow = Customer & {
+  ledgerBalance: number;
+  creditLimit: number;
+  overLimit: boolean;
+  hasGap: boolean;
+  integrity: {
+    ledgerBalance: number;
+    cachedBalance: number | null;
+    difference: number | null;
+    hasGap: boolean;
+  } | null;
+};
+
+/** شارة حالة موحّدة بلسان نظام التصميم (بدل الشارات المكتوبة يدوياً). */
+function DebtStatusPill({
+  tone,
+  children,
+}: {
+  tone: "danger" | "warning" | "success";
+  children: ReactNode;
+}) {
+  const styles = {
+    danger: "border-rose-500/25 bg-rose-500/10 text-rose-600 dark:text-rose-400",
+    warning: "border-amber-500/25 bg-amber-500/10 text-amber-600 dark:text-amber-400",
+    success: "border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  } as const;
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[11px] font-bold",
+        styles[tone],
+      )}
+    >
+      <span className="size-1.5 rounded-full bg-current" />
+      {children}
+    </span>
+  );
+}
+
 function DebtsPage() {
   const { t, lang } = useI18n();
   const navigate = useNavigate();
   const searchParams = Route.useSearch();
   const customerId = searchParams?.customerId;
+  const isAr = lang === "ar";
+
   const [rows, setRows] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"all" | "debt" | "over_limit">("debt");
-  const [advancedFilterOpen, setAdvancedFilterOpen] = useState(false);
-  const [hasPhoneOnly, setHasPhoneOnly] = useState(false);
+  const [quickFilter, setQuickFilter] = useState<"all" | "debt" | "over_limit">("debt");
+  const [filters, setFilters] = useState<FilterValues>({});
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [sort, setSort] = useState<DataTableSort | null>(null);
+  const [sortOpen, setSortOpen] = useState(false);
+  const [viewMode, setViewMode] = usePersistedViewMode("debts", "cards");
+
   const [collectionCustomer, setCollectionCustomer] = useState<{
     id: string;
     name: string;
@@ -149,46 +227,144 @@ function DebtsPage() {
     setPayments((pay.data ?? []) as Payment[]);
   }
 
-  const filtered = useMemo(() => {
+  /* ─── صفوف مشتقّة: الرصيد من الدفتر + الفلاتر + الترتيب + البحث ─── */
+
+  const allRows = useMemo<DebtRow[]>(
+    () =>
+      rows.map((r) => {
+        const ledgerRow = ledgerIndex.get(r.id);
+        const ledgerBalance = ledgerRow ? ledgerRow.ledgerBalance : Number(r.balance);
+        const creditLimit = Number(r.credit_limit);
+        return {
+          ...r,
+          ledgerBalance,
+          creditLimit,
+          overLimit: creditLimit > 0 && ledgerBalance > creditLimit,
+          hasGap: Boolean(ledgerRow?.hasGap),
+          integrity: ledgerRow
+            ? {
+                ledgerBalance: ledgerRow.ledgerBalance,
+                cachedBalance: ledgerRow.cachedBalance,
+                difference: ledgerRow.difference,
+                hasGap: ledgerRow.hasGap,
+              }
+            : null,
+        };
+      }),
+    [rows, ledgerIndex],
+  );
+
+  /** تعريفات الفلترة المتقدمة — نفس عقد شاشة المنتجات. */
+  const filterDefinitions = useMemo<FilterDefinition[]>(
+    () => [
+      {
+        key: "status",
+        label: isAr ? "الحالة" : "Status",
+        type: "select",
+        options: [
+          { value: "debtor", label: t("debts.debtor") },
+          { value: "clear", label: t("debts.clear") },
+          { value: "over_limit", label: t("debts.filter.over_limit") },
+        ],
+      },
+      {
+        key: "has_phone",
+        label: isAr ? "رقم الهاتف" : "Phone number",
+        type: "boolean",
+      },
+      {
+        key: "has_gap",
+        label: isAr ? "فرق تسوية" : "Reconciliation gap",
+        type: "boolean",
+      },
+      {
+        key: "min_balance",
+        label: isAr ? "أدنى رصيد" : "Minimum balance",
+        type: "text",
+        placeholder: "0",
+      },
+    ],
+    [isAr, t],
+  );
+
+  const sortOptions = useMemo<SortOption[]>(
+    () => [
+      { value: "name", label: isAr ? "الاسم" : "Name" },
+      { value: "balance", label: t("common.balance") },
+      { value: "credit_limit", label: t("customers.credit_limit") },
+    ],
+    [isAr, t],
+  );
+
+  const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return rows.filter((r) => {
-      // الرصيد المعتمد للفلترة من الدفتر إن توفّر، وإلا الرصيد المخزَّن
-      const ledgerRow = ledgerIndex.get(r.id);
-      const balance = ledgerRow ? ledgerRow.ledgerBalance : Number(r.balance);
-      if (filter === "debt" && balance <= 0) return false;
-      if (
-        filter === "over_limit" &&
-        (Number(r.credit_limit) <= 0 || balance <= Number(r.credit_limit))
-      )
-        return false;
-      if (!q) return true;
-      return (
-        r.name.toLowerCase().includes(q) ||
-        (r.phone ?? "").includes(q) ||
-        (r.email ?? "").toLowerCase().includes(q)
+    let next = allRows;
+
+    // شرائح سريعة
+    if (quickFilter === "debt") next = next.filter((r) => r.ledgerBalance > 0);
+    if (quickFilter === "over_limit") next = next.filter((r) => r.overLimit);
+
+    // بحث نصي
+    if (q) {
+      next = next.filter(
+        (r) =>
+          r.name.toLowerCase().includes(q) ||
+          (r.phone ?? "").includes(q) ||
+          (r.email ?? "").toLowerCase().includes(q),
       );
+    }
+
+    // الفلترة المتقدمة
+    next = applyFilters(next, filters, {
+      status: (r) => (r.overLimit ? "over_limit" : r.ledgerBalance > 0 ? "debtor" : "clear"),
+      has_phone: (r) => ((r.phone ?? "").trim() ? "true" : "false"),
+      has_gap: (r) => (r.hasGap ? "true" : "false"),
     });
-  }, [rows, search, filter, ledgerIndex]);
+
+    // «أدنى رصيد» رقمي (أكبر من أو يساوي) وليس مساواة
+    const minBalance = filters.min_balance;
+    if (typeof minBalance === "string" && minBalance.trim() !== "") {
+      const value = Number(minBalance);
+      if (!Number.isNaN(value)) next = next.filter((r) => r.ledgerBalance >= value);
+    }
+
+    // الترتيب
+    if (sort) {
+      const dir = sort.direction === "desc" ? -1 : 1;
+      next = [...next].sort((a, b) => {
+        if (sort.key === "name") return a.name.localeCompare(b.name) * dir;
+        if (sort.key === "credit_limit") return (a.creditLimit - b.creditLimit) * dir;
+        return (a.ledgerBalance - b.ledgerBalance) * dir;
+      });
+    }
+
+    return next;
+  }, [allRows, search, quickFilter, filters, sort]);
 
   // مجاميع مشتقّة من نفس مصدر الصفوف — لا منطق مكرر
   const totals = useMemo(() => {
     let totalDebt = 0;
     let debtors = 0;
     let overLimit = 0;
-    for (const r of rows) {
-      const ledgerRow = ledgerIndex.get(r.id);
-      const balance = ledgerRow ? ledgerRow.ledgerBalance : Number(r.balance);
-      if (balance > 0) {
-        totalDebt = Math.round((totalDebt + balance) * 100) / 100;
+    for (const r of allRows) {
+      if (r.ledgerBalance > 0) {
+        totalDebt = Math.round((totalDebt + r.ledgerBalance) * 100) / 100;
         debtors += 1;
-        if (Number(r.credit_limit) > 0 && balance > Number(r.credit_limit)) overLimit += 1;
+        if (r.overLimit) overLimit += 1;
       }
     }
     return { totalDebt, debtors, overLimit };
-  }, [rows, ledgerIndex]);
+  }, [allRows]);
+
+  const countActiveFilters = (values: FilterValues) =>
+    Object.values(values).filter((value) => {
+      if (value == null) return false;
+      if (typeof value === "string") return value !== "";
+      return Boolean(value.from || value.to);
+    }).length;
 
   // The catalogue, not a local map — same change as the payments screen.
-  const pmLabel = (m: string) => paymentMethodLabel(m, lang === "ar" ? "ar" : "en");
+  const pmLabel = (m: string) => paymentMethodLabel(m, isAr ? "ar" : "en");
 
   /** الرصيد المعتمد للعميل المحدد — من الدفتر لا من العمود المخزَّن */
   const selectedLedgerRow = selected ? ledgerIndex.get(selected.id) : undefined;
@@ -212,6 +388,372 @@ function DebtsPage() {
       search: { customerId: customerIdToOpen } as never,
     });
   }
+
+  /** يفتح شيت التحصيل الفوري — نفس الشيت المستخدم في بقية الشاشات. */
+  function openCollection(customer: Customer, balance: number) {
+    setCollectionCustomer({
+      id: customer.id,
+      name: customer.name,
+      phone: customer.phone,
+      balance,
+    });
+    setCollectionOpen(true);
+  }
+
+  const totalInvoiced = invoices.reduce((sum, i) => sum + Number(i.total), 0);
+  const totalCollected = payments.reduce((sum, p) => sum + Number(p.amount), 0);
+  const totalRemaining = invoices.reduce(
+    (sum, i) => sum + Math.max(0, Number(i.total) - Number(i.paid)),
+    0,
+  );
+  const ledgerSummary = selectedIntegrity
+    ? [
+        { label: isAr ? "رصيد الدفتر" : "Ledger", value: selectedIntegrity.ledgerBalance },
+        {
+          label: isAr ? "المخزَّن" : "Cached",
+          value: Number(selectedIntegrity.cachedBalance ?? 0),
+        },
+        {
+          label: isAr ? "الفرق" : "Difference",
+          value: Number(selectedIntegrity.difference ?? 0),
+        },
+      ]
+    : [];
+
+  /* ───────── عارضات الصف الواحد — بطاقة / صف قائمة / أعمدة جدول ───────── */
+
+  const initials = (name: string) => name.trim().slice(0, 2);
+
+  const statusLabel = (r: DebtRow) =>
+    r.overLimit
+      ? t("debts.filter.over_limit")
+      : r.ledgerBalance > 0
+        ? t("debts.debtor")
+        : t("debts.clear");
+
+  const statusTone = (r: DebtRow) =>
+    r.overLimit ? "danger" : r.ledgerBalance > 0 ? "warning" : "success";
+
+  const balanceTone = (r: DebtRow) =>
+    r.overLimit
+      ? "text-rose-600 dark:text-rose-400"
+      : r.ledgerBalance > 0
+        ? "text-amber-600 dark:text-amber-400"
+        : "text-muted-foreground";
+
+  const renderCard = (r: DebtRow) => (
+    <div
+      className={cn(
+        "card-mullak group relative flex h-full flex-col overflow-hidden rounded-2xl border border-r-4 p-3 transition-all duration-200 hover:shadow-md sm:p-4.5",
+        r.overLimit
+          ? "border-r-rose-500 hover:border-rose-500/60"
+          : r.ledgerBalance > 0
+            ? "border-r-amber-500 shadow-amber-500/5 hover:border-amber-500/60"
+            : "border-r-emerald-500 shadow-emerald-500/5 hover:border-emerald-500/60",
+      )}
+    >
+      <div className="mb-2 flex items-center justify-between gap-1.5">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <div
+            className={cn(
+              "grid size-8 shrink-0 place-items-center rounded-xl border text-[10px] font-black uppercase",
+              r.ledgerBalance > 0
+                ? "border-amber-500/25 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                : "border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+            )}
+          >
+            {initials(r.name)}
+          </div>
+          <DebtStatusPill tone={statusTone(r)}>{statusLabel(r)}</DebtStatusPill>
+        </div>
+        {r.hasGap && r.integrity && <StatementIntegrityBadge integrity={r.integrity} />}
+      </div>
+
+      <h4
+        className="mb-2 line-clamp-2 text-xs font-bold leading-snug text-foreground transition-colors group-hover:text-primary sm:text-sm"
+        dir={isAr ? "rtl" : "ltr"}
+      >
+        {r.name}
+      </h4>
+
+      <div className="mb-2.5 flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground">
+        {r.phone && (
+          <span className="inline-flex items-center gap-1 rounded-md border border-border/50 bg-surface-2/70 px-1.5 py-0.2 font-mono">
+            <Phone className="size-2.5" />
+            <Ltr>{r.phone}</Ltr>
+          </span>
+        )}
+        <span className="inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/10 px-1.5 py-0.2 font-semibold text-primary">
+          {isAr ? "الحد:" : "Limit:"} {toSystemDigits(money(r.creditLimit))}
+        </span>
+      </div>
+
+      <div className="mt-auto flex items-center justify-between gap-1.5 border-t border-border/60 pt-2">
+        <div className="min-w-0">
+          <p className="text-[9px] font-medium text-muted-foreground sm:text-[10px]">
+            {t("debts.balance")}
+          </p>
+          <p
+            className={cn(
+              "truncate font-mono text-sm font-black tabular-nums sm:text-base",
+              balanceTone(r),
+            )}
+          >
+            <Ltr>{money(r.ledgerBalance)}</Ltr>
+          </p>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-1">
+          {r.ledgerBalance > 0 && (
+            <>
+              <Button
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openCollection(r, r.ledgerBalance);
+                }}
+                className="h-8 gap-1 rounded-full px-2.5 text-[11px] font-bold shadow-xs shadow-primary/20"
+              >
+                <Wallet className="size-3.5" />
+                <span className="hidden sm:inline">{isAr ? "تحصيل" : "Collect"}</span>
+              </Button>
+              <WhatsAppButton
+                phone={r.phone}
+                message={debtReminderMessage({
+                  name: r.name,
+                  balance: money(r.ledgerBalance),
+                  lang,
+                })}
+                className="inline-flex size-8 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-40 dark:text-emerald-400"
+              />
+            </>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void openDetail(r)}
+            className="size-8 rounded-full border-border/80 p-0"
+            title={t("debts.view")}
+          >
+            <ArrowUpRight className="size-3.5 text-muted-foreground" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderListRow = (r: DebtRow) => (
+    <div
+      className={cn(
+        "card-mullak flex items-center gap-3 overflow-hidden rounded-2xl border border-s-4 px-3.5 py-3 transition-all duration-200 hover:shadow-md sm:px-4",
+        r.overLimit
+          ? "border-s-rose-500"
+          : r.ledgerBalance > 0
+            ? "border-s-amber-500"
+            : "border-s-emerald-500",
+      )}
+    >
+      <div
+        className={cn(
+          "grid size-10 shrink-0 place-items-center rounded-2xl border text-[11px] font-black uppercase",
+          r.ledgerBalance > 0
+            ? "border-amber-500/25 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+            : "border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+        )}
+      >
+        {initials(r.name)}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="truncate text-sm font-bold text-foreground">{r.name}</span>
+          {r.hasGap && r.integrity && <StatementIntegrityBadge integrity={r.integrity} />}
+        </div>
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-muted-foreground">
+          <span className="inline-flex items-center gap-1 font-mono">
+            <Phone className="size-3 opacity-60" />
+            <Ltr>{r.phone ?? "—"}</Ltr>
+          </span>
+          <span className="hidden sm:inline">
+            {isAr ? "الحد الائتماني:" : "Credit limit:"}{" "}
+            <span className="font-mono">{toSystemDigits(money(r.creditLimit))}</span>
+          </span>
+        </div>
+      </div>
+
+      <div className="hidden sm:block">
+        <DebtStatusPill tone={statusTone(r)}>{statusLabel(r)}</DebtStatusPill>
+      </div>
+
+      <div className="min-w-[92px] text-end">
+        <p className="text-[9px] text-muted-foreground sm:hidden">{t("debts.balance")}</p>
+        <p className={cn("font-mono text-sm font-black tabular-nums", balanceTone(r))}>
+          <Ltr>{money(r.ledgerBalance)}</Ltr>
+        </p>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-1">
+        {r.ledgerBalance > 0 && (
+          <>
+            <Button
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                openCollection(r, r.ledgerBalance);
+              }}
+              className="h-8 gap-1 rounded-full px-2.5 text-[11px] font-bold shadow-xs shadow-primary/20"
+            >
+              <Wallet className="size-3.5" />
+              <span className="hidden md:inline">{isAr ? "تحصيل" : "Collect"}</span>
+            </Button>
+            <WhatsAppButton
+              phone={r.phone}
+              message={debtReminderMessage({
+                name: r.name,
+                balance: money(r.ledgerBalance),
+                lang,
+              })}
+              className="hidden size-8 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-40 sm:inline-flex dark:text-emerald-400"
+            />
+          </>
+        )}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => void openDetail(r)}
+          className="h-8 gap-1 rounded-full border-border/80 px-3 text-[11px] font-semibold"
+        >
+          {t("debts.view")}
+          <ArrowUpRight className="size-3.5 text-muted-foreground" />
+        </Button>
+      </div>
+    </div>
+  );
+
+  const columns: DataTableColumn<DebtRow>[] = [
+    {
+      key: "name",
+      header: t("common.customer"),
+      sortable: true,
+      cell: (r) => (
+        <div className="flex items-center gap-3">
+          <div
+            className={cn(
+              "grid size-9 shrink-0 place-items-center rounded-2xl border text-[11px] font-black uppercase",
+              r.ledgerBalance > 0
+                ? "border-amber-500/25 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                : "border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+            )}
+          >
+            {initials(r.name)}
+          </div>
+          <div className="min-w-0">
+            <span className="block truncate font-semibold text-foreground">{r.name}</span>
+            <span className="block truncate text-[11px] text-muted-foreground">
+              {r.email || (isAr ? "لا يوجد بريد" : "No email")}
+            </span>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "phone",
+      header: t("common.phone"),
+      hideBelow: "sm",
+      cell: (r) => (
+        <span className="inline-flex items-center gap-1.5 font-mono text-xs text-muted-foreground">
+          <Phone className="size-3 opacity-60" />
+          <Ltr>{r.phone ?? "—"}</Ltr>
+        </span>
+      ),
+    },
+    {
+      key: "credit_limit",
+      header: t("customers.credit_limit"),
+      align: "end",
+      sortable: true,
+      hideBelow: "md",
+      cell: (r) => (
+        <span className="font-mono text-xs text-muted-foreground">
+          <Ltr>{money(r.creditLimit)}</Ltr>
+        </span>
+      ),
+    },
+    {
+      key: "balance",
+      header: t("common.balance"),
+      align: "end",
+      sortable: true,
+      cell: (r) => (
+        <div className="flex items-center justify-end gap-1.5">
+          {r.hasGap && r.integrity && <StatementIntegrityBadge integrity={r.integrity} />}
+          <span className={cn("font-mono text-sm font-black tabular-nums", balanceTone(r))}>
+            <Ltr>{money(r.ledgerBalance)}</Ltr>
+          </span>
+        </div>
+      ),
+    },
+    {
+      key: "status",
+      header: t("common.status"),
+      hideBelow: "sm",
+      cell: (r) =>
+        r.overLimit ? (
+          <DebtStatusPill tone="danger">
+            <AlertCircle className="size-3" />
+            {t("debts.filter.over_limit")}
+          </DebtStatusPill>
+        ) : (
+          <DebtStatusPill tone={statusTone(r)}>{statusLabel(r)}</DebtStatusPill>
+        ),
+    },
+    {
+      key: "actions",
+      header: "",
+      align: "end",
+      cell: (r) => (
+        <div className="flex items-center justify-end gap-1.5">
+          {r.ledgerBalance > 0 && (
+            <>
+              <Button
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openCollection(r, r.ledgerBalance);
+                }}
+                className="h-8 gap-1.5 rounded-full px-3 text-[11px] font-bold shadow-xs shadow-primary/20"
+              >
+                <Wallet className="size-3.5" />
+                <span>{isAr ? "تحصيل" : "Collect"}</span>
+              </Button>
+              <WhatsAppButton
+                phone={r.phone}
+                message={debtReminderMessage({
+                  name: r.name,
+                  balance: money(r.ledgerBalance),
+                  lang,
+                })}
+                className="inline-flex size-8 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-40 dark:text-emerald-400"
+              />
+            </>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              void openDetail(r);
+            }}
+            className="h-8 gap-1 rounded-full border-border/80 px-3 text-[11px] font-semibold"
+          >
+            {t("debts.view")}
+            <ArrowUpRight className="size-3.5 text-muted-foreground" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <>
       <PageHeader
@@ -222,6 +764,7 @@ function DebtsPage() {
             to="/payments"
             className="flex h-10 items-center gap-1.5 rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-sm shadow-primary/20 hover:opacity-90"
           >
+            <Wallet className="size-3.5" />
             {t("debts.record_payment")}
           </Link>
         }
@@ -235,442 +778,441 @@ function DebtsPage() {
           highlight
           icon={<Wallet className="size-5 text-amber-600 dark:text-amber-400" />}
           iconClassName="bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
-          subtitle="إجمالي المبالغ المستحقة طرف العملاء"
+          subtitle={
+            isAr ? "إجمالي المبالغ المستحقة طرف العملاء" : "Total outstanding from customers"
+          }
+          onClick={() => setQuickFilter("debt")}
+          className="cursor-pointer"
         />
         <VortexMetricCard
           title={t("debts.debtors")}
           value={totals.debtors}
-          currency="عميل"
+          currency={isAr ? "عميل" : "customers"}
           icon={<UserCheck className="size-5 text-sky-600 dark:text-sky-400" />}
           iconClassName="bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20"
-          subtitle="عملاء عليهم أرصدة مدينة قائمة"
+          subtitle={isAr ? "عملاء عليهم أرصدة مدينة قائمة" : "Customers holding an open balance"}
+          onClick={() => setQuickFilter("debt")}
+          highlight={quickFilter === "debt"}
+          className="cursor-pointer"
         />
         <VortexMetricCard
           title={t("debts.over_limit")}
           value={totals.overLimit}
-          currency="حساب"
+          currency={isAr ? "حساب" : "accounts"}
           icon={<AlertTriangle className="size-5 text-rose-600 dark:text-rose-400" />}
           iconClassName="bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
-          subtitle="حسابات تجاوزت الحد الائتماني المسموح"
+          subtitle={
+            isAr ? "حسابات تجاوزت الحد الائتماني المسموح" : "Accounts past their credit limit"
+          }
+          onClick={() => setQuickFilter("over_limit")}
+          highlight={quickFilter === "over_limit"}
+          className="cursor-pointer"
         />
       </div>
 
-      <div className="panel-elevated p-4">
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <div className="flex h-10 flex-1 min-w-[220px] items-center gap-2 rounded-full border border-input bg-surface px-4 text-sm">
-            <Search className="h-4 w-4 text-muted-foreground" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={t("debts.search_customer")}
-              className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
-            />
-          </div>
-          {/* Advanced Filter Button — شيت الملاك (المحور 10) */}
-          <button
-            type="button"
-            onClick={() => setAdvancedFilterOpen(true)}
-            className="flex items-center gap-1.5 rounded-full border border-input bg-surface px-3 py-1.5 text-xs font-medium hover:bg-surface-elevated transition-colors text-foreground"
-          >
-            <SlidersHorizontal className="size-3.5 text-primary" />
-            <span>فلترة متقدمة</span>
-            {hasPhoneOnly && <span className="size-1.5 rounded-full bg-primary" />}
-          </button>
-        </div>
+      {/* ─── شريط السجلات الموحّد: بحث + فلترة + ترتيب + عرض ─── */}
+      <div className="pt-2 sm:pt-3.5">
+        <RecordsToolbar
+          searchValue={search}
+          onSearchChange={setSearch}
+          searchPlaceholder={t("debts.search_customer")}
+          resultCount={filteredRows.length}
+          searchLoading={loading}
+          filterLabel={isAr ? "فلترة" : "Filter"}
+          activeFilterCount={countActiveFilters(filters)}
+          onFilterOpen={() => setFiltersOpen(true)}
+          onClearFilters={() => {
+            setFilters({});
+            setSearch("");
+            setQuickFilter("all");
+          }}
+          sortActive={Boolean(sort)}
+          sortLabel={isAr ? "ترتيب" : "Sort"}
+          onSortOpen={() => setSortOpen(true)}
+          viewMode={viewMode as RecordsViewMode}
+          onViewModeChange={setViewMode}
+          action={
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void load()}
+              disabled={loading}
+              className="h-9 rounded-full border-border/80 px-3 text-xs font-medium"
+            >
+              {t("common.refresh")}
+            </Button>
+          }
+        >
+          {/* شرائح سريعة — تظهر في الأوضاع الثلاثة دائمًا */}
+          <QuickFilterBar
+            ariaLabel={t("debts.subtitle")}
+            items={[
+              { id: "all", label: t("debts.filter.all"), tone: "primary", count: allRows.length },
+              {
+                id: "debt",
+                label: t("debts.filter.debtors"),
+                tone: "warning",
+                count: totals.debtors,
+              },
+              {
+                id: "over_limit",
+                label: t("debts.filter.over_limit"),
+                tone: "danger",
+                count: totals.overLimit,
+              },
+            ]}
+            value={quickFilter}
+            onChange={(id) => setQuickFilter(id as typeof quickFilter)}
+          />
+        </RecordsToolbar>
 
-        {/* شريط الفلاتر السريعة — QuickFilterBar ملون دائماً (المحور 8) */}
-        <QuickFilterBar
-          ariaLabel={t("debts.subtitle")}
-          items={[
-            { id: "all", label: t("debts.filter.all"), tone: "primary", count: rows.length },
-            {
-              id: "debt",
-              label: t("debts.filter.debtors"),
-              tone: "warning",
-              count: totals.debtors,
-            },
-            {
-              id: "over_limit",
-              label: t("debts.filter.over_limit"),
-              tone: "danger",
-              count: totals.overLimit,
-            },
-          ]}
-          value={filter}
-          onChange={(id) => setFilter(id as typeof filter)}
-          className="mb-3"
+        <RecordsFilterPanel
+          open={filtersOpen}
+          onClose={() => setFiltersOpen(false)}
+          definitions={filterDefinitions}
+          values={filters}
+          onSubmit={(next) => {
+            setFilters(next);
+            setFiltersOpen(false);
+          }}
         />
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-xs uppercase text-muted-foreground">
-              <tr className="border-b border-border">
-                <th className="px-3 py-2 text-start font-medium">{t("common.customer")}</th>
-                <th className="px-3 py-2 text-start font-medium">{t("common.phone")}</th>
-                <th className="px-3 py-2 text-end font-medium">{t("customers.credit_limit")}</th>
-                <th className="px-3 py-2 text-end font-medium">{t("common.balance")}</th>
-                <th className="px-3 py-2 text-start font-medium">{t("common.status")}</th>
-                <th className="px-3 py-2"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="py-10 text-center text-muted-foreground">
-                    {t("common.loading")}
-                  </td>
-                </tr>
-              ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-12 text-center text-muted-foreground">
-                    <Users className="mx-auto mb-2 h-8 w-8 opacity-50" />
-                    {lang === "ar" ? "لا نتائج" : "No results"}
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((r) => {
-                  const ledgerRow = ledgerIndex.get(r.id);
-                  // الرصيد المعتمد: من الدفتر إن توفّر، وإلا المخزَّن (مع شارة الفرق)
-                  const bal = ledgerRow ? ledgerRow.ledgerBalance : Number(r.balance);
-                  const lim = Number(r.credit_limit);
-                  const over = lim > 0 && bal > lim;
-                  return (
-                    <tr
-                      key={r.id}
-                      className="border-b border-border/50 hover:bg-surface-2/40 cursor-pointer"
-                      onClick={() => openDetail(r)}
-                    >
-                      <td className="px-3 py-2.5 font-medium">{r.name}</td>
-                      <td className="px-3 py-2.5 text-muted-foreground">
-                        <Ltr className="block">{r.phone ?? "—"}</Ltr>
-                      </td>
-                      <td className="px-3 py-2.5 text-end font-mono text-muted-foreground">
-                        <Ltr>{money(lim)}</Ltr>
-                      </td>
-                      <td
-                        className={`px-3 py-2.5 text-end font-mono font-semibold ${bal > 0 ? (over ? "text-rose-500" : "text-amber-500") : "text-muted-foreground"}`}
-                      >
-                        <div className="flex items-center justify-end gap-1.5">
-                          {ledgerRow?.hasGap && (
-                            <StatementIntegrityBadge
-                              integrity={{
-                                ledgerBalance: ledgerRow.ledgerBalance,
-                                cachedBalance: ledgerRow.cachedBalance,
-                                difference: ledgerRow.difference,
-                                hasGap: true,
-                              }}
-                            />
-                          )}
-                          <span>
-                            <Ltr>{money(bal)}</Ltr>
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-3 py-2.5">
-                        {over ? (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-rose-500/30 bg-rose-500/10 px-2 py-0.5 text-[10px] text-rose-500">
-                            <AlertCircle className="h-3 w-3" />
-                            {t("debts.filter.over_limit")}
-                          </span>
-                        ) : bal > 0 ? (
-                          <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-500">
-                            {t("debts.debtor")}
-                          </span>
-                        ) : (
-                          <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-500">
-                            {t("debts.clear")}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2.5 text-end">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {bal > 0 && (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setCollectionCustomer({
-                                    id: r.id,
-                                    name: r.name,
-                                    phone: r.phone,
-                                    balance: bal,
-                                  });
-                                  setCollectionOpen(true);
-                                }}
-                                title={lang === "ar" ? "تحصيل فوري" : "Quick Collect"}
-                                className="flex h-7 items-center gap-1 rounded-full bg-primary/10 hover:bg-primary hover:text-primary-foreground border border-primary/20 px-2.5 text-[11px] font-bold text-primary transition active:scale-95"
-                              >
-                                <Wallet className="size-3" />
-                                <span>{lang === "ar" ? "تحصيل" : "Collect"}</span>
-                              </button>
-                              <WhatsAppButton
-                                phone={r.phone}
-                                message={debtReminderMessage({
-                                  name: r.name,
-                                  balance: money(bal),
-                                  lang,
-                                })}
-                              />
-                            </>
-                          )}
-                          <button
-                            onClick={() => openDetail(r)}
-                            className="rounded-full border border-border bg-surface px-3 py-1 text-xs text-muted-foreground hover:bg-surface-2"
-                          >
-                            {t("debts.view")}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+        <RecordsSortPanel
+          open={sortOpen}
+          onClose={() => setSortOpen(false)}
+          options={sortOptions}
+          value={sort?.key ?? ""}
+          onSubmit={(value) => {
+            setSort(value ? { key: value, direction: sort?.direction ?? "asc" } : null);
+            setSortOpen(false);
+          }}
+        />
       </div>
+
+      {/* ─── عرض السجلات: بطاقات / قائمة / جدول ─── */}
+      <RecordsView<DebtRow>
+        rows={filteredRows}
+        getRowId={(r) => r.id}
+        viewMode={viewMode as RecordsViewMode}
+        columns={columns}
+        sort={sort}
+        onSortChange={setSort}
+        renderCard={renderCard}
+        renderListRow={renderListRow}
+        onRowClick={(r) => void openDetail(r)}
+        loading={loading}
+        empty={{
+          icon: <Users className="size-8" />,
+          title: isAr ? "لا توجد نتائج مطابقة" : "No matching results",
+          description: isAr
+            ? "جرّب تعديل كلمة البحث أو إعادة تعيين الفلاتر."
+            : "Try a different search term or reset the filters.",
+          action: (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setFilters({});
+                setSearch("");
+                setQuickFilter("all");
+              }}
+            >
+              {t("records.filters.clear_all")}
+            </Button>
+          ),
+        }}
+        className="mt-3"
+      />
 
       <VortexCollectionSheet
         open={collectionOpen}
         onOpenChange={setCollectionOpen}
         customer={collectionCustomer}
         onSuccess={() => {
-          load();
+          void load();
         }}
       />
 
-      {/* شيت الفلترة المتقدمة — جلد الملاك الموحد (المحور 10) */}
-      <VortexFilterSheet
-        open={advancedFilterOpen}
-        onOpenChange={setAdvancedFilterOpen}
-        lang={lang}
-        title={lang === "ar" ? "فلترة متقدمة" : "Advanced filters"}
-        subtitle={t("debts.subtitle")}
-        activeFiltersCount={hasPhoneOnly ? 1 : 0}
-        onApply={() => setAdvancedFilterOpen(false)}
-        onReset={() => {
-          setHasPhoneOnly(false);
-          setSearch("");
+      {/* ─── درج ملف العميل — نفس حاوية VortexDrawerDialog في كل الشاشات ─── */}
+      <VortexDrawerDialog
+        open={!!selected}
+        onOpenChange={(open) => {
+          if (!open) setSelected(null);
         }}
+        size="lg"
+        title={selected?.name ?? ""}
+        subtitle={`${t("debts.customer_record")} · ${selected?.phone ?? (isAr ? "بلا هاتف" : "No phone")}`}
+        icon={<Users className="size-5" />}
+        footer={
+          selected ? (
+            <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap items-center gap-2">
+                {selectedLedgerBalance > 0 && (
+                  <WhatsAppButton
+                    phone={selected.phone}
+                    label={isAr ? "تذكير واتساب" : "WhatsApp reminder"}
+                    message={debtReminderMessage({
+                      name: selected.name,
+                      balance: money(selectedLedgerBalance),
+                      lang,
+                    })}
+                    className="flex h-9 items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 text-xs font-semibold text-emerald-600 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-40 dark:text-emerald-400"
+                  />
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => goStatement(selected.id)}
+                  className="h-9 gap-1.5 rounded-full text-xs font-semibold"
+                >
+                  <FileText className="size-3.5 text-primary" />
+                  {isAr ? "كشف حساب / PDF" : "Statement / PDF"}
+                </Button>
+              </div>
+              <div className="flex items-center justify-end gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelected(null)}
+                  className="h-9 rounded-full text-xs"
+                >
+                  {t("common.close")}
+                </Button>
+                {selectedLedgerBalance > 0 && (
+                  <Button
+                    size="sm"
+                    onClick={() => openCollection(selected, selectedLedgerBalance)}
+                    className="h-9 gap-1.5 rounded-full text-xs font-bold shadow-xs shadow-primary/20"
+                  >
+                    <Wallet className="size-3.5" />
+                    {isAr ? "تحصيل دفعة" : "Record payment"}
+                  </Button>
+                )}
+              </div>
+            </div>
+          ) : null
+        }
       >
-        <VortexFilterSection
-          title={lang === "ar" ? "بيانات الاتصال" : "Contact data"}
-          icon={<Users className="size-4" />}
-        >
-          <button
-            type="button"
-            onClick={() => setHasPhoneOnly(!hasPhoneOnly)}
-            className="flex w-full items-center justify-between rounded-xl border border-border/60 bg-surface px-3 py-2.5 text-sm transition hover:bg-surface-2/60"
-          >
-            <span>{lang === "ar" ? "لديه رقم هاتف فقط" : "Has phone number only"}</span>
-            <span
-              className={`flex size-5 items-center justify-center rounded-md border transition ${
-                hasPhoneOnly
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-surface"
-              }`}
-            >
-              {hasPhoneOnly && <Check className="size-3.5" />}
-            </span>
-          </button>
-        </VortexFilterSection>
-      </VortexFilterSheet>
-
-      {selected && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur-sm p-4">
-          <div className="panel-elevated flex max-h-[90vh] w-full max-w-3xl flex-col p-6">
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div>
-                <div className="text-xs uppercase text-muted-foreground">
-                  {t("debts.customer_record")}
+        {selected && (
+          <div className="space-y-4">
+            {/* ملخّص الرصيد */}
+            <div className="relative overflow-hidden rounded-3xl border border-border/70 bg-gradient-to-br from-primary/5 via-card to-card p-5 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                    {t("debts.balance")}
+                  </span>
+                  <div
+                    className={cn(
+                      "font-mono text-3xl font-black tracking-tight",
+                      selectedLedgerBalance > 0
+                        ? "text-amber-600 dark:text-amber-400"
+                        : "text-emerald-600 dark:text-emerald-400",
+                    )}
+                  >
+                    <Ltr>{money(selectedLedgerBalance)}</Ltr>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <DebtStatusPill tone={selectedLedgerBalance > 0 ? "warning" : "success"}>
+                      {selectedLedgerBalance > 0 ? t("debts.debtor") : t("debts.clear")}
+                    </DebtStatusPill>
+                    <span className="text-[11px] text-muted-foreground">
+                      {isAr ? "الحد الائتماني:" : "Credit limit:"}{" "}
+                      <span className="font-mono font-semibold text-foreground">
+                        <Ltr>{money(Number(selected.credit_limit))}</Ltr>
+                      </span>
+                    </span>
+                  </div>
                 </div>
-                <h3 className="text-lg font-semibold">{selected.name}</h3>
-                <div className="text-xs text-muted-foreground">
-                  {selected.phone ?? "—"} · {selected.email ?? "—"}
-                </div>
-              </div>
-              <div className="text-end">
-                <div className="text-[10px] uppercase text-muted-foreground">
-                  {t("debts.balance")}
-                </div>
-                <div className="font-mono text-xl font-semibold text-amber-500">
-                  <Ltr>{money(selectedLedgerBalance)}</Ltr>
+                <div className="grid size-12 shrink-0 place-items-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
+                  <Wallet className="size-6" />
                 </div>
               </div>
-              <button onClick={() => setSelected(null)} className="rounded p-1 hover:bg-surface-2">
-                <X className="h-4 w-4" />
-              </button>
             </div>
 
             {selectedIntegrity?.hasGap && (
-              <StatementIntegrityBadge
-                integrity={selectedIntegrity}
-                variant="panel"
-                className="mb-3"
-              />
+              <StatementIntegrityBadge integrity={selectedIntegrity} variant="panel" />
             )}
 
-            <div className="flex-1 space-y-4 overflow-y-auto">
-              <div>
-                <h4 className="mb-2 text-sm font-semibold">{t("debts.invoices")}</h4>
-                {invoices.length === 0 ? (
-                  <div className="rounded border border-border py-6 text-center text-sm text-muted-foreground">
-                    {t("debts.no_invoices")}
+            {/* مؤشرات الملف */}
+            <div className="grid grid-cols-3 gap-2.5">
+              {[
+                {
+                  label: isAr ? "إجمالي الفواتير" : "Invoiced",
+                  value: totalInvoiced,
+                  tone: "text-foreground",
+                },
+                {
+                  label: isAr ? "إجمالي التحصيل" : "Collected",
+                  value: totalCollected,
+                  tone: "text-emerald-600 dark:text-emerald-400",
+                },
+                {
+                  label: t("debts.remaining"),
+                  value: totalRemaining,
+                  tone: "text-amber-600 dark:text-amber-400",
+                },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  className="space-y-0.5 rounded-2xl border border-border/70 bg-card p-3.5"
+                >
+                  <span className="block text-[11px] font-bold text-muted-foreground">
+                    {stat.label}
+                  </span>
+                  <p className={cn("font-mono text-base font-black", stat.tone)}>
+                    <Ltr>{money(stat.value)}</Ltr>
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            {ledgerSummary.length > 0 && (
+              <div className="grid grid-cols-3 gap-2 rounded-2xl border border-border/60 bg-muted/30 p-3 text-center text-[11px]">
+                {ledgerSummary.map((item) => (
+                  <div key={item.label}>
+                    <span className="block font-medium text-muted-foreground">{item.label}</span>
+                    <span className="font-mono font-bold text-foreground">
+                      <Ltr>{money(item.value)}</Ltr>
+                    </span>
                   </div>
-                ) : (
-                  <table className="w-full text-sm">
-                    <thead className="text-xs text-muted-foreground">
-                      <tr className="border-b border-border">
-                        <th className="py-1.5 text-start">#</th>
-                        <th className="py-1.5 text-start">{lang === "ar" ? "التاريخ" : "Date"}</th>
-                        <th className="py-1.5 text-end">{lang === "ar" ? "الإجمالي" : "Total"}</th>
-                        <th className="py-1.5 text-end">{lang === "ar" ? "المدفوع" : "Paid"}</th>
-                        <th className="py-1.5 text-end">{t("debts.remaining")}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {invoices.map((i) => {
-                        const rem = Number(i.total) - Number(i.paid);
-                        return (
-                          <tr key={i.id} className="border-b border-border/40">
-                            <td className="py-1.5 font-mono text-xs">
-                              <Ltr>{i.invoice_number}</Ltr>
+                ))}
+              </div>
+            )}
+
+            {/* الفواتير */}
+            <section className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h4 className="flex items-center gap-1.5 text-xs font-bold text-foreground">
+                  <FileText className="size-3.5 text-primary" />
+                  {t("debts.invoices")}
+                </h4>
+                <span className="rounded-md border border-border/50 bg-muted/50 px-2 py-0.5 font-mono text-[11px] font-bold text-muted-foreground">
+                  {toSystemDigits(invoices.length)}
+                </span>
+              </div>
+              {invoices.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-border/70 bg-card/50 py-8 text-center text-xs text-muted-foreground">
+                  {t("debts.no_invoices")}
+                </div>
+              ) : (
+                <div className="overflow-hidden rounded-2xl border border-border/70 bg-card">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead className="border-b border-border/60 bg-muted/40 text-muted-foreground">
+                        <tr>
+                          <th className="px-3.5 py-2.5 text-start font-semibold">#</th>
+                          <th className="px-3.5 py-2.5 text-start font-semibold">
+                            {isAr ? "التاريخ" : "Date"}
+                          </th>
+                          <th className="px-3.5 py-2.5 text-end font-semibold">
+                            {isAr ? "الإجمالي" : "Total"}
+                          </th>
+                          <th className="px-3.5 py-2.5 text-end font-semibold">
+                            {isAr ? "المدفوع" : "Paid"}
+                          </th>
+                          <th className="px-3.5 py-2.5 text-end font-semibold">
+                            {t("debts.remaining")}
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/40">
+                        {invoices.map((i) => {
+                          const rem = Number(i.total) - Number(i.paid);
+                          return (
+                            <tr key={i.id} className="transition-colors hover:bg-muted/20">
+                              <td className="px-3.5 py-2.5 font-mono text-muted-foreground">
+                                <Ltr>{i.invoice_number}</Ltr>
+                              </td>
+                              <td className="px-3.5 py-2.5">
+                                <VortexDateBadge date={i.created_at} size="sm" showTime={false} />
+                              </td>
+                              <td className="px-3.5 py-2.5 text-end font-mono text-foreground">
+                                <Ltr>{money(Number(i.total))}</Ltr>
+                              </td>
+                              <td className="px-3.5 py-2.5 text-end font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+                                <Ltr>{money(Number(i.paid))}</Ltr>
+                              </td>
+                              <td
+                                className={cn(
+                                  "px-3.5 py-2.5 text-end font-mono",
+                                  rem > 0
+                                    ? "font-bold text-amber-600 dark:text-amber-400"
+                                    : "text-muted-foreground",
+                                )}
+                              >
+                                <Ltr>{money(rem)}</Ltr>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </section>
+
+            {/* التحصيلات */}
+            <section className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h4 className="flex items-center gap-1.5 text-xs font-bold text-foreground">
+                  <Wallet className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                  {t("debts.collections")}
+                </h4>
+                <span className="rounded-md border border-border/50 bg-muted/50 px-2 py-0.5 font-mono text-[11px] font-bold text-muted-foreground">
+                  {toSystemDigits(payments.length)}
+                </span>
+              </div>
+              {payments.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-border/70 bg-card/50 py-8 text-center text-xs text-muted-foreground">
+                  {t("debts.no_collections")}
+                </div>
+              ) : (
+                <div className="overflow-hidden rounded-2xl border border-border/70 bg-card">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead className="border-b border-border/60 bg-muted/40 text-muted-foreground">
+                        <tr>
+                          <th className="px-3.5 py-2.5 text-start font-semibold">
+                            {isAr ? "التاريخ" : "Date"}
+                          </th>
+                          <th className="px-3.5 py-2.5 text-start font-semibold">
+                            {isAr ? "الفاتورة" : "Invoice"}
+                          </th>
+                          <th className="px-3.5 py-2.5 text-start font-semibold">
+                            {isAr ? "الطريقة" : "Method"}
+                          </th>
+                          <th className="px-3.5 py-2.5 text-end font-semibold">
+                            {isAr ? "المبلغ" : "Amount"}
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/40">
+                        {payments.map((p) => (
+                          <tr key={p.id} className="transition-colors hover:bg-muted/20">
+                            <td className="px-3.5 py-2.5">
+                              <VortexDateBadge date={p.payment_date} size="sm" showTime={false} />
                             </td>
-                            <td className="py-1.5 text-muted-foreground">
-                              <Ltr>{new Date(i.created_at).toLocaleDateString()}</Ltr>
+                            <td className="px-3.5 py-2.5 font-mono text-muted-foreground">
+                              <Ltr>{p.sales_invoices?.invoice_number ?? t("debts.on_account")}</Ltr>
                             </td>
-                            <td className="py-1.5 text-end font-mono">
-                              <Ltr>{money(Number(i.total))}</Ltr>
+                            <td className="px-3.5 py-2.5 text-muted-foreground">
+                              {pmLabel(p.payment_method)}
                             </td>
-                            <td className="py-1.5 text-end font-mono text-emerald-500">
-                              <Ltr>{money(Number(i.paid))}</Ltr>
-                            </td>
-                            <td
-                              className={`py-1.5 text-end font-mono ${rem > 0 ? "text-amber-500 font-semibold" : "text-muted-foreground"}`}
-                            >
-                              <Ltr>{money(rem)}</Ltr>
+                            <td className="px-3.5 py-2.5 text-end font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                              <Ltr>{money(Number(p.amount))}</Ltr>
                             </td>
                           </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-
-              <div>
-                <h4 className="mb-2 text-sm font-semibold">{t("debts.collections")}</h4>
-                {payments.length === 0 ? (
-                  <div className="rounded border border-border py-6 text-center text-sm text-muted-foreground">
-                    {t("debts.no_collections")}
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                ) : (
-                  <table className="w-full text-sm">
-                    <thead className="text-xs text-muted-foreground">
-                      <tr className="border-b border-border">
-                        <th className="py-1.5 text-start">{lang === "ar" ? "التاريخ" : "Date"}</th>
-                        <th className="py-1.5 text-start">
-                          {lang === "ar" ? "الفاتورة" : "Invoice"}
-                        </th>
-                        <th className="py-1.5 text-start">
-                          {lang === "ar" ? "الطريقة" : "Method"}
-                        </th>
-                        <th className="py-1.5 text-end">{lang === "ar" ? "المبلغ" : "Amount"}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {payments.map((p) => (
-                        <tr key={p.id} className="border-b border-border/40">
-                          <td className="py-1.5 text-muted-foreground">
-                            <Ltr>{p.payment_date}</Ltr>
-                          </td>
-                          <td className="py-1.5 font-mono text-xs">
-                            <Ltr>{p.sales_invoices?.invoice_number ?? t("debts.on_account")}</Ltr>
-                          </td>
-                          <td className="py-1.5 text-muted-foreground">
-                            {pmLabel(p.payment_method)}
-                          </td>
-                          <td className="py-1.5 text-end font-mono font-semibold text-emerald-500">
-                            <Ltr>{money(Number(p.amount))}</Ltr>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            </div>
-
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                onClick={() => setSelected(null)}
-                className="h-9 rounded-md border border-border px-4 text-sm hover:bg-surface-2"
-              >
-                {t("common.close")}
-              </button>
-              {selectedLedgerBalance > 0 && (
-                <WhatsAppButton
-                  phone={selected.phone}
-                  label={lang === "ar" ? "تذكير واتساب" : "WhatsApp reminder"}
-                  message={debtReminderMessage({
-                    name: selected.name,
-                    balance: money(selectedLedgerBalance),
-                    lang,
-                  })}
-                  className="flex h-9 items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-4 text-sm font-medium text-emerald-500 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-40"
-                />
+                </div>
               )}
-              <button
-                onClick={() => goStatement(selected.id)}
-                className="flex h-9 items-center gap-1.5 rounded-md border border-border px-4 text-sm hover:bg-surface-2"
-              >
-                <FileText className="h-4 w-4" />
-                {lang === "ar" ? "كشف حساب / PDF" : "Statement / PDF"}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setCollectionCustomer({
-                    id: selected.id,
-                    name: selected.name,
-                    phone: selected.phone,
-                    balance: selectedLedgerBalance,
-                  });
-                  setCollectionOpen(true);
-                }}
-                className="flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90 active:scale-95 transition"
-              >
-                {lang === "ar" ? "تحصيل دفعة فوري" : "Record payment"}
-              </button>
-            </div>
+            </section>
           </div>
-        </div>
-      )}
+        )}
+      </VortexDrawerDialog>
     </>
-  );
-}
-
-function SumCard({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone: "warn" | "neg" | "info";
-}) {
-  const color =
-    tone === "warn"
-      ? "text-amber-500 border-amber-500/20 bg-amber-500/5"
-      : tone === "neg"
-        ? "text-rose-500 border-rose-500/20 bg-rose-500/5"
-        : "text-primary border-primary/20 bg-primary/5";
-  return (
-    <div className={`rounded-xl border p-4 ${color}`}>
-      <div className="text-[10px] uppercase">{label}</div>
-      <div className="mt-1 font-mono text-2xl font-semibold">
-        <Ltr>{value}</Ltr>
-      </div>
-    </div>
   );
 }

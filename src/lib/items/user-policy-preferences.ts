@@ -14,7 +14,7 @@ const STORAGE_PREFIX = "market_hub_item_policy_preferences";
 export const DEFAULT_USER_ITEM_POLICY_PREFERENCES: UserItemPolicyPreferences = {
   item_nature: "GOOD",
   inventory_policy: "TRACKED",
-  tracking: "BATCH",
+  tracking: "NONE",
   costing_method: "MOVING_AVERAGE",
   is_sellable: true,
   is_purchasable: true,
@@ -34,22 +34,17 @@ export function readUserItemPolicyPreferences(userId: string): UserItemPolicyPre
       ...DEFAULT_USER_ITEM_POLICY_PREFERENCES,
       ...JSON.parse(raw),
     };
-    // Older releases saved the form's old default (GOOD + TRACKED + NONE)
-    // as if the user had chosen it. Upgrade that untouched default to batches.
+    // Older releases upgraded the untouched default to BATCH. Restore NONE
+    // only for that exact default-shaped preference; preserve explicit choices.
     if (
       saved.item_nature === "GOOD" &&
       saved.inventory_policy === "TRACKED" &&
-      saved.tracking === "NONE" &&
+      saved.tracking === "BATCH" &&
       saved.costing_method === "MOVING_AVERAGE" &&
       saved.is_sellable === true &&
       saved.is_purchasable === true
     ) {
-      saved.tracking = "BATCH";
-    }
-    // A new good must carry a stock balance. UNTRACKED is reserved for
-    // services; CUSTOMER_OWNED is the explicit exception for mill custody.
-    if (saved.item_nature === "GOOD" && saved.inventory_policy === "UNTRACKED") {
-      return { ...DEFAULT_USER_ITEM_POLICY_PREFERENCES };
+      saved.tracking = "NONE";
     }
     return saved;
   } catch {

@@ -174,6 +174,7 @@ type ProductRow = {
   inventory_policy?: InventoryPolicy;
   tracking?: ItemTracking;
   costing_method?: CostingMethod;
+  batch_dispatch_strategy?: "FEFO" | "FIFO" | "MANUAL" | null;
   is_sellable?: boolean;
   is_purchasable?: boolean;
   compatibilities?: { vehicle_model_id: string }[];
@@ -338,7 +339,7 @@ function ProductsPage() {
       // disappear from the grid.
       const { data: page, error: productError } = await (supabase.from("products") as any)
         .select(
-          "id, name, name_ar, sku, barcode, sale_price, cost_price, tax_rate, min_stock, package_weight_kg, is_active, category_id, brand_id, unit_id, item_nature, item_class, inventory_policy, tracking, costing_method, is_sellable, is_purchasable",
+          "id, name, name_ar, sku, barcode, sale_price, cost_price, tax_rate, min_stock, package_weight_kg, is_active, category_id, brand_id, unit_id, item_nature, item_class, inventory_policy, tracking, costing_method, batch_dispatch_strategy, is_sellable, is_purchasable",
         )
         // أصناف أمانات المطحنة تُدار من واجهتها المستقلة، وليست ضمن كتالوج الشركة.
         .eq("is_custody_item", false)
@@ -2489,7 +2490,7 @@ function ProductDialog({
     return {
       item_nature: product.item_nature ?? "GOOD",
       inventory_policy: inventoryPolicy,
-      tracking: product.tracking ?? (inventoryPolicy === "TRACKED" ? "BATCH" : "NONE"),
+      tracking: product.tracking ?? "NONE",
       costing_method:
         inventoryPolicy === "TRACKED" && product.costing_method === "NONE"
           ? "MOVING_AVERAGE"
@@ -2505,6 +2506,9 @@ function ProductDialog({
         ? readUserItemPolicyPreferences(userId)
         : DEFAULT_USER_ITEM_POLICY_PREFERENCES,
   );
+  const [batchDispatchStrategy, setBatchDispatchStrategy] = useState<
+    "INHERIT" | "FEFO" | "FIFO" | "MANUAL"
+  >(initial?.batch_dispatch_strategy ?? "INHERIT");
   const [form, setForm] = useState({
     name: initial?.name ?? "",
     name_ar: initial?.name_ar ?? "",
@@ -2534,6 +2538,7 @@ function ProductDialog({
           ? readUserItemPolicyPreferences(userId)
           : DEFAULT_USER_ITEM_POLICY_PREFERENCES,
     );
+    setBatchDispatchStrategy(initial?.batch_dispatch_strategy ?? "INHERIT");
   }, [initial, userId]);
 
   useKeyboardWedge({
@@ -2599,6 +2604,10 @@ function ProductDialog({
         costing_method: policy.costing_method,
         is_sellable: policy.is_sellable,
         is_purchasable: policy.is_purchasable,
+        batch_dispatch_strategy:
+          policy.tracking === "BATCH" && batchDispatchStrategy !== "INHERIT"
+            ? batchDispatchStrategy
+            : null,
         is_custody_item: false,
       };
       const request: any = initial
@@ -3197,8 +3206,8 @@ function ProductDialog({
                 : "Service: available on relevant invoices without stock balance or stock valuation."
               : policy.inventory_policy === "UNTRACKED"
                 ? lang === "ar"
-                  ? "صنف قديم محفوظ بلا تتبع مخزني. لا يمكن اختيار هذه السياسة لصنف جديد؛ اختر طبيعة (خدمة) للخدمات."
-                  : "Legacy good saved without stock tracking. New goods cannot use this policy; choose Service for services."
+                  ? "صنف مادي بلا رصيد مخزني: يظهر في الفواتير ولا يزيد أو ينقص رصيد المستودع."
+                  : "Physical item without a stock balance: it appears on invoices but does not change warehouse quantities."
                 : lang === "ar"
                   ? "سلعة مخزنية: حركات الفواتير تحدّث الرصيد والتكلفة تلقائيًا."
                   : "Stocked good: invoices update its stock balance and cost automatically."}
@@ -3242,15 +3251,10 @@ function ProductDialog({
                     value: "TRACKED",
                     label: INVENTORY_POLICY_LABELS.TRACKED[lang === "ar" ? "ar" : "en"],
                   },
-                  ...(initial && policy.inventory_policy === "UNTRACKED"
-                    ? [
-                        {
-                          value: "UNTRACKED",
-                          label: lang === "ar" ? "غير متتبع (قديم)" : "Untracked (legacy)",
-                          disabled: true,
-                        },
-                      ]
-                    : []),
+                  {
+                    value: "UNTRACKED",
+                    label: INVENTORY_POLICY_LABELS.UNTRACKED[lang === "ar" ? "ar" : "en"],
+                  },
                 ]}
                 onChange={(value) => {
                   const nextPolicy = value as InventoryPolicy;
@@ -3259,7 +3263,7 @@ function ProductDialog({
                       return {
                         ...current,
                         inventory_policy: nextPolicy,
-                        tracking: current.tracking === "NONE" ? "BATCH" : current.tracking,
+                        tracking: current.tracking,
                         costing_method:
                           current.costing_method === "NONE"
                             ? "MOVING_AVERAGE"
@@ -3279,6 +3283,14 @@ function ProductDialog({
               />
             )}
 
+            {policy.item_nature === "GOOD" && (
+              <p className="-mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                {lang === "ar"
+                  ? "أصناف الأمانات المملوكة للعملاء تُنشأ وتُدار من شاشة منتجات أمانات المطحنة."
+                  : "Customer-owned custody items are created and managed from the Milling Custody Products screen."}
+              </p>
+            )}
+
             {policy.item_nature === "GOOD" && policy.inventory_policy === "TRACKED" && (
               <>
                 <SettingsChoice
@@ -3291,8 +3303,8 @@ function ProductDialog({
                       value: "SERIAL",
                       label:
                         lang === "ar"
-                          ? "أرقام تسلسلية — غير مدعومة بعد"
-                          : "Serial — not supported yet",
+                          ? "الأرقام التسلسلية — غير متاحة حالياً"
+                          : "Serial numbers — unavailable currently",
                       disabled: true,
                     },
                   ]}
@@ -3305,8 +3317,8 @@ function ProductDialog({
                 />
                 <p className="-mt-2 text-[11px] leading-relaxed text-muted-foreground">
                   {lang === "ar"
-                    ? "تتبع الدفعات يعمل مع الاستلام والصرف. سجل الأرقام التسلسلية غير منفذ بعد."
-                    : "Batch tracking is connected to receipts and dispatch. Serial-number records are not implemented yet."}
+                    ? "الدفعات تُسجّل عند الشراء وتُخصم عند البيع. تتبع الأرقام التسلسلية غير مدعوم حالياً."
+                    : "Batches are recorded on purchases and deducted on sales. Serial-number tracking is not currently supported."}
                 </p>
               </>
             )}
@@ -3325,8 +3337,8 @@ function ProductDialog({
                       value: "FIFO",
                       label:
                         lang === "ar"
-                          ? "FIFO — غير مدعوم كتقييم تكلفة"
-                          : "FIFO — not supported as costing",
+                          ? "FIFO — غير متاح كتقييم تكلفة حالياً"
+                          : "FIFO — unavailable as a costing method",
                       disabled: true,
                     },
                     {
@@ -3344,11 +3356,36 @@ function ProductDialog({
                 />
                 <p className="-mt-2 text-[11px] leading-relaxed text-muted-foreground">
                   {lang === "ar"
-                    ? "المتوسط المتحرك هو طريقة التقييم الافتراضية. FIFO في إعداد الدفعات يحدد ترتيب الصرف فقط، والتكلفة القياسية إعداد محاسبي مركزي."
-                    : "Moving average is the active default. FIFO in batch settings controls dispatch order only; standard costing is company-wide."}
+                    ? "المتوسط المتحرك هو تقييم التكلفة المستخدم حالياً. إعداد FIFO في صفحة الدفعات يحدد ترتيب صرف الدفعات للأصناف التي فعّلت تتبعها، ولا يغيّر طريقة تقييم التكلفة."
+                    : "Moving average is the active costing method. FIFO in batch settings controls batch dispatch for items with batch tracking; it does not change stock valuation."}
                 </p>
               </>
             )}
+
+            {policy.item_nature === "GOOD" &&
+              policy.inventory_policy === "TRACKED" &&
+              policy.tracking === "BATCH" && (
+                <>
+                  <SettingsChoice
+                    label={lang === "ar" ? "ترتيب صرف دفعات هذا الصنف" : "Batch dispatch for this item"}
+                    value={batchDispatchStrategy}
+                    options={[
+                      { value: "INHERIT", label: lang === "ar" ? "استخدام إعداد الشركة" : "Use company setting" },
+                      { value: "FEFO", label: lang === "ar" ? "الأقرب انتهاءً أولاً (FEFO)" : "Earliest expiry first (FEFO)" },
+                      { value: "FIFO", label: lang === "ar" ? "الأقدم استلاماً أولاً (FIFO)" : "Oldest receipt first (FIFO)" },
+                      { value: "MANUAL", label: lang === "ar" ? "اختيار الدفعة يدوياً عند البيع" : "Choose batch manually at sale" },
+                    ]}
+                    onChange={(value) =>
+                      setBatchDispatchStrategy(value as "INHERIT" | "FEFO" | "FIFO" | "MANUAL")
+                    }
+                  />
+                  <p className="-mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                    {lang === "ar"
+                      ? "هذا يحدد دفعة الصرف لهذا الصنف فقط. عند استخدام إعداد الشركة، يطبق ترتيب الصرف العام. لا يغيّر طريقة تقييم تكلفة المخزون."
+                      : "This sets lot dispatch for this item. Company setting is used when inherited. It does not change inventory cost valuation."}
+                  </p>
+                </>
+              )}
 
             <div className="grid grid-cols-2 gap-2 pt-2">
               <SettingsToggle
