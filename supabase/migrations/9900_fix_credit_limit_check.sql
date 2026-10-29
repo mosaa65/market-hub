@@ -1,5 +1,5 @@
 -- ============================================================================
--- 99_fix_credit_limit_check.sql
+-- 9900_fix_credit_limit_check.sql
 --
 -- 修复: سقف الدين يرفض كل العمليات الآجلة حتى لو الرصيد صفر والمطلوب أقل بكثير من الحد.
 -- Root cause: `customer_credit_limit_allows` used a CROSS JOIN with
