@@ -337,6 +337,7 @@ function POSPage() {
    * skeleton يظهر بدل الشاشة الفارغة أثناء الجلب.
    */
   const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogComplete, setCatalogComplete] = useState(false);
   const [stockMap, setStockMap] = useState<Record<string, number>>({});
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -359,6 +360,9 @@ function POSPage() {
     key: "name",
     direction: "asc",
   });
+  const [catalogVisibleLimit, setCatalogVisibleLimit] = useState(60);
+  const catalogScrollSentinelRef = useRef<HTMLDivElement | null>(null);
+  const catalogScrollRootRef = useRef<HTMLDivElement | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
   /* Unified records vocabulary: cards (was "grid"), list (was "compact"), table. */
@@ -493,10 +497,26 @@ function POSPage() {
       (payload) => {
         if (payload.eventType === "UPDATE") {
           const updated = payload.new as any;
-          setProducts((prev) => prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)));
+          setProducts((prev) =>
+            prev.map((p) =>
+              p.id === updated.id
+                ? {
+                    ...p,
+                    ...updated,
+                    // Realtime payloads don't include joined/enriched catalog fields.
+                    sale_uoms: p.sale_uoms,
+                    category: p.category,
+                    brand: p.brand,
+                    unit: p.unit,
+                    origin: p.origin,
+                    quality: p.quality,
+                  }
+                : p,
+            ),
+          );
         } else if (payload.eventType === "INSERT") {
-          const inserted = payload.new as any;
-          setProducts((prev) => [inserted, ...prev]);
+          // Do not insert a raw realtime row into the POS catalog: it lacks UOM and pricing enrichment.
+          // The next catalog refresh will add it with complete sales data.
         } else if (payload.eventType === "DELETE") {
           const deleted = payload.old as any;
           setProducts((prev) => prev.filter((p) => p.id !== deleted.id));
@@ -572,11 +592,11 @@ function POSPage() {
 
   async function loadAll() {
     setSaleUomsLoaded(false);
+    setCatalogComplete(false);
     try {
       /*
-       * مسار سريع للمنتجات: يُطلق قبل كل شيء ويُعرض فور وصوله، حتى لا ينتظر
-       * الكاشير اكتمال جلب التصنيفات والماركات والموديلات… (تظهر العناصر
-       * المساعدة لحظة اكتمالها عبر إعادة الإثراء أدناه).
+       * مسار سريع للمنتجات: يُطلق فوراً لأول 500 صنف حتى يبدأ الكاشير مباشرة
+       * دون انتظار بقية الفهرس، بينما يكتمل جلب كامل المنتجات في المسار الرئيسي أدناه.
        */
       const fastProductQuery = (supabase.from("products") as any)
         .select(
@@ -585,9 +605,6 @@ function POSPage() {
         .eq("is_active", true)
         .eq("is_sellable", true)
         .eq("is_custody_item", false);
-      // Milling services and custody inputs use dedicated operational screens.
-      // General ERP POS eligibility is determined by is_sellable, not an
-      // activity-specific item_class value.
       if (millingMode === "simplified") {
         fastProductQuery
           .neq("item_class", "RAW_MATERIAL")
@@ -596,13 +613,14 @@ function POSPage() {
       }
       void fastProductQuery
         .order("name")
-        .limit(1000)
+        .order("id")
+        .range(0, 499)
         .then(({ data }: { data: any[] | null }) => {
+          // نتائج مؤقتة لإظهار واجهة سريعة، مع إبقاء البحث معلناً كجارٍ حتى اكتمال الفهرس.
           if (data?.length) {
-            setProducts(data as Product[]);
+            setProducts((prev) => (prev.length === 0 ? (data as Product[]) : prev));
             setCatalogLoading(false);
           }
-          // إن جاء فارغاً يبقى skeleton حتى يعالج fallback في المسار الكامل.
         });
 
       const [
@@ -626,22 +644,42 @@ function POSPage() {
           .from("customers")
           .select("id,name,phone,balance,credit_limit,is_system")
           .order("name"),
-        (() => {
-          const salesProductQuery = (supabase.from("products") as any)
-            .select(
-              "id,sku,barcode,name,name_ar,sale_price,tax_rate,image_url,category_id,brand_id,unit_id,origin_id,quality_grade_id,is_active,is_service,item_nature,inventory_policy,tracking,is_custody_item",
-            )
-            // In general mode the business sellability flag controls POS access.
-            .eq("is_active", true)
-            .eq("is_sellable", true)
-            .eq("is_custody_item", false);
-          if (millingMode === "simplified") {
-            salesProductQuery
-              .neq("item_class", "RAW_MATERIAL")
-              .neq("item_class", "PACKAGING")
-              .neq("item_class", "SERVICE");
+        (async () => {
+          // تحميل كامل الفهرس على دفعات ثابتة، مع ترتيب ثابت لتجنب فقد الصفوف بين الصفحات.
+          const allItems: any[] = [];
+          const pageSize = 500;
+          let from = 0;
+          let selectCols =
+            "id,sku,barcode,name,name_ar,sale_price,tax_rate,image_url,category_id,brand_id,unit_id,origin_id,quality_grade_id,is_active,is_service,item_nature,inventory_policy,tracking,is_custody_item";
+
+          while (true) {
+            let query = (supabase.from("products") as any)
+              .select(selectCols)
+              .eq("is_active", true)
+              .eq("is_sellable", true)
+              .eq("is_custody_item", false);
+            if (millingMode === "simplified") {
+              query = query
+                .neq("item_class", "RAW_MATERIAL")
+                .neq("item_class", "PACKAGING")
+                .neq("item_class", "SERVICE");
+            }
+            const { data, error } = await query
+              .order("name", { ascending: true })
+              .order("id", { ascending: true })
+              .range(from, from + pageSize - 1);
+
+            if (error && from === 0 && selectCols.includes("origin_id")) {
+              selectCols =
+                "id,sku,barcode,name,name_ar,sale_price,tax_rate,image_url,category_id,brand_id,unit_id";
+              continue;
+            }
+            if (error) return { data: null, error };
+            allItems.push(...(data ?? []));
+            if (!data || data.length < pageSize) break;
+            from += pageSize;
           }
-          return salesProductQuery.order("name").limit(1000);
+          return { data: allItems, error: null };
         })(),
         supabase.from("categories").select("id,name,name_ar").order("name"),
         supabase.from("brands").select("id,name,name_ar").order("name"),
@@ -658,7 +696,13 @@ function POSPage() {
 
       const ws = wsRes.status === "fulfilled" ? wsRes.value.data : null;
       const cs = csRes.status === "fulfilled" ? csRes.value.data : null;
-      const ps = psRes.status === "fulfilled" ? psRes.value.data : null;
+      const ps = psRes.status === "fulfilled" && !psRes.value.error ? psRes.value.data : null;
+      if (psRes.status === "rejected" || (psRes.status === "fulfilled" && psRes.value.error)) {
+        console.error(
+          "[pos] Failed to load the product catalog:",
+          psRes.status === "rejected" ? psRes.reason : psRes.value.error,
+        );
+      }
       const cats = catsRes.status === "fulfilled" ? catsRes.value.data : null;
       const brs = brsRes.status === "fulfilled" ? brsRes.value.data : null;
       const uns = unsRes.status === "fulfilled" ? unsRes.value.data : null;
@@ -683,78 +727,108 @@ function POSPage() {
       const qualMap = new Map((quals ?? []).map((q: any) => [q.id, q]));
 
       let rawProducts = (ps as any) ?? [];
-      // Fallback query if the first returned empty due to column discrepancy
+      // Column-compatibility fallback, paginated as well to avoid restoring the old 1000-item cap.
       if (!rawProducts.length) {
         try {
-          const fallbackQuery = (supabase.from("products") as any)
-            .select(
-              "id,sku,barcode,name,name_ar,sale_price,tax_rate,image_url,category_id,brand_id,unit_id",
-            )
-            .eq("is_active", true)
-            .eq("is_sellable", true)
-            .eq("is_custody_item", false);
-          if (millingMode === "simplified") {
-            fallbackQuery
-              .neq("item_class", "RAW_MATERIAL")
-              .neq("item_class", "PACKAGING")
-              .neq("item_class", "SERVICE");
+          let from = 0;
+          const pageSize = 500;
+          const fallbackProducts: any[] = [];
+          while (true) {
+            let query = (supabase.from("products") as any)
+              .select(
+                "id,sku,barcode,name,name_ar,sale_price,tax_rate,image_url,category_id,brand_id,unit_id",
+              )
+              .eq("is_active", true)
+              .eq("is_sellable", true)
+              .eq("is_custody_item", false);
+            if (millingMode === "simplified") {
+              query = query
+                .neq("item_class", "RAW_MATERIAL")
+                .neq("item_class", "PACKAGING")
+                .neq("item_class", "SERVICE");
+            }
+            const { data, error } = await query
+              .order("name", { ascending: true })
+              .order("id", { ascending: true })
+              .range(from, from + pageSize - 1);
+            if (error) throw error;
+            fallbackProducts.push(...(data ?? []));
+            if (!data || data.length < pageSize) break;
+            from += pageSize;
           }
-          const { data: fallbackPs } = await fallbackQuery.limit(1000);
-          if (fallbackPs && fallbackPs.length) rawProducts = fallbackPs;
-        } catch (e) {
-          console.warn("Fallback products query error:", e);
+          rawProducts = fallbackProducts;
+        } catch (error) {
+          console.warn("[pos] Fallback product catalog query failed:", error);
         }
       }
 
       const saleUomsByProduct = new Map<string, SaleUom[]>();
       const baseSalePrices = new Map<string, number>();
+      const chunked = <T,>(items: T[], size = 400): T[][] => {
+        const chunks: T[][] = [];
+        for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size));
+        return chunks;
+      };
       let unitSettingsReady = true;
       setUnitBarcodeMap({});
       if (rawProducts.length) {
         const productIds = rawProducts.map((product: any) => product.id);
         try {
-          const [uomResult, companyPriceResult] = await Promise.all([
-            (supabase as any)
-              .from("product_uoms")
-              .select(
-                "id, product_id, unit_id, factor_to_base, quantity_increment, is_default_sale, unit:units!product_uoms_unit_id_fkey(name, name_ar, short_name)",
-              )
-              .in("product_id", productIds)
-              .eq("is_active", true)
-              .eq("can_sell", true),
-            (supabase as any)
-              .from("company_items")
-              .select("item_id, default_sale_price")
-              .eq("company_id", 1)
-              .eq("is_active", true)
-              .in("item_id", productIds),
-          ]);
+          const idChunks = chunked(productIds, 400);
+          const uomRows: any[] = [];
+          const companyPriceRows: any[] = [];
+          for (const ids of idChunks) {
+            const [uomResult, companyPriceResult] = await Promise.all([
+              (supabase as any)
+                .from("product_uoms")
+                .select(
+                  "id, product_id, unit_id, factor_to_base, quantity_increment, is_default_sale, unit:units!product_uoms_unit_id_fkey(name, name_ar, short_name)",
+                )
+                .in("product_id", ids)
+                .eq("is_active", true)
+                .eq("can_sell", true),
+              (supabase as any)
+                .from("company_items")
+                .select("item_id, default_sale_price")
+                .eq("company_id", 1)
+                .eq("is_active", true)
+                .in("item_id", ids),
+            ]);
+            if (uomResult.error) throw uomResult.error;
+            if (companyPriceResult.error) throw companyPriceResult.error;
+            uomRows.push(...(uomResult.data ?? []));
+            companyPriceRows.push(...(companyPriceResult.data ?? []));
+          }
+          const uomResult = { data: uomRows, error: null };
+          const companyPriceResult = { data: companyPriceRows, error: null };
           for (const priceRow of companyPriceResult.data ?? []) {
             if (priceRow.default_sale_price != null) {
               baseSalePrices.set(priceRow.item_id, Number(priceRow.default_sale_price));
             }
           }
-          const missingUomSchema =
-            uomResult.error && ["42P01", "PGRST205"].includes(uomResult.error.code ?? "");
-          if (uomResult.error && !missingUomSchema) throw uomResult.error;
-          if (companyPriceResult.error) throw companyPriceResult.error;
-          if (missingUomSchema) {
-            unitSettingsReady = true;
-          } else if (uomResult.data?.length) {
+          if (uomResult.data.length) {
             const uomIds = uomResult.data.map((row: any) => row.id);
-            const { data: priceRows, error: priceError } = await (supabase as any)
-              .from("product_uom_prices")
-              .select("product_uom_id, sale_price")
-              .in("product_uom_id", uomIds)
-              .eq("company_id", 1);
-            if (priceError) throw priceError;
-            const { data: barcodeRows, error: barcodeError } = await (supabase as any)
-              .from("product_uom_barcodes")
-              .select("product_uom_id, barcode")
-              .in("product_uom_id", uomIds)
-              .eq("company_id", 1)
-              .eq("is_active", true);
-            if (barcodeError) throw barcodeError;
+            const priceRows: any[] = [];
+            const barcodeRows: any[] = [];
+            for (const ids of chunked(uomIds, 400)) {
+              const [priceResult, barcodeResult] = await Promise.all([
+                (supabase as any)
+                  .from("product_uom_prices")
+                  .select("product_uom_id, sale_price")
+                  .in("product_uom_id", ids)
+                  .eq("company_id", 1),
+                (supabase as any)
+                  .from("product_uom_barcodes")
+                  .select("product_uom_id, barcode")
+                  .in("product_uom_id", ids)
+                  .eq("company_id", 1)
+                  .eq("is_active", true),
+              ]);
+              if (priceResult.error) throw priceResult.error;
+              if (barcodeResult.error) throw barcodeResult.error;
+              priceRows.push(...(priceResult.data ?? []));
+              barcodeRows.push(...(barcodeResult.data ?? []));
+            }
             const priceByUom = new Map<string, number>();
             for (const priceRow of priceRows ?? []) {
               if (priceRow.sale_price != null)
@@ -816,6 +890,7 @@ function POSPage() {
 
       setProducts(enrichedProducts);
       setSaleUomsLoaded(unitSettingsReady);
+      setCatalogComplete(true);
       setCatalogLoading(false);
       setCategories(cats ?? []);
       setBrands(brs ?? []);
@@ -845,6 +920,7 @@ function POSPage() {
           }
         });
     } catch (err: any) {
+      setCatalogLoading(false);
       console.error("Error loading POS meta:", err);
     }
   }
@@ -1159,6 +1235,40 @@ function POSPage() {
     lang,
   ]);
 
+  // Reset visible limit on search / filter / sort change
+  useEffect(() => {
+    setCatalogVisibleLimit(60);
+  }, [
+    search,
+    selectedCategory,
+    selectedBrand,
+    selectedUnit,
+    selectedOrigin,
+    selectedQuality,
+    selectedMake,
+    selectedModel,
+    catalogSort,
+    viewMode,
+  ]);
+
+  // Infinite scroll observer is rooted in the catalog's own scroll area.
+  useEffect(() => {
+    const sentinel = catalogScrollSentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setCatalogVisibleLimit((prev) => Math.min(prev + 60, filtered.length));
+        }
+      },
+      { root: catalogScrollRootRef.current, rootMargin: "300px" },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [filtered.length, catalogVisibleLimit, viewMode]);
+
   const tableRows = useMemo(() => {
     const label = (product: Product, key: string): string | number => {
       if (key === "code") return product.barcode || product.sku || "";
@@ -1190,6 +1300,16 @@ function POSPage() {
             direction;
     });
   }, [filtered, catalogTableSort, stockMap, lang]);
+
+  const visibleFiltered = useMemo(
+    () => filtered.slice(0, catalogVisibleLimit),
+    [filtered, catalogVisibleLimit],
+  );
+
+  const visibleTableRows = useMemo(
+    () => tableRows.slice(0, catalogVisibleLimit),
+    [tableRows, catalogVisibleLimit],
+  );
 
   function addToCart(
     p: Product,
@@ -1515,6 +1635,15 @@ function POSPage() {
       confirmScan();
       setSearch("");
       return true;
+    }
+    // Do not report a false miss while later catalog pages are still loading.
+    if (!catalogComplete) {
+      toast.info(
+        lang === "ar"
+          ? "جارٍ تحميل بقية المنتجات؛ أعد المسح بعد لحظة"
+          : "Catalog is still loading; scan again in a moment.",
+      );
+      return false;
     }
     // No matching product: keep the raw scanned code and offer a clear next step.
     // Nothing is created automatically; the user chooses to open the product form.
@@ -2452,6 +2581,16 @@ function POSPage() {
                     : "Search by product name or SKU, or scan barcode (F2)"
                 }
                 resultCount={filtered.length}
+                resultCountText={
+                  !catalogComplete
+                    ? lang === "ar"
+                      ? `${filtered.length} مطابقة • ${products.length} محمّل`
+                      : `${filtered.length} matches • ${products.length} loaded`
+                    : visibleFiltered.length < filtered.length
+                      ? `${visibleFiltered.length} / ${filtered.length}`
+                      : String(filtered.length)
+                }
+                searchLoading={!catalogComplete}
                 searchRef={searchRef}
                 onSearchKeyDown={handleScan}
                 activeFilterCount={activeFiltersCount}
@@ -2540,7 +2679,7 @@ function POSPage() {
               />
 
               {/* ─── Product Catalog Body: Three Distinct View Modes ─── */}
-              <div className="min-h-0 flex-1 overflow-y-auto pr-1 pb-2">
+              <div ref={catalogScrollRootRef} className="min-h-0 flex-1 overflow-y-auto pr-1 pb-2">
                 {catalogLoading ? (
                   /* ─── أنيقة skeleton تظهر لحظة فتح الشاشة بدل الفراغ ─── */
                   <CatalogSkeleton viewMode={viewMode} />
@@ -2568,7 +2707,7 @@ function POSPage() {
                 ) : viewMode === "cards" ? (
                   /* ─── Mode 1: Luxury Grid Cards ─── */
                   <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2.5">
-                    {filtered.map((p) => {
+                    {visibleFiltered.map((p) => {
                       const stock = stockMap[p.id] ?? 0;
                       const saleUom = getDefaultSaleUom(p);
                       const stockInSaleUnit = stock / Math.max(saleUom.factor_to_base, 0.000000001);
@@ -2701,7 +2840,7 @@ function POSPage() {
                 ) : viewMode === "list" ? (
                   /* ─── Mode 2: Compact Cashier List ─── */
                   <div className="space-y-1.5">
-                    {filtered.map((p) => {
+                    {visibleFiltered.map((p) => {
                       const stock = stockMap[p.id] ?? 0;
                       const saleUom = getDefaultSaleUom(p);
                       const stockInSaleUnit = stock / Math.max(saleUom.factor_to_base, 0.000000001);
@@ -2871,7 +3010,7 @@ function POSPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border/50">
-                        {tableRows.map((p) => {
+                        {visibleTableRows.map((p) => {
                           const stock = stockMap[p.id] ?? 0;
                           const saleUom = getDefaultSaleUom(p);
                           const stockInSaleUnit =
@@ -2936,6 +3075,21 @@ function POSPage() {
                         })}
                       </tbody>
                     </table>
+                  </div>
+                )}
+
+                {/* Sentinel for infinite scroll loading next 60 items */}
+                {visibleFiltered.length < filtered.length && (
+                  <div
+                    ref={catalogScrollSentinelRef}
+                    className="py-3 text-center text-xs text-muted-foreground flex items-center justify-center gap-2"
+                  >
+                    <span className="inline-block h-2 w-2 rounded-full bg-primary animate-ping" />
+                    <span>
+                      {lang === "ar"
+                        ? `عرض ${visibleFiltered.length} من أصل ${filtered.length} صنف (مرر لتحميل المزيد)`
+                        : `Showing ${visibleFiltered.length} of ${filtered.length} items (scroll for more)`}
+                    </span>
                   </div>
                 )}
               </div>
@@ -3623,7 +3777,7 @@ function POSPage() {
         </div>
       )}
 
-      {/* Mobile product picker — reuses the SAME filtered products & search state. */}
+      {/* Mobile product picker — reuses the SAME filtered products & search state with 60-items batching. */}
       <MobileProductPicker
         open={mobilePickerOpen && !isDesktop}
         onClose={() => setMobilePickerOpen(false)}
@@ -3633,7 +3787,8 @@ function POSPage() {
         searchPlaceholder={t("pos.search_product")}
         emptyLabel={t("pos.no_products")}
         inputRef={searchRef}
-        products={filtered.slice(0, 200).map((p) => {
+        pageSize={60}
+        products={filtered.map((p) => {
           const stock = stockMap[p.id] ?? 0;
           const saleUom = getDefaultSaleUom(p);
           const stockInSaleUnit = stock / Math.max(saleUom.factor_to_base, 0.000000001);

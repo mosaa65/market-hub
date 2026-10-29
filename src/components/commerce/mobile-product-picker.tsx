@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { X, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SearchInput } from "@/components/ui/search-input";
@@ -39,6 +39,7 @@ export interface MobileProductPickerProps {
   emptyLabel: string;
   searchIcon?: boolean;
   inputRef?: React.RefObject<HTMLInputElement | null>;
+  pageSize?: number;
 }
 
 export function MobileProductPicker({
@@ -52,10 +53,41 @@ export function MobileProductPicker({
   searchPlaceholder,
   emptyLabel,
   inputRef,
+  pageSize = 60,
 }: MobileProductPickerProps) {
   const { lang } = useI18n();
   const fallbackRef = useRef<HTMLInputElement>(null);
   const ref = inputRef ?? fallbackRef;
+
+  const [visibleLimit, setVisibleLimit] = useState(pageSize);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const resultsScrollRef = useRef<HTMLDivElement | null>(null);
+
+  // Reset pagination when search changes or when drawer opens
+  useEffect(() => {
+    setVisibleLimit(pageSize);
+  }, [search, open, pageSize]);
+
+  // Infinite scroll trigger
+  useEffect(() => {
+    if (!open) return;
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setVisibleLimit((prev) => Math.min(prev + pageSize, products.length));
+        }
+      },
+      { root: resultsScrollRef.current, rootMargin: "250px" },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [open, pageSize, products.length, visibleLimit]);
+
+  const visibleProducts = useMemo(() => products.slice(0, visibleLimit), [products, visibleLimit]);
 
   useEffect(() => {
     if (open) {
@@ -81,11 +113,20 @@ export function MobileProductPicker({
     <div className="fixed inset-0 z-50 flex flex-col bg-background/95 backdrop-blur-md animate-in fade-in duration-150">
       {/* Header */}
       <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border/70 px-4 py-3">
-        <h3 className="text-sm font-bold text-foreground">{title}</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-bold text-foreground">{title}</h3>
+          {products.length > 0 && (
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-mono font-medium text-primary">
+              {visibleProducts.length < products.length
+                ? `${visibleProducts.length} / ${products.length}`
+                : products.length}
+            </span>
+          )}
+        </div>
         <button
           type="button"
           onClick={onClose}
-          aria-label="close"
+          aria-label={lang === "ar" ? "إغلاق" : "Close"}
           className="grid h-9 w-9 place-items-center rounded-full border border-border/70 bg-surface text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
         >
           <X className="h-4 w-4" />
@@ -114,14 +155,14 @@ export function MobileProductPicker({
       </div>
 
       {/* Results */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6">
+      <div ref={resultsScrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 pb-6">
         {products.length === 0 ? (
           <div className="grid place-items-center py-16 text-sm text-muted-foreground">
             {emptyLabel}
           </div>
         ) : (
           <div className="space-y-1.5">
-            {products.map((p) => (
+            {visibleProducts.map((p) => (
               <button
                 key={p.id}
                 type="button"
@@ -150,6 +191,13 @@ export function MobileProductPicker({
                 </span>
               </button>
             ))}
+
+            {/* Infinite scroll sentinel */}
+            {visibleProducts.length < products.length && (
+              <div ref={sentinelRef} className="py-2 text-center text-xs text-muted-foreground">
+                {lang === "ar" ? "جارٍ تحميل المزيد..." : "Loading more..."}
+              </div>
+            )}
           </div>
         )}
       </div>

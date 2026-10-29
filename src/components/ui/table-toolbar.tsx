@@ -137,6 +137,7 @@ export interface TableToolbarProps {
     placeholder?: string;
     dir?: "rtl" | "ltr";
     resultCount?: number;
+    resultCountText?: string;
     debounceMs?: number;
     loading?: boolean;
     inputRef?: React.Ref<HTMLInputElement>;
@@ -238,11 +239,13 @@ export function TableToolbar({
    *              loaded catalogue can never be read as the match count.
    */
   const resultCountText =
-    search?.resultCount == null
-      ? undefined
-      : countMode === "total" && loadedCount != null
-        ? `${loadedCount}/${search.resultCount}`
-        : String(search.resultCount);
+    search?.resultCountText !== undefined
+      ? search.resultCountText
+      : search?.resultCount == null
+        ? undefined
+        : countMode === "total" && loadedCount != null
+          ? `${loadedCount}/${search.resultCount}`
+          : String(search.resultCount);
 
   return (
     <div
