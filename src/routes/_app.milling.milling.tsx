@@ -33,18 +33,13 @@ import {
   fetchCustodyBalances,
   fetchOutputItems,
   fetchGrainTypes,
-  custodyVoucherToDoc,
-  buildCustodyVoucher,
   capacityKgOf,
   type CustodyLine,
   type ProductOption,
   type GrainType,
 } from "@/lib/milling";
-import { LuxuryPrintPreviewModal } from "@/components/luxury-print-preview-modal";
-import { UnifiedPrintModal } from "@/components/milling/unified-print-modal";
 import { MillingDocumentsBoard } from "@/components/milling/milling-documents-board";
 import { CustodyAdjustmentPanel } from "@/components/milling/custody-adjustment-panel";
-import type { UnifiedDocumentData } from "@/lib/templates/types";
 import {
   MillingPanel,
   MillingSectionTitle,
@@ -90,10 +85,6 @@ function MillingMillPage() {
 
   // E6/M5: نوع الحبة المرجعي (grain_types) — يعبّئ الفاقد والنواتج الافتراضية
   const [grainTypeId, setGrainTypeId] = useState("");
-
-  // معاينة وطباعة سند الطحن الفاخر
-  const [printDoc, setPrintDoc] = useState<UnifiedDocumentData | null>(null);
-  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
 
   const customers = useQuery({
     queryKey: ["milling", "customers"],
@@ -340,12 +331,18 @@ function MillingMillPage() {
   const isExactMatch = discrepancyKg === 0;
   const isRoundedMatch = !isExactMatch && Math.abs(discrepancyKg) <= FILL_TOLERANCE_KG;
 
-  // تجاوز الرصيد: يُفحص لكل سطر حبوب على حدة
-  const overGrainLine = grains.find((g) => {
+  // نتحقق من مجموع السطور لكل صنف، حتى لا يتجاوز تكرار الصنف الرصيد المتاح.
+  const overGrainLine = grains.find((g, idx) => {
     if (!g.itemId) return false;
     const b = grainBalances.find((x) => x.item_id === g.itemId);
     if (!b) return false;
-    return (Number(g.bags) || 0) > b.bags_balance || (Number(g.kg) || 0) > b.kg_balance;
+    const sameItem = grains.filter((candidate) => candidate.itemId === g.itemId);
+    const totalBags = sameItem.reduce((sum, line) => sum + (Number(line.bags) || 0), 0);
+    const totalKg = sameItem.reduce((sum, line) => sum + (Number(line.kg) || 0), 0);
+    return (
+      idx === grains.findIndex((candidate) => candidate.itemId === g.itemId) &&
+      (totalBags > b.bags_balance || totalKg > b.kg_balance)
+    );
   });
   const canSubmit = Boolean(
     customerId &&
@@ -373,21 +370,11 @@ function MillingMillPage() {
       }
 
       const docNumber = res.data ?? "";
-      toast.success(`تم تسجيل الطحن بنجاح — سند #${docNumber}`);
-
-      // تجهيز سند الطحن للطباعة الفاخرة
-      if (docNumber) {
-        try {
-          const voucher = await buildCustodyVoucher(docNumber as string);
-          if (voucher) {
-            const uDoc = custodyVoucherToDoc(voucher);
-            setPrintDoc(uDoc);
-            setIsPrintModalOpen(true);
-          }
-        } catch (e) {
-          console.error("Failed to build voucher:", e);
-        }
-      }
+      toast.success(
+        docNumber
+          ? `تم تسجيل عملية الطحن بنجاح — مرجع داخلي #${docNumber}`
+          : "تم تسجيل عملية الطحن بنجاح.",
+      );
 
       setGrains([{ itemId: "", bags: 0, kg: 0 }]);
       setOutputs([{ itemId: "", bags: 0, kg: 0 }]);
@@ -402,22 +389,22 @@ function MillingMillPage() {
 
   return (
     <ModuleGuard moduleId="milling_operations">
-      <div className="mx-auto max-w-7xl space-y-4 p-4">
-        {/* شريط رأس الصفحة */}
+      <div dir="rtl" className="mx-auto w-full max-w-[1480px] space-y-5 px-3 py-4 sm:px-5 lg:px-7">
+        {/* واجهة تشغيل داخلية بلا إيحاءات إصدار فواتير أو سندات للعميل */}
         <PageHeader
-          title="تسجيل عمليات الطحن ونواتج الأمانات"
-          subtitle="صادر حبوب العميل المستهلكة + وارد النواتج المعبأة مع ضبط الفاقد ومطابقة الأوزان."
+          title="تشغيل الطحن"
+          subtitle="معالجة داخلية لأمانات العملاء: صرف الحبوب، تسجيل النواتج، ومراجعة الرصيد."
           actions={
             <div className="flex items-center gap-2">
               <Link
                 to="/milling/delivery"
-                className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-xs font-bold text-primary-foreground shadow-xs transition hover:bg-primary/90"
+                className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground shadow-sm transition hover:bg-primary/90"
               >
-                شاشة التسليم <ArrowLeft className="h-3.5 w-3.5" />
+                التسليم <ArrowLeft className="h-4 w-4" />
               </Link>
               <Link
                 to="/milling/customer-statement"
-                className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-card px-3.5 py-2 text-xs font-bold text-foreground shadow-xs transition hover:bg-muted"
+                className="inline-flex min-h-11 items-center justify-center rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-bold text-foreground shadow-sm transition hover:bg-muted"
               >
                 كشف الحساب
               </Link>
@@ -425,10 +412,9 @@ function MillingMillPage() {
           }
         />
 
-        {/* جسم الشاشة: عمود التسجيل (7 أعمدة) + عمود أرصدة الحبوب والملخص (5 أعمدة) */}
-        <div className="grid gap-4 lg:grid-cols-12">
-          {/* العمود الأيمن (7 أعمدة): عملية الطحن */}
-          <MillingPanel className="lg:col-span-7 space-y-4">
+        {/* مسار العمل: بيانات العملية أولاً، ثم الأرصدة المساعدة على الشاشات الواسعة */}
+        <div className="grid min-w-0 gap-5 xl:grid-cols-12">
+          <MillingPanel className="min-w-0 space-y-4 overflow-hidden xl:col-span-8">
             <MillingSectionTitle
               icon={<Cog className="h-4 w-4" />}
               title="تسجيل عملية الطحن"
@@ -474,18 +460,14 @@ function MillingMillPage() {
 
               {/* أسطر الحبوب المطحونة — صنف مستقل لكل سطر من رصيد أمانات العميل */}
               <div className="rounded-2xl border border-border/80 bg-surface-2/30 p-3.5 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h4 className="flex items-center gap-2 text-sm font-bold text-foreground">
                     <Wheat className="h-4 w-4 text-amber-500" />
-                    <span>الحبوب الخام المستهلكة في الطحن</span>
+                    <span>الحبوب المستهلكة</span>
                   </h4>
-                  <button
-                    type="button"
-                    onClick={addGrainLine}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-bold text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 transition-colors"
-                  >
-                    <Plus className="h-3.5 w-3.5" /> إضافة صنف حبوب آخر
-                  </button>
+                  <span className="rounded-full bg-amber-500/10 px-3 py-1 text-xs font-bold text-amber-700 dark:text-amber-300">
+                    {fmtNum(currentMilledKg)} كجم · {fmtNum(currentMilledBags)} كيس
+                  </span>
                 </div>
                 {grains.map((line, idx) => {
                   const b = line.itemId
@@ -613,7 +595,7 @@ function MillingMillPage() {
                   className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-amber-500/40 bg-amber-500/[0.04] hover:bg-amber-500/[0.09] text-xs font-bold text-amber-700 dark:text-amber-300 transition-all active:scale-[0.99]"
                 >
                   <Plus className="h-4 w-4" />
-                  <span>إضافة صنف حبوب خام آخر</span>
+                  <span>إضافة صنف حبوب</span>
                 </button>
 
                 {/* شريط إجماليات الحبوب والنواتج */}
@@ -683,7 +665,7 @@ function MillingMillPage() {
                 {outputs.map((line, idx) => (
                   <div
                     key={idx}
-                    className="grid grid-cols-[1fr_80px_100px_36px] sm:grid-cols-[1fr_90px_110px_36px] items-center gap-2 rounded-xl border border-border/70 bg-card p-2.5"
+                    className="grid min-w-0 grid-cols-1 items-center gap-2.5 rounded-xl border border-border/70 bg-card p-3 sm:grid-cols-[minmax(0,1fr)_minmax(84px,0.35fr)_minmax(100px,0.4fr)_36px] sm:gap-3"
                   >
                     <MillingSelect
                       value={line.itemId}
@@ -743,101 +725,121 @@ function MillingMillPage() {
                 </button>
               </div>
 
-              {/* قسم الفاقد التشغيلي الفعلي أثناء الطحن */}
-              <div className="rounded-2xl border border-amber-500/25 bg-amber-500/5 p-3.5 space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                    <Scale className="h-4 w-4 text-amber-600" />
-                    <span>الفاقد التشغيلي الفعلي للطحن (اختياري)</span>
-                  </h4>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleAutoFillLossFromDiscrepancy}
-                      disabled={currentMilledKg <= 0 || currentMilledKg <= totalProducedKg}
-                      className="inline-flex items-center gap-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[11px] font-bold text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 disabled:opacity-40 transition-colors shadow-xs"
-                      title="احتساب وتعبئة الفاقد تلقائياً من الفارق بين الحبوب المطحونة والنواتج"
-                    >
-                      <Sparkles className="h-3 w-3 text-amber-500" />
-                      <span>احتساب الفاقد من الفارق تلقائياً</span>
-                    </button>
-                    <span className="text-[11px] text-muted-foreground hidden sm:inline">
-                      الفاقد المتطاير أثناء الطحن
-                    </span>
-                  </div>
-                </div>
-
-                <div className="grid gap-2.5 sm:grid-cols-2">
-                  <MillingField label="أكياس الفاقد" hint="اختياري — يحسب الوزن تلقائياً">
-                    <QuantityInput
-                      decimals={0}
-                      min={0}
-                      placeholder="0"
-                      aria-label="أكياس الفاقد"
-                      value={lossBags === "" ? null : Number(lossBags)}
-                      onValueChange={(v) => handleLossBagsChange(v == null ? "" : String(v))}
-                    />
-                  </MillingField>
-
-                  <MillingField label="وزن الفاقد (كجم)" hint="قابل للتعديل اليدوي">
-                    <QuantityInput
-                      decimals={2}
-                      min={0}
-                      placeholder="0.00"
-                      aria-label="وزن الفاقد (كجم)"
-                      value={lossKg === "" ? null : Number(lossKg)}
-                      onValueChange={(v) => setLossKg(v == null ? "" : String(v))}
-                      className="font-bold text-amber-700 dark:text-amber-300"
-                    />
-                  </MillingField>
-                </div>
-
-                {/* لوحة المطابقة والتوازن */}
-                <div className="rounded-xl border border-border/80 bg-background/80 p-3 text-xs space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">وزن الحبوب المطحونة:</span>
-                    <span className="font-bold text-foreground">{fmtNum(currentMilledKg)} كجم</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">
-                      مجموع النواتج ({fmtNum(totalProducedKg)} كجم) + الفاقد ({fmtNum(actualLossKg)}{" "}
-                      كجم):
-                    </span>
-                    <span className="font-bold text-foreground">
-                      {fmtNum(totalOutputsWithLossKg)} كجم
-                    </span>
-                  </div>
-
-                  {currentMilledKg > 0 && (
-                    <div className="pt-1 border-t border-border/60">
-                      {discrepancyKg === 0 ? (
-                        <div className="flex items-center gap-1.5 font-bold text-emerald-600 dark:text-emerald-400">
-                          <CheckCircle2 className="h-4 w-4" />
-                          <span>✓ مطابقة تامة: النواتج والفاقد تعادل الحبوب المطحونة تماماً.</span>
-                        </div>
-                      ) : isRoundedMatch ? (
-                        <div className="flex items-center gap-1.5 font-semibold text-sky-600 dark:text-sky-400">
-                          <CheckCircle2 className="h-4 w-4" />
-                          <span>
-                            ✓ مطابقة بتقريب التعبئة: فرق {fmtNum(Math.abs(discrepancyKg))} كجم
-                            {discrepancyKg > 0 ? " (فاقد صغير غير مسجّل)" : " (زيادة نواتج صغيرة)"}.
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5 font-semibold text-amber-600 dark:text-amber-400">
-                          <AlertCircle className="h-4 w-4" />
-                          <span>
-                            الفارق غير المحتسب: {fmtNum(Math.abs(discrepancyKg))} كجم{" "}
-                            {discrepancyKg > 0 ? "(نقص/فاقد إضافي)" : "(زيادة نواتج)"}.
-                          </span>
-                        </div>
-                      )}
+              {/* الفاقد والمطابقة تفاصيل مساعدة وليست حقولاً مهيمنة على التشغيل */}
+              <details className="group rounded-2xl border border-border bg-card">
+                <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-2xl px-4 py-3 transition hover:bg-muted/40 [&::-webkit-details-marker]:hidden">
+                  <span className="flex min-w-0 items-center gap-2 text-sm font-bold">
+                    <Scale className="h-4 w-4 shrink-0 text-amber-600" />
+                    <span>الفاقد ومطابقة الأوزان</span>
+                  </span>
+                  <span
+                    className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${Math.abs(discrepancyKg) <= FILL_TOLERANCE_KG ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "bg-amber-500/10 text-amber-700 dark:text-amber-300"}`}
+                  >
+                    {currentMilledKg > 0
+                      ? `الفرق ${fmtNum(Math.abs(discrepancyKg))} كجم`
+                      : "اختياري"}
+                  </span>
+                </summary>
+                <div className="space-y-3 border-t border-border p-3 sm:p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                      <Scale className="h-4 w-4 text-amber-600" />
+                      <span>الفاقد التشغيلي الفعلي للطحن (اختياري)</span>
+                    </h4>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleAutoFillLossFromDiscrepancy}
+                        disabled={currentMilledKg <= 0 || currentMilledKg <= totalProducedKg}
+                        className="inline-flex items-center gap-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[11px] font-bold text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 disabled:opacity-40 transition-colors shadow-xs"
+                        title="احتساب وتعبئة الفاقد تلقائياً من الفارق بين الحبوب المطحونة والنواتج"
+                      >
+                        <Sparkles className="h-3 w-3 text-amber-500" />
+                        <span>احتساب الفاقد من الفارق تلقائياً</span>
+                      </button>
+                      <span className="text-[11px] text-muted-foreground hidden sm:inline">
+                        الفاقد المتطاير أثناء الطحن
+                      </span>
                     </div>
-                  )}
-                </div>
-              </div>
+                  </div>
+                  <div className="grid gap-2.5 sm:grid-cols-2">
+                    <MillingField label="أكياس الفاقد" hint="اختياري — يحسب الوزن تلقائياً">
+                      <QuantityInput
+                        decimals={0}
+                        min={0}
+                        placeholder="0"
+                        aria-label="أكياس الفاقد"
+                        value={lossBags === "" ? null : Number(lossBags)}
+                        onValueChange={(v) => handleLossBagsChange(v == null ? "" : String(v))}
+                      />
+                    </MillingField>
 
-              <MillingField label="ملاحظات الطحن والتشغيل" hint="اختيارية">
+                    <MillingField label="وزن الفاقد (كجم)" hint="قابل للتعديل اليدوي">
+                      <QuantityInput
+                        decimals={2}
+                        min={0}
+                        placeholder="0.00"
+                        aria-label="وزن الفاقد (كجم)"
+                        value={lossKg === "" ? null : Number(lossKg)}
+                        onValueChange={(v) => setLossKg(v == null ? "" : String(v))}
+                        className="font-bold text-amber-700 dark:text-amber-300"
+                      />
+                    </MillingField>
+                  </div>
+                  {/* لوحة المطابقة والتوازن */}
+                  <div className="rounded-xl border border-border/80 bg-background/80 p-3 text-xs space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">وزن الحبوب المطحونة:</span>
+                      <span className="font-bold text-foreground">
+                        {fmtNum(currentMilledKg)} كجم
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">
+                        مجموع النواتج ({fmtNum(totalProducedKg)} كجم) + الفاقد (
+                        {fmtNum(actualLossKg)} كجم):
+                      </span>
+                      <span className="font-bold text-foreground">
+                        {fmtNum(totalOutputsWithLossKg)} كجم
+                      </span>
+                    </div>
+
+                    {currentMilledKg > 0 && (
+                      <div className="pt-1 border-t border-border/60">
+                        {discrepancyKg === 0 ? (
+                          <div className="flex items-center gap-1.5 font-bold text-emerald-600 dark:text-emerald-400">
+                            <CheckCircle2 className="h-4 w-4" />
+                            <span>
+                              ✓ مطابقة تامة: النواتج والفاقد تعادل الحبوب المطحونة تماماً.
+                            </span>
+                          </div>
+                        ) : isRoundedMatch ? (
+                          <div className="flex items-center gap-1.5 font-semibold text-sky-600 dark:text-sky-400">
+                            <CheckCircle2 className="h-4 w-4" />
+                            <span>
+                              ✓ مطابقة بتقريب التعبئة: فرق {fmtNum(Math.abs(discrepancyKg))} كجم
+                              {discrepancyKg > 0
+                                ? " (فاقد صغير غير مسجّل)"
+                                : " (زيادة نواتج صغيرة)"}
+                              .
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 font-semibold text-amber-600 dark:text-amber-400">
+                            <AlertCircle className="h-4 w-4" />
+                            <span>
+                              الفارق غير المحتسب: {fmtNum(Math.abs(discrepancyKg))} كجم{" "}
+                              {discrepancyKg > 0 ? "(نقص/فاقد إضافي)" : "(زيادة نواتج)"}.
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>{" "}
+                </div>
+              </details>
+
+              <MillingField label="ملاحظة داخلية" hint="اختيارية">
                 <MillingTextarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
@@ -854,20 +856,20 @@ function MillingMillPage() {
                 {submit.isPending ? (
                   <>
                     <RefreshCw className="h-4 w-4 animate-spin" />
-                    جارٍ تسجيل الطحن وإصدار السند…
+                    جارٍ حفظ العملية…
                   </>
                 ) : (
                   <>
                     <Check className="h-5 w-5" />
-                    تسجيل نواتج الطحن وإصدار السند
+                    حفظ عملية الطحن
                   </>
                 )}
               </button>
             </div>
           </MillingPanel>
 
-          {/* العمود الأيسر (5 أعمدة): أرصدة الحبوب الخام المتاحة */}
-          <MillingPanel className="lg:col-span-5 flex flex-col justify-between">
+          {/* أرصدة مساعدة، تظهر بمحاذاة النموذج على الشاشات الواسعة */}
+          <MillingPanel className="min-w-0 flex flex-col justify-between xl:col-span-4">
             <div>
               <MillingSectionTitle
                 icon={<Wheat className="h-4 w-4" />}
@@ -973,36 +975,41 @@ function MillingMillPage() {
           </MillingPanel>
         </div>
 
-        {/* سجل عمليات الطحن: المستندات الموحدة (استلام+فاتورة+طحن) بزاوية المطحون */}
-        <MillingDocumentsBoard focus="milling" title="سجل عمليات الطحن" />
+        {/* أدوات التشغيل والسجل خارج مسار تسجيل العملية لتقليل ازدحام الشاشة */}
+        <details className="group rounded-2xl border border-border bg-card">
+          <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-bold transition hover:bg-muted/40 [&::-webkit-details-marker]:hidden">
+            <span>سجل عمليات الطحن</span>
+            <span className="text-xs font-medium text-muted-foreground">عرض عند الحاجة</span>
+          </summary>
+          <div className="border-t border-border p-3 sm:p-4">
+            <MillingDocumentsBoard focus="milling" title="سجل عمليات الطحن" />
+          </div>
+        </details>
 
-        {/* E5: تسويات الأمانات — الإدخال الموثّق الوحيد للحبوب/النواتج المنفصلة */}
-        <CustodyAdjustmentPanel
-          customerId={customerId}
-          warehouseId={warehouseId}
-          items={[
-            ...(grainBalances.map((b) => ({
-              id: b.item_id,
-              name: b.name_ar,
-              name_ar: b.name_ar,
-              item_class: b.item_class,
-            })) as any),
-            ...((outputItems.data ?? []) as any),
-          ]}
-        />
-
-        {/* نافذة معاينة وطباعة سند الطحن الفاخر */}
-        {printDoc && (
-          <UnifiedPrintModal
-            open={isPrintModalOpen}
-            onClose={() => {
-              setIsPrintModalOpen(false);
-              setPrintDoc(null);
-            }}
-            doc={printDoc}
-            stage="milled"
-          />
-        )}
+        <details className="group rounded-2xl border border-border bg-card">
+          <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-bold transition hover:bg-muted/40 [&::-webkit-details-marker]:hidden">
+            <span>تسويات الأمانات</span>
+            <span className="text-xs font-medium text-muted-foreground">أداة إدارية منفصلة</span>
+          </summary>
+          <div className="border-t border-border p-3 sm:p-4">
+            <CustodyAdjustmentPanel
+              customerId={customerId}
+              warehouseId={warehouseId}
+              items={[
+                ...grainBalances.map((b) => ({
+                  id: b.item_id,
+                  sku: "",
+                  name: b.name_ar ?? "صنف بدون اسم",
+                  name_ar: b.name_ar,
+                  item_class: b.item_class,
+                  sale_price: 0,
+                  package_weight_kg: null,
+                })),
+                ...(outputItems.data ?? []),
+              ]}
+            />
+          </div>
+        </details>
       </div>
     </ModuleGuard>
   );
