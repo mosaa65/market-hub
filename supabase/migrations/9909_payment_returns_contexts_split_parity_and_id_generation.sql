@@ -47,13 +47,14 @@ UPDATE public.payment_methods m
          'sales_returns','purchase_returns'
        ]::text[];
 
--- ── 2. الدفع المجزأ: أربعة خيارات فقط في الصفوف الجديدة ────────────────────
+-- ── 2. الدفع المجزأ: القنوات الثلاث فقط في الصفوف الجديدة ──────────────────
 --
--- `guard_four_payment_method_write` يقبل `payment_splits` و
--- `customer_payment_splits` كما هي، فهو لا يمرّ عبر `resolve_writable_payment_method`
--- حين يكون `p_method = 'split'` مسموحًا. الحارس هنا يمنع `card` تحديدًا في
--- صفوف التجزئة الجديدة، مع إبقاء الصفوف التاريخية قابلة للتعديل في حقولها
--- الأخرى (التحديث الذي لا يغيّر الطريقة يمرّ بلا فحص).
+-- `guard_four_payment_method_write` يمرّ فوق `payment_splits` و
+-- `customer_payment_splits` لكنه لا يعترض على `card`: القيمة مقبولة في التعداد
+-- وتسقط إلى حساب البنك 1111، فيبدو الصف سليمًا. محلّل التجزئة في الواجهة يعرف
+-- القنوات الثلاث فقط، فصف `card` لا ينشئه أي مسار حقيقي — وهو بقية من إعداد
+-- قديم تُنتج توزيعًا يخالف ما عرضه الكاشير. الصفوف التاريخية تبقى قابلة للتعديل
+-- في حقولها الأخرى: التحديث الذي لا يغيّر القناة يمرّ بلا فحص.
 CREATE OR REPLACE FUNCTION public.guard_split_tender_approved()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -71,9 +72,12 @@ BEGIN
     END IF;
   END IF;
 
-  IF v_method = 'card' THEN
+  -- ثلاث قنوات، لا «كل ما ليس البطاقة»: القائمة المسموحة تُغلق الباب على أي
+  -- قيمة تاريخية أخرى (cheque) تُدخل من مسار RPC قديم.
+  IF v_method NOT IN ('cash', 'bank_transfer', 'mobile_money') THEN
     RAISE EXCEPTION
-      'البطاقة ليست خيارًا معتمدًا في الدفع المجزأ. الخيارات: نقداً، تحويل بنكي، محفظة إلكترونية.'
+      'قناة الدفع المجزأ "%" غير معتمدة. القنوات: نقداً، تحويل بنكي، محفظة إلكترونية.',
+      coalesce(nullif(v_method, ''), '(فارغ)')
       USING ERRCODE = 'check_violation';
   END IF;
 
@@ -81,7 +85,7 @@ BEGIN
 END $$;
 
 COMMENT ON FUNCTION public.guard_split_tender_approved() IS
-  'يمنع كتابة قناة تحصيل متقاعدة (البطاقة) في صف تجزئة جديد، ويترك الصفوف التاريخية كما هي.';
+  'لا يقبل في صف تجزئة جديد إلا القنوات الثلاث المعتمدة، ويترك الصفوف التاريخية كما هي.';
 
 REVOKE ALL ON FUNCTION public.guard_split_tender_approved() FROM PUBLIC, anon, authenticated, service_role;
 
@@ -291,6 +295,7 @@ DECLARE
   v_acct      public.accounts;
   v_expected  text;
   v_expected_code text;
+  v_in_family boolean;
 BEGIN
   IF NOT public.can_author_payment_methods() THEN
     RAISE EXCEPTION 'لا تملك صلاحية تعديل طرق الدفع — هذه الصلاحية لصاحب المنشأة والمدير وسوبر أدمن المنصة'
@@ -319,12 +324,24 @@ BEGIN
         USING ERRCODE = 'check_violation';
     END IF;
 
+    --
+    -- مطابقة الكود المباشرة لا تكفي: الحسابات البنكية الفعلية تُنشأ تحت 1111
+    -- بأكواد فرعية مثل 1111001، وحسابات المحافظ تحت 1131. فنقبل الكود نفسه أو
+    -- أي كود يبدأ بادئته. وتُقبل أيضًا 1101 لصناديق تحمل حسابها الأصلي، لأن
+    -- الصندوق الرئيسي في البذرة مرتبط بـ 1101 مباشرةً.
     v_expected := CASE v_kind WHEN 'CASH' THEN '1101' WHEN 'BANK' THEN '1111' ELSE '1131' END;
-    v_expected_code := public.payment_method_ledger_account(p_method_id);
-    IF v_acct.code <> v_expected AND v_acct.code <> v_expected_code THEN
+    v_expected_code := coalesce(public.payment_method_ledger_account(p_method_id), v_expected);
+
+    v_in_family :=
+      v_acct.code = v_expected
+      OR v_acct.code LIKE v_expected || '%'
+      OR v_acct.code = v_expected_code
+      OR v_acct.code LIKE v_expected_code || '%';
+
+    IF NOT v_in_family THEN
       RAISE EXCEPTION
-        'الحساب "%" لا ينتمي إلى عائلة هذه الطريقة (المتوقع تحت % أو %)',
-        v_acct.code, coalesce(v_expected_code, v_expected), v_expected
+        'الحساب "%" لا ينتمي إلى عائلة هذه الطريقة (المتوقع % أو أحد فروعه)',
+        v_acct.code, v_expected
         USING ERRCODE = 'check_violation';
     END IF;
   END IF;

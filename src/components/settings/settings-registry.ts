@@ -12,6 +12,7 @@ import {
   CreditCard,
   Boxes,
   PanelLeft,
+  GitBranch,
   LucideIcon,
 } from "lucide-react";
 import { CompanySection } from "./sections/company-section";
@@ -26,6 +27,7 @@ import { NumberFormatSection } from "./sections/number-format-section";
 import { PaymentMethodsSection } from "./sections/payment-methods-section";
 import { BackupSettingsCard } from "@/components/backup-settings-card";
 import { SidebarNavigationSection } from "./sections/sidebar-navigation-section";
+import { ExpenseCostCentersSection } from "./sections/expense-cost-centers-section";
 
 export type SettingsSectionId =
   | "company"
@@ -34,6 +36,7 @@ export type SettingsSectionId =
   | "printing"
   | "catalog"
   | "stock-settings"
+  | "expense-cost-centers"
   | "subscription"
   | "backup"
   | "number-format"
@@ -125,6 +128,16 @@ registerSettingsSection({
   descriptionEn: "Central valuation method, stock codes, numbering rules, and stock thresholds",
   icon: Boxes,
   component: StockSettingsSection,
+});
+
+registerSettingsSection({
+  id: "expense-cost-centers",
+  titleAr: "مراكز التكلفة",
+  titleEn: "Cost Centers",
+  descriptionAr: "إضافة مراكز التكلفة وتعديلها وإيقاف استخدامها",
+  descriptionEn: "Create, edit, and deactivate cost centers",
+  icon: GitBranch,
+  component: ExpenseCostCentersSection,
 });
 
 registerSettingsSection({

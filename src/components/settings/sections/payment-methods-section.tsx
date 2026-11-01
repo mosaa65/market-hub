@@ -129,6 +129,11 @@ export function PaymentMethodsSection() {
   const { lang } = useI18n();
   const isAr = lang === "ar";
   const { methods, isLoading, isFallback, refetch } = usePaymentMethods();
+  const linkage = usePaymentAccountLinkage();
+  const { save, isSaving } = useUpdatePaymentMethodSettings();
+  const { setDefaultAccount } = useSetPaymentMethodDefaultAccount();
+  const { activeCashboxes } = useCashboxes();
+  const { banks, wallets } = useCompanyBankAccounts();
 
   /**
    * الحسابات القابلة للاختيار لكل عائلة.
@@ -145,7 +150,11 @@ export function PaymentMethodsSection() {
         code: box.account?.code ?? "",
       })),
       BANK: banks
-        .map((bank) => ({ id: bank.account_id, label: bank.name_ar, code: bank.account?.code ?? "" }))
+        .map((bank) => ({
+          id: bank.account_id,
+          label: bank.name_ar,
+          code: bank.account?.code ?? "",
+        }))
         .filter((entry, index, list) => list.findIndex((e) => e.id === entry.id) === index),
       WALLET: wallets
         .map((wallet) => ({
@@ -157,11 +166,6 @@ export function PaymentMethodsSection() {
     }),
     [activeCashboxes, banks, wallets],
   );
-  const linkage = usePaymentAccountLinkage();
-  const { save, isSaving } = useUpdatePaymentMethodSettings();
-  const { setDefaultAccount } = useSetPaymentMethodDefaultAccount();
-  const { activeCashboxes } = useCashboxes();
-  const { banks, wallets } = useCompanyBankAccounts();
 
   const [mainTab, setMainTab] = useState<"catalog" | "cashboxes" | "banks" | "cheques">("catalog");
   const [draft, setDraft] = useState<DraftState>({ rows: {}, order: [] });
@@ -801,14 +805,13 @@ export function PaymentMethodsSection() {
                           يمكن اختيار حساب من عائلة أخرى.
                         */}
                         {!isCredit &&
+                          row.enabled &&
                           (method.ledgerKind === "CASH" ||
                             method.ledgerKind === "BANK" ||
                             method.ledgerKind === "WALLET") &&
                           (() => {
                             const choices =
-                              accountChoices[
-                                method.ledgerKind as "CASH" | "BANK" | "WALLET"
-                              ] ?? [];
+                              accountChoices[method.ledgerKind as "CASH" | "BANK" | "WALLET"] ?? [];
                             const current = method.defaultAccount?.id ?? "";
                             return (
                               <div className="mt-2.5 border-t border-border/40 pt-2.5">
@@ -828,9 +831,7 @@ export function PaymentMethodsSection() {
                                       .then(() => {
                                         void refetch();
                                         toast.success(
-                                          isAr
-                                            ? "تم ربط الحساب"
-                                            : "Settlement account linked",
+                                          isAr ? "تم ربط الحساب" : "Settlement account linked",
                                         );
                                       })
                                       .catch((error: unknown) => {

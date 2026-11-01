@@ -5,6 +5,7 @@ import {
   PAYMENT_METHOD_CATALOG,
   CORE_PAYMENT_METHOD_IDS,
   PAYMENT_METHOD_ICON_ASSETS,
+  RETIRED_PAYMENT_METHOD_LABELS,
   SHIPPED_PAYMENT_METHOD_ORDER,
   TENANT_SELECTABLE_LEGACY_VALUES,
   getPaymentMethodDefinition,
@@ -25,16 +26,10 @@ import { isSplitTender } from "../split-tenders";
 const methodIds = PAYMENT_METHOD_CATALOG.map((method) => method.id);
 assert.equal(new Set(methodIds).size, methodIds.length, "catalogue method ids must be unique");
 
+// كل قيمة يستطيع مستند جديد أن يحملها لها صف يقابلها. `card` و`cheque` ليستا
+// هنا: التعداد يعرفهما للقراءة التاريخية، لكن لا شيء يستطيع أن يكتبهما الآن.
 const legacyValues = new Set(PAYMENT_METHOD_CATALOG.map((method) => method.legacyValue));
-for (const legacy of [
-  "cash",
-  "card",
-  "bank_transfer",
-  "credit",
-  "mobile_money",
-  "split",
-  "cheque",
-]) {
+for (const legacy of ["cash", "bank_transfer", "credit", "mobile_money", "split"]) {
   assert.ok(legacyValues.has(legacy as (typeof PAYMENT_METHOD_CATALOG)[number]["legacyValue"]));
 }
 
@@ -50,11 +45,9 @@ for (const id of TENANT_SELECTABLE_LEGACY_VALUES) {
   assert.ok(legacyValues.has(id), `${id} must map to a known stored value`);
 }
 
-assert.equal(getPaymentMethodDefinition("cheque")?.legacyValue, "cheque");
-assert.equal(getPaymentMethodDefinition("cheque")?.requiresReference, true);
 assert.equal(toCatalogId("bank_transfer"), "bank_transfer");
-assert.equal(toCatalogId("mobile_money"), "jawali");
-assert.equal(toCatalogId("cheque"), "cheque");
+assert.equal(toCatalogId("mobile_money"), "mobile_money");
+assert.equal(toCatalogId("cheque"), undefined);
 assert.ok(paymentMethodIcon("unknown", "WALLET"));
 assert.equal(paymentMethodLabel("bank_transfer", "ar"), "تحويل بنكي");
 assert.equal(paymentMethodLabel("split", "en"), "Split payment");
@@ -65,6 +58,18 @@ assert.equal(isSplitTender("mobile_money"), true);
 assert.equal(isSplitTender("card"), false);
 assert.equal(isSplitTender("cheque"), false);
 assert.ok(!TENANT_SELECTABLE_LEGACY_VALUES.includes("credit"));
+
+// The two collecting methods must reach the return screens, otherwise a bank or
+// wallet refund can only be recorded as cash from the till.
+for (const id of ["bank_transfer", "mobile_money"]) {
+  const contexts = getPaymentMethodDefinition(id)?.allowedContexts ?? [];
+  assert.ok(contexts.includes("sales_returns"), `${id} must be offered on sales returns`);
+  assert.ok(contexts.includes("purchase_returns"), `${id} must be offered on purchase returns`);
+}
+// آجل is not a refund channel: `create_sales_return` refuses it.
+assert.ok(
+  !(getPaymentMethodDefinition("credit")?.allowedContexts ?? []).includes("customer_collection"),
+);
 
 assert.deepEqual(Object.keys(PAYMENT_METHOD_ICON_ASSETS).sort(), ["floosak", "jaib", "one_cash"]);
 assert.equal(paymentMethodIconAsset("floosak")?.src, "/yemeni_wallet_icons_svg/floosak.svg");
@@ -125,32 +130,60 @@ assert.ok(!isLegacyPaymentValue("transfer"), "'transfer' is not a real ENUM valu
 assert.ok(!isLegacyPaymentValue("bank"), "'bank' is not a real ENUM value");
 assert.ok(!isLegacyPaymentValue("online"), "'online' is not a real ENUM value");
 
-// `cheque` shipped in the migration seed and must be a first-class catalogue row
-// — its absence from the client registry once left it nameless and icon-less.
-const cheque = getPaymentMethodDefinition("cheque");
-assert.ok(cheque, "cheque must be in the catalogue");
-assert.equal(cheque.legacyValue, "cheque");
-assert.ok(isLegacyPaymentValue(cheque.legacyValue));
-
-// ── 3. Named institutions share a generic value WITHOUT losing their name ──
+// ── 3. المتقاعد لا يعود ────────────────────────────────────────────────────
 //
-// بنك الكريمي / جيب / فلوسك / ون كاش are not ENUM values of their own. They
-// settle as the generic bank_transfer / mobile_money, and their `legacyIds` is
-// deliberately empty so a stored generic value does not masquerade as them.
-for (const id of ["kuraimi_bank", "yemen_kuwait_bank", "jaib", "floosak", "one_cash"]) {
-  const def = getPaymentMethodDefinition(id);
-  assert.ok(def, `${id} must be in the catalogue`);
-  assert.deepEqual(def.legacyIds, [], `${id} must declare no legacy id of its own`);
+// ثماني طرق حُذفت من الكتالوج نهائيًا (الترحيل 9910). القيم المخزّنة تبقى في
+// التعداد للقراءة التاريخية، لكن معرّفاتها لم تعد وسائل: لا تُختار، ولا تشير
+// إليها أي طريقة، ويُطبع اسمها العربي من سجل الأسماء التاريخية.
+const RETIRED_IDS = [
+  "kuraimi_bank",
+  "yemen_kuwait_bank",
+  "jawali",
+  "jaib",
+  "floosak",
+  "one_cash",
+  "card",
+  "cheque",
+] as const;
+
+for (const id of RETIRED_IDS) {
+  assert.equal(
+    getPaymentMethodDefinition(id),
+    undefined,
+    `${id} must be gone from the catalogue — it was deleted in migration 9910`,
+  );
   assert.ok(
-    def.legacyValue === "bank_transfer" || def.legacyValue === "mobile_money",
-    `${id} must settle as a generic bank/wallet value`,
+    Object.prototype.hasOwnProperty.call(RETIRED_PAYMENT_METHOD_LABELS, id),
+    `${id} must keep an Arabic label for historic documents`,
+  );
+  assert.equal(
+    requiresPaymentReference(id),
+    true,
+    `${id} is retired but a historic document that stored it still needs a reference`,
   );
 }
 
-// The FIRST wallet carries the historical value; a stored `mobile_money`
-// resolves to جوالي, not to one of the later wallets.
-assert.equal(toCatalogId("mobile_money"), "jawali");
-assert.equal(getPaymentMethodDefinition("jawali")?.legacyIds?.[0], "mobile_money");
+// وكل صف باقٍ ينتمي إلى الخيارات الأربعة أو إلى حالة `split`.
+for (const method of PAYMENT_METHOD_CATALOG) {
+  assert.ok(
+    [...CORE_PAYMENT_METHOD_IDS, "split"].includes(method.id as never),
+    `${method.id} survived the cleanup and must be an approved method`,
+  );
+}
+assert.deepEqual(
+  PAYMENT_METHOD_CATALOG.map((method) => method.id).sort(),
+  ["bank_transfer", "cash", "credit", "mobile_money", "split"],
+  "the catalogue is exactly the four approved methods plus the split state",
+);
+
+// والأسماء التاريخية ما تزال تُطبع بالعربية لا بالمعرّف اللاتيني.
+assert.equal(paymentMethodLabel("cheque", "ar"), "شيك");
+assert.equal(paymentMethodLabel("card", "ar"), "بطاقة / شبكة");
+assert.equal(paymentMethodLabel("kuraimi_bank", "ar"), "بنك الكريمي");
+assert.equal(paymentMethodLabel("mobile_money", "ar"), "محفظة إلكترونية");
+
+// The generic wallet is the only row carrying the stored `mobile_money` value.
+assert.equal(toCatalogId("mobile_money"), "mobile_money");
 
 // ── 4. `split` is never offered as a single tender ────────────────────────
 //
@@ -190,16 +223,9 @@ assert.equal(isSplitPaymentValue(null, null), false);
 //
 // The POS used to test two hard-coded ids, so بنك الكريمي silently dropped the
 // transfer number the cashier typed.
-assert.equal(requiresPaymentReference("kuraimi_bank"), true);
-assert.equal(requiresPaymentReference("yemen_kuwait_bank"), true);
-assert.equal(requiresPaymentReference("jaib"), true);
-assert.equal(requiresPaymentReference("floosak"), true);
-assert.equal(requiresPaymentReference("one_cash"), true);
-assert.equal(requiresPaymentReference("cheque"), true);
 assert.equal(requiresPaymentReference("bank_transfer"), true);
 assert.equal(requiresPaymentReference("mobile_money"), true);
 assert.equal(requiresPaymentReference("cash"), false);
-assert.equal(requiresPaymentReference("card"), false);
 assert.equal(requiresPaymentReference("credit"), false);
 assert.equal(requiresPaymentReference(null), false);
 assert.equal(requiresPaymentReference(undefined), false);
@@ -263,7 +289,9 @@ assert.notEqual(
   paymentMethodLabel("kuraimi_bank", "ar"),
   "a generic bank value must not be shown as a named bank",
 );
-assert.equal(getShippedPaymentMethod("kuraimi_bank")?.nameAr, "بنك الكريمي");
+// المتقاعد لا يُرجع تعريفًا من الكتالوج، لكن اسمه العربي باقٍ للعرض التاريخي.
+assert.equal(getShippedPaymentMethod("kuraimi_bank"), undefined);
+assert.equal(paymentMethodLabel("kuraimi_bank", "ar"), "بنك الكريمي");
 assert.equal(getShippedPaymentMethod("nonexistent_method"), undefined);
 
 // ── 10. Treasury Hierarchy & Cheque Types Integrity ──────────────────────

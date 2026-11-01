@@ -690,7 +690,7 @@ function NewPurchaseReturn({
       setInvoiceItems(nextItems);
       setLines([]);
     })();
-  }, [supplierId, lang]);
+  }, [supplierId, lang, isRtl]);
 
   useEffect(() => {
     if (!supplierInvoiceId) {
@@ -726,7 +726,7 @@ function NewPurchaseReturn({
       );
       setLines([]);
     })();
-  }, [supplierInvoiceId, lang]);
+  }, [supplierInvoiceId, lang, isRtl]);
 
   const filtered = useMemo(
     () =>
@@ -845,7 +845,9 @@ function NewPurchaseReturn({
       _items: lines as any,
     });
     if (error) {
-      toast.error(error.message);
+      // رسالة مترجمة، كما في شاشة مرتجع المبيعات — نص PostgreSQL الإنجليزي
+      // الخام لا يعني شيئًا للكاشير ولا يخبره بما يصلحه.
+      toast.error(translateRpcError(error, isRtl ? "ar" : "en"));
       return;
     }
     const returnId = typeof retData === "string" ? retData : (retData as any)?.id;
@@ -856,18 +858,26 @@ function NewPurchaseReturn({
         settlement.paymentMethodId ||
         settlement.reference)
     ) {
-      try {
-        await (supabase as any)
-          .from("purchase_returns")
-          .update({
-            cashbox_id: settlement.cashboxId || null,
-            bank_account_id: settlement.bankAccountId || null,
-            payment_method_id: settlement.paymentMethodId || refundMethod || null,
-            payment_reference: settlement.reference || null,
-          })
-          .eq("id", returnId);
-      } catch (e) {
-        console.warn("Could not set treasury settlement on purchase_return:", e);
+      // لا `try` حول استعلام شبكي: PostgREST يعيد الخطأ في الحقل ولا يرميه،
+      // فالاكتفاء بـ try/catch كان يعني فقدان توجيه الخزينة بصمت. الدالة
+      // المصدرة `create_purchase_return` ترحّل القيد من `refund_method` وحده،
+      // فإذا فشل هذا التحديث تُرحَّل النقود إلى الحساب العام بدل صندوق بعينه —
+      // وهذا يستحق تنبيهًا لا سطرًا في console.
+      const { error: settlementError } = await (supabase as any)
+        .from("purchase_returns")
+        .update({
+          cashbox_id: settlement.cashboxId || null,
+          bank_account_id: settlement.bankAccountId || null,
+          payment_method_id: settlement.paymentMethodId || refundMethod || null,
+          payment_reference: settlement.reference || null,
+        })
+        .eq("id", returnId);
+      if (settlementError) {
+        toast.warning(
+          isRtl
+            ? `سُجّل المرتجع، لكن تعذّر توجيه الخزينة: ${settlementError.message}`
+            : `Return recorded, but settlement routing failed: ${settlementError.message}`,
+        );
       }
     }
     toast.success(

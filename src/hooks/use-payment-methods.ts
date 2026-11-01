@@ -180,9 +180,9 @@ async function fetchPaymentMethods(): Promise<{
 
   // أسماء الحسابات المرتبطة تُقرأ مرة واحدة، لا استعلاماً لكل طريقة. فشلها لا
   // يجعل الطريقة غير موجودة: تبقى معرَّفة بكودها فقط.
-  const linkedAccountIds = (Array.isArray(settingsRes.data) ? settingsRes.data : [])
+  const linkedAccountIds: string[] = (Array.isArray(settingsRes.data) ? settingsRes.data : [])
     .map((row: SettingsRow) => row.default_account_id)
-    .filter((value): value is string => Boolean(value));
+    .filter((value: string | null): value is string => Boolean(value));
   const accountsById = new Map<string, PaymentMethodDefaultAccount>();
   if (linkedAccountIds.length > 0) {
     const accountsRes = await db
@@ -274,10 +274,19 @@ function resolveRow(
 
     enabled: settings ? settings.enabled : true,
     effectiveSortOrder: settings ? settings.sort_order : row.sort_order,
-    // A business may narrow a method to its approved contexts, never widen it.
-    effectiveContexts: settings?.enabled_contexts?.length
-      ? tenantContexts.filter((context) => allowedContexts.includes(context))
-      : allowedContexts,
+    //
+    // المنشأة تضيّق ولا توسّع. والفارق بين «لم يُضبط» و«ضُبط فارغًا» مقصود:
+    //
+    //   NULL       = لا صف إعداد أو عمود فارغ → ترث أقسام الكتالوج.
+    //   [] (فارغ)  = المشغّل أطفأ الطريقة في كل الأقسام → لا تظهر في أي شاشة.
+    //
+    // كان الشرط `settings?.enabled_contexts?.length ? … : allowedContexts`
+    // فيقرأ المصفوفة الفارغة كأنها «لم يُضبط»، فيعيد طريقة أطفئت عمدًا إلى
+    // كل الأقسام — أي أن إطفاءها لم يكن يعمل أصلًا.
+    effectiveContexts:
+      settings?.enabled_contexts == null
+        ? allowedContexts
+        : tenantContexts.filter((context) => allowedContexts.includes(context)),
     isConfigured: Boolean(settings),
     isSystem: row.is_system !== false,
     isAuthored: false,

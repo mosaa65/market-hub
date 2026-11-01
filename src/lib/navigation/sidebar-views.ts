@@ -89,6 +89,7 @@ const DAILY_GROUPS: GroupDefinition[] = [
 
 const ACTIVITY_GROUPS: GroupDefinition[] = [
   DAILY_GROUPS[0],
+  DAILY_GROUPS[1],
   {
     key: "sales",
     titleAr: "فواتير المبيعات",
@@ -119,7 +120,6 @@ const ACTIVITY_GROUPS: GroupDefinition[] = [
     styleCategory: "procurement",
     matches: (entry) => entry.id === "suppliers",
   },
-  DAILY_GROUPS[1],
   {
     key: "finance",
     titleAr: "المالية",
