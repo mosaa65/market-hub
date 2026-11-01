@@ -222,6 +222,158 @@ WHERE NOT EXISTS (
 );
 
 -- ============================================================================
+-- القسم 3ب — أصناف الأمانات (مملوكة للعميل / لا تعتمد على البيع والشراء)
+-- ============================================================================
+-- هذه المنتجات تُظهر في صفحة «أصناف الأمانات» فقط لأنّها تحمل:
+--   is_custody_item = true
+--   inventory_policy = 'CUSTOMER_OWNED'
+--   item_class IN ('RAW_MATERIAL', 'FINISHED_GOOD', 'BY_PRODUCT')
+-- وتخضع لقيود قاعدة البيانات التي تمنع دخولها في الفواتير التجارية.
+
+INSERT INTO public.products (
+  name, name_ar, description,
+  category_id, unit_id, base_uom_id, sales_uom_id, purchase_uom_id,
+  cost_price, sale_price, tax_rate, min_stock,
+  is_service, is_active, status,
+  item_nature, inventory_policy, tracking, costing_method,
+  is_sellable, is_purchasable,
+  item_class, package_type_id, package_weight_kg,
+  is_custody_item
+)
+SELECT
+  NULL::text,
+  v.name_ar, v.description,
+  (SELECT id FROM public.categories WHERE name_ar = v.category LIMIT 1),
+  (SELECT id FROM public.units WHERE name = 'Kilogram'),
+  (SELECT id FROM public.units WHERE name = 'Kilogram'),
+  (SELECT id FROM public.units WHERE name = 'Kilogram'),
+  (SELECT id FROM public.units WHERE name = 'Kilogram'),
+  0, 0, 0, 0,
+  false,
+  true,
+  'ACTIVE'::public.item_status,
+  'GOOD'::public.item_nature,
+  'CUSTOMER_OWNED'::public.inventory_policy,
+  'NONE'::public.item_tracking,
+  'NONE'::public.costing_method,
+  false,
+  false,
+  v.item_class::public.item_class,
+  NULL,
+  v.weight::numeric,
+  true
+FROM (VALUES
+  ('أمانة حبوب بر السعيد كيس 50 كيلوجرام',
+   'أمانة حبوب بر السعيد — حبوب خام مستلمة من العميل لدى المطحنة.', 'بر حبوب', 'RAW_MATERIAL', 50),
+  ('أمانة حبوب بر السعيد قطمة 25 كيلوجرام',
+   'أمانة حبوب بر السعيد — نسخة نصف قطمة من الحبوب المستلمة.', 'بر حبوب', 'RAW_MATERIAL', 25),
+
+  ('أمانة حبوب بر الكبوس كيس 50 كيلوجرام',
+   'أمانة حبوب بر الكبوس — حبوب خام مستلمة من العميل لدى المطحنة.', 'بر حبوب', 'RAW_MATERIAL', 50),
+  ('أمانة حبوب بر الكبوس قطمة 25 كيلوجرام',
+   'أمانة حبوب بر الكبوس — نسخة نصف قطمة من الحبوب المستلمة.', 'بر حبوب', 'RAW_MATERIAL', 25),
+
+  ('أمانة حبوب بر الخريف كيس 50 كيلوجرام',
+   'أمانة حبوب بر الخريف — حبوب خام مستلمة من العميل لدى المطحنة.', 'بر حبوب', 'RAW_MATERIAL', 50),
+  ('أمانة حبوب بر الخريف قطمة 25 كيلوجرام',
+   'أمانة حبوب بر الخريف — نسخة نصف قطمة من الحبوب المستلمة.', 'بر حبوب', 'RAW_MATERIAL', 25),
+
+  ('أمانة حبوب بر الحصان كيس 50 كيلوجرام',
+   'أمانة حبوب بر الحصان — حبوب خام مستلمة من العميل لدى المطحنة.', 'بر حبوب', 'RAW_MATERIAL', 50),
+  ('أمانة حبوب بر الحصان قطمة 25 كيلوجرام',
+   'أمانة حبوب بر الحصان — نسخة نصف قطمة من الحبوب المستلمة.', 'بر حبوب', 'RAW_MATERIAL', 25),
+
+  ('أمانة حبوب بر الخيول كيس 50 كيلوجرام',
+   'أمانة حبوب بر الخيول — حبوب خام مستلمة من العميل لدى المطحنة.', 'بر حبوب', 'RAW_MATERIAL', 50),
+  ('أمانة حبوب بر الخيول قطمة 25 كيلوجرام',
+   'أمانة حبوب بر الخيول — نسخة نصف قطمة من الحبوب المستلمة.', 'بر حبوب', 'RAW_MATERIAL', 25)
+) AS v(name_ar, description, category, item_class, weight)
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM public.products p
+  WHERE p.name_ar = v.name_ar
+    AND p.is_custody_item = true
+    AND p.item_class = v.item_class::public.item_class
+);
+
+-- ============================================================================
+-- القسم 3ج — نواتج أمانات الطحن (صنفات نواتج العميل في المطحنة)
+-- ============================================================================
+-- هذه الأصناف تتبع نفس المبدأ: أمانة العميل، لا تدخل في المبيعات أو الشراء
+-- التجاري، كل اسم يبدأ بـ «أمانة» للتمييز في صفحة الأصناف.
+
+INSERT INTO public.products (
+  name, name_ar, description,
+  category_id, unit_id, base_uom_id, sales_uom_id, purchase_uom_id,
+  cost_price, sale_price, tax_rate, min_stock,
+  is_service, is_active, status,
+  item_nature, inventory_policy, tracking, costing_method,
+  is_sellable, is_purchasable,
+  item_class, package_type_id, package_weight_kg,
+  is_custody_item
+)
+SELECT
+  NULL::text,
+  v.name_ar, v.description,
+  (SELECT id FROM public.categories WHERE name_ar = v.category LIMIT 1),
+  (SELECT id FROM public.units WHERE name = 'Kilogram'),
+  (SELECT id FROM public.units WHERE name = 'Kilogram'),
+  (SELECT id FROM public.units WHERE name = 'Kilogram'),
+  (SELECT id FROM public.units WHERE name = 'Kilogram'),
+  0, 0, 0, 0,
+  false,
+  true,
+  'ACTIVE'::public.item_status,
+  'GOOD'::public.item_nature,
+  'CUSTOMER_OWNED'::public.inventory_policy,
+  'NONE'::public.item_tracking,
+  'NONE'::public.costing_method,
+  false,
+  false,
+  v.item_class::public.item_class,
+  NULL,
+  v.weight::numeric,
+  true
+FROM (VALUES
+  ('أمانة بر مطحون أبيض كيس 50 كيلوجرام',
+   'أمانة بر مطحون أبيض — ناتج طحن مستلم من العميل للبقاء في أماناته.', 'بر مطحون', 'FINISHED_GOOD', 50),
+  ('أمانة بر مطحون أبيض قطمة 25 كيلوجرام',
+   'أمانة بر مطحون أبيض — نسخة نصف قطمة من ناتج الأمانة.', 'بر مطحون', 'FINISHED_GOOD', 25),
+
+  ('أمانة بر مطحون الحصان كيس 50 كيلوجرام',
+   'أمانة بر مطحون الحصان — ناتج طحن مستلم من العميل للبقاء في أماناته.', 'بر مطحون', 'FINISHED_GOOD', 50),
+  ('أمانة بر مطحون الحصان قطمة 25 كيلوجرام',
+   'أمانة بر مطحون الحصان — نسخة نصف قطمة من ناتج الأمانة.', 'بر مطحون', 'FINISHED_GOOD', 25),
+
+  ('أمانة بر مطحون الخريف كيس 50 كيلوجرام',
+   'أمانة بر مطحون الخريف — ناتج طحن مستلم من العميل للبقاء في أماناته.', 'بر مطحون', 'FINISHED_GOOD', 50),
+  ('أمانة بر مطحون الخريف قطمة 25 كيلوجرام',
+   'أمانة بر مطحون الخريف — نسخة نصف قطمة من ناتج الأمانة.', 'بر مطحون', 'FINISHED_GOOD', 25),
+
+  ('أمانة بر مطحون الخيول كيس 50 كيلوجرام',
+   'أمانة بر مطحون الخيول — ناتج طحن مستلم من العميل للبقاء في أماناته.', 'بر مطحون', 'FINISHED_GOOD', 50),
+  ('أمانة بر مطحون الخيول قطمة 25 كيلوجرام',
+   'أمانة بر مطحون الخيول — نسخة نصف قطمة من ناتج الأمانة.', 'بر مطحون', 'FINISHED_GOOD', 25),
+
+  ('أمانة بر مطحون السعيد كيس 50 كيلوجرام',
+   'أمانة بر مطحون السعيد — ناتج طحن مستلم من العميل للبقاء في أماناته.', 'بر مطحون', 'FINISHED_GOOD', 50),
+  ('أمانة بر مطحون السعيد قطمة 25 كيلوجرام',
+   'أمانة بر مطحون السعيد — نسخة نصف قطمة من ناتج الأمانة.', 'بر مطحون', 'FINISHED_GOOD', 25),
+
+  ('أمانة بر مطحون الكبوس كيس 50 كيلوجرام',
+   'أمانة بر مطحون الكبوس — ناتج طحن مستلم من العميل للبقاء في أماناته.', 'بر مطحون', 'FINISHED_GOOD', 50),
+  ('أمانة بر مطحون الكبوس قطمة 25 كيلوجرام',
+   'أمانة بر مطحون الكبوس — نسخة نصف قطمة من ناتج الأمانة.', 'بر مطحون', 'FINISHED_GOOD', 25)
+) AS v(name_ar, description, category, item_class, weight)
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM public.products p
+  WHERE p.name_ar = v.name_ar
+    AND p.is_custody_item = true
+    AND p.item_class = v.item_class::public.item_class
+);
+
+-- ============================================================================
 -- القسم 4 — المورّد والعميلان
 -- ============================================================================
 -- (أُلغي حسب طلب المالك): بيانات «مؤسسة الحبوب للتوريدات» وعميلي التجربة
