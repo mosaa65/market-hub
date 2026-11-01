@@ -43,6 +43,19 @@ UPDATE public.products
 SET is_active = false
 WHERE sku LIKE 'حبوب-%' OR sku LIKE 'ناتج-%' OR sku LIKE 'مستهلك-%';
 
+DELETE FROM public.products
+WHERE name_ar LIKE '%دقيق%'
+   OR name_ar LIKE '%قطعة%'
+   OR name_ar LIKE '%كيس بر مطحون%'
+   OR name_ar LIKE '%كيس نخالة%';
+
+UPDATE public.products
+SET category_id = (SELECT id FROM public.categories WHERE name_ar = 'بر حبوب' LIMIT 1)
+WHERE category_id = (SELECT id FROM public.categories WHERE name_ar = 'البُر (القمح)' LIMIT 1);
+
+DELETE FROM public.categories
+WHERE name_ar IN ('دقيق البُر', 'المخلوط اليمني', 'البُر (القمح)');
+
 -- ============================================================================
 -- القسم 1 — (نُقل) المستودع
 -- ============================================================================
@@ -58,9 +71,8 @@ WHERE sku LIKE 'حبوب-%' OR sku LIKE 'ناتج-%' OR sku LIKE 'مستهلك-%
 INSERT INTO public.categories (name, name_ar, parent_id)
 SELECT v.name, v.name_ar, NULL::uuid
 FROM (VALUES
-  ('البُر (القمح)',   'البُر (القمح)'),
-  ('دقيق البُر',      'دقيق البُر'),
-  ('المخلوط اليمني',  'المخلوط اليمني'),
+  ('بر حبوب',        'بر حبوب'),
+  ('بر مطحون',       'بر مطحون'),
   ('النخالة',         'النخالة')
 ) AS v(name, name_ar)
 WHERE NOT EXISTS (
@@ -112,42 +124,91 @@ SELECT
   v.weight::numeric,
   (v.policy = 'CUSTOMER_OWNED') -- الخدمة ليست صنف أمانات
 FROM (VALUES
-  -- ── حبتان خام × نسختين (50 / 25) — الاسم الكامل يحمل كل المعلومات ────────
-  ('حبوب بُر سمراء كيس 50 كيلوجرام',
-   'حبوب بُر سمراء محلي — أشهر أصناف القمح اليمني.', 'البُر (القمح)',
-   0, 0, false, 'GOOD', 'CUSTOMER_OWNED', 'NONE', 'NONE', false, false, 'RAW_MATERIAL', 50),
-  ('حبوب بُر سمراء كيس 25 كيلوجرام',
-   'حبوب بُر سمراء محلي — نسخة نصف كيس.', 'البُر (القمح)',
-   0, 0, false, 'GOOD', 'CUSTOMER_OWNED', 'NONE', 'NONE', false, false, 'RAW_MATERIAL', 25),
+  -- ── حبتان خام × نسختين (50 / 25) — مخزون الشركة؛ قابل للشراء فقط ────────
+  ('حبوب بُر الكبوس كيس 50 كيلوجرام',
+   'حبوب بُر الكبوس — منتج خام مخزون للشركة قابِل للشراء.', 'بر حبوب',
+   0, 0, false, 'GOOD', 'TRACKED', 'NONE', 'MOVING_AVERAGE', false, true, 'RAW_MATERIAL', 50),
+  ('حبوب بُر الكبوس قطمة 25 كيلوجرام',
+   'حبوب بُر الكبوس — نسخة نصف قطمة.', 'بر حبوب',
+   0, 0, false, 'GOOD', 'TRACKED', 'NONE', 'MOVING_AVERAGE', false, true, 'RAW_MATERIAL', 25),
 
-  ('حبوب بُر ميساني كيس 50 كيلوجرام',
-   'حبوب بُر ميساني — صنف قمح محلي معروف.', 'البُر (القمح)',
-   0, 0, false, 'GOOD', 'CUSTOMER_OWNED', 'NONE', 'NONE', false, false, 'RAW_MATERIAL', 50),
-  ('حبوب بُر ميساني كيس 25 كيلوجرام',
-   'حبوب بُر ميساني — نسخة نصف كيس.', 'البُر (القمح)',
-   0, 0, false, 'GOOD', 'CUSTOMER_OWNED', 'NONE', 'NONE', false, false, 'RAW_MATERIAL', 25),
+  ('حبوب بُر السعيد كيس 50 كيلوجرام',
+   'حبوب بُر السعيد — منتج خام مخزون للشركة قابِل للشراء.', 'بر حبوب',
+   0, 0, false, 'GOOD', 'TRACKED', 'NONE', 'MOVING_AVERAGE', false, true, 'RAW_MATERIAL', 50),
+  ('حبوب بُر السعيد قطمة 25 كيلوجرام',
+   'حبوب بُر السعيد — نسخة نصف قطمة.', 'بر حبوب',
+   0, 0, false, 'GOOD', 'TRACKED', 'NONE', 'MOVING_AVERAGE', false, true, 'RAW_MATERIAL', 25),
 
-  -- ── ناتجان × نسختين (50 / 25) ────────────────────────────────────────────
-  ('كيس دقيق أبيض 50 كيلوجرام',
-   'دقيق أبيض من البُر — للخبز والرشوش والملوج.', 'دقيق البُر',
-   0, 0, false, 'GOOD', 'CUSTOMER_OWNED', 'NONE', 'NONE', false, false, 'FINISHED_GOOD', 50),
-  ('كيس دقيق أبيض 25 كيلوجرام',
-   'دقيق أبيض من البُر — نسخة نصف كيس.', 'دقيق البُر',
-   0, 0, false, 'GOOD', 'CUSTOMER_OWNED', 'NONE', 'NONE', false, false, 'FINISHED_GOOD', 25),
+  ('حبوب بُر الخريف كيس 50 كيلوجرام',
+   'حبوب بُر الخريف — منتج خام مخزون للشركة قابِل للشراء.', 'بر حبوب',
+   0, 0, false, 'GOOD', 'TRACKED', 'NONE', 'MOVING_AVERAGE', false, true, 'RAW_MATERIAL', 50),
+  ('حبوب بُر الخريف قطمة 25 كيلوجرام',
+   'حبوب بُر الخريف — نسخة نصف قطمة.', 'بر حبوب',
+   0, 0, false, 'GOOD', 'TRACKED', 'NONE', 'MOVING_AVERAGE', false, true, 'RAW_MATERIAL', 25),
 
-  ('كيس نخالة 50 كيلوجرام',
-   'نخالة البُر — ناتج طحن يُسجّل أمانةً للعميل ويُسلّم له.', 'النخالة',
-   0, 0, false, 'GOOD', 'CUSTOMER_OWNED', 'NONE', 'NONE', false, false, 'BY_PRODUCT', 50),
-  ('كيس نخالة 25 كيلوجرام',
-   'نخالة البُر — ناتج طحن أمانة للعميل — نسخة نصف كيس.', 'النخالة',
-   0, 0, false, 'GOOD', 'CUSTOMER_OWNED', 'NONE', 'NONE', false, false, 'BY_PRODUCT', 25),
+  ('حبوب بُر الحصان كيس 50 كيلوجرام',
+   'حبوب بُر الحصان — منتج خام مخزون للشركة قابِل للشراء.', 'بر حبوب',
+   0, 0, false, 'GOOD', 'TRACKED', 'NONE', 'MOVING_AVERAGE', false, true, 'RAW_MATERIAL', 50),
+  ('حبوب بُر الحصان قطمة 25 كيلوجرام',
+   'حبوب بُر الحصان — نسخة نصف قطمة.', 'بر حبوب',
+   0, 0, false, 'GOOD', 'TRACKED', 'NONE', 'MOVING_AVERAGE', false, true, 'RAW_MATERIAL', 25),
+
+  ('حبوب بُر الخيول كيس 50 كيلوجرام',
+   'حبوب بُر الخيول — منتج خام مخزون للشركة قابِل للشراء.', 'بر حبوب',
+   0, 0, false, 'GOOD', 'TRACKED', 'NONE', 'MOVING_AVERAGE', false, true, 'RAW_MATERIAL', 50),
+  ('حبوب بُر الخيول قطمة 25 كيلوجرام',
+   'حبوب بُر الخيول — نسخة نصف قطمة.', 'بر حبوب',
+   0, 0, false, 'GOOD', 'TRACKED', 'NONE', 'MOVING_AVERAGE', false, true, 'RAW_MATERIAL', 25),
+
+  -- ── ناتجان × نسختين (50 / 25) — مخزون الشركة؛ قابل للبيع فقط ───────────────
+  ('كيس بر مطحون أبيض 50 كيلوجرام',
+   'بر مطحون أبيض من البُر — سلعة مخزونة للشركة قابلة للبيع.', 'بر مطحون',
+   0, 0, false, 'GOOD', 'TRACKED', 'NONE', 'MOVING_AVERAGE', true, false, 'FINISHED_GOOD', 50),
+  ('قطمة بر مطحون أبيض 25 كيلوجرام',
+   'بر مطحون أبيض من البُر — نسخة نصف قطمة.', 'بر مطحون',
+   0, 0, false, 'GOOD', 'TRACKED', 'NONE', 'MOVING_AVERAGE', true, false, 'FINISHED_GOOD', 25),
+
+  ('كيس بر مطحون الكبوس 50 كيلوجرام',
+   'بر مطحون الكبوس — منتج نهائي مخزون للشركة قابِل للبيع.', 'بر مطحون',
+   0, 0, false, 'GOOD', 'TRACKED', 'NONE', 'MOVING_AVERAGE', true, false, 'FINISHED_GOOD', 50),
+  ('قطمة بر مطحون الكبوس 25 كيلوجرام',
+   'بر مطحون الكبوس — نسخة نصف قطمة.', 'بر مطحون',
+   0, 0, false, 'GOOD', 'TRACKED', 'NONE', 'MOVING_AVERAGE', true, false, 'FINISHED_GOOD', 25),
+
+  ('كيس بر مطحون السعيد 50 كيلوجرام',
+   'بر مطحون السعيد — منتج نهائي مخزون للشركة قابِل للبيع.', 'بر مطحون',
+   0, 0, false, 'GOOD', 'TRACKED', 'NONE', 'MOVING_AVERAGE', true, false, 'FINISHED_GOOD', 50),
+  ('قطمة بر مطحون السعيد 25 كيلوجرام',
+   'بر مطحون السعيد — نسخة نصف قطمة.', 'بر مطحون',
+   0, 0, false, 'GOOD', 'TRACKED', 'NONE', 'MOVING_AVERAGE', true, false, 'FINISHED_GOOD', 25),
+
+  ('كيس بر مطحون الخريف 50 كيلوجرام',
+   'بر مطحون الخريف — منتج نهائي مخزون للشركة قابِل للبيع.', 'بر مطحون',
+   0, 0, false, 'GOOD', 'TRACKED', 'NONE', 'MOVING_AVERAGE', true, false, 'FINISHED_GOOD', 50),
+  ('قطمة بر مطحون الخريف 25 كيلوجرام',
+   'بر مطحون الخريف — نسخة نصف قطمة.', 'بر مطحون',
+   0, 0, false, 'GOOD', 'TRACKED', 'NONE', 'MOVING_AVERAGE', true, false, 'FINISHED_GOOD', 25),
+
+  ('كيس بر مطحون الحصان 50 كيلوجرام',
+   'بر مطحون الحصان — منتج نهائي مخزون للشركة قابِل للبيع.', 'بر مطحون',
+   0, 0, false, 'GOOD', 'TRACKED', 'NONE', 'MOVING_AVERAGE', true, false, 'FINISHED_GOOD', 50),
+  ('قطمة بر مطحون الحصان 25 كيلوجرام',
+   'بر مطحون الحصان — نسخة نصف قطمة.', 'بر مطحون',
+   0, 0, false, 'GOOD', 'TRACKED', 'NONE', 'MOVING_AVERAGE', true, false, 'FINISHED_GOOD', 25),
+
+  ('كيس بر مطحون الخيول 50 كيلوجرام',
+   'بر مطحون الخيول — منتج نهائي مخزون للشركة قابِل للبيع.', 'بر مطحون',
+   0, 0, false, 'GOOD', 'TRACKED', 'NONE', 'MOVING_AVERAGE', true, false, 'FINISHED_GOOD', 50),
+  ('قطمة بر مطحون الخيول 25 كيلوجرام',
+   'بر مطحون الخيول — نسخة نصف قطمة.', 'بر مطحون',
+   0, 0, false, 'GOOD', 'TRACKED', 'NONE', 'MOVING_AVERAGE', true, false, 'FINISHED_GOOD', 25),
 
   -- ── الخدمة الوحيدة: أجور طحن وتجهيز (ق5 — البساطة المطلقة) ────────────────
   -- سطر واحد في فاتورة الأجور، والسعر من هذا الصنف (مصدر السعر الوحيد).
   -- ليست منتج أمانات (is_custody_item = false) — تظهر فقط في فاتورة الأجور.
   ('أجور طحن وتجهيز',
-   'أجرة الخدمة الوحيدة للطحن والتجهيز — سعرها من هذا الصنف ولا يُدخل في مكان آخر.', 'دقيق البُر',
-   0, 1000, true, 'SERVICE', 'UNTRACKED', 'NONE', 'NONE', true, false, 'SERVICE', NULL)
+   'أجرة الخدمة الوحيدة للطحن والتجهيز — سعرها من هذا الصنف ولا يُدخل في مكان آخر.', 'بر مطحون',
+   0, 500, true, 'SERVICE', 'UNTRACKED', 'NONE', 'NONE', true, false, 'SERVICE', NULL)
 
 ) AS v(name_ar, description, category, cost, price, is_service,
        nature, policy, tracking, costing, sellable, purchasable, item_class, weight)
