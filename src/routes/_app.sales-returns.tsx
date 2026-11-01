@@ -1026,13 +1026,17 @@ function NewSalesReturn({
             </div>
             <div className="grid gap-1.5 sm:col-span-2">
               <Label>{lang === "ar" ? "طريقة ومصدر الاسترداد" : "Refund method & source"}</Label>
+              {/*
+                آجل مستبعد: المرتجع يُعيد نقودًا، و`create_sales_return` يرفض قيمة
+                credit صراحةً. عرضها كان يعِد بخيار يفشل عند الحفظ.
+              */}
               <DynamicPaymentSelector
                 context="sales_returns"
                 value={refundMethod}
                 onChange={setRefundMethod}
                 settlement={settlement}
                 onSettlementChange={setSettlement}
-                includeCredit
+                includeCredit={false}
                 compact
               />
             </div>

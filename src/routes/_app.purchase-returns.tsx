@@ -32,7 +32,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { PaymentMethodPicker } from "@/components/ui/payment-method";
 import { DynamicPaymentSelector } from "@/components/ui/payment-method/dynamic-payment-selector";
 import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
 import { paymentMethodLabel } from "@/lib/payments/payment-methods";
@@ -954,13 +953,14 @@ function NewPurchaseReturn({
             </div>
             <div className="grid gap-1.5 sm:col-span-2">
               <Label>{lang === "ar" ? "طريقة ومصدر الاسترداد" : "Refund method & source"}</Label>
+              {/* آجل ليس طريق استرداد: العرض هنا لقناة الخروج التي عاد منها المال. */}
               <DynamicPaymentSelector
                 context="purchase_returns"
                 value={refundMethod}
                 onChange={setRefundMethod}
                 settlement={settlement}
                 onSettlementChange={setSettlement}
-                includeCredit
+                includeCredit={false}
                 compact
               />
             </div>

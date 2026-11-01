@@ -295,18 +295,21 @@ export type Database = {
           id: string;
           name: string;
           name_ar: string | null;
+          production_cost_eligible: boolean;
         };
         Insert: {
           created_at?: string;
           id?: string;
           name: string;
           name_ar?: string | null;
+          production_cost_eligible?: boolean;
         };
         Update: {
           created_at?: string;
           id?: string;
           name?: string;
           name_ar?: string | null;
+          production_cost_eligible?: boolean;
         };
         Relationships: [];
       };
@@ -2297,6 +2300,10 @@ export type Database = {
         };
         Returns: boolean;
       };
+      set_production_expense_category_eligibility: {
+        Args: { p_category_id: string; p_eligible: boolean };
+        Returns: boolean;
+      };
       settle_tax_period: {
         Args: {
           p_start_date: string;
@@ -2315,6 +2322,46 @@ export type Database = {
           _notes: string;
         };
         Returns: string;
+      };
+      create_and_post_production_order: {
+        Args: {
+          p_warehouse_id: string;
+          p_cost_center_id: string;
+          p_production_date: string;
+          p_notes: string | null;
+          p_materials: Json;
+          p_outputs: Json;
+          p_expenses?: Json;
+          p_losses?: Json;
+        };
+        Returns: string;
+      };
+      reverse_production_order: {
+        Args: { p_order_id: string; p_reason: string };
+        Returns: string;
+      };
+      create_production_order: {
+        Args: {
+          p_warehouse_id: string;
+          p_cost_center_id: string;
+          p_production_date?: string;
+          p_notes?: string | null;
+        };
+        Returns: string;
+      };
+      complete_production_order: {
+        Args: {
+          p_order_id: string;
+          p_materials: Json;
+          p_outputs: Json;
+          p_expenses?: Json;
+          p_losses?: Json;
+        };
+        Returns: string;
+      };
+      production_cost_sources: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json[];
       };
       submit_expense: {
         Args: {

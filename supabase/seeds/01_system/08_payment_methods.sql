@@ -87,15 +87,17 @@ INSERT INTO public.payment_methods (
    'آجل'),
 
   -- ─── تحويل بنكي عام: غير مرتبط ببنك بعينه ────────────────────────────────
+  -- المرتجعات مشمولة: الاسترداد البنكي للعميل وقبض المورد يمرّان عبر البنك.
   ('bank_transfer', 'تحويل بنكي', 'Bank transfer', 'bank-transfer', true, 30,
-   ARRAY['pos','sales','purchases','expenses','customer_collection'],
+   ARRAY['pos','sales','purchases','expenses','customer_collection','sales_returns','purchase_returns'],
    'BANK', '1111', false, true, ARRAY['bank_transfer'], 'bank_transfer',
    'حوالة مصرفية عامة. يتطلب رقم الحوالة.',
    'تحويل بنكي'),
 
   -- ─── المحفظة الإلكترونية العامة: البديل التاريخي بلا مؤسسة محددة ─────────
+  -- المرتجعات مشمولة لسبب تحويل بنكي نفسه.
   ('mobile_money', 'محفظة إلكترونية', 'Mobile money', 'mobile-money', true, 110,
-   ARRAY['pos','sales','purchases','expenses','customer_collection'],
+   ARRAY['pos','sales','purchases','expenses','customer_collection','sales_returns','purchase_returns'],
    'WALLET', '1131', false, true, ARRAY['mobile_money'], 'mobile_money',
    'محفظة محلية غير محددة. تبقى للتوافق مع العمليات القديمة.',
    'محفظة إلكترونية'),

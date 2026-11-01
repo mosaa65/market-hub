@@ -18,6 +18,7 @@
     "db:local:rebuild": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/db-local-rebuild.ps1",
     "db:local:migrate": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/apply-local-migrations.ps1",
     "db:local:status": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/db-local-status.ps1",
+    "test:company-production-cycle": "node scripts/check-company-production-cycle.mjs",
     "db:backup": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/local_backup.ps1",
     "db:types": "node scripts/update-supabase-types.mjs",
     "db:cloud:push": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/push-cloud.ps1",

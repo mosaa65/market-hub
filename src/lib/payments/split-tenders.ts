@@ -12,12 +12,23 @@
  *  • أي جزء لا يعطي مبلغاً موجباً يُهمل ولا يُرسل للقاعدة.
  */
 
-/** الطرق الأربع المعتمدة (مطابقة لـ CORE_PAYMENT_METHODS في الواجهة). */
+/**
+ * الطرق الأربع المعتمدة في شاشة التوزيع.
+ *
+ * `credit` ليس قناة تحصيل، لكنه جزء مشروع من التوزيع: ما تبقّى بعد كل قناة
+ * فعلية يصبح ذمة على العميل. ولذلك يظهر في هذا الثابت خارج قائمة القنوات أدناه.
+ */
 export const CORE_SPLIT_METHODS = ["cash", "credit", "bank_transfer", "mobile_money"] as const;
 
 export type CoreSplitMethod = (typeof CORE_SPLIT_METHODS)[number];
 
-/** القيم التي تقبلها قاعدة البيانات في `_payment_splits[].method` حالياً. */
+/**
+ * القنوات التي تُكتب كصف في `payment_splits` / `customer_payment_splits`.
+ *
+ * `card` ليست منها: هي قيمة متقاعدة، ويحرسها الآن
+ * `guard_split_tender_approved` في قاعدة البيانات (الترحيل 9909). الصفوف
+ * التاريخية تبقى مقروءة، لكن قناة جديدة لا يمكن أن تُكتب بها.
+ */
 const SPLITTABLE_TENDER_VALUES = new Set(["cash", "bank_transfer", "mobile_money"]);
 
 /**

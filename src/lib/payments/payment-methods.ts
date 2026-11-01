@@ -391,7 +391,17 @@ export const PAYMENT_METHOD_CATALOG: readonly PaymentMethodDefinition[] = [
     iconKey: "bank-transfer",
     isActive: true,
     sortOrder: 30,
-    allowedContexts: ["pos", "sales", "purchases", "expenses", "customer_collection"],
+    // المرتجعات مشمولة: استرداد العميل أو قبض المورد يمرّ عبر البنك فعلًا. حرمانه
+    // كان يجبر الكاشير على تسجيل استرداد بنكي كأنه نقد من الصندوق.
+    allowedContexts: [
+      "pos",
+      "sales",
+      "purchases",
+      "expenses",
+      "customer_collection",
+      "sales_returns",
+      "purchase_returns",
+    ],
     ledgerKind: "BANK",
     defaultAccountCode: "1111",
     requiresReference: true,
@@ -504,7 +514,16 @@ export const PAYMENT_METHOD_CATALOG: readonly PaymentMethodDefinition[] = [
     iconKey: "mobile-money",
     isActive: true,
     sortOrder: 110,
-    allowedContexts: ["pos", "sales", "purchases", "expenses", "customer_collection"],
+    // نفس سبب تحويل بنكي: الاسترداد إلى المحفظة تحصيل عكسي مشروع.
+    allowedContexts: [
+      "pos",
+      "sales",
+      "purchases",
+      "expenses",
+      "customer_collection",
+      "sales_returns",
+      "purchase_returns",
+    ],
     ledgerKind: "WALLET",
     defaultAccountCode: "1131",
     requiresReference: true,

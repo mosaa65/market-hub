@@ -7,6 +7,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { paymentMethodLabel } from "@/lib/payments/payment-methods";
 import {
   InventoryMovementsFilterSchema,
   PurchaseRegisterFilterSchema,
@@ -436,12 +437,15 @@ export const executeSalesGroupedReport = createServerFn({ method: "POST" })
       (customersResult?.data ?? []).map((customer: any) => [customer.id, customer.name]),
     );
 
-    const pmLabels: Record<string, string> = {
-      cash: "نقدي",
-      card: "شبكة / بطاقة",
-      bank_transfer: "تحويل بنكي",
-      credit: "آجل",
-    };
+    //
+    // لا خريطة محلية: الأسماء من الكتالوج المشترك.
+    //
+    // الخريطة السابقة كانت أربعة مفاتيح فقط، فكانت `mobile_money` و`cheque`
+    // — وكل طريقة تضيفها المنشأة (الكريمي، جيب) — تُطبع بقيمتها الخام
+    // (`cheque`) في تقرير عربي، أو تُسقط إلى «نقدي» الافتراضي في دلالة خاطئة
+    // تمامًا. `paymentMethodLabel` يعرف الكتالوج والقيم التاريخية معًا.
+    const pmLabel = (value: string | null | undefined) =>
+      value ? paymentMethodLabel(value, "ar") : "—";
 
     let grossSales = 0,
       itemDiscounts = 0,
@@ -504,7 +508,7 @@ export const executeSalesGroupedReport = createServerFn({ method: "POST" })
           }
           if (activeDimensions.includes("payment_method")) {
             base.payment_method = row.payment_method || "cash";
-            base.payment_method_name = pmLabels[row.payment_method] || row.payment_method || "نقدي";
+            base.payment_method_name = pmLabel(row.payment_method);
           }
           if (activeDimensions.includes("branch")) {
             base.branch_id = row.branch_id || "main";
@@ -668,12 +672,8 @@ export const executePurchasesGroupedReport = createServerFn({ method: "POST" })
       (suppliersResult?.data ?? []).map((supplier: any) => [supplier.id, supplier.name]),
     );
 
-    const pmLabels: Record<string, string> = {
-      cash: "نقدي",
-      card: "شبكة / بطاقة",
-      bank_transfer: "تحويل بنكي",
-      credit: "آجل",
-    };
+    const pmLabel = (value: string | null | undefined) =>
+      value ? paymentMethodLabel(value, "ar") : "—";
 
     let grossPurchases = 0,
       itemDiscounts = 0,
@@ -729,7 +729,7 @@ export const executePurchasesGroupedReport = createServerFn({ method: "POST" })
           }
           if (activeDimensions.includes("payment_method")) {
             base.payment_method = row.payment_method || "credit";
-            base.payment_method_name = pmLabels[row.payment_method] || row.payment_method || "آجل";
+            base.payment_method_name = pmLabel(row.payment_method);
           }
           if (activeDimensions.includes("warehouse")) {
             base.warehouse_id = row.warehouse_id || "main";
@@ -850,9 +850,7 @@ export const executeInventoryMovementsReport = createServerFn({ method: "POST" }
       }, "Inventory opening balance");
       for (const movement of beforeRows) {
         const quantity = Math.abs(toNumber(movement.quantity));
-        const delta = isInboundMovement(movement.movement_type, quantity)
-          ? quantity
-          : -quantity;
+        const delta = isInboundMovement(movement.movement_type, quantity) ? quantity : -quantity;
         const warehouseId = movement.warehouse_id as string;
         openingByWarehouse.set(
           warehouseId,

@@ -67,6 +67,8 @@ export interface ResolvedPaymentMethod extends PaymentMethodDefinition {
    * The settings screen shows "معدّلة" and offers a reset for this.
    */
   isAuthored: boolean;
+  /** الحساب الافتراضي الذي ربطته المنشأة، أو null للوراثة من الكتالوج. */
+  defaultAccount: PaymentMethodDefaultAccount | null;
 }
 
 /**
@@ -129,6 +131,19 @@ interface SettingsRow {
   default_account_id: string | null;
 }
 
+/**
+ * الحساب الذي اختارته المنشأة لهذه الطريقة، أو null حين ترث الافتراضي.
+ *
+ * يُقرأ من `payment_method_settings` وليس من الكتالوج: الكتالوج يقول «العائلة»،
+ * والإعدادات تقول «أي صندوق/بنك/محفظة بعينه». كان العمود يُقرأ ولم يُكتب من أي
+ * شاشة، فبقي الترحيل دائمًا على الحساب التجميعي 1111/1131.
+ */
+export interface PaymentMethodDefaultAccount {
+  id: string;
+  code: string;
+  nameAr: string;
+}
+
 function isLedgerKind(value: string): value is LedgerKind {
   return ["CASH", "BANK", "WALLET", "CARD", "CREDIT", "OTHER"].includes(value);
 }
@@ -163,6 +178,26 @@ async function fetchPaymentMethods(): Promise<{
       .select("payment_method_id,enabled,sort_order,enabled_contexts,default_account_id"),
   ]);
 
+  // أسماء الحسابات المرتبطة تُقرأ مرة واحدة، لا استعلاماً لكل طريقة. فشلها لا
+  // يجعل الطريقة غير موجودة: تبقى معرَّفة بكودها فقط.
+  const linkedAccountIds = (Array.isArray(settingsRes.data) ? settingsRes.data : [])
+    .map((row: SettingsRow) => row.default_account_id)
+    .filter((value): value is string => Boolean(value));
+  const accountsById = new Map<string, PaymentMethodDefaultAccount>();
+  if (linkedAccountIds.length > 0) {
+    const accountsRes = await db
+      .from("accounts")
+      .select("id,code,name_ar")
+      .in("id", linkedAccountIds);
+    for (const row of (accountsRes.data ?? []) as Array<{
+      id: string;
+      code: string;
+      name_ar: string;
+    }>) {
+      accountsById.set(row.id, { id: row.id, code: row.code, nameAr: row.name_ar });
+    }
+  }
+
   const catalogRows: CatalogRow[] = Array.isArray(catalogRes.data) ? catalogRes.data : [];
 
   // ── The catalogue is the authority. If it cannot be read, say so. ────────
@@ -196,7 +231,7 @@ async function fetchPaymentMethods(): Promise<{
   // the pickers that its contexts allow — the fixed list used to hide it.
   const methods = catalogRows
     .filter((row) => row.is_active !== false)
-    .map((row) => resolveRow(row, settingsById.get(row.id)))
+    .map((row) => resolveRow(row, settingsById.get(row.id), accountsById))
     .sort(byEffectiveOrder);
 
   return {
@@ -206,7 +241,11 @@ async function fetchPaymentMethods(): Promise<{
   };
 }
 
-function resolveRow(row: CatalogRow, settings?: SettingsRow): ResolvedPaymentMethod {
+function resolveRow(
+  row: CatalogRow,
+  settings: SettingsRow | undefined,
+  accountsById: ReadonlyMap<string, PaymentMethodDefaultAccount>,
+): ResolvedPaymentMethod {
   const allowedContexts = toContexts(row.allowed_contexts);
   const tenantContexts = toContexts(settings?.enabled_contexts);
 
@@ -242,6 +281,9 @@ function resolveRow(row: CatalogRow, settings?: SettingsRow): ResolvedPaymentMet
     isConfigured: Boolean(settings),
     isSystem: row.is_system !== false,
     isAuthored: false,
+    defaultAccount: settings?.default_account_id
+      ? (accountsById.get(settings.default_account_id) ?? null)
+      : null,
   };
 
   // A tenant row is authored by definition; a developer row only when its label
@@ -296,6 +338,7 @@ function fallbackMethods(): ResolvedPaymentMethod[] {
     isConfigured: false,
     isSystem: true,
     isAuthored: false,
+    defaultAccount: null,
   })).sort(byEffectiveOrder);
 }
 
@@ -370,6 +413,56 @@ export function usePaymentMethodsForContext(
 }
 
 /**
+ * ربط طرق الدفع بحسابات دليل الحسابات.
+ *
+ * يقرأ `payment_method_account_linkage()` (الهجرة 68) التي تخبر أي طريقة
+ * مفعّلة **لا يملك حسابها وجودًا في الدليل**. بدون ذلك لا يعرف المستخدم أن
+ * التحصيل سيفشل إلا حين يقف أمام عميل وبيده نقدية.
+ *
+ * لا يقول شيئًا إن كانت الدالة غير موجودة (قاعدة لم تُطبَّق عليها الهجرة بعد):
+ * الفحص مساعد، وغيابه لا يجوز أن يعطّل البيع.
+ */
+export interface PaymentAccountLinkageRow {
+  method_id: string;
+  method_name: string;
+  ledger_kind: string;
+  is_active: boolean;
+  account_code: string | null;
+  account_name: string | null;
+  account_exists: boolean;
+  account_postable: boolean;
+  is_healthy: boolean;
+}
+
+export function usePaymentAccountLinkage() {
+  const query = useQuery({
+    queryKey: ["payment-account-linkage"] as const,
+    queryFn: async (): Promise<PaymentAccountLinkageRow[]> => {
+      // الدالة مضافة بالهجرة 68 ولم تُولَّد في أنواع العميل بعد؛ `any` هنا
+      // لأن العقد معروف ومكتوب أعلاه، وليس لأن القيمة مجهولة.
+      const { data, error } = await (supabase as any).rpc("payment_method_account_linkage");
+      if (error) throw error;
+      return (data ?? []) as PaymentAccountLinkageRow[];
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: 0,
+  });
+
+  const broken = (query.data ?? []).filter(
+    (row) => row.is_active && !row.is_healthy && row.ledger_kind !== "CREDIT",
+  );
+
+  return {
+    rows: query.data ?? [],
+    /** طرق مفعّلة لن تُرحَّل نقديتها إلى أي حساب حيّ. */
+    broken,
+    isLoading: query.isLoading,
+    hasIssues: broken.length > 0,
+    refetch: query.refetch,
+  };
+}
+
+/**
  * The business's own names and icons, keyed by catalogue id, for screens that
  * render a STORED value rather than a catalogue row.
  *
@@ -438,6 +531,45 @@ export function useUpdatePaymentMethodSettings() {
 
   return {
     save,
+    isSaving: mutation.isPending,
+    error: mutation.error as Error | null,
+  };
+}
+
+/**
+ * ربط طريقة الدفع بحساب فرعي بعينه من دليل الحسابات، أو إرجاعها للافتراضي.
+ *
+ * `null` يعني «احذف التخصيص وارجع إلى الحساب الذي يقرّره محرّك الترحيل». لا
+ * يعني «لا حساب»: آجل وحده هو من لا حساب له، وهو ممنوع في الدالة الخلفية.
+ *
+ * القواعد في الرافعة: الصلاحية، وأن الحساب موجود وقابل للترحيل، وأنه ينتمي إلى
+ * عائلة الطريقة. التحقق هنا لا يكرّرها، بل يترجمها إلى رسالة عربية.
+ */
+export function useSetPaymentMethodDefaultAccount() {
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: async ({ methodId, accountId }: { methodId: string; accountId: string | null }) => {
+      const { data, error } = await db.rpc("set_payment_method_default_account", {
+        p_method_id: methodId,
+        p_account_id: accountId,
+      });
+      if (error) throw error;
+      return data as Array<{ payment_method_id: string; default_account_id: string | null }>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: PAYMENT_METHODS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: ["payment-account-linkage"] as const });
+    },
+  });
+
+  const setDefaultAccount = useCallback(
+    (methodId: string, accountId: string | null) => mutation.mutateAsync({ methodId, accountId }),
+    [mutation],
+  );
+
+  return {
+    setDefaultAccount,
     isSaving: mutation.isPending,
     error: mutation.error as Error | null,
   };
