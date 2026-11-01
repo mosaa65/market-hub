@@ -1,98 +1,83 @@
-# ==============================================================================
-# scripts/apply-local-migrations.ps1 — تطبيق الترحيلات على قاعدة Docker المحلية
-# (db:local:migrate — أضيف بطلب المالك: كان يوجد أمر السحابة فقط)
-#
-# ماذا يفعل؟
-#   1. يتحقق أن Docker daemon يعمل (نفس حماية الدليل المحلي).
-#   2. يقرأ قائمة ملفات supabase/migrations/*.sql مرتبة بالاسم.
-#   3. يقارنها بجدول supabase_migrations.schema_migrations — يطبق فقط
-#      الملفات التي لم تُسجَّل بعد (idempotent: التشغيل الثاني = لا شيء).
-#   4. لكل ملف جديد: docker cp إلى الحاوية ثم psql -f مع ON_ERROR_STOP=1
-#      (القاعدة الحاكمة على Windows: لا أنبوب ولا `<` — docker cp فقط).
-#   5. يسجّل كل ملف في schema_migrations حتى لا يُعاد تطبيقه.
-#   6. يجري أزمة سريعة لعدد الترحيلات والجداول في النهاية.
-#
-# لا يمس السحابة إطلاقاً — محلي فقط. لا يستخدم supabase db reset ولا حذف.
-# ==============================================================================
+# ============================================================================== 
+# scripts/apply-local-migrations.ps1
+# Applies pending migrations to the local Docker Supabase database only.
+# This script does not reset or delete data. It only applies new SQL files.
+# ============================================================================== 
 
 $ErrorActionPreference = "Stop"
 
-# ── 0) تحقق Docker daemon (المشكلة 5.1/5.2 في الدليل المحلي) ─────────────────
+# Ensure Docker is available.
 $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") +
   ";C:\Program Files\Docker\Docker\resources\bin"
 $dockerVersion = & docker info --format "{{.ServerVersion}}" 2>&1
 if ($LASTEXITCODE -ne 0) {
-  throw "Docker daemon لا يستجيب. افتح Docker Desktop وانتظر حتى تصبح أيقونته خضراء ثم أعد المحاولة."
+  throw "Docker daemon is not responding. Open Docker Desktop and wait until it is ready, then retry."
 }
 Write-Host "[OK] Docker daemon v$dockerVersion" -ForegroundColor Green
 
-# ── 1) ابحث عن حاوية قاعدة البيانات المحلية ──────────────────────────────────
+# Find the local database container.
 $dbContainer = (& docker ps --format "{{.Names}}" | Select-String "supabase_db_").ToString()
 if (-not $dbContainer) {
-  throw "لا توجد حاوية supabase_db_* شغالة. شغّل أولاً: npm run db:local:start"
+  throw "No supabase_db_* container is running. Start it first with: npm run db:local:start"
 }
-Write-Host "[OK] حاوية القاعدة: $dbContainer" -ForegroundColor Green
+Write-Host "[OK] Database container: $dbContainer" -ForegroundColor Green
 
-# ── 2) اقرأ الترحيلات المطبَّقة حالياً ────────────────────────────────────────
+# Read currently applied migrations.
 $appliedRaw = docker exec $dbContainer psql -U postgres -d postgres -At -c `
   "SELECT version FROM supabase_migrations.schema_migrations ORDER BY version;"
-if ($LASTEXITCODE -ne 0) { throw "تعذر قراءة supabase_migrations.schema_migrations." }
+if ($LASTEXITCODE -ne 0) { throw "Could not read supabase_migrations.schema_migrations." }
 $applied = @($appliedRaw | Where-Object { $_ -and $_.Trim() -ne "" })
-Write-Host "[OK] ترحيلات مطبقة حالياً: $($applied.Count)" -ForegroundColor Green
+Write-Host "[OK] Applied migrations: $($applied.Count)" -ForegroundColor Green
 
-# ── 3) ملفات الترحيلات المحلية (01 → …) ──────────────────────────────────────
+# List local migration files.
 $migrationsDir = Join-Path $PSScriptRoot "..\supabase\migrations"
 $files = Get-ChildItem $migrationsDir -Filter "*.sql" | Sort-Object Name
-if ($files.Count -eq 0) { throw "لا توجد ملفات ترحيلات في supabase/migrations." }
+if ($files.Count -eq 0) { throw "No migration files were found in supabase/migrations." }
 
-# ── 4) طبّق الجديد فقط ────────────────────────────────────────────────────────
+# Apply only new migration files.
 $appliedCount = 0
 $skippedCount = 0
 foreach ($file in $files) {
-  # اشتق الإصدار من اسم الملف: NN_description.sql → NN (فقط الأرقام البادئة)
   if ($file.BaseName -notmatch '^(\d+)_') {
-    Write-Host "[SKIP] $($file.Name) — الاسم لا يبدأ برقم إصدار" -ForegroundColor DarkGray
+    Write-Host "[SKIP] $($file.Name) - file name does not start with a version number" -ForegroundColor DarkGray
     continue
   }
-  $version = $Matches[1]
 
+  $version = $Matches[1]
   if ($applied -contains $version) {
     $skippedCount++
     continue
   }
 
-  Write-Host "→ تطبيق: $($file.Name) (version $version)" -ForegroundColor Cyan
+  Write-Host "-> Applying: $($file.Name) (version $version)" -ForegroundColor Cyan
   $tmpPath = "/tmp/migration_$version.sql"
   docker cp $file.FullName "${dbContainer}:${tmpPath}"
-  if ($LASTEXITCODE -ne 0) { throw "فشل docker cp للملف $($file.Name)." }
+  if ($LASTEXITCODE -ne 0) { throw "Failed to copy $($file.Name) into the container." }
 
   docker exec $dbContainer psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f $tmpPath
   if ($LASTEXITCODE -ne 0) {
-    throw "فشل تطبيق $($file.Name) — راجع الخطأ أعلاه. الملف لم يُسجَّل في schema_migrations."
+    throw "Failed to apply $($file.Name). See the SQL error above. The file was not marked as applied."
   }
 
-  # سجّل الملف حتى لا يعاد تطبيقه (المعرف عشوائي ثابت لن يتصادم)
   docker exec $dbContainer psql -U postgres -d postgres -At -c `
     "INSERT INTO supabase_migrations.schema_migrations(version, name, statements) VALUES ('$version', '$($file.BaseName)', 1) ON CONFLICT (version) DO NOTHING;"
-  if ($LASTEXITCODE -ne 0) { throw "فشل تسجيل $version في schema_migrations." }
+  if ($LASTEXITCODE -ne 0) { throw "Failed to register $version in schema_migrations." }
 
   $appliedCount++
 }
 
 Write-Host ""
 Write-Host "════════════════════════════════════════════════════" -ForegroundColor Green
-Write-Host "النتيجة: طُبّق $($appliedCount) ملفاً جديداً · تم تخطي $($skippedCount) مسبقاً" -ForegroundColor Green
+Write-Host "Result: applied $($appliedCount) new migration file(s) | skipped $($skippedCount) already applied" -ForegroundColor Green
 
-# ── 4.5) تحديث ذاكرة PostgREST (مهم!) ───────────────────────────────────────
-# الدوال الجديدة لا تُرى من التطبيق إلا بعد إعادة تحميل مخطط PostgREST —
-# بدونها يظهر خطأ «Could not find the function» وتعود القوائم فارغة.
+# Reload PostgREST metadata so new functions are visible to the app.
 if ($appliedCount -gt 0) {
   docker exec $dbContainer psql -U postgres -d postgres -At -c "NOTIFY pgrst, 'reload schema';"
   Start-Sleep -Seconds 2
-  Write-Host "[OK] أُعيد تحميل مخطط PostgREST" -ForegroundColor Green
+  Write-Host "[OK] PostgREST schema reload triggered" -ForegroundColor Green
 }
 
-# ── 5) فحص سريع بعد التطبيق ──────────────────────────────────────────────────
+# Quick verification.
 docker exec $dbContainer psql -U postgres -d postgres -At -c `
-  "SELECT 'ترحيلات: ' || count(*) || ' — آخر إصدار: ' || max(version) FROM supabase_migrations.schema_migrations; SELECT 'جداول public: ' || count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';"
-if ($LASTEXITCODE -ne 0) { throw "فشل فحص ما بعد التطبيق." }
+  "SELECT 'Migrations: ' || count(*) || ' - latest: ' || max(version) FROM supabase_migrations.schema_migrations; SELECT 'Public tables: ' || count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';"
+if ($LASTEXITCODE -ne 0) { throw "Post-apply verification failed." }
