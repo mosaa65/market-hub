@@ -2304,6 +2304,28 @@ export type Database = {
         Args: { p_category_id: string; p_eligible: boolean };
         Returns: boolean;
       };
+      expense_category_management: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          id: string;
+          name: string;
+          name_ar: string | null;
+          notes: string | null;
+          is_active: boolean;
+          production_cost_eligible: boolean;
+          account_id: string | null;
+          account_code: string | null;
+          account_name_ar: string | null;
+        }[];
+      };
+      expense_category_postable_accounts: {
+        Args: Record<PropertyKey, never>;
+        Returns: { id: string; code: string; name_ar: string | null }[];
+      };
+      set_expense_category_account: {
+        Args: { p_category_id: string; p_account_id: string | null };
+        Returns: Json;
+      };
       settle_tax_period: {
         Args: {
           p_start_date: string;

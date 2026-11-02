@@ -54,6 +54,9 @@ export const ROUTE_ACCESS: Record<string, RouteAccessRule> = {
   "/milling/manufacture": {
     allowedRoles: ["owner", "manager", "warehouse"],
   },
+  "/milling/production-orders": {
+    allowedRoles: ["owner", "manager", "accountant", "warehouse"],
+  },
   // تقرير أداء القسم: قراءة مالية — المالك والمدير والمحاسب.
   "/milling/performance": {
     allowedRoles: ["owner", "manager", "accountant"],

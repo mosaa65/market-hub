@@ -13,6 +13,7 @@ import {
   Boxes,
   PanelLeft,
   GitBranch,
+  Tags,
   LucideIcon,
 } from "lucide-react";
 import { CompanySection } from "./sections/company-section";
@@ -28,6 +29,7 @@ import { PaymentMethodsSection } from "./sections/payment-methods-section";
 import { BackupSettingsCard } from "@/components/backup-settings-card";
 import { SidebarNavigationSection } from "./sections/sidebar-navigation-section";
 import { ExpenseCostCentersSection } from "./sections/expense-cost-centers-section";
+import { ExpenseCategoriesSection } from "./sections/expense-categories-section";
 
 export type SettingsSectionId =
   | "company"
@@ -37,6 +39,7 @@ export type SettingsSectionId =
   | "catalog"
   | "stock-settings"
   | "expense-cost-centers"
+  | "expense-categories"
   | "subscription"
   | "backup"
   | "number-format"
@@ -138,6 +141,16 @@ registerSettingsSection({
   descriptionEn: "Create, edit, and deactivate cost centers",
   icon: GitBranch,
   component: ExpenseCostCentersSection,
+});
+
+registerSettingsSection({
+  id: "expense-categories",
+  titleAr: "تصنيفات المصروفات",
+  titleEn: "Expense Categories",
+  descriptionAr: "إنشاء التصنيفات وربطها بالحسابات وتحديد ما يقبل تخصيصه للإنتاج",
+  descriptionEn: "Create categories, map accounts, and choose which costs can be allocated to production",
+  icon: Tags,
+  component: ExpenseCategoriesSection,
 });
 
 registerSettingsSection({

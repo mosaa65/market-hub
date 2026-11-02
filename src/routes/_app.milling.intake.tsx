@@ -66,6 +66,7 @@ import { PaymentSplitCatalogDialog, type PaymentSplitTender } from "@/components
 import { useFormNavigationScope } from "@/hooks/use-form-navigation";
 import { AmountInput } from "@/components/ui/amount-input";
 import { QuantityInput } from "@/components/ui/quantity-input";
+import { ProductPicker } from "@/components/products/product-picker";
 import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
 import {
   getPaymentMethodDefinition,
@@ -673,18 +674,25 @@ function MillingIntakePage() {
                           <label className="md:hidden block text-[11px] font-semibold text-muted-foreground mb-1">
                             نوع الحبوب:
                           </label>
-                          <MillingSelect
+                          {/*
+                            منتقي الصنف الموحّد: البحث والفئات والألوان تُختصر ثلاثة
+                            أسطر من القائمة الأصلية إلى حقل واحد مفهوم.
+                          */}
+                          <ProductPicker
                             value={line.itemId}
-                            onChange={(e) => setLineItem(idx, e.target.value)}
-                            className="font-bold text-xs w-full"
-                          >
-                            <option value="">اختر نوع الحبوب…</option>
-                            {(grainItems.data ?? []).map((g: ProductOption) => (
-                              <option key={g.id} value={g.id}>
-                                {g.name_ar || g.name} {g.package_weight_kg ? `(${g.package_weight_kg} كجم)` : ""}
-                              </option>
-                            ))}
-                          </MillingSelect>
+                            items={(grainItems.data ?? []).map((g: ProductOption) => ({
+                              id: g.id,
+                              nameAr: g.name_ar || g.name,
+                              sku: g.sku,
+                              item_class: g.item_class,
+                              package_weight_kg: g.package_weight_kg,
+                            }))}
+                            classes={["RAW_MATERIAL"]}
+                            loading={grainItems.isLoading}
+                            onChange={(item) => setLineItem(idx, item.id)}
+                            placeholder="اختر نوع الحبوب…"
+                            ariaLabel={`نوع الحبوب في السطر ${idx + 1}`}
+                          />
                         </div>
 
                         {/* 2. عدد الأكياس (عمودان) */}
@@ -723,7 +731,9 @@ function MillingIntakePage() {
 
                         {/* 4. أجر السطر التقديري (عمودان) */}
                         <div className="md:col-span-2 flex items-center justify-between md:justify-center">
-                          <span className="md:hidden text-[11px] text-muted-foreground">أجرة السطر:</span>
+                          <span className="md:hidden text-[11px] text-muted-foreground">
+                            أجرة السطر:
+                          </span>
                           <div className="rounded-lg bg-surface-2/80 px-2 py-1 text-center text-xs border border-border/60">
                             <span className="font-black text-foreground tabular-nums">
                               {fmtNum(rowEstimate)}
@@ -976,7 +986,21 @@ function MillingIntakePage() {
                   ) : (
                     <div className="flex min-h-9 items-center justify-between rounded-xl border border-primary/20 bg-primary/[0.04] px-3 text-xs font-semibold text-primary">
                       <span>الدفع موزع على عدة طرق</span>
-                      <button type="button" onClick={() => { setSplitPayments([]); setPaymentMethod("cash"); setSettlement((current) => ({ ...current, method: "cash", paymentMethodId: "cash" })); }} className="underline underline-offset-2">إلغاء التجزئة</button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSplitPayments([]);
+                          setPaymentMethod("cash");
+                          setSettlement((current) => ({
+                            ...current,
+                            method: "cash",
+                            paymentMethodId: "cash",
+                          }));
+                        }}
+                        className="underline underline-offset-2"
+                      >
+                        إلغاء التجزئة
+                      </button>
                     </div>
                   )}
                   <button
@@ -1073,7 +1097,8 @@ function MillingIntakePage() {
                 <div className="flex items-center gap-1.5 rounded-xl bg-destructive/10 p-2 text-xs font-semibold text-destructive border border-destructive/20">
                   <AlertCircle className="h-4 w-4 shrink-0" />
                   <span>
-                    المبلغ المدفوع ({fmtNum(currentPaid)}) أكبر من صافي الفاتورة ({fmtNum(grandTotal)})!
+                    المبلغ المدفوع ({fmtNum(currentPaid)}) أكبر من صافي الفاتورة (
+                    {fmtNum(grandTotal)})!
                   </span>
                 </div>
               )}
@@ -1177,9 +1202,7 @@ function MillingIntakePage() {
           context="sales"
           onConfirm={(splits) => {
             setSplitPayments(splits);
-            setPaymentMethod(
-              splits.length > 1 ? "split" : (splits[0]?.method ?? "credit"),
-            );
+            setPaymentMethod(splits.length > 1 ? "split" : (splits[0]?.method ?? "credit"));
             setPaid(String(splits.reduce((sum, line) => sum + line.amount, 0)));
             setPaidAuto(false);
           }}

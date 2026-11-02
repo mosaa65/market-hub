@@ -100,7 +100,7 @@ export interface ProductionOrderSummary {
 }
 
 export async function loadProductionLookups() {
-  const [warehouses, centers, products, units, productUoms, batches, inventory, costs, categories, orders] =
+  const [warehouses, centers, products, units, productUoms, batches, inventory, costs, categories] =
     await Promise.all([
       db.from("warehouses").select("id,name,name_ar,is_default").eq("is_active", true),
       db.from("expense_cost_centers").select("id,name,name_ar").eq("is_active", true).order("name"),
@@ -131,13 +131,6 @@ export async function loadProductionLookups() {
         .eq("is_active", true)
         .order("sort_order")
         .order("name"),
-      db
-        .from("production_orders")
-        .select(
-          "id,order_number,production_date,status,warehouse_id,cost_center_id,material_cost,conversion_cost,total_cost,output_cost,abnormal_loss_cost,notes,completed_at,reversed_at,reversal_reason",
-        )
-        .order("created_at", { ascending: false })
-        .limit(30),
     ]);
 
   const result = [
@@ -149,7 +142,7 @@ export async function loadProductionLookups() {
     batches,
     inventory,
     costs,
-    orders,
+    categories,
   ];
   const failure = result.filter((_, index) => index !== 7).find((item) => item.error);
   if (failure?.error) throw failure.error;
@@ -177,8 +170,28 @@ export async function loadProductionLookups() {
     }[],
     expenseSources: (costs.error ? [] : (costs.data ?? [])) as ProductionExpenseSource[],
     canAllocateExpenses: !costs.error,
+    expenseSourcesError: costs.error?.message ?? null,
     expenseCategories: (categories.data ?? []) as ProductionExpenseCategory[],
+  };
+}
+
+export async function loadProductionOrderHistory() {
+  const [orders, centers] = await Promise.all([
+    db
+      .from("production_orders")
+      .select(
+        "id,order_number,production_date,status,warehouse_id,cost_center_id,material_cost,conversion_cost,total_cost,output_cost,abnormal_loss_cost,notes,completed_at,reversed_at,reversal_reason",
+      )
+      .order("created_at", { ascending: false })
+      .limit(250),
+    db.from("expense_cost_centers").select("id,name,name_ar").order("name"),
+  ]);
+  if (orders.error) throw orders.error;
+  if (centers.error) throw centers.error;
+
+  return {
     orders: (orders.data ?? []) as ProductionOrderSummary[],
+    centers: (centers.data ?? []) as ProductionCostCenter[],
   };
 }
 

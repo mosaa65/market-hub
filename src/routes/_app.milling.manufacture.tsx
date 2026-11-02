@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   CheckCircle2,
+  ClipboardList,
   Plus,
-  RotateCcw,
   Trash2,
   Warehouse as WarehouseIcon,
 } from "lucide-react";
@@ -26,7 +26,6 @@ import {
 import {
   createAndPostProductionOrder,
   loadProductionLookups,
-  reverseProductionOrder,
   type ProductionExpenseInput,
   type ProductionLossInput,
   type ProductionMaterialInput,
@@ -35,7 +34,7 @@ import {
 } from "@/lib/production/production-orders";
 
 export const Route = createFileRoute("/_app/milling/manufacture")({
-  head: () => ({ meta: [{ title: "تصنيع منتجات المنشأة — فورتكس ERP" }] }),
+  head: () => ({ meta: [{ title: "التصنيع والإنتاج — فورتكس ERP" }] }),
   component: CompanyProductionPage,
 });
 
@@ -187,6 +186,8 @@ export function CompanyProductionPage() {
       source.cost_center_id === costCenterId &&
       Number(source.available_amount) > 0,
   );
+  const selectedCostCenter = data?.centers.find((center) => center.id === costCenterId);
+  const selectedCostCenterLabel = selectedCostCenter?.name_ar || selectedCostCenter?.name || "مركز التكلفة المحدد";
   const estimatedConversionCost = expenses.reduce(
     (sum, line) => sum + (Number(line.amount) || 0),
     0,
@@ -249,6 +250,7 @@ export function CompanyProductionPage() {
       setLosses([]);
       setNotes("");
       await qc.invalidateQueries({ queryKey: ["company-production"] });
+      await qc.invalidateQueries({ queryKey: ["company-production-order-history"] });
       await qc.invalidateQueries({ queryKey: ["inventory"] });
       await qc.invalidateQueries({ queryKey: ["milling"] });
     },
@@ -269,19 +271,6 @@ export function CompanyProductionPage() {
     },
     onError: (error) =>
       toast.error(translateRpcError(error, "ar", "تعذر تحديث أهلية تصنيف المصروف.")),
-  });
-
-  const productionReversal = useMutation({
-    mutationFn: (input: { orderId: string; reason: string }) =>
-      reverseProductionOrder(input.orderId, input.reason),
-    onSuccess: async (_orderId, input) => {
-      toast.success(`تم عكس تشغيلة الإنتاج: ${input.reason}`);
-      await qc.invalidateQueries({ queryKey: ["company-production"] });
-      await qc.invalidateQueries({ queryKey: ["inventory"] });
-      await qc.invalidateQueries({ queryKey: ["milling"] });
-    },
-    onError: (error) =>
-      toast.error(translateRpcError(error, "ar", "تعذر عكس التشغيلة. قد تكون لها حركات مخزون لاحقة.")),
   });
 
   const formValid = Boolean(
@@ -334,15 +323,23 @@ export function CompanyProductionPage() {
     <ModuleGuard moduleId="milling_operations">
       <div className="mx-auto max-w-7xl space-y-5 p-3 sm:p-5">
         <PageHeader
-          title="تصنيع منتجات المنشأة"
-          subtitle="أنشئ تشغيلة تنقل التكلفة الفعلية للمواد والتكاليف الصناعية المؤهلة إلى مخزون المنتجات الناتجة."
+          title="التصنيع والإنتاج"
+          subtitle="أنشئ تشغيلة تنقل تكلفة المواد والتكاليف الصناعية المؤهلة إلى مخزون المنتجات الناتجة."
           actions={
-            <Link
-              to="/milling/milling"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs font-bold text-foreground hover:bg-muted"
-            >
-              خدمة طحن حبوب العملاء <ArrowLeft className="h-3.5 w-3.5" />
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                to="/milling/production-orders"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs font-bold text-foreground hover:bg-muted"
+              >
+                <ClipboardList className="h-4 w-4" /> سجل التشغيلات
+              </Link>
+              <Link
+                to="/milling/milling"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs font-bold text-foreground hover:bg-muted"
+              >
+                خدمة طحن حبوب العملاء <ArrowLeft className="h-3.5 w-3.5" />
+              </Link>
+            </div>
           }
         />
 
@@ -399,6 +396,18 @@ export function CompanyProductionPage() {
                   </option>
                 ))}
               </MillingSelect>
+              <Link
+                to="/settings"
+                search={{ section: "expense-cost-centers" } as any}
+                className="mt-1 inline-flex text-[11px] font-semibold text-primary hover:underline"
+              >
+                إدارة مراكز التكلفة
+              </Link>
+              {!data?.centers.length && (
+                <p className="mt-1 text-[11px] text-amber-700">
+                  لا يوجد مركز تكلفة نشط. أضف مركز «الإنتاج» من إدارة مراكز التكلفة لتفعيل الترحيل.
+                </p>
+              )}
             </MillingField>
             <MillingField label="تاريخ الإنتاج">
               <MillingInput
@@ -421,7 +430,16 @@ export function CompanyProductionPage() {
           <MillingPanel>
             <MillingSectionTitle
               title="تصنيفات المصروف المؤهلة للتصنيع"
-              subtitle="كل التصنيفات تبدأ غير مؤهلة. فعّل فقط أجور الإنتاج والطاقة والتعبئة أو المصروف الصناعي المحدد. تبقى الإدارية والبيعية خارج المخزون، ويلزم أن يطابق مركز المصروف مركز التشغيلة."
+              subtitle="التأهيل يسمح بتخصيص الجزء الإنتاجي فقط من بند مصروف مرحّل؛ لا يضيف تكلفة تلقائياً. اختر تصنيفاً واضحاً لعمل إنتاجي واربطه بحساب مصروف."
+              action={
+                <Link
+                  to="/settings"
+                  search={{ section: "expense-categories" } as any}
+                  className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-2 text-xs font-bold hover:bg-muted"
+                >
+                  إدارة التصنيفات والحسابات
+                </Link>
+              }
             />
             <div className="grid gap-2 p-4 sm:grid-cols-2 xl:grid-cols-3">
               {(data?.expenseCategories ?? []).map((category) => (
@@ -451,6 +469,9 @@ export function CompanyProductionPage() {
                 <p className="text-xs text-muted-foreground">لا توجد تصنيفات مصروفات نشطة.</p>
               )}
             </div>
+            <p className="px-4 pb-4 text-[11px] leading-5 text-muted-foreground">
+              أجور العمالة المباشرة والطاقة المستخدمة في التشغيل والتعبئة المستهلكة فيه يمكن تخصيصها بنسبة الاستخدام. الإيجار والصيانة والاستهلاك الصناعي لا تُحمّل إلا بتوزيع منتظم على الطاقة الطبيعية. المصروف الإداري والبيعي والتوصيل للعميل خارج تكلفة المخزون. إذا كانت مواد التعبئة أصنافاً مخزنية فأضفها ضمن المواد المصروفة أعلاه.
+            </p>
           </MillingPanel>
         )}
 
@@ -702,7 +723,7 @@ export function CompanyProductionPage() {
         <MillingPanel>
           <MillingSectionTitle
             title="تكاليف التحويل المؤهلة"
-            subtitle="حمّل أجور العمالة والطاقة والتعبئة المرتبطة بالإنتاج من مصروف مرحّل، بالقيمة الصافية دون ضريبة المدخلات."
+            subtitle="خصص الجزء الإنتاجي من بند مصروف مُرحّل، بالقيمة الصافية دون ضريبة المدخلات، مع توثيق أساس التوزيع."
             action={
               <button
                 type="button"
@@ -720,13 +741,32 @@ export function CompanyProductionPage() {
             }
           />
           <div className="space-y-3 p-4">
-            {expenseSources.length === 0 && (
-              <p className="text-xs text-muted-foreground">
-                {data?.canAllocateExpenses
-                  ? "لا توجد بنود مصروف مرحّلة متاحة لمركز التكلفة المحدد."
-                  : "تحتاج صلاحية مالية لعرض المصروفات وتخصيصها."}{" "}
-                المصروفات العامة والإدارية لا تُرسمل تلقائياً.
+            {!data?.canAllocateExpenses && (
+              <p className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-3 text-xs leading-5 text-muted-foreground">
+                تعذر تحميل بنود المصروفات المؤهلة. تحقق من صلاحية قراءة المالية أو إعداد قاعدة البيانات.
+                {data?.expenseSourcesError ? <span className="sr-only"> {data.expenseSourcesError}</span> : null}
               </p>
+            )}
+            {data?.canAllocateExpenses && expenseSources.length === 0 && (
+              <div className="space-y-3 rounded-xl border border-dashed border-border p-4">
+                <div>
+                  <p className="text-sm font-semibold">لا يوجد مصروف مرحّل متاح لهذا المركز حتى الآن</p>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                    {costCenterId
+                      ? `تأهيل التصنيف لا يسجل مبلغاً. سجّل المصروف أولاً، واختر تصنيفه ومركز «${selectedCostCenterLabel}»، ثم استخدم «حفظ وصرف» أو رحّله من سجل المصروفات. بعد الترحيل سيظهر هنا تلقائياً.`
+                      : "اختر مركز التكلفة في بيانات التشغيلة أولاً. يجب أن يطابق مركز المصروف مركز التشغيلة حتى يظهر بند المصروف هنا."}
+                  </p>
+                </div>
+                {costCenterId && (
+                  <Link
+                    to="/expenses"
+                    search={{ create: true, costCenterId, categoryId: undefined } as any}
+                    className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-primary-foreground hover:opacity-90"
+                  >
+                    <Plus className="size-4" /> إضافة مصروف لهذا المركز
+                  </Link>
+                )}
+              </div>
             )}
             {expenses.map((line, index) => {
               const source = expenseSources.find(
@@ -955,89 +995,6 @@ export function CompanyProductionPage() {
           </button>
         </div>
 
-        <MillingPanel>
-          <MillingSectionTitle
-            title="تشغيلات الإنتاج المسجلة"
-            subtitle="قيمة المخزون المنتج تبقى مرتبطة بحركة استلامه. يمكن عكس التشغيلة إذا لم يكن للناتج رصيد سابق ولم تقع حركات لاحقة على المدخلات أو النواتج."
-          />
-          <div className="overflow-x-auto p-3">
-            <table className="w-full min-w-[760px] text-start text-xs">
-              <thead>
-                <tr className="border-b border-border text-muted-foreground">
-                  <th className="p-2">رقم التشغيلة</th>
-                  <th className="p-2">التاريخ</th>
-                  <th className="p-2">الحالة</th>
-                  <th className="p-2">المواد</th>
-                  <th className="p-2">التحويل</th>
-                  <th className="p-2">إجمالي التكلفة</th>
-                  <th className="p-2">تكلفة النواتج</th>
-                  {(hasRole("owner") || hasRole("manager") || hasRole("accountant")) && (
-                    <th className="p-2">الإجراء</th>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {(data?.orders ?? []).map((order) => (
-                  <tr key={order.id} className="border-b border-border/50">
-                    <td className="p-2 font-mono">{order.order_number}</td>
-                    <td className="p-2">{order.production_date}</td>
-                    <td
-                      className="p-2"
-                      title={order.reversal_reason ?? undefined}
-                    >
-                      {order.status === "POSTED"
-                        ? "مرحّلة"
-                        : order.status === "REVERSED"
-                          ? "معكوسة"
-                          : order.status === "CANCELLED"
-                            ? "ملغاة"
-                            : order.status}
-                    </td>
-                    <td className="p-2">{fmtNum(Number(order.material_cost))}</td>
-                    <td className="p-2">{fmtNum(Number(order.conversion_cost))}</td>
-                    <td className="p-2 font-bold">{fmtNum(Number(order.total_cost))}</td>
-                    <td className="p-2">{fmtNum(Number(order.output_cost))}</td>
-                    {(hasRole("owner") || hasRole("manager") || hasRole("accountant")) && (
-                      <td className="p-2">
-                        {order.status === "POSTED" && (
-                          <button
-                            type="button"
-                            disabled={productionReversal.isPending}
-                            title="عكس التشغيلة قبل الحركات اللاحقة"
-                            aria-label={`عكس تشغيلة الإنتاج ${order.order_number}`}
-                            onClick={() => {
-                              const reason = window.prompt(
-                                `سبب عكس تشغيلة الإنتاج ${order.order_number}`,
-                              );
-                              if (reason?.trim()) {
-                                productionReversal.mutate({ orderId: order.id, reason: reason.trim() });
-                              }
-                            }}
-                            className="inline-flex size-8 items-center justify-center rounded-full text-muted-foreground hover:bg-amber-500/10 hover:text-amber-700 disabled:opacity-50"
-                          >
-                            <RotateCcw className="size-4" />
-                          </button>
-                        )}
-                      </td>
-                    )}
-                  </tr>
-                ))}
-                {!data?.orders.length && (
-                  <tr>
-                    <td
-                      colSpan={
-                        hasRole("owner") || hasRole("manager") || hasRole("accountant") ? 8 : 7
-                      }
-                      className="p-8 text-center text-muted-foreground"
-                    >
-                      لا توجد تشغيلات إنتاج مسجلة.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </MillingPanel>
       </div>
     </ModuleGuard>
   );

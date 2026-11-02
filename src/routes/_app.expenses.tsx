@@ -13,8 +13,8 @@
  * breaks for anyone mid-task when this ships.
  */
 
-import { useCallback, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { useCallback, useEffect, useState } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ModuleGuard } from "@/lib/modules";
 import { ExpenseRegister } from "@/components/expenses/expense-register";
 import { ExpenseFormDialog } from "@/components/expenses/expense-form";
@@ -29,6 +29,11 @@ import { EMPTY_EXPENSE_FILTERS, type ExpenseListFilters } from "@/lib/expenses/q
 import type { ExpenseDetail, ExpenseListRow } from "@/lib/expenses/types";
 
 export const Route = createFileRoute("/_app/expenses")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    create: search.create === "1" || search.create === "true" || search.create === true,
+    costCenterId: typeof search.costCenterId === "string" ? search.costCenterId : undefined,
+    categoryId: typeof search.categoryId === "string" ? search.categoryId : undefined,
+  }),
   head: () => ({ meta: [{ title: "المصروفات — Vortex ERP" }] }),
   component: () => (
     <ModuleGuard moduleId="expenses">
@@ -38,6 +43,8 @@ export const Route = createFileRoute("/_app/expenses")({
 });
 
 function ExpensesPage() {
+  const search = Route.useSearch();
+  const navigate = useNavigate();
   /*
    * The default window is the current month. It is not imposed on the user —
    * the filter sheet can widen it — but starting unbounded would make the first
@@ -59,6 +66,12 @@ function ExpensesPage() {
   const list = useExpenseList(filters);
   const summary = useExpenseSummary(filters.dateFrom, filters.dateTo, filters.warehouseId);
   const realtime = useExpenseRealtime();
+
+  useEffect(() => {
+    if (!search.create) return;
+    setEditingDetail(null);
+    setFormOpen(true);
+  }, [search.create]);
 
   /* -------------------------------------------------- handlers */
   const handleCreate = useCallback(() => {
@@ -107,9 +120,20 @@ function ExpensesPage() {
       />
       <ExpenseFormDialog
         open={formOpen}
+        initialCostCenterId={search.create ? search.costCenterId : undefined}
+        initialCategoryId={search.create ? search.categoryId : undefined}
         onOpenChange={(open) => {
           setFormOpen(open);
-          if (!open) setEditingDetail(null);
+          if (!open) {
+            setEditingDetail(null);
+            if (search.create) {
+              void navigate({
+                to: "/expenses",
+                search: { create: undefined, costCenterId: undefined, categoryId: undefined } as any,
+                replace: true,
+              });
+            }
+          }
         }}
         lookups={lookups.data}
         lookupsError={lookups.error}

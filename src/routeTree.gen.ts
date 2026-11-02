@@ -69,6 +69,7 @@ import { Route as AppMillingManufactureRouteImport } from './routes/_app.milling
 import { Route as AppMillingMillingRouteImport } from './routes/_app.milling.milling'
 import { Route as AppMillingOperationsGuideRouteImport } from './routes/_app.milling.operations-guide'
 import { Route as AppMillingPerformanceRouteImport } from './routes/_app.milling.performance'
+import { Route as AppMillingProductionOrdersRouteImport } from './routes/_app.milling.production-orders'
 import { Route as AppMillingProductsRouteImport } from './routes/_app.milling.products'
 import { Route as AppReportsCustomersRouteImport } from './routes/_app.reports.customers'
 import { Route as AppReportsInventoryRouteImport } from './routes/_app.reports.inventory'
@@ -381,6 +382,12 @@ const AppMillingPerformanceRoute = AppMillingPerformanceRouteImport.update({
   path: '/performance',
   getParentRoute: () => AppMillingRoute,
 } as any)
+const AppMillingProductionOrdersRoute =
+  AppMillingProductionOrdersRouteImport.update({
+    id: '/production-orders',
+    path: '/production-orders',
+    getParentRoute: () => AppMillingRoute,
+  } as any)
 const AppMillingProductsRoute = AppMillingProductsRouteImport.update({
   id: '/products',
   path: '/products',
@@ -488,6 +495,7 @@ export interface FileRoutesByFullPath {
   '/milling/milling': typeof AppMillingMillingRoute
   '/milling/operations-guide': typeof AppMillingOperationsGuideRoute
   '/milling/performance': typeof AppMillingPerformanceRoute
+  '/milling/production-orders': typeof AppMillingProductionOrdersRoute
   '/milling/products': typeof AppMillingProductsRoute
   '/reports/customers': typeof AppReportsCustomersRoute
   '/reports/inventory': typeof AppReportsInventoryRoute
@@ -558,6 +566,7 @@ export interface FileRoutesByTo {
   '/milling/milling': typeof AppMillingMillingRoute
   '/milling/operations-guide': typeof AppMillingOperationsGuideRoute
   '/milling/performance': typeof AppMillingPerformanceRoute
+  '/milling/production-orders': typeof AppMillingProductionOrdersRoute
   '/milling/products': typeof AppMillingProductsRoute
   '/reports/customers': typeof AppReportsCustomersRoute
   '/reports/inventory': typeof AppReportsInventoryRoute
@@ -630,6 +639,7 @@ export interface FileRoutesById {
   '/_app/milling/milling': typeof AppMillingMillingRoute
   '/_app/milling/operations-guide': typeof AppMillingOperationsGuideRoute
   '/_app/milling/performance': typeof AppMillingPerformanceRoute
+  '/_app/milling/production-orders': typeof AppMillingProductionOrdersRoute
   '/_app/milling/products': typeof AppMillingProductsRoute
   '/_app/reports/customers': typeof AppReportsCustomersRoute
   '/_app/reports/inventory': typeof AppReportsInventoryRoute
@@ -702,6 +712,7 @@ export interface FileRouteTypes {
     | '/milling/milling'
     | '/milling/operations-guide'
     | '/milling/performance'
+    | '/milling/production-orders'
     | '/milling/products'
     | '/reports/customers'
     | '/reports/inventory'
@@ -772,6 +783,7 @@ export interface FileRouteTypes {
     | '/milling/milling'
     | '/milling/operations-guide'
     | '/milling/performance'
+    | '/milling/production-orders'
     | '/milling/products'
     | '/reports/customers'
     | '/reports/inventory'
@@ -843,6 +855,7 @@ export interface FileRouteTypes {
     | '/_app/milling/milling'
     | '/_app/milling/operations-guide'
     | '/_app/milling/performance'
+    | '/_app/milling/production-orders'
     | '/_app/milling/products'
     | '/_app/reports/customers'
     | '/_app/reports/inventory'
@@ -1282,6 +1295,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMillingPerformanceRouteImport
       parentRoute: typeof AppMillingRoute
     }
+    '/_app/milling/production-orders': {
+      id: '/_app/milling/production-orders'
+      path: '/production-orders'
+      fullPath: '/milling/production-orders'
+      preLoaderRoute: typeof AppMillingProductionOrdersRouteImport
+      parentRoute: typeof AppMillingRoute
+    }
     '/_app/milling/products': {
       id: '/_app/milling/products'
       path: '/products'
@@ -1357,6 +1377,7 @@ interface AppMillingRouteChildren {
   AppMillingMillingRoute: typeof AppMillingMillingRoute
   AppMillingOperationsGuideRoute: typeof AppMillingOperationsGuideRoute
   AppMillingPerformanceRoute: typeof AppMillingPerformanceRoute
+  AppMillingProductionOrdersRoute: typeof AppMillingProductionOrdersRoute
   AppMillingProductsRoute: typeof AppMillingProductsRoute
 }
 
@@ -1369,6 +1390,7 @@ const AppMillingRouteChildren: AppMillingRouteChildren = {
   AppMillingMillingRoute: AppMillingMillingRoute,
   AppMillingOperationsGuideRoute: AppMillingOperationsGuideRoute,
   AppMillingPerformanceRoute: AppMillingPerformanceRoute,
+  AppMillingProductionOrdersRoute: AppMillingProductionOrdersRoute,
   AppMillingProductsRoute: AppMillingProductsRoute,
 }
 

@@ -81,7 +81,9 @@ function CustodyProductsPage() {
   const [dialogDefaultClass, setDialogDefaultClass] = useState<
     "RAW_MATERIAL" | "FINISHED_GOOD" | "BY_PRODUCT"
   >("RAW_MATERIAL");
-  const [editingProduct, setEditingProduct] = useState<CustodyProductFormData | null>(null);
+  const [editingProduct, setEditingProduct] = useState<
+    (Partial<CustodyProductFormData> & { id: string }) | null
+  >(null);
 
   /* ---- fetch custody products ---- */
   const { data: products = [], isLoading } = useQuery({
@@ -145,6 +147,8 @@ function CustodyProductsPage() {
   };
 
   const handleEdit = (p: CustodyProduct) => {
+    // الحقوق غير الموجودة في صف قائمة المنتجات تُترك `undefined`، فيملأها
+    // النموذج الموحّد من القاعدة عند الحفظ. لا نفترض قيمًا فارغة هنا.
     setEditingProduct({
       id: p.id,
       name_ar: p.name_ar,
@@ -178,9 +182,7 @@ function CustodyProductsPage() {
           actions={
             <div className="flex items-center gap-2">
               <button
-                onClick={() =>
-                  handleCreate(tab === "raw" ? "RAW_MATERIAL" : "FINISHED_GOOD")
-                }
+                onClick={() => handleCreate(tab === "raw" ? "RAW_MATERIAL" : "FINISHED_GOOD")}
                 className={cn(
                   "flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold text-white transition-all",
                   "bg-gradient-to-l from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400",
@@ -275,13 +277,7 @@ function CustodyProductsPage() {
             }
             action={
               <button
-                onClick={() =>
-                  handleCreate(
-                    tab === "raw"
-                      ? "RAW_MATERIAL"
-                      : "FINISHED_GOOD",
-                  )
-                }
+                onClick={() => handleCreate(tab === "raw" ? "RAW_MATERIAL" : "FINISHED_GOOD")}
                 className="flex items-center gap-1.5 rounded-lg bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-300 transition-colors hover:bg-amber-500/20"
               >
                 <Plus className="h-3 w-3" />
@@ -371,9 +367,7 @@ function CustodyProductsPage() {
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
                       <button
-                        onClick={() =>
-                          toggleMutation.mutate({ id: p.id, active: !p.is_active })
-                        }
+                        onClick={() => toggleMutation.mutate({ id: p.id, active: !p.is_active })}
                         title={p.is_active ? "تعطيل الصنف" : "تفعيل الصنف"}
                         className={cn(
                           "grid h-8 w-8 place-items-center rounded-lg transition-colors",

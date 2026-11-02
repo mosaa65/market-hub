@@ -52,6 +52,7 @@ import {
   fmtNum,
 } from "@/components/milling/milling-ui";
 import { QuantityInput } from "@/components/ui/quantity-input";
+import { ProductPicker } from "@/components/products/product-picker";
 
 export const Route = createFileRoute("/_app/milling/milling")({
   head: () => ({ meta: [{ title: "عمليات الطحن ونواتج الأمانات — فورتكس ERP" }] }),
@@ -485,19 +486,21 @@ function MillingMillPage() {
                       }`}
                     >
                       <div className="grid grid-cols-[1fr_auto] items-center gap-2">
-                        <MillingSelect
+                        <ProductPicker
                           value={line.itemId}
-                          onChange={(e) => changeGrainItem(idx, e.target.value)}
-                          className="font-bold text-xs"
-                        >
-                          <option value="">اختر صنف الحبوب من رصيد العميل…</option>
-                          {grainBalances.map((g) => (
-                            <option key={g.item_id} value={g.item_id}>
-                              {g.name_ar} — رصيد متبقٍ: {fmtNum(g.bags_balance)} كيس (
-                              {fmtNum(g.kg_balance)} كجم)
-                            </option>
-                          ))}
-                        </MillingSelect>
+                          items={grainBalances.map((g) => ({
+                            id: g.item_id,
+                            nameAr: g.name_ar,
+                            sku: g.sku,
+                            item_class: g.item_class,
+                            balanceKg: g.kg_balance,
+                            balanceBags: g.bags_balance,
+                          }))}
+                          classes={["RAW_MATERIAL"]}
+                          onChange={(item) => changeGrainItem(idx, item.id)}
+                          placeholder="اختر صنف الحبوب من رصيد العميل…"
+                          ariaLabel={`الحبوب المطحونة في السطر ${idx + 1}`}
+                        />
                         <div className="flex items-center gap-1">
                           {b && (
                             <button
@@ -667,19 +670,20 @@ function MillingMillPage() {
                     key={idx}
                     className="grid min-w-0 grid-cols-1 items-center gap-2.5 rounded-xl border border-border/70 bg-card p-3 sm:grid-cols-[minmax(0,1fr)_minmax(84px,0.35fr)_minmax(100px,0.4fr)_36px] sm:gap-3"
                   >
-                    <MillingSelect
+                    <ProductPicker
                       value={line.itemId}
-                      onChange={(e) => changeLineItem(idx, e.target.value)}
-                      className="font-bold text-xs"
-                    >
-                      <option value="">اختر الناتج (دقيق / نخالة / سميد)…</option>
-                      {(outputItems.data ?? []).map((g: ProductOption) => (
-                        <option key={g.id} value={g.id}>
-                          {g.name_ar || g.name}{" "}
-                          {g.package_weight_kg ? `(${g.package_weight_kg} كجم)` : ""}
-                        </option>
-                      ))}
-                    </MillingSelect>
+                      items={(outputItems.data ?? []).map((g: ProductOption) => ({
+                        id: g.id,
+                        nameAr: g.name_ar || g.name,
+                        sku: g.sku,
+                        item_class: g.item_class,
+                        package_weight_kg: g.package_weight_kg,
+                      }))}
+                      classes={["FINISHED_GOOD", "BY_PRODUCT"]}
+                      onChange={(item) => changeLineItem(idx, item.id)}
+                      placeholder="اختر الناتج (دقيق / نخالة / سميد)…"
+                      ariaLabel={`ناتج الطحن في السطر ${idx + 1}`}
+                    />
 
                     <QuantityInput
                       decimals={0}

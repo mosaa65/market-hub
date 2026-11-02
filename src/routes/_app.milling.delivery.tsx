@@ -49,6 +49,7 @@ import {
   fmtNum,
 } from "@/components/milling/milling-ui";
 import { QuantityInput } from "@/components/ui/quantity-input";
+import { ProductPicker } from "@/components/products/product-picker";
 
 export const Route = createFileRoute("/_app/milling/delivery")({
   head: () => ({ meta: [{ title: "تسليم نواتج الأمانات — فورتكس ERP" }] }),
@@ -398,19 +399,21 @@ function MillingDeliveryPage() {
                       }`}
                     >
                       <div className="grid grid-cols-[1fr_auto] items-center gap-2">
-                        <MillingSelect
+                        <ProductPicker
                           value={line.itemId}
-                          onChange={(e) => changeLineItem(idx, e.target.value)}
-                          className="font-bold text-xs"
-                        >
-                          <option value="">اختر ناتج الطحن أو الأمانة…</option>
-                          {available.map((item) => (
-                            <option key={item.item_id} value={item.item_id}>
-                              {item.name_ar} — رصيد متبقٍ: {fmtNum(item.bags_balance)} كيس (
-                              {fmtNum(item.kg_balance)} كجم)
-                            </option>
-                          ))}
-                        </MillingSelect>
+                          items={available.map((item) => ({
+                            id: item.item_id,
+                            nameAr: item.name_ar,
+                            sku: item.sku,
+                            item_class: item.item_class,
+                            balanceKg: item.kg_balance,
+                            balanceBags: item.bags_balance,
+                          }))}
+                          classes={["RAW_MATERIAL", "FINISHED_GOOD", "BY_PRODUCT"]}
+                          onChange={(item) => changeLineItem(idx, item.id)}
+                          placeholder="اختر ناتج الطحن أو الأمانة…"
+                          ariaLabel={`صنف التسليم في السطر ${idx + 1}`}
+                        />
 
                         <div className="flex items-center gap-1">
                           {b && (
@@ -517,8 +520,6 @@ function MillingDeliveryPage() {
                   <span>إضافة صنف آخر للتسليم</span>
                 </button>
               </div>
-
-
 
               <MillingField label="ملاحظات التسليم الإضافية" hint="تظهر في سند التسليم الرسمي">
                 <MillingTextarea
