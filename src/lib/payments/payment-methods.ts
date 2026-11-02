@@ -391,112 +391,31 @@ export const PAYMENT_METHOD_CATALOG: readonly PaymentMethodDefinition[] = [
     iconKey: "bank-transfer",
     isActive: true,
     sortOrder: 30,
-    allowedContexts: ["pos", "sales", "purchases", "expenses", "customer_collection"],
+    // المرتجعات مشمولة: استرداد العميل أو قبض المورد يمرّ عبر البنك فعلًا. حرمانه
+    // كان يجبر الكاشير على تسجيل استرداد بنكي كأنه نقد من الصندوق.
+    allowedContexts: [
+      "pos",
+      "sales",
+      "purchases",
+      "expenses",
+      "customer_collection",
+      "sales_returns",
+      "purchase_returns",
+    ],
     ledgerKind: "BANK",
     defaultAccountCode: "1111",
     requiresReference: true,
     legacyValue: "bank_transfer",
   },
-  {
-    id: "kuraimi_bank",
-    nameAr: "بنك الكريمي",
-    nameEn: "Al-Kuraimi Bank",
-    iconKey: "kuraimi",
-    isActive: false,
-    sortOrder: 40,
-    allowedContexts: ["pos", "sales", "purchases", "expenses", "customer_collection"],
-    ledgerKind: "BANK",
-    defaultAccountCode: "1111",
-    requiresReference: true,
-    legacyValue: "bank_transfer",
-    // No legacy id: this method was never its own ENUM value. Storing the
-    // generic `bank_transfer` is deliberate — see the migration seed.
-    legacyIds: [],
-  },
-  {
-    id: "yemen_kuwait_bank",
-    nameAr: "بنك اليمن الدولي",
-    nameEn: "Yemen International Bank",
-    iconKey: "bank",
-    isActive: false,
-    sortOrder: 50,
-    allowedContexts: ["pos", "sales", "purchases", "expenses", "customer_collection"],
-    ledgerKind: "BANK",
-    defaultAccountCode: "1111",
-    requiresReference: true,
-    legacyValue: "bank_transfer",
-    legacyIds: [],
-  },
-  {
-    id: "jawali",
-    nameAr: "جوالي",
-    nameEn: "Jawali",
-    iconKey: "mobile-money",
-    isActive: false,
-    sortOrder: 60,
-    allowedContexts: ["pos", "sales", "purchases", "expenses", "customer_collection"],
-    ledgerKind: "WALLET",
-    defaultAccountCode: "1131",
-    requiresReference: true,
-    legacyValue: "mobile_money",
-    // The FIRST wallet carries the historical `mobile_money` value; the others
-    // deliberately do not, so a stored `mobile_money` resolves to جوالي only.
-    legacyIds: ["mobile_money"],
-  },
-  {
-    id: "jaib",
-    nameAr: "جيب",
-    nameEn: "Jaib Wallet",
-    iconKey: "wallet",
-    isActive: false,
-    sortOrder: 70,
-    allowedContexts: ["pos", "sales", "purchases", "expenses", "customer_collection"],
-    ledgerKind: "WALLET",
-    defaultAccountCode: "1131",
-    requiresReference: true,
-    legacyValue: "mobile_money",
-    legacyIds: [],
-  },
-  {
-    id: "floosak",
-    nameAr: "فلوسك",
-    nameEn: "Floosak",
-    iconKey: "wallet",
-    isActive: false,
-    sortOrder: 80,
-    allowedContexts: ["pos", "sales", "purchases", "expenses", "customer_collection"],
-    ledgerKind: "WALLET",
-    defaultAccountCode: "1131",
-    requiresReference: true,
-    legacyValue: "mobile_money",
-    legacyIds: [],
-  },
-  {
-    id: "one_cash",
-    nameAr: "ون كاش",
-    nameEn: "One Cash",
-    iconKey: "wallet",
-    isActive: false,
-    sortOrder: 90,
-    allowedContexts: ["pos", "sales", "purchases", "expenses", "customer_collection"],
-    ledgerKind: "WALLET",
-    defaultAccountCode: "1131",
-    requiresReference: true,
-    legacyValue: "mobile_money",
-    legacyIds: [],
-  },
-  {
-    id: "card",
-    nameAr: "بطاقة / شبكة",
-    nameEn: "Card",
-    iconKey: "card",
-    isActive: false,
-    sortOrder: 100,
-    allowedContexts: ["pos", "sales", "purchases", "expenses", "customer_collection"],
-    ledgerKind: "CARD",
-    defaultAccountCode: "1111",
-    legacyValue: "card",
-  },
+  /*
+   * الطرق الثماني المتقاعدة (بنك الكريمي، بنك اليمن الدولي، جوالي، جيب، فلوسك،
+   * ون كاش، البطاقة، الشيك) كانت مُدرَجة هنا حتى تحمل المستندات القديمة اسمًا
+   * وأيقونة. أحيلت إلى `RETIRED_PAYMENT_METHOD_LABELS` أدناه: بيانات بسيطة بلا
+   * أقسام ولا حساب ولا تفعيل، فلا يمكن أن تُعرض كخيار مرة أخرى.
+   *
+   * حُذفت من القاعدة كلها في الترحيل 9910، لأن المستند يخزّن قيمة التعداد
+   * (`payment_method` / `refund_method`) لا حقلًا مرجعيًا إلى هذا الجدول.
+   */
   {
     id: "mobile_money",
     nameAr: "محفظة إلكترونية",
@@ -504,36 +423,20 @@ export const PAYMENT_METHOD_CATALOG: readonly PaymentMethodDefinition[] = [
     iconKey: "mobile-money",
     isActive: true,
     sortOrder: 110,
-    allowedContexts: ["pos", "sales", "purchases", "expenses", "customer_collection"],
+    // نفس سبب تحويل بنكي: الاسترداد إلى المحفظة تحصيل عكسي مشروع.
+    allowedContexts: [
+      "pos",
+      "sales",
+      "purchases",
+      "expenses",
+      "customer_collection",
+      "sales_returns",
+      "purchase_returns",
+    ],
     ledgerKind: "WALLET",
     defaultAccountCode: "1131",
     requiresReference: true,
     legacyValue: "mobile_money",
-  },
-  {
-    // A cheque clears through the bank, so it settles as `bank_transfer` while
-    // keeping its own name and icon. It shipped in the migration seed from the
-    // start (`20261208000000` section 1) — its absence here meant a database
-    // that had the migration applied showed "شيك" with no label and no icon.
-    id: "cheque",
-    nameAr: "شيك",
-    nameEn: "Cheque",
-    // The applied database seed uses `bank-transfer`; keep it aligned until a
-    // forward migration deliberately changes the stored icon key.
-    iconKey: "bank-transfer",
-    isActive: false,
-    sortOrder: 120,
-    allowedContexts: ["pos", "sales", "purchases", "expenses", "customer_collection"],
-    ledgerKind: "BANK",
-    //
-    // 1221 لا 1111: الشيك ليس نقدًا في البنك بعد — هو ورقة برسم التحصيل.
-    // تقييده على حساب البنك مباشرةً يُظهر رصيدًا متاحًا لم يُحصَّل بعد،
-    // ويخالف ما تفعله قاعدة البيانات عند الترحيل (`payment_method_ledger_account`
-    // تُرجع 1221 للشيك). الترتيب الصحيح: 1221 ← يُحوَّل إلى 1111 عند التحصيل.
-    defaultAccountCode: "1221",
-    requiresReference: true,
-    legacyValue: "cheque",
-    legacyIds: ["cheque"],
   },
   {
     // Not a tender the operator picks — it is what an invoice records when the
@@ -552,6 +455,46 @@ export const PAYMENT_METHOD_CATALOG: readonly PaymentMethodDefinition[] = [
     legacyIds: ["split"],
   },
 ];
+
+/**
+ * أسماء الطرق المتقاعدة، للعرض التاريخي فقط.
+ *
+ * حُذفت صفوفها من `payment_methods` وتعدادها لم يُحذف: مستند من 2024 يقول
+ * `card` يجب أن يُطبع «بطاقة / شبكة» لا `card`. هذا الجدول هو المكان الوحيد
+ * الذي تحتفظ فيه الواجهة بتلك الأسماء — بيانات عرض فقط، لا تعريف طريقة:
+ * بلا `allowedContexts` ولا `ledgerKind` ولا حساب، فلا يمكن أن تظهر كخيار.
+ */
+export const RETIRED_PAYMENT_METHOD_LABELS: Record<string, { nameAr: string; nameEn: string }> = {
+  kuraimi_bank: { nameAr: "بنك الكريمي", nameEn: "Al-Kuraimi Bank" },
+  yemen_kuwait_bank: { nameAr: "بنك اليمن الدولي", nameEn: "Yemen International Bank" },
+  jawali: { nameAr: "جوالي", nameEn: "Jawali" },
+  jaib: { nameAr: "جيب", nameEn: "Jaib Wallet" },
+  floosak: { nameAr: "فلوسك", nameEn: "Floosak" },
+  one_cash: { nameAr: "ون كاش", nameEn: "One Cash" },
+  card: { nameAr: "بطاقة / شبكة", nameEn: "Card" },
+  cheque: { nameAr: "شيك", nameEn: "Cheque" },
+};
+
+/**
+ * القيم التي تحتاج مرجعًا، ومنها المتقاعدة.
+ *
+ * معرّفات البنوك والمحافظ المسماة ليست قيم تعداد، فمرجعها يلزم لأن مستندًا
+ * قديمًا كتب عليها تحويلًا لا يُطابق بأي إشعار آخر. القائمة صغيرة وباينة
+ * ومقصورة على ما عاد يُكتب، فلا خطر أن تتضخم.
+ */
+const REQUIRES_REFERENCE_LEGACY = new Set<string>([
+  "bank_transfer",
+  "mobile_money",
+  "cheque",
+  "card",
+  // هويات المؤسسات المتقاعدة: كانت `requiresReference = true` في صفوفها.
+  "kuraimi_bank",
+  "yemen_kuwait_bank",
+  "jawali",
+  "jaib",
+  "floosak",
+  "one_cash",
+]);
 
 /**
  * Is this id something an OPERATOR may pick as a single tender?
@@ -657,7 +600,23 @@ export function toStorablePaymentValue(id: string | null | undefined): LegacyPay
  */
 export function requiresPaymentReference(id: string | null | undefined): boolean {
   if (!id) return false;
-  return Boolean(CATALOG_BY_ID.get(id)?.requiresReference);
+
+  const shipped = CATALOG_BY_ID.get(id);
+  if (shipped) return Boolean(shipped.requiresReference);
+
+  // القيمة المخزّنة نفسها: `mobile_money` / `bank_transfer` تحلّ إلى الطريقة
+  // المعتمدة المعادلة.
+  const byLegacy = CATALOG_BY_LEGACY.get(id);
+  if (byLegacy) return Boolean(byLegacy.requiresReference);
+
+  //
+  // متقاعد أو غير معروف. `cheque` و`card` تحتاجان مرجعًا إن ظهرتا على مستند
+  // قديم، وكذلك معرّفات البنوك والمحافظ المسماة (`jawali`، `jaib`، …): مرجع
+  // التحويل/المحفظة هو ما يطابق الدفعة بإشعارها.
+  //
+  // قبل حذف الصفوف كان هذا يُقرأ من الكتالوج. بقي دلاليًا كما كان: كل طريقة
+  // تحصيل غير نقدية تحتاج مرجعًا، والنقد وحده لا.
+  return REQUIRES_REFERENCE_LEGACY.has(id);
 }
 
 /**
@@ -896,9 +855,16 @@ export function paymentMethodLabel(
   }
 
   const def = byId ?? CATALOG_BY_LEGACY.get(value);
-  if (!def) return value;
+  if (def) return lang === "ar" ? def.nameAr : (def.nameEn ?? def.nameAr);
 
-  return lang === "ar" ? def.nameAr : (def.nameEn ?? def.nameAr);
+  // معرّف لطريقة متقاعدة (بنك الكريمي، جيب، …) قد يظهر في سجل تدقيق أو مستند
+  // قديم، وأيضًا القيمتان `card` / `cheque` التي لم تعد لهما طريقة في الكتالوج.
+  // اسمه العربي معروف في سجل الأسماء التاريخية، فلا نُطبع معرّفًا لاتينيًا في
+  // واجهة عربية.
+  const retired = RETIRED_PAYMENT_METHOD_LABELS[value];
+  if (retired) return lang === "ar" ? retired.nameAr : retired.nameEn;
+
+  return value;
 }
 
 /**

@@ -131,23 +131,61 @@ export function PaymentMethodSelect({
   const selected =
     options.find((m) => m.id === value || m.legacyValue === value) ?? options[0] ?? null;
 
-  /** الحساب المرتبط — مصدره الخزائن/البنوك الفعلية، لا نص مكتوب. */
+  /**
+   * الحساب المرتبط — مصدره الخزائن/البنوك الفعلية، لا نص مكتوب.
+   *
+   * ترتيب الأسبقية:
+   *   1. ما اختاره المشغّل على هذه الفاتورة (`settlement`).
+   *   2. الحساب الافتراضي الذي ربطته المنشأة بالطريقة في الإعدادات
+   *      (`payment_method_settings.default_account_id`) — يُحلّ إلى صندوق أو
+   *      بنك أو محفظة بالحساب نفسه، فقد يكون الحساب الفرعي موجودًا دون صف
+   *      صندوق/بنك مقابل له في القوائم.
+   *   3. الصندوق/البنك/المحفظة الافتراضية.
+   *
+   * الخطوة الثانية غائبة كانت، فاختيار «بنك التضامن» في الإعدادات لا يظهر في
+   * الكاشير إلا إن اختاره المشغّل يدويًا في كل فاتورة.
+   *
+   * وإذا لم يوجد صف صندوق أو بنك أو محفظة أصلًا، يُعرض الحساب الافتراضي نفسه:
+   * الترحيل يعمل معه (محرك الترحيل يقرأ `default_account_id` مباشرةً)، فلا معنى
+   * لإعلان «بلا حساب في الدليل» وتخويف المشغّل والقيود تُرحَّل سليمة.
+   */
   const accountFor = React.useCallback(
     (method: ResolvedPaymentMethod | null) => {
       if (!method) return null;
+      const configured = method.defaultAccount;
+
       if (method.ledgerKind === "CASH") {
         const box =
-          activeCashboxes.find((c) => c.id === settlement?.cashboxId) ?? defaultCashbox ?? null;
-        return box ? { id: box.id, name: box.name_ar, kind: "CASH" as const } : null;
+          activeCashboxes.find((c) => c.id === settlement?.cashboxId) ??
+          (configured ? activeCashboxes.find((c) => c.account_id === configured.id) : undefined) ??
+          defaultCashbox ??
+          null;
+        if (box) return { id: box.id, name: box.name_ar, kind: "CASH" as const };
+        return configured
+          ? { id: configured.id, name: configured.nameAr, kind: "CASH" as const }
+          : null;
       }
       if (method.ledgerKind === "BANK" || method.ledgerKind === "CARD") {
-        const bank = banks.find((b) => b.id === settlement?.bankAccountId) ?? defaultBank ?? null;
-        return bank ? { id: bank.id, name: bank.name_ar, kind: "BANK" as const } : null;
+        const bank =
+          banks.find((b) => b.id === settlement?.bankAccountId) ??
+          (configured ? banks.find((b) => b.account_id === configured.id) : undefined) ??
+          defaultBank ??
+          null;
+        if (bank) return { id: bank.id, name: bank.name_ar, kind: "BANK" as const };
+        return configured
+          ? { id: configured.id, name: configured.nameAr, kind: "BANK" as const }
+          : null;
       }
       if (method.ledgerKind === "WALLET") {
         const wallet =
-          wallets.find((w) => w.id === settlement?.bankAccountId) ?? defaultWallet ?? null;
-        return wallet ? { id: wallet.id, name: wallet.name_ar, kind: "WALLET" as const } : null;
+          wallets.find((w) => w.id === settlement?.bankAccountId) ??
+          (configured ? wallets.find((w) => w.account_id === configured.id) : undefined) ??
+          defaultWallet ??
+          null;
+        if (wallet) return { id: wallet.id, name: wallet.name_ar, kind: "WALLET" as const };
+        return configured
+          ? { id: configured.id, name: configured.nameAr, kind: "WALLET" as const }
+          : null;
       }
       return null;
     },
@@ -173,7 +211,9 @@ export function PaymentMethodSelect({
       selected?.ledgerKind === "CARD" ||
       selected?.ledgerKind === "WALLET") &&
     !selectedAccount;
-  const needsDetail = !isCredit && (Boolean(selectedAccount) || needsReference);
+  // التحذير جزء من التفصيل: كان يظهر تحت حقل لا يُعرض، فلا يراه أحد ويُكتشف
+  // النقص عند أول تحصيل يفشل.
+  const needsDetail = !isCredit && (Boolean(selectedAccount) || needsReference || accountMissing);
   const showSearch = options.length > 5;
 
   const filtered = React.useMemo(() => {

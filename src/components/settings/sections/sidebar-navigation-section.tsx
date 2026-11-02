@@ -18,6 +18,7 @@ const GROUPS = [
   ["suppliers", "nav.view.group.suppliers"],
   ["milling", "nav.view.group.milling"],
   ["finance", "nav.view.group.finance"],
+  ["expenses", "nav.view.group.expenses"],
   ["reports", "nav.view.group.reports"],
   ["statements", "nav.view.group.statements"],
   ["admin", "nav.view.group.admin"],

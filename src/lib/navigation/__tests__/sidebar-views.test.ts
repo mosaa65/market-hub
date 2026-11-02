@@ -51,10 +51,13 @@ check(
 check("focus mode exposes groups available for selection", focus.availableFocusGroups.length > 1);
 
 const explorerHome = buildSidebarView(sections, "explorer", null);
-const explorerUnit = buildSidebarView(sections, "explorer", "inventory");
-check("explorer home starts at the unit chooser", explorerHome.groups.length === 0);
 check(
-  "explorer opens only the selected unit submenu",
+  "explorer home exposes units without displaying their routes",
+  explorerHome.groups.length === 0 && explorerHome.availableFocusGroups.length > 1,
+);
+const explorerUnit = buildSidebarView(sections, "explorer", "inventory");
+check(
+  "explorer opens only the selected unit navigation",
   explorerUnit.groups.length === 1 && explorerUnit.groups[0]?.key === "inventory",
 );
 const explorerHomeUnit = buildSidebarView(sections, "explorer", "command_center");

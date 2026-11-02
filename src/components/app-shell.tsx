@@ -3,9 +3,13 @@ import { HeaderNavArrows } from "@/components/header-nav-arrows";
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ArrowLeft,
+  ArrowRight,
   Bell,
   Check,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Layers3,
   LogOut,
   Menu,
@@ -111,6 +115,16 @@ const CATEGORY_STYLES: Record<
     activeBg:
       "bg-gradient-to-r from-violet-500/15 via-violet-500/5 to-transparent border-violet-500/20",
   },
+  expenses: {
+    iconBoxActive: "bg-fuchsia-500/20 text-fuchsia-500 ring-1 ring-fuchsia-500/40",
+    iconBoxInactive:
+      "bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400 group-hover:bg-fuchsia-500/20",
+    iconActive: "text-fuchsia-500 stroke-[2.4]",
+    iconInactive: "text-fuchsia-600 dark:text-fuchsia-400 group-hover:scale-110",
+    accentPill: "bg-fuchsia-500",
+    activeBg:
+      "bg-gradient-to-r from-fuchsia-500/15 via-fuchsia-500/5 to-transparent border-fuchsia-500/20",
+  },
   milling: {
     iconBoxActive: "bg-orange-500/20 text-orange-500 ring-1 ring-orange-500/40",
     iconBoxInactive:
@@ -210,6 +224,7 @@ const SidebarContents = memo(function SidebarContents({
   });
   const currentSearchParams = useMemo(() => new URLSearchParams(currentSearch), [currentSearch]);
   const currentSection = currentSearchParams.get("section");
+  const navigationRef = useRef<HTMLElement | null>(null);
 
   // Navigation belongs to the application itself, not to an individual tenant.
   // The company logo remains available in invoices and printable documents.
@@ -243,6 +258,30 @@ const SidebarContents = memo(function SidebarContents({
       ),
     [filteredSections, preferences.mode, preferences.focusGroup, preferences.explorerGroup],
   );
+  const explorerModules = useMemo(
+    () => availableFocusGroups.filter((group) => group.key !== "command_center"),
+    [availableFocusGroups],
+  );
+  const selectedExplorerModule =
+    preferences.mode === "explorer"
+      ? explorerModules.find((group) => group.key === preferences.explorerGroup) ?? null
+      : null;
+  const SelectedExplorerModuleIcon = selectedExplorerModule
+    ? routeIcon(selectedExplorerModule.entries[0]?.id ?? selectedExplorerModule.key)
+    : null;
+  const selectedExplorerModuleStyle = selectedExplorerModule
+    ? getSidebarStyle(
+        selectedExplorerModule.styleCategory,
+        selectedExplorerModule.key,
+        preferences,
+      )
+    : null;
+
+  useEffect(() => {
+    if (preferences.mode === "explorer") {
+      navigationRef.current?.scrollTo({ top: 0 });
+    }
+  }, [preferences.explorerGroup, preferences.mode]);
 
   // مجدول النسخ الاحتياطي التلقائي — يعمل مرة واحدة عند إقلاع التطبيق
   useEffect(() => {
@@ -253,9 +292,10 @@ const SidebarContents = memo(function SidebarContents({
     if (
       preferences.mode === "explorer" &&
       preferences.explorerGroup &&
-      !availableFocusGroups.some((group) => group.key === preferences.explorerGroup)
+      !explorerModules.some((group) => group.key === preferences.explorerGroup)
     ) {
       update({ explorerGroup: null });
+      return;
     }
     if (
       preferences.mode === "focus" &&
@@ -271,6 +311,7 @@ const SidebarContents = memo(function SidebarContents({
     }
   }, [
     availableFocusGroups,
+    explorerModules,
     preferences.explorerGroup,
     preferences.focusGroup,
     preferences.mode,
@@ -433,6 +474,7 @@ const SidebarContents = memo(function SidebarContents({
 
       {/* Navigation Links */}
       <nav
+        ref={navigationRef}
         className={cn(
           "flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain custom-scrollbar",
           collapsed ? "px-2 py-3 space-y-2" : "px-3 py-3.5 space-y-2.5",
@@ -485,7 +527,7 @@ const SidebarContents = memo(function SidebarContents({
                   {preferences.mode === mode && <Check className="size-4 text-primary" />}
                 </DropdownMenuItem>
               ))}
-              {(preferences.mode === "focus" || preferences.mode === "explorer") && (
+              {preferences.mode === "focus" && (
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuLabel>{t("nav.view.choose_unit")}</DropdownMenuLabel>
@@ -495,17 +537,11 @@ const SidebarContents = memo(function SidebarContents({
                       <DropdownMenuItem
                         key={group.key}
                         onSelect={() =>
-                          update(
-                            preferences.mode === "explorer"
-                              ? { explorerGroup: group.key }
-                              : { focusGroup: group.key },
-                          )
+                          update({ focusGroup: group.key })
                         }
                       >
                         <span className="flex-1">{t(`nav.view.group.${group.key}`)}</span>
-                        {(preferences.mode === "explorer"
-                          ? preferences.explorerGroup
-                          : preferences.focusGroup) === group.key && (
+                        {preferences.focusGroup === group.key && (
                           <Check className="size-4 text-primary" />
                         )}
                       </DropdownMenuItem>
@@ -529,6 +565,132 @@ const SidebarContents = memo(function SidebarContents({
             </div>
           )}
         </div>
+        {preferences.mode === "explorer" && !selectedExplorerModule && (
+          <div className={cn("space-y-2", collapsed && "flex flex-col items-center")}>
+            {!collapsed && (
+              <div className="px-1 pb-1">
+                <p className="text-sm font-bold text-foreground">
+                  {t("nav.view.modules_title")}
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  {t("nav.view.modules_description")}
+                </p>
+              </div>
+            )}
+            {explorerModules.map((group) => {
+              const title = t(`nav.view.group.${group.key}`);
+              const ModuleIcon = routeIcon(group.entries[0]?.id ?? group.key);
+              const ForwardIcon = dir === "rtl" ? ChevronLeft : ChevronRight;
+              const style = getSidebarStyle(group.styleCategory, group.key, preferences);
+              const isCurrentModule = activeGroupKey === group.key;
+
+              return (
+                <Hint
+                  key={group.key}
+                  label={collapsed ? title : undefined}
+                  side={dir === "rtl" ? "left" : "right"}
+                >
+                  <button
+                    type="button"
+                    onClick={() => update({ explorerGroup: group.key })}
+                    aria-label={title}
+                    className={cn(
+                      "group flex min-h-[58px] w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-start transition-colors",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                      collapsed && "min-h-11 w-11 justify-center rounded-xl p-1.5",
+                      isCurrentModule
+                        ? cn("border-transparent", style.activeBg)
+                        : "border-sidebar-border/60 bg-sidebar-accent/20 hover:border-sidebar-border hover:bg-sidebar-accent/60",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "grid size-10 shrink-0 place-items-center rounded-xl transition-colors",
+                        collapsed && "size-9",
+                        isCurrentModule ? style.iconBoxActive : style.iconBoxInactive,
+                      )}
+                    >
+                      <ModuleIcon
+                        className={cn(
+                          "size-5 transition-transform duration-200",
+                          isCurrentModule ? style.iconActive : style.iconInactive,
+                        )}
+                      />
+                    </span>
+                    {!collapsed && (
+                      <>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold text-foreground">
+                            {title}
+                          </span>
+                          <span className="mt-0.5 block text-xs text-muted-foreground">
+                            {t("nav.view.pages_count")}: {group.entries.length}
+                          </span>
+                        </span>
+                        <ForwardIcon
+                          className={cn(
+                            "size-4 shrink-0 text-muted-foreground transition-transform",
+                            dir === "rtl"
+                              ? "group-hover:-translate-x-0.5"
+                              : "group-hover:translate-x-0.5",
+                          )}
+                        />
+                      </>
+                    )}
+                  </button>
+                </Hint>
+              );
+            })}
+          </div>
+        )}
+        {preferences.mode === "explorer" && selectedExplorerModule && (
+          <div className="mb-3 space-y-3">
+            <Hint
+              label={collapsed ? t("nav.view.back_to_units") : undefined}
+              side={dir === "rtl" ? "left" : "right"}
+            >
+              <button
+                type="button"
+                onClick={() => update({ explorerGroup: null })}
+                aria-label={t("nav.view.back_to_units")}
+                className={cn(
+                  "flex min-h-11 items-center rounded-lg text-xs font-semibold text-muted-foreground transition-colors",
+                  "hover:bg-sidebar-accent/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                  collapsed ? "mx-auto w-11 justify-center" : "w-full gap-2 px-3",
+                )}
+              >
+                {dir === "rtl" ? (
+                  <ArrowRight className="size-4 shrink-0" />
+                ) : (
+                  <ArrowLeft className="size-4 shrink-0" />
+                )}
+                {!collapsed && <span>{t("nav.view.back_to_units")}</span>}
+              </button>
+            </Hint>
+            {!collapsed && SelectedExplorerModuleIcon && selectedExplorerModuleStyle && (
+              <div className="flex items-center gap-3 rounded-xl border border-sidebar-border/60 bg-sidebar-accent/30 px-3 py-3">
+                <span
+                  className={cn(
+                    "grid size-10 shrink-0 place-items-center rounded-xl",
+                    selectedExplorerModuleStyle.iconBoxActive,
+                  )}
+                >
+                  <SelectedExplorerModuleIcon
+                    className={cn("size-5", selectedExplorerModuleStyle.iconActive)}
+                  />
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-bold text-foreground">
+                    {t(`nav.view.group.${selectedExplorerModule.key}`)}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    {t("nav.view.pages_count")}: {selectedExplorerModule.entries.length}
+                  </span>
+                </span>
+              </div>
+            )}
+          </div>
+        )}
         {displayGroups.map((sec, secIdx) => {
           const sectionKey = sec.key;
           const sectionOpen =
@@ -537,37 +699,17 @@ const SidebarContents = memo(function SidebarContents({
 
           return (
             <div key={sectionKey}>
-              {preferences.mode === "explorer" ? (
-                !collapsed && (
-                  <div
-                    className={cn(
-                      "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold tracking-[0.04em]",
-                      activeInSection ? "text-foreground" : "text-muted-foreground",
-                    )}
-                  >
-                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary/70" aria-hidden />
-                    <span className="min-w-0 flex-1 truncate text-start">
-                      {t(
-                        sec.key === "favorites"
-                          ? "nav.view.favorites"
-                          : sec.key === "recent"
-                            ? "nav.view.recent"
-                            : `nav.view.group.${sec.key}`,
-                      )}
-                    </span>
-                  </div>
-                )
-              ) : !collapsed ? (
+              {preferences.mode === "explorer" ? null : !collapsed ? (
                 <button
                   type="button"
                   onClick={() => toggleSection(sectionKey)}
                   aria-expanded={sectionOpen}
                   aria-controls={`sidebar-section-${sectionKey}`}
                   className={cn(
-                    "flex w-full items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-[0.12em]",
+                    "flex min-h-10 w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold",
                     "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
                     activeInSection
-                      ? "text-foreground"
+                      ? "bg-sidebar-accent/45 text-foreground"
                       : "text-muted-foreground/80 hover:bg-sidebar-accent/60 hover:text-foreground",
                   )}
                 >

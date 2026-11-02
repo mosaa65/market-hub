@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, RotateCcw, Save } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
@@ -39,6 +39,7 @@ export const Route = createFileRoute("/_app/settings")({
 function SettingsPage() {
   const { t, lang } = useI18n();
   const { section: sectionFromUrl } = Route.useSearch();
+  const navigate = useNavigate();
   const { hasRole } = useAuth();
   const canEdit = hasRole("owner") || hasRole("manager");
   const [form, setForm] = useState<any>({
@@ -69,6 +70,18 @@ function SettingsPage() {
     }
     return true;
   });
+
+  useEffect(() => {
+    if (sectionFromUrl === "expense-categories" || sectionFromUrl === "expense-cost-centers") {
+      void navigate({
+        to: "/expenses/setup",
+        search: {
+          section: sectionFromUrl === "expense-cost-centers" ? "cost-centers" : "categories",
+        } as any,
+        replace: true,
+      });
+    }
+  }, [navigate, sectionFromUrl]);
 
   useEffect(() => {
     supabase
@@ -175,6 +188,10 @@ function SettingsPage() {
       setSaveState("error");
     }
   };
+
+  if (sectionFromUrl === "expense-categories" || sectionFromUrl === "expense-cost-centers") {
+    return null;
+  }
 
   return (
     <div className="space-y-6 pb-10">

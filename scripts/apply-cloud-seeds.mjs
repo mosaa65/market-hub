@@ -33,6 +33,7 @@ const systemSeeds = [
   "07_document_numbering.sql",
   "08_payment_methods.sql",
   "09_essential_partners.sql",
+  "10_production_expense_defaults.sql",
 ];
 const seeds = systemSeeds.map((name) => ({
   name,

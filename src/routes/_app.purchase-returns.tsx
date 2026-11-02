@@ -32,7 +32,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { PaymentMethodPicker } from "@/components/ui/payment-method";
 import { DynamicPaymentSelector } from "@/components/ui/payment-method/dynamic-payment-selector";
 import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
 import { paymentMethodLabel } from "@/lib/payments/payment-methods";
@@ -691,7 +690,7 @@ function NewPurchaseReturn({
       setInvoiceItems(nextItems);
       setLines([]);
     })();
-  }, [supplierId, lang]);
+  }, [supplierId, lang, isRtl]);
 
   useEffect(() => {
     if (!supplierInvoiceId) {
@@ -727,7 +726,7 @@ function NewPurchaseReturn({
       );
       setLines([]);
     })();
-  }, [supplierInvoiceId, lang]);
+  }, [supplierInvoiceId, lang, isRtl]);
 
   const filtered = useMemo(
     () =>
@@ -846,7 +845,9 @@ function NewPurchaseReturn({
       _items: lines as any,
     });
     if (error) {
-      toast.error(error.message);
+      // رسالة مترجمة، كما في شاشة مرتجع المبيعات — نص PostgreSQL الإنجليزي
+      // الخام لا يعني شيئًا للكاشير ولا يخبره بما يصلحه.
+      toast.error(translateRpcError(error, isRtl ? "ar" : "en"));
       return;
     }
     const returnId = typeof retData === "string" ? retData : (retData as any)?.id;
@@ -857,18 +858,26 @@ function NewPurchaseReturn({
         settlement.paymentMethodId ||
         settlement.reference)
     ) {
-      try {
-        await (supabase as any)
-          .from("purchase_returns")
-          .update({
-            cashbox_id: settlement.cashboxId || null,
-            bank_account_id: settlement.bankAccountId || null,
-            payment_method_id: settlement.paymentMethodId || refundMethod || null,
-            payment_reference: settlement.reference || null,
-          })
-          .eq("id", returnId);
-      } catch (e) {
-        console.warn("Could not set treasury settlement on purchase_return:", e);
+      // لا `try` حول استعلام شبكي: PostgREST يعيد الخطأ في الحقل ولا يرميه،
+      // فالاكتفاء بـ try/catch كان يعني فقدان توجيه الخزينة بصمت. الدالة
+      // المصدرة `create_purchase_return` ترحّل القيد من `refund_method` وحده،
+      // فإذا فشل هذا التحديث تُرحَّل النقود إلى الحساب العام بدل صندوق بعينه —
+      // وهذا يستحق تنبيهًا لا سطرًا في console.
+      const { error: settlementError } = await (supabase as any)
+        .from("purchase_returns")
+        .update({
+          cashbox_id: settlement.cashboxId || null,
+          bank_account_id: settlement.bankAccountId || null,
+          payment_method_id: settlement.paymentMethodId || refundMethod || null,
+          payment_reference: settlement.reference || null,
+        })
+        .eq("id", returnId);
+      if (settlementError) {
+        toast.warning(
+          isRtl
+            ? `سُجّل المرتجع، لكن تعذّر توجيه الخزينة: ${settlementError.message}`
+            : `Return recorded, but settlement routing failed: ${settlementError.message}`,
+        );
       }
     }
     toast.success(
@@ -954,13 +963,14 @@ function NewPurchaseReturn({
             </div>
             <div className="grid gap-1.5 sm:col-span-2">
               <Label>{lang === "ar" ? "طريقة ومصدر الاسترداد" : "Refund method & source"}</Label>
+              {/* آجل ليس طريق استرداد: العرض هنا لقناة الخروج التي عاد منها المال. */}
               <DynamicPaymentSelector
                 context="purchase_returns"
                 value={refundMethod}
                 onChange={setRefundMethod}
                 settlement={settlement}
                 onSettlementChange={setSettlement}
-                includeCredit
+                includeCredit={false}
                 compact
               />
             </div>

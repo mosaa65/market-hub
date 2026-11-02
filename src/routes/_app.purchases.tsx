@@ -55,7 +55,6 @@ import { DataTable, type DataTableColumn, type DataTableSort } from "@/component
 import { IconButton } from "@/components/ui/icon-button";
 import { useBreakpoint } from "@/design/breakpoints";
 import { toast } from "sonner";
-import { PaymentMethodPicker } from "@/components/ui/payment-method";
 import { DynamicPaymentSelector } from "@/components/ui/payment-method/dynamic-payment-selector";
 import { AmountInput } from "@/components/ui/amount-input";
 import { QuantityInput } from "@/components/ui/quantity-input";

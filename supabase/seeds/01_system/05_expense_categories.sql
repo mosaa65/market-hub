@@ -32,13 +32,16 @@ BEGIN;
 
 -- كل صف: (اسم، اسم عربي، ترتيب، كود الحساب المحاسبي)
 -- الحساب يُحلّ باستعلام فرعي على الكود، فلا معرّف ثابت في الملف.
-INSERT INTO public.expense_categories (name, name_ar, sort_order, is_active, account_id)
+INSERT INTO public.expense_categories (
+  name, name_ar, sort_order, is_active, account_id, production_cost_eligible
+)
 SELECT
   v.name,
   v.name_ar,
   v.sort_order,
   true,
-  (SELECT id FROM public.accounts WHERE code = v.account_code)
+  (SELECT id FROM public.accounts WHERE code = v.account_code),
+  false
 FROM (VALUES
   ('Rent',        'إيجارات',           10, '5313'),
   ('Salaries',    'رواتب وأجور',        20, '5221'),

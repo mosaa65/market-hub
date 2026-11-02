@@ -1,26 +1,12 @@
-/**
- * /milling/manufacture — التحويل الداخلي (تحويل مخزون بعدّ المنتجات).
- *
- * النموذج المعتمد من المالك (rebuild-plan-v2-product-count.md):
- *   • كل منتج وحدة عدّ مستقلة — «دقيق أبيض كيس 50 كجم» منتج، و«كيس 25» منتج منفصل.
- *   • الكمية في كل حقل = عدد من وحدة المنتج. لا كجم ولا سعات ولا نسب في أي عملية.
- *   • التحويل: منتج مصدر × كمية → نواتج (منتج × كمية) + فاقد اختياري بوحدات.
- *   • الشرط الوحيد: النواتج + الفاقد = كمية المصدر.
- *   • لا توزيع تكلفة ولا هوامش ولا قيود — سعر وتكلفة كل منتج ثابتة يدوياً.
- *   • مستلزمات التعبئة مصروفات فقط — لا صرف مستهلكات من هنا.
- */
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import {
-  ArrowLeftRight,
   ArrowLeft,
+  CheckCircle2,
+  ClipboardList,
   Plus,
   Trash2,
-  Info,
-  Package,
-  AlertTriangle,
-  CheckCircle2,
   Warehouse as WarehouseIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -28,447 +14,957 @@ import { PageHeader } from "@/components/page-header";
 import { ModuleGuard } from "@/lib/modules";
 import { supabase } from "@/integrations/supabase/client";
 import { translateRpcError } from "@/lib/errors/rpc-errors";
-import { convertStock } from "@/lib/milling/custody";
-import type { ProductOption } from "@/lib/milling/custody";
 import {
+  MillingField,
+  MillingInput,
   MillingPanel,
   MillingSectionTitle,
-  MillingField,
   MillingSelect,
-  MillingTextarea,
-  Mono,
   fmtNum,
 } from "@/components/milling/milling-ui";
-import { QuantityInput } from "@/components/ui/quantity-input";
+import {
+  createAndPostProductionOrder,
+  loadProductionLookups,
+  type ProductionExpenseInput,
+  type ProductionLossInput,
+  type ProductionMaterialInput,
+  type ProductionOutputInput,
+  type ProductionProduct,
+} from "@/lib/production/production-orders";
 
 export const Route = createFileRoute("/_app/milling/manufacture")({
-  head: () => ({ meta: [{ title: "التحويل الداخلي — تحويل المخزون بعدّ المنتجات — فورتكس ERP" }] }),
-  component: StockConversionPage,
+  head: () => ({ meta: [{ title: "التصنيع والإنتاج — فورتكس ERP" }] }),
+  component: CompanyProductionPage,
 });
 
-interface WarehouseOption {
-  id: string;
-  name_ar: string | null;
-  name: string;
-  is_default: boolean | null;
-}
+type MaterialDraft = { productId: string; quantity: string; uomId: string; batchId: string };
+type OutputDraft = {
+  productId: string;
+  quantity: string;
+  uomId: string;
+  allocationValue: string;
+  batchNumber: string;
+  expiryDate: string;
+};
+type ExpenseDraft = { expenseLineId: string; amount: string; basis: string; note: string };
+type LossDraft = { type: "NORMAL" | "ABNORMAL"; quantity: string; uomId: string; reason: string };
 
-interface OutputLine {
-  itemId: string;
-  qty: string;
-}
+const blankMaterial = (): MaterialDraft => ({
+  productId: "",
+  quantity: "",
+  uomId: "",
+  batchId: "",
+});
+const blankOutput = (): OutputDraft => ({
+  productId: "",
+  quantity: "",
+  uomId: "",
+  allocationValue: "",
+  batchNumber: "",
+  expiryDate: "",
+});
+const localDate = () => {
+  const date = new Date();
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+};
 
-export function StockConversionPage() {
+export function CompanyProductionPage() {
   const qc = useQueryClient();
-  const [warehouseId, setWarehouseId] = useState("");
-  const [sourceItemId, setSourceItemId] = useState("");
-  const [sourceQty, setSourceQty] = useState<string>("");
-  const [lossQty, setLossQty] = useState<string>("0");
-  const [batchRef, setBatchRef] = useState("");
-  const [notes, setNotes] = useState("");
-  const [outputs, setOutputs] = useState<OutputLine[]>([{ itemId: "", qty: "" }]);
+  const db = supabase as any;
+  const query = useQuery({ queryKey: ["company-production"], queryFn: loadProductionLookups });
+  const data = query.data;
 
-  // المستودعات
-  const warehouses = useQuery({
-    queryKey: ["milling", "warehouses"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("warehouses")
-        .select("id, name, name_ar, is_default")
-        .eq("is_active", true)
-        .order("is_default", { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as WarehouseOption[];
-    },
-  });
+  const [warehouseId, setWarehouseId] = useState("");
+  const [costCenterId, setCostCenterId] = useState("");
+  const [productionDate, setProductionDate] = useState(localDate);
+  const [notes, setNotes] = useState("");
+  const [materials, setMaterials] = useState<MaterialDraft[]>([blankMaterial()]);
+  const [outputs, setOutputs] = useState<OutputDraft[]>([blankOutput()]);
+  const [expenses, setExpenses] = useState<ExpenseDraft[]>([]);
+  const [losses, setLosses] = useState<LossDraft[]>([]);
 
   useEffect(() => {
-    if (warehouseId) return;
-    const list = warehouses.data ?? [];
-    const preferred = list.find((w) => w.is_default) ?? list[0];
-    if (preferred) setWarehouseId(preferred.id);
-  }, [warehouses.data, warehouseId]);
+    if (!data) return;
+    if (!warehouseId)
+      setWarehouseId(data.warehouses.find((w) => w.is_default)?.id ?? data.warehouses[0]?.id ?? "");
+    if (!costCenterId) {
+      const productionCenter = data.centers.find(
+        (center) =>
+          center.code?.trim().toUpperCase() === "PROD" ||
+          [center.name, center.name_ar].some((name) =>
+            ["production", "الإنتاج", "الانتاج"].includes(name?.trim().toLocaleLowerCase("ar") ?? ""),
+          ),
+      );
+      setCostCenterId(productionCenter?.id ?? (data.centers.length === 1 ? data.centers[0].id : ""));
+    }
+  }, [data, warehouseId, costCenterId]);
 
-  // كل المنتجات النشطة: أي منتج يمكن أن يكون مصدراً أو ناتجاً
-  const allProducts = useQuery({
-    queryKey: ["milling", "all-products"],
-    queryFn: async (): Promise<ProductOption[]> => {
-      const { data, error } = await supabase
-        .from("products")
-        .select("id, sku, name, name_ar, item_class, sale_price, cost_price, package_weight_kg")
-        .eq("is_active", true)
-        .order("item_class")
-        .order("name_ar");
-      if (error) throw error;
-      return (data ?? []) as unknown as ProductOption[];
-    },
-  });
-
-  const selectedSource = allProducts.data?.find((p) => p.id === sourceItemId);
-
-  // الرصيد المخزني المتاح للمصدر في المستودع المختار (بوحدة المنتج)
-  const sourceStockQuery = useQuery({
-    queryKey: ["milling", "source-stock", warehouseId, sourceItemId],
-    queryFn: async () => {
-      if (!warehouseId || !sourceItemId) return 0;
-      const { data, error } = await supabase
-        .from("inventory")
-        .select("quantity")
-        .eq("warehouse_id", warehouseId)
-        .eq("product_id", sourceItemId)
-        .maybeSingle();
-      if (error) return 0;
-      return Number(data?.quantity ?? 0);
-    },
-    enabled: Boolean(warehouseId && sourceItemId),
-  });
-
-  const availableStock = sourceStockQuery.data ?? 0;
-  const numSourceQty = Number(sourceQty) || 0;
-  const numLossQty = Number(lossQty) || 0;
-  const isOverStock = numSourceQty > availableStock;
-
-  const totalOutputQty = useMemo(
-    () => outputs.reduce((sum, l) => sum + (Number(l.qty) || 0), 0),
-    [outputs],
+  const products = data?.products ?? [];
+  const materialProducts = products.filter(
+    (product) =>
+      ["RAW_MATERIAL", "PACKAGING"].includes(product.item_class ?? "") &&
+      product.item_nature !== "SERVICE" &&
+      product.inventory_policy === "TRACKED" &&
+      !product.is_custody_item,
+  );
+  const rawMaterialProducts = materialProducts.filter((product) => product.item_class === "RAW_MATERIAL");
+  const packagingProducts = materialProducts.filter((product) => product.item_class === "PACKAGING");
+  const outputProducts = products.filter(
+    (product) =>
+      product.is_sellable &&
+      product.inventory_policy === "TRACKED" &&
+      !product.is_custody_item &&
+      ["FINISHED_GOOD", "BY_PRODUCT"].includes(product.item_class ?? ""),
+  );
+  const massUnits = data?.units.filter((u) => u.dimension_code === "MASS") ?? [];
+  const kiloUnit =
+    massUnits.find((u) => ["kg", "كجم", "كيلوجرام"].includes(u.short_name.toLowerCase())) ??
+    massUnits[0];
+  const unitById = useMemo(
+    () => new Map((data?.units ?? []).map((unit) => [unit.id, unit])),
+    [data?.units],
   );
 
-  /**
-   * القاعدة الوحيدة (قرار المالك): النواتج + الفاقد = كمية المصدر.
-   * الفاقد اختياري — يعبّر عن الفرق فقط، بوحدات، بلا أي حساب كجم.
-   */
-  const remainder = numSourceQty - totalOutputQty - numLossQty;
-  const isBalanced = remainder === 0;
-  const outputsValid =
-    outputs.length > 0 && outputs.every((l) => l.itemId && (Number(l.qty) || 0) > 0);
+  const getUomChoices = (product: ProductionProduct | undefined) => {
+    if (!product || !data) return [];
+    const baseId = product.base_uom_id ?? product.unit_id;
+    const allowed = product.uoms.filter((u) => u.is_active);
+    if (allowed.length) {
+      return allowed.map((uom) => ({
+        id: uom.unit_id,
+        factor: Number(uom.factor_to_base),
+        label: unitLabel(unitById.get(uom.unit_id)),
+        isBase: uom.is_base,
+      }));
+    }
+    const baseUnit = baseId ? unitById.get(baseId) : undefined;
+    return [{ id: baseId ?? "", factor: 1, label: unitLabel(baseUnit), isBase: true }];
+  };
+
+  const unitLabel = (unit?: { name_ar: string | null; short_name: string } | null) =>
+    unit?.name_ar || unit?.short_name || "وحدة الأساس";
+  const selectedUom = (product: ProductionProduct | undefined, uomId: string) => {
+    const choices = getUomChoices(product);
+    return (
+      choices.find((choice) => choice.id === uomId) ??
+      choices.find((choice) => choice.isBase) ??
+      choices[0]
+    );
+  };
+  const availableQuantity = (productId: string) => {
+    if (!data || !warehouseId) return 0;
+    const inventory = data.inventory.find(
+      (i) => i.product_id === productId && i.warehouse_id === warehouseId,
+    );
+    return Number(inventory?.quantity ?? 0);
+  };
+  const availableBatches = (productId: string) =>
+    (data?.batches ?? []).filter(
+      (batch) => batch.product_id === productId && batch.warehouse_id === warehouseId,
+    );
+
+  const selectedProducts = materials.map((line) => products.find((p) => p.id === line.productId));
+  const selectedOutputs = outputs.map((line) => products.find((p) => p.id === line.productId));
+  const estimatedMaterialMass = materials.reduce((sum, line, index) => {
+    const product = selectedProducts[index];
+    const qty = Number(line.quantity) || 0;
+    if (!product || qty <= 0) return sum;
+    const uom = selectedUom(product, line.uomId);
+    const baseQty = qty * Number(uom?.factor ?? 1);
+    const baseUnit = unitById.get(product.base_uom_id ?? product.unit_id ?? "");
+    const kg =
+      baseUnit?.dimension_code === "MASS" && baseUnit.factor_to_reference
+        ? (baseQty * Number(baseUnit.factor_to_reference)) /
+          Number(kiloUnit?.factor_to_reference ?? 1000)
+        : product.package_weight_kg
+          ? baseQty * Number(product.package_weight_kg)
+          : null;
+    return kg === null ? Number.NaN : sum + kg;
+  }, 0);
+  const estimatedOutputMass = outputs.reduce((sum, line, index) => {
+    const product = selectedOutputs[index];
+    const qty = Number(line.quantity) || 0;
+    if (!product || qty <= 0) return sum;
+    const uom = selectedUom(product, line.uomId);
+    const baseQty = qty * Number(uom?.factor ?? 1);
+    const baseUnit = unitById.get(product.base_uom_id ?? product.unit_id ?? "");
+    const kg =
+      baseUnit?.dimension_code === "MASS" && baseUnit.factor_to_reference
+        ? (baseQty * Number(baseUnit.factor_to_reference)) /
+          Number(kiloUnit?.factor_to_reference ?? 1000)
+        : product.package_weight_kg
+          ? baseQty * Number(product.package_weight_kg)
+          : null;
+    return kg === null ? Number.NaN : sum + kg;
+  }, 0);
+
+  const expenseSources = (data?.expenseSources ?? []).filter(
+    (source) =>
+      source.cost_center_id === costCenterId &&
+      Number(source.available_amount) > 0,
+  );
+  const selectedCostCenter = data?.centers.find((center) => center.id === costCenterId);
+  const selectedCostCenterLabel = selectedCostCenter?.name_ar || selectedCostCenter?.name || "مركز التكلفة المحدد";
+  const estimatedConversionCost = expenses.reduce(
+    (sum, line) => sum + (Number(line.amount) || 0),
+    0,
+  );
 
   const submit = useMutation({
-    mutationFn: () => {
-      const fullNotes = [
-        batchRef ? `تشغيلة: ${batchRef.trim()}` : "",
-        numLossQty > 0 ? `فاقد: ${numLossQty} وحدة` : "",
-        notes ? notes.trim() : "",
-      ]
-        .filter(Boolean)
-        .join(" — ");
+    mutationFn: async () => {
+      const cleanMaterials: ProductionMaterialInput[] = materials.map((line) => ({
+        product_id: line.productId,
+        quantity: Number(line.quantity),
+        uom_id: line.uomId || null,
+        batch_id: line.batchId || null,
+      }));
+      const cleanOutputs: ProductionOutputInput[] = outputs.map((line) => ({
+        product_id: line.productId,
+        quantity: Number(line.quantity),
+        uom_id: line.uomId || null,
+        allocation_value_per_base: Number(line.allocationValue) || 0,
+        batch_number: line.batchNumber.trim() || null,
+        expiry_date: line.expiryDate || null,
+      }));
+      const cleanExpenses: ProductionExpenseInput[] = expenses
+        .filter((line) => line.expenseLineId && Number(line.amount) > 0)
+        .map((line) => ({
+          expense_line_id: line.expenseLineId,
+          amount: Number(line.amount),
+          basis: line.basis.trim(),
+          note: line.note.trim() || null,
+        }));
+      const cleanLosses: ProductionLossInput[] = losses
+        .filter((line) => Number(line.quantity) > 0)
+        .map((line) => ({
+          loss_type: line.type,
+          quantity: Number(line.quantity),
+          uom_id: line.uomId,
+          reason: line.reason.trim(),
+        }));
 
-      return convertStock({
-        warehouseId,
-        sourceItemId,
-        sourceQty: numSourceQty,
-        outputs: outputs.map((l) => ({ itemId: l.itemId, qty: Number(l.qty) || 0 })),
-        lossQty: numLossQty,
-        notes: fullNotes || undefined,
+      return createAndPostProductionOrder({
+        warehouse_id: warehouseId,
+        cost_center_id: costCenterId,
+        production_date: productionDate,
+        notes: notes.trim() || null,
+        materials: cleanMaterials,
+        outputs: cleanOutputs,
+        expenses: cleanExpenses,
+        losses: cleanLosses,
       });
     },
-    onSuccess: (res) => {
-      if (!res.ok) {
-        toast.error(res.message || "تعذر تنفيذ التحويل.");
-        return;
-      }
-      toast.success(`تم التحويل بنجاح — مستند ${res.data ?? ""}`);
-      setSourceQty("");
-      setLossQty("0");
-      setBatchRef("");
-      setOutputs([{ itemId: "", qty: "" }]);
+    onSuccess: async (orderId) => {
+      const { data: order } = await db
+        .from("production_orders")
+        .select("order_number")
+        .eq("id", orderId)
+        .maybeSingle();
+      toast.success(`تم ترحيل تشغيلة الإنتاج ${order?.order_number ?? ""}`);
+      setMaterials([blankMaterial()]);
+      setOutputs([blankOutput()]);
+      setExpenses([]);
+      setLosses([]);
       setNotes("");
-      void qc.invalidateQueries({ queryKey: ["milling"] });
-      void qc.invalidateQueries({ queryKey: ["inventory"] });
+      await qc.invalidateQueries({ queryKey: ["company-production"] });
+      await qc.invalidateQueries({ queryKey: ["company-production-order-history"] });
+      await qc.invalidateQueries({ queryKey: ["inventory"] });
+      await qc.invalidateQueries({ queryKey: ["milling"] });
     },
-    onError: (err) => toast.error(translateRpcError(err, "ar", "تعذر تنفيذ التحويل.")),
+    onError: (error) => toast.error(translateRpcError(error, "ar", "تعذر ترحيل تشغيلة الإنتاج.")),
   });
 
-  const canSubmit = Boolean(
-    warehouseId && sourceItemId && numSourceQty > 0 && !isOverStock && isBalanced && outputsValid,
+  const formValid = Boolean(
+    warehouseId &&
+    costCenterId &&
+    productionDate &&
+    materials.length > 0 &&
+    materials.every((line) => line.productId && Number(line.quantity) > 0) &&
+    outputs.length > 0 &&
+    outputs.every((line) => line.productId && Number(line.quantity) > 0) &&
+    (outputs.length < 2 || outputs.every((line) => Number(line.allocationValue) > 0)) &&
+    expenses.every(
+      (line) => !line.expenseLineId || (Number(line.amount) > 0 && line.basis.trim().length >= 3),
+    ) &&
+    losses.every(
+      (line) => !Number(line.quantity) || (line.uomId && line.reason.trim().length >= 3),
+    ),
   );
 
-  const unitName = (p?: ProductOption | null) =>
-    p ? `(${p.sku || "—"}${p.package_weight_kg ? ` · ${p.package_weight_kg} كجم` : ""})` : "";
+  if (query.isLoading)
+    return <div className="p-6 text-sm text-muted-foreground">جارٍ تحميل بيانات التصنيع…</div>;
+  if (query.error) {
+    return (
+      <ModuleGuard moduleId="milling_operations">
+        <div className="mx-auto max-w-5xl p-4">
+          <PageHeader
+            title="تصنيع منتجات المنشأة"
+            subtitle="تعذر تحميل إعدادات المستودعات أو المنتجات أو الوحدات."
+          />
+          <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-700">
+            {String(query.error)}
+          </div>
+        </div>
+      </ModuleGuard>
+    );
+  }
+
+  const updateMaterial = (index: number, values: Partial<MaterialDraft>) =>
+    setMaterials((current) =>
+      current.map((line, i) => (i === index ? { ...line, ...values } : line)),
+    );
+  const updateOutput = (index: number, values: Partial<OutputDraft>) =>
+    setOutputs((current) =>
+      current.map((line, i) => (i === index ? { ...line, ...values } : line)),
+    );
+  const productOption = (product: ProductionProduct) =>
+    `${product.name_ar}${product.sku ? ` · ${product.sku}` : ""}`;
 
   return (
     <ModuleGuard moduleId="milling_operations">
       <div className="mx-auto max-w-7xl space-y-5 p-3 sm:p-5">
         <PageHeader
-          title="التحويل الداخلي — تحويل المخزون بعدّ المنتجات"
-          subtitle="منتج مصدر × كمية ← منتجات ناتجة × كميات، مع فاقد اختياري بوحدات. لا نسب ولا أوزان ولا تسعير."
+          title="التصنيع والإنتاج"
+          subtitle="أنشئ تشغيلة تنقل تكلفة المواد والتكاليف الصناعية المؤهلة إلى مخزون المنتجات الناتجة."
           actions={
-            <Link
-              to="/milling/milling"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs font-bold text-foreground transition hover:bg-muted"
-            >
-              خدمة طحن الغير <ArrowLeft className="h-3.5 w-3.5" />
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                to="/milling/production-orders"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs font-bold text-foreground hover:bg-muted"
+              >
+                <ClipboardList className="h-4 w-4" /> سجل التشغيلات
+              </Link>
+              <Link
+                to="/milling/milling"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs font-bold text-foreground hover:bg-muted"
+              >
+                خدمة طحن حبوب العملاء <ArrowLeft className="h-3.5 w-3.5" />
+              </Link>
+            </div>
           }
         />
 
-        {/* إيضاح النموذج المعتمد */}
-        <div className="flex items-start gap-2.5 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-3.5 text-xs font-medium text-emerald-800 dark:text-emerald-200">
-          <Info className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-          <p className="leading-relaxed">
-            <strong>عدّ المنتجات:</strong> كل منتج وحدة مستقلة — الكمية تعني «عدد من هذا المنتج»
-            أياً كانت وحدته (كيس، لتر، حبة، كرتون). الوحدة وسعة العبوة تفاصيل وصفية فقط. لا يوجد أي
-            تسعير أو هامش بعد التحويل — سعر كل منتج ثابت. مستلزمات التعبئة تسجل كمصروفات، لا من هنا.
-          </p>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl border border-border/70 bg-surface-1/80 p-4">
+            <p className="text-xs font-semibold text-muted-foreground">تكلفة المواد التقديرية</p>
+            <p className="mt-1 text-sm font-bold">يحددها محرك متوسط تكلفة المخزون عند الصرف</p>
+          </div>
+          <div className="rounded-2xl border border-border/70 bg-surface-1/80 p-4">
+            <p className="text-xs font-semibold text-muted-foreground">تكاليف التحويل المحددة</p>
+            <p className="mt-1 text-lg font-black tabular-nums">
+              {fmtNum(estimatedConversionCost)} <span className="text-xs font-semibold">ر.ي</span>
+            </p>
+          </div>
+          <div className="rounded-2xl border border-border/70 bg-surface-1/80 p-4">
+            <p className="text-xs font-semibold text-muted-foreground">مكافئ الكتلة المدخل</p>
+            <p className="mt-1 text-sm font-bold">
+              {Number.isFinite(estimatedMaterialMass) && Number.isFinite(estimatedOutputMass)
+                ? `${fmtNum(estimatedMaterialMass)} كجم مواد خام ← ${fmtNum(estimatedOutputMass)} كجم نواتج`
+                : "يظهر عند توفر وزن العبوة أو وحدة كتلية للصنف"}
+            </p>
+          </div>
         </div>
 
-        {/* اللوحتان في صف واحد (فورم المصدر + فورم النواتج) على الشاشات الكبيرة */}
-        <div className="grid gap-4 lg:grid-cols-2 items-start">
-          {/* ─── اللوحة الأولى: المصدر والمستودع ─── */}
-          <MillingPanel>
-            <MillingSectionTitle
-              icon={<WarehouseIcon className="h-4 w-4 text-amber-500" />}
-              title="1. منتج المصدر والمستودع"
-              subtitle="حدد المستودع والمنتج المُحوَّل وكميته بعدّ الوحدات"
-            />
-            <div className="space-y-4 p-4 sm:p-5">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <MillingField label="مستودع السحب *">
-                  <MillingSelect
-                    value={warehouseId}
-                    onChange={(e) => setWarehouseId(e.target.value)}
-                  >
-                    <option value="">اختر المخزن…</option>
-                    {(warehouses.data ?? []).map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.name_ar || w.name} {w.is_default ? "★ (الرئيسي)" : ""}
-                      </option>
-                    ))}
-                  </MillingSelect>
-                </MillingField>
-
-                <MillingField label="منتج المصدر *">
-                  <MillingSelect
-                    value={sourceItemId}
-                    onChange={(e) => setSourceItemId(e.target.value)}
-                  >
-                    <option value="">اختر المنتج…</option>
-                    {(allProducts.data ?? []).map((p: ProductOption) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name_ar || p.name} {unitName(p)}
-                      </option>
-                    ))}
-                  </MillingSelect>
-                </MillingField>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <MillingField label="الكمية المُحوَّلة (عدد الوحدات) *">
-                  <QuantityInput
-                    value={sourceQty === "" ? null : Number(sourceQty)}
-                    onValueChange={(v) => setSourceQty(v == null ? "" : String(v))}
-                    decimals={0}
-                    unit="وحدة"
-                  />
-                </MillingField>
-
-                <MillingField label="مرجع التشغيلة" hint="اختياري">
-                  <MillingTextarea
-                    value={batchRef}
-                    onChange={(e) => setBatchRef(e.target.value)}
-                    rows={1}
-                    placeholder="مثال: تشغيلة صباحية"
-                  />
-                </MillingField>
-              </div>
-
-              {/* شريط الرصيد الفعلي بوحدة المنتج */}
-              {sourceItemId && warehouseId && (
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/70 bg-surface/80 p-3 text-xs">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Package className="h-4 w-4 text-muted-foreground" />
-                    <span>
-                      الرصيد المتاح:{" "}
-                      <strong className={availableStock > 0 ? "text-foreground" : "text-rose-500"}>
-                        <Mono>{fmtNum(availableStock)}</Mono> وحدة
-                      </strong>
-                    </span>
-                    {selectedSource?.cost_price ? (
-                      <span className="text-muted-foreground">
-                        · تكلفة الوحدة (ثابتة يدوياً):{" "}
-                        <Mono>{fmtNum(selectedSource.cost_price)}</Mono>
-                      </span>
-                    ) : null}
-                  </div>
-                  {availableStock > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setSourceQty(String(Math.floor(availableStock)))}
-                      className="rounded-lg border border-border bg-surface px-2.5 py-1 text-[11px] font-bold text-primary transition hover:bg-muted active:scale-95"
-                    >
-                      تعبئة كامل الرصيد المتاح
-                    </button>
-                  )}
-                </div>
+        <MillingPanel>
+          <MillingSectionTitle
+            icon={<WarehouseIcon className="h-4 w-4" />}
+            title="بيانات التشغيلة"
+            subtitle="لكل عملية تصنيع رقم مستقل ومركز تكلفة تحليلي."
+          />
+          <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-4">
+            <MillingField label="المستودع">
+              <MillingSelect
+                value={warehouseId}
+                onChange={(event) => setWarehouseId(event.target.value)}
+              >
+                <option value="">اختر المستودع</option>
+                {data?.warehouses.map((warehouse) => (
+                  <option key={warehouse.id} value={warehouse.id}>
+                    {warehouse.name_ar || warehouse.name}
+                  </option>
+                ))}
+              </MillingSelect>
+            </MillingField>
+            <MillingField label="مركز التكلفة">
+              <MillingSelect
+                value={costCenterId}
+                onChange={(event) => setCostCenterId(event.target.value)}
+              >
+                <option value="">اختر مركز التكلفة</option>
+                {data?.centers.map((center) => (
+                  <option key={center.id} value={center.id}>
+                    {center.name_ar || center.name}
+                  </option>
+                ))}
+              </MillingSelect>
+              <Link
+                to="/expenses/setup"
+                search={{ section: "cost-centers" } as any}
+                className="mt-1 inline-flex text-[11px] font-semibold text-primary hover:underline"
+              >
+                إدارة مراكز التكلفة
+              </Link>
+              {!data?.centers.length && (
+                <p className="mt-1 text-[11px] text-amber-700">
+                  لا يوجد مركز تكلفة نشط. أضف مركز «الإنتاج» من إدارة مراكز التكلفة لتفعيل الترحيل.
+                </p>
               )}
-
-              {isOverStock && (
-                <div className="flex items-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs font-semibold text-rose-700 dark:text-rose-300">
-                  <AlertTriangle className="h-4 w-4 shrink-0 text-rose-500" />
-                  <span>
-                    تنبيه: الكمية المطلوبة (<Mono>{fmtNum(numSourceQty)}</Mono> وحدة) أكبر من الرصيد
-                    المتاح (<Mono>{fmtNum(availableStock)}</Mono> وحدة)!
-                  </span>
-                </div>
-              )}
-            </div>
-          </MillingPanel>
-
-          {/* ─── اللوحة الثانية: النواتج والفاقد ─── */}
-          <MillingPanel>
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70 p-4">
-              <MillingSectionTitle
-                icon={<ArrowLeftRight className="h-4 w-4 text-emerald-500" />}
-                title="2. المنتجات الناتجة والفاقد"
-                subtitle="أضف أي منتجات ناتجة بكمياتها (عدد الوحدات) — والفاقد اختياري يغطي الفرق"
+            </MillingField>
+            <MillingField label="تاريخ الإنتاج">
+              <MillingInput
+                type="date"
+                value={productionDate}
+                onChange={(event) => setProductionDate(event.target.value)}
               />
+            </MillingField>
+            <MillingField label="ملاحظات التشغيل">
+              <MillingInput
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                placeholder="اختياري"
+              />
+            </MillingField>
+          </div>
+        </MillingPanel>
+
+        <MillingPanel>
+          <MillingSectionTitle
+            title="المواد المصروفة إلى الإنتاج"
+            subtitle="تُصرف من مخزون المنشأة بوحدة الصنف الأساسية، وتخصم الدفعات وفق سياسة الصنف أو تحددها يدوياً."
+            action={
               <button
                 type="button"
-                onClick={() => setOutputs((o) => [...o, { itemId: "", qty: "" }])}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary transition hover:bg-primary/20 active:scale-95"
+                onClick={() => setMaterials((current) => [...current, blankMaterial()])}
+                className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-2 text-xs font-bold"
               >
-                <Plus className="h-3.5 w-3.5" /> إضافة سطر ناتج
+                <Plus className="h-4 w-4" /> إضافة مادة
               </button>
-            </div>
-
-            <div className="space-y-3.5 p-4 sm:p-5">
-              {outputs.map((line, idx) => (
+            }
+          />
+          <div className="space-y-3 p-4">
+            {materials.map((line, index) => {
+              const product = products.find((item) => item.id === line.productId);
+              const uoms = getUomChoices(product);
+              const uom = selectedUom(product, line.uomId);
+              const batches = availableBatches(line.productId);
+              const stock = availableQuantity(line.productId);
+              return (
                 <div
-                  key={idx}
-                  className="rounded-2xl border border-border/80 bg-surface/50 p-3 sm:p-4 transition hover:border-border"
+                  key={index}
+                  className="grid gap-3 rounded-xl border border-border/60 p-3 sm:grid-cols-2 xl:grid-cols-[2fr_1fr_1fr_1.4fr_auto]"
                 >
-                  <div className="grid gap-3 sm:grid-cols-[1.5fr_1fr_40px] items-start">
-                    <MillingField label="منتج الناتج *">
+                  <MillingField label="المادة / الصنف">
+                    <MillingSelect
+                      value={line.productId}
+                      onChange={(event) =>
+                        updateMaterial(index, {
+                          productId: event.target.value,
+                          uomId: "",
+                          batchId: "",
+                        })
+                      }
+                    >
+                      <option value="">اختر مادة خام أو مادة تعبئة مخزنية</option>
+                      {rawMaterialProducts.length > 0 && (
+                        <optgroup label="مواد خام مملوكة للمنشأة">
+                          {rawMaterialProducts.map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {productOption(item)}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {packagingProducts.length > 0 && (
+                        <optgroup label="مواد تعبئة مخزنية">
+                          {packagingProducts.map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {productOption(item)}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                    </MillingSelect>
+                    {!materialProducts.length && (
+                      <p className="mt-1 text-[11px] text-amber-700">
+                        لا توجد مواد خام أو مواد تعبئة مخزنية مملوكة للمنشأة. أصناف الأمانات والمنتجات التامة لا تُصرف كمواد خام.
+                      </p>
+                    )}
+                    {product && (
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        المتاح: {fmtNum(stock)}{" "}
+                        {unitLabel(unitById.get(product.base_uom_id ?? product.unit_id ?? ""))}
+                      </p>
+                    )}
+                  </MillingField>
+                  <MillingField label="الكمية المدخلة">
+                    <MillingInput
+                      type="number"
+                      min="0"
+                      step="0.001"
+                      value={line.quantity}
+                      onChange={(event) => updateMaterial(index, { quantity: event.target.value })}
+                    />
+                  </MillingField>
+                  <MillingField label="وحدة الصرف">
+                    <MillingSelect
+                      value={line.uomId || uom?.id || ""}
+                      onChange={(event) => updateMaterial(index, { uomId: event.target.value })}
+                    >
+                      {uoms.map((choice) => (
+                        <option key={choice.id} value={choice.id}>
+                          {choice.label}
+                          {choice.isBase ? " (الأساس)" : ` × ${fmtNum(choice.factor)}`}
+                        </option>
+                      ))}
+                    </MillingSelect>
+                  </MillingField>
+                  {product?.tracking === "BATCH" ? (
+                    <MillingField
+                      label="دفعة الصرف"
+                      hint="حدد الدفعة عند اتباع سياسة MANUAL؛ وإلا يتبع الصرف استراتيجية FIFO/FEFO."
+                    >
                       <MillingSelect
-                        value={line.itemId}
-                        onChange={(e) =>
-                          setOutputs((o) =>
-                            o.map((l, i) => (i === idx ? { ...l, itemId: e.target.value } : l)),
-                          )
-                        }
+                        value={line.batchId}
+                        onChange={(event) => updateMaterial(index, { batchId: event.target.value })}
                       >
-                        <option value="">اختر المنتج…</option>
-                        {(allProducts.data ?? []).map((p: ProductOption) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name_ar || p.name} {unitName(p)}
+                        <option value="">تلقائي حسب السياسة</option>
+                        {batches.map((batch) => (
+                          <option key={batch.id} value={batch.id}>
+                            {batch.batch_number} · {fmtNum(Number(batch.quantity))}
+                            {batch.expiry_date ? ` · ${batch.expiry_date}` : ""}
                           </option>
                         ))}
                       </MillingSelect>
                     </MillingField>
-
-                    <MillingField label="الكمية (عدد الوحدات) *">
-                      <QuantityInput
-                        value={line.qty === "" ? null : Number(line.qty)}
-                        onValueChange={(v) =>
-                          setOutputs((o) =>
-                            o.map((l, i) =>
-                              i === idx ? { ...l, qty: v == null ? "" : String(v) } : l,
-                            ),
-                          )
-                        }
-                        decimals={0}
-                        unit="وحدة"
-                      />
-                    </MillingField>
-
+                  ) : (
+                    <div className="flex items-end text-[11px] text-muted-foreground">
+                      قيمة الصرف تسجل من تكلفة المخزون الحالية.
+                    </div>
+                  )}
+                  <div className="flex items-end justify-end">
                     <button
                       type="button"
-                      onClick={() => setOutputs((o) => o.filter((_, i) => i !== idx))}
-                      disabled={outputs.length === 1}
-                      className="mt-6 grid h-9 w-9 place-items-center rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-600 transition hover:bg-rose-500/20 disabled:opacity-30"
-                      title="حذف السطر"
+                      aria-label="حذف المادة"
+                      onClick={() =>
+                        setMaterials((current) =>
+                          current.length > 1
+                            ? current.filter((_, i) => i !== index)
+                            : [blankMaterial()],
+                        )
+                      }
+                      className="rounded-full p-2 text-muted-foreground hover:bg-rose-500/10 hover:text-rose-600"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </MillingPanel>
+
+        <MillingPanel>
+          <MillingSectionTitle
+            title="النواتج المستلمة في المخزون"
+            subtitle="التكلفة الموزعة تُستلم عبر محرك تقييم المخزون؛ الصنف المتتبع بالدفعات ينشئ دفعة إنتاج مرتبطة بالتشغيلة."
+            action={
+              <button
+                type="button"
+                onClick={() => setOutputs((current) => [...current, blankOutput()])}
+                className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-2 text-xs font-bold"
+              >
+                <Plus className="h-4 w-4" /> إضافة ناتج
+              </button>
+            }
+          />
+          <div className="space-y-3 p-4">
+            {outputs.map((line, index) => {
+              const product = products.find((item) => item.id === line.productId);
+              const uoms = getUomChoices(product);
+              const uom = selectedUom(product, line.uomId);
+              return (
+                <div
+                  key={index}
+                  className="grid gap-3 rounded-xl border border-border/60 p-3 sm:grid-cols-2 xl:grid-cols-[2fr_1fr_1fr_1.3fr_1fr_1fr_auto]"
+                >
+                  <MillingField label="المنتج الناتج">
+                    <MillingSelect
+                      value={line.productId}
+                      onChange={(event) =>
+                        updateOutput(index, { productId: event.target.value, uomId: "" })
+                      }
+                    >
+                      <option value="">اختر الناتج</option>
+                      {outputProducts.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {productOption(item)}
+                        </option>
+                      ))}
+                    </MillingSelect>
+                  </MillingField>
+                  <MillingField label="الكمية الناتجة">
+                    <MillingInput
+                      type="number"
+                      min="0"
+                      step="0.001"
+                      value={line.quantity}
+                      onChange={(event) => updateOutput(index, { quantity: event.target.value })}
+                    />
+                  </MillingField>
+                  <MillingField label="وحدة الناتج">
+                    <MillingSelect
+                      value={line.uomId || uom?.id || ""}
+                      onChange={(event) => updateOutput(index, { uomId: event.target.value })}
+                    >
+                      {uoms.map((choice) => (
+                        <option key={choice.id} value={choice.id}>
+                          {choice.label}
+                          {choice.isBase ? " (الأساس)" : ` × ${fmtNum(choice.factor)}`}
+                        </option>
+                      ))}
+                    </MillingSelect>
+                  </MillingField>
+                  <MillingField
+                    label="قيمة بيع تقديرية لوحدة الأساس"
+                    hint={
+                      outputs.length > 1
+                        ? "للتوزيع النسبي لتكلفة الناتج المشترك فقط."
+                        : "تستخدم فقط عند توزيع تكلفة عدة نواتج."
+                    }
+                  >
+                    <MillingInput
+                      type="number"
+                      min="0"
+                      step="0.0001"
+                      value={line.allocationValue}
+                      onChange={(event) =>
+                        updateOutput(index, { allocationValue: event.target.value })
+                      }
+                    />
+                  </MillingField>
+                  {product?.tracking === "BATCH" ? (
+                    <>
+                      <MillingField label="رقم دفعة الناتج">
+                        <MillingInput
+                          value={line.batchNumber}
+                          onChange={(event) =>
+                            updateOutput(index, { batchNumber: event.target.value })
+                          }
+                          placeholder="تلقائي عند تركه فارغاً"
+                        />
+                      </MillingField>
+                      <MillingField label="تاريخ الانتهاء">
+                        <MillingInput
+                          type="date"
+                          value={line.expiryDate}
+                          onChange={(event) =>
+                            updateOutput(index, { expiryDate: event.target.value })
+                          }
+                        />
+                      </MillingField>
+                    </>
+                  ) : (
+                    <div className="flex items-end text-[11px] text-muted-foreground">
+                      لا توجد دفعة لهذا الصنف.
+                    </div>
+                  )}
+                  <div className="flex items-end justify-end">
+                    <button
+                      type="button"
+                      aria-label="حذف الناتج"
+                      onClick={() =>
+                        setOutputs((current) =>
+                          current.length > 1
+                            ? current.filter((_, i) => i !== index)
+                            : [blankOutput()],
+                        )
+                      }
+                      className="rounded-full p-2 text-muted-foreground hover:bg-rose-500/10 hover:text-rose-600"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </MillingPanel>
+
+        <MillingPanel>
+          <MillingSectionTitle
+            title="تكاليف التحويل المؤهلة"
+            subtitle="خصص الجزء الإنتاجي من بند مصروف مُرحّل، بالقيمة الصافية دون ضريبة المدخلات، مع توثيق أساس التوزيع."
+            action={
+              <button
+                type="button"
+                disabled={!expenseSources.length || !data?.canAllocateExpenses}
+                onClick={() =>
+                  setExpenses((current) => [
+                    ...current,
+                    { expenseLineId: "", amount: "", basis: "", note: "" },
+                  ])
+                }
+                className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-2 text-xs font-bold disabled:opacity-50"
+              >
+                <Plus className="h-4 w-4" /> تخصيص مصروف
+              </button>
+            }
+          />
+          <div className="space-y-3 p-4">
+            {!data?.canAllocateExpenses && (
+              <p className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-3 text-xs leading-5 text-muted-foreground">
+                تعذر تحميل بنود المصروفات المؤهلة. تحقق من صلاحية قراءة المالية أو إعداد قاعدة البيانات.
+                {data?.expenseSourcesError ? <span className="sr-only"> {data.expenseSourcesError}</span> : null}
+              </p>
+            )}
+            {data?.canAllocateExpenses && expenseSources.length === 0 && (
+              <div className="space-y-3 rounded-xl border border-dashed border-border p-4">
+                <div>
+                  <p className="text-sm font-semibold">لا يوجد مصروف مرحّل متاح لهذا المركز حتى الآن</p>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                    {costCenterId
+                      ? `تأهيل التصنيف لا يسجل مبلغاً. سجّل المصروف أولاً، واختر تصنيفه ومركز «${selectedCostCenterLabel}»، ثم استخدم «حفظ وصرف» أو رحّله من سجل المصروفات. بعد الترحيل سيظهر هنا تلقائياً.`
+                      : "اختر مركز التكلفة في بيانات التشغيلة أولاً. يجب أن يطابق مركز المصروف مركز التشغيلة حتى يظهر بند المصروف هنا."}
+                  </p>
+                </div>
+                {costCenterId && (
+                  <Link
+                    to="/expenses"
+                    search={{ create: true, costCenterId, categoryId: undefined } as any}
+                    className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-primary-foreground hover:opacity-90"
+                  >
+                    <Plus className="size-4" /> إضافة مصروف لهذا المركز
+                  </Link>
+                )}
+              </div>
+            )}
+            {expenses.map((line, index) => {
+              const source = expenseSources.find(
+                (item) => item.expense_line_id === line.expenseLineId,
+              );
+              return (
+                <div
+                  key={index}
+                  className="grid gap-3 rounded-xl border border-border/60 p-3 sm:grid-cols-2 xl:grid-cols-[2fr_1fr_1.5fr_1.5fr_auto]"
+                >
+                  <MillingField label="مصدر المصروف">
+                    <MillingSelect
+                      value={line.expenseLineId}
+                      onChange={(event) => {
+                        const selected = expenseSources.find(
+                          (item) => item.expense_line_id === event.target.value,
+                        );
+                        setExpenses((current) =>
+                          current.map((item, i) =>
+                            i === index
+                              ? {
+                                  ...item,
+                                  expenseLineId: event.target.value,
+                                  amount: selected
+                                    ? String(selected.available_amount)
+                                    : item.amount,
+                                }
+                              : item,
+                          ),
+                        );
+                      }}
+                    >
+                      <option value="">اختر بنداً مرحّلاً</option>
+                      {expenseSources.map((item) => (
+                        <option key={item.expense_line_id} value={item.expense_line_id}>
+                          {item.reference} · {item.category_name} · متاح{" "}
+                          {fmtNum(Number(item.available_amount))}
+                        </option>
+                      ))}
+                    </MillingSelect>
+                    {source && (
+                      <span className="mt-1 block text-[11px] text-muted-foreground">
+                        {source.description} · صافي البند {fmtNum(Number(source.net_amount))}
+                      </span>
+                    )}
+                  </MillingField>
+                  <MillingField label="المبلغ المحمل">
+                    <MillingInput
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      max={source?.available_amount}
+                      value={line.amount}
+                      onChange={(event) =>
+                        setExpenses((current) =>
+                          current.map((item, i) =>
+                            i === index ? { ...item, amount: event.target.value } : item,
+                          ),
+                        )
+                      }
+                    />
+                  </MillingField>
+                  <MillingField label="أساس التوزيع">
+                    <MillingInput
+                      value={line.basis}
+                      onChange={(event) =>
+                        setExpenses((current) =>
+                          current.map((item, i) =>
+                            i === index ? { ...item, basis: event.target.value } : item,
+                          ),
+                        )
+                      }
+                      placeholder="مثال: ساعات تشغيل الماكينة"
+                    />
+                  </MillingField>
+                  <MillingField label="ملاحظة">
+                    <MillingInput
+                      value={line.note}
+                      onChange={(event) =>
+                        setExpenses((current) =>
+                          current.map((item, i) =>
+                            i === index ? { ...item, note: event.target.value } : item,
+                          ),
+                        )
+                      }
+                      placeholder="اختياري"
+                    />
+                  </MillingField>
+                  <div className="flex items-end justify-end">
+                    <button
+                      type="button"
+                      aria-label="حذف تخصيص المصروف"
+                      onClick={() =>
+                        setExpenses((current) => current.filter((_, i) => i !== index))
+                      }
+                      className="rounded-full p-2 text-muted-foreground hover:bg-rose-500/10 hover:text-rose-600"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </MillingPanel>
+
+        <MillingPanel>
+          <MillingSectionTitle
+            title="الفاقد الإنتاجي"
+            subtitle="سجل الفاقد بوحدة كتلية؛ الطبيعي يُحمّل على المنتجات الجيدة، وغير الطبيعي يذهب إلى مصروف الفاقد."
+            action={
+              <button
+                type="button"
+                disabled={!massUnits.length}
+                onClick={() =>
+                  setLosses((current) => [
+                    ...current,
+                    { type: "NORMAL", quantity: "", uomId: kiloUnit?.id ?? "", reason: "" },
+                  ])
+                }
+                className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-2 text-xs font-bold disabled:opacity-50"
+              >
+                <Plus className="h-4 w-4" /> إضافة فاقد
+              </button>
+            }
+          />
+          {losses.length > 0 && (
+            <div className="space-y-3 p-4">
+              {losses.map((line, index) => (
+                <div
+                  key={index}
+                  className="grid gap-3 rounded-xl border border-border/60 p-3 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_2fr_auto]"
+                >
+                  <MillingField label="تصنيف الفاقد">
+                    <MillingSelect
+                      value={line.type}
+                      onChange={(event) =>
+                        setLosses((current) =>
+                          current.map((item, i) =>
+                            i === index
+                              ? { ...item, type: event.target.value as LossDraft["type"] }
+                              : item,
+                          ),
+                        )
+                      }
+                    >
+                      <option value="NORMAL">طبيعي</option>
+                      <option value="ABNORMAL">غير طبيعي</option>
+                    </MillingSelect>
+                  </MillingField>
+                  <MillingField label="الكمية">
+                    <MillingInput
+                      type="number"
+                      min="0"
+                      step="0.001"
+                      value={line.quantity}
+                      onChange={(event) =>
+                        setLosses((current) =>
+                          current.map((item, i) =>
+                            i === index ? { ...item, quantity: event.target.value } : item,
+                          ),
+                        )
+                      }
+                    />
+                  </MillingField>
+                  <MillingField label="وحدة الكتلة">
+                    <MillingSelect
+                      value={line.uomId}
+                      onChange={(event) =>
+                        setLosses((current) =>
+                          current.map((item, i) =>
+                            i === index ? { ...item, uomId: event.target.value } : item,
+                          ),
+                        )
+                      }
+                    >
+                      {massUnits.map((unit) => (
+                        <option key={unit.id} value={unit.id}>
+                          {unit.name_ar || unit.short_name}
+                        </option>
+                      ))}
+                    </MillingSelect>
+                  </MillingField>
+                  <MillingField label="سبب الفاقد">
+                    <MillingInput
+                      value={line.reason}
+                      onChange={(event) =>
+                        setLosses((current) =>
+                          current.map((item, i) =>
+                            i === index ? { ...item, reason: event.target.value } : item,
+                          ),
+                        )
+                      }
+                      placeholder="يُطلب عند تسجيل الفاقد"
+                    />
+                  </MillingField>
+                  <div className="flex items-end justify-end">
+                    <button
+                      type="button"
+                      aria-label="حذف الفاقد"
+                      onClick={() => setLosses((current) => current.filter((_, i) => i !== index))}
+                      className="rounded-full p-2 text-muted-foreground hover:bg-rose-500/10 hover:text-rose-600"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
               ))}
-
-              {/* زر إضافة سطر ناتج إضافي */}
-              <button
-                type="button"
-                onClick={() => setOutputs((o) => [...o, { itemId: "", qty: "" }])}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-emerald-500/40 bg-emerald-500/[0.04] hover:bg-emerald-500/[0.08] text-xs font-bold text-emerald-700 dark:text-emerald-300 transition-all active:scale-[0.99]"
-              >
-                <Plus className="h-4 w-4" />
-                <span>إضافة سطر ناتج جديد</span>
-              </button>
-
-              {/* الفاقد الاختياري + لوحة التوازن */}
-              <div className="grid gap-4 sm:grid-cols-2">
-                <MillingField label="الفاقد (اختياري)" hint="عدد الوحدات التي تختفي — يمثل الفرق">
-                  <QuantityInput
-                    value={lossQty === "" ? null : numLossQty}
-                    onValueChange={(v) => setLossQty(v == null ? "0" : String(v))}
-                    decimals={0}
-                    unit="وحدة"
-                  />
-                </MillingField>
-
-                <div className="rounded-xl border border-border/80 bg-background/80 p-3 text-xs space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">مجموع النواتج:</span>
-                    <span className="font-bold">
-                      <Mono>{fmtNum(totalOutputQty)}</Mono> وحدة
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">الفرق المتبقي من المصدر:</span>
-                    <span
-                      className={
-                        isBalanced
-                          ? "font-bold text-emerald-600 dark:text-emerald-400"
-                          : "font-bold text-amber-600 dark:text-amber-400"
-                      }
-                    >
-                      <Mono>{fmtNum(Math.abs(remainder))}</Mono> وحدة
-                      {remainder > 0
-                        ? " (أضفها كفاقد أو ناتج)"
-                        : remainder < 0
-                          ? " (تجاوز المصدر!)"
-                          : " ✓"}
-                    </span>
-                  </div>
-                  {isBalanced && numSourceQty > 0 && (
-                    <div className="flex items-center gap-1.5 border-t border-border/60 pt-1 font-bold text-emerald-600 dark:text-emerald-400">
-                      <CheckCircle2 className="h-4 w-4" />
-                      <span>
-                        ✓ متوازن: {fmtNum(totalOutputQty)} + {fmtNum(numLossQty)} ={" "}
-                        {fmtNum(numSourceQty)}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <MillingField label="ملاحظات التحويل" hint="اختيارية">
-                <MillingTextarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="مثال: تحويل دفعة الصباح — آلة رقم 2"
-                />
-              </MillingField>
             </div>
-          </MillingPanel>
-        </div>
+          )}
+        </MillingPanel>
 
-        {/* زر التنفيذ */}
-        <div className="sticky bottom-4 z-10">
+        <div className="flex flex-col gap-3 rounded-2xl border border-amber-500/25 bg-amber-500/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="max-w-3xl text-xs leading-relaxed text-muted-foreground">
+            عند الترحيل تُحفظ التشغيلة وحركات المخزون والدفعات وقيود اليومية معاً. لا تدخل حبوب
+            العميل أو أجرة طحنه هنا؛ مسار الأمانة والخدمة مستقل.
+          </p>
           <button
             type="button"
-            disabled={!canSubmit || submit.isPending}
+            disabled={!formValid || submit.isPending}
             onClick={() => submit.mutate()}
-            className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 py-3.5 px-4 text-sm font-black text-white shadow-lg transition hover:bg-emerald-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {submit.isPending ? (
-              "جارٍ تنفيذ التحويل…"
-            ) : (
-              <>
-                <CheckCircle2 className="h-5 w-5" />
-                تنفيذ التحويل وتحديث المخزون
-              </>
-            )}
+            <CheckCircle2 className="h-4 w-4" />{" "}
+            {submit.isPending ? "جارٍ ترحيل التشغيلة…" : "ترحيل تشغيلة الإنتاج"}
           </button>
         </div>
+
       </div>
     </ModuleGuard>
   );

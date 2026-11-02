@@ -30,7 +30,7 @@ import { CartLine as CartLineRow } from "@/components/commerce/cart-line";
 import { MobileProductPicker } from "@/components/commerce/mobile-product-picker";
 import { TableToolbar, type FilterValues } from "@/components/ui/table-toolbar";
 import { RecordsViewToggle } from "@/components/ui/records-view-toggle";
-import { PaymentMethodPicker } from "@/components/ui/payment-method";
+import { PaymentMethodSelect } from "@/components/ui/payment-method";
 import { AmountInput } from "@/components/commerce/amount-input";
 import { PosDatePicker } from "@/components/commerce/pos-date-picker";
 import { PartyPicker } from "@/components/commerce/party-picker";
@@ -2123,31 +2123,34 @@ function PurchasePOSPage() {
                 <span className="truncate text-[10px] font-semibold leading-none text-muted-foreground">
                   {lang === "ar" ? "طريقة الدفع" : "Payment method"}
                 </span>
-                <PaymentMethodPicker
+                {/*
+                 * المكوّن الموحّد (يعرض معه المؤسسة وسطرها) بدل المنتقي القديم.
+                 *
+                 * `showSettlement={false}`: هذه الشاشة تدير حساب التحصيل بنفسها
+                 * من خلال `paymentSelection`؛ فتح الصندوق/البنك داخل المكوّن
+                 * كان سيُنشئ مسارين للحقيقة في مستند واحد.
+                 */}
+                <PaymentMethodSelect
                   context="purchases"
                   value={paymentMethod}
+                  methods={purchasePaymentMethods}
                   onChange={(method) => {
-                    setPaymentMethod(method);
-                    if (method !== "split") setSplitPaymentLines([]);
-                    setPaid(method === "credit" ? "0" : "");
+                    const stored = method.legacyValue;
+                    setPaymentMethod(stored);
+                    if (stored !== "split") setSplitPaymentLines([]);
+                    setPaid(stored === "credit" ? "0" : "");
                     setPaidManuallyEdited(false);
                     setPaymentSelection((s) => ({
                       ...s,
-                      method,
-                      paymentMethodId: method === "cash" ? "cash" : s.paymentMethodId || method,
+                      method: stored,
+                      paymentMethodId: stored === "cash" ? "cash" : s.paymentMethodId || method.id,
                     }));
                   }}
+                  includeCredit
+                  showSettlement={false}
                   ensureIds={[paymentMethod]}
-                  allowedLegacyValues={[
-                    "cash",
-                    "card",
-                    "bank_transfer",
-                    "credit",
-                    "mobile_money",
-                    "split",
-                  ]}
-                  ariaLabel={lang === "ar" ? "طريقة الدفع" : "Payment method"}
-                  className="h-8 min-w-0 rounded-lg text-[10px] sm:text-xs"
+                  label={lang === "ar" ? "طريقة الدفع" : "Payment method"}
+                  className="min-w-0"
                 />
               </div>
               {paymentMethod === "split" && (

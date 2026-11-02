@@ -246,20 +246,18 @@ export function MillingOperationsGuidePage() {
           </div>
         )}
 
-        {/* ─── الباب 2: قمح المطحنة والتصنيع الذكي ─── */}
+        {/* ─── الباب 2: مخزون المنشأة والتصنيع ─── */}
         {activeTab === "own_grain" && (
           <div className="space-y-6">
             <div className="rounded-2xl border border-border bg-card p-6 shadow-xs space-y-4">
               <div className="flex items-center gap-2.5 text-sky-600 dark:text-sky-400">
                 <Cog className="h-5 w-5" />
-                <h3 className="text-base font-bold text-foreground">
-                  قمح المطحنة التجاري والتصنيع الذكي
-                </h3>
+                <h3 className="text-base font-bold text-foreground">تصنيع مخزون المنشأة</h3>
               </div>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                هذا المسار مخصص عندما تشتري المطحنة قمحاً لحسابها الخاص بهدف طحنه وبيعه للمستهلكين
-                أو المتاجر. هنا الحبوب والدقيق ملك للمطحنة بالكامل وتدخل في تقييم المخزون وتكلفة
-                المبيعات وحساب الأرباح والخسائر.
+                هذا المسار يخص أي مواد تملكها المنشأة وتحولها إلى منتجاتها، مثل الغذاء أو مواد
+                البناء أو غيرها. المواد الخام تدخل مخزون الشركة، والتصنيع ينقل تكلفتها وتكاليف
+                التحويل المؤهلة إلى المنتج النهائي. أما حبوب العميل فتبقى أمانة وخدمة مستقلة.
               </p>
 
               <div className="space-y-3 pt-2">
@@ -268,13 +266,15 @@ export function MillingOperationsGuidePage() {
                     أ
                   </span>
                   <div className="space-y-1">
-                    <h4 className="text-xs font-bold text-foreground">شراء القمح وتوريده للمخزن</h4>
+                    <h4 className="text-xs font-bold text-foreground">
+                      شراء المواد وتوريدها للمخزن
+                    </h4>
                     <p className="text-xs text-muted-foreground leading-relaxed">
                       يتم عبر شاشة المشتريات العامة أو نقطة الشراء السريعة (
                       <Link to="/purchases" className="text-primary underline">
                         /purchases
                       </Link>
-                      ). يدخل القمح مخزون الشركة بتكلفة الشراء الحقيقية ويُسجل كأصل من أصول المخزون.
+                      ). تدخل المواد مخزون الشركة بتكلفة الشراء الفعلية في وحدة الأساس وتُسجل كأصل.
                     </p>
                   </div>
                 </div>
@@ -285,22 +285,23 @@ export function MillingOperationsGuidePage() {
                   </span>
                   <div className="space-y-1">
                     <h4 className="text-xs font-bold text-foreground">
-                      عملية «التصنيع الذكي» (
+                      أمر إنتاج المنشأة (
                       <Link to="/milling/manufacture" className="text-primary underline">
                         /milling/manufacture
                       </Link>
                       )
                     </h4>
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      عند تشغيل الماكينة لطحن قمح الشركة:
+                      عند تصنيع منتج مملوك للمنشأة:
                       <br />
-                      1. حدد المخزن وصنف القمح الخام وكمية القمح المطحون (بالكيلوجرام).
+                      1. حدد المستودع ومركز التكلفة والمواد الخام وكمياتها بوحدات الأصناف المعرّفة.
                       <br />
-                      2. أضف النواتج المستخرجة (مثال: دقيق ممتاز + نخالة).
+                      2. أضف النواتج، والتكاليف الصناعية المؤهلة من بنود المصروف المرحلة، والفاقد إن
+                      وجد.
                       <br />
-                      3. يقوم النظام تلقائياً بخصم كمية القمح من المخزون، وإدخال النواتج بتكلفة
-                      محسوبة آلياً بنسبة أسعار بيعها (Relative Sales Value). الناتج الأخير يستقبل
-                      فارق التقريب تلقائياً لضمان تطابق إجمالي التكلفة بنسبة 100%.
+                      3. ينقل النظام تكلفة صرف المواد والتكاليف المخصصة إلى مخزون النواتج، ويرحل
+                      قيود الإنتاج والدفعات كوحدة واحدة. تُستخدم قيم البيع التقديرية فقط لتوزيع
+                      تكلفة الناتج المشترك بين أكثر من منتج.
                     </p>
                   </div>
                 </div>
@@ -310,11 +311,11 @@ export function MillingOperationsGuidePage() {
                     ج
                   </span>
                   <div className="space-y-1">
-                    <h4 className="text-xs font-bold text-foreground">بيع الدقيق والمنتجات</h4>
+                    <h4 className="text-xs font-bold text-foreground">بيع المنتجات الناتجة</h4>
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      يتم بيع الدقيق والنخالة كأي منتجات تجارية عبر نقطة البيع POS أو فواتير
-                      المبيعات. عند البيع يتم خصم المخزون واحتساب تكلفة البضاعة المباعة (COGS) بدقة
-                      بناءً على تكلفة التصنيع الذكي المحسوبة سابقاً.
+                      تباع المنتجات من خلال نقطة البيع أو فاتورة المبيعات. عند البيع يسجل النظام
+                      تكلفة البضاعة المباعة من حركة الصرف الفعلية، ويقابلها بحساب المخزون المناسب
+                      لفئة المنتج.
                     </p>
                   </div>
                 </div>

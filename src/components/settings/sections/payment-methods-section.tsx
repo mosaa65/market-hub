@@ -67,10 +67,14 @@ import {
 import { usePersistedViewMode } from "@/hooks/use-persisted-view-mode";
 import { RecordsViewToggle } from "@/components/ui/records-view-toggle";
 import {
+  usePaymentAccountLinkage,
   usePaymentMethods,
+  useSetPaymentMethodDefaultAccount,
   useUpdatePaymentMethodSettings,
   type ResolvedPaymentMethod,
 } from "@/hooks/use-payment-methods";
+import { useCashboxes } from "@/hooks/use-cashboxes";
+import { useCompanyBankAccounts } from "@/hooks/use-company-bank-accounts";
 import { PaymentMethodIcon } from "@/components/ui/payment-method/payment-method-icon";
 import { PaymentMethodIdentityEditor } from "@/components/ui/payment-method/payment-method-identity-editor";
 
@@ -125,7 +129,43 @@ export function PaymentMethodsSection() {
   const { lang } = useI18n();
   const isAr = lang === "ar";
   const { methods, isLoading, isFallback, refetch } = usePaymentMethods();
+  const linkage = usePaymentAccountLinkage();
   const { save, isSaving } = useUpdatePaymentMethodSettings();
+  const { setDefaultAccount } = useSetPaymentMethodDefaultAccount();
+  const { activeCashboxes } = useCashboxes();
+  const { banks, wallets } = useCompanyBankAccounts();
+
+  /**
+   * الحسابات القابلة للاختيار لكل عائلة.
+   *
+   * الصف الأول دائمًا «افتراضي»: اختياره يحذف التخصيص ويترك محرّك الترحيل
+   * يستخدم 1101 / 1111 / 1131. وهذه هي الحالة التي كانت الوحيدة سابقًا لأن
+   * العمود لم يكن يُكتب من أي شاشة.
+   */
+  const accountChoices = useMemo(
+    () => ({
+      CASH: activeCashboxes.map((box) => ({
+        id: box.account_id,
+        label: box.name_ar,
+        code: box.account?.code ?? "",
+      })),
+      BANK: banks
+        .map((bank) => ({
+          id: bank.account_id,
+          label: bank.name_ar,
+          code: bank.account?.code ?? "",
+        }))
+        .filter((entry, index, list) => list.findIndex((e) => e.id === entry.id) === index),
+      WALLET: wallets
+        .map((wallet) => ({
+          id: wallet.account_id,
+          label: wallet.name_ar,
+          code: wallet.account?.code ?? "",
+        }))
+        .filter((entry, index, list) => list.findIndex((e) => e.id === entry.id) === index),
+    }),
+    [activeCashboxes, banks, wallets],
+  );
 
   const [mainTab, setMainTab] = useState<"catalog" | "cashboxes" | "banks" | "cheques">("catalog");
   const [draft, setDraft] = useState<DraftState>({ rows: {}, order: [] });
@@ -374,6 +414,41 @@ export function PaymentMethodsSection() {
 
   return (
     <div className="space-y-4">
+      {/*
+       * تنبيه الربط المحاسبي.
+       *
+       * طريقة دفع مفعّلة بدون حساب في الدليل لا تفشل الآن — تفشل أمام العميل
+       * حين يحاول الكاشير التحصيل. هذا التنبيه ينقل الاكتشاف إلى مكان إعداده.
+       */}
+      {linkage.hasIssues && (
+        <div className="flex items-start gap-2.5 rounded-2xl border border-rose-500/35 bg-rose-500/[0.07] px-3.5 py-3">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-rose-600 dark:text-rose-400" />
+          <div className="min-w-0 flex-1 text-xs">
+            <p className="font-bold text-rose-700 dark:text-rose-300">
+              {isAr
+                ? `${linkage.broken.length} طريقة دفع مفعّلة بلا حساب في دليل الحسابات`
+                : `${linkage.broken.length} active method(s) without a chart account`}
+            </p>
+            <p className="mt-0.5 text-[11px] leading-relaxed text-rose-700/80 dark:text-rose-300/80">
+              {isAr
+                ? "التحصيل بهذه الطرق سيفشل أو يسقط على حساب غير مقصود. اربط حساباً لكل واحدة من شجرة الحسابات."
+                : "Collecting with these methods will fail or land on an unintended account. Link one for each."}
+            </p>
+            <ul className="mt-1.5 flex flex-wrap gap-1.5">
+              {linkage.broken.map((row) => (
+                <li
+                  key={row.method_id}
+                  className="rounded-md border border-rose-500/25 bg-background/60 px-1.5 py-0.5 font-mono text-[10px] text-rose-700 dark:text-rose-300"
+                >
+                  {row.method_name}
+                  {row.account_code ? ` → ${row.account_code}` : " → —"}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
       {/* ── Treasury & Payment Navigation Tabs ── */}
       <div className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-border/80 bg-surface/80 p-1.5 shadow-2xs">
         <button
@@ -447,8 +522,8 @@ export function PaymentMethodsSection() {
           */}
           <div className="rounded-2xl border border-border/70 bg-surface/60 p-3.5 text-[11px] leading-relaxed text-muted-foreground">
             {isAr
-              ? "هذه هي طرق الدفع المعتمدة في النظام. يمكنك تفعيل الطريقة أو تعطيلها وترتيب ظهورها فقط. الحسابات والصناديق والمحافظ الافتراضية مرتبطة بالدليل المحاسبي ولا تُنشأ من هذه الشاشة."
-              : "These are the system's approved payment methods. You can rename or re-icon any of them to suit your business, enable or disable them, and choose the sections they appear in. The accounting family is not affected by a rename, so posting stays exactly as it was."}
+              ? "هذه هي طرق الدفع المعتمدة. يمكنك تسميتها بأيقونتها، وتفعيلها أو تعطيلها، وترتيب ظهورها، واختيار أقسامها. وتحت كل طريقة تختار الصندوق أو البنك أو المحفظة التي تُقيَّد فيها نقديتها؛ وحسابات الدليل لا تُنشأ من هنا."
+              : "These are the approved payment methods. You may rename and re-icon them, enable or disable them, reorder them and choose their sections. Under each method you pick the cashbox, bank or wallet its money posts to; chart accounts are never created here."}
           </div>
 
           {/* A configuration that could not be read must never look like a choice. */}
@@ -480,8 +555,8 @@ export function PaymentMethodsSection() {
               </CardTitle>
               <CardDescription className="mt-1.5 text-xs">
                 {isAr
-                  ? "الطريقة غير المفعّلة لا تظهر في أي شاشة. وتخصيص الأقسام مستقل لكل طريقة."
-                  : "A disabled method appears nowhere. Default settlement accounts are linked to the chart of accounts and are not created from this screen."}
+                  ? "الطريقة غير المفعّلة لا تظهر في أي شاشة. وتخصيص الأقسام مستقل لكل طريقة. الحساب الافتراضي يحدّد أين تُرحَّل النقود داخل عائلة الطريقة."
+                  : "A disabled method appears nowhere, and each method has its own sections. The default account decides where the money posts inside the method's family."}
               </CardDescription>
             </CardHeader>
 
@@ -625,7 +700,10 @@ export function PaymentMethodsSection() {
                                 </span>
                               ) : null}
                               {method.defaultAccountCode ? (
-                                <span>{isAr ? "حساب مرتبط" : "Linked account"}</span>
+                                <span>
+                                  {isAr ? "حساب مرتبط" : "Linked account"}
+                                  {method.defaultAccount ? `: ${method.defaultAccount.nameAr}` : ""}
+                                </span>
                               ) : null}
                             </div>
                           </div>
@@ -716,6 +794,80 @@ export function PaymentMethodsSection() {
                             )}
                           </div>
                         )}
+
+                        {/*
+                          ── Row 4: the default settlement account. ──
+
+                          قبل هذا الصف كان `default_account_id` عمودًا يُقرأ ولا
+                          يُكتب، فيسقط الترحيل دائمًا على الحساب التجميعي 1111/1131
+                          حتى لو كان للبنك حساب فرعي خاص. القائمة تعرض الصناديق أو
+                          البنوك أو المحافظ الفعلية فقط — لا شجرة حسابات حرة — فلا
+                          يمكن اختيار حساب من عائلة أخرى.
+                        */}
+                        {!isCredit &&
+                          row.enabled &&
+                          (method.ledgerKind === "CASH" ||
+                            method.ledgerKind === "BANK" ||
+                            method.ledgerKind === "WALLET") &&
+                          (() => {
+                            const choices =
+                              accountChoices[method.ledgerKind as "CASH" | "BANK" | "WALLET"] ?? [];
+                            const current = method.defaultAccount?.id ?? "";
+                            return (
+                              <div className="mt-2.5 border-t border-border/40 pt-2.5">
+                                <label
+                                  className="mb-1.5 block text-[10px] font-semibold text-muted-foreground"
+                                  htmlFor={`pm-account-${method.id}`}
+                                >
+                                  {isAr ? "الحساب الافتراضي للتسوية" : "Default settlement account"}
+                                </label>
+                                <select
+                                  id={`pm-account-${method.id}`}
+                                  value={current}
+                                  disabled={choices.length === 0}
+                                  onChange={(event) => {
+                                    const accountId = event.target.value || null;
+                                    void setDefaultAccount(method.id, accountId)
+                                      .then(() => {
+                                        void refetch();
+                                        toast.success(
+                                          isAr ? "تم ربط الحساب" : "Settlement account linked",
+                                        );
+                                      })
+                                      .catch((error: unknown) => {
+                                        toast.error(
+                                          error instanceof Error
+                                            ? error.message
+                                            : isAr
+                                              ? "تعذّر ربط الحساب"
+                                              : "Could not link the account",
+                                        );
+                                      });
+                                  }}
+                                  className="h-8 w-full rounded-lg border border-border/70 bg-background/70 px-2 text-[11px] font-medium text-foreground outline-none transition focus:border-primary/60 focus-visible:ring-2 focus-visible:ring-primary/25 disabled:opacity-50"
+                                >
+                                  <option value="">
+                                    {isAr
+                                      ? `افتراضي النظام (${method.defaultAccountCode ?? "—"})`
+                                      : `System default (${method.defaultAccountCode ?? "—"})`}
+                                  </option>
+                                  {choices.map((choice) => (
+                                    <option key={choice.id} value={choice.id}>
+                                      {choice.code ? `${choice.code} — ` : ""}
+                                      {choice.label}
+                                    </option>
+                                  ))}
+                                </select>
+                                {choices.length === 0 && (
+                                  <p className="mt-1 text-[10px] text-amber-600 dark:text-amber-400">
+                                    {isAr
+                                      ? "لا يوجد صندوق أو بنك أو محفظة معرّفة في هذا القسم — أضفها من التبويبات أعلاه."
+                                      : "No cashbox, bank or wallet is defined — add one from the tabs above."}
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          })()}
                       </div>
                     );
                   })}

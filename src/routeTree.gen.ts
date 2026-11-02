@@ -61,6 +61,7 @@ import { Route as AppTrialBalanceRouteImport } from './routes/_app.trial-balance
 import { Route as AppUsersRouteImport } from './routes/_app.users'
 import { Route as AppVortexUiRouteImport } from './routes/_app.vortex-ui'
 import { Route as AppWarehousesRouteImport } from './routes/_app.warehouses'
+import { Route as AppExpensesSetupRouteImport } from './routes/_app.expenses.setup'
 import { Route as AppMillingCustodyDeliveryRouteImport } from './routes/_app.milling.custody-delivery'
 import { Route as AppMillingCustomerStatementRouteImport } from './routes/_app.milling.customer-statement'
 import { Route as AppMillingDeliveryRouteImport } from './routes/_app.milling.delivery'
@@ -69,6 +70,7 @@ import { Route as AppMillingManufactureRouteImport } from './routes/_app.milling
 import { Route as AppMillingMillingRouteImport } from './routes/_app.milling.milling'
 import { Route as AppMillingOperationsGuideRouteImport } from './routes/_app.milling.operations-guide'
 import { Route as AppMillingPerformanceRouteImport } from './routes/_app.milling.performance'
+import { Route as AppMillingProductionOrdersRouteImport } from './routes/_app.milling.production-orders'
 import { Route as AppMillingProductsRouteImport } from './routes/_app.milling.products'
 import { Route as AppReportsCustomersRouteImport } from './routes/_app.reports.customers'
 import { Route as AppReportsInventoryRouteImport } from './routes/_app.reports.inventory'
@@ -338,6 +340,11 @@ const AppWarehousesRoute = AppWarehousesRouteImport.update({
   path: '/warehouses',
   getParentRoute: () => AppRoute,
 } as any)
+const AppExpensesSetupRoute = AppExpensesSetupRouteImport.update({
+  id: '/setup',
+  path: '/setup',
+  getParentRoute: () => AppExpensesRoute,
+} as any)
 const AppMillingCustodyDeliveryRoute =
   AppMillingCustodyDeliveryRouteImport.update({
     id: '/custody-delivery',
@@ -381,6 +388,12 @@ const AppMillingPerformanceRoute = AppMillingPerformanceRouteImport.update({
   path: '/performance',
   getParentRoute: () => AppMillingRoute,
 } as any)
+const AppMillingProductionOrdersRoute =
+  AppMillingProductionOrdersRouteImport.update({
+    id: '/production-orders',
+    path: '/production-orders',
+    getParentRoute: () => AppMillingRoute,
+  } as any)
 const AppMillingProductsRoute = AppMillingProductsRouteImport.update({
   id: '/products',
   path: '/products',
@@ -442,7 +455,7 @@ export interface FileRoutesByFullPath {
   '/daily-journal': typeof AppDailyJournalRoute
   '/dashboard': typeof AppDashboardRoute
   '/debts': typeof AppDebtsRoute
-  '/expenses': typeof AppExpensesRoute
+  '/expenses': typeof AppExpensesRouteWithChildren
   '/finance': typeof AppFinanceRoute
   '/fiscal-periods': typeof AppFiscalPeriodsRoute
   '/fiscal-year-close': typeof AppFiscalYearCloseRoute
@@ -480,6 +493,7 @@ export interface FileRoutesByFullPath {
   '/users': typeof AppUsersRoute
   '/vortex-ui': typeof AppVortexUiRoute
   '/warehouses': typeof AppWarehousesRoute
+  '/expenses/setup': typeof AppExpensesSetupRoute
   '/milling/custody-delivery': typeof AppMillingCustodyDeliveryRoute
   '/milling/customer-statement': typeof AppMillingCustomerStatementRoute
   '/milling/delivery': typeof AppMillingDeliveryRoute
@@ -488,6 +502,7 @@ export interface FileRoutesByFullPath {
   '/milling/milling': typeof AppMillingMillingRoute
   '/milling/operations-guide': typeof AppMillingOperationsGuideRoute
   '/milling/performance': typeof AppMillingPerformanceRoute
+  '/milling/production-orders': typeof AppMillingProductionOrdersRoute
   '/milling/products': typeof AppMillingProductsRoute
   '/reports/customers': typeof AppReportsCustomersRoute
   '/reports/inventory': typeof AppReportsInventoryRoute
@@ -512,7 +527,7 @@ export interface FileRoutesByTo {
   '/daily-journal': typeof AppDailyJournalRoute
   '/dashboard': typeof AppDashboardRoute
   '/debts': typeof AppDebtsRoute
-  '/expenses': typeof AppExpensesRoute
+  '/expenses': typeof AppExpensesRouteWithChildren
   '/finance': typeof AppFinanceRoute
   '/fiscal-periods': typeof AppFiscalPeriodsRoute
   '/fiscal-year-close': typeof AppFiscalYearCloseRoute
@@ -550,6 +565,7 @@ export interface FileRoutesByTo {
   '/users': typeof AppUsersRoute
   '/vortex-ui': typeof AppVortexUiRoute
   '/warehouses': typeof AppWarehousesRoute
+  '/expenses/setup': typeof AppExpensesSetupRoute
   '/milling/custody-delivery': typeof AppMillingCustodyDeliveryRoute
   '/milling/customer-statement': typeof AppMillingCustomerStatementRoute
   '/milling/delivery': typeof AppMillingDeliveryRoute
@@ -558,6 +574,7 @@ export interface FileRoutesByTo {
   '/milling/milling': typeof AppMillingMillingRoute
   '/milling/operations-guide': typeof AppMillingOperationsGuideRoute
   '/milling/performance': typeof AppMillingPerformanceRoute
+  '/milling/production-orders': typeof AppMillingProductionOrdersRoute
   '/milling/products': typeof AppMillingProductsRoute
   '/reports/customers': typeof AppReportsCustomersRoute
   '/reports/inventory': typeof AppReportsInventoryRoute
@@ -584,7 +601,7 @@ export interface FileRoutesById {
   '/_app/daily-journal': typeof AppDailyJournalRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/debts': typeof AppDebtsRoute
-  '/_app/expenses': typeof AppExpensesRoute
+  '/_app/expenses': typeof AppExpensesRouteWithChildren
   '/_app/finance': typeof AppFinanceRoute
   '/_app/fiscal-periods': typeof AppFiscalPeriodsRoute
   '/_app/fiscal-year-close': typeof AppFiscalYearCloseRoute
@@ -622,6 +639,7 @@ export interface FileRoutesById {
   '/_app/users': typeof AppUsersRoute
   '/_app/vortex-ui': typeof AppVortexUiRoute
   '/_app/warehouses': typeof AppWarehousesRoute
+  '/_app/expenses/setup': typeof AppExpensesSetupRoute
   '/_app/milling/custody-delivery': typeof AppMillingCustodyDeliveryRoute
   '/_app/milling/customer-statement': typeof AppMillingCustomerStatementRoute
   '/_app/milling/delivery': typeof AppMillingDeliveryRoute
@@ -630,6 +648,7 @@ export interface FileRoutesById {
   '/_app/milling/milling': typeof AppMillingMillingRoute
   '/_app/milling/operations-guide': typeof AppMillingOperationsGuideRoute
   '/_app/milling/performance': typeof AppMillingPerformanceRoute
+  '/_app/milling/production-orders': typeof AppMillingProductionOrdersRoute
   '/_app/milling/products': typeof AppMillingProductsRoute
   '/_app/reports/customers': typeof AppReportsCustomersRoute
   '/_app/reports/inventory': typeof AppReportsInventoryRoute
@@ -694,6 +713,7 @@ export interface FileRouteTypes {
     | '/users'
     | '/vortex-ui'
     | '/warehouses'
+    | '/expenses/setup'
     | '/milling/custody-delivery'
     | '/milling/customer-statement'
     | '/milling/delivery'
@@ -702,6 +722,7 @@ export interface FileRouteTypes {
     | '/milling/milling'
     | '/milling/operations-guide'
     | '/milling/performance'
+    | '/milling/production-orders'
     | '/milling/products'
     | '/reports/customers'
     | '/reports/inventory'
@@ -764,6 +785,7 @@ export interface FileRouteTypes {
     | '/users'
     | '/vortex-ui'
     | '/warehouses'
+    | '/expenses/setup'
     | '/milling/custody-delivery'
     | '/milling/customer-statement'
     | '/milling/delivery'
@@ -772,6 +794,7 @@ export interface FileRouteTypes {
     | '/milling/milling'
     | '/milling/operations-guide'
     | '/milling/performance'
+    | '/milling/production-orders'
     | '/milling/products'
     | '/reports/customers'
     | '/reports/inventory'
@@ -835,6 +858,7 @@ export interface FileRouteTypes {
     | '/_app/users'
     | '/_app/vortex-ui'
     | '/_app/warehouses'
+    | '/_app/expenses/setup'
     | '/_app/milling/custody-delivery'
     | '/_app/milling/customer-statement'
     | '/_app/milling/delivery'
@@ -843,6 +867,7 @@ export interface FileRouteTypes {
     | '/_app/milling/milling'
     | '/_app/milling/operations-guide'
     | '/_app/milling/performance'
+    | '/_app/milling/production-orders'
     | '/_app/milling/products'
     | '/_app/reports/customers'
     | '/_app/reports/inventory'
@@ -1226,6 +1251,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppWarehousesRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/expenses/setup': {
+      id: '/_app/expenses/setup'
+      path: '/setup'
+      fullPath: '/expenses/setup'
+      preLoaderRoute: typeof AppExpensesSetupRouteImport
+      parentRoute: typeof AppExpensesRoute
+    }
     '/_app/milling/custody-delivery': {
       id: '/_app/milling/custody-delivery'
       path: '/custody-delivery'
@@ -1280,6 +1312,13 @@ declare module '@tanstack/react-router' {
       path: '/performance'
       fullPath: '/milling/performance'
       preLoaderRoute: typeof AppMillingPerformanceRouteImport
+      parentRoute: typeof AppMillingRoute
+    }
+    '/_app/milling/production-orders': {
+      id: '/_app/milling/production-orders'
+      path: '/production-orders'
+      fullPath: '/milling/production-orders'
+      preLoaderRoute: typeof AppMillingProductionOrdersRouteImport
       parentRoute: typeof AppMillingRoute
     }
     '/_app/milling/products': {
@@ -1348,6 +1387,18 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AppExpensesRouteChildren {
+  AppExpensesSetupRoute: typeof AppExpensesSetupRoute
+}
+
+const AppExpensesRouteChildren: AppExpensesRouteChildren = {
+  AppExpensesSetupRoute: AppExpensesSetupRoute,
+}
+
+const AppExpensesRouteWithChildren = AppExpensesRoute._addFileChildren(
+  AppExpensesRouteChildren,
+)
+
 interface AppMillingRouteChildren {
   AppMillingCustodyDeliveryRoute: typeof AppMillingCustodyDeliveryRoute
   AppMillingCustomerStatementRoute: typeof AppMillingCustomerStatementRoute
@@ -1357,6 +1408,7 @@ interface AppMillingRouteChildren {
   AppMillingMillingRoute: typeof AppMillingMillingRoute
   AppMillingOperationsGuideRoute: typeof AppMillingOperationsGuideRoute
   AppMillingPerformanceRoute: typeof AppMillingPerformanceRoute
+  AppMillingProductionOrdersRoute: typeof AppMillingProductionOrdersRoute
   AppMillingProductsRoute: typeof AppMillingProductsRoute
 }
 
@@ -1369,6 +1421,7 @@ const AppMillingRouteChildren: AppMillingRouteChildren = {
   AppMillingMillingRoute: AppMillingMillingRoute,
   AppMillingOperationsGuideRoute: AppMillingOperationsGuideRoute,
   AppMillingPerformanceRoute: AppMillingPerformanceRoute,
+  AppMillingProductionOrdersRoute: AppMillingProductionOrdersRoute,
   AppMillingProductsRoute: AppMillingProductsRoute,
 }
 
@@ -1422,7 +1475,7 @@ interface AppRouteChildren {
   AppDailyJournalRoute: typeof AppDailyJournalRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppDebtsRoute: typeof AppDebtsRoute
-  AppExpensesRoute: typeof AppExpensesRoute
+  AppExpensesRoute: typeof AppExpensesRouteWithChildren
   AppFinanceRoute: typeof AppFinanceRoute
   AppFiscalPeriodsRoute: typeof AppFiscalPeriodsRoute
   AppFiscalYearCloseRoute: typeof AppFiscalYearCloseRoute
@@ -1475,7 +1528,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppDailyJournalRoute: AppDailyJournalRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppDebtsRoute: AppDebtsRoute,
-  AppExpensesRoute: AppExpensesRoute,
+  AppExpensesRoute: AppExpensesRouteWithChildren,
   AppFinanceRoute: AppFinanceRoute,
   AppFiscalPeriodsRoute: AppFiscalPeriodsRoute,
   AppFiscalYearCloseRoute: AppFiscalYearCloseRoute,

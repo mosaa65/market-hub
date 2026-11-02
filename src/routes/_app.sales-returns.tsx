@@ -35,7 +35,10 @@ import { Loader2, Plus, Printer, RotateCcw, Search, Trash2, Truck, Wallet } from
 import { LuxuryPrintPreviewModal } from "@/components/luxury-print-preview-modal";
 import type { UnifiedDocumentData } from "@/lib/templates";
 import { translateRpcError } from "@/lib/errors/rpc-errors";
-import { addReturnableQuantities, quantityIncrementDecimals } from "@/lib/invoice-returnable-quantities";
+import {
+  addReturnableQuantities,
+  quantityIncrementDecimals,
+} from "@/lib/invoice-returnable-quantities";
 import { IconButton } from "@/components/ui/icon-button";
 import { VortexMetricCard } from "@/components/vortex-ui";
 import { RecordsView, type RecordsViewMode } from "@/components/ui/records-view";
@@ -399,7 +402,9 @@ function SalesReturnsPage() {
   async function openReturnPrint(r: SalesReturn) {
     const { data: items } = await supabase
       .from("sales_return_items")
-      .select("quantity, unit_price, total, tax, entered_quantity, entered_unit_price, uom_id, products(name, name_ar, sku), uom:units!sales_return_items_uom_id_fkey(name,name_ar)")
+      .select(
+        "quantity, unit_price, total, tax, entered_quantity, entered_unit_price, uom_id, products(name, name_ar, sku), uom:units!sales_return_items_uom_id_fkey(name,name_ar)",
+      )
       .eq("return_id", r.id);
 
     setPreviewDoc({
@@ -792,7 +797,7 @@ function NewSalesReturn({
       setInvoiceItems(nextItems);
       setLines([]);
     })();
-  }, [customerId, lang]);
+  }, [customerId, lang, isAr]);
 
   useEffect(() => {
     if (!customerInvoiceId) {
@@ -828,23 +833,27 @@ function NewSalesReturn({
       );
       setLines([]);
     })();
-  }, [customerInvoiceId, lang]);
+  }, [customerInvoiceId, lang, isAr]);
 
   const filtered = useMemo(
     () =>
       invoiceItems
-        .filter(
-          (item) => {
-            const p = item.products;
-            if (!p || Number(item.returnable_entered_quantity ?? item.entered_quantity ?? item.quantity ?? 0) <= 0) return false;
-            return (
+        .filter((item) => {
+          const p = item.products;
+          if (
+            !p ||
+            Number(
+              item.returnable_entered_quantity ?? item.entered_quantity ?? item.quantity ?? 0,
+            ) <= 0
+          )
+            return false;
+          return (
             !search ||
             (p.name ?? "").toLowerCase().includes(search.toLowerCase()) ||
             (p.name_ar ?? "").includes(search) ||
             p.sku?.toLowerCase().includes(search.toLowerCase())
-            );
-          },
-        )
+          );
+        })
         .slice(0, 8),
     [invoiceItems, search],
   );
@@ -854,9 +863,18 @@ function NewSalesReturn({
     if (!p || !item.id) return;
     setLines((l) => {
       const ex = l.find((x) => x.invoice_item_id === item.id);
-      if (ex) return l.map((x) => (x.invoice_item_id === item.id ? { ...x, quantity: Math.min(x.max_quantity, x.quantity + x.quantity_step) } : x));
-      const maxQuantity = Number(item.returnable_entered_quantity ?? item.entered_quantity ?? item.quantity ?? 9999);
-      const quantityStep = Number(item.returnable_quantity_increment ?? item.uom_quantity_increment ?? 0.001);
+      if (ex)
+        return l.map((x) =>
+          x.invoice_item_id === item.id
+            ? { ...x, quantity: Math.min(x.max_quantity, x.quantity + x.quantity_step) }
+            : x,
+        );
+      const maxQuantity = Number(
+        item.returnable_entered_quantity ?? item.entered_quantity ?? item.quantity ?? 9999,
+      );
+      const quantityStep = Number(
+        item.returnable_quantity_increment ?? item.uom_quantity_increment ?? 0.001,
+      );
       const initialQuantity = Math.min(maxQuantity, Math.ceil(1 / quantityStep) * quantityStep);
       return [
         ...l,
@@ -867,7 +885,10 @@ function NewSalesReturn({
           quantity: initialQuantity,
           max_quantity: maxQuantity,
           uom_id: item.uom_id ?? null,
-          unit_label: item.uom?.name_ar || item.uom?.name || (lang === "ar" ? "وحدة الفاتورة" : "Invoice unit"),
+          unit_label:
+            item.uom?.name_ar ||
+            item.uom?.name ||
+            (lang === "ar" ? "وحدة الفاتورة" : "Invoice unit"),
           quantity_step: quantityStep,
           unit_price: Number(item.entered_unit_price ?? item.unit_price ?? 0),
           tax_per_unit:
@@ -896,13 +917,27 @@ function NewSalesReturn({
 
   const total =
     Math.round(
-      lines.reduce((a, l) => a + l.quantity * (l.unit_price * invoiceDiscountFactor + l.tax_per_unit), 0) * 100,
+      lines.reduce(
+        (a, l) => a + l.quantity * (l.unit_price * invoiceDiscountFactor + l.tax_per_unit),
+        0,
+      ) * 100,
     ) / 100;
 
   async function save() {
     if (saving) return;
-    if (lines.some((line) => Math.abs(line.quantity / line.quantity_step - Math.round(line.quantity / line.quantity_step)) > 1e-7)) {
-      toast.error(isAr ? "الكمية يجب أن تطابق خطوة الوحدة المسجلة في الفاتورة الأصلية" : "Quantity must follow the unit increment saved on the original invoice");
+    if (
+      lines.some(
+        (line) =>
+          Math.abs(
+            line.quantity / line.quantity_step - Math.round(line.quantity / line.quantity_step),
+          ) > 1e-7,
+      )
+    ) {
+      toast.error(
+        isAr
+          ? "الكمية يجب أن تطابق خطوة الوحدة المسجلة في الفاتورة الأصلية"
+          : "Quantity must follow the unit increment saved on the original invoice",
+      );
       return;
     }
     if (!warehouseId || lines.length === 0) {
@@ -930,18 +965,24 @@ function NewSalesReturn({
         settlement.paymentMethodId ||
         settlement.reference)
     ) {
-      try {
-        await (supabase as any)
-          .from("sales_returns")
-          .update({
-            cashbox_id: settlement.cashboxId || null,
-            bank_account_id: settlement.bankAccountId || null,
-            payment_method_id: settlement.paymentMethodId || refundMethod || null,
-            payment_reference: settlement.reference || null,
-          })
-          .eq("id", returnId);
-      } catch (e) {
-        console.warn("Could not set treasury settlement on sales_return:", e);
+      // PostgREST لا يرمي استثناءً: يعيد `error` في نتيجة الاستعلام. كان
+      // try/catch هنا يعني أن فشل توجيه الخزينة يُبتلع بصمت، فيسجّل المرتجع
+      // على الحساب العام 1101 بينما الكاشير اختار بنكًا أو محفظة بعينها.
+      const { error: settlementError } = await (supabase as any)
+        .from("sales_returns")
+        .update({
+          cashbox_id: settlement.cashboxId || null,
+          bank_account_id: settlement.bankAccountId || null,
+          payment_method_id: settlement.paymentMethodId || refundMethod || null,
+          payment_reference: settlement.reference || null,
+        })
+        .eq("id", returnId);
+      if (settlementError) {
+        toast.warning(
+          lang === "ar"
+            ? `سُجّل المرتجع، لكن تعذّر توجيه الخزينة: ${settlementError.message}`
+            : `Return recorded, but settlement routing failed: ${settlementError.message}`,
+        );
       }
     }
     toast.success(
@@ -1026,13 +1067,17 @@ function NewSalesReturn({
             </div>
             <div className="grid gap-1.5 sm:col-span-2">
               <Label>{lang === "ar" ? "طريقة ومصدر الاسترداد" : "Refund method & source"}</Label>
+              {/*
+                آجل مستبعد: المرتجع يُعيد نقودًا، و`create_sales_return` يرفض قيمة
+                credit صراحةً. عرضها كان يعِد بخيار يفشل عند الحفظ.
+              */}
               <DynamicPaymentSelector
                 context="sales_returns"
                 value={refundMethod}
                 onChange={setRefundMethod}
                 settlement={settlement}
                 onSettlementChange={setSettlement}
-                includeCredit
+                includeCredit={false}
                 compact
               />
             </div>
@@ -1060,7 +1105,11 @@ function NewSalesReturn({
                     className="flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-accent text-start"
                     onClick={() => addLine(item)}
                   >
-                    <span>{isAr ? item.products?.name_ar || item.products?.name : item.products?.name || item.products?.name_ar}</span>
+                    <span>
+                      {isAr
+                        ? item.products?.name_ar || item.products?.name
+                        : item.products?.name || item.products?.name_ar}
+                    </span>
                     <span className="font-mono text-xs text-muted-foreground">
                       {money(Number(item.entered_unit_price ?? item.unit_price ?? 0))}
                     </span>
@@ -1086,7 +1135,14 @@ function NewSalesReturn({
                       <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
                         <span>{item.products?.sku ?? "—"}</span>
                         <span>
-                          {Number(item.returnable_entered_quantity ?? item.entered_quantity ?? item.quantity)} {item.uom?.name_ar || item.uom?.name || (lang === "ar" ? "وحدة الفاتورة" : "Invoice unit")}
+                          {Number(
+                            item.returnable_entered_quantity ??
+                              item.entered_quantity ??
+                              item.quantity,
+                          )}{" "}
+                          {item.uom?.name_ar ||
+                            item.uom?.name ||
+                            (lang === "ar" ? "وحدة الفاتورة" : "Invoice unit")}
                         </span>
                       </div>
                     </button>
@@ -1119,7 +1175,10 @@ function NewSalesReturn({
                 <tbody>
                   {lines.map((l) => (
                     <tr key={l.invoice_item_id} className="border-t border-border/60">
-                      <td className="px-3 py-2 font-medium">{l.name}<span className="ms-2 text-xs text-muted-foreground">{l.unit_label}</span></td>
+                      <td className="px-3 py-2 font-medium">
+                        {l.name}
+                        <span className="ms-2 text-xs text-muted-foreground">{l.unit_label}</span>
+                      </td>
                       <td className="px-3 py-2">
                         {/* الكمية المُوحّدة: أرقام في المنتصف، بلا عجلة ماوس. */}
                         <QuantityInput
@@ -1128,13 +1187,17 @@ function NewSalesReturn({
                           min={l.quantity_step}
                           aria-label={lang === "ar" ? "الكمية" : "Quantity"}
                           value={l.quantity}
-                          onValueChange={(v) => updateQty(l.invoice_item_id, v == null ? l.quantity_step : v)}
+                          onValueChange={(v) =>
+                            updateQty(l.invoice_item_id, v == null ? l.quantity_step : v)
+                          }
                           className="h-8 w-20"
                         />
                       </td>
                       <td className="px-3 py-2 font-mono">{money(l.unit_price)}</td>
                       <td className="px-3 py-2 text-end font-mono font-semibold">
-                        {money(l.quantity * (l.unit_price * invoiceDiscountFactor + l.tax_per_unit))}
+                        {money(
+                          l.quantity * (l.unit_price * invoiceDiscountFactor + l.tax_per_unit),
+                        )}
                       </td>
                       <td className="px-3 py-2 text-end">
                         <button

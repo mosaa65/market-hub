@@ -158,7 +158,10 @@ function FinancePage() {
         }
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <Link to="/expenses">
+            <Link
+          to="/expenses"
+          search={{ create: true, costCenterId: undefined, categoryId: undefined, section: undefined }}
+        >
               <ActionButton tone="outline" size="sm" icon={<Receipt />}>
                 {ar ? "سجل المصروفات الكامل" : "Expense register"}
               </ActionButton>
@@ -274,7 +277,10 @@ function FinancePage() {
                 <CardTitle className="text-base">
                   {ar ? "آخر المصروفات المسجلة" : "Recent expenses"}
                 </CardTitle>
-                <Link to="/expenses">
+                <Link
+          to="/expenses"
+          search={{ create: true, costCenterId: undefined, categoryId: undefined, section: undefined }}
+        >
                   <Button variant="ghost" size="sm" className="text-xs">
                     {ar ? "عرض السجل التفصيلي" : "View full register"}
                     <ArrowUpRight className="h-3.5 w-3.5 ms-1" />

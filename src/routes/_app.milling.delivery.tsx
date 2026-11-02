@@ -49,6 +49,11 @@ import {
   fmtNum,
 } from "@/components/milling/milling-ui";
 import { QuantityInput } from "@/components/ui/quantity-input";
+import { ProductPicker } from "@/components/products/product-picker";
+import { ProductLinesEditor } from "@/components/products/product-lines-editor";
+import { QuickAddButton } from "@/components/ui/quick-add-button";
+import { QuickProductDialog } from "@/components/milling/quick-product-dialog";
+import { WarehouseBadge } from "@/components/ui/warehouse-badge";
 
 export const Route = createFileRoute("/_app/milling/delivery")({
   head: () => ({ meta: [{ title: "تسليم نواتج الأمانات — فورتكس ERP" }] }),
@@ -73,6 +78,8 @@ function MillingDeliveryPage() {
   const [customerId, setCustomerId] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
   const [lines, setLines] = useState<CustodyLine[]>([{ itemId: "", bags: 0, kg: 0 }]);
+  /** نافذة إضافة صنف جديد — منبثقة فوق الشاشة، لا تُقصّ داخل اللوحة. */
+  const [quickItemOpen, setQuickItemOpen] = useState(false);
   const [notes, setNotes] = useState("");
 
   // حالة معاينة وطباعة الفاتورة الفاخرة
@@ -348,26 +355,22 @@ function MillingDeliveryPage() {
                   </MillingSelect>
                 </MillingField>
 
-                <MillingField label="المستودع المصروف منه *">
-                  <MillingSelect
-                    value={warehouseId}
-                    onChange={(e) => setWarehouseId(e.target.value)}
-                    className="font-bold text-xs"
-                  >
-                    <option value="">اختر المستودع…</option>
-                    {(warehouses.data ?? []).map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.name_ar || w.name} {w.is_default ? "★ (الافتراضي)" : ""}
-                      </option>
-                    ))}
-                  </MillingSelect>
-                </MillingField>
+                <WarehouseBadge
+                  value={warehouseId}
+                  onChange={setWarehouseId}
+                  required
+                  warehouses={(warehouses.data ?? []).map((w) => ({
+                    id: w.id,
+                    nameAr: w.name_ar || w.name,
+                    isDefault: Boolean(w.is_default),
+                  }))}
+                />
               </div>
 
-              {/* جدول أسطر التسليم */}
-              <div className="space-y-3 rounded-2xl border border-border/80 bg-surface-2/30 p-3.5">
-                <div className="flex items-center justify-between">
-                  <div>
+              {/* جدول أسطر التسليم — نفس المحرّر الموحّد المستخدم في الاستلام والطحن */}
+              <div className="space-y-3 rounded-2xl border border-border/80 bg-surface-2/30 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="min-w-0">
                     <h4 className="text-xs font-bold text-foreground">
                       الأصناف والكميات المراد تسليمها
                     </h4>
@@ -375,150 +378,70 @@ function MillingDeliveryPage() {
                       يمكن التسليم على دفعات متفرقة، وسيظهر المتبقي في الفاتورة والسجل.
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setLines((l) => [...l, { itemId: "", bags: 0, kg: 0 }])}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/20 transition-colors"
-                  >
-                    <Plus className="h-3.5 w-3.5" /> إضافة صنف آخر للتسليم
-                  </button>
+                  <QuickAddButton
+                    label="إضافة صنف جديد إلى دليل الأمانات"
+                    icon={Plus}
+                    tone="emerald"
+                    size="sm"
+                    onClick={() => setQuickItemOpen(true)}
+                  />
                 </div>
 
-                {lines.map((line, idx) => {
-                  const b = line.itemId ? balanceFor(line.itemId) : undefined;
-                  const remBags = b ? Math.max(0, b.bags_balance - (Number(line.bags) || 0)) : 0;
-                  const remKg = b ? Math.max(0, b.kg_balance - (Number(line.kg) || 0)) : 0;
-                  const isOver = b && (line.bags > b.bags_balance || line.kg > b.kg_balance);
-
-                  return (
-                    <div
-                      key={idx}
-                      className={`space-y-2 rounded-xl border p-3 transition-colors ${
-                        isOver ? "border-rose-500/50 bg-rose-500/5" : "border-border/70 bg-card/70"
-                      }`}
-                    >
-                      <div className="grid grid-cols-[1fr_auto] items-center gap-2">
-                        <MillingSelect
-                          value={line.itemId}
-                          onChange={(e) => changeLineItem(idx, e.target.value)}
-                          className="font-bold text-xs"
-                        >
-                          <option value="">اختر ناتج الطحن أو الأمانة…</option>
-                          {available.map((item) => (
-                            <option key={item.item_id} value={item.item_id}>
-                              {item.name_ar} — رصيد متبقٍ: {fmtNum(item.bags_balance)} كيس (
-                              {fmtNum(item.kg_balance)} كجم)
-                            </option>
-                          ))}
-                        </MillingSelect>
-
-                        <div className="flex items-center gap-1">
-                          {b && (
-                            <button
-                              type="button"
-                              onClick={() => handleDeliverAllForLine(idx)}
-                              className="rounded-lg bg-emerald-500/10 px-2 py-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20"
-                              title="تسليم كامل الكمية المتاحة لهذا الصنف"
-                            >
-                              تسليم الكل
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            disabled={lines.length === 1}
-                            onClick={() => setLines((l) => l.filter((_, i) => i !== idx))}
-                            className="grid h-8 w-8 place-items-center rounded-lg text-rose-500 hover:bg-rose-500/10 disabled:opacity-30"
-                            aria-label="حذف السطر"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 items-center">
-                        <div>
-                          <span className="block text-[11px] font-semibold text-muted-foreground mb-1">
-                            الأكياس المسلمة:
-                          </span>
-                          <QuantityInput
-                            decimals={0}
-                            min={0}
-                            emptyAsZero
-                            placeholder="0"
-                            aria-label="الأكياس المسلمة"
-                            value={line.bags || null}
-                            onValueChange={(v) => changeLineBags(idx, v ?? 0)}
-                            className="font-bold text-emerald-600 dark:text-emerald-400"
-                          />
-                        </div>
-
-                        <div>
-                          <span className="block text-[11px] font-semibold text-muted-foreground mb-1">
-                            الوزن المسلّم (كجم):
-                          </span>
-                          <QuantityInput
-                            decimals={2}
-                            min={0}
-                            emptyAsZero
-                            placeholder="0.00"
-                            aria-label="الوزن المسلّم (كجم)"
-                            value={line.kg || null}
-                            onValueChange={(v) => changeLineKg(idx, v ?? 0)}
-                            className="font-bold"
-                          />
-                        </div>
-
-                        <div className="rounded-lg bg-muted/40 p-2 text-center text-xs">
-                          <span className="block text-[10px] text-muted-foreground">
-                            الرصيد المتاح:
-                          </span>
-                          <span className="font-bold text-foreground">
-                            {b ? `${fmtNum(b.bags_balance)} كيس` : "—"}
-                          </span>
-                          <span className="block text-[10px] text-muted-foreground">
-                            {b ? `(${fmtNum(b.kg_balance)} كجم)` : ""}
-                          </span>
-                        </div>
-
-                        <div className="rounded-lg bg-amber-500/10 p-2 text-center text-xs">
-                          <span className="block text-[10px] text-amber-700 dark:text-amber-300 font-semibold">
-                            المتبقي بعد الصرف:
-                          </span>
-                          <span className="font-black text-amber-700 dark:text-amber-300">
-                            {b ? `${fmtNum(remBags)} كيس` : "—"}
-                          </span>
-                          <span className="block text-[10px] text-amber-700/80 dark:text-amber-300/80">
-                            {b ? `(${fmtNum(remKg)} كجم)` : ""}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* رسالة التحذير في حال تجاوز الكمية المتاحة */}
-                      {isOver && (
-                        <div className="flex items-center gap-1.5 rounded-lg bg-rose-500/10 px-2.5 py-1 text-xs font-bold text-rose-600 dark:text-rose-300">
-                          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                          <span>
-                            تنبيه: الكمية المطلوبة تسليمها أكبر من رصيد العميل المتبقي! الحد الأقصى:{" "}
-                            {fmtNum(b.bags_balance)} كيس / {fmtNum(b.kg_balance)} كجم.
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-
-                {/* زر إضافة صنف آخر للتسليم في الأسفل */}
-                <button
-                  type="button"
-                  onClick={() => setLines((l) => [...l, { itemId: "", bags: 0, kg: 0 }])}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-primary/30 bg-primary/[0.04] hover:bg-primary/[0.08] text-xs font-bold text-primary transition-all active:scale-[0.99]"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span>إضافة صنف آخر للتسليم</span>
-                </button>
+                <ProductLinesEditor
+                  lines={lines.map((line) => ({
+                    itemId: line.itemId,
+                    bags: Number(line.bags) || 0,
+                    kg: Number(line.kg) || 0,
+                  }))}
+                  onChange={(index, patch) => {
+                    if (patch.itemId !== undefined) changeLineItem(index, patch.itemId);
+                    if (patch.bags !== undefined) changeLineBags(index, patch.bags);
+                    if (patch.kg !== undefined) changeLineKg(index, patch.kg);
+                  }}
+                  onAdd={() => setLines((l) => [...l, { itemId: "", bags: 0, kg: 0 }])}
+                  onRemove={(index) => setLines((l) => l.filter((_, i) => i !== index))}
+                  items={available.map((item) => ({
+                    id: item.item_id,
+                    nameAr: item.name_ar,
+                    sku: item.sku,
+                    item_class: item.item_class,
+                    balanceKg: item.kg_balance,
+                    balanceBags: item.bags_balance,
+                  }))}
+                  classes={["RAW_MATERIAL", "FINISHED_GOOD", "BY_PRODUCT"]}
+                  placeholder="اختر ناتج الطحن أو الأمانة…"
+                  bagsLabel="أكياس مسلّمة"
+                  kgLabel="الوزن المسلّم (كجم)"
+                  onFillAll={handleDeliverAllForLine}
+                  fillAllLabel="تسليم الكل"
+                  addLabel="إضافة صنف آخر للتسليم"
+                  ariaLabel="الأصناف المراد تسليمها"
+                  metrics={(_index, line) => {
+                    const balance = line.itemId ? balanceFor(line.itemId) : undefined;
+                    if (!balance) return [];
+                    const overBags = line.bags > balance.bags_balance;
+                    const overKg = line.kg > balance.kg_balance;
+                    return [
+                      {
+                        key: "available",
+                        label: "المتاح",
+                        value: balance.bags_balance,
+                        unit: "كيس",
+                        secondary: `(${fmtNum(balance.kg_balance)} كجم)`,
+                        isOver: overBags || overKg,
+                      },
+                      {
+                        key: "remaining",
+                        label: "المتبقي",
+                        value: Math.max(0, balance.bags_balance - line.bags),
+                        unit: "كيس",
+                        secondary: `(${fmtNum(Math.max(0, balance.kg_balance - line.kg))} كجم)`,
+                        tone: "success",
+                      },
+                    ];
+                  }}
+                />
               </div>
-
-
 
               <MillingField label="ملاحظات التسليم الإضافية" hint="تظهر في سند التسليم الرسمي">
                 <MillingTextarea
@@ -647,6 +570,25 @@ function MillingDeliveryPage() {
             stage="delivery"
           />
         )}
+
+        {/* إضافة صنف — منبثقة على `document.body`، تعلو الكاونتر ولا تُقصّ معه. */}
+        <QuickProductDialog
+          open={quickItemOpen}
+          onOpenChange={setQuickItemOpen}
+          mode="custody"
+          defaultClass="FINISHED_GOOD"
+          classes={["FINISHED_GOOD", "BY_PRODUCT", "RAW_MATERIAL"]}
+          onSaved={(productId) => {
+            const emptyIdx = lines.findIndex((l) => !l.itemId);
+            if (emptyIdx >= 0) {
+              setLines((current) =>
+                current.map((line, i) => (i === emptyIdx ? { ...line, itemId: productId } : line)),
+              );
+            } else {
+              setLines((current) => [...current, { itemId: productId, bags: 0, kg: 0 }]);
+            }
+          }}
+        />
       </div>
     </ModuleGuard>
   );

@@ -42,6 +42,7 @@ import {
   fmtNum,
 } from "@/components/milling/milling-ui";
 import { QuantityInput } from "@/components/ui/quantity-input";
+import { ProductPicker } from "@/components/products/product-picker";
 import { UniversalPrintPreview } from "@/components/universal-print-preview";
 import {
   UnifiedPrintModal,
@@ -324,17 +325,28 @@ export function MillingDocumentWorkflow({
                   label="الحبوب المطحونة (خاصة بهذا المستند)"
                   hint="لا يُخلط رصيد مستند آخر مع هذا المستند."
                 >
-                  <MillingSelect
+                  <ProductPicker
                     value={grainItemId}
-                    onChange={(e) => setGrainItemId(e.target.value)}
-                  >
-                    {grainOptions.map((g) => (
-                      <option key={g.itemId} value={g.itemId}>
-                        {g.nameAr} — المتبقي: {fmtNum(g.bagsRemaining)} كيس /{" "}
-                        {fmtNum(g.kgRemaining)} كجم
-                      </option>
-                    ))}
-                  </MillingSelect>
+                    items={grainOptions.map((g) => ({
+                      id: g.itemId,
+                      nameAr: g.nameAr,
+                      item_class: "RAW_MATERIAL",
+                      package_weight_kg: g.packageWeightKg,
+                      balanceKg: g.kgRemaining,
+                      balanceBags: g.bagsRemaining,
+                    }))}
+                    classes={["RAW_MATERIAL"]}
+                    onChange={(item) => {
+                      setGrainItemId(item.id);
+                      const chosen = grainOptions.find((g) => g.itemId === item.id);
+                      if (chosen) {
+                        if (chosen.bagsRemaining > 0) setBagsOut(String(chosen.bagsRemaining));
+                        if (chosen.kgRemaining > 0) setKgOut(String(chosen.kgRemaining));
+                      }
+                    }}
+                    placeholder="اختر الحبوب المطحونة…"
+                    ariaLabel="الحبوب المطحونة لهذا المستند"
+                  />
                 </MillingField>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -551,7 +563,14 @@ function LinesEditor({
 }: {
   lines: CustodyLine[];
   setLines: Dispatch<SetStateAction<CustodyLine[]>>;
-  items: { id: string; name: string; name_ar: string | null }[];
+  items: {
+    id: string;
+    name: string;
+    name_ar: string | null;
+    sku?: string | null;
+    item_class?: string | null;
+    package_weight_kg?: number | null;
+  }[];
   label: string;
 }) {
   const update = (index: number, patch: Partial<CustodyLine>) =>
@@ -572,17 +591,20 @@ function LinesEditor({
       </div>
       {lines.map((line, index) => (
         <div key={index} className="grid grid-cols-[1fr_72px_88px_28px] gap-2 items-center">
-          <MillingSelect
+          <ProductPicker
             value={line.itemId}
-            onChange={(e) => update(index, { itemId: e.target.value })}
-          >
-            <option value="">اختر الصنف…</option>
-            {items.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name_ar || item.name}
-              </option>
-            ))}
-          </MillingSelect>
+            items={items.map((item) => ({
+              id: item.id,
+              nameAr: item.name_ar || item.name,
+              sku: item.sku ?? null,
+              item_class: item.item_class ?? "FINISHED_GOOD",
+              package_weight_kg: item.package_weight_kg ?? null,
+            }))}
+            classes={["FINISHED_GOOD", "BY_PRODUCT"]}
+            onChange={(item) => update(index, { itemId: item.id })}
+            placeholder="اختر الصنف…"
+            ariaLabel={`ناتج الطحن في السطر ${index + 1}`}
+          />
           <QuantityInput
             decimals={0}
             min={0}

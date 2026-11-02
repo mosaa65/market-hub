@@ -40,6 +40,15 @@ const ALLOWED = new Set([
 const PAYMENT_LABEL = /(["'`])(نقدًا|نقدا|تحويل بنكي|حوالة بنكية|محفظة إلكترونية)(["'`])/;
 
 /**
+ * خريطة أسماء محلية: `cash: "..."` / `bank_transfer: "..."`.
+ *
+ * هذا هو الشكل الذي بُنيت به الخرائط المكرّرة في التقارير وفي شاشة الكاشير.
+ * مثل هذه الخريطة لا تعرف طريقة تضيفها المنشأة (شيك، الكريمي) فتُسقطها إلى
+ * نصِّها الخام أو إلى «نقدي» الخاطئ. الأسماء تأتي من `paymentMethodLabel`.
+ */
+const LOCAL_LABEL_MAP = /^\s*(cash|credit|card|bank_transfer|mobile_money|cheque)\s*:\s*["'`]/m;
+
+/**
  * {x.ledgerKind} — مفتاح تقني يُعرض للمستخدم.
  *
  * يستبعد `ledgerKind={...}` لأنه تمرير قيمة إلى مكوّن (كما يفعل
@@ -83,6 +92,16 @@ for (const file of files) {
         file,
         line: index + 1,
         rule: "عرض ledgerKind الخام — استخدم ledgerKindLabel()",
+        text: trimmed.slice(0, 110),
+      });
+      return;
+    }
+
+    if (LOCAL_LABEL_MAP.test(line)) {
+      violations.push({
+        file,
+        line: index + 1,
+        rule: "خريطة أسماء طرق دفع محلية — استخدم paymentMethodLabel()",
         text: trimmed.slice(0, 110),
       });
       return;

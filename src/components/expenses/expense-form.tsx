@@ -101,6 +101,8 @@ function lineGross(line: ExpenseLineDraft): number | null {
 export function ExpenseFormDialog({
   open,
   onOpenChange,
+  initialCostCenterId,
+  initialCategoryId,
   lookups,
   lookupsError,
   isLoadingLookups = false,
@@ -110,6 +112,8 @@ export function ExpenseFormDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialCostCenterId?: string;
+  initialCategoryId?: string;
   lookups: ExpenseLookups | undefined;
   lookupsError?: Error | null;
   isLoadingLookups?: boolean;
@@ -192,20 +196,20 @@ export function ExpenseFormDialog({
       setOpMode(entry.due_date ? "ACCRUAL_INVOICE" : "CASH_PAYMENT");
       setShowAdvanced(Boolean(entry.warehouse_id || entry.cost_center_id || entry.project_id));
     } else {
-      setHeader(blankHeader());
-      setLines([blankLine()]);
+      setHeader({ ...blankHeader(), cost_center_id: initialCostCenterId ?? "" });
+      setLines([blankLine({ category_id: initialCategoryId ?? "" })]);
       setOpMode("CASH_PAYMENT");
       setPaymentMethod("cash");
       setSettlement({ method: "cash", paymentMethodId: "cash" });
       setAccountId("");
       setAccountLabel("");
-      setShowAdvanced(false);
+      setShowAdvanced(Boolean(initialCostCenterId));
     }
 
     setDirty(false);
     const handle = setTimeout(() => amountInputRef.current?.focus(), 80);
     return () => clearTimeout(handle);
-  }, [open, editing]);
+  }, [open, editing, initialCostCenterId, initialCategoryId]);
 
   const primaryLine = lines[0] ?? blankLine();
   const numAmount = lineGross(primaryLine) ?? 0;

@@ -71,7 +71,13 @@ export function buildUnifiedContext(options: BuildContextOptions): UnifiedCommun
       receiptNumber: options.payment.receiptNumber || "",
       date: options.payment.date || new Date().toISOString().split("T")[0],
       amount: Number(options.payment.amount ?? 0),
-      method: options.payment.method || "نقداً",
+      //
+      // لا نفترض «نقداً» حين لا تُمرّر الطريقة.
+      //
+      // هذه القيمة تدخل نص رسالة تُرسل للعميل على واتساب/SMS؛ رسالة تقول
+      // «دُفع نقداً» عن عملية لم تُعرف طريقتها قد تكون إقرارًا ماليًا غير صحيح
+      // يبقى في هاتف العميل. الشرطة الصريحة أصدق وأمنع للنزاع.
+      method: options.payment.method || "—",
       remainingBalance: options.payment.remainingBalance,
       notes: options.payment.notes,
       invoiceNumber: options.payment.invoiceNumber,

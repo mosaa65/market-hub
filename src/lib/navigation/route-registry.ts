@@ -29,6 +29,7 @@ export type RouteCategory =
   | "sales"
   | "inventory"
   | "procurement"
+  | "expenses"
   | "finance"
   | "milling"
   | "admin"
@@ -644,10 +645,22 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
     descriptionAr: "سندات الصرف والمصاريف التشغيلية",
     descriptionEn: "Operational expenses & vouchers",
     keywords: ["مصروفات", "مصاريف", "سند صرف", "expenses"],
-    category: "finance",
+    category: "expenses",
     moduleId: "expenses",
     requiredRoles: FINANCE,
     i18nKey: "nav.expenses",
+  },
+  {
+    id: "expense-management",
+    path: "/expenses/setup",
+    titleAr: "إعدادات المصروفات",
+    titleEn: "Expense Setup",
+    descriptionAr: "إدارة تصنيفات المصروفات ومراكز التكلفة من قسم المصروفات",
+    descriptionEn: "Manage expense categories and cost centers in the expenses section",
+    keywords: withSynonyms(["تصنيفات المصروفات", "مراكز التكلفة", "تكلفة الإنتاج", "expense setup"], SEARCH_SYNONYMS.settings),
+    category: "expenses",
+    moduleId: "expenses",
+    requiredRoles: FINANCE,
   },
   {
     id: "finance",
@@ -881,16 +894,28 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
   {
     id: "milling-manufacture",
     path: "/milling/manufacture",
-    titleAr: "طحن قمح المنشأة (تحويل المخزون)",
-    titleEn: "Own-Stock Manufacture",
+    titleAr: "التصنيع والإنتاج",
+    titleEn: "Manufacturing & Production",
     descriptionAr:
-      "تحويل مخزون المنشأة: صرف حبوب خام وإنتاج نواتج الشركة — منفصل تماماً عن أمانات الغير",
+      "تصنيع منتجات المنشأة وتسجيل صرف المواد والتكاليف والنواتج — منفصل عن خدمة طحن حبوب العملاء",
     descriptionEn:
-      "Own-stock conversion: grain out, company outputs in — fully separate from customer custody",
-    keywords: withSynonyms(["تصنيع", "تحويل", "تصنيع ذكي", "manufacture"], SEARCH_SYNONYMS.milling),
+      "Create company production runs with material issues, production costs and finished outputs",
+    keywords: withSynonyms(["تصنيع", "إنتاج", "تشغيلات", "manufacture", "production"], SEARCH_SYNONYMS.milling),
     category: "milling",
     moduleId: "milling_operations",
     requiredRoles: STOCK_OPS,
+  },
+  {
+    id: "milling-production-orders",
+    path: "/milling/production-orders",
+    titleAr: "سجل تشغيلات الإنتاج",
+    titleEn: "Production Run Register",
+    descriptionAr: "مراجعة تكاليف التشغيلات والنواتج وعكس التشغيلة وفق الضوابط",
+    descriptionEn: "Review production run costs and outputs, and reverse runs when allowed",
+    keywords: withSynonyms(["سجل الإنتاج", "تشغيلة", "أمر إنتاج", "production order", "production run"], SEARCH_SYNONYMS.milling),
+    category: "milling",
+    moduleId: "milling_operations",
+    requiredRoles: ["owner", "manager", "accountant", "warehouse"],
   },
   {
     id: "milling-performance",
@@ -1247,13 +1272,14 @@ export const ROUTE_BY_ID: Record<string, RouteSearchEntry> = Object.fromEntries(
  */
 export const SIDEBAR_SECTION_ORDER: { category: RouteCategory; titleKey: string }[] = [
   { category: "command_center", titleKey: "nav.section.command_center" },
+  { category: "milling", titleKey: "nav.section.milling" },
   { category: "reports", titleKey: "nav.section.reports" },
   { category: "statements", titleKey: "nav.section.statements" },
   { category: "sales", titleKey: "nav.section.sales" },
   { category: "inventory", titleKey: "nav.section.inventory" },
   { category: "procurement", titleKey: "nav.section.procurement" },
+  { category: "expenses", titleKey: "nav.section.expenses" },
   { category: "finance", titleKey: "nav.section.finance" },
-  { category: "milling", titleKey: "nav.section.milling" },
   { category: "admin", titleKey: "nav.section.admin" },
   /**
    * قسم الإعدادات كان غائباً من هذا الترتيب تماماً.

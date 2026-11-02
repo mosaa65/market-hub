@@ -51,6 +51,13 @@ const DAILY_GROUPS: GroupDefinition[] = [
     matches: (entry) => entry.category === "procurement",
   },
   {
+    key: "expenses",
+    titleAr: "المصروفات",
+    titleEn: "Expenses",
+    styleCategory: "expenses",
+    matches: (entry) => entry.category === "expenses",
+  },
+  {
     key: "finance",
     titleAr: "المالية",
     titleEn: "Finance",
@@ -89,6 +96,7 @@ const DAILY_GROUPS: GroupDefinition[] = [
 
 const ACTIVITY_GROUPS: GroupDefinition[] = [
   DAILY_GROUPS[0],
+  DAILY_GROUPS[1],
   {
     key: "sales",
     titleAr: "فواتير المبيعات",
@@ -119,7 +127,13 @@ const ACTIVITY_GROUPS: GroupDefinition[] = [
     styleCategory: "procurement",
     matches: (entry) => entry.id === "suppliers",
   },
-  DAILY_GROUPS[1],
+  {
+    key: "expenses",
+    titleAr: "المصروفات",
+    titleEn: "Expenses",
+    styleCategory: "expenses",
+    matches: (entry) => entry.category === "expenses",
+  },
   {
     key: "finance",
     titleAr: "المالية",
@@ -160,6 +174,8 @@ export function buildSidebarView(
   const availableFocusGroups = materializeGroups(entries, definitions);
   const groups =
     mode === "explorer"
+      // Explorer is a drill-down view: the module picker is shown by the
+      // sidebar, and this list contains routes only after a module is selected.
       ? availableFocusGroups.filter((group) => group.key === focusGroup)
       : mode === "focus"
         ? [

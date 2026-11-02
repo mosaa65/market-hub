@@ -531,12 +531,14 @@ export async function createMillingServiceDocumentMulti(input: {
   discount?: number;
   paymentMethod: string;
   paid: number;
-  paymentSplits?: {
-    method: string;
-    amount: number;
-    payment_method_id?: string;
-    reference?: string | null;
-  }[] | null;
+  paymentSplits?:
+    | {
+        method: string;
+        amount: number;
+        payment_method_id?: string;
+        reference?: string | null;
+      }[]
+    | null;
   notes?: string;
 }): Promise<OpResult<MillingServiceDocumentCreated>> {
   const valid = (input.grains ?? []).filter(
@@ -559,9 +561,10 @@ export async function createMillingServiceDocumentMulti(input: {
     _service_unit_price: input.serviceTotal ?? 0,
     _discount: input.discount ?? 0,
     _payment_method: paymentSplits.length > 1 ? "split" : input.paymentMethod,
-    _paid: paymentSplits.length > 1
-      ? Math.round(paymentSplits.reduce((sum, line) => sum + Number(line.amount), 0) * 100) / 100
-      : (input.paid ?? 0),
+    _paid:
+      paymentSplits.length > 1
+        ? Math.round(paymentSplits.reduce((sum, line) => sum + Number(line.amount), 0) * 100) / 100
+        : (input.paid ?? 0),
     _notes: input.notes ?? null,
   };
   if (paymentSplits.length > 1) rpcArgs._payment_splits = paymentSplits;
@@ -869,7 +872,11 @@ export function buildMillingDocumentUnifiedDoc(
     total,
     paid,
     balance: remaining,
-    payment: inv?.payment_method ? paymentMethodLabel(inv.payment_method) : "نقداً",
+    //
+    // لا نُسمّي طريقة لم تُدفع «نقداً» افتراضيًا: إن لم توجد طريقة مسجّلة،
+    // فالمستند يقول ذلك بوضوح بدل أن يدّعي استلام نقد. البيان المالي على
+    // ورقة يُقرأ سنينَ بعد التسليم، والافتراض الخاطئ فيه لا يمكن تصحيحه لاحقًا.
+    payment: inv?.payment_method ? paymentMethodLabel(inv.payment_method) : "—",
     notes:
       "حبوب ونواتج ملك العميل (أمانة عينية خارج مخزون المنشأة). أجور الخدمة مثبتة بالفاتورة الرسمية المبينة أعلاه.",
     options: {

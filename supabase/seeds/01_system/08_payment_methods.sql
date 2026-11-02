@@ -3,9 +3,11 @@
 -- ============================================================================
 --
 -- ما هذا الملف؟
---   طرق الاختيار الجديدة أربع فقط: النقد والآجل والتحويل البنكي والمحفظة.
---   على القواعد القائمة تبقى الصفوف التاريخية غير نشطة. إعادة البناء النظيفة
---   لا تزرع هويات البنوك/المحافظ المسماة أو البطاقة والشيك ضمن الكتالوج.
+--   طرق الاختيار أربع فقط: النقد والآجل والتحويل البنكي والمحفظة، ومعها
+--   `split` كحالة مستند لا خيار. لا تُزرع هويات البنوك/المحافظ المسماة ولا
+--   البطاقة ولا الشيك أصلًا، والترحيل 9910 يحذفها من قواعد بُنيت على نسخة
+--   سابقة. الأسماء التاريخية للعرض تعيش في `RETIRED_PAYMENT_METHOD_LABELS`
+--   بالواجهة، لا في هذا الجدول.
 --
 -- لماذا هو ملف نظام (يُشغَّل تلقائيًا)؟
 --   لأن بلا هذه الصفوف لا يستطيع الكاشير تسجيل أي دفعة: كل الاستعلامات تقرأ
@@ -87,15 +89,17 @@ INSERT INTO public.payment_methods (
    'آجل'),
 
   -- ─── تحويل بنكي عام: غير مرتبط ببنك بعينه ────────────────────────────────
+  -- المرتجعات مشمولة: الاسترداد البنكي للعميل وقبض المورد يمرّان عبر البنك.
   ('bank_transfer', 'تحويل بنكي', 'Bank transfer', 'bank-transfer', true, 30,
-   ARRAY['pos','sales','purchases','expenses','customer_collection'],
+   ARRAY['pos','sales','purchases','expenses','customer_collection','sales_returns','purchase_returns'],
    'BANK', '1111', false, true, ARRAY['bank_transfer'], 'bank_transfer',
    'حوالة مصرفية عامة. يتطلب رقم الحوالة.',
    'تحويل بنكي'),
 
   -- ─── المحفظة الإلكترونية العامة: البديل التاريخي بلا مؤسسة محددة ─────────
+  -- المرتجعات مشمولة لسبب تحويل بنكي نفسه.
   ('mobile_money', 'محفظة إلكترونية', 'Mobile money', 'mobile-money', true, 110,
-   ARRAY['pos','sales','purchases','expenses','customer_collection'],
+   ARRAY['pos','sales','purchases','expenses','customer_collection','sales_returns','purchase_returns'],
    'WALLET', '1131', false, true, ARRAY['mobile_money'], 'mobile_money',
    'محفظة محلية غير محددة. تبقى للتوافق مع العمليات القديمة.',
    'محفظة إلكترونية'),
@@ -132,12 +136,35 @@ ON CONFLICT (id) DO UPDATE SET
 -- اختياره. والطرق اليمنية المسمّاة لا تأخذ صفًا هنا عن قصد — غياب الصف يعني
 -- «ورّث افتراضي الكتالوج».
 INSERT INTO public.payment_method_settings (
-  payment_method_id, enabled, sort_order, enabled_contexts
+  payment_method_id, enabled, sort_order, enabled_contexts, default_account_id
 )
-SELECT m.id, true, m.sort_order, m.allowed_contexts
+SELECT m.id, true, m.sort_order, m.allowed_contexts,
+       -- الربط افتراضيًا: صندوقك/بنكك/محفظتك إن أنشأتها، وإلا الحساب التجميعي
+       -- نفسه من `03_chart_of_accounts.sql`. آجل لا حساب له عن قصد.
+       CASE m.ledger_kind
+         WHEN 'CREDIT' THEN NULL
+         WHEN 'CASH'   THEN (SELECT a.id FROM public.accounts a WHERE a.code = '1101')
+         WHEN 'BANK'   THEN (SELECT a.id FROM public.accounts a WHERE a.code = '1111')
+         ELSE               (SELECT a.id FROM public.accounts a WHERE a.code = '1131')
+       END
 FROM public.payment_methods m
 WHERE m.id IN ('cash','credit','bank_transfer','mobile_money')
 ON CONFLICT (payment_method_id) DO NOTHING;
+
+-- منشأة ترقّت من إصدار سابق يكون صفّها موجودًا بلا حساب افتراضي. لا يُستبدل
+-- اختيارها، لكن يُملأ الفراغ — وإلا بقيت الطريقة «بلا حساب في الدليل» ولن
+-- تُرحَّل قيودها، وهو التحذير الذي يظهر في كل شاشة دفع.
+UPDATE public.payment_method_settings s
+   SET default_account_id = CASE m.ledger_kind
+         WHEN 'CASH' THEN (SELECT a.id FROM public.accounts a WHERE a.code = '1101')
+         WHEN 'BANK' THEN (SELECT a.id FROM public.accounts a WHERE a.code = '1111')
+         ELSE             (SELECT a.id FROM public.accounts a WHERE a.code = '1131')
+       END,
+       updated_at = now()
+  FROM public.payment_methods m
+ WHERE m.id = s.payment_method_id
+   AND m.ledger_kind IN ('CASH','BANK','WALLET')
+   AND s.default_account_id IS NULL;
 
 -- ── التحقق الذاتي ───────────────────────────────────────────────────────────
 -- كل كود حساب في الكتالوج يجب أن يوجد في دليل الحسابات. لو غاب، لظهر الخطأ
