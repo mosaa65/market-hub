@@ -14,7 +14,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { ModuleGuard } from "@/lib/modules";
 import { ExpenseRegister } from "@/components/expenses/expense-register";
 import { ExpenseFormDialog } from "@/components/expenses/expense-form";
@@ -33,14 +33,20 @@ export const Route = createFileRoute("/_app/expenses")({
     create: search.create === "1" || search.create === "true" || search.create === true,
     costCenterId: typeof search.costCenterId === "string" ? search.costCenterId : undefined,
     categoryId: typeof search.categoryId === "string" ? search.categoryId : undefined,
+    section: search.section === "cost-centers" ? "cost-centers" : search.section === "categories" ? "categories" : undefined,
   }),
   head: () => ({ meta: [{ title: "المصروفات — Vortex ERP" }] }),
   component: () => (
     <ModuleGuard moduleId="expenses">
-      <ExpensesPage />
+      <ExpensesRouteContent />
     </ModuleGuard>
   ),
 });
+
+function ExpensesRouteContent() {
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  return pathname === "/expenses/setup" ? <Outlet /> : <ExpensesPage />;
+}
 
 function ExpensesPage() {
   const search = Route.useSearch();

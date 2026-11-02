@@ -85,6 +85,7 @@ export const ROUTE_ACCESS: Record<string, RouteAccessRule> = {
 
   // المالية والمحاسبة
   "/expenses": { allowedRoles: FINANCE },
+  "/expenses/setup": { allowedRoles: FINANCE },
   "/finance": { allowedRoles: FINANCE },
   "/daily-journal": { allowedRoles: FINANCE },
   "/general-ledger": { allowedRoles: FINANCE },

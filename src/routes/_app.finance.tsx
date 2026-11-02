@@ -160,7 +160,7 @@ function FinancePage() {
           <div className="flex flex-wrap items-center gap-2">
             <Link
           to="/expenses"
-          search={{ create: true, costCenterId: undefined, categoryId: undefined }}
+          search={{ create: true, costCenterId: undefined, categoryId: undefined, section: undefined }}
         >
               <ActionButton tone="outline" size="sm" icon={<Receipt />}>
                 {ar ? "سجل المصروفات الكامل" : "Expense register"}
@@ -279,7 +279,7 @@ function FinancePage() {
                 </CardTitle>
                 <Link
           to="/expenses"
-          search={{ create: true, costCenterId: undefined, categoryId: undefined }}
+          search={{ create: true, costCenterId: undefined, categoryId: undefined, section: undefined }}
         >
                   <Button variant="ghost" size="sm" className="text-xs">
                     {ar ? "عرض السجل التفصيلي" : "View full register"}

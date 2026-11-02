@@ -30,6 +30,7 @@ export interface ProductionProduct {
   tracking: string;
   track_expiry: boolean;
   is_sellable: boolean;
+  is_custody_item: boolean;
   package_weight_kg: number | null;
   unit_id: string | null;
   base_uom_id: string | null;
@@ -46,6 +47,7 @@ export interface ProductionWarehouse {
 
 export interface ProductionCostCenter {
   id: string;
+  code: string | null;
   name: string;
   name_ar: string | null;
 }
@@ -74,13 +76,6 @@ export interface ProductionExpenseSource {
   available_amount: number;
 }
 
-export interface ProductionExpenseCategory {
-  id: string;
-  name: string;
-  name_ar: string | null;
-  production_cost_eligible: boolean;
-}
-
 export interface ProductionOrderSummary {
   id: string;
   order_number: string;
@@ -100,14 +95,14 @@ export interface ProductionOrderSummary {
 }
 
 export async function loadProductionLookups() {
-  const [warehouses, centers, products, units, productUoms, batches, inventory, costs, categories] =
+  const [warehouses, centers, products, units, productUoms, batches, inventory, costs] =
     await Promise.all([
       db.from("warehouses").select("id,name,name_ar,is_default").eq("is_active", true),
-      db.from("expense_cost_centers").select("id,name,name_ar").eq("is_active", true).order("name"),
+      db.from("expense_cost_centers").select("id,code,name,name_ar").eq("is_active", true).order("name"),
       db
         .from("products")
         .select(
-          "id,sku,name,name_ar,item_class,item_nature,inventory_policy,tracking,track_expiry,is_sellable,package_weight_kg,unit_id,base_uom_id,batch_dispatch_strategy",
+          "id,sku,name,name_ar,item_class,item_nature,inventory_policy,tracking,track_expiry,is_sellable,is_custody_item,package_weight_kg,unit_id,base_uom_id,batch_dispatch_strategy",
         )
         .eq("is_active", true)
         .order("name_ar"),
@@ -125,12 +120,6 @@ export async function loadProductionLookups() {
         .gt("quantity", 0),
       db.from("inventory").select("product_id,warehouse_id,quantity").eq("owner_type", "COMPANY"),
       db.rpc("production_cost_sources"),
-      db
-        .from("expense_categories")
-        .select("id,name,name_ar,production_cost_eligible")
-        .eq("is_active", true)
-        .order("sort_order")
-        .order("name"),
     ]);
 
   const result = [
@@ -142,9 +131,8 @@ export async function loadProductionLookups() {
     batches,
     inventory,
     costs,
-    categories,
   ];
-  const failure = result.filter((_, index) => index !== 7).find((item) => item.error);
+  const failure = result.find((item) => item.error);
   if (failure?.error) throw failure.error;
 
   const uomsByProduct = new Map<string, ProductionProductUom[]>();
@@ -171,7 +159,6 @@ export async function loadProductionLookups() {
     expenseSources: (costs.error ? [] : (costs.data ?? [])) as ProductionExpenseSource[],
     canAllocateExpenses: !costs.error,
     expenseSourcesError: costs.error?.message ?? null,
-    expenseCategories: (categories.data ?? []) as ProductionExpenseCategory[],
   };
 }
 

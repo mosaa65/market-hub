@@ -51,6 +51,13 @@ const DAILY_GROUPS: GroupDefinition[] = [
     matches: (entry) => entry.category === "procurement",
   },
   {
+    key: "expenses",
+    titleAr: "المصروفات",
+    titleEn: "Expenses",
+    styleCategory: "expenses",
+    matches: (entry) => entry.category === "expenses",
+  },
+  {
     key: "finance",
     titleAr: "المالية",
     titleEn: "Finance",
@@ -119,6 +126,13 @@ const ACTIVITY_GROUPS: GroupDefinition[] = [
     titleEn: "Suppliers",
     styleCategory: "procurement",
     matches: (entry) => entry.id === "suppliers",
+  },
+  {
+    key: "expenses",
+    titleAr: "المصروفات",
+    titleEn: "Expenses",
+    styleCategory: "expenses",
+    matches: (entry) => entry.category === "expenses",
   },
   {
     key: "finance",

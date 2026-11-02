@@ -29,7 +29,8 @@ supabase/seeds/
 │   ├── 06_platform_admins.sql   حسابات منصة (استثناء مقصود)
 │   ├── 07_document_numbering.sql إعداد ترقيم المستندات
 │   ├── 08_payment_methods.sql   طرق الدفع + إعداد المنشأة الافتراضي
-│   └── 09_essential_partners.sql شركاء النظام الأساسيون
+│   ├── 09_essential_partners.sql شركاء النظام الأساسيون
+│   └── 10_production_expense_defaults.sql مركز الإنتاج وتصنيفات تكاليف الإنتاج الافتراضية
 │
 ├── 02_company/                  ← يدوي، مرة واحدة لكل عميل
 │   ├── README.md

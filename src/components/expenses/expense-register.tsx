@@ -12,6 +12,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "@tanstack/react-router";
+import { Settings2 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { moneyCell } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -408,6 +410,20 @@ export function ExpenseRegister({
         subtitle={t("expenses.subtitle")}
         actions={
           <div className="flex items-center gap-2">
+            <Link
+              to="/expenses/setup"
+              search={{
+                section: "categories",
+                create: false,
+                costCenterId: undefined,
+                categoryId: undefined,
+              }}
+              aria-label={ar ? "إعدادات المصروفات" : "Expense setup"}
+              className="inline-flex min-h-9 items-center gap-2 rounded-md border border-input px-3 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+            >
+              <Settings2 className="size-4" aria-hidden="true" />
+              <span className="hidden sm:inline">{ar ? "إعدادات المصروفات" : "Expense setup"}</span>
+            </Link>
             <Button variant="outline" size="sm" onClick={onRefresh} disabled={isFetching}>
               <RefreshCw className={cn("size-3.5", isFetching && "animate-spin")} />
               <span className="hidden sm:inline">{t("common.retry")}</span>

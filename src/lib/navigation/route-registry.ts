@@ -29,6 +29,7 @@ export type RouteCategory =
   | "sales"
   | "inventory"
   | "procurement"
+  | "expenses"
   | "finance"
   | "milling"
   | "admin"
@@ -644,10 +645,22 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
     descriptionAr: "سندات الصرف والمصاريف التشغيلية",
     descriptionEn: "Operational expenses & vouchers",
     keywords: ["مصروفات", "مصاريف", "سند صرف", "expenses"],
-    category: "finance",
+    category: "expenses",
     moduleId: "expenses",
     requiredRoles: FINANCE,
     i18nKey: "nav.expenses",
+  },
+  {
+    id: "expense-management",
+    path: "/expenses/setup",
+    titleAr: "إعدادات المصروفات",
+    titleEn: "Expense Setup",
+    descriptionAr: "إدارة تصنيفات المصروفات ومراكز التكلفة من قسم المصروفات",
+    descriptionEn: "Manage expense categories and cost centers in the expenses section",
+    keywords: withSynonyms(["تصنيفات المصروفات", "مراكز التكلفة", "تكلفة الإنتاج", "expense setup"], SEARCH_SYNONYMS.settings),
+    category: "expenses",
+    moduleId: "expenses",
+    requiredRoles: FINANCE,
   },
   {
     id: "finance",
@@ -1159,30 +1172,6 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
     i18nKey: "nav.settings_stock",
   },
   {
-    id: "expense-cost-centers-settings",
-    path: "/settings?section=expense-cost-centers",
-    titleAr: "مراكز التكلفة",
-    titleEn: "Cost Centers",
-    descriptionAr: "إضافة مراكز مثل الإنتاج وربط المصروفات والتشغيلات بها",
-    descriptionEn: "Add centers such as Production and assign expenses and runs",
-    keywords: withSynonyms(["مركز تكلفة", "مراكز التكلفة", "إنتاج", "cost center"], SEARCH_SYNONYMS.settings),
-    category: "settings",
-    moduleId: "core",
-    requiredRoles: ["owner", "manager"],
-  },
-  {
-    id: "expense-categories-settings",
-    path: "/settings?section=expense-categories",
-    titleAr: "تصنيفات المصروفات",
-    titleEn: "Expense Categories",
-    descriptionAr: "إضافة التصنيفات وربطها بحساب المصروف وتحديد أهلية الإنتاج",
-    descriptionEn: "Create categories, map expense accounts and set production eligibility",
-    keywords: withSynonyms(["تصنيف مصروف", "تصنيفات المصروفات", "تكلفة إنتاج", "expense category"], SEARCH_SYNONYMS.settings),
-    category: "settings",
-    moduleId: "core",
-    requiredRoles: ["owner", "manager"],
-  },
-  {
     id: "number-format-settings",
     path: "/settings?section=number-format",
     titleAr: "نظام الأرقام",
@@ -1289,6 +1278,7 @@ export const SIDEBAR_SECTION_ORDER: { category: RouteCategory; titleKey: string 
   { category: "sales", titleKey: "nav.section.sales" },
   { category: "inventory", titleKey: "nav.section.inventory" },
   { category: "procurement", titleKey: "nav.section.procurement" },
+  { category: "expenses", titleKey: "nav.section.expenses" },
   { category: "finance", titleKey: "nav.section.finance" },
   { category: "admin", titleKey: "nav.section.admin" },
   /**

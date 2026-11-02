@@ -12,7 +12,6 @@ import {
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { ModuleGuard } from "@/lib/modules";
-import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { translateRpcError } from "@/lib/errors/rpc-errors";
 import {
@@ -72,7 +71,6 @@ const localDate = () => {
 export function CompanyProductionPage() {
   const qc = useQueryClient();
   const db = supabase as any;
-  const { hasRole } = useAuth();
   const query = useQuery({ queryKey: ["company-production"], queryFn: loadProductionLookups });
   const data = query.data;
 
@@ -89,15 +87,34 @@ export function CompanyProductionPage() {
     if (!data) return;
     if (!warehouseId)
       setWarehouseId(data.warehouses.find((w) => w.is_default)?.id ?? data.warehouses[0]?.id ?? "");
-    if (!costCenterId && data.centers.length === 1) setCostCenterId(data.centers[0].id);
+    if (!costCenterId) {
+      const productionCenter = data.centers.find(
+        (center) =>
+          center.code?.trim().toUpperCase() === "PROD" ||
+          [center.name, center.name_ar].some((name) =>
+            ["production", "الإنتاج", "الانتاج"].includes(name?.trim().toLocaleLowerCase("ar") ?? ""),
+          ),
+      );
+      setCostCenterId(productionCenter?.id ?? (data.centers.length === 1 ? data.centers[0].id : ""));
+    }
   }, [data, warehouseId, costCenterId]);
 
   const products = data?.products ?? [];
-  const materialProducts = products.filter((p) =>
-    ["RAW_MATERIAL", "PACKAGING", "FINISHED_GOOD", "BY_PRODUCT"].includes(p.item_class ?? ""),
+  const materialProducts = products.filter(
+    (product) =>
+      ["RAW_MATERIAL", "PACKAGING"].includes(product.item_class ?? "") &&
+      product.item_nature !== "SERVICE" &&
+      product.inventory_policy === "TRACKED" &&
+      !product.is_custody_item,
   );
+  const rawMaterialProducts = materialProducts.filter((product) => product.item_class === "RAW_MATERIAL");
+  const packagingProducts = materialProducts.filter((product) => product.item_class === "PACKAGING");
   const outputProducts = products.filter(
-    (p) => p.is_sellable && ["FINISHED_GOOD", "BY_PRODUCT"].includes(p.item_class ?? ""),
+    (product) =>
+      product.is_sellable &&
+      product.inventory_policy === "TRACKED" &&
+      !product.is_custody_item &&
+      ["FINISHED_GOOD", "BY_PRODUCT"].includes(product.item_class ?? ""),
   );
   const massUnits = data?.units.filter((u) => u.dimension_code === "MASS") ?? [];
   const kiloUnit =
@@ -257,22 +274,6 @@ export function CompanyProductionPage() {
     onError: (error) => toast.error(translateRpcError(error, "ar", "تعذر ترحيل تشغيلة الإنتاج.")),
   });
 
-  const expenseCategoryEligibility = useMutation({
-    mutationFn: async (input: { categoryId: string; eligible: boolean }) => {
-      const { error } = await db.rpc("set_production_expense_category_eligibility", {
-        p_category_id: input.categoryId,
-        p_eligible: input.eligible,
-      });
-      if (error) throw error;
-    },
-    onSuccess: async () => {
-      toast.success("تم تحديث أهلية تصنيف المصروف للإنتاج");
-      await qc.invalidateQueries({ queryKey: ["company-production"] });
-    },
-    onError: (error) =>
-      toast.error(translateRpcError(error, "ar", "تعذر تحديث أهلية تصنيف المصروف.")),
-  });
-
   const formValid = Boolean(
     warehouseId &&
     costCenterId &&
@@ -397,8 +398,8 @@ export function CompanyProductionPage() {
                 ))}
               </MillingSelect>
               <Link
-                to="/settings"
-                search={{ section: "expense-cost-centers" } as any}
+                to="/expenses/setup"
+                search={{ section: "cost-centers" } as any}
                 className="mt-1 inline-flex text-[11px] font-semibold text-primary hover:underline"
               >
                 إدارة مراكز التكلفة
@@ -425,55 +426,6 @@ export function CompanyProductionPage() {
             </MillingField>
           </div>
         </MillingPanel>
-
-        {(hasRole("owner") || hasRole("manager")) && (
-          <MillingPanel>
-            <MillingSectionTitle
-              title="تصنيفات المصروف المؤهلة للتصنيع"
-              subtitle="التأهيل يسمح بتخصيص الجزء الإنتاجي فقط من بند مصروف مرحّل؛ لا يضيف تكلفة تلقائياً. اختر تصنيفاً واضحاً لعمل إنتاجي واربطه بحساب مصروف."
-              action={
-                <Link
-                  to="/settings"
-                  search={{ section: "expense-categories" } as any}
-                  className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-2 text-xs font-bold hover:bg-muted"
-                >
-                  إدارة التصنيفات والحسابات
-                </Link>
-              }
-            />
-            <div className="grid gap-2 p-4 sm:grid-cols-2 xl:grid-cols-3">
-              {(data?.expenseCategories ?? []).map((category) => (
-                <label
-                  key={category.id}
-                  className="flex cursor-pointer items-center gap-3 rounded-xl border border-border/60 p-3 text-sm"
-                >
-                  <input
-                    type="checkbox"
-                    checked={category.production_cost_eligible}
-                    disabled={expenseCategoryEligibility.isPending}
-                    onChange={(event) =>
-                      expenseCategoryEligibility.mutate({
-                        categoryId: category.id,
-                        eligible: event.target.checked,
-                      })
-                    }
-                    className="size-4 accent-primary"
-                  />
-                  <span>{category.name_ar || category.name}</span>
-                  <span className="ms-auto text-[10px] text-muted-foreground">
-                    {category.production_cost_eligible ? "مؤهل" : "غير مؤهل"}
-                  </span>
-                </label>
-              ))}
-              {!data?.expenseCategories.length && (
-                <p className="text-xs text-muted-foreground">لا توجد تصنيفات مصروفات نشطة.</p>
-              )}
-            </div>
-            <p className="px-4 pb-4 text-[11px] leading-5 text-muted-foreground">
-              أجور العمالة المباشرة والطاقة المستخدمة في التشغيل والتعبئة المستهلكة فيه يمكن تخصيصها بنسبة الاستخدام. الإيجار والصيانة والاستهلاك الصناعي لا تُحمّل إلا بتوزيع منتظم على الطاقة الطبيعية. المصروف الإداري والبيعي والتوصيل للعميل خارج تكلفة المخزون. إذا كانت مواد التعبئة أصنافاً مخزنية فأضفها ضمن المواد المصروفة أعلاه.
-            </p>
-          </MillingPanel>
-        )}
 
         <MillingPanel>
           <MillingSectionTitle
@@ -512,13 +464,31 @@ export function CompanyProductionPage() {
                         })
                       }
                     >
-                      <option value="">اختر المادة</option>
-                      {materialProducts.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {productOption(item)}
-                        </option>
-                      ))}
+                      <option value="">اختر مادة خام أو مادة تعبئة مخزنية</option>
+                      {rawMaterialProducts.length > 0 && (
+                        <optgroup label="مواد خام مملوكة للمنشأة">
+                          {rawMaterialProducts.map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {productOption(item)}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {packagingProducts.length > 0 && (
+                        <optgroup label="مواد تعبئة مخزنية">
+                          {packagingProducts.map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {productOption(item)}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
                     </MillingSelect>
+                    {!materialProducts.length && (
+                      <p className="mt-1 text-[11px] text-amber-700">
+                        لا توجد مواد خام أو مواد تعبئة مخزنية مملوكة للمنشأة. أصناف الأمانات والمنتجات التامة لا تُصرف كمواد خام.
+                      </p>
+                    )}
                     {product && (
                       <p className="mt-1 text-[11px] text-muted-foreground">
                         المتاح: {fmtNum(stock)}{" "}

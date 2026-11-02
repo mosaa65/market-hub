@@ -115,6 +115,16 @@ const CATEGORY_STYLES: Record<
     activeBg:
       "bg-gradient-to-r from-violet-500/15 via-violet-500/5 to-transparent border-violet-500/20",
   },
+  expenses: {
+    iconBoxActive: "bg-fuchsia-500/20 text-fuchsia-500 ring-1 ring-fuchsia-500/40",
+    iconBoxInactive:
+      "bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400 group-hover:bg-fuchsia-500/20",
+    iconActive: "text-fuchsia-500 stroke-[2.4]",
+    iconInactive: "text-fuchsia-600 dark:text-fuchsia-400 group-hover:scale-110",
+    accentPill: "bg-fuchsia-500",
+    activeBg:
+      "bg-gradient-to-r from-fuchsia-500/15 via-fuchsia-500/5 to-transparent border-fuchsia-500/20",
+  },
   milling: {
     iconBoxActive: "bg-orange-500/20 text-orange-500 ring-1 ring-orange-500/40",
     iconBoxInactive:

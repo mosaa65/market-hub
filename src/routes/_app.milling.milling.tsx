@@ -53,6 +53,8 @@ import {
 } from "@/components/milling/milling-ui";
 import { QuantityInput } from "@/components/ui/quantity-input";
 import { ProductPicker } from "@/components/products/product-picker";
+import { ProductLinesEditor } from "@/components/products/product-lines-editor";
+import { WarehouseBadge } from "@/components/ui/warehouse-badge";
 
 export const Route = createFileRoute("/_app/milling/milling")({
   head: () => ({ meta: [{ title: "عمليات الطحن ونواتج الأمانات — فورتكس ERP" }] }),
@@ -423,8 +425,8 @@ function MillingMillPage() {
             />
 
             <div className="space-y-4 p-4">
-              {/* العميل والمستودع */}
-              <div className="grid gap-3 sm:grid-cols-2">
+              {/* العميل والمستودع — المستودع شارة، لا حقل يزاحم العميل */}
+              <div className="space-y-2">
                 <MillingField label="صاحب الأمانة (العميل) *">
                   <MillingSelect
                     value={customerId}
@@ -443,20 +445,15 @@ function MillingMillPage() {
                   </MillingSelect>
                 </MillingField>
 
-                <MillingField label="المستودع / الصالة *">
-                  <MillingSelect
-                    value={warehouseId}
-                    onChange={(e) => setWarehouseId(e.target.value)}
-                    className="font-bold text-xs"
-                  >
-                    <option value="">اختر المستودع…</option>
-                    {(warehouses.data ?? []).map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.name_ar || w.name}
-                      </option>
-                    ))}
-                  </MillingSelect>
-                </MillingField>
+                <WarehouseBadge
+                  value={warehouseId}
+                  onChange={setWarehouseId}
+                  required
+                  warehouses={(warehouses.data ?? []).map((w) => ({
+                    id: w.id,
+                    nameAr: w.name_ar || w.name,
+                  }))}
+                />
               </div>
 
               {/* أسطر الحبوب المطحونة — صنف مستقل لكل سطر من رصيد أمانات العميل */}
@@ -470,136 +467,62 @@ function MillingMillPage() {
                     {fmtNum(currentMilledKg)} كجم · {fmtNum(currentMilledBags)} كيس
                   </span>
                 </div>
-                {grains.map((line, idx) => {
-                  const b = line.itemId
-                    ? grainBalances.find((x) => x.item_id === line.itemId)
-                    : undefined;
-                  const isOver =
-                    b && ((line.bags || 0) > b.bags_balance || (line.kg || 0) > b.kg_balance);
-                  const remBags = b ? Math.max(0, b.bags_balance - (line.bags || 0)) : 0;
-                  const remKg = b ? Math.max(0, b.kg_balance - (line.kg || 0)) : 0;
-                  return (
-                    <div
-                      key={idx}
-                      className={`space-y-2 rounded-xl border p-3 ${
-                        isOver ? "border-rose-500/50 bg-rose-500/5" : "border-border/70 bg-card/70"
-                      }`}
-                    >
-                      <div className="grid grid-cols-[1fr_auto] items-center gap-2">
-                        <ProductPicker
-                          value={line.itemId}
-                          items={grainBalances.map((g) => ({
-                            id: g.item_id,
-                            nameAr: g.name_ar,
-                            sku: g.sku,
-                            item_class: g.item_class,
-                            balanceKg: g.kg_balance,
-                            balanceBags: g.bags_balance,
-                          }))}
-                          classes={["RAW_MATERIAL"]}
-                          onChange={(item) => changeGrainItem(idx, item.id)}
-                          placeholder="اختر صنف الحبوب من رصيد العميل…"
-                          ariaLabel={`الحبوب المطحونة في السطر ${idx + 1}`}
-                        />
-                        <div className="flex items-center gap-1">
-                          {b && (
-                            <button
-                              type="button"
-                              onClick={() => handleMillAllForLine(idx)}
-                              className="rounded-lg bg-amber-500/10 px-2 py-1 text-[11px] font-bold text-amber-700 dark:text-amber-300 hover:bg-amber-500/20"
-                            >
-                              طحن الكل
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            disabled={grains.length === 1}
-                            onClick={() => removeGrainLine(idx)}
-                            className="grid h-8 w-8 place-items-center rounded-lg text-rose-500 hover:bg-rose-500/10 disabled:opacity-30"
-                            aria-label="حذف السطر"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 items-center">
-                        <div>
-                          <span className="block text-[11px] font-semibold text-muted-foreground mb-1">
-                            الأكياس المطحونة:
-                          </span>
-                          <QuantityInput
-                            decimals={0}
-                            min={0}
-                            emptyAsZero
-                            placeholder="0"
-                            aria-label="الأكياس المطحونة"
-                            value={line.bags || null}
-                            onValueChange={(v) => changeGrainBags(idx, v ?? 0)}
-                            className="font-bold text-amber-600 dark:text-amber-400"
-                          />
-                        </div>
-                        <div>
-                          <span className="block text-[11px] font-semibold text-muted-foreground mb-1">
-                            الوزن المطحون (كجم):
-                          </span>
-                          <QuantityInput
-                            decimals={2}
-                            min={0}
-                            emptyAsZero
-                            placeholder="0.00"
-                            aria-label="الوزن المطحون (كجم)"
-                            value={line.kg || null}
-                            onValueChange={(v) => changeGrainKg(idx, v ?? 0)}
-                            className="font-bold"
-                          />
-                        </div>
-                        <div className="rounded-lg bg-muted/40 p-2 text-center text-xs">
-                          <span className="block text-[10px] text-muted-foreground">
-                            الرصيد المتاح:
-                          </span>
-                          <span className="font-bold text-foreground">
-                            {b ? `${fmtNum(b.bags_balance)} كيس` : "—"}
-                          </span>
-                          <span className="block text-[10px] text-muted-foreground">
-                            {b ? `(${fmtNum(b.kg_balance)} كجم)` : ""}
-                          </span>
-                        </div>
-                        <div className="rounded-lg bg-blue-500/10 p-2 text-center text-xs">
-                          <span className="block text-[10px] text-blue-700 dark:text-blue-300 font-semibold">
-                            المتبقي بعد الطحن:
-                          </span>
-                          <span className="font-black text-blue-700 dark:text-blue-300">
-                            {b ? `${fmtNum(remBags)} كيس` : "—"}
-                          </span>
-                          <span className="block text-[10px] text-blue-700/80 dark:text-blue-300/80">
-                            {b ? `(${fmtNum(remKg)} كجم)` : ""}
-                          </span>
-                        </div>
-                      </div>
-
-                      {isOver && (
-                        <div className="flex items-center gap-1.5 rounded-lg bg-rose-500/10 px-2.5 py-1 text-xs font-bold text-rose-600 dark:text-rose-300">
-                          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                          <span>
-                            الكمية المطلوبة أكبر من رصيد الحبوب المتاح! الحد الأقصى:{" "}
-                            {fmtNum(b.bags_balance)} كيس / {fmtNum(b.kg_balance)} كجم.
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-
-                {/* زر إضافة صنف حبوب خام آخر في الأسفل بتصميم الهوية الموحدة */}
-                <button
-                  type="button"
-                  onClick={addGrainLine}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-amber-500/40 bg-amber-500/[0.04] hover:bg-amber-500/[0.09] text-xs font-bold text-amber-700 dark:text-amber-300 transition-all active:scale-[0.99]"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span>إضافة صنف حبوب</span>
-                </button>
+                <ProductLinesEditor
+                  lines={grains.map((line) => ({
+                    itemId: line.itemId,
+                    bags: line.bags || 0,
+                    kg: line.kg || 0,
+                  }))}
+                  onChange={(index, patch) => {
+                    if (patch.itemId !== undefined) changeGrainItem(index, patch.itemId);
+                    if (patch.bags !== undefined) changeGrainBags(index, patch.bags);
+                    if (patch.kg !== undefined) changeGrainKg(index, patch.kg);
+                  }}
+                  onAdd={addGrainLine}
+                  onRemove={removeGrainLine}
+                  items={grainBalances.map((g) => ({
+                    id: g.item_id,
+                    nameAr: g.name_ar,
+                    sku: g.sku,
+                    item_class: g.item_class,
+                    balanceKg: g.kg_balance,
+                    balanceBags: g.bags_balance,
+                  }))}
+                  classes={["RAW_MATERIAL"]}
+                  placeholder="اختر صنف الحبوب من رصيد العميل…"
+                  bagsLabel="أكياس مطحونة"
+                  kgLabel="الوزن المطحون (كجم)"
+                  onFillAll={handleMillAllForLine}
+                  fillAllLabel="طحن الكل"
+                  addLabel="إضافة صنف حبوب"
+                  ariaLabel="الحبوب المستهلكة"
+                  metrics={(_index, line) => {
+                    const balance = line.itemId
+                      ? grainBalances.find((x) => x.item_id === line.itemId)
+                      : undefined;
+                    if (!balance) return [];
+                    const overBags = line.bags > balance.bags_balance;
+                    const overKg = line.kg > balance.kg_balance;
+                    return [
+                      {
+                        key: "available",
+                        label: "المتاح",
+                        value: balance.bags_balance,
+                        unit: "كيس",
+                        secondary: `(${fmtNum(balance.kg_balance)} كجم)`,
+                        isOver: overBags || overKg,
+                      },
+                      {
+                        key: "remaining",
+                        label: "المتبقي",
+                        value: Math.max(0, balance.bags_balance - line.bags),
+                        unit: "كيس",
+                        secondary: `(${fmtNum(Math.max(0, balance.kg_balance - line.kg))} كجم)`,
+                        tone: "primary",
+                      },
+                    ];
+                  }}
+                />
 
                 {/* شريط إجماليات الحبوب والنواتج */}
                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-muted/60 p-3 text-xs">
@@ -665,68 +588,33 @@ function MillingMillPage() {
                   <div className="text-center">حذف</div>
                 </div>
 
-                {outputs.map((line, idx) => (
-                  <div
-                    key={idx}
-                    className="grid min-w-0 grid-cols-1 items-center gap-2.5 rounded-xl border border-border/70 bg-card p-3 sm:grid-cols-[minmax(0,1fr)_minmax(84px,0.35fr)_minmax(100px,0.4fr)_36px] sm:gap-3"
-                  >
-                    <ProductPicker
-                      value={line.itemId}
-                      items={(outputItems.data ?? []).map((g: ProductOption) => ({
-                        id: g.id,
-                        nameAr: g.name_ar || g.name,
-                        sku: g.sku,
-                        item_class: g.item_class,
-                        package_weight_kg: g.package_weight_kg,
-                      }))}
-                      classes={["FINISHED_GOOD", "BY_PRODUCT"]}
-                      onChange={(item) => changeLineItem(idx, item.id)}
-                      placeholder="اختر الناتج (دقيق / نخالة / سميد)…"
-                      ariaLabel={`ناتج الطحن في السطر ${idx + 1}`}
-                    />
-
-                    <QuantityInput
-                      decimals={0}
-                      min={0}
-                      emptyAsZero
-                      placeholder="0"
-                      aria-label="أكياس الناتج"
-                      value={line.bags || null}
-                      onValueChange={(v) => changeLineBags(idx, v ?? 0)}
-                      className="font-bold text-emerald-600 dark:text-emerald-400"
-                    />
-
-                    <QuantityInput
-                      decimals={2}
-                      min={0}
-                      emptyAsZero
-                      placeholder="0.00"
-                      aria-label="وزن الناتج كجم"
-                      value={line.kg || null}
-                      onValueChange={(v) => changeLineKg(idx, v ?? 0)}
-                      className="font-bold"
-                    />
-
-                    <button
-                      type="button"
-                      disabled={outputs.length === 1}
-                      onClick={() => setOutputs((o) => o.filter((_, i) => i !== idx))}
-                      className="grid h-8 w-8 place-items-center rounded-lg text-rose-500 hover:bg-rose-500/10 disabled:opacity-30"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))}
-
-                {/* زر إضافة سطر ناتج جديد موحد في الأسفل */}
-                <button
-                  type="button"
-                  onClick={() => setOutputs((o) => [...o, { itemId: "", bags: 0, kg: 0 }])}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-emerald-500/40 bg-emerald-500/[0.04] hover:bg-emerald-500/[0.09] text-xs font-bold text-emerald-700 dark:text-emerald-300 transition-all active:scale-[0.99]"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span>إضافة سطر ناتج جديد</span>
-                </button>
+                <ProductLinesEditor
+                  lines={outputs.map((line) => ({
+                    itemId: line.itemId,
+                    bags: line.bags || 0,
+                    kg: line.kg || 0,
+                  }))}
+                  onChange={(index, patch) => {
+                    if (patch.itemId !== undefined) changeLineItem(index, patch.itemId);
+                    if (patch.bags !== undefined) changeLineBags(index, patch.bags);
+                    if (patch.kg !== undefined) changeLineKg(index, patch.kg);
+                  }}
+                  onAdd={() => setOutputs((o) => [...o, { itemId: "", bags: 0, kg: 0 }])}
+                  onRemove={(index) => setOutputs((o) => o.filter((_, i) => i !== index))}
+                  items={(outputItems.data ?? []).map((g: ProductOption) => ({
+                    id: g.id,
+                    nameAr: g.name_ar || g.name,
+                    sku: g.sku,
+                    item_class: g.item_class,
+                    package_weight_kg: g.package_weight_kg,
+                  }))}
+                  classes={["FINISHED_GOOD", "BY_PRODUCT"]}
+                  placeholder="اختر الناتج (دقيق / نخالة / سميد)…"
+                  bagsLabel="أكياس الناتج"
+                  kgLabel="وزن الناتج (كجم)"
+                  addLabel="إضافة سطر ناتج جديد"
+                  ariaLabel="النواتج المستخرجة"
+                />
               </div>
 
               {/* الفاقد والمطابقة تفاصيل مساعدة وليست حقولاً مهيمنة على التشغيل */}

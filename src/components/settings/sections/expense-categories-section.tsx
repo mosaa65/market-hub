@@ -283,7 +283,15 @@ export function ExpenseCategoriesSection({ canEdit = false, lang = "ar" }) {
                           disabled={eligibility.isPending || !category.account_id}
                           onCheckedChange={(eligible) => eligibility.mutate({ id: category.id, eligible })}
                         />
-                        <span>{isAr ? "يقبل تخصيص تكلفة إنتاج" : "Allow production allocation"}</span>
+                        <span>
+                          {category.production_cost_eligible
+                            ? isAr
+                              ? "مؤهل لتخصيص الإنتاج"
+                              : "Production eligible"
+                            : isAr
+                              ? "غير مؤهل لتخصيص الإنتاج"
+                              : "Not production eligible"}
+                        </span>
                       </label>
                       {!category.account_id && (
                         <span className="text-[10px] text-amber-700">
