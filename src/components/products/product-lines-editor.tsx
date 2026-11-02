@@ -147,7 +147,7 @@ export function ProductLinesEditor<T extends ProductPickerItem>({
             key={index}
             aria-label={`السطر ${index + 1}`}
             className={cn(
-              "group overflow-hidden rounded-xl border transition-colors",
+              "group relative rounded-xl border transition-colors",
               overlay.some((m) => m.isOver)
                 ? "border-rose-400/60 bg-rose-500/[0.03]"
                 : "border-border/70 bg-card/70 focus-within:border-primary/40",
@@ -189,7 +189,7 @@ export function ProductLinesEditor<T extends ProductPickerItem>({
             </div>
 
             {/* ── المستوى الثاني: شريط المقاييس ── */}
-            <div className="grid grid-cols-2 border-t border-border/60 bg-surface/60 sm:grid-cols-4">
+            <div className="grid grid-cols-2 rounded-b-xl border-t border-border/60 bg-surface/60 sm:grid-cols-4">
               <MetricCell label={bagsLabel} accent="primary">
                 <QuantityInput
                   decimals={0}
