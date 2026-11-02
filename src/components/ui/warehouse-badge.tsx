@@ -56,9 +56,7 @@ export function WarehouseBadge({
     <div
       className={cn(
         "inline-flex min-w-0 items-center gap-1.5 rounded-lg border px-2 py-1",
-        missing
-          ? "border-amber-500/50 bg-amber-500/[0.06]"
-          : "border-border/70 bg-surface/70",
+        missing ? "border-amber-500/50 bg-amber-500/[0.06]" : "border-border/70 bg-surface/70",
         className,
       )}
       title={missing ? "اختر المستودع قبل الحفظ" : undefined}

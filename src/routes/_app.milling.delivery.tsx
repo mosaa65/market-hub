@@ -51,6 +51,8 @@ import {
 import { QuantityInput } from "@/components/ui/quantity-input";
 import { ProductPicker } from "@/components/products/product-picker";
 import { ProductLinesEditor } from "@/components/products/product-lines-editor";
+import { QuickAddButton } from "@/components/ui/quick-add-button";
+import { QuickProductDialog } from "@/components/milling/quick-product-dialog";
 import { WarehouseBadge } from "@/components/ui/warehouse-badge";
 
 export const Route = createFileRoute("/_app/milling/delivery")({
@@ -76,6 +78,8 @@ function MillingDeliveryPage() {
   const [customerId, setCustomerId] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
   const [lines, setLines] = useState<CustodyLine[]>([{ itemId: "", bags: 0, kg: 0 }]);
+  /** نافذة إضافة صنف جديد — منبثقة فوق الشاشة، لا تُقصّ داخل اللوحة. */
+  const [quickItemOpen, setQuickItemOpen] = useState(false);
   const [notes, setNotes] = useState("");
 
   // حالة معاينة وطباعة الفاتورة الفاخرة
@@ -365,13 +369,22 @@ function MillingDeliveryPage() {
 
               {/* جدول أسطر التسليم — نفس المحرّر الموحّد المستخدم في الاستلام والطحن */}
               <div className="space-y-3 rounded-2xl border border-border/80 bg-surface-2/30 p-3">
-                <div>
-                  <h4 className="text-xs font-bold text-foreground">
-                    الأصناف والكميات المراد تسليمها
-                  </h4>
-                  <p className="text-[11px] text-muted-foreground">
-                    يمكن التسليم على دفعات متفرقة، وسيظهر المتبقي في الفاتورة والسجل.
-                  </p>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <h4 className="text-xs font-bold text-foreground">
+                      الأصناف والكميات المراد تسليمها
+                    </h4>
+                    <p className="text-[11px] text-muted-foreground">
+                      يمكن التسليم على دفعات متفرقة، وسيظهر المتبقي في الفاتورة والسجل.
+                    </p>
+                  </div>
+                  <QuickAddButton
+                    label="إضافة صنف جديد إلى دليل الأمانات"
+                    icon={Plus}
+                    tone="emerald"
+                    size="sm"
+                    onClick={() => setQuickItemOpen(true)}
+                  />
                 </div>
 
                 <ProductLinesEditor
@@ -557,6 +570,25 @@ function MillingDeliveryPage() {
             stage="delivery"
           />
         )}
+
+        {/* إضافة صنف — منبثقة على `document.body`، تعلو الكاونتر ولا تُقصّ معه. */}
+        <QuickProductDialog
+          open={quickItemOpen}
+          onOpenChange={setQuickItemOpen}
+          mode="custody"
+          defaultClass="FINISHED_GOOD"
+          classes={["FINISHED_GOOD", "BY_PRODUCT", "RAW_MATERIAL"]}
+          onSaved={(productId) => {
+            const emptyIdx = lines.findIndex((l) => !l.itemId);
+            if (emptyIdx >= 0) {
+              setLines((current) =>
+                current.map((line, i) => (i === emptyIdx ? { ...line, itemId: productId } : line)),
+              );
+            } else {
+              setLines((current) => [...current, { itemId: productId, bags: 0, kg: 0 }]);
+            }
+          }}
+        />
       </div>
     </ModuleGuard>
   );

@@ -44,7 +44,7 @@ import { CustomerFormDialog } from "@/components/contacts/customer-form-dialog";
 import { LuxuryPrintPreviewModal } from "@/components/luxury-print-preview-modal";
 import { UnifiedPrintModal } from "@/components/milling/unified-print-modal";
 import { DocumentShareDialog } from "@/components/communication/document-share-dialog";
-import { CustodyProductFormDialog } from "@/components/milling/custody-product-form-dialog";
+import { QuickProductDialog } from "@/components/milling/quick-product-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import {
   createMillingServiceDocument,
@@ -935,22 +935,6 @@ function MillingIntakePage() {
                         إلغاء
                       </button>
                     </div>
-                  ) : (
-                    /*
-                      «توزيع الدفع» زرّ أيقوني داخل صف طريقة الدفع نفسه، لا زرًّا
-                      نصيًا أسفله يأخذ سطرًا كاملاً لكل عملية. الطريقة المنفردة
-                      هي الأصل، والتجزئة استثناء — فلا تستحق مساحة دائمة.
-                    */
-                    <button
-                      type="button"
-                      disabled={submit.isPending || grandTotal <= 0}
-                      onClick={() => setSplitEditorOpen(true)}
-                      aria-label="توزيع الدفع على أكثر من طريقة"
-                      title="توزيع الدفع على أكثر من طريقة"
-                      className="grid size-8 shrink-0 place-items-center rounded-lg border border-border/70 bg-surface text-muted-foreground transition hover:border-primary/40 hover:text-primary disabled:pointer-events-none disabled:opacity-40"
-                    >
-                      <Layers className="size-3.5" />
-                    </button>
                   )}
                 </div>
 
@@ -1161,13 +1145,21 @@ function MillingIntakePage() {
           }}
         />
 
-        {/* نافذة إضافة صنف حبوب جديد سريعاً دون مغادرة الكاونتر */}
-        <CustodyProductFormDialog
+        {/*
+          نافذة إضافة صنف حبوب سريعة.
+
+          تُركَّب بـ`createPortal` على `document.body` داخل `QuickProductDialog`،
+          فلا تُقصّ عند حدود `MillingPanel` ذي `overflow-hidden` وتعلو الشاشة كما
+          يُتوقع من نافذة منبثقة.
+        */}
+        <QuickProductDialog
           open={quickGrainDialogOpen}
           onOpenChange={setQuickGrainDialogOpen}
+          mode="custody"
           defaultClass="RAW_MATERIAL"
+          classes={["RAW_MATERIAL"]}
           onSaved={(productId) => {
-            // اختر الصنف الجديد تلقائياً في آخر سطر فارغ
+            // اختر الصنف الجديد تلقائيًا في آخر سطر فارغ
             const emptyIdx = lines.findIndex((l) => !l.itemId);
             if (emptyIdx >= 0) {
               setLineItem(emptyIdx, productId);

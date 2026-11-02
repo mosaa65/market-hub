@@ -54,6 +54,8 @@ import {
 import { QuantityInput } from "@/components/ui/quantity-input";
 import { ProductPicker } from "@/components/products/product-picker";
 import { ProductLinesEditor } from "@/components/products/product-lines-editor";
+import { QuickAddButton } from "@/components/ui/quick-add-button";
+import { QuickProductDialog } from "@/components/milling/quick-product-dialog";
 import { WarehouseBadge } from "@/components/ui/warehouse-badge";
 
 export const Route = createFileRoute("/_app/milling/milling")({
@@ -80,6 +82,8 @@ function MillingMillPage() {
   const [warehouseId, setWarehouseId] = useState("");
   const [grains, setGrains] = useState<CustodyLine[]>([{ itemId: "", bags: 0, kg: 0 }]);
   const [outputs, setOutputs] = useState<CustodyLine[]>([{ itemId: "", bags: 0, kg: 0 }]);
+  /** نافذة إضافة ناتج جديد — تُركَّب على `document.body` فتعلو الكاونتر. */
+  const [quickOutputOpen, setQuickOutputOpen] = useState(false);
 
   // حقل الفاقد التشغيلي الفعلي أثناء الطحن — وزن فيزيائي يدوي فقط (V2: بلا سعات)
   const [lossKg, setLossKg] = useState("");
@@ -558,27 +562,35 @@ function MillingMillPage() {
               </div>
 
               {/* النواتج المستخرجة */}
-              <div className="space-y-3 rounded-2xl border border-border/80 bg-surface-2/30 p-3.5">
-                <div>
-                  <h4 className="text-xs font-bold text-foreground">النواتج المستخرجة المعبأة</h4>
-                  <p className="text-[11px] text-muted-foreground">
-                    حدد الصنف، عدد الأكياس والوزن المستخرج (دقيق 50، 25، 10 كجم، نخالة، سميد…).
-                  </p>
-                  {outputItems.data && outputItems.data.length === 0 && (
-                    <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-2.5 py-1.5 text-[11px]">
-                      <span className="font-semibold text-amber-700 dark:text-amber-300">
-                        لا توجد منتجات نواتج أمانات بعد!
-                      </span>
-                      <Link
-                        to="/milling/products"
-                        search={undefined as never}
-                        className="inline-flex items-center gap-1 rounded-lg bg-amber-500 px-2 py-1 font-bold text-white hover:bg-amber-600"
-                      >
-                        أضف ناتجاً من «أصناف الأمانات» ←
-                      </Link>
-                    </div>
-                  )}
+              <div className="space-y-3 rounded-2xl border border-border/80 bg-surface-2/30 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <h4 className="text-xs font-bold text-foreground">النواتج المستخرجة المعبأة</h4>
+                    <p className="text-[11px] text-muted-foreground">
+                      حدد الصنف، عدد الأكياس والوزن المستخرج (دقيق 50، 25، 10 كجم، نخالة، سميد…).
+                    </p>
+                  </div>
+                  {/*
+                    إضافة ناتج من داخل الشاشة: زرّ دائريّ بأيقونة يفتح نافذة
+                    منبثقة فوق الكاونتر. قبل ذلك كان الطريق الوحيد مغادرة
+                    الكاونتر إلى «أصناف الأمانات» وترك المستند مفتوحًا تكتشف
+                    لاحقًا أنه فقد سياقه.
+                  */}
+                  <QuickAddButton
+                    label="إضافة صنف ناتج جديد"
+                    icon={Plus}
+                    tone="emerald"
+                    size="sm"
+                    onClick={() => setQuickOutputOpen(true)}
+                  />
                 </div>
+                {outputItems.data && outputItems.data.length === 0 && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-2.5 py-1.5 text-[11px]">
+                    <span className="font-semibold text-amber-700 dark:text-amber-300">
+                      لا توجد أصناف نواتج بعد — أضف واحدًا لتسجيل النواتج.
+                    </span>
+                  </div>
+                )}
 
                 {/* ترويسة أعمدة النواتج للشاشات المتوسطة والكبيرة */}
                 <div className="hidden sm:grid sm:grid-cols-[1fr_90px_110px_36px] gap-2 px-3 py-1.5 text-[11px] font-bold text-muted-foreground bg-muted/50 rounded-xl">
@@ -902,6 +914,25 @@ function MillingMillPage() {
             />
           </div>
         </details>
+
+        {/* إضافة ناتج — نافذة منبثقة فوق الشاشة، لا نافذة تُقصّ داخل اللوحة. */}
+        <QuickProductDialog
+          open={quickOutputOpen}
+          onOpenChange={setQuickOutputOpen}
+          mode="custody"
+          defaultClass="FINISHED_GOOD"
+          classes={["FINISHED_GOOD", "BY_PRODUCT"]}
+          onSaved={(productId) => {
+            const emptyIdx = outputs.findIndex((o) => !o.itemId);
+            if (emptyIdx >= 0) {
+              setOutputs((current) =>
+                current.map((line, i) => (i === emptyIdx ? { ...line, itemId: productId } : line)),
+              );
+            } else {
+              setOutputs((current) => [...current, { itemId: productId, bags: 0, kg: 0 }]);
+            }
+          }}
+        />
       </div>
     </ModuleGuard>
   );

@@ -15,6 +15,17 @@ import { toSystemDigits } from "@/lib/format-preferences";
 
 /* ------------------------------------------------------------------ panel */
 
+/**
+ * لوحة محتوى الشاشة.
+ *
+ * `overflow-hidden` هنا ضروري لرؤوس اللوحة (خلفية الرأس تتبع نصف القطر).
+ * لكنه **يُنشئ سياق قصّ**، فأي نافذة تُركَّب داخل اللوحة بدل `document.body`
+ * تُقصّ عند حدودها — وهذا ما جعل «إضافة صنف» تختفي خلف اللوحة أو تُقطع.
+ *
+ * الحل الدائم: كل نافذة تُركَّب بـ`createPortal` على `document.body`
+ * (`QuickProductDialog` مثلاً). ولو بقي مكوّن قديم يرسم داخل اللوحة،
+ * فهذا الشعار يذكّر أين المشكلة بدل أن يُنقل `overflow-hidden` ويُكسر التصميم.
+ */
 export function MillingPanel({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <div

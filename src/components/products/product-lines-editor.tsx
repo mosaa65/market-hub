@@ -223,7 +223,11 @@ export function ProductLinesEditor<T extends ProductPickerItem>({
                   tone={metric.tone}
                   isOver={metric.isOver}
                 >
-                  <ReadOnlyValue value={metric.value} unit={metric.unit} secondary={metric.secondary} />
+                  <ReadOnlyValue
+                    value={metric.value}
+                    unit={metric.unit}
+                    secondary={metric.secondary}
+                  />
                 </MetricCell>
               ))}
 
@@ -289,7 +293,9 @@ function MetricCell({
         spanFull && "col-span-2 sm:col-span-1",
       )}
     >
-      <span className={cn("block truncate text-[9px] font-bold uppercase tracking-wide", labelTone)}>
+      <span
+        className={cn("block truncate text-[9px] font-bold uppercase tracking-wide", labelTone)}
+      >
         {label}
       </span>
       {children}
@@ -311,7 +317,9 @@ function ReadOnlyValue({
     <div className="h-9 min-w-0">
       <span className="block truncate text-center font-mono text-xs font-bold tabular-nums text-foreground">
         {missing ? "—" : toSystemDigits(value)}
-        {!missing && unit ? <span className="ms-0.5 font-sans text-[9px] font-medium opacity-60">{unit}</span> : null}
+        {!missing && unit ? (
+          <span className="ms-0.5 font-sans text-[9px] font-medium opacity-60">{unit}</span>
+        ) : null}
       </span>
       {secondary ? (
         <span className="block truncate text-center text-[9px] leading-tight text-muted-foreground/80">
