@@ -15,6 +15,34 @@ export interface QuantityStepperProps {
   size?: "sm" | "md";
 }
 
+/**
+ * تقريب الأرقام العشرية لمنع تشوهات الفاصلة العائمة (floating point epsilon)
+ * مثل 1.0000000000000002 أو 1.001 عند الزيادة/النقصان.
+ */
+function roundToStep(val: number, step: number): number {
+  const safeStep = Number.isFinite(step) && step > 0 ? step : 1;
+  const stepStr = String(safeStep);
+  const decimals = stepStr.includes(".") ? Math.min(stepStr.split(".")[1].length, 4) : 0;
+  // تقريب المضاعف لأقرب خطوة
+  const rounded = Math.round(val / safeStep) * safeStep;
+  return Number(rounded.toFixed(decimals));
+}
+
+function cleanAdd(val: number, step: number): number {
+  const safeStep = Number.isFinite(step) && step > 0 ? step : 1;
+  const stepStr = String(safeStep);
+  const decimals = stepStr.includes(".") ? Math.min(stepStr.split(".")[1].length, 4) : 0;
+  return Number((val + safeStep).toFixed(decimals));
+}
+
+function cleanSub(val: number, step: number, min: number): number {
+  const safeStep = Number.isFinite(step) && step > 0 ? step : 1;
+  const stepStr = String(safeStep);
+  const decimals = stepStr.includes(".") ? Math.min(stepStr.split(".")[1].length, 4) : 0;
+  const res = Number((val - safeStep).toFixed(decimals));
+  return val <= min ? 0 : Math.max(min, res);
+}
+
 export function QuantityStepper({
   value,
   onCommit,
@@ -53,25 +81,22 @@ export function QuantityStepper({
       setText("0");
       return;
     }
-    const safeStep = Number.isFinite(step) && step > 0 ? step : 1;
-    let next = Number((Math.round(parsed / safeStep) * safeStep).toFixed(12));
+    let next = roundToStep(parsed, step);
     if (next < min) next = min;
     if (ceiling != null && Number.isFinite(ceiling) && next > ceiling) next = ceiling;
     onCommit(next);
     setText(String(next));
   }
 
-  const hClass = size === "md" ? "h-8" : "h-7";
-  const btnClass = size === "md" ? "h-8 w-7" : "h-7 w-6";
-  // عرض الحقل يتمدد مع عدد أرقام الكمية (يبدأ من مقاس الكتلة المدمجة) فلا يُقصّ
-  // الرقم في المنتصف ولا يتضخم الحقل لكمية من خانة واحدة.
+  const hClass = size === "md" ? "h-7.5" : "h-6.5";
+  const btnClass = size === "md" ? "h-7.5 w-6.5" : "h-6.5 w-5.5";
   const digitCount = text.replace(/[^0-9]/g, "").length;
-  const widthCh = Math.min(Math.max(digitCount + 1, 2), 7);
+  const widthCh = Math.min(Math.max(digitCount + 1, 2), 6);
 
   return (
     <div
       className={cn(
-        "inline-flex shrink-0 items-center overflow-hidden rounded-lg border border-border/80 bg-background/80 shadow-2xs transition hover:border-border focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/25",
+        "inline-flex shrink-0 items-center overflow-hidden rounded-md border border-border/70 bg-background/90 shadow-2xs transition hover:border-primary/40 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/20",
         hClass,
         className,
       )}
@@ -79,16 +104,14 @@ export function QuantityStepper({
       <button
         type="button"
         disabled={disabled}
-        onClick={() =>
-          onCommit(value <= min ? 0 : Number(Math.max(min, value - step).toFixed(12)))
-        }
+        onClick={() => onCommit(cleanSub(value, step, min))}
         aria-label="decrease"
         className={cn(
           btnClass,
           "grid place-items-center text-muted-foreground/80 hover:bg-muted hover:text-foreground active:scale-95 transition disabled:opacity-40",
         )}
       >
-        <Minus className="h-3 w-3" />
+        <Minus className="h-2.5 w-2.5" />
       </button>
 
       <input
@@ -115,16 +138,16 @@ export function QuantityStepper({
         }}
         className={cn(
           "h-full min-w-0 shrink-0 bg-transparent text-center font-mono font-bold tabular-nums text-foreground outline-none [unicode-bidi:plaintext] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
-          size === "md" ? "text-xs sm:text-sm" : "text-xs",
+          size === "md" ? "text-xs" : "text-[11px]",
         )}
-        style={{ width: `${widthCh + 0.5}ch` }}
+        style={{ width: `${widthCh + 0.3}ch` }}
       />
 
       <button
         type="button"
         disabled={disabled}
         onClick={() => {
-          const next = Number((value + step).toFixed(12));
+          const next = cleanAdd(value, step);
           if (!unbounded && ceiling != null && next > ceiling) return;
           onCommit(next);
         }}
@@ -134,7 +157,7 @@ export function QuantityStepper({
           "grid place-items-center text-muted-foreground/80 hover:bg-muted hover:text-foreground active:scale-95 transition disabled:opacity-40",
         )}
       >
-        <Plus className="h-3 w-3" />
+        <Plus className="h-2.5 w-2.5" />
       </button>
     </div>
   );
