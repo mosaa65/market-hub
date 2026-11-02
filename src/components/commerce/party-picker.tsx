@@ -11,7 +11,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { money } from "@/lib/format";
 
-type PartyOption = {
+export type PartyOption = {
   id: string;
   name: string;
   is_system?: boolean | null;

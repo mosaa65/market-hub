@@ -1390,7 +1390,14 @@ function POSPage() {
             );
             return c;
           }
-          return c.map((l) => (l === existing ? { ...l, quantity: l.quantity + 1 } : l));
+          return c.map((l) =>
+            l === existing
+              ? {
+                  ...l,
+                  quantity: Number((l.quantity + (existing.quantity_increment ?? 1)).toFixed(4)),
+                }
+              : l,
+          );
         }
         return [
           ...c,
@@ -1424,7 +1431,12 @@ function POSPage() {
       );
       if (existing) {
         return c.map((l) =>
-          l.line_id === existing.line_id ? { ...l, quantity: l.quantity + 1 } : l,
+          l.line_id === existing.line_id
+            ? {
+                ...l,
+                quantity: Number((l.quantity + (existing.quantity_increment ?? 1)).toFixed(4)),
+              }
+            : l,
         );
       }
       return [
@@ -1506,9 +1518,7 @@ function POSPage() {
   function setPrice(lineId: string, price: number) {
     setCart((current) =>
       current.map((line) =>
-        line.line_id === lineId && line.is_service
-          ? { ...line, unit_price: Math.max(0, price) }
-          : line,
+        line.line_id === lineId ? { ...line, unit_price: Math.max(0, price) } : line,
       ),
     );
   }
@@ -3213,7 +3223,7 @@ function POSPage() {
                         unitPrice: l.unit_price,
                         taxRate: l.tax_rate,
                         isService: l.is_service,
-                        priceEditable: l.line_id.startsWith("service-"),
+                        priceEditable: true,
                         unitId: l.uom_id,
                         unit: l.uom_label,
                         unitOptions: l.sale_uoms?.map((uom) => ({

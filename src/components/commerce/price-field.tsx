@@ -31,10 +31,10 @@ export function PriceField({
         decimals={2}
         disabled={disabled}
         className={cn(
-          "h-7 w-full min-w-[4.25rem] rounded-lg border px-2 text-center text-xs font-semibold outline-none transition focus:border-primary focus:ring-1 focus:ring-primary/25",
+          "h-6.5 w-full min-w-[3.5rem] rounded-md border px-1.5 text-center font-mono text-[11px] font-semibold outline-none transition focus:border-primary focus:ring-1 focus:ring-primary/20",
           modified
             ? "border-amber-500/60 bg-amber-500/10 text-amber-700 dark:text-amber-300"
-            : "border-border/80 bg-background/80 hover:border-border focus:bg-background",
+            : "border-border/70 bg-background/90 hover:border-primary/40 focus:bg-background text-foreground",
           className,
         )}
       />
