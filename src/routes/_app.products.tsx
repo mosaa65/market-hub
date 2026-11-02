@@ -1,3 +1,4 @@
+import { FormCombobox } from "@/components/products/product-form-combobox";
 import { cn } from "@/lib/utils";
 import {
   VortexDrawerDialog,
@@ -45,6 +46,10 @@ import {
   X,
   Copy,
   ShieldCheck,
+  Scale,
+  Globe2,
+  Award,
+  Bookmark,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
@@ -3262,26 +3267,24 @@ function ProductDialog({
                 }
                 aria-label={lang === "ar" ? "اختصار الوحدة" : "Unit abbreviation"}
               />
-              <select
+              <FormCombobox
+                title={lang === "ar" ? "بُعد الوحدة" : "Unit dimension"}
                 value={quickAddUnitDimension}
-                onChange={(event) => setQuickAddUnitDimension(event.target.value)}
-                className={cn(fieldSurfaceClass, "h-10 min-w-0 px-3 text-sm")}
-                aria-label={lang === "ar" ? "بُعد الوحدة" : "Unit dimension"}
-              >
-                {[
-                  ["CUSTOM", lang === "ar" ? "مخصص للصنف" : "Item-specific"],
-                  ["PACKAGING", lang === "ar" ? "عبوة" : "Packaging"],
-                  ["COUNT", lang === "ar" ? "عدد" : "Count"],
-                  ["MASS", lang === "ar" ? "كتلة" : "Mass"],
-                  ["VOLUME", lang === "ar" ? "حجم" : "Volume"],
-                  ["LENGTH", lang === "ar" ? "طول" : "Length"],
-                  ["AREA", lang === "ar" ? "مساحة" : "Area"],
-                ].map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setQuickAddUnitDimension(val)}
+                placeholder={lang === "ar" ? "اختر بُعد الوحدة..." : "Select unit dimension..."}
+                clearable={false}
+                lang={lang}
+                options={[
+                  { id: "CUSTOM", label: lang === "ar" ? "مخصص للصنف" : "Item-specific" },
+                  { id: "PACKAGING", label: lang === "ar" ? "عبوة" : "Packaging" },
+                  { id: "COUNT", label: lang === "ar" ? "عدد" : "Count" },
+                  { id: "MASS", label: lang === "ar" ? "كتلة" : "Mass" },
+                  { id: "VOLUME", label: lang === "ar" ? "حجم" : "Volume" },
+                  { id: "LENGTH", label: lang === "ar" ? "طول" : "Length" },
+                  { id: "AREA", label: lang === "ar" ? "مساحة" : "Area" },
+                ]}
+                className="h-10"
+              />
               {!["CUSTOM", "PACKAGING"].includes(quickAddUnitDimension) && (
                 /*
                  * معامل تحويل الوحدة رقم مخزون حقيقي لا يُكتب بالخطأ: حقل
@@ -3477,24 +3480,26 @@ function ProductDialog({
                 }
               >
                 {(p) => (
-                  <select
+                  <FormCombobox
                     id={p.id}
                     aria-describedby={p["aria-describedby"]}
+                    title={lang === "ar" ? "تصنيف الصنف" : "Item classification"}
                     value={form.item_class}
-                    onChange={(e) => setForm({ ...form, item_class: e.target.value })}
-                    className={cn(fieldSurfaceClass, "h-10 px-4 text-sm font-medium")}
-                  >
-                    <option value="">
-                      {lang === "ar" ? "تلقائي (حسب السياسة)" : "Automatic (by policy)"}
-                    </option>
-                    {(Object.keys(ITEM_ROLE_STYLES) as ItemClass[]).map((role) => (
-                      <option key={role} value={role}>
-                        {lang === "ar"
+                    onChange={(val) => setForm({ ...form, item_class: val })}
+                    placeholder={lang === "ar" ? "تلقائي (حسب السياسة)" : "Automatic (by policy)"}
+                    clearLabel={lang === "ar" ? "تلقائي (حسب السياسة)" : "Automatic (by policy)"}
+                    clearable
+                    icon={<Boxes className="size-4" />}
+                    lang={lang}
+                    options={(Object.keys(ITEM_ROLE_STYLES) as ItemClass[]).map((role) => ({
+                      id: role,
+                      label:
+                        lang === "ar"
                           ? ITEM_ROLE_STYLES[role].labelAr
-                          : ITEM_ROLE_STYLES[role].labelEn}
-                      </option>
-                    ))}
-                  </select>
+                          : ITEM_ROLE_STYLES[role].labelEn,
+                      badge: role,
+                    }))}
+                  />
                 )}
               </FormField>
             )}
@@ -3504,25 +3509,29 @@ function ProductDialog({
                 {(p) => (
                   <div className="space-y-2">
                     <div className="flex gap-2">
-                      <select
+                      <FormCombobox
                         id={p.id}
                         aria-describedby={p["aria-describedby"]}
+                        title={t("products.category")}
                         value={form.category_id}
-                        onChange={(e) => setForm({ ...form, category_id: e.target.value })}
-                        className={cn(
-                          fieldSurfaceClass,
-                          "h-10 min-w-0 flex-1 px-4 text-sm font-medium",
-                        )}
-                      >
-                        <option value="">
-                          {lang === "ar" ? "اختر التصنيف..." : "Select category..."}
-                        </option>
-                        {meta.categories.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {labelOf(c.name, c.name_ar)}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={(val) => setForm({ ...form, category_id: val })}
+                        placeholder={lang === "ar" ? "اختر التصنيف..." : "Select category..."}
+                        clearLabel={lang === "ar" ? "بدون تصنيف" : "No category"}
+                        clearable
+                        icon={<Tag className="size-4" />}
+                        lang={lang}
+                        options={meta.categories.map((c) => ({
+                          id: c.id,
+                          label: labelOf(c.name, c.name_ar),
+                          sublabel:
+                            c.name_ar && c.name && c.name_ar !== c.name
+                              ? lang === "ar"
+                                ? c.name
+                                : c.name_ar
+                              : null,
+                        }))}
+                        className="flex-1"
+                      />
                       <IconButton
                         type="button"
                         size="lg"
@@ -3591,25 +3600,27 @@ function ProductDialog({
                 {(p) => (
                   <>
                     <div className="flex gap-2">
-                      <select
+                      <FormCombobox
                         id={p.id}
                         aria-describedby={p["aria-describedby"]}
+                        title={t("products.unit")}
                         value={form.unit_id}
-                        onChange={(e) => setForm({ ...form, unit_id: e.target.value })}
-                        className={cn(
-                          fieldSurfaceClass,
-                          "h-10 min-w-0 flex-1 px-4 text-sm font-medium",
-                        )}
-                      >
-                        <option value="">
-                          {lang === "ar" ? "اختر وحدة القياس..." : "Select unit..."}
-                        </option>
-                        {meta.units.map((u) => (
-                          <option key={u.id} value={u.id}>
-                            {labelOf(u.name, u.name_ar)}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={(val) => setForm({ ...form, unit_id: val })}
+                        placeholder={lang === "ar" ? "اختر وحدة القياس..." : "Select unit..."}
+                        clearLabel={lang === "ar" ? "بدون وحدة" : "No unit"}
+                        clearable
+                        icon={<Scale className="size-4" />}
+                        lang={lang}
+                        options={meta.units.map((u) => ({
+                          id: u.id,
+                          label: labelOf(u.name, u.name_ar),
+                          sublabel: u.short_name
+                            ? `${lang === "ar" ? "الرمز" : "Code"}: ${u.short_name}`
+                            : null,
+                          badge: u.dimension_code ?? undefined,
+                        }))}
+                        className="flex-1"
+                      />
                       <IconButton
                         type="button"
                         size="lg"
@@ -3855,44 +3866,48 @@ function ProductDialog({
                   >
                     {(p) => (
                       <div className="flex gap-2">
-                        <select
+                        <FormCombobox
                           id={p.id}
                           aria-describedby={p["aria-describedby"]}
+                          title={lang === "ar" ? "نوع العبوة" : "Package type"}
                           value={form.package_type_id}
-                          onChange={(event) =>
-                            setForm({ ...form, package_type_id: event.target.value })
-                          }
-                          className={cn(
-                            fieldSurfaceClass,
-                            "h-10 min-w-0 flex-1 px-4 text-sm font-medium",
-                          )}
-                        >
-                          <option value="">{lang === "ar" ? "بدون تحديد" : "Not specified"}</option>
-                          {form.package_type_id &&
-                            !meta.packagingTypes.some(
-                              (item) => item.id === form.package_type_id,
-                            ) && (
-                              <option value={form.package_type_id}>
-                                {lang === "ar" ? "نوع محفوظ غير متاح" : "Saved type unavailable"}
-                              </option>
-                            )}
-                          {meta.packagingTypes.map((item) => (
-                            <option
-                              key={item.id}
-                              value={item.id}
-                              disabled={!item.is_active && item.id !== form.package_type_id}
-                            >
-                              {lang === "ar"
-                                ? item.name_ar || item.name_en || item.code
-                                : item.name_en || item.name_ar || item.code}
-                              {!item.is_active
+                          onChange={(val) => setForm({ ...form, package_type_id: val })}
+                          placeholder={lang === "ar" ? "بدون تحديد" : "Not specified"}
+                          clearLabel={lang === "ar" ? "بدون تحديد" : "Not specified"}
+                          clearable
+                          icon={<Package className="size-4" />}
+                          lang={lang}
+                          options={[
+                            ...(form.package_type_id &&
+                            !meta.packagingTypes.some((item) => item.id === form.package_type_id)
+                              ? [
+                                  {
+                                    id: form.package_type_id,
+                                    label:
+                                      lang === "ar"
+                                        ? "نوع محفوظ غير متاح"
+                                        : "Saved type unavailable",
+                                    badge: lang === "ar" ? "محفوظ" : "Saved",
+                                  },
+                                ]
+                              : []),
+                            ...meta.packagingTypes.map((item) => ({
+                              id: item.id,
+                              label:
+                                lang === "ar"
+                                  ? item.name_ar || item.name_en || item.code
+                                  : item.name_en || item.name_ar || item.code,
+                              sublabel: item.code ? `كود: ${item.code}` : null,
+                              badge: !item.is_active
                                 ? lang === "ar"
-                                  ? " (غير نشط)"
-                                  : " (inactive)"
-                                : ""}
-                            </option>
-                          ))}
-                        </select>
+                                  ? "غير نشط"
+                                  : "Inactive"
+                                : undefined,
+                              disabled: !item.is_active && item.id !== form.package_type_id,
+                            })),
+                          ]}
+                          className="flex-1"
+                        />
                         {canManageReferenceData && (
                           <IconButton
                             type="button"
@@ -3947,25 +3962,29 @@ function ProductDialog({
                 {(p) => (
                   <>
                     <div className="flex gap-2">
-                      <select
+                      <FormCombobox
                         id={p.id}
                         aria-describedby={p["aria-describedby"]}
+                        title={t("products.brand")}
                         value={form.brand_id}
-                        onChange={(e) => setForm({ ...form, brand_id: e.target.value })}
-                        className={cn(
-                          fieldSurfaceClass,
-                          "h-10 min-w-0 flex-1 px-4 text-sm font-medium",
-                        )}
-                      >
-                        <option value="">
-                          {lang === "ar" ? "اختر العلامة التجارية..." : "Select brand..."}
-                        </option>
-                        {meta.brands.map((b) => (
-                          <option key={b.id} value={b.id}>
-                            {labelOf(b.name, b.name_ar)}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={(val) => setForm({ ...form, brand_id: val })}
+                        placeholder={lang === "ar" ? "اختر العلامة التجارية..." : "Select brand..."}
+                        clearLabel={lang === "ar" ? "بدون علامة تجارية" : "No brand"}
+                        clearable
+                        icon={<Bookmark className="size-4" />}
+                        lang={lang}
+                        options={meta.brands.map((b) => ({
+                          id: b.id,
+                          label: labelOf(b.name, b.name_ar),
+                          sublabel:
+                            b.name_ar && b.name && b.name_ar !== b.name
+                              ? lang === "ar"
+                                ? b.name
+                                : b.name_ar
+                              : null,
+                        }))}
+                        className="flex-1"
+                      />
                       <IconButton
                         type="button"
                         size="lg"
@@ -3991,25 +4010,26 @@ function ProductDialog({
                 {(p) => (
                   <>
                     <div className="flex gap-2">
-                      <select
+                      <FormCombobox
                         id={p.id}
                         aria-describedby={p["aria-describedby"]}
+                        title={lang === "ar" ? "بلد المنشأ" : "Country of origin"}
                         value={form.origin_id}
-                        onChange={(e) => setForm({ ...form, origin_id: e.target.value })}
-                        className={cn(
-                          fieldSurfaceClass,
-                          "h-10 min-w-0 flex-1 px-4 text-sm font-medium",
-                        )}
-                      >
-                        <option value="">
-                          {lang === "ar" ? "اختر بلد المنشأ..." : "Select origin..."}
-                        </option>
-                        {meta.origins.map((o) => (
-                          <option key={o.id} value={o.id}>
-                            {lang === "ar" ? o.name_ar : o.name}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={(val) => setForm({ ...form, origin_id: val })}
+                        placeholder={lang === "ar" ? "اختر بلد المنشأ..." : "Select origin..."}
+                        clearLabel={lang === "ar" ? "بدون بلد منشأ" : "No origin"}
+                        clearable
+                        icon={<Globe2 className="size-4" />}
+                        lang={lang}
+                        options={meta.origins.map((o) => ({
+                          id: o.id,
+                          label: lang === "ar" ? o.name_ar : o.name,
+                          sublabel: o.code ? `كود: ${o.code}` : null,
+                          badge:
+                            lang === "ar" && o.name && o.name !== o.name_ar ? o.name : undefined,
+                        }))}
+                        className="flex-1"
+                      />
                       <IconButton
                         type="button"
                         size="lg"
@@ -4040,25 +4060,26 @@ function ProductDialog({
                 {(p) => (
                   <>
                     <div className="flex gap-2">
-                      <select
+                      <FormCombobox
                         id={p.id}
                         aria-describedby={p["aria-describedby"]}
+                        title={lang === "ar" ? "درجة الجودة" : "Quality grade"}
                         value={form.quality_grade_id}
-                        onChange={(e) => setForm({ ...form, quality_grade_id: e.target.value })}
-                        className={cn(
-                          fieldSurfaceClass,
-                          "h-10 min-w-0 flex-1 px-4 text-sm font-medium",
-                        )}
-                      >
-                        <option value="">
-                          {lang === "ar" ? "اختر درجة الجودة..." : "Select quality grade..."}
-                        </option>
-                        {meta.qualities.map((q) => (
-                          <option key={q.id} value={q.id}>
-                            {lang === "ar" ? q.name_ar : q.name}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={(val) => setForm({ ...form, quality_grade_id: val })}
+                        placeholder={
+                          lang === "ar" ? "اختر درجة الجودة..." : "Select quality grade..."
+                        }
+                        clearLabel={lang === "ar" ? "بدون درجة جودة" : "No quality grade"}
+                        clearable
+                        icon={<Award className="size-4" />}
+                        lang={lang}
+                        options={meta.qualities.map((q) => ({
+                          id: q.id,
+                          label: lang === "ar" ? q.name_ar : q.name,
+                          badge: q.code ?? undefined,
+                        }))}
+                        className="flex-1"
+                      />
                       <IconButton
                         type="button"
                         size="lg"
