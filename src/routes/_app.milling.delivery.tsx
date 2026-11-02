@@ -10,6 +10,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import {
   Truck,
+  UserPlus,
   Plus,
   Trash2,
   PackageCheck,
@@ -53,6 +54,9 @@ import { ProductPicker } from "@/components/products/product-picker";
 import { ProductLinesEditor } from "@/components/products/product-lines-editor";
 import { QuickAddButton } from "@/components/ui/quick-add-button";
 import { QuickProductDialog } from "@/components/milling/quick-product-dialog";
+import { PartyPicker } from "@/components/commerce/party-picker";
+import { CustomerFormDialog } from "@/components/contacts/customer-form-dialog";
+import { useI18n } from "@/lib/i18n";
 import { WarehouseBadge } from "@/components/ui/warehouse-badge";
 
 export const Route = createFileRoute("/_app/milling/delivery")({
@@ -64,6 +68,8 @@ interface CustomerOption {
   id: string;
   name: string;
   phone?: string | null;
+  balance?: number | null;
+  is_system?: boolean | null;
 }
 
 interface WarehouseOption {
@@ -75,7 +81,9 @@ interface WarehouseOption {
 
 function MillingDeliveryPage() {
   const qc = useQueryClient();
+  const { lang } = useI18n();
   const [customerId, setCustomerId] = useState("");
+  const [newCustomerOpen, setNewCustomerOpen] = useState(false);
   const [warehouseId, setWarehouseId] = useState("");
   const [lines, setLines] = useState<CustodyLine[]>([{ itemId: "", bags: 0, kg: 0 }]);
   /** نافذة إضافة صنف جديد — منبثقة فوق الشاشة، لا تُقصّ داخل اللوحة. */
@@ -92,7 +100,7 @@ function MillingDeliveryPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("customers")
-        .select("id, name, phone")
+        .select("id, name, phone, balance, is_system")
         .eq("is_active", true)
         .order("name");
       if (error) throw error;
@@ -338,21 +346,30 @@ function MillingDeliveryPage() {
               {/* العميل والمستودع */}
               <div className="grid gap-3 sm:grid-cols-2">
                 <MillingField label="العميل صاحب الأمانة *">
-                  <MillingSelect
-                    value={customerId}
-                    onChange={(e) => {
-                      setCustomerId(e.target.value);
-                      setLines([{ itemId: "", bags: 0, kg: 0 }]);
-                    }}
-                    className="font-bold text-xs"
-                  >
-                    <option value="">اختر العميل المستلم…</option>
-                    {(customers.data ?? []).map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} {c.phone ? `(${c.phone})` : ""}
-                      </option>
-                    ))}
-                  </MillingSelect>
+                  <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                    <PartyPicker
+                      options={customers.data ?? []}
+                      value={customerId}
+                      onChange={(nextId) => {
+                        setCustomerId(nextId);
+                        setLines([{ itemId: "", bags: 0, kg: 0 }]);
+                      }}
+                      lang={lang}
+                      label={lang === "ar" ? "العميل" : "Customer"}
+                      emptyLabel={lang === "ar" ? "اختر العميل المستلم…" : "Select customer…"}
+                      kind="customer"
+                      className="h-10 min-w-0 flex-1 rounded-2xl border-primary/20 bg-primary/[0.035] text-xs hover:border-primary/50 hover:bg-primary/[0.07]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setNewCustomerOpen(true)}
+                      className="grid size-9 shrink-0 place-items-center rounded-full border border-primary/25 bg-primary/10 text-primary shadow-sm transition hover:border-primary/40 hover:bg-primary/15 active:scale-95 cursor-pointer"
+                      title={lang === "ar" ? "إضافة عميل جديد" : "Add customer"}
+                      aria-label={lang === "ar" ? "إضافة عميل جديد" : "Add customer"}
+                    >
+                      <UserPlus className="h-4 w-4" />
+                    </button>
+                  </div>
                 </MillingField>
 
                 <WarehouseBadge
@@ -587,6 +604,19 @@ function MillingDeliveryPage() {
             } else {
               setLines((current) => [...current, { itemId: productId, bags: 0, kg: 0 }]);
             }
+          }}
+        />
+        {/* نافذة إضافة عميل جديد سريعاً دون مغادرة شاشة التسليم */}
+        <CustomerFormDialog
+          open={newCustomerOpen}
+          onClose={() => setNewCustomerOpen(false)}
+          hint={lang === "ar" ? "سيتم اختيار العميل تلقائياً فور حفظه لتسليم أمانته فوراً." : "Customer will be selected automatically."}
+          onSaved={(newCust) => {
+            void qc.invalidateQueries({ queryKey: ["milling", "customers"] });
+            setCustomerId(newCust.id);
+            setLines([{ itemId: "", bags: 0, kg: 0 }]);
+            setNewCustomerOpen(false);
+            toast.success(lang === "ar" ? `تمت إضافة واختيار العميل: ${newCust.name}` : `Customer selected: ${newCust.name}`);
           }}
         />
       </div>

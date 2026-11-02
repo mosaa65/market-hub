@@ -40,6 +40,7 @@ import {
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { ModuleGuard } from "@/lib/modules";
+import { PartyPicker, type PartyOption } from "@/components/commerce/party-picker";
 import {
   TableToolbar,
   type FilterDefinition,
@@ -174,7 +175,7 @@ export function CustomerCustodyPageBase({ mode }: { mode: CustodyMode }) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("customers")
-        .select("id, name, phone")
+        .select("id, name, phone, balance, is_system")
         .eq("is_active", true)
         .order("name");
       if (error) throw error;
@@ -1092,7 +1093,7 @@ function QuickMillingModal({
   initialRow: CustodyStatementRow | null;
   outputItems: ProductOption[];
   grainItems: ProductOption[];
-  customers: { id: string; name: string; phone?: string | null }[];
+  customers: PartyOption[];
   warehouses: { id: string; name: string; name_ar: string | null }[];
   onSuccess: (doc?: UnifiedDocumentData) => void;
 }) {
@@ -1344,19 +1345,22 @@ function QuickMillingModal({
           {/* معلومات العميل والمستودع والصنف */}
           <div className="grid gap-3 sm:grid-cols-3">
             <MillingField label="العميل *">
-              <MillingSelect
-                value={customerId}
-                onChange={(e) => setCustomerId(e.target.value)}
-                disabled={Boolean(initialRow)}
-                className="font-semibold text-xs"
-              >
-                <option value="">اختر العميل…</option>
-                {customers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </MillingSelect>
+              {initialRow ? (
+                <div className="flex h-10 items-center rounded-2xl border border-border/70 bg-muted/50 px-3 text-xs font-semibold text-foreground">
+                  {customers.find((c) => c.id === customerId)?.name || initialRow.customer_name_ar || "—"}
+                </div>
+              ) : (
+                <PartyPicker
+                  options={customers}
+                  value={customerId}
+                  onChange={setCustomerId}
+                  lang="ar"
+                  label="العميل"
+                  emptyLabel="اختر العميل…"
+                  kind="customer"
+                  className="h-10 min-w-0 flex-1 rounded-2xl border-primary/20 bg-primary/[0.035] text-xs hover:border-primary/50 hover:bg-primary/[0.07]"
+                />
+              )}
             </MillingField>
 
             <MillingField label="المستودع *">
@@ -1623,7 +1627,7 @@ function QuickDeliveryModal({
   open: boolean;
   onClose: () => void;
   initialRow: CustodyStatementRow | null;
-  customers: { id: string; name: string }[];
+  customers: PartyOption[];
   warehouses: { id: string; name: string; name_ar: string | null }[];
   onSuccess: (doc?: UnifiedDocumentData) => void;
 }) {
@@ -1738,19 +1742,22 @@ function QuickDeliveryModal({
         <div className="space-y-4 p-5">
           <div className="grid gap-3 sm:grid-cols-2">
             <MillingField label="العميل المستلم *">
-              <MillingSelect
-                value={customerId}
-                onChange={(e) => setCustomerId(e.target.value)}
-                disabled={Boolean(initialRow)}
-                className="font-semibold text-xs"
-              >
-                <option value="">اختر العميل…</option>
-                {customers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </MillingSelect>
+              {initialRow ? (
+                <div className="flex h-10 items-center rounded-2xl border border-border/70 bg-muted/50 px-3 text-xs font-semibold text-foreground">
+                  {customers.find((c) => c.id === customerId)?.name || initialRow.customer_name_ar || "—"}
+                </div>
+              ) : (
+                <PartyPicker
+                  options={customers}
+                  value={customerId}
+                  onChange={setCustomerId}
+                  lang="ar"
+                  label="العميل"
+                  emptyLabel="اختر العميل المستلم…"
+                  kind="customer"
+                  className="h-10 min-w-0 flex-1 rounded-2xl border-primary/20 bg-primary/[0.035] text-xs hover:border-primary/50 hover:bg-primary/[0.07]"
+                />
+              )}
             </MillingField>
 
             <MillingField label="المستودع *">

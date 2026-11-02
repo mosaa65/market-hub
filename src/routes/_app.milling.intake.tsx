@@ -41,6 +41,8 @@ import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { ModuleGuard } from "@/lib/modules";
 import { CustomerFormDialog } from "@/components/contacts/customer-form-dialog";
+import { PartyPicker } from "@/components/commerce/party-picker";
+import { useI18n } from "@/lib/i18n";
 import { LuxuryPrintPreviewModal } from "@/components/luxury-print-preview-modal";
 import { UnifiedPrintModal } from "@/components/milling/unified-print-modal";
 import { DocumentShareDialog } from "@/components/communication/document-share-dialog";
@@ -107,6 +109,7 @@ interface CustomerOption {
   name: string;
   phone?: string | null;
   balance?: number | null;
+  is_system?: boolean | null;
 }
 
 interface WarehouseOption {
@@ -123,6 +126,7 @@ function MillingIntakePage() {
 
   const currencySymbol = useMemo(() => getCompanyCurrencySymbol(), []);
   const formScopeRef = useFormNavigationScope<HTMLDivElement>();
+  const { lang } = useI18n();
 
   // الحقول الأساسية — تبدأ فارغة لتفادي إزعاج الـ 0
   const [customerId, setCustomerId] = useState("");
@@ -173,7 +177,7 @@ function MillingIntakePage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("customers")
-        .select("id, name, phone, balance")
+        .select("id, name, phone, balance, is_system")
         .eq("is_active", true)
         .order("name");
       if (error) throw error;
@@ -535,24 +539,26 @@ function MillingIntakePage() {
               {/* العميل يُختار بحثًا، والمستودع شارة ثابتة لا حقل يزاحمه */}
               <div className="space-y-2">
                 <MillingField label="صاحب الأمانة / العميل *">
-                  <div className="flex items-center gap-1.5">
-                    <MillingSelect
+                  <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                    <PartyPicker
+                      options={customers.data ?? []}
                       value={customerId}
-                      onChange={(e) => setCustomerId(e.target.value)}
-                      className="min-w-0 flex-1 font-medium"
-                    >
-                      <option value="">اختر العميل…</option>
-                      {(customers.data ?? []).map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name} {c.phone ? `(${c.phone})` : ""}
-                        </option>
-                      ))}
-                    </MillingSelect>
-                    <QuickAddButton
-                      label="إضافة عميل جديد"
-                      icon={UserPlus}
-                      onClick={() => setQuickCustomerOpen(true)}
+                      onChange={setCustomerId}
+                      lang={lang}
+                      label={lang === "ar" ? "العميل" : "Customer"}
+                      emptyLabel={lang === "ar" ? "اختر العميل…" : "Select customer…"}
+                      kind="customer"
+                      className="h-10 min-w-0 flex-1 rounded-2xl border-primary/20 bg-primary/[0.035] text-xs hover:border-primary/50 hover:bg-primary/[0.07]"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setQuickCustomerOpen(true)}
+                      className="grid size-9 shrink-0 place-items-center rounded-full border border-primary/25 bg-primary/10 text-primary shadow-sm transition hover:border-primary/40 hover:bg-primary/15 active:scale-95 cursor-pointer"
+                      title={lang === "ar" ? "إضافة عميل جديد" : "Add customer"}
+                      aria-label={lang === "ar" ? "إضافة عميل جديد" : "Add customer"}
+                    >
+                      <UserPlus className="h-4 w-4" />
+                    </button>
                   </div>
                 </MillingField>
 
