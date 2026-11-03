@@ -792,7 +792,12 @@ export function StatementPage() {
         </div>
 
         {result?.integrity.hasGap && (
-          <StatementIntegrityBadge integrity={result.integrity} variant="panel" />
+          <StatementIntegrityBadge
+            integrity={result.integrity}
+            variant="panel"
+            customerId={partyType === "customer" ? partyId : undefined}
+            onReconciled={() => void refetch()}
+          />
         )}
         {from && to && from > to && (
           <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 px-3.5 py-2 text-[11px] text-amber-700">

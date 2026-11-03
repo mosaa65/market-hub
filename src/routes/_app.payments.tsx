@@ -273,7 +273,9 @@ function PaymentsPage() {
         t("payments.invalid_amount") || (lang === "ar" ? "أدخل مبلغ صحيح" : "Enter a valid amount"),
       );
     }
-    const payableAmount = selectedInvoice ? remaining : Math.max(Number(selected.balance), 0);
+    // لا نُقصّ الرصيد عند الصفر هنا: رصيد دائن (دفعة مقدمة/مرتجع) حقيقي يجب أن
+    // يظهر كما هو، والقرار المالي يُترك للخادم الذي يقرأ دفتر العميل.
+    const payableAmount = selectedInvoice ? remaining : Number(selected.balance);
     if (amt > payableAmount + 0.001) {
       savingRef.current = false;
       setSaving(false);
@@ -365,7 +367,7 @@ function PaymentsPage() {
         );
       }
       const updatedCustomer = await refresh(selected.id);
-      const updatedBalance = Math.max(Number(updatedCustomer?.balance ?? selected.balance), 0);
+      const updatedBalance = Number(updatedCustomer?.balance ?? selected.balance);
       const receiptNumber = resultPaymentId;
       const resolvedMethodLabel = settlement.bankAccountName
         ? `${pmLabel(method)} (${settlement.bankAccountName})`
