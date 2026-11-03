@@ -48,7 +48,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { money } from "@/lib/format";
-import { PaymentSplitCatalogDialog, type PaymentSplitTender } from "@/components/ui/payment-method/payment-split-catalog-dialog";
+import {
+  PaymentSplitCatalogDialog,
+  type PaymentSplitTender,
+} from "@/components/ui/payment-method/payment-split-catalog-dialog";
 import { useI18n } from "@/lib/i18n";
 import { getPaymentMethodDefinition, type PaymentContext } from "@/lib/payments/payment-methods";
 import {
@@ -209,9 +212,7 @@ export interface PaymentPanelProps {
   reference?: string;
   onReferenceChange?: (value: string) => void;
   /** Enable the shared multi-tender flow only when the caller can persist its rows. */
-  onSplitChange?: (
-    splits: PaymentSplitTender[],
-  ) => void;
+  onSplitChange?: (splits: PaymentSplitTender[]) => void;
   /** Hide the method picker when a screen already renders the shared settlement selector. */
   showMethodPicker?: boolean;
 }
@@ -244,8 +245,13 @@ export function PaymentPanel(props: PaymentPanelProps) {
   const { t, lang } = useI18n();
   const isRtl = lang === "ar";
   const [splitOpen, setSplitOpen] = useState(false);
-  const [splitLines, setSplitLines] = useState<import("@/components/payments/split-payment-editor").SplitPaymentEditorLine[]>([]);
-  const splitAllocated = splitLines.reduce((sum, line) => sum + Math.max(0, Number(line.amount) || 0), 0);
+  const [splitLines, setSplitLines] = useState<
+    import("@/components/payments/split-payment-editor").SplitPaymentEditorLine[]
+  >([]);
+  const splitAllocated = splitLines.reduce(
+    (sum, line) => sum + Math.max(0, Number(line.amount) || 0),
+    0,
+  );
 
   const result = usePaymentPanel({
     total,
@@ -269,28 +275,28 @@ export function PaymentPanel(props: PaymentPanelProps) {
               </label>
             )}
             {showShortcuts && (
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                disabled={disabled}
-                onClick={() => onPaidChange(String(result.total))}
-                className="rounded-lg bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-emerald-700 hover:bg-emerald-500/20 disabled:opacity-50 dark:text-emerald-300"
-              >
-                {t("common.pay_full")}
-              </button>
-              <button
-                type="button"
-                disabled={disabled}
-                onClick={() => {
-                  setSplitLines([]);
-                  onMethodChange("credit");
-                  onPaidChange("0");
-                }}
-                className="rounded-lg bg-violet-500/10 px-2 py-0.5 text-[11px] font-bold text-violet-700 hover:bg-violet-500/20 disabled:opacity-50 dark:text-violet-300"
-              >
-                {t("common.pay_credit")}
-              </button>
-            </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => onPaidChange(String(result.total))}
+                  className="rounded-lg bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-emerald-700 hover:bg-emerald-500/20 disabled:opacity-50 dark:text-emerald-300"
+                >
+                  {t("common.pay_full")}
+                </button>
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => {
+                    setSplitLines([]);
+                    onMethodChange("credit");
+                    onPaidChange("0");
+                  }}
+                  className="rounded-lg bg-violet-500/10 px-2 py-0.5 text-[11px] font-bold text-violet-700 hover:bg-violet-500/20 disabled:opacity-50 dark:text-violet-300"
+                >
+                  {t("common.pay_credit")}
+                </button>
+              </div>
             )}
           </div>
         )}
@@ -443,12 +449,14 @@ export function PaymentPanel(props: PaymentPanelProps) {
           context={context}
           initialLines={splitLines}
           onConfirm={(splits) => {
-            setSplitLines(splits.map((line, index) => ({
-              key: `${line.payment_method_id}-${index}`,
-              methodId: line.payment_method_id,
-              amount: String(line.amount),
-              reference: line.reference,
-            })));
+            setSplitLines(
+              splits.map((line, index) => ({
+                key: `${line.payment_method_id}-${index}`,
+                methodId: line.payment_method_id,
+                amount: String(line.amount),
+                reference: line.reference,
+              })),
+            );
             onMethodChange(splits.length > 1 ? "split" : (splits[0]?.method ?? "credit"));
             onPaidChange(String(splits.reduce((sum, line) => sum + line.amount, 0)));
             onSplitChange(splits);

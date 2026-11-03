@@ -1394,7 +1394,7 @@ function POSPage() {
             l === existing
               ? {
                   ...l,
-                  quantity: Number((l.quantity + (existing.quantity_increment ?? 1)).toFixed(4)),
+                  quantity: l.quantity + 1,
                 }
               : l,
           );
@@ -1434,7 +1434,7 @@ function POSPage() {
           l.line_id === existing.line_id
             ? {
                 ...l,
-                quantity: Number((l.quantity + (existing.quantity_increment ?? 1)).toFixed(4)),
+                quantity: l.quantity + 1,
               }
             : l,
         );
@@ -3230,7 +3230,7 @@ function POSPage() {
                           id: uom.unit_id,
                           label: uom.label,
                         })),
-                        quantityStep: l.quantity_increment ?? 1,
+                        quantityStep: Math.max(1, Math.round(l.quantity_increment ?? 1)),
                         priceModified:
                           l.base_price != null &&
                           Math.round(l.base_price * 100) !== Math.round(l.unit_price * 100),
@@ -3290,46 +3290,46 @@ function POSPage() {
                     والحقل نفسه يحمل ملخص التوزيع. لا شريط حالة ولا زر مستقل.
                   */}
                   <DynamicPaymentSelector
-                      context="pos"
-                        value={paymentMethod}
-                        settlement={settlement}
-                        onSettlementChange={(next) => {
-                          setSettlement(next);
-                          //
-                          // حقل المرجع الوحيد في الشاشة يرسمه المنتقي. وكان في
-                          // نقطة البيع حقلًا ثانيًا مستقلًا يكتب `transferRef`،
-                          // فيظهر رقمان مرجعيان لطريقة واحدة. الآن يقرأ `transferRef`
-                          // من نفس حالة التسوية، فيبقى التحقق من الإرسال كما هو
-                          // بلا حقل مكرر.
-                          setTransferRef(next.reference ?? "");
-                        }}
-                        compact
-                        onChange={(method) => {
-                          setIsSplitPayment(false);
-                          setSplitPayments([]);
-                          setPaymentMethod(method);
-                          setSettlement((current) => ({ ...current, method }));
-                          setPaid(method === "credit" ? "0" : "");
-                          setPaidManuallyEdited(false);
-                        }}
-                        disabled={loading}
-                        className="col-span-1 sm:col-span-2"
-                        /*
+                    context="pos"
+                    value={paymentMethod}
+                    settlement={settlement}
+                    onSettlementChange={(next) => {
+                      setSettlement(next);
+                      //
+                      // حقل المرجع الوحيد في الشاشة يرسمه المنتقي. وكان في
+                      // نقطة البيع حقلًا ثانيًا مستقلًا يكتب `transferRef`،
+                      // فيظهر رقمان مرجعيان لطريقة واحدة. الآن يقرأ `transferRef`
+                      // من نفس حالة التسوية، فيبقى التحقق من الإرسال كما هو
+                      // بلا حقل مكرر.
+                      setTransferRef(next.reference ?? "");
+                    }}
+                    compact
+                    onChange={(method) => {
+                      setIsSplitPayment(false);
+                      setSplitPayments([]);
+                      setPaymentMethod(method);
+                      setSettlement((current) => ({ ...current, method }));
+                      setPaid(method === "credit" ? "0" : "");
+                      setPaidManuallyEdited(false);
+                    }}
+                    disabled={loading}
+                    className="col-span-1 sm:col-span-2"
+                    /*
                           «توزيع الدفع» خيار داخل القائمة، لا زرًّا مستقلًا أسفل الحقل.
                           في وضع التوزيع تُبقى القائمة متاحة («رجوع»)، فلا حاجة لزر
                           ثالث لإلغاء التوزيع.
                         */
-                        onChooseSplit={() => setSplitEditorOpen(true)}
-                        isSplitMode={isSplitPayment}
-                        splitSummary={
-                          isSplitPayment
-                            ? `${splitPayments.filter((l) => Number(l.amount) > 0).length} ${
-                                lang === "ar" ? "طرق" : "methods"
-                            }`
-                          : undefined
-                      }
-                    />
-                  </div>
+                    onChooseSplit={() => setSplitEditorOpen(true)}
+                    isSplitMode={isSplitPayment}
+                    splitSummary={
+                      isSplitPayment
+                        ? `${splitPayments.filter((l) => Number(l.amount) > 0).length} ${
+                            lang === "ar" ? "طرق" : "methods"
+                          }`
+                        : undefined
+                    }
+                  />
+                </div>
                 {isSplitPayment ? (
                   <div className="flex min-w-0 flex-col gap-1">
                     <span className="truncate text-[10px] font-semibold leading-none text-muted-foreground">
@@ -3361,29 +3361,7 @@ function POSPage() {
                     className="h-8 min-w-0 rounded-lg border border-border bg-background px-2 text-[10px] font-semibold outline-none focus:border-primary sm:px-2.5 sm:text-[11px]"
                   />
                 )}
-                <AmountInput
-                  label={t("pos.discount")}
-                  showLabel
-                  dir={lang === "ar" ? "rtl" : "ltr"}
-                  value={discount}
-                  onValueChange={setDiscount}
-                  data-form-nav
-                  placeholder={lang === "ar" ? "الخصم" : "Discount"}
-                  className="h-8 min-w-0 rounded-lg border border-border bg-background px-2 text-[10px] font-semibold outline-none focus:border-primary sm:px-2.5 sm:text-[11px]"
-                />
               </div>
-
-              {/* Split Payment Details */}
-              {isSplitPayment ? (
-                <div className="flex items-center justify-between gap-2 rounded-lg bg-primary/[0.04] px-2 py-1 text-[10px]">
-                  <span className="text-muted-foreground">
-                    {lang === "ar"
-                      ? `دفع متعدد · ${splitRows.length} طرق`
-                      : `Split payment · ${splitRows.length} methods`}
-                  </span>
-                  <span className="font-mono font-semibold">{money(splitPaidTotal)}</span>
-                </div>
-              ) : null}
 
               {/* Notes stay beside the payment controls, not below the totals. */}
               <input
@@ -3406,6 +3384,28 @@ function POSPage() {
                   ...(discountN > 0
                     ? [{ label: t("pos.discount"), value: `−${money(discountN)}` }]
                     : []),
+                  {
+                    label: t("pos.discount"),
+                    /*
+                      حقل الخصم يعيش في صف الملخص.
+
+                      كان حقلًا ثالثًا في شريط التحكم بجانب الطريقة والمدفوع،
+                      فيضيق كل واحد منها إلى عرض غير مقروء. وفي الملخص يُكتب
+                      بجانب أثره مباشرةً — والصف نفسه يعرض الناتج بعده.
+                    */
+                    value: (
+                      <AmountInput
+                        label={t("pos.discount")}
+                        dir={lang === "ar" ? "rtl" : "ltr"}
+                        value={discount}
+                        onValueChange={setDiscount}
+                        data-form-nav
+                        placeholder="0"
+                        className="h-6 w-20 rounded-md border border-border bg-background px-1.5 text-end text-[11px] font-semibold outline-none focus:border-primary"
+                      />
+                    ),
+                    className: "bg-muted/30",
+                  },
                   {
                     label: lang === "ar" ? "المبلغ المدفوع" : "Amount paid",
                     value: money(effectivePaid),

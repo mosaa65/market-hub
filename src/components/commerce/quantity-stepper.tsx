@@ -19,28 +19,30 @@ export interface QuantityStepperProps {
  * تقريب الأرقام العشرية لمنع تشوهات الفاصلة العائمة (floating point epsilon)
  * مثل 1.0000000000000002 أو 1.001 عند الزيادة/النقصان.
  */
-function roundToStep(val: number, step: number): number {
-  const safeStep = Number.isFinite(step) && step > 0 ? step : 1;
-  const stepStr = String(safeStep);
-  const decimals = stepStr.includes(".") ? Math.min(stepStr.split(".")[1].length, 4) : 0;
-  // تقريب المضاعف لأقرب خطوة
-  const rounded = Math.round(val / safeStep) * safeStep;
-  return Number(rounded.toFixed(decimals));
+/**
+ * تقريب وحساب خطوات الزيادة والنقصان بأعداد صحيحة (Integers).
+ */
+export function cleanAdd(val: number, step: number): number {
+  const safeStep = Number.isFinite(step) && step >= 1 ? Math.round(step) : 1;
+  // الزيادة بأعداد صحيحة دائماً
+  if (Math.abs(val - Math.round(val)) < 1e-4) {
+    return Math.round(val) + safeStep;
+  }
+  return Math.floor(val) + safeStep;
 }
 
-function cleanAdd(val: number, step: number): number {
-  const safeStep = Number.isFinite(step) && step > 0 ? step : 1;
-  const stepStr = String(safeStep);
-  const decimals = stepStr.includes(".") ? Math.min(stepStr.split(".")[1].length, 4) : 0;
-  return Number((val + safeStep).toFixed(decimals));
-}
+export function cleanSub(val: number, step: number, min: number): number {
+  const safeStep = Number.isFinite(step) && step >= 1 ? Math.round(step) : 1;
+  const safeMin = Number.isFinite(min) && min >= 1 ? Math.round(min) : 1;
+  // إذا كانت الكمية الحالية 1 أو أقل، فالنقصان يوصل لـ 0 لحذف الصنف من السلة
+  if (val <= safeMin || val <= 1) return 0;
 
-function cleanSub(val: number, step: number, min: number): number {
-  const safeStep = Number.isFinite(step) && step > 0 ? step : 1;
-  const stepStr = String(safeStep);
-  const decimals = stepStr.includes(".") ? Math.min(stepStr.split(".")[1].length, 4) : 0;
-  const res = Number((val - safeStep).toFixed(decimals));
-  return val <= min ? 0 : Math.max(min, res);
+  if (Math.abs(val - Math.round(val)) < 1e-4) {
+    const next = Math.round(val) - safeStep;
+    return next <= 0 ? 0 : next;
+  }
+  const next = Math.ceil(val) - safeStep;
+  return next <= 0 ? 0 : next;
 }
 
 export function QuantityStepper({
@@ -55,6 +57,9 @@ export function QuantityStepper({
   className,
   size = "sm",
 }: QuantityStepperProps) {
+  const effectiveStep = Math.max(1, Math.round(Number.isFinite(step) && (step ?? 1) >= 1 ? (step ?? 1) : 1));
+  const effectiveMin = Math.max(1, Math.round(Number.isFinite(min) && (min ?? 1) >= 1 ? (min ?? 1) : 1));
+
   const [text, setText] = useState(() => String(value));
   const editing = useRef(false);
 
@@ -81,8 +86,7 @@ export function QuantityStepper({
       setText("0");
       return;
     }
-    let next = roundToStep(parsed, step);
-    if (next < min) next = min;
+    let next = parsed;
     if (ceiling != null && Number.isFinite(ceiling) && next > ceiling) next = ceiling;
     onCommit(next);
     setText(String(next));
@@ -104,7 +108,7 @@ export function QuantityStepper({
       <button
         type="button"
         disabled={disabled}
-        onClick={() => onCommit(cleanSub(value, step, min))}
+        onClick={() => onCommit(cleanSub(value, effectiveStep, effectiveMin))}
         aria-label="decrease"
         className={cn(
           btnClass,
@@ -147,7 +151,7 @@ export function QuantityStepper({
         type="button"
         disabled={disabled}
         onClick={() => {
-          const next = cleanAdd(value, step);
+          const next = cleanAdd(value, effectiveStep);
           if (!unbounded && ceiling != null && next > ceiling) return;
           onCommit(next);
         }}

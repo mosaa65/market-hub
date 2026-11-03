@@ -2068,7 +2068,7 @@ function PurchasePOSPage() {
                           id: uom.unit_id,
                           label: uom.label,
                         })),
-                        quantityStep: line.quantity_increment,
+                        quantityStep: Math.max(1, Math.round(line.quantity_increment ?? 1)),
                         unboundedQuantity: true,
                       }}
                       labels={{

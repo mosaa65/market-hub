@@ -140,8 +140,8 @@ export function CartLine({
             value={line.quantity}
             onCommit={onQuantityCommit}
             max={line.stock}
-            min={line.quantityStep ?? 1}
-            step={line.quantityStep ?? 1}
+            min={1}
+            step={Math.max(1, Math.round(line.quantityStep ?? 1))}
             unbounded={line.isService || line.unboundedQuantity}
             ariaLabel={labels.quantity}
           />

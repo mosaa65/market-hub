@@ -820,14 +820,20 @@ function MillingIntakePage() {
 
                   {/* سعر الخدمة حسب وحدة صنف الخدمة (كيس أو كجم) */}
                   <div className="grid gap-2.5 sm:grid-cols-2">
-                    <MillingField label={`أجر الطحن لكل ${billingUnitLabel}`} hint={`سعر الخدمة لكل ${billingUnitLabel}`}>
+                    <MillingField
+                      label={`أجر الطحن لكل ${billingUnitLabel}`}
+                      hint={`سعر الخدمة لكل ${billingUnitLabel}`}
+                    >
                       <AmountInput
                         min={0}
                         showInWords={false}
                         placeholder="1000"
                         aria-label={`أجر الطحن لكل ${billingUnitLabel}`}
                         value={feePerUnit === "" ? null : Number(feePerUnit)}
-                        onValueChange={(v) => { setFeePerUnit(v == null ? "" : String(v)); setServicePrice(""); }}
+                        onValueChange={(v) => {
+                          setFeePerUnit(v == null ? "" : String(v));
+                          setServicePrice("");
+                        }}
                         className="font-bold"
                       />
                     </MillingField>
@@ -852,7 +858,8 @@ function MillingIntakePage() {
                   </div>
                   {Number(serviceItem.data?.sale_price) <= 0 && !feePerUnit ? (
                     <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">
-                      لم يُحدد سعر بيع للخدمة؛ أدخل الأجرة لكل {billingUnitLabel} قبل إصدار الفاتورة.
+                      لم يُحدد سعر بيع للخدمة؛ أدخل الأجرة لكل {billingUnitLabel} قبل إصدار
+                      الفاتورة.
                     </p>
                   ) : null}
 
@@ -861,7 +868,9 @@ function MillingIntakePage() {
                     <div className="flex items-center justify-between rounded-xl bg-background/90 px-3 py-2 text-xs font-semibold text-foreground border border-border/70">
                       <span className="text-muted-foreground">حسبة الخدمة:</span>
                       <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-foreground">{fmtNum(billedQuantity)} {billingUnitLabel}</span>
+                        <span className="font-bold text-foreground">
+                          {fmtNum(billedQuantity)} {billingUnitLabel}
+                        </span>
                         <span>×</span>
                         <span className="font-bold">{fmtNum(Number(feePerUnit))}</span>
                         <span>=</span>
@@ -872,10 +881,14 @@ function MillingIntakePage() {
                     </div>
                   )}
                   <p className="text-[11px] leading-5 text-muted-foreground">
-                    التكلفة المرجعية للصنف: {Number(serviceItem.data?.cost_price) > 0
+                    التكلفة المرجعية للصنف:{" "}
+                    {Number(serviceItem.data?.cost_price) > 0
                       ? `${fmtNum(Number(serviceItem.data?.cost_price))} ${currencySymbol} / ${billingUnitLabel}`
-                      : "غير محددة"}. التكلفة الفعلية تُحسب من المصروفات المرحلة على مركز خدمة الطحن.
-                    {!serviceUnit.recognized ? " تحقق من أن وحدة صنف الخدمة الأساسية هي كيس أو كجم حتى تتطابق التكلفة المرجعية مع وحدة الفوترة." : ""}
+                      : "غير محددة"}
+                    . التكلفة الفعلية تُحسب من المصروفات المرحلة على مركز خدمة الطحن.
+                    {!serviceUnit.recognized
+                      ? " تحقق من أن وحدة صنف الخدمة الأساسية هي كيس أو كجم حتى تتطابق التكلفة المرجعية مع وحدة الفوترة."
+                      : ""}
                   </p>
                 </div>
 

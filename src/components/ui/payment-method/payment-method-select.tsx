@@ -120,8 +120,33 @@ export function PaymentMethodSelect({
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
   const [activeIndex, setActiveIndex] = React.useState(0);
+  /**
+   * اتجاه فتح القائمة.
+   *
+   * كان `top-[calc(100%+4px)]` ثابتًا، فتُفتح دائمًا للأسفل. وفي شريط الدفع
+   * السفلي (نقطة البيع والاستلام) لا مساحة تحت الحقل: القائمة تُدفن خلف زر
+   * الفوتر وأزرار الطباعة، فلا تُرى الطرق ولا تُختار.
+   *
+   * الحساب يتم عند الفتح، لا عند الرسم: المساحة تتغيّر مع لوحة المفاتيح
+   * وتمرير الشاشة. إن كان أسفل الحقل أقل من مساحة تكفي القائمة، تُفتح للأعلى.
+   */
+  const [placement, setPlacement] = React.useState<"bottom" | "top">("bottom");
+  const triggerRef = React.useRef<HTMLButtonElement | null>(null);
   const rootRef = React.useRef<HTMLDivElement | null>(null);
   const searchRef = React.useRef<HTMLInputElement | null>(null);
+
+  /** أقل مساحة مقبولة للفتح للأسفل — مقاس القائمة نفسه تقريبًا. */
+  const MIN_SPACE = 240;
+
+  const measurePlacement = React.useCallback(() => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    const below = window.innerHeight - rect.bottom;
+    // الفتح للأعلى يتجاوَز أيضًا الفوتر الثابت في هذه الشاشات.
+    const above = rect.top;
+    setPlacement(below < MIN_SPACE && above > below ? "top" : "bottom");
+  }, []);
 
   /** طرق هذا القسم، مع ضمان بقاء أي طريقة محفوظة على المستند. */
   const options = React.useMemo(() => {
@@ -316,7 +341,16 @@ export function PaymentMethodSelect({
     if (!open) return;
     const index = filtered.findIndex((m) => m.id === selected?.id);
     setActiveIndex(index >= 0 ? index : 0);
+    measurePlacement();
     if (showSearch) requestAnimationFrame(() => searchRef.current?.focus());
+    // إعادة القياس عند تغيّر المساحة أثناء الفتح (لوحة المفاتيح، تمرير…).
+    const onResize = () => measurePlacement();
+    window.addEventListener("resize", onResize);
+    window.addEventListener("scroll", onResize, true);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("scroll", onResize, true);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -373,6 +407,7 @@ export function PaymentMethodSelect({
       {/* ── الحقل الظاهر: سطر واحد ── */}
       <button
         id={id}
+        ref={triggerRef}
         type="button"
         data-pm-trigger
         data-form-nav
@@ -434,7 +469,14 @@ export function PaymentMethodSelect({
 
       {/* ── القائمة ── */}
       {open && (
-        <div className="absolute inset-x-0 top-[calc(100%+4px)] z-50 overflow-hidden rounded-xl border border-border/80 bg-popover shadow-2xl">
+        <div
+          className={cn(
+            "absolute inset-x-0 z-50 overflow-hidden rounded-xl border border-border/80 bg-popover shadow-2xl",
+            placement === "bottom"
+              ? "top-[calc(100%+4px)] animate-in fade-in-0 slide-in-from-top-1"
+              : "bottom-[calc(100%+4px)] animate-in fade-in-0 slide-in-from-bottom-1",
+          )}
+        >
           {showSearch && (
             <div className="flex items-center gap-2 border-b border-border/60 px-2.5 py-2">
               <Search className="size-3.5 shrink-0 text-muted-foreground" />
@@ -456,7 +498,7 @@ export function PaymentMethodSelect({
             role="listbox"
             aria-label={t("methodLabel")}
             onKeyDown={onListKeyDown}
-            className="max-h-64 overflow-y-auto p-1 custom-scrollbar"
+            className="max-h-[min(16rem,45vh)] overflow-y-auto p-1 custom-scrollbar"
           >
             {filtered.length === 0 ? (
               <p className="px-3 py-4 text-center text-[11px] text-muted-foreground">

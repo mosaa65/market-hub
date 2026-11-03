@@ -260,11 +260,39 @@ export function ProductPicker<T extends ProductPickerItem = ProductPickerItem>({
   const SelectedTone = selected ? productClassTone(selected.item_class) : null;
   const SelectedIcon = SelectedTone?.icon;
 
+  /*
+   * اتجاه فتح القائمة — نفس منطق منتقي الدفع.
+   *
+   * أسطر الأصناف تُضاف في أسفل الشاشات المزدحمة (الاستلام، التسليم، نقاط
+   * البيع)، فالقائمة التي تُفتح للأسفل تُدفن تحت الفوتر. نقيس المساحة عند
+   * الفتح ونقلب الاتجاه إن ضاق الأسفل.
+   */
+  const [placement, setPlacement] = React.useState<"bottom" | "top">("bottom");
+  const triggerRef = React.useRef<HTMLButtonElement | null>(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const measure = () => {
+      const rect = triggerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const below = window.innerHeight - rect.bottom;
+      setPlacement(below < 260 && rect.top > below ? "top" : "bottom");
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    window.addEventListener("scroll", measure, true);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
+    };
+  }, [open]);
+
   return (
     <div ref={rootRef} className={cn("relative min-w-0", className)}>
       {/* ── الحقل الظاهر ── */}
       <button
         id={id}
+        ref={triggerRef}
         type="button"
         data-form-nav
         aria-haspopup="listbox"
@@ -314,7 +342,12 @@ export function ProductPicker<T extends ProductPickerItem = ProductPickerItem>({
 
       {/* ── القائمة ── */}
       {open && (
-        <div className="absolute inset-x-0 top-[calc(100%+4px)] z-50 overflow-hidden rounded-xl border border-border/80 bg-popover shadow-2xl">
+        <div
+          className={cn(
+            "absolute inset-x-0 z-50 overflow-hidden rounded-xl border border-border/80 bg-popover shadow-2xl",
+            placement === "bottom" ? "top-[calc(100%+4px)]" : "bottom-[calc(100%+4px)]",
+          )}
+        >
           <div className="flex items-center gap-2 border-b border-border/60 px-2.5 py-2">
             <Search className="size-3.5 shrink-0 text-muted-foreground" />
             <input
