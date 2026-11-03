@@ -46,10 +46,12 @@ chmod 600 deploy/.env.production
 
 - `APP_DOMAIN`: نطاق التطبيق.
 - `SUPABASE_DOMAIN`: نطاق API.
+- `VITE_SUPABASE_TARGET` و`SUPABASE_TARGET`: يجب أن تكونا `docker` لهذا النشر الذاتي عبر Docker. التطبيق يرفض التشغيل إذا غاب الهدف أو لم يطابق عنوان API؛ لا يوجد تحويل تلقائي إلى مشروع سحابي.
 - `VITE_SUPABASE_URL`: `https://` متبوعًا بنطاق API.
 - `VITE_SUPABASE_PUBLISHABLE_KEY`: قيمة `SUPABASE_PUBLISHABLE_KEY` من إعداد Supabase الذاتي.
 - `SUPABASE_URL`: `http://api-gw:8000`، عنوان داخلي بين حاويات Docker.
-- `SUPABASE_SERVICE_ROLE_KEY`: قيمة `SUPABASE_SECRET_KEY` من إعداد Supabase الذاتي. هذا سر خادمي يتجاوز RLS؛ لا تضعه في متغير `VITE_*` ولا تشاركه.
+- `SUPABASE_PUBLISHABLE_KEY`: مفتاح عام يستخدمه الخادم للتحقق من جلسات المستخدم.
+- `SUPABASE_SECRET_KEY`: قيمة السر الخادمي من إعداد Supabase الذاتي. يتجاوز RLS؛ لا تضعه في متغير `VITE_*` ولا تشاركه. يقبل التطبيق `SUPABASE_SERVICE_ROLE_KEY` كاسم قديم للتوافق.
 
 تحقق من الإعداد ثم ابنِ التطبيق وشغّله من جذر المستودع:
 

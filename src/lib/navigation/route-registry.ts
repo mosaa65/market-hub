@@ -1086,7 +1086,7 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
     keywords: ["docker", "supabase", "بنية تحتية", "صيانة", "تشخيص", "git", "infrastructure"],
     category: "admin",
     moduleId: "core",
-    requiredRoles: ["owner"],
+    superadminOnly: true,
     i18nKey: "nav.infrastructure",
   },
   {

@@ -377,10 +377,10 @@ function UsersPage() {
     )
       return;
 
-    const { error } = await supabase
-      .from("profiles")
-      .update({ is_active: active } as any)
-      .eq("id", userId);
+    const { error } = await (supabase as any).rpc("set_profile_active", {
+      p_user_id: userId,
+      p_is_active: active,
+    });
 
     if (error) return toast.error(error.message);
     toast.success(

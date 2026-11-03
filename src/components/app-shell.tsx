@@ -237,7 +237,7 @@ const SidebarContents = memo(function SidebarContents({
       isModuleEnabled,
       isVisibleByMillingMode: (path) => isRouteVisibleByMillingMode(path, millingMode),
       canAccess: (entry) =>
-        canAccessRoute(entry.path.split("?")[0], { roles, isPlatformAdmin, isPlatformSuperadmin }),
+        canAccessRoute(entry.path, { roles, isPlatformAdmin, isPlatformSuperadmin }),
     });
   }, [isModuleEnabled, isPlatformAdmin, isPlatformSuperadmin, roles, millingMode]);
 
@@ -264,17 +264,13 @@ const SidebarContents = memo(function SidebarContents({
   );
   const selectedExplorerModule =
     preferences.mode === "explorer"
-      ? explorerModules.find((group) => group.key === preferences.explorerGroup) ?? null
+      ? (explorerModules.find((group) => group.key === preferences.explorerGroup) ?? null)
       : null;
   const SelectedExplorerModuleIcon = selectedExplorerModule
     ? routeIcon(selectedExplorerModule.entries[0]?.id ?? selectedExplorerModule.key)
     : null;
   const selectedExplorerModuleStyle = selectedExplorerModule
-    ? getSidebarStyle(
-        selectedExplorerModule.styleCategory,
-        selectedExplorerModule.key,
-        preferences,
-      )
+    ? getSidebarStyle(selectedExplorerModule.styleCategory, selectedExplorerModule.key, preferences)
     : null;
 
   useEffect(() => {
@@ -536,9 +532,7 @@ const SidebarContents = memo(function SidebarContents({
                     .map((group) => (
                       <DropdownMenuItem
                         key={group.key}
-                        onSelect={() =>
-                          update({ focusGroup: group.key })
-                        }
+                        onSelect={() => update({ focusGroup: group.key })}
                       >
                         <span className="flex-1">{t(`nav.view.group.${group.key}`)}</span>
                         {preferences.focusGroup === group.key && (
@@ -569,9 +563,7 @@ const SidebarContents = memo(function SidebarContents({
           <div className={cn("space-y-2", collapsed && "flex flex-col items-center")}>
             {!collapsed && (
               <div className="px-1 pb-1">
-                <p className="text-sm font-bold text-foreground">
-                  {t("nav.view.modules_title")}
-                </p>
+                <p className="text-sm font-bold text-foreground">{t("nav.view.modules_title")}</p>
                 <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                   {t("nav.view.modules_description")}
                 </p>

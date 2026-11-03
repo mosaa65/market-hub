@@ -58,7 +58,7 @@ import {
   gitActionFn,
   maintenanceAction,
 } from "@/lib/infra/functions";
-import { dependencyOrder } from "@/lib/infra/services";
+import { containerName, dependencyOrder } from "@/lib/infra/services";
 import type {
   HealthReport,
   DiagnosisReport,
@@ -440,9 +440,7 @@ function ContainersTab({
             <Button
               size="sm"
               variant="outline"
-              onClick={() =>
-                act.mutate({ action: "start", container: "supabase_kong_kwzqvgdyadylwnvjghqn" })
-              }
+              onClick={() => act.mutate({ action: "start", container: containerName("kong") })}
               disabled={act.isPending}
             >
               <Play className="h-3.5 w-3.5" /> تشغيل المجموعة (Supabase start)
@@ -450,9 +448,7 @@ function ContainersTab({
             <Button
               size="sm"
               variant="outline"
-              onClick={() =>
-                act.mutate({ action: "stop", container: "supabase_kong_kwzqvgdyadylwnvjghqn" })
-              }
+              onClick={() => act.mutate({ action: "stop", container: containerName("kong") })}
               disabled={act.isPending}
             >
               <Square className="h-3.5 w-3.5" /> إيقاف الكل (Supabase stop)
@@ -892,12 +888,12 @@ function DatabaseTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
 
       <ConfirmDialog
         open={confirmOpen}
-        title="إعادة بناء قاعدة البيانات المحلية"
-        word="RESET"
-        description="سيتم إيقاف كل حاويات Supabase المحلية وإعادة بنائها من الترحيلات. بيانات قاعدة البيانات المحلية ستُفقد (لن يتأثر المشروع السحابي أبداً)."
+        title="إعادة بناء قاعدة Docker المحلية"
+        word="RESET LOCAL"
+        description="سيعيد الأمر قاعدة Docker المحلية المختارة من ملفات الترحيل ويمسح بياناتها الحالية. الخادم يرفض تنفيذ هذا الإجراء إذا كان الهدف المحدد هو cloud."
         busy={act.isPending}
         onConfirm={() => {
-          act.mutate({ action: "reset", confirm: "RESET LOCAL kwzqvgdyadylwnvjghqn" });
+          act.mutate({ action: "reset", confirm: "RESET LOCAL" });
           setConfirmOpen(false);
         }}
         onCancel={() => setConfirmOpen(false)}
@@ -985,24 +981,17 @@ function SupabaseTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">الارتباط بالسحابة (Cloud)</CardTitle>
+          <CardTitle className="text-base">هدف Supabase المحدد</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
-          {s?.cloud.linked ? (
-            <>
-              <p className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-emerald-500" /> مرتبط بمشروع{" "}
-                <span className="font-mono">{s.cloud.projectRef}</span>
-              </p>
-              <p className="text-xs text-muted-foreground">
-                في وضع السحابة تُعرض المعلومات الرسمية فقط (حالة الارتباط وبيانات المشروع) — لا
-                تُدار الخدمات السحابية من هنا لأنها خارج نطاق Docker المحلي. استخدم تبويب
-                «الترحيلات» للدفع/السحب عبر Supabase CLI.
-              </p>
-            </>
+          {s?.mode === "local" ? (
+            <p className="text-muted-foreground">
+              الهدف Docker المحلي. توقف Docker لا يغيّر الهدف ولا يرسل أوامر إلى مشروع سحابي مرتبط
+              بملف CLI.
+            </p>
           ) : (
             <p className="text-muted-foreground">
-              لا يوجد ربط بمشروع سحابي (supabase/.temp/project-ref غير موجود).
+              الهدف cloud محدد صراحةً. أوامر Docker والترحيلات المحلية معطّلة في هذا الوضع.
             </p>
           )}
         </CardContent>
@@ -1022,7 +1011,7 @@ function MigrationsTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
     refetchInterval: REFRESH_MS * 3,
   });
   const act = useMutation({
-    mutationFn: (p: { action: "list" | "repair" | "diff" | "push" | "pull"; confirm?: string }) =>
+    mutationFn: (p: { action: "list" | "diff" | "apply"; confirm?: string }) =>
       migrationAction({ data: p }),
     onSuccess: (res) => {
       if (res.ok) toast.success("تم — راجع المخرجات في السجل تحت");
@@ -1031,7 +1020,7 @@ function MigrationsTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
     },
   });
   const [out, setOut] = useState("");
-  const run = (p: { action: "list" | "repair" | "diff" | "push" | "pull"; confirm?: string }) =>
+  const run = (p: { action: "list" | "diff" | "apply"; confirm?: string }) =>
     act.mutate(p, { onSuccess: (res) => setOut(res.output) });
   if (q.isLoading) return <LoadingBlock />;
   const m = q.data as MigrationStatusReport | undefined;
@@ -1047,7 +1036,7 @@ function MigrationsTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
               معلقة محلياً: {m?.pending ?? "—"}
             </Badge>
             <Badge variant="outline" className="text-blue-600">
-              مطبقة سحابياً فقط: {m?.appliedRemoteOnly ?? "—"}
+              موجودة في القاعدة المحلية فقط: {m?.appliedDatabaseOnly ?? "—"}
             </Badge>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -1057,18 +1046,15 @@ function MigrationsTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
             <Button size="sm" variant="outline" onClick={() => run({ action: "diff" })}>
               <History className="h-3.5 w-3.5" /> Diff (مقارنة المخطط)
             </Button>
-            <Button size="sm" variant="secondary" onClick={() => run({ action: "pull" })}>
-              <Download className="h-3.5 w-3.5" /> Pull من السحابة
-            </Button>
             <Button
               size="sm"
               variant="destructive"
               onClick={() => {
-                const c = window.prompt("سيطبق الترحيلات على قاعدة السحابة. اكتب PUSH للتأكيد:");
-                if (c) run({ action: "push", confirm: c });
+                const c = window.prompt("سيطبق الترحيلات المعلقة على قاعدة Docker المحلية. اكتب APPLY LOCAL للتأكيد:");
+                if (c) run({ action: "apply", confirm: c });
               }}
             >
-              <Upload className="h-3.5 w-3.5" /> Push إلى السحابة (خطر)
+              <Upload className="h-3.5 w-3.5" /> تطبيق الترحيلات محلياً
             </Button>
           </div>
         </CardContent>
@@ -1183,7 +1169,7 @@ function DiagnosisTab() {
                   else if (i.fix.action === "supabase.start")
                     act.mutate({
                       action: "start",
-                      container: "supabase_kong_kwzqvgdyadylwnvjghqn",
+                      container: containerName("kong"),
                     });
                 }}
                 disabled={act.isPending}

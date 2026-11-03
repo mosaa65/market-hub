@@ -3,30 +3,34 @@
  * يدعم الوضعين تلقائياً: local (Docker) و cloud (ربط رسمي فقط —
  * لا محاولة لإدارة الخدمات السحابية لأنها خارج نطاق Docker المحلي).
  */
-import { readFile, readdir } from "node:fs/promises";
+import { readdir } from "node:fs/promises";
 import path from "node:path";
 import { supabase } from "./tools";
-import { DEFAULT_PROJECT_REF, SERVICES } from "./services";
+import { LOCAL_PROJECT_ID } from "./services";
+import { parseSupabaseTarget } from "@/integrations/supabase/target";
+import { requireDockerInfrastructureTarget } from "./target";
 import type { MigrationInfo, MigrationStatusReport, SupabaseStatusReport } from "./types";
 
 interface LocalStatusJson {
   [key: string]: string;
 }
 
-async function readProjectRef(): Promise<string | null> {
-  try {
-    const ref = await readFile(
-      path.join(process.cwd(), "supabase", ".temp", "project-ref"),
-      "utf8",
-    );
-    return ref.trim() || null;
-  } catch {
-    return null;
-  }
-}
-
 export async function supabaseStatus(): Promise<SupabaseStatusReport> {
-  const projectRef = await readProjectRef();
+  const target = parseSupabaseTarget(process.env.SUPABASE_TARGET);
+  if (target === "cloud") {
+    return {
+      available: true,
+      mode: "cloud",
+      local: { running: false, stoppedServices: [], urls: {}, projectRef: null },
+      cloud: {
+        linked: true,
+        projectRef: process.env.SUPABASE_PROJECT_REF?.trim() || null,
+        projectName: null,
+      },
+    };
+  }
+
+  requireDockerInfrastructureTarget();
   const res = await supabase(["status", "--output", "json"], { timeoutMs: 60_000, maxLines: 500 });
   const text = res.output;
   const jsonStart = text.indexOf("{");
@@ -46,30 +50,31 @@ export async function supabaseStatus(): Promise<SupabaseStatusReport> {
     const m = text.match(/Stopped services:\s*\[([^\]]*)\]/);
     if (m) stoppedServices = m[1].split(/\s+/).filter(Boolean);
   }
-  const linked = Boolean(projectRef);
   return {
     available: true,
-    mode: running ? (linked ? "linked-both" : "local") : linked ? "cloud" : "unknown",
+    mode: "local",
     local: {
       running,
       stoppedServices,
       urls,
-      projectRef: DEFAULT_PROJECT_REF,
+      projectRef: LOCAL_PROJECT_ID,
     },
     cloud: {
-      linked,
-      projectRef,
-      projectName: projectRef ? "market-hub" : null,
+      linked: false,
+      projectRef: null,
+      projectName: null,
     },
   };
 }
 
 /** تشغيل/إيقاف كل الخدمات المحلية — عبر CLI الرسمي. */
 export async function supabaseStart(): Promise<{ ok: boolean; output: string }> {
+  requireDockerInfrastructureTarget();
   const res = await supabase(["start"], { timeoutMs: 600_000, maxLines: 400 });
   return { ok: res.ok, output: res.output };
 }
 export async function supabaseStop(): Promise<{ ok: boolean; output: string }> {
+  requireDockerInfrastructureTarget();
   const res = await supabase(["stop"], { timeoutMs: 300_000, maxLines: 400 });
   return { ok: res.ok, output: res.output };
 }
@@ -79,9 +84,9 @@ export async function supabaseStop(): Promise<{ ok: boolean; output: string }> {
 // ---------------------------------------------------------------------------
 
 function parseMigrationList(output: string): MigrationInfo[] {
-  // إخراج supabase migration list:
+  // إخراج supabase migration list --local:
   // LOCAL          │ REMOTE │ INSERTED ...
-  // 20261012000001 │ 2026...│ ...
+  // LOCAL = ملفات الترحيل، REMOTE = قاعدة Docker المحددة صراحةً بـ --local.
   const lines = output.split(/\r?\n/);
   const result: MigrationInfo[] = [];
   for (const line of lines) {
@@ -99,32 +104,44 @@ function parseMigrationList(output: string): MigrationInfo[] {
           ? "both"
           : /^\d{6,}$/.test(local)
             ? "local"
-            : "remote",
+            : "database",
     });
   }
   return result;
 }
 
 export async function migrationsStatus(): Promise<MigrationStatusReport> {
-  const res = await supabase(["migration", "list"], { timeoutMs: 120_000 });
+  try {
+    requireDockerInfrastructureTarget();
+  } catch (error) {
+    return {
+      available: false,
+      error: error instanceof Error ? error.message : "Docker target is required.",
+      migrations: [],
+      pending: 0,
+      appliedDatabaseOnly: 0,
+      seedFiles: await listSeeds(),
+    };
+  }
+  const res = await supabase(["migration", "list", "--local"], { timeoutMs: 120_000 });
   if (!res.ok) {
     return {
       available: false,
       error: res.output.slice(0, 2000),
       migrations: [],
       pending: 0,
-      appliedRemoteOnly: 0,
+      appliedDatabaseOnly: 0,
       seedFiles: [],
     };
   }
   const migrations = parseMigrationList(res.output);
   const pending = migrations.filter((m) => m.location === "local").length;
-  const appliedRemoteOnly = migrations.filter((m) => m.location === "remote").length;
+  const appliedDatabaseOnly = migrations.filter((m) => m.location === "database").length;
   return {
     available: true,
     migrations,
     pending,
-    appliedRemoteOnly,
+    appliedDatabaseOnly,
     seedFiles: await listSeeds(),
   };
 }

@@ -19,7 +19,21 @@ import {
   Laptop,
   Layers,
   Type,
+  Bell,
+  Volume2,
+  VolumeX,
+  AlertTriangle,
+  AlertOctagon,
+  Info,
 } from "lucide-react";
+import { toast } from "sonner";
+import {
+  isToastSoundEnabled,
+  setToastSoundEnabled,
+  getStoredToastPosition,
+  setStoredToastPosition,
+  type ToastPositionType,
+} from "@/lib/toast-sound";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useI18n } from "@/lib/i18n";
 import { useTheme } from "@/lib/theme";
@@ -61,12 +75,16 @@ export function AppearanceSection({ canEdit = true }: AppearanceSectionProps) {
   const [hexInput, setHexInput] = useState(customColor);
   const [colorNameInput, setColorNameInput] = useState("");
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+  const [soundEnabled, setSoundEnabledState] = useState<boolean>(() => isToastSoundEnabled());
+  const [toastPosition, setToastPositionState] = useState<ToastPositionType>(() =>
+    getStoredToastPosition(),
+  );
   // كل تغيير في المظهر/اللغة/اللون/الخط يُحفظ فوراً في مخزن التفضيلات —
   // الشارة تُعلم المستخدم بذلك دون زر حفظ.
   const [savePulse, setSavePulse] = useState(0);
   useEffect(() => {
     setSavePulse((n) => n + 1);
-  }, [theme, lang, accentTheme, customColor, fontTheme]);
+  }, [theme, lang, accentTheme, customColor, fontTheme, soundEnabled, toastPosition]);
 
   const handleHexChange = (value: string) => {
     let clean = value.trim();
@@ -882,6 +900,200 @@ export function AppearanceSection({ canEdit = true }: AppearanceSectionProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* 2.5 نظام التنبيهات والإشعارات التفاعلية والموضع الذكي */}
+      <Card className="rounded-3xl border-border/80 shadow-xs overflow-hidden">
+        <CardHeader className="border-b border-border/50 pb-4 bg-surface/40">
+          <CardTitle className="text-base font-bold flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                <Bell className="h-5 w-5" />
+              </div>
+              <div>
+                <div>
+                  {isAr
+                    ? "نظام التنبيهات والإشعارات التفاعلية"
+                    : "Interactive Notification & Alert System"}
+                </div>
+                <div className="text-xs text-muted-foreground font-normal mt-0.5">
+                  {isAr
+                    ? "التحكم في النغمات الصوتية، موضع الظهور (علوي لمنع حجب الشاشات)، وتجربة كافة حالات الإشعارات"
+                    : "Control chime sounds, screen placement, and preview all toast variants"}
+                </div>
+              </div>
+            </div>
+            <span className="text-xs px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary font-bold">
+              {isAr ? "نظام موحد" : "Unified Engine"}
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-5 space-y-5">
+          {/* إعدادات الصوت وموضع الظهور */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* خيار النغمات الصوتية */}
+            <div className="rounded-2xl border border-border/70 bg-surface/60 p-4 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`p-2.5 rounded-xl border transition-colors ${
+                    soundEnabled
+                      ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500"
+                      : "bg-muted/40 border-border text-muted-foreground"
+                  }`}
+                >
+                  {soundEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-foreground">
+                    {isAr ? "نغمات الإشعارات التفاعلية" : "Interactive Audio Chimes"}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">
+                    {isAr
+                      ? "أصوات نقية فورية (Web Audio) بدون أي تأخير"
+                      : "Zero-latency pure synth tones for alerts"}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !soundEnabled;
+                  setSoundEnabledState(next);
+                  setToastSoundEnabled(next);
+                  if (next) {
+                    toast.success(isAr ? "تم تفعيل نغمات الإشعارات" : "Toast sounds enabled");
+                  }
+                }}
+                className={`h-9 px-4 rounded-xl text-xs font-bold transition-all border ${
+                  soundEnabled
+                    ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25"
+                    : "bg-surface border-border text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {soundEnabled ? (isAr ? "مفعلة ✓" : "Enabled") : isAr ? "مكتومة" : "Muted"}
+              </button>
+            </div>
+
+            {/* خيار موضع ظهور الإشعار */}
+            <div className="rounded-2xl border border-border/70 bg-surface/60 p-4 flex flex-col justify-between gap-2.5">
+              <div className="text-xs font-bold text-foreground flex items-center justify-between">
+                <span>{isAr ? "موضع ظهور الإشعارات" : "Toast Screen Position"}</span>
+                <span className="text-[10px] text-primary font-medium">
+                  {isAr ? "علوي (مفضل للهواتف)" : "Top (Mobile friendly)"}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {[
+                  { id: "top-center" as ToastPositionType, ar: "أعلى الوسط", en: "Top Center" },
+                  { id: "top-right" as ToastPositionType, ar: "أعلى اليمين", en: "Top Right" },
+                  { id: "top-left" as ToastPositionType, ar: "أعلى اليسار", en: "Top Left" },
+                ].map((pos) => {
+                  const active = toastPosition === pos.id;
+                  return (
+                    <button
+                      key={pos.id}
+                      type="button"
+                      onClick={() => {
+                        setToastPositionState(pos.id);
+                        setStoredToastPosition(pos.id);
+                        toast.info(
+                          isAr ? `تم ضبط الموضع: ${pos.ar}` : `Position set to: ${pos.en}`,
+                        );
+                      }}
+                      className={`py-2 px-2 rounded-xl text-[11px] font-bold border transition-all truncate text-center ${
+                        active
+                          ? "bg-primary text-primary-foreground border-primary shadow-xs"
+                          : "bg-surface border-border/70 text-muted-foreground hover:text-foreground hover:border-primary/40"
+                      }`}
+                    >
+                      {isAr ? pos.ar : pos.en}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* معمل تجربة الإشعارات بألوانها الفاخرة وأصواتها وأيقوناتها */}
+          <div className="rounded-2xl border border-border/80 bg-surface/40 p-4 space-y-3">
+            <div className="text-xs font-bold text-foreground flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Sparkles className="h-4 w-4 text-primary" />
+                {isAr ? "تجربة فورية لحالات الإشعارات الأربعة" : "Live Toast Preview"}
+              </span>
+              <span className="text-[11px] text-muted-foreground">
+                {isAr ? "انقر لاختبار المظهر والنغمة والأنميشن" : "Click to test visuals and sound"}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
+              {/* 1. تجربة نجاح */}
+              <button
+                type="button"
+                onClick={() => {
+                  toast.success(isAr ? "تم حفظ الفاتورة بنجاح" : "Invoice saved successfully", {
+                    description: isAr
+                      ? "تم تسجيل العملية في دفتر اليومية وتحديث المخزون فورياً."
+                      : "Entry recorded in general ledger and stock updated immediately.",
+                  });
+                }}
+                className="flex items-center justify-center gap-2 py-3 px-3.5 rounded-xl text-xs font-bold transition-all border bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                <span>{isAr ? "تجربة إشعار نجاح (أخضر)" : "Success Toast"}</span>
+              </button>
+
+              {/* 2. تجربة خطأ */}
+              <button
+                type="button"
+                onClick={() => {
+                  toast.error(isAr ? "تعذر إتمام عملية الترحيل" : "Failed to post entry", {
+                    description: isAr
+                      ? "رصيد الصندوق أو الكمية المتاحة لا تكفي لإتمام هذه الحركة."
+                      : "Insufficient cash box balance or item stock for this transaction.",
+                  });
+                }}
+                className="flex items-center justify-center gap-2 py-3 px-3.5 rounded-xl text-xs font-bold transition-all border bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <AlertOctagon className="h-4 w-4 text-rose-500 shrink-0" />
+                <span>{isAr ? "تجربة إشعار خطأ (أحمر)" : "Error Toast"}</span>
+              </button>
+
+              {/* 3. تجربة تحذير */}
+              <button
+                type="button"
+                onClick={() => {
+                  toast.warning(isAr ? "تنبيه: اقتراب نفاد المخزون" : "Warning: Low stock level", {
+                    description: isAr
+                      ? "وصل رصيد المادة إلى حد إعادة الطلب الأدنى (متبقي 3 قطع)."
+                      : "Current inventory reached reorder point (3 items remaining).",
+                  });
+                }}
+                className="flex items-center justify-center gap-2 py-3 px-3.5 rounded-xl text-xs font-bold transition-all border bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+                <span>{isAr ? "تجربة إشعار تحذير (برتقالي)" : "Warning Toast"}</span>
+              </button>
+
+              {/* 4. تجربة معلومات وتعليمات */}
+              <button
+                type="button"
+                onClick={() => {
+                  toast.info(isAr ? "إرشادات النظام الذكي" : "Smart System Instructions", {
+                    description: isAr
+                      ? "يمكنك الضغط على F2 للبحث السريع أو Ctrl+S لحفظ السندات."
+                      : "Press F2 for quick item lookup or Ctrl+S to save vouchers.",
+                  });
+                }}
+                className="flex items-center justify-center gap-2 py-3 px-3.5 rounded-xl text-xs font-bold transition-all border bg-sky-500/10 border-sky-500/30 text-sky-600 dark:text-sky-400 hover:bg-sky-500/20 hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <Info className="h-4 w-4 text-sky-500 shrink-0" />
+                <span>{isAr ? "تجربة إشعار تعليمات (أزرق)" : "Info Toast"}</span>
+              </button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* 3. معمل الفحص البصري الشامل للثيمات الستة وتدقيق الألوان الوظيفية */}
       <Card className="rounded-3xl border-border/80 shadow-xs">
         <CardHeader className="border-b border-border/50 pb-4">

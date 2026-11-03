@@ -56,7 +56,7 @@ export function CommandPalette({
     isModuleEnabled,
     isVisibleByMillingMode: (path) => isRouteVisibleByMillingMode(path, millingMode),
     canAccess: (entry) =>
-      canAccessRoute(entry.path.split("?")[0], { roles, isPlatformAdmin, isPlatformSuperadmin }),
+      canAccessRoute(entry.path, { roles, isPlatformAdmin, isPlatformSuperadmin }),
   });
 
   return (

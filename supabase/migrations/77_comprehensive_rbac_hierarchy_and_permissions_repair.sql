@@ -10,14 +10,13 @@
 --      دون الحاجة لتكرار ذكر 'owner' في كل سياسة أو حارس دالة.
 --    - مدير المتجر (manager) يرث صلاحيات الكاشير وأمين المستودع (cashier, warehouse).
 --
--- 2. توحيد وإصلاح دالة is_staff:
---    - تشمل مسؤولي المنصة (is_platform_admin) ولا تفشل بسبب قيمة profiles.is_active
---      إذا كانت null أثناء الإنشاء الأولي للحساب.
+-- 2. توحيد وإصلاح دوال التفويض:
+--    - الأدوار التشغيلية لا تتجاوز profiles.is_active؛ حالة مسؤولي المنصة
+--      مصدرها platform_admins.is_active.
 --
--- 3. الصلاحيات الافتراضية لقاعدة البيانات (PostgreSQL DEFAULT PRIVILEGES):
---    - ضبط ALTER DEFAULT PRIVILEGES في مخطط public لمنح authenticated صلاحيات
---      SELECT, INSERT, UPDATE, DELETE على الجداول و EXECUTE على الدوال تلقائياً،
---      مما يمنع ظهور خطأ 42501 (Permission Denied) مستقبلاً مع كل تطوير جديد.
+-- 3. الصلاحيات الافتراضية:
+--    - لا تُمنح صلاحيات الجداول أو الدوال الجديدة تلقائيًا؛ كل هجرة تضيف
+--      المنح المطلوب صراحةً بعد مراجعة سياسة RLS.
 --
 -- 4. إتاحة دالة has_any_role كدالة مساعدة آمنة للمصفوفات.
 -- ============================================================================
@@ -29,10 +28,20 @@ CREATE OR REPLACE FUNCTION public.has_role(_user_id uuid, _role app_role)
 RETURNS boolean
 LANGUAGE plpgsql
 STABLE SECURITY DEFINER
-SET search_path = public
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
   IF _user_id IS NULL THEN
+    RETURN false;
+  END IF;
+
+  -- Platform superadmin status is governed by platform_admins.is_active.
+  IF public.is_platform_superadmin(_user_id) THEN
+    RETURN true;
+  END IF;
+
+  -- Store roles never authorize a deactivated or missing profile.
+  IF NOT COALESCE((SELECT p.is_active FROM public.profiles p WHERE p.id = _user_id), false) THEN
     RETURN false;
   END IF;
 
@@ -69,7 +78,7 @@ CREATE OR REPLACE FUNCTION public.has_any_role(_user_id uuid, _roles app_role[])
 RETURNS boolean
 LANGUAGE plpgsql
 STABLE SECURITY DEFINER
-SET search_path = public
+SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
   IF _user_id IS NULL THEN
@@ -78,6 +87,10 @@ BEGIN
 
   IF public.is_platform_superadmin(_user_id) THEN
     RETURN true;
+  END IF;
+
+  IF NOT COALESCE((SELECT p.is_active FROM public.profiles p WHERE p.id = _user_id), false) THEN
+    RETURN false;
   END IF;
 
   RETURN EXISTS (
@@ -100,17 +113,17 @@ CREATE OR REPLACE FUNCTION public.is_staff(_user_id uuid)
 RETURNS boolean
 LANGUAGE sql
 STABLE SECURITY DEFINER
-SET search_path = public
+SET search_path = pg_catalog, public, pg_temp
 AS $$
-  SELECT (
-    EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = _user_id)
-    OR public.is_platform_admin(_user_id)
-  )
-  AND COALESCE((SELECT is_active FROM public.profiles WHERE id = _user_id), true);
+  SELECT public.is_platform_superadmin(_user_id)
+    OR (
+      EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = _user_id)
+      AND COALESCE((SELECT is_active FROM public.profiles WHERE id = _user_id), false)
+    );
 $$;
 
 COMMENT ON FUNCTION public.is_staff(uuid) IS
-  'يتحقق أن المستخدم مسجل في طاقم المتجر أو إدارة المنصة وحسابه غير معطل.';
+  'يتحقق أن المستخدم عضو نشط في طاقم المتجر أو سوبر أدمن منصة نشط؛ دعم المنصة لا يرث وصول المتجر.';
 
 -- ── (4) ترقية رتبة المصروفات والمالية expense_role_rank ─────────────────────
 CREATE OR REPLACE FUNCTION public.expense_role_rank(p_user uuid)
@@ -149,14 +162,11 @@ AS $$
      );
 $$;
 
--- ── (6) ضبط الصلاحيات التلقائية (Default Privileges) والأذونات العامة ───────
--- تضمن ألا يتعطل أي جدول أو دالة مستقبلية بخطأ 42501
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO authenticated;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO authenticated;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO authenticated;
+-- ── (6) ضبط الأذونات الافتراضية ──────────────────────────────────────────────
+-- لا تمنح الجداول أو الدوال المستقبلية صلاحيات كتابة/تنفيذ تلقائيًا.
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE USAGE, SELECT ON SEQUENCES FROM authenticated;
 
 GRANT USAGE ON SCHEMA public TO authenticated;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated;
 
 -- منح صريح لدوال الصلاحيات الأساسية

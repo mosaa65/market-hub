@@ -2,8 +2,8 @@
  * سجل خدمات Supabase المحلية — المصدر الوحيد لتعريف الخدمات ورسم الاعتماد.
  *
  * بيانات محضة (لا React / لا Node) تُستهلك من الواجهة ومن جامع الحالة معاً.
- * أسماء الحاويات تتبع نمط supabase_<service>_<projectRef> القادم من Supabase
- * CLI، والمشروع الحالي kwzqvgdyadylwnvjghqn.
+ * أسماء الحاويات المحلية تتبع نمط supabase_<service>_<projectId> القادم من
+ * Supabase CLI. هذا معرّف config.toml المحلي، وليس اختياراً لمشروع سحابي.
  */
 import type { ServiceHealthEntry } from "./types";
 
@@ -23,7 +23,7 @@ export interface ServiceDefinition {
   hostPorts?: number[];
 }
 
-export const DEFAULT_PROJECT_REF = "kwzqvgdyadylwnvjghqn";
+export const LOCAL_PROJECT_ID = "kwzqvgdyadylwnvjghqn";
 
 export const SERVICES: ServiceDefinition[] = [
   {
@@ -152,8 +152,8 @@ export const SERVICES: ServiceDefinition[] = [
   },
 ];
 
-export function containerName(service: string, projectRef = DEFAULT_PROJECT_REF): string {
-  return `supabase_${service}_${projectRef}`;
+export function containerName(service: string, projectId = LOCAL_PROJECT_ID): string {
+  return `supabase_${service}_${projectId}`;
 }
 
 /** رسم الاعتماد بترتيب موجّه — أعلى: docker ثم PostgreSQL ثم البوابة ثم الواجهة. */

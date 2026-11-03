@@ -1,56 +1,72 @@
 import { canAccessRoute, getRouteRule, type TenantRole } from "./route-access";
 import { ROUTE_REGISTRY } from "./navigation/route-registry";
 
-const financeRoute = "/opening-balances";
-const standardRoute = "/dashboard";
-const platformAccess = {
-  roles: [],
+const baseContext = {
+  roles: ["cashier"] as TenantRole[],
   isPlatformAdmin: false,
   isPlatformSuperadmin: false,
+  isActive: true,
 };
 
 const cases: Array<[string, boolean]> = [
-  ["empty role list is denied on financial routes", !canAccessRoute(financeRoute, platformAccess)],
+  ["signed-in active staff can open the dashboard", canAccessRoute("/dashboard", baseContext)],
   [
-    "cashier is denied on financial routes",
-    !canAccessRoute(financeRoute, { ...platformAccess, roles: ["cashier"] }),
+    "active but unassigned users are denied on all staff routes",
+    !canAccessRoute("/dashboard", { ...baseContext, roles: [] }),
+  ],
+  ["unknown direct routes are denied", !canAccessRoute("/unregistered-secret", baseContext)],
+  [
+    "inactive accounts cannot open even public staff routes",
+    !canAccessRoute("/dashboard", { ...baseContext, isActive: false }),
   ],
   [
-    "warehouse is denied on financial routes",
-    !canAccessRoute(financeRoute, { ...platformAccess, roles: ["warehouse"] }),
+    "unassigned users are denied on finance routes",
+    !canAccessRoute("/opening-balances", baseContext),
   ],
   [
-    "accountant is allowed on financial routes",
-    canAccessRoute(financeRoute, { ...platformAccess, roles: ["accountant"] }),
+    "cashier is denied on finance routes",
+    !canAccessRoute("/opening-balances", { ...baseContext, roles: ["cashier"] }),
   ],
   [
-    "case- and whitespace-normalized roles still access finance",
-    canAccessRoute(financeRoute, {
-      ...platformAccess,
-      // Runtime data can be untyped; normalization must still accept it.
-      roles: [" Manager ", "ACCOUNTANT"] as unknown as TenantRole[],
-    }),
+    "accountant is allowed on finance routes",
+    canAccessRoute("/opening-balances", { ...baseContext, roles: ["accountant"] }),
   ],
   [
-    "owner is allowed on financial routes",
-    canAccessRoute(financeRoute, { ...platformAccess, roles: ["owner"] }),
+    "support admin does not bypass tenant roles",
+    !canAccessRoute("/opening-balances", { ...baseContext, isPlatformAdmin: true }),
   ],
   [
-    "unrestricted routes remain accessible without roles",
-    canAccessRoute(standardRoute, platformAccess),
+    "support admin cannot open superadmin-only pages",
+    !canAccessRoute("/platform-admin", { ...baseContext, isPlatformAdmin: true }),
   ],
   [
-    "platform support can access financial routes",
-    canAccessRoute(financeRoute, { ...platformAccess, isPlatformAdmin: true }),
+    "platform superadmin can open superadmin-only pages",
+    canAccessRoute("/platform-admin", { ...baseContext, isPlatformSuperadmin: true }),
+  ],
+  [
+    "settings query parameters keep their registered access rule",
+    JSON.stringify(getRouteRule("/settings", { section: "backup" })) ===
+      JSON.stringify(getRouteRule("/settings?section=backup")),
   ],
 ];
 
-for (const entry of ROUTE_REGISTRY.filter(
-  (route) => route.category === "finance" && route.requiredRoles,
-)) {
-  const declared = [...(entry.requiredRoles ?? [])].sort().join(",");
-  const guarded = [...(getRouteRule(entry.path)?.allowedRoles ?? [])].sort().join(",");
-  cases.push([`navigation and direct-route roles agree for ${entry.path}`, declared === guarded]);
+for (const entry of ROUTE_REGISTRY) {
+  const rule = getRouteRule(entry.path);
+  const expected = [...(entry.requiredRoles ?? [])].sort();
+  const actual = [...(rule?.allowedRoles ?? [])].sort();
+  cases.push([
+    `registered role rules match the direct-route guard for ${entry.path}`,
+    Boolean(rule) &&
+      Boolean(entry.superadminOnly) === Boolean(rule?.superadminOnly) &&
+      JSON.stringify(actual) === JSON.stringify(expected),
+  ]);
+
+  for (const role of entry.requiredRoles ?? []) {
+    cases.push([
+      `${role} can open assigned route ${entry.path}`,
+      canAccessRoute(entry.path, { ...baseContext, roles: [role] }),
+    ]);
+  }
 }
 
 const failed = cases.filter(([, passed]) => !passed);

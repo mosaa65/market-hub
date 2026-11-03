@@ -1,4 +1,4 @@
-import { ModuleGuard, useModules } from "@/lib/modules";
+﻿import { ModuleGuard, useModules } from "@/lib/modules";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -6,13 +6,21 @@ import {
   ArrowDownUp,
   ArrowUp,
   Building2,
+  CheckCircle2,
   Plus,
+  RotateCcw,
   Trash2,
   ScanBarcode,
   Loader2,
   UserPlus,
   ShoppingBag,
+  ShoppingCart,
+  Layers,
   FileText,
+  AlertCircle,
+  Percent,
+  StickyNote,
+  Wallet,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
@@ -28,13 +36,20 @@ import { useCatalogModules } from "@/lib/catalog-modules";
 import { useIsDesktop, useMediaQuery } from "@/hooks/use-media-query";
 import { CartLine as CartLineRow } from "@/components/commerce/cart-line";
 import { MobileProductPicker } from "@/components/commerce/mobile-product-picker";
-import { TableToolbar, type FilterValues } from "@/components/ui/table-toolbar";
-import { RecordsViewToggle } from "@/components/ui/records-view-toggle";
+import { RecordsToolbar } from "@/components/ui/records-toolbar";
+import { RecordsSortPanel, RecordsFilterPanel } from "@/components/ui/records-panels";
+import type { FilterDefinition, FilterValues } from "@/components/ui/table-toolbar";
 import { PaymentMethodSelect } from "@/components/ui/payment-method";
 import { AmountInput } from "@/components/commerce/amount-input";
+import { useFormNavigationScope } from "@/hooks/use-form-navigation";
 import { PosDatePicker } from "@/components/commerce/pos-date-picker";
 import { PartyPicker } from "@/components/commerce/party-picker";
 import { PosTotalsCard } from "@/components/commerce/pos-totals-card";
+import {
+  PosLabeledField,
+  POS_FIELD_CLASS,
+  POS_FIELD_EMPHASIS_CLASS,
+} from "@/components/commerce/pos-labeled-field";
 import { usePaymentMethodsForContext } from "@/hooks/use-payment-methods";
 import { usePersistedViewMode } from "@/hooks/use-persisted-view-mode";
 import { SupplierFormDialog } from "@/components/contacts/supplier-form-dialog";
@@ -75,6 +90,7 @@ interface Product {
   is_custody_item?: boolean;
   is_purchasable?: boolean;
   is_active?: boolean;
+  batch_dispatch_strategy?: "FEFO" | "FIFO" | "MANUAL" | null;
   image_url: string | null;
   category_id?: string | null;
   brand_id?: string | null;
@@ -361,6 +377,11 @@ function PurchasePOSPage() {
   const isDesktop = useIsDesktop();
   const isTouchDevice = useMediaQuery("(pointer: coarse)");
   const [mobilePickerOpen, setMobilePickerOpen] = useState(false);
+  // Keyboard-only operation: the checkout column is one navigation scope, so
+  // arrows/Enter walk method → reference → paid → discount → note → save.
+  const purchaseFormScopeRef = useFormNavigationScope<HTMLDivElement>();
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [sortOpen, setSortOpen] = useState(false);
 
   // Modals
   const [newSupplierOpen, setNewSupplierOpen] = useState(false);
@@ -764,7 +785,29 @@ function PurchasePOSPage() {
     setStockMap(map);
   }
 
-  const clearAllFilters = () => {
+  // Active Filters Count
+  const activeFiltersCount = useMemo(() => {
+    return [
+      selectedCategory,
+      catalogConfig.enableBrands ? selectedBrand : "",
+      catalogConfig.enableUnits ? selectedUnit : "",
+      catalogConfig.enableOrigins ? selectedOrigin : "",
+      catalogConfig.enableQualityGrades ? selectedQuality : "",
+      catalogConfig.enableMakesAndModels ? selectedMake : "",
+      catalogConfig.enableMakesAndModels ? selectedModel : "",
+    ].filter(Boolean).length;
+  }, [
+    selectedCategory,
+    selectedBrand,
+    selectedUnit,
+    selectedOrigin,
+    selectedQuality,
+    selectedMake,
+    selectedModel,
+    catalogConfig,
+  ]);
+
+  function resetFilters() {
     setSelectedCategory("");
     setSelectedBrand("");
     setSelectedUnit("");
@@ -772,8 +815,183 @@ function PurchasePOSPage() {
     setSelectedQuality("");
     setSelectedMake("");
     setSelectedModel("");
+  }
+
+  function clearAllFilters() {
+    resetFilters();
     setSearch("");
+  }
+
+  /*
+   * نموذج الفلترة الموحد (VortexFilterSheet) — نفس الشيت الجانبي المستخدم في
+   * نقطة البيع وكل شاشات السجلات بدل لوحة مضمّنة خاصة بهذه الشاشة.
+   */
+  const catalogFilterDefinitions: FilterDefinition[] = useMemo(
+    () => [
+      {
+        key: "category",
+        label: lang === "ar" ? "التصنيف" : "Category",
+        type: "select",
+        options: categories.map((c) => ({
+          value: c.id,
+          label: (lang === "ar" ? c.name_ar || c.name : c.name || c.name_ar) || c.name,
+        })),
+      },
+      ...(catalogConfig.enableBrands
+        ? [
+            {
+              key: "brand",
+              label: lang === "ar" ? "الماركة" : "Brand",
+              type: "select" as const,
+              options: brands.map((b) => ({
+                value: b.id,
+                label: (lang === "ar" ? b.name_ar || b.name : b.name || b.name_ar) || b.name,
+              })),
+            },
+          ]
+        : []),
+      ...(catalogConfig.enableUnits
+        ? [
+            {
+              key: "unit",
+              label: lang === "ar" ? "الوحدة" : "Unit",
+              type: "select" as const,
+              options: units.map((u) => ({
+                value: u.id,
+                label: (lang === "ar" ? u.name_ar || u.name : u.name || u.name_ar) || u.name,
+              })),
+            },
+          ]
+        : []),
+      ...(catalogConfig.enableOrigins
+        ? [
+            {
+              key: "origin",
+              label: lang === "ar" ? "بلد المنشأ" : "Origin",
+              type: "select" as const,
+              options: origins.map((o) => ({
+                value: o.id,
+                label: (lang === "ar" ? o.name_ar || o.name : o.name || o.name_ar) || o.name,
+              })),
+            },
+          ]
+        : []),
+      ...(catalogConfig.enableQualityGrades
+        ? [
+            {
+              key: "quality",
+              label: lang === "ar" ? "درجة الجودة" : "Quality grade",
+              type: "select" as const,
+              options: qualities.map((q) => ({
+                value: q.id,
+                label: (lang === "ar" ? q.name_ar || q.name : q.name || q.name_ar) || q.name,
+              })),
+            },
+          ]
+        : []),
+      ...(catalogConfig.enableMakesAndModels
+        ? [
+            {
+              key: "make",
+              label: lang === "ar" ? "الماركة (المركبة)" : "Vehicle make",
+              type: "select" as const,
+              options: makes.map((m) => ({
+                value: m.id,
+                label: (lang === "ar" ? m.name_ar || m.name : m.name || m.name_ar) || m.name,
+              })),
+            },
+            {
+              key: "model",
+              label: lang === "ar" ? "الموديل (المركبة)" : "Vehicle model",
+              type: "select" as const,
+              options: (selectedMake
+                ? models.filter((m) => m.make_id === selectedMake)
+                : models
+              ).map((m) => ({
+                value: m.id,
+                label: (lang === "ar" ? m.name_ar || m.name : m.name || m.name_ar) || m.name,
+              })),
+            },
+          ]
+        : []),
+    ],
+    [
+      categories,
+      brands,
+      units,
+      origins,
+      qualities,
+      makes,
+      models,
+      selectedMake,
+      catalogConfig,
+      lang,
+    ],
+  );
+
+  const catalogFilterValues: FilterValues = useMemo(
+    () => ({
+      category: selectedCategory || undefined,
+      brand: selectedBrand || undefined,
+      unit: selectedUnit || undefined,
+      origin: selectedOrigin || undefined,
+      quality: selectedQuality || undefined,
+      make: selectedMake || undefined,
+      model: selectedModel || undefined,
+    }),
+    [
+      selectedCategory,
+      selectedBrand,
+      selectedUnit,
+      selectedOrigin,
+      selectedQuality,
+      selectedMake,
+      selectedModel,
+    ],
+  );
+
+  const applyCatalogFilters = (values: FilterValues) => {
+    const pick = (key: string) => {
+      const v = values[key];
+      return typeof v === "string" ? v : "";
+    };
+    setFilterOpen(false);
+    const nextMake = pick("make");
+    setSelectedCategory(pick("category"));
+    setSelectedBrand(pick("brand"));
+    setSelectedUnit(pick("unit"));
+    setSelectedOrigin(pick("origin"));
+    setSelectedQuality(pick("quality"));
+    setSelectedMake(nextMake);
+    // إعادة ضبط الموديل إذا لم يعد متوافقاً مع الماركة الجديدة.
+    const nextModel = pick("model");
+    if (nextModel) {
+      const target = models.find((m) => m.id === nextModel);
+      setSelectedModel(target && (!nextMake || target.make_id === nextMake) ? nextModel : "");
+    } else {
+      setSelectedModel("");
+    }
   };
+
+  // Vehicle compatibility lookups — same filtering the Sales POS applies.
+  const productCompatMap = useMemo(() => {
+    const modelLookup = new Map(models.map((m) => [m.id, m]));
+    const makeLookup = new Map(makes.map((mk) => [mk.id, mk]));
+    const map = new Map<string, { makeName: string; modelName: string }[]>();
+    for (const c of compatibilities) {
+      const model = modelLookup.get(c.vehicle_model_id);
+      if (!model) continue;
+      const make = model.make_id ? makeLookup.get(model.make_id) : null;
+      const makeName =
+        lang === "ar" ? make?.name_ar || make?.name || "" : make?.name || make?.name_ar || "";
+      const modelName =
+        lang === "ar" ? model.name_ar || model.name || "" : model.name || model.name_ar || "";
+      const list = map.get(c.product_id) || [];
+      list.push({ makeName, modelName });
+      map.set(c.product_id, list);
+    }
+    return map;
+  }, [compatibilities, models, makes, lang]);
 
   // Add to purchase cart
   function addToCart(p: Product, requestedUom?: PurchaseUom | null) {
@@ -995,6 +1213,26 @@ function PurchasePOSPage() {
   // Filter products
   const filtered = useMemo(() => {
     const q = search.trim();
+    // Model compatibility set
+    const compatibleWithModel = selectedModel
+      ? new Set(
+          compatibilities
+            .filter((c) => c.vehicle_model_id === selectedModel)
+            .map((c) => c.product_id),
+        )
+      : null;
+    // Make compatibility set
+    const makeModelIds = selectedMake
+      ? new Set(models.filter((m) => m.make_id === selectedMake).map((m) => m.id))
+      : null;
+    const compatibleWithMake = makeModelIds
+      ? new Set(
+          compatibilities
+            .filter((c) => makeModelIds.has(c.vehicle_model_id))
+            .map((c) => c.product_id),
+        )
+      : null;
+
     const matching = products.filter((p) => {
       if (q) {
         const matchesFuzzy =
@@ -1013,6 +1251,14 @@ function PurchasePOSPage() {
         catalogConfig.enableQualityGrades &&
         selectedQuality &&
         p.quality_grade_id !== selectedQuality
+      )
+        return false;
+      if (catalogConfig.enableMakesAndModels && compatibleWithMake && !compatibleWithMake.has(p.id))
+        return false;
+      if (
+        catalogConfig.enableMakesAndModels &&
+        compatibleWithModel &&
+        !compatibleWithModel.has(p.id)
       )
         return false;
       return true;
@@ -1041,6 +1287,10 @@ function PurchasePOSPage() {
     selectedUnit,
     selectedOrigin,
     selectedQuality,
+    selectedMake,
+    selectedModel,
+    compatibilities,
+    models,
     catalogConfig,
     catalogSort,
     stockMap,
@@ -1440,33 +1690,11 @@ function PurchasePOSPage() {
 
   return (
     <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden bg-[radial-gradient(ellipse_at_top,_color-mix(in_oklab,var(--primary)_8%,transparent),transparent_48%)] p-0 sm:gap-1 sm:p-1 lg:grid-cols-[minmax(0,1fr)_clamp(360px,26vw,440px)] lg:grid-rows-[auto_minmax(0,1fr)]">
-      {/* Top Bar / Header */}
-      <div className="flex min-w-0 shrink-0 items-center justify-between gap-1 self-start overflow-x-auto overscroll-x-contain rounded-xl border border-border/80 bg-surface/95 px-1.5 py-1.5 shadow-xs backdrop-blur-md sm:gap-2 sm:px-3 sm:py-2 lg:col-span-2 lg:row-start-1">
-        {/* Global Toolbar Selectors */}
+      {/* ─── Top Executive Command Deck (phones & tablets) ─── */}
+      <header className="flex min-w-0 shrink-0 items-center justify-between gap-1 self-start overflow-x-auto overscroll-x-contain rounded-xl border border-border/80 bg-surface/95 px-1.5 py-1.5 shadow-xs backdrop-blur-md sm:gap-2 sm:px-3 sm:py-2 lg:hidden">
         <div className="flex w-full min-w-0 flex-1 items-center justify-between gap-1 sm:gap-1.5">
-          {/* Warehouse Selector */}
-          <div className="flex h-9 min-w-0 shrink-0 items-center gap-1.5 rounded-full border border-amber-500/25 bg-amber-500/[0.07] px-2 text-amber-700 transition hover:bg-amber-500/10 dark:text-amber-300 sm:px-3">
-            <Building2 className="size-4 shrink-0" />
-            <select
-              dir={lang === "ar" ? "rtl" : "ltr"}
-              value={warehouseId}
-              onChange={(e) => setWarehouseId(e.target.value)}
-              aria-label={lang === "ar" ? "المستودع" : "Warehouse"}
-              className="min-w-0 max-w-[5.5rem] cursor-pointer appearance-none bg-transparent text-[10px] font-semibold text-inherit outline-none sm:max-w-28 xl:max-w-44 xl:text-xs"
-            >
-              {warehouses.map((w) => (
-                <option key={w.id} value={w.id}>
-                  {lang === "ar" ? w.name_ar || w.name : w.name || w.name_ar}
-                </option>
-              ))}
-            </select>
-            <span className="hidden text-[11px] font-medium xl:inline">
-              {lang === "ar" ? "المستودع" : "Warehouse"}
-            </span>
-          </div>
-
-          {/* Supplier Selector with Cash Supplier Default */}
-          <div className="flex min-w-0 flex-1 items-center gap-1">
+          {/* Supplier Selector with default cash supplier */}
+          <div className="flex min-w-0 flex-1 items-center gap-1 2xl:flex-none">
             <PartyPicker
               options={suppliers}
               value={supplierId}
@@ -1480,11 +1708,33 @@ function PurchasePOSPage() {
               type="button"
               onClick={() => setNewSupplierOpen(true)}
               title={lang === "ar" ? "إضافة مورد جديد" : "Add new supplier"}
+              aria-label={lang === "ar" ? "إضافة مورد جديد" : "Add new supplier"}
               className="grid size-9 shrink-0 place-items-center rounded-full border border-primary/25 bg-primary/10 text-primary shadow-sm transition hover:border-primary/40 hover:bg-primary/15 active:scale-95 disabled:opacity-40"
               disabled={!canManageSuppliers}
             >
               <UserPlus className="h-4 w-4" />
             </button>
+          </div>
+
+          {/* Warehouse Selector */}
+          <div className="relative flex h-8 min-w-0 shrink-0 items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 text-amber-700 transition hover:bg-amber-500/15 dark:text-amber-300 sm:h-9 xl:px-3">
+            <Building2 className="size-3.5 shrink-0" />
+            <select
+              dir={lang === "ar" ? "rtl" : "ltr"}
+              aria-label={lang === "ar" ? "المستودع" : "Warehouse"}
+              value={warehouseId}
+              onChange={(e) => setWarehouseId(e.target.value)}
+              className="h-full min-w-0 max-w-[5.5rem] cursor-pointer appearance-none bg-transparent pe-4 text-[10px] font-semibold outline-none sm:max-w-24 sm:text-[11px] xl:max-w-40 xl:pe-0 xl:text-xs"
+            >
+              {warehouses.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {lang === "ar" ? w.name_ar || w.name : w.name || w.name_ar}
+                </option>
+              ))}
+            </select>
+            <span className="hidden shrink-0 text-[11px] font-medium xl:inline">
+              {lang === "ar" ? "المستودع" : "Warehouse"}
+            </span>
           </div>
 
           <div className="flex shrink-0 items-center gap-1 2xl:contents">
@@ -1493,267 +1743,310 @@ function PurchasePOSPage() {
               value={purchaseDate}
               onChange={setPurchaseDate}
               lang={lang}
-              label={lang === "ar" ? "تاريخ فاتورة الشراء" : "Purchase invoice date"}
+              label={lang === "ar" ? "تاريخ الفاتورة" : "Invoice date"}
             />
 
-            {/* Page Guide Button */}
+            {/* Barcode reader / camera scanner */}
+            {catalogConfig.enableBarcode &&
+              (isDesktop && !isTouchDevice ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !barcodeReaderEnabled;
+                    setBarcodeReaderEnabled(next);
+                    localStorage.setItem("purchase_pos_barcode_reader_enabled", String(next));
+                  }}
+                  aria-pressed={barcodeReaderEnabled}
+                  title={
+                    lang === "ar"
+                      ? barcodeReaderEnabled
+                        ? "إيقاف قارئ الباركود"
+                        : "تفعيل قارئ الباركود"
+                      : barcodeReaderEnabled
+                        ? "Disable barcode reader"
+                        : "Enable barcode reader"
+                  }
+                  className={`inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full border px-2.5 transition xl:w-auto xl:px-3 ${barcodeReaderEnabled ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600" : "border-border bg-surface text-muted-foreground"}`}
+                >
+                  <ScanBarcode className="h-4 w-4" />
+                  <span className="hidden text-[11px] font-semibold lg:inline">
+                    {lang === "ar" ? "قارئ" : "Reader"}
+                  </span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setScannerOpen(true)}
+                  title={lang === "ar" ? "مسح بالكاميرا" : "Scan with camera"}
+                  className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2.5 text-primary transition hover:bg-primary/20 xl:w-auto xl:px-3"
+                >
+                  <ScanBarcode className="h-4 w-4" />
+                  <span className="hidden text-[11px] font-semibold lg:inline">
+                    {lang === "ar" ? "مسح" : "Scan"}
+                  </span>
+                </button>
+              ))}
+
+            {/* Page Guide */}
             <PageGuideButton
               config={purchasePosGuideConfig}
-              className="!size-8 !rounded-full shrink-0 sm:!size-9"
+              className="!size-8 shrink-0 sm:!size-9"
             />
-
-            {/* Barcode Camera Modal Trigger */}
-            {isDesktop && !isTouchDevice && catalogConfig.enableBarcode ? (
-              <button
-                type="button"
-                onClick={() => {
-                  const next = !barcodeReaderEnabled;
-                  setBarcodeReaderEnabled(next);
-                  localStorage.setItem("purchase_pos_barcode_reader_enabled", String(next));
-                }}
-                aria-pressed={barcodeReaderEnabled}
-                title={
-                  lang === "ar"
-                    ? barcodeReaderEnabled
-                      ? "إيقاف قارئ الباركود"
-                      : "تفعيل قارئ الباركود"
-                    : barcodeReaderEnabled
-                      ? "Disable barcode reader"
-                      : "Enable barcode reader"
-                }
-                className={`inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full border px-2.5 transition xl:w-auto xl:px-3 ${barcodeReaderEnabled ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600" : "border-border bg-surface text-muted-foreground"}`}
-              >
-                <ScanBarcode className="h-4 w-4" />
-                <span className="hidden text-[11px] font-semibold lg:inline">
-                  {lang === "ar" ? "قارئ" : "Reader"}
-                </span>
-              </button>
-            ) : (!isDesktop || isTouchDevice) && catalogConfig.enableBarcode ? (
-              <button
-                type="button"
-                onClick={() => setScannerOpen(true)}
-                className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full border border-border/80 bg-surface px-2.5 text-muted-foreground shadow-2xs transition hover:bg-surface-2 hover:text-foreground xl:w-auto xl:px-3"
-                title={lang === "ar" ? "مسح الباركود بالكاميرا" : "Scan barcode with camera"}
-              >
-                <ScanBarcode className="h-4 w-4" />
-                <span className="hidden text-[11px] font-semibold lg:inline">
-                  {lang === "ar" ? "مسح" : "Scan"}
-                </span>
-              </button>
-            ) : null}
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Main Content Area: Products Grid (Left) + Cart & Totals (Right) */}
-      <div className="flex min-h-0 flex-col gap-0 overflow-hidden px-1.5 pb-1.5 sm:gap-2 sm:px-2 sm:pb-2 lg:contents lg:row-start-2">
-        {/* Left Column: Search, Filters & Product Grid — desktop only. */}
+      {/* ─── Main Content Split: Catalog (Desktop) & Cart (All) ─── */}
+      <div className="grid min-h-0 grid-cols-1 grid-rows-[minmax(0,1fr)] items-stretch gap-0 sm:gap-2 lg:contents">
+        {/* ─── Products Panel (Desktop & Tablet) ─── */}
         {isDesktop && (
           <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-border/80 bg-surface/95 p-1.5 shadow-sm ring-1 ring-background/40 sm:rounded-3xl sm:p-2 lg:col-start-1 lg:row-start-2">
-            <TableToolbar
-              className="border-b border-border/60 bg-surface/50 p-3"
-              lang={lang}
-              search={{
-                value: search,
-                onValueChange: setSearch,
-                dir: lang === "ar" ? "rtl" : "ltr",
-                inputRef: searchRef,
-                onKeyDown: (event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    handleBarcode(search);
-                  }
-                },
-                placeholder:
-                  lang === "ar"
-                    ? "ابحث باسم المنتج، SKU، أو امسح الباركود (F2)..."
-                    : "Search by product name, SKU, or scan barcode (F2)...",
-                resultCount: filtered.length,
-                resultCountText: !catalogComplete
+            <div className="mb-1.5 rounded-xl border border-border/70 bg-surface/90 p-1.5 shadow-sm sm:rounded-2xl sm:p-2">
+              <div className="flex flex-col gap-2 xl:flex-row xl:items-center">
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    {lang === "ar" ? "البيانات الأساسية" : "Purchase context"}
+                  </div>
+                  <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                    <PartyPicker
+                      options={suppliers}
+                      value={supplierId}
+                      onChange={setSupplierId}
+                      lang={lang}
+                      label={lang === "ar" ? "المورد" : "Supplier"}
+                      kind="supplier"
+                      className="h-10 min-w-0 flex-1 rounded-2xl border-primary/20 bg-primary/[0.035] text-xs hover:border-primary/50 hover:bg-primary/[0.07]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setNewSupplierOpen(true)}
+                      className="grid size-9 shrink-0 place-items-center rounded-full border border-primary/25 bg-primary/10 text-primary shadow-sm transition hover:border-primary/40 hover:bg-primary/15 active:scale-95 disabled:opacity-40"
+                      title={lang === "ar" ? "إضافة مورد جديد" : "Add supplier"}
+                      aria-label={lang === "ar" ? "إضافة مورد جديد" : "Add supplier"}
+                      disabled={!canManageSuppliers}
+                    >
+                      <UserPlus className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="relative min-w-[150px] xl:w-[170px]">
+                  <label className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    {lang === "ar" ? "المستودع" : "Warehouse"}
+                  </label>
+                  <select
+                    dir={lang === "ar" ? "rtl" : "ltr"}
+                    aria-label={lang === "ar" ? "المستودع" : "Warehouse"}
+                    value={warehouseId}
+                    onChange={(e) => setWarehouseId(e.target.value)}
+                    className="h-10 w-full appearance-none rounded-2xl border border-border/80 bg-surface/90 px-3 text-xs font-medium text-foreground outline-none transition hover:border-primary/40 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  >
+                    {warehouses.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {lang === "ar" ? w.name_ar || w.name : w.name || w.name_ar}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="min-w-[170px] xl:w-[190px]">
+                  <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    {lang === "ar" ? "تاريخ الشراء" : "Invoice date"}
+                  </div>
+                  <PosDatePicker
+                    value={purchaseDate}
+                    onChange={setPurchaseDate}
+                    lang={lang}
+                    label={lang === "ar" ? "تاريخ الفاتورة" : "Invoice date"}
+                  />
+                </div>
+
+                <div className="flex items-center gap-1.5 self-end pb-1 xl:pb-0">
+                  {catalogConfig.enableBarcode &&
+                    (isDesktop && !isTouchDevice ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = !barcodeReaderEnabled;
+                          setBarcodeReaderEnabled(next);
+                          localStorage.setItem("purchase_pos_barcode_reader_enabled", String(next));
+                        }}
+                        aria-pressed={barcodeReaderEnabled}
+                        title={
+                          lang === "ar"
+                            ? barcodeReaderEnabled
+                              ? "إيقاف قارئ الباركود"
+                              : "تفعيل قارئ الباركود"
+                            : barcodeReaderEnabled
+                              ? "Disable barcode reader"
+                              : "Enable barcode reader"
+                        }
+                        className={`inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full border px-2.5 transition ${barcodeReaderEnabled ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600" : "border-border bg-surface text-muted-foreground"}`}
+                      >
+                        <ScanBarcode className="h-4 w-4" />
+                        <span className="text-[11px] font-semibold">
+                          {lang === "ar" ? "باركود" : "Barcode"}
+                        </span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setScannerOpen(true)}
+                        title={lang === "ar" ? "مسح بالكاميرا" : "Scan with camera"}
+                        className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2.5 text-primary transition hover:bg-primary/20"
+                      >
+                        <ScanBarcode className="h-4 w-4" />
+                        <span className="text-[11px] font-semibold">
+                          {lang === "ar" ? "باركود" : "Scan"}
+                        </span>
+                      </button>
+                    ))}
+
+                  <PageGuideButton config={purchasePosGuideConfig} className="!size-9 shrink-0" />
+                </div>
+              </div>
+            </div>
+
+            <RecordsToolbar
+              searchValue={search}
+              onSearchChange={setSearch}
+              searchPlaceholder={
+                lang === "ar"
+                  ? "ابحث باسم المنتج أو الرمز أو امسح الباركود (F2)"
+                  : "Search by product name or SKU, or scan barcode (F2)"
+              }
+              resultCount={filtered.length}
+              resultCountText={
+                !catalogComplete
                   ? lang === "ar"
                     ? `${filtered.length} مطابقة • ${products.length} محمّل`
                     : `${filtered.length} matches • ${products.length} loaded`
                   : visibleFiltered.length < filtered.length
                     ? `${visibleFiltered.length} / ${filtered.length}`
-                    : String(filtered.length),
-                loading: !catalogComplete,
-              }}
-              filters={{
-                definitions: [
-                  {
-                    key: "category",
-                    label: lang === "ar" ? "التصنيف" : "Category",
-                    type: "select",
-                    options: categories.map((item) => ({
-                      value: item.id,
-                      label:
-                        lang === "ar" ? item.name_ar || item.name : item.name || item.name_ar || "",
-                    })),
-                  },
-                  ...(catalogConfig.enableBrands
-                    ? [
-                        {
-                          key: "brand",
-                          label: lang === "ar" ? "الماركة" : "Brand",
-                          type: "select" as const,
-                          options: brands.map((item) => ({
-                            value: item.id,
-                            label:
-                              lang === "ar"
-                                ? item.name_ar || item.name
-                                : item.name || item.name_ar || "",
-                          })),
-                        },
-                      ]
-                    : []),
-                  ...(catalogConfig.enableUnits
-                    ? [
-                        {
-                          key: "unit",
-                          label: lang === "ar" ? "الوحدة" : "Unit",
-                          type: "select" as const,
-                          options: units.map((item) => ({
-                            value: item.id,
-                            label:
-                              lang === "ar"
-                                ? item.name_ar || item.name
-                                : item.name || item.name_ar || "",
-                          })),
-                        },
-                      ]
-                    : []),
-                  ...(catalogConfig.enableOrigins
-                    ? [
-                        {
-                          key: "origin",
-                          label: lang === "ar" ? "بلد المنشأ" : "Origin",
-                          type: "select" as const,
-                          options: origins.map((item) => ({
-                            value: item.id,
-                            label:
-                              lang === "ar"
-                                ? item.name_ar || item.name
-                                : item.name || item.name_ar || "",
-                          })),
-                        },
-                      ]
-                    : []),
-                  ...(catalogConfig.enableQualityGrades
-                    ? [
-                        {
-                          key: "quality",
-                          label: lang === "ar" ? "درجة الجودة" : "Quality grade",
-                          type: "select" as const,
-                          options: qualities.map((item) => ({
-                            value: item.id,
-                            label:
-                              lang === "ar"
-                                ? item.name_ar || item.name
-                                : item.name || item.name_ar || "",
-                          })),
-                        },
-                      ]
-                    : []),
-                ],
-                values: {
-                  category: selectedCategory,
-                  brand: selectedBrand,
-                  unit: selectedUnit,
-                  origin: selectedOrigin,
-                  quality: selectedQuality,
-                },
-                onValueChange: (values: FilterValues) => {
-                  setSelectedCategory(typeof values.category === "string" ? values.category : "");
-                  setSelectedBrand(typeof values.brand === "string" ? values.brand : "");
-                  setSelectedUnit(typeof values.unit === "string" ? values.unit : "");
-                  setSelectedOrigin(typeof values.origin === "string" ? values.origin : "");
-                  setSelectedQuality(typeof values.quality === "string" ? values.quality : "");
-                },
-              }}
-              sort={
-                viewMode === "table"
-                  ? undefined
-                  : {
-                      value: catalogSort,
-                      onValueChange: setCatalogSort,
-                      options: [
-                        {
-                          value: "name_asc",
-                          label: lang === "ar" ? "الاسم: أ إلى ي" : "Name: A to Z",
-                        },
-                        {
-                          value: "name_desc",
-                          label: lang === "ar" ? "الاسم: ي إلى أ" : "Name: Z to A",
-                        },
-                        {
-                          value: "cost_asc",
-                          label: lang === "ar" ? "التكلفة: الأقل أولاً" : "Cost: low to high",
-                        },
-                        {
-                          value: "cost_desc",
-                          label: lang === "ar" ? "التكلفة: الأعلى أولاً" : "Cost: high to low",
-                        },
-                        {
-                          value: "stock_asc",
-                          label: lang === "ar" ? "المخزون: الأقل أولاً" : "Stock: low to high",
-                        },
-                        {
-                          value: "stock_desc",
-                          label: lang === "ar" ? "المخزون: الأعلى أولاً" : "Stock: high to low",
-                        },
-                      ],
-                    }
+                    : String(filtered.length)
               }
-              viewToggle={<RecordsViewToggle value={viewMode} onChange={setViewMode} cycle />}
-            >
-              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+              searchLoading={!catalogComplete}
+              searchRef={searchRef}
+              onSearchKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  handleBarcode(search);
+                }
+              }}
+              activeFilterCount={activeFiltersCount}
+              onFilterOpen={() => setFilterOpen(true)}
+              onClearFilters={resetFilters}
+              filterLabel={lang === "ar" ? "فلترة" : "Filter"}
+              onSortOpen={() => setSortOpen(true)}
+              sortActive={catalogSort !== "name_asc"}
+              sortLabel={lang === "ar" ? "ترتيب" : "Sort"}
+              viewMode={viewMode}
+              onViewModeChange={setViewMode}
+              viewModes={["cards", "list", "table"]}
+              viewModeCycle
+              sticky={false}
+              className="mb-2.5"
+            />
+            <RecordsSortPanel
+              open={sortOpen}
+              onClose={() => setSortOpen(false)}
+              options={[
+                { value: "name_asc", label: lang === "ar" ? "الاسم: أ إلى ي" : "Name: A to Z" },
+                { value: "name_desc", label: lang === "ar" ? "الاسم: ي إلى أ" : "Name: Z to A" },
+                {
+                  value: "cost_asc",
+                  label: lang === "ar" ? "التكلفة: الأقل أولاً" : "Cost: low to high",
+                },
+                {
+                  value: "cost_desc",
+                  label: lang === "ar" ? "التكلفة: الأعلى أولاً" : "Cost: high to low",
+                },
+                {
+                  value: "stock_asc",
+                  label: lang === "ar" ? "المخزون: الأقل أولاً" : "Stock: low to high",
+                },
+                {
+                  value: "stock_desc",
+                  label: lang === "ar" ? "المخزون: الأعلى أولاً" : "Stock: high to low",
+                },
+              ]}
+              value={catalogSort}
+              onSubmit={(value) => {
+                setCatalogSort(value || "name_asc");
+                setSortOpen(false);
+              }}
+            />
+
+            {/* Quick Category Chips Bar */}
+            {categories.length > 0 && (
+              <div className="mb-2.5 flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
                 <button
                   type="button"
                   onClick={() => setSelectedCategory("")}
-                  className={`h-7 shrink-0 rounded-lg px-2.5 text-xs font-medium ${selectedCategory === "" ? "bg-primary text-primary-foreground" : "border border-border/80 bg-surface text-muted-foreground hover:border-primary/40"}`}
+                  className={`h-7 shrink-0 rounded-lg px-2.5 text-xs font-medium transition ${
+                    selectedCategory === ""
+                      ? "bg-primary text-primary-foreground font-semibold shadow-2xs"
+                      : "bg-surface border border-border/80 text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                  }`}
                 >
                   {lang === "ar" ? "الكل" : "All"} ({products.length})
                 </button>
-                {categories.map((category) => (
+                {categories.map((c) => (
                   <button
-                    key={category.id}
+                    key={c.id}
                     type="button"
-                    onClick={() =>
-                      setSelectedCategory((current) => (current === category.id ? "" : category.id))
-                    }
-                    className={`h-7 shrink-0 rounded-lg px-2.5 text-xs font-medium ${selectedCategory === category.id ? "bg-primary text-primary-foreground" : "border border-border/80 bg-surface text-muted-foreground hover:border-primary/40"}`}
+                    onClick={() => setSelectedCategory((prev) => (prev === c.id ? "" : c.id))}
+                    className={`h-7 shrink-0 rounded-lg px-2.5 text-xs font-medium transition ${
+                      selectedCategory === c.id
+                        ? "bg-primary text-primary-foreground font-semibold shadow-2xs"
+                        : "bg-surface border border-border/80 text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                    }`}
                   >
-                    {lang === "ar"
-                      ? category.name_ar || category.name
-                      : category.name || category.name_ar}
+                    {lang === "ar" ? c.name_ar || c.name : c.name || c.name_ar}
                   </button>
                 ))}
               </div>
-            </TableToolbar>
+            )}
 
-            {/* Products Grid */}
-            <div
-              ref={catalogScrollRootRef}
-              className="flex-1 min-h-0 overflow-y-auto p-3 custom-scrollbar"
-            >
-              {filtered.length === 0 ? (
-                <div className="grid place-items-center py-16 text-center text-muted-foreground">
-                  <ShoppingBag className="h-10 w-10 opacity-30 mb-2" />
-                  <p className="text-sm font-semibold">
+            {/* نموذج الفلترة الموحد (VortexFilterSheet) — نفس شيت السجلات في كل الشاشات */}
+            <RecordsFilterPanel
+              open={filterOpen}
+              onClose={() => setFilterOpen(false)}
+              definitions={catalogFilterDefinitions}
+              values={catalogFilterValues}
+              onSubmit={applyCatalogFilters}
+              title={lang === "ar" ? "فلترة الفهرس" : "Catalog filters"}
+            />
+
+            {/* ─── Product Catalog Body: Three Distinct View Modes ─── */}
+            <div ref={catalogScrollRootRef} className="min-h-0 flex-1 overflow-y-auto pr-1 pb-2">
+              {catalogLoading ? (
+                <CatalogSkeleton viewMode={viewMode} />
+              ) : filtered.length === 0 ? (
+                <div className="grid place-items-center py-20 text-center text-sm text-muted-foreground">
+                  <div className="mb-3 grid h-14 w-14 place-items-center rounded-2xl border border-border bg-surface shadow-xs">
+                    <ScanBarcode className="h-7 w-7 text-primary opacity-60" />
+                  </div>
+                  <div className="font-bold text-foreground">
+                    {lang === "ar" ? "لا توجد منتجات مطابقة" : "No matching products"}
+                  </div>
+                  <p className="mt-1 max-w-xs text-xs text-muted-foreground">
                     {lang === "ar"
-                      ? "لم يتم العثور على أي منتجات مطابقة"
-                      : "No matching products found"}
+                      ? "لم يتم العثور على أي منتج يطابق معايير البحث أو التصفية الحالية"
+                      : "No products matched your current search or filter criteria"}
                   </p>
-                  <button
-                    type="button"
-                    onClick={clearAllFilters}
-                    className="mt-2 text-xs text-primary underline"
-                  >
-                    {lang === "ar" ? "إعادة ضبط الفلاتر" : "Reset filters"}
-                  </button>
+                  {activeFiltersCount > 0 && (
+                    <button
+                      onClick={resetFilters}
+                      className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-primary underline underline-offset-4 hover:opacity-80"
+                    >
+                      <RotateCcw className="h-3 w-3" />
+                      {lang === "ar" ? "إلغاء التصفية وإظهار الكل" : "Clear filters and show all"}
+                    </button>
+                  )}
                 </div>
               ) : viewMode === "cards" ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">
+                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-2 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                   {visibleFiltered.map((p) => {
                     const stock = stockMap[p.id] ?? 0;
                     const purchaseUom = getDefaultPurchaseUom(p);
@@ -1763,70 +2056,100 @@ function PurchasePOSPage() {
                       lang === "ar"
                         ? p.category?.name_ar || p.category?.name
                         : p.category?.name || p.category?.name_ar;
+                    const brandLabel = p.brand
+                      ? lang === "ar"
+                        ? p.brand.name_ar || p.brand.name
+                        : p.brand.name || p.brand.name_ar
+                      : null;
+                    const originLabel =
+                      lang === "ar"
+                        ? p.origin?.name_ar || p.origin?.name
+                        : p.origin?.name || p.origin?.name_ar;
                     const qualityLabel =
                       lang === "ar"
                         ? p.quality?.name_ar || p.quality?.name
                         : p.quality?.name || p.quality?.name_ar;
+                    const compats = productCompatMap.get(p.id) || [];
+                    const uniqueMakes = Array.from(
+                      new Set(compats.map((c) => c.makeName).filter(Boolean)),
+                    );
 
                     return (
                       <button
                         key={p.id}
-                        type="button"
                         onClick={() => addToCart(p)}
-                        className="card-mullak group flex h-full flex-col justify-between rounded-2xl p-3 text-start transition-all hover:shadow-md active:scale-[0.98]"
+                        className="group relative flex flex-col items-start justify-between gap-2 rounded-2xl border border-border/80 bg-white p-2.5 text-start transition-all duration-150 hover:border-primary/50 hover:shadow-md active:scale-[0.98] dark:bg-card"
                       >
                         <div className="w-full">
-                          {/* Quality & Category Badges */}
-                          <div className="mb-1.5 flex flex-wrap items-center gap-1 text-[10px]">
-                            {qualityLabel && (
-                              <span className="rounded bg-primary/10 px-1.5 py-0.5 font-bold text-primary border border-primary/20">
-                                {qualityLabel}
+                          {/* Tags strip — quality, origin, brand/category, vehicle fitment */}
+                          <div className="mb-1.5 flex flex-wrap items-center gap-1 text-[10px] leading-none">
+                            {catalogConfig.enableQualityGrades && qualityLabel && (
+                              <span
+                                className={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 font-bold border ${
+                                  qualityLabel.includes("أصلي") ||
+                                  qualityLabel.toLowerCase().includes("genuine") ||
+                                  qualityLabel.toLowerCase().includes("oem")
+                                    ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                                    : "bg-surface-2 text-foreground/80 border-border/70"
+                                }`}
+                              >
+                                <span>{qualityLabel}</span>
                               </span>
                             )}
-                            {catLabel && (
-                              <span className="rounded bg-surface-2 px-1.5 py-0.5 text-muted-foreground font-medium border border-border/60 truncate max-w-[100px]">
+
+                            {catalogConfig.enableOrigins && originLabel && (
+                              <span className="inline-flex items-center gap-0.5 rounded border border-border/60 bg-surface px-1 py-0.5 text-muted-foreground font-medium">
+                                <span>{originLabel}</span>
+                              </span>
+                            )}
+
+                            {catalogConfig.enableBrands && brandLabel ? (
+                              <span className="inline-flex max-w-[85px] items-center truncate rounded border border-primary/20 bg-primary/10 px-1.5 py-0.5 font-semibold text-primary">
+                                {brandLabel}
+                              </span>
+                            ) : catLabel ? (
+                              <span className="inline-flex max-w-[85px] items-center truncate rounded bg-surface-2 px-1.5 py-0.5 text-muted-foreground">
                                 {catLabel}
+                              </span>
+                            ) : null}
+
+                            {catalogConfig.enableMakesAndModels && compats.length > 0 && (
+                              <span
+                                className="inline-flex max-w-[120px] items-center gap-0.5 truncate rounded border border-sky-500/25 bg-sky-500/10 px-1.5 py-0.5 font-semibold text-sky-700 dark:text-sky-300"
+                                title={compats
+                                  .map((c) => `${c.makeName} - ${c.modelName}`)
+                                  .join(" | ")}
+                              >
+                                <span>
+                                  🏍️ {uniqueMakes[0] || compats[0].makeName}{" "}
+                                  {compats.length > 1
+                                    ? `(+${compats.length - 1})`
+                                    : compats[0].modelName}
+                                </span>
                               </span>
                             )}
                           </div>
 
-                          {/* Product Title */}
-                          <h4 className="text-xs font-bold text-foreground leading-snug line-clamp-2 group-hover:text-primary transition-colors">
-                            {lang === "ar" ? p.name_ar || p.name : p.name || p.name_ar}
-                          </h4>
-
-                          {/* SKU & Barcode */}
-                          <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground font-mono">
-                            {p.sku && <span>SKU: {p.sku}</span>}
-                            {p.barcode && <span>#{p.barcode}</span>}
+                          {/* Product name */}
+                          <div className="line-clamp-2 text-xs font-bold leading-snug text-foreground transition-colors group-hover:text-primary sm:text-sm">
+                            {lang === "ar" && p.name_ar ? p.name_ar : p.name}
                           </div>
                         </div>
 
-                        {/* Financials & Stock */}
-                        <div className="mt-2.5 pt-2 border-t border-border/60 w-full flex items-center justify-between">
-                          <div>
-                            <span className="text-[10px] text-muted-foreground block">
-                              {lang === "ar" ? "سعر التكلفة:" : "Cost:"}
-                            </span>
-                            <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                              {money(purchaseUom.purchase_price)}
-                            </span>
-                            <span className="block truncate text-[9px] text-muted-foreground">
-                              {purchaseUom.label}
-                            </span>
-                          </div>
-
-                          {/* Warehouse Stock */}
-                          <div className="text-end">
-                            <span className="text-[10px] text-muted-foreground block">
-                              {lang === "ar" ? "المخزون:" : "Stock:"}
-                            </span>
-                            <span
-                              className={`font-mono text-xs font-semibold ${stock <= 0 ? "text-amber-500" : "text-muted-foreground"}`}
-                            >
-                              {stockInPurchaseUnit}
-                            </span>
-                          </div>
+                        {/* Price & stock */}
+                        <div className="mt-2 flex w-full items-center justify-between border-t border-border/40 pt-1.5">
+                          <span className="font-mono text-xs font-black text-primary [unicode-bidi:isolate] sm:text-sm">
+                            {money(purchaseUom.purchase_price)}
+                          </span>
+                          <span
+                            className={`rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold ${
+                              stock <= 0
+                                ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
+                                : "bg-muted text-muted-foreground"
+                            }`}
+                          >
+                            {`${stockInPurchaseUnit} · ${purchaseUom.label || ""}`}
+                          </span>
                         </div>
                       </button>
                     );
@@ -1834,78 +2157,115 @@ function PurchasePOSPage() {
                 </div>
               ) : viewMode === "list" ? (
                 <div className="space-y-1.5">
-                  {visibleFiltered.map((product) => (
-                    <button
-                      key={product.id}
-                      type="button"
-                      onClick={() => addToCart(product)}
-                      className="card-mullak flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-start transition hover:shadow-sm"
-                    >
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-semibold">
-                          {lang === "ar"
-                            ? product.name_ar || product.name
-                            : product.name || product.name_ar}
-                        </span>
-                        <span className="block truncate text-[11px] text-muted-foreground">
-                          {product.category?.name_ar ||
-                            product.category?.name ||
-                            product.sku ||
-                            "—"}
-                          {product.barcode ? ` · ${product.barcode}` : ""}
-                        </span>
-                      </span>
-                      <span className="shrink-0 text-end">
-                        <span className="block text-xs font-semibold text-primary">
-                          {money(getDefaultPurchaseUom(product).purchase_price)}
-                        </span>
-                        <span className="block text-[10px] text-muted-foreground">
-                          {lang === "ar"
-                            ? `المخزون: ${(stockMap[product.id] ?? 0) / Math.max(getDefaultPurchaseUom(product).factor_to_base, 0.000000001)} ${getDefaultPurchaseUom(product).label}`
-                            : `Stock: ${(stockMap[product.id] ?? 0) / Math.max(getDefaultPurchaseUom(product).factor_to_base, 0.000000001)} ${getDefaultPurchaseUom(product).label}`}
-                        </span>
-                      </span>
-                    </button>
-                  ))}
+                  {visibleFiltered.map((p) => {
+                    const stock = stockMap[p.id] ?? 0;
+                    const purchaseUom = getDefaultPurchaseUom(p);
+                    const stockInPurchaseUnit =
+                      stock / Math.max(purchaseUom.factor_to_base, 0.000000001);
+                    const catLabel =
+                      lang === "ar"
+                        ? p.category?.name_ar || p.category?.name
+                        : p.category?.name || p.category?.name_ar;
+
+                    return (
+                      <div
+                        key={p.id}
+                        className="group flex items-center justify-between gap-2.5 rounded-xl border border-border/70 bg-white p-2 transition-all hover:border-primary/50 hover:shadow-xs dark:bg-card"
+                      >
+                        {(p.barcode || p.sku) && (
+                          <span className="hidden shrink-0 rounded-md bg-muted/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground sm:inline-block">
+                            {p.barcode || p.sku}
+                          </span>
+                        )}
+
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-xs font-semibold text-foreground transition-colors group-hover:text-primary">
+                            {lang === "ar" && p.name_ar ? p.name_ar : p.name}
+                          </div>
+                          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                            {catLabel && <span className="max-w-[120px] truncate">{catLabel}</span>}
+                            {p.brand && (
+                              <span className="max-w-[100px] truncate font-medium text-primary">
+                                {lang === "ar" ? p.brand.name_ar || p.brand.name : p.brand.name}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="shrink-0 text-end">
+                          <span
+                            className={`rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold ${
+                              stock <= 0
+                                ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
+                                : "bg-muted/70 text-muted-foreground"
+                            }`}
+                          >
+                            {`${stockInPurchaseUnit} ${purchaseUom.label}`}
+                          </span>
+                        </div>
+
+                        <div className="min-w-[4.5rem] shrink-0 text-end font-mono text-xs font-extrabold text-primary [unicode-bidi:isolate] sm:text-sm">
+                          {money(purchaseUom.purchase_price)}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => addToCart(p)}
+                          className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary transition hover:bg-primary hover:text-primary-foreground active:scale-90"
+                          title={t("pos.add_to_cart")}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
-                <div className="overflow-x-auto rounded-lg border border-border">
+                <div className="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-xs">
                   <table className="w-full text-start text-xs">
-                    {/* الترويسة ليست sticky: الحاوي الأب overflow-x-auto فقط،
-                     * والـ sticky بداخله كان يرسم الترويسة كطبقة عائمة شفافة
-                     * (تأثير غريب أثناء التمرير) بدل صف ثابت عادي. */}
-                    <thead className="bg-surface-2 text-muted-foreground">
-                      <tr>
+                    <thead>
+                      <tr className="border-b border-border/80 bg-muted/50 text-[11px] font-bold text-muted-foreground">
                         {(
                           [
                             {
-                              key: "name",
-                              label: lang === "ar" ? "الصنف" : "Product",
-                              align: "start",
-                            },
-                            {
                               key: "code",
-                              label: lang === "ar" ? "الرمز" : "Code",
+                              label: lang === "ar" ? "الباركود / الرمز" : "Barcode / SKU",
                               align: "start",
                             },
                             {
-                              key: "cost",
-                              label: lang === "ar" ? "التكلفة" : "Cost",
-                              align: "end",
+                              key: "name",
+                              label: lang === "ar" ? "اسم المنتج" : "Product Name",
+                              align: "start",
+                            },
+                            {
+                              key: "category",
+                              label: lang === "ar" ? "التصنيف والماركة" : "Category & Brand",
+                              align: "start",
                             },
                             {
                               key: "stock",
-                              label: lang === "ar" ? "المخزون" : "Stock",
+                              label: lang === "ar" ? "المتوفر" : "Stock",
+                              align: "center",
+                            },
+                            {
+                              key: "cost",
+                              label: lang === "ar" ? "سعر الشراء" : "Cost",
                               align: "end",
                             },
                           ] as const
                         ).map((column) => {
                           const active = catalogTableSort.key === column.key;
-                          const DirectionIcon = active
+                          const sortLabel = active
                             ? catalogTableSort.direction === "asc"
-                              ? ArrowUp
-                              : ArrowDown
-                            : ArrowDownUp;
+                              ? lang === "ar"
+                                ? "تصاعدي"
+                                : "ascending"
+                              : lang === "ar"
+                                ? "تنازلي"
+                                : "descending"
+                            : lang === "ar"
+                              ? "غير مرتب"
+                              : "not sorted";
                           return (
                             <th
                               key={column.key}
@@ -1916,7 +2276,7 @@ function PurchasePOSPage() {
                                     : "descending"
                                   : "none"
                               }
-                              className={`p-1.5 sm:p-2 ${column.align === "end" ? "text-end" : "text-start"}`}
+                              className={`px-3 py-2 ${column.align === "end" ? "text-end" : column.align === "center" ? "text-center" : "text-start"}`}
                             >
                               <button
                                 type="button"
@@ -1929,63 +2289,101 @@ function PurchasePOSPage() {
                                         : "asc",
                                   }))
                                 }
-                                title={column.label}
                                 className="inline-flex items-center gap-1 rounded-full px-1.5 py-1 transition hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                                title={`${column.label} · ${sortLabel}`}
                               >
                                 {column.label}
-                                <DirectionIcon
-                                  className={`size-3 ${active ? "text-primary" : "opacity-40"}`}
-                                  aria-hidden
-                                />
+                                {active ? (
+                                  catalogTableSort.direction === "asc" ? (
+                                    <ArrowUp className="size-3 text-primary" aria-hidden />
+                                  ) : (
+                                    <ArrowDown className="size-3 text-primary" aria-hidden />
+                                  )
+                                ) : (
+                                  <ArrowDownUp className="size-3 opacity-40" aria-hidden />
+                                )}
                               </button>
                             </th>
                           );
                         })}
+                        <th className="px-3 py-2 text-center">
+                          {lang === "ar" ? "إجراء" : "Action"}
+                        </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-border/60">
-                      {tableRows.map((product) => (
-                        <tr
-                          key={product.id}
-                          onClick={() => addToCart(product)}
-                          className="cursor-pointer hover:bg-primary/5"
-                        >
-                          <td className="p-2 font-medium">
-                            {lang === "ar"
-                              ? product.name_ar || product.name
-                              : product.name || product.name_ar}
-                          </td>
-                          <td className="p-2 font-mono text-muted-foreground">
-                            {product.sku || product.barcode || "—"}
-                          </td>
-                          <td className="p-2 text-end">
-                            {money(getDefaultPurchaseUom(product).purchase_price)}{" "}
-                            <span className="text-muted-foreground">
-                              /{getDefaultPurchaseUom(product).label}
-                            </span>
-                          </td>
-                          <td className="p-2 text-end">
-                            {(stockMap[product.id] ?? 0) /
-                              Math.max(getDefaultPurchaseUom(product).factor_to_base, 0.000000001)}
-                          </td>
-                        </tr>
-                      ))}
+                    <tbody className="divide-y divide-border/50">
+                      {tableRows.map((p) => {
+                        const stock = stockMap[p.id] ?? 0;
+                        const purchaseUom = getDefaultPurchaseUom(p);
+                        const stockInPurchaseUnit =
+                          stock / Math.max(purchaseUom.factor_to_base, 0.000000001);
+                        const catLabel =
+                          lang === "ar"
+                            ? p.category?.name_ar || p.category?.name
+                            : p.category?.name || p.category?.name_ar;
+
+                        return (
+                          <tr
+                            key={p.id}
+                            onClick={() => addToCart(p)}
+                            className="cursor-pointer transition hover:bg-primary/[0.04]"
+                          >
+                            <td className="px-3 py-2 font-mono text-[11px] text-muted-foreground">
+                              {p.barcode || p.sku || "—"}
+                            </td>
+                            <td className="px-3 py-2 font-semibold text-foreground">
+                              {lang === "ar" && p.name_ar ? p.name_ar : p.name}
+                            </td>
+                            <td className="px-3 py-2 text-muted-foreground">
+                              {catLabel || "—"}
+                              {p.brand &&
+                                ` · ${lang === "ar" ? p.brand.name_ar || p.brand.name : p.brand.name}`}
+                            </td>
+                            <td className="px-3 py-2 text-center font-mono font-semibold">
+                              <span
+                                className={`rounded-md px-1.5 py-0.5 text-[10px] ${
+                                  stock <= 0
+                                    ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
+                                    : "bg-muted/70 text-foreground"
+                                }`}
+                              >
+                                {stockInPurchaseUnit}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 text-end font-mono font-bold text-primary [unicode-bidi:isolate]">
+                              {money(purchaseUom.purchase_price)}
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  addToCart(p);
+                                }}
+                                className="inline-grid h-6 w-6 place-items-center rounded-md bg-primary/10 text-primary transition hover:bg-primary hover:text-primary-foreground active:scale-90"
+                              >
+                                <Plus className="h-3.5 w-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
               )}
 
-              {/* Infinite scroll sentinel */}
+              {/* Sentinel for infinite scroll loading the next batch */}
               {visibleFiltered.length < filtered.length && (
                 <div
                   ref={catalogSentinelRef}
-                  className="py-4 text-center text-xs text-muted-foreground flex items-center justify-center gap-2"
+                  className="flex items-center justify-center gap-2 py-3 text-center text-xs text-muted-foreground"
                 >
-                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  <span className="inline-block h-2 w-2 rounded-full bg-primary animate-ping" />
                   <span>
                     {lang === "ar"
-                      ? `جارٍ تحميل المزيد (${visibleFiltered.length} من ${filtered.length})...`
-                      : `Loading more (${visibleFiltered.length} of ${filtered.length})...`}
+                      ? `عرض ${visibleFiltered.length} من أصل ${filtered.length} صنف (مرر لتحميل المزيد)`
+                      : `Showing ${visibleFiltered.length} of ${filtered.length} items (scroll for more)`}
                   </span>
                 </div>
               )}
@@ -1993,64 +2391,110 @@ function PurchasePOSPage() {
           </div>
         )}
 
-        {/* Right Column: Purchase Cart & Invoicing — the primary workspace. */}
+        {/* ─── Cart Panel (Primary Workspace on All Devices) ─── */}
         <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-primary/20 bg-surface/95 p-1.5 shadow-xl ring-1 ring-border/50 backdrop-blur-md sm:p-2 lg:col-start-2 lg:row-start-2">
           {/* Cart Header */}
-          <div className="mb-2 flex shrink-0 items-center justify-between border-b border-border/60 px-1 pb-2">
+          <div className="mb-1 flex shrink-0 items-center justify-between border-b border-border/60 px-1 pb-1.5">
             <div className="flex items-center gap-2">
               <div className="grid size-7 place-items-center rounded-full bg-primary/10 text-primary">
-                <ShoppingBag className="h-4 w-4" />
+                <ShoppingCart className="h-4 w-4" />
               </div>
               <h2 className="flex items-center gap-2 text-xs font-bold text-foreground sm:text-sm">
-                <span>{lang === "ar" ? "أصناف أمر الشراء" : "Purchase Items"}</span>
-                <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-mono font-extrabold text-primary">
-                  {cart.length}
+                <span>{lang === "ar" ? "سلة المشتريات" : "Purchase cart"}</span>
+                <span className="rounded-full bg-primary/15 px-2 py-0.5 font-mono text-[10px] font-extrabold text-primary">
+                  {cart.length} {lang === "ar" ? "أصناف" : "items"}
                 </span>
               </h2>
             </div>
-            {isDesktop ? (
-              cart.length > 0 && (
+
+            <div className="flex shrink-0 items-center gap-1">
+              {paymentMethod !== "split" && splitPaymentLines.length === 0 && (
                 <button
                   type="button"
-                  onClick={() => setCart([])}
-                  className="grid size-8 shrink-0 place-items-center rounded-full border border-destructive/20 text-destructive transition hover:bg-destructive/10"
-                  title={lang === "ar" ? "إفراغ السلة" : "Clear cart"}
+                  onClick={() => {
+                    setPaymentMethod("split");
+                    setPaid("");
+                  }}
+                  disabled={cart.length === 0 || splitPaymentMethods.length < 2}
+                  aria-pressed={paymentMethod === "split"}
+                  aria-label={lang === "ar" ? "الدفع بأكثر من طريقة" : "Split payment"}
+                  title={
+                    lang === "ar"
+                      ? "توزيع قيمة الفاتورة على أكثر من طريقة دفع"
+                      : "Split the invoice across multiple payment methods"
+                  }
+                  className={`grid size-8 place-items-center rounded-full border transition disabled:opacity-40 ${
+                    paymentMethod === "split"
+                      ? "border-primary/40 bg-primary/10 text-primary"
+                      : "border-border text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                  }`}
+                >
+                  <Layers className="size-4" />
+                </button>
+              )}
+              {cart.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCart([]);
+                    setPaymentMethod("cash");
+                    setSplitPaymentLines([]);
+                  }}
+                  className="grid size-8 shrink-0 place-items-center rounded-full border border-destructive/20 text-destructive transition hover:bg-destructive/10 active:scale-95"
+                  title={lang === "ar" ? "تفريغ السلة" : "Clear cart"}
+                  aria-label={lang === "ar" ? "تفريغ السلة" : "Clear cart"}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
-              )
-            ) : (
-              <button
-                type="button"
-                onClick={() => setMobilePickerOpen(true)}
-                className="grid size-9 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm active:scale-95"
-                title={t("pos.add_product")}
-              >
-                <Plus className="h-3.5 w-3.5" />
-              </button>
-            )}
+              )}
+              {!isDesktop && (
+                <button
+                  type="button"
+                  onClick={() => setMobilePickerOpen(true)}
+                  className="grid size-8 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm active:scale-95"
+                  title={t("pos.add_product")}
+                  aria-label={t("pos.add_product")}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
           </div>
 
-          {/* Cart lines and payment details share one scroll region. */}
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain custom-scrollbar">
-            <div className="my-1 space-y-1 pr-1">
+          {/* Product rows scroll while payment controls stay anchored below. */}
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-0.5 pb-2">
+            <div className="space-y-1">
               {cart.length === 0 ? (
-                <div className="grid place-items-center py-14 text-center text-sm text-muted-foreground">
-                  <div className="grid h-12 w-12 place-items-center rounded-2xl border border-dashed border-border bg-surface-2/50 mb-2">
-                    <ShoppingBag className="h-6 w-6 opacity-40 text-muted-foreground" />
+                <div className="grid place-items-center py-12 text-center text-muted-foreground">
+                  <div className="mb-2 grid h-12 w-12 place-items-center rounded-2xl border border-border bg-muted/40">
+                    <ShoppingCart className="h-6 w-6 text-primary opacity-40" />
                   </div>
-                  <p className="text-xs font-semibold">
+                  <div className="text-xs font-bold text-foreground">
                     {lang === "ar" ? "سلة المشتريات فارغة" : "Purchase cart is empty"}
+                  </div>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    {isDesktop
+                      ? lang === "ar"
+                        ? "اختر من الفهرس أو امسح الباركود لإضافة الأصناف"
+                        : "Click products from catalogue or scan barcode"
+                      : lang === "ar"
+                        ? "اضغط على زر إضافة منتج للبحث والإضافة"
+                        : "Tap add product to search"}
                   </p>
-                  <p className="text-[11px] text-muted-foreground/80 mt-1 max-w-[200px]">
-                    {lang === "ar"
-                      ? "انقر على أي منتج أو امسح الباركود لإضافته لأمر الشراء"
-                      : "Click any item or scan barcode to add to purchase order"}
-                  </p>
+                  {!isDesktop && (
+                    <button
+                      type="button"
+                      onClick={() => setMobilePickerOpen(true)}
+                      className="mt-3 grid size-10 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm active:scale-95"
+                      title={t("pos.add_product")}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
               ) : (
                 cart.map((line) => (
-                  <div key={line.line_id} className="space-y-2">
+                  <div key={line.line_id} className="space-y-1">
                     <CartLineRow
                       line={{
                         id: line.line_id,
@@ -2058,10 +2502,7 @@ function PurchasePOSPage() {
                         quantity: line.quantity,
                         unitPrice: line.unit_cost,
                         taxRate: line.tax_rate,
-                        stock: Math.max(
-                          0,
-                          Number(stockMap[line.product_id] ?? 0) / (line.uom_factor || 1),
-                        ),
+                        priceEditable: true,
                         unitId: line.uom_id,
                         unit: line.uom_label,
                         unitOptions: line.purchase_uoms.map((uom) => ({
@@ -2073,9 +2514,9 @@ function PurchasePOSPage() {
                       }}
                       labels={{
                         price: lang === "ar" ? "سعر الشراء" : "Cost",
-                        quantity: lang === "ar" ? "الكمية" : "Qty",
-                        remove: lang === "ar" ? "حذف" : "Remove",
-                        stockLabel: lang === "ar" ? "الرصيد التقريبي" : "Current stock",
+                        quantity: t("common.qty"),
+                        remove: t("common.delete"),
+                        stockLabel: t("pos.stock_available"),
                       }}
                       formatMoney={money}
                       onQuantityCommit={(next) => setQty(line.line_id, next)}
@@ -2094,7 +2535,7 @@ function PurchasePOSPage() {
                             onChange={(event) =>
                               updateCartLine(line.line_id, { batch_number: event.target.value })
                             }
-                            className="h-9 w-full rounded-md border border-input bg-surface px-2 text-sm text-foreground"
+                            className="h-8 w-full rounded-lg border border-border bg-background px-2 text-xs text-foreground outline-none focus:border-primary"
                           />
                         </label>
                         <label className="space-y-1 text-[11px] text-muted-foreground">
@@ -2105,7 +2546,7 @@ function PurchasePOSPage() {
                             onChange={(event) =>
                               updateCartLine(line.line_id, { expiry_date: event.target.value })
                             }
-                            className="h-9 w-full rounded-md border border-input bg-surface px-2 text-sm text-foreground"
+                            className="h-8 w-full rounded-lg border border-border bg-background px-2 text-xs text-foreground outline-none focus:border-primary"
                           />
                         </label>
                       </div>
@@ -2116,21 +2557,19 @@ function PurchasePOSPage() {
             </div>
           </div>
 
-          {/* Fixed payment and totals footer */}
-          <div className="max-h-[56dvh] shrink-0 space-y-1.5 overflow-y-auto overscroll-contain border-t border-border/70 bg-surface/95 pt-2 pr-1">
-            <div className="grid min-w-0 grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.8fr)] items-end gap-1.5">
+          {/* Fixed payment, totals and note footer */}
+          {/* data-form-nav-scope: the counter's keyboard order. Tab and Enter
+              walk method → reference → paid → discount → note → save. */}
+          <div
+            ref={purchaseFormScopeRef}
+            data-form-nav-scope
+            className="max-h-[56dvh] shrink-0 space-y-1.5 overflow-y-auto overscroll-contain border-t border-border/70 bg-surface/95 pt-2 pr-0.5"
+          >
+            <div className="grid min-w-0 grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] items-end gap-1.5">
               <div className="flex min-w-0 flex-col gap-1">
-                <span className="truncate text-[10px] font-semibold leading-none text-muted-foreground">
+                <span className="truncate text-[10px] font-semibold leading-none text-muted-foreground sm:text-[11px]">
                   {lang === "ar" ? "طريقة الدفع" : "Payment method"}
                 </span>
-                {/*
-                 * المكوّن الموحّد (يعرض معه المؤسسة وسطرها) بدل المنتقي القديم.
-                 *
-                 * `showSettlement`: كان `false`، فلم تُعرض سوى قائمة الطريقة —
-                 * أي أن شراءً بحوالة بنكية كان يمكن حفظه **بلا رقم مرجعي أصلًا**.
-                 * المرجع هو ما يطابق الدفعة بإشعار البنك، وحرمان هذه الشاشة منه
-                 * يجعل مطابقة كشف الموردين مستحيلة. الحقل يعود هنا كما في كل شاشة.
-                 */}
                 <PaymentMethodSelect
                   context="purchases"
                   value={paymentMethod}
@@ -2152,10 +2591,6 @@ function PurchasePOSPage() {
                   ensureIds={[paymentMethod]}
                   label={lang === "ar" ? "طريقة الدفع" : "Payment method"}
                   className="min-w-0"
-                  /*
-                    حقل المرجع يرسمه المكوّن الآن. `transferRef` يظل مرآة له
-                    لأن منطق الإرسال والتحقق يقرأ منه — لا حقل ثانٍ في الشاشة.
-                  */
                   settlement={{
                     method: paymentMethod,
                     paymentMethodId: paymentSelection.paymentMethodId ?? null,
@@ -2172,71 +2607,91 @@ function PurchasePOSPage() {
                   isSplitMode={paymentMethod === "split"}
                 />
               </div>
-              {paymentMethod === "split" && (
-                <SplitPaymentEditor
-                  total={total}
-                  lines={splitPaymentLines}
-                  methods={splitPaymentMethods}
-                  onChange={setSplitPaymentLines}
-                  lang={lang === "ar" ? "ar" : "en"}
-                  className="col-span-full"
+
+              {paymentMethod === "split" ? (
+                <PosLabeledField
+                  label={lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}
+                  icon={<Wallet className="size-3" />}
+                  emphasis
+                >
+                  <div className="flex h-9 min-w-0 items-center truncate rounded-xl border border-primary/25 bg-primary/[0.04] px-2.5 text-xs font-semibold tabular-nums text-primary">
+                    {money(splitPaidN)}
+                  </div>
+                </PosLabeledField>
+              ) : (
+                <AmountInput
+                  id="purchase-paid"
+                  label={lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}
+                  icon={<Wallet className="size-3" />}
+                  showLabel
+                  dir={lang === "ar" ? "rtl" : "ltr"}
+                  value={
+                    paymentMethod === "credit"
+                      ? "0"
+                      : paidManuallyEdited
+                        ? paid || "0"
+                        : String(total)
+                  }
+                  onValueChange={(value) => {
+                    setPaid(value);
+                    setPaidManuallyEdited(true);
+                  }}
+                  invalid={isOverpaid}
+                  data-form-nav
+                  placeholder={lang === "ar" ? "المدفوع" : "Paid"}
+                  className={POS_FIELD_EMPHASIS_CLASS}
                 />
               )}
-              <AmountInput
-                label={lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}
-                showLabel
-                dir={lang === "ar" ? "rtl" : "ltr"}
-                value={
-                  paymentMethod === "credit"
-                    ? "0"
-                    : paymentMethod === "split"
-                      ? String(splitPaidN)
-                      : paidManuallyEdited
-                        ? paid
-                        : String(total)
-                }
-                disabled={paymentMethod === "split"}
-                onValueChange={(value) => {
-                  setPaid(value);
-                  setPaidManuallyEdited(true);
-                }}
-                invalid={isOverpaid}
-                placeholder={lang === "ar" ? "المدفوع" : "Paid"}
-                className="h-8 rounded-lg border border-border/80 bg-surface px-2 text-[10px] outline-none focus:border-primary sm:text-[11px]"
+            </div>
+
+            {paymentMethod === "split" && (
+              <SplitPaymentEditor
+                total={total}
+                lines={splitPaymentLines}
+                methods={splitPaymentMethods}
+                onChange={setSplitPaymentLines}
+                lang={lang === "ar" ? "ar" : "en"}
               />
+            )}
+
+            {/* Notes + discount share one row. Same label slot, height and
+                surface as the payment field above, so the three read as one
+                control group instead of a framed box beside a bare input. */}
+            <div className="flex items-end gap-1.5">
+              <PosLabeledField
+                label={lang === "ar" ? "الملاحظة" : "Note"}
+                icon={<StickyNote className="size-3" />}
+                htmlFor="purchase-note"
+                className="flex-1"
+              >
+                <input
+                  id="purchase-note"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  data-form-nav
+                  placeholder={
+                    lang === "ar" ? "ملاحظة على الفاتورة (اختياري)" : "Invoice note (optional)"
+                  }
+                  className={POS_FIELD_CLASS}
+                />
+              </PosLabeledField>
               <AmountInput
+                id="purchase-discount"
                 label={lang === "ar" ? "الخصم" : "Discount"}
+                icon={<Percent className="size-3" />}
                 showLabel
                 dir={lang === "ar" ? "rtl" : "ltr"}
                 value={discount}
                 onValueChange={setDiscount}
-                placeholder={lang === "ar" ? "الخصم" : "Discount"}
-                className="h-8 rounded-lg border border-border/80 bg-surface px-2 text-[10px] outline-none focus:border-primary sm:text-[11px]"
+                data-form-nav
+                placeholder="0"
+                className={`w-28 shrink-0 ${POS_FIELD_CLASS}`}
               />
             </div>
 
-            {isOverpaid && (
-              <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-2.5 py-1.5 text-[11px] font-medium text-destructive">
-                {lang === "ar"
-                  ? "المبلغ المدفوع أكبر من إجمالي الفاتورة"
-                  : "Paid amount exceeds the invoice total"}
-              </p>
-            )}
-
-            {/* Note Input */}
-            <input
-              type="text"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder={
-                lang === "ar" ? "ملاحظة على فاتورة الشراء (اختياري)..." : "Note (optional)..."
-              }
-              className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2.5 text-xs text-foreground placeholder:text-muted-foreground/70 outline-none focus:border-primary"
-            />
-
             <PosTotalsCard
               countLabel={lang === "ar" ? "عدد الأصناف" : "Items"}
-              count={cart.reduce((sum, line) => sum + line.quantity, 0)}
+              count={cart.length}
               rows={[
                 {
                   label: lang === "ar" ? "الإجمالي بدون ضريبة" : "Subtotal",
@@ -2246,14 +2701,12 @@ function PurchasePOSPage() {
                   ? [{ label: lang === "ar" ? "قيمة الضريبة" : "Tax", value: money(taxTotal) }]
                   : []),
                 ...(discountN > 0
-                  ? [
-                      {
-                        label: lang === "ar" ? "الخصم" : "Discount",
-                        value: `−${money(discountN)}`,
-                      },
-                    ]
+                  ? [{ label: lang === "ar" ? "الخصم" : "Discount", value: `−${money(discountN)}` }]
                   : []),
-                { label: lang === "ar" ? "المبلغ المدفوع" : "Amount paid", value: money(paidN) },
+                {
+                  label: lang === "ar" ? "المبلغ المدفوع" : "Amount paid",
+                  value: money(paidN),
+                },
                 ...(total - paidN > 0
                   ? [
                       {
@@ -2266,39 +2719,71 @@ function PurchasePOSPage() {
               totalLabel={lang === "ar" ? "الإجمالي" : "Total"}
               total={money(total)}
             />
+
+            {isOverpaid && (
+              <p
+                role="alert"
+                className="rounded-lg bg-destructive/10 px-2 py-1 text-[10px] font-semibold text-destructive"
+              >
+                {lang === "ar"
+                  ? "المبلغ المدفوع أكبر من إجمالي الفاتورة"
+                  : "Paid amount exceeds the invoice total"}
+              </p>
+            )}
           </div>
 
-          {/* Actions stay outside the only scroll region. */}
-          <div
-            className="mt-2 flex shrink-0 gap-2 border-t border-border/70 bg-surface/95 pb-1 pt-2"
-            dir={lang === "ar" ? "rtl" : "ltr"}
-          >
-            <button
-              type="button"
-              onClick={openPurchaseQuotation}
-              disabled={cart.length === 0}
-              className={`flex h-11 shrink-0 items-center justify-center gap-2 rounded-2xl border border-transparent bg-foreground px-4 text-sm font-semibold text-background transition hover:opacity-90 active:scale-[0.99] disabled:opacity-50 ${lang === "ar" ? "order-last" : ""}`}
-            >
-              <FileText className="h-4 w-4" />
-              <span className="hidden sm:inline">
-                {lang === "ar" ? "عرض الأسعار" : "Price preview"}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={submitPurchase}
-              disabled={loading || cart.length === 0 || isOverpaid}
-              className={`flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-primary to-primary/90 px-4 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition hover:shadow-primary/35 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50 ${lang === "ar" ? "order-first" : ""}`}
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>{lang === "ar" ? "جاري تسجيل الشراء..." : "Recording purchase..."}</span>
-                </>
-              ) : (
-                <span>{lang === "ar" ? "تسجيل فاتورة الشراء" : "Save Purchase Order"}</span>
-              )}
-            </button>
+          {/* ─── Sticky Action Row ─── */}
+          <div className="mt-2 shrink-0 border-t border-border/70 bg-surface/95 pb-1 pt-2">
+            {isOverpaid ? (
+              <button
+                type="button"
+                disabled
+                className="flex h-11 w-full cursor-not-allowed items-center justify-center gap-2 rounded-2xl border border-destructive/60 bg-destructive text-sm font-bold text-destructive-foreground opacity-90 shadow-lg shadow-destructive/20"
+              >
+                <AlertCircle className="h-4 w-4" />
+                <span>
+                  {lang === "ar"
+                    ? "المبلغ المدفوع أكبر من الإجمالي المطلوب!"
+                    : "Paid amount exceeds total!"}
+                </span>
+              </button>
+            ) : (
+              <div className="flex gap-2" dir={lang === "ar" ? "rtl" : "ltr"}>
+                {/* Secondary: price preview */}
+                <button
+                  type="button"
+                  onClick={openPurchaseQuotation}
+                  disabled={cart.length === 0}
+                  className={`flex h-11 shrink-0 items-center justify-center gap-2 rounded-2xl border border-border/80 bg-surface px-4 text-xs font-bold text-foreground transition hover:bg-surface-2 active:scale-95 disabled:opacity-40 ${lang === "ar" ? "order-last" : ""}`}
+                >
+                  <FileText className="h-4 w-4" />
+                  <span className="hidden sm:inline">
+                    {lang === "ar" ? "عرض الأسعار" : "Price preview"}
+                  </span>
+                </button>
+
+                {/* Primary: save purchase */}
+                <button
+                  type="button"
+                  onClick={submitPurchase}
+                  disabled={loading || cart.length === 0}
+                  className={`flex h-11 flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-primary via-primary to-primary/90 px-4 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/25 transition hover:shadow-primary/35 hover:brightness-105 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50 ${lang === "ar" ? "order-first" : ""}`}
+                >
+                  {loading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4" />
+                  )}
+                  <span>
+                    {loading
+                      ? lang === "ar"
+                        ? "جاري تسجيل الشراء..."
+                        : "Recording purchase..."
+                      : `${lang === "ar" ? "تسجيل فاتورة الشراء" : "Save purchase"} (F4)`}
+                  </span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -2370,6 +2855,83 @@ function PurchasePOSPage() {
           rtl={lang === "ar"}
         />
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * هيكل عظمي أنيق لكتالوج المنتجات — يظهر لحظة فتح الشاشة بنفس تخطيط العرض
+ * المختار (بطاقات / قائمة / جدول) حتى لا تقفز الواجهة عند وصول البيانات.
+ * نسخة مطابقة لما يعرضه في نقطة البيع.
+ */
+function CatalogSkeleton({ viewMode }: { viewMode: "cards" | "list" | "table" }) {
+  if (viewMode === "cards") {
+    return (
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-2 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        {Array.from({ length: 12 }).map((_, i) => (
+          <div
+            key={i}
+            className="flex flex-col gap-2 rounded-2xl border border-border/60 bg-card/70 p-2.5"
+            aria-hidden
+          >
+            <div className="h-3 w-1/2 animate-pulse rounded-full bg-muted/80" />
+            <div className="h-3.5 w-full animate-pulse rounded-md bg-muted/80" />
+            <div className="h-3.5 w-3/4 animate-pulse rounded-md bg-muted/80" />
+            <div className="mt-1 flex items-center justify-between border-t border-border/40 pt-1.5">
+              <div className="h-3 w-16 animate-pulse rounded-full bg-muted/80" />
+              <div className="h-4 w-10 animate-pulse rounded-full bg-muted/80" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (viewMode === "list") {
+    return (
+      <div className="space-y-1.5" aria-hidden>
+        {Array.from({ length: 10 }).map((_, i) => (
+          <div
+            key={i}
+            className="flex items-center justify-between gap-2.5 rounded-xl border border-border/60 bg-card/70 p-2"
+          >
+            <div className="h-3 w-20 animate-pulse rounded-full bg-muted/80" />
+            <div className="min-w-0 flex-1 space-y-1">
+              <div className="h-3 w-2/3 animate-pulse rounded-md bg-muted/80" />
+              <div className="h-2.5 w-1/3 animate-pulse rounded-md bg-muted/60" />
+            </div>
+            <div className="h-3 w-10 animate-pulse rounded-full bg-muted/80" />
+            <div className="h-6 w-6 animate-pulse rounded-lg bg-muted/80" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-border/80 bg-card/70" aria-hidden>
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="border-b border-border/80 bg-muted/50">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <th key={i} className="px-3 py-2.5">
+                <div className="mx-auto h-3 w-16 animate-pulse rounded-full bg-muted/90" />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border/40">
+          {Array.from({ length: 12 }).map((_, i) => (
+            <tr key={i}>
+              {Array.from({ length: 5 }).map((_, j) => (
+                <td key={j} className="px-3 py-2.5">
+                  <div className="h-3 w-full max-w-24 animate-pulse rounded-full bg-muted/70" />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

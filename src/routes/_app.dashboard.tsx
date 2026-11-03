@@ -515,155 +515,311 @@ function DashboardPage() {
 
           return (
             <>
-              {/* Top Row: Operational Briefing & Launchers + Full Month Luxury Chronos */}
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 items-stretch">
-                {/* Card 1: Operational Briefing & Quick Launchers Dock (6 cols) */}
-                <div className="relative overflow-hidden rounded-3xl border border-border/80 bg-gradient-to-br from-card via-card/95 to-zinc-900/40 dark:from-zinc-950 dark:via-zinc-900/90 dark:to-zinc-950 p-5 sm:p-6 lg:col-span-6 shadow-panel backdrop-blur-xl flex flex-col justify-between">
+              {/* Top Row: Operational Briefing + Vitals in Center + Compact Chronos on the Left */}
+              <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-12 items-stretch">
+                {/* Card 1: Operational Briefing & Quick Launchers Dock (4 cols - Right side in RTL) */}
+                <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-border/80 bg-gradient-to-br from-card via-card/95 to-zinc-900/40 dark:from-zinc-950 dark:via-zinc-900/90 dark:to-zinc-950 p-3.5 sm:p-4 lg:col-span-4 shadow-panel backdrop-blur-xl flex flex-col justify-between">
                   {/* Ambient Lighting */}
                   <div className="pointer-events-none absolute -top-24 -start-24 size-72 rounded-full bg-amber-500/10 blur-3xl opacity-70" />
                   <div className="pointer-events-none absolute -bottom-24 -end-24 size-64 rounded-full bg-emerald-500/10 blur-3xl opacity-60" />
                   <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
 
-                  {/* Operational Briefing Header (Replaced user greeting with business health briefing) */}
-                  <div className="relative space-y-4">
+                  {/* Operational Briefing Header */}
+                  <div className="relative space-y-3">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="grid size-11 place-items-center rounded-2xl bg-gradient-to-br from-amber-500/20 via-amber-500/10 to-transparent border border-amber-500/30 text-amber-500 shadow-inner">
-                          <Activity className="size-5" />
+                      <div className="flex items-center gap-2.5">
+                        <div className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-amber-500/20 via-amber-500/10 to-transparent border border-amber-500/30 text-amber-500 shadow-inner">
+                          <Activity className="size-4" />
                         </div>
                         <div>
-                          <h3 className="text-base sm:text-lg font-black text-foreground tracking-tight">
+                          <h3 className="text-sm sm:text-base font-black text-foreground tracking-tight">
                             {isAr
                               ? "الموجز التنفيذي والجاهزية اليومية"
                               : "Executive Operations Briefing"}
                           </h3>
-                          <p className="text-xs text-muted-foreground font-medium">
+                          <p className="text-[11px] text-muted-foreground font-medium">
                             {isAr
                               ? "كفاءة حركة النقد ومسارات الإنجاز الفوري"
                               : "Cash velocity & rapid execution paths"}
                           </p>
                         </div>
                       </div>
-                      <span className="hidden sm:inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                      <span className="hidden sm:inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
                         <CheckCircle2 className="size-3" />
-                        <span>{isAr ? "تشغيلي 100%" : "Optimal"}</span>
+                        <span>{isAr ? "تشغيلي" : "Optimal"}</span>
                       </span>
                     </div>
 
                     {/* Operational Pulse Metrics */}
-                    <div className="grid grid-cols-3 gap-2.5 pt-1">
-                      <div className="rounded-2xl border border-border/70 bg-surface/60 p-3 backdrop-blur-xs">
-                        <span className="block text-[11px] font-semibold text-muted-foreground mb-1">
+                    <div className="grid grid-cols-3 gap-2 pt-0.5">
+                      <div className="rounded-xl border border-border/70 bg-surface/60 p-2 backdrop-blur-xs">
+                        <span className="block text-[10px] font-semibold text-muted-foreground mb-0.5 truncate">
                           {isAr ? "الوردية والبيع" : "Shift Status"}
                         </span>
-                        <div className="flex items-center gap-1.5">
-                          <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-                          <span className="text-xs sm:text-sm font-bold text-foreground truncate">
+                        <div className="flex items-center gap-1">
+                          <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                          <span className="text-[11px] sm:text-xs font-bold text-foreground truncate">
                             {isAr ? "نقطة البيع نشطة" : "POS Ready"}
                           </span>
                         </div>
                       </div>
 
-                      <div className="rounded-2xl border border-border/70 bg-surface/60 p-3 backdrop-blur-xs">
-                        <span className="block text-[11px] font-semibold text-muted-foreground mb-1">
+                      <div className="rounded-xl border border-border/70 bg-surface/60 p-2 backdrop-blur-xs">
+                        <span className="block text-[10px] font-semibold text-muted-foreground mb-0.5 truncate">
                           {isAr ? "عمليات اليوم المختار" : "Selected Day"}
                         </span>
-                        <div className="flex items-center gap-1.5 font-mono text-xs sm:text-sm font-black text-foreground">
-                          <ShoppingCart className="size-3.5 text-amber-500 shrink-0" />
+                        <div className="flex items-center gap-1 font-mono text-[11px] sm:text-xs font-black text-foreground truncate">
+                          <ShoppingCart className="size-3 text-amber-500 shrink-0" />
                           <span>
                             {num(selectedDayOrders)} {isAr ? "فاتورة" : "orders"}
                           </span>
                         </div>
                       </div>
 
-                      <div className="rounded-2xl border border-border/70 bg-surface/60 p-3 backdrop-blur-xs">
-                        <span className="block text-[11px] font-semibold text-muted-foreground mb-1">
+                      <div className="rounded-xl border border-border/70 bg-surface/60 p-2 backdrop-blur-xs">
+                        <span className="block text-[10px] font-semibold text-muted-foreground mb-0.5 truncate">
                           {isAr ? "جاهزية البيانات" : "Data Sync"}
                         </span>
-                        <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-foreground">
-                          <Zap className="size-3.5 text-amber-500 shrink-0" />
+                        <div className="flex items-center gap-1 text-[11px] sm:text-xs font-bold text-foreground truncate">
+                          <Zap className="size-3 text-amber-500 shrink-0" />
                           <span className="text-emerald-600 dark:text-emerald-400 truncate">
-                            {isAr ? "محدثة كلياً" : "Live Synced"}
+                            {isAr ? "محدثة" : "Live"}
                           </span>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Fast Launchers Dock (Preserved Exactly As Requested) */}
-                  <div className="relative mt-5 pt-4 border-t border-border/50">
-                    <div className="flex items-center justify-between mb-2.5">
-                      <span className="text-xs font-bold text-muted-foreground">
+                  {/* Fast Launchers Dock */}
+                  <div className="relative mt-3 pt-2.5 border-t border-border/50">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[11px] font-bold text-muted-foreground">
                         {isAr ? "مسارات الإطلاق السريع:" : "Fast Actions:"}
                       </span>
-                      <span className="text-[11px] font-medium text-muted-foreground/80">
-                        {isAr ? "اختصارات لوحة المفاتيح مدعومة" : "Shortcuts ready"}
+                      <span className="text-[10px] font-medium text-muted-foreground/80">
+                        {isAr ? "اختصارات سريعة" : "Shortcuts"}
                       </span>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <Link
                         to="/pos"
-                        className="inline-flex h-8 sm:h-9 items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-3 text-xs font-bold text-white shadow-sm hover:from-amber-600 hover:to-amber-700 transition-all active:scale-95"
+                        className="inline-flex h-7 sm:h-8 items-center gap-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 px-2.5 text-[11px] font-bold text-white shadow-xs hover:from-amber-600 hover:to-amber-700 transition-all active:scale-95"
                       >
-                        <Zap className="size-3.5" />
-                        <span>{lang === "ar" ? "نقطة البيع (POS)" : "Open POS"}</span>
-                        <kbd className="hidden sm:inline-block rounded bg-black/20 px-1 py-0.2 text-[9px] font-mono">
+                        <Zap className="size-3" />
+                        <span>{lang === "ar" ? "نقطة البيع" : "POS"}</span>
+                        <kbd className="hidden sm:inline-block rounded bg-black/20 px-1 py-0.2 text-[8px] font-mono">
                           F2
                         </kbd>
                       </Link>
 
                       <Link
                         to="/sales"
-                        className="inline-flex h-8 sm:h-9 items-center gap-1.5 rounded-xl border border-border/80 bg-surface/80 px-2.5 text-xs font-semibold text-foreground hover:bg-surface-2 transition-all active:scale-95"
+                        className="inline-flex h-7 sm:h-8 items-center gap-1 rounded-lg border border-border/80 bg-surface/80 px-2 text-[11px] font-semibold text-foreground hover:bg-surface-2 transition-all active:scale-95"
                       >
-                        <Receipt className="size-3.5 text-muted-foreground" />
+                        <Receipt className="size-3 text-muted-foreground" />
                         <span>{lang === "ar" ? "الفواتير" : "Invoices"}</span>
                       </Link>
 
                       <Link
                         to="/debts"
-                        className="inline-flex h-8 sm:h-9 items-center gap-1.5 rounded-xl border border-border/80 bg-surface/80 px-2.5 text-xs font-semibold text-foreground hover:bg-surface-2 transition-all active:scale-95"
+                        className="inline-flex h-7 sm:h-8 items-center gap-1 rounded-lg border border-border/80 bg-surface/80 px-2 text-[11px] font-semibold text-foreground hover:bg-surface-2 transition-all active:scale-95"
                       >
-                        <Wallet className="size-3.5 text-amber-500" />
-                        <span>{lang === "ar" ? "التحصيل والديون" : "Debts"}</span>
+                        <Wallet className="size-3 text-amber-500" />
+                        <span>{lang === "ar" ? "الديون" : "Debts"}</span>
                       </Link>
 
                       <Link
                         to={"/products" as any}
                         search={{ barcode: undefined } as any}
-                        className="inline-flex h-8 sm:h-9 items-center gap-1.5 rounded-xl border border-border/80 bg-surface/80 px-2.5 text-xs font-semibold text-foreground hover:bg-surface-2 transition-all active:scale-95"
+                        className="inline-flex h-7 sm:h-8 items-center gap-1 rounded-lg border border-border/80 bg-surface/80 px-2 text-[11px] font-semibold text-foreground hover:bg-surface-2 transition-all active:scale-95"
                       >
-                        <Package className="size-3.5 text-muted-foreground" />
+                        <Package className="size-3 text-muted-foreground" />
                         <span>{lang === "ar" ? "المنتجات" : "Products"}</span>
                       </Link>
                     </div>
                   </div>
                 </div>
 
-                {/* Card 2: Luxury Executive Chronos & Full Month Calendar (6 cols) */}
-                <div className="relative overflow-hidden rounded-3xl border border-border/80 bg-gradient-to-br from-card via-surface/90 to-zinc-900/30 dark:from-zinc-950 dark:via-zinc-900/80 dark:to-zinc-950 p-5 sm:p-6 lg:col-span-6 shadow-panel backdrop-blur-xl flex flex-col justify-between">
+                {/* Column 2: Executive Vitals Stack (4 cols - Now in the Center, compact size) */}
+                {data && (
+                  <div className="relative flex flex-col justify-between gap-2 rounded-2xl sm:rounded-3xl border border-border/80 bg-gradient-to-br from-card via-surface/90 to-zinc-900/30 dark:from-zinc-950 dark:via-zinc-900/80 dark:to-zinc-950 p-2.5 sm:p-3 lg:col-span-4 shadow-panel backdrop-blur-xl">
+                    <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
+
+                    {/* Vital Card 1: Selected Day Sales Velocity */}
+                    <div className="group relative flex-1 overflow-hidden rounded-xl sm:rounded-2xl border border-border/70 bg-surface/60 p-2.5 shadow-xs transition-all hover:border-primary/40 hover:shadow-sm">
+                      <div className="pointer-events-none absolute end-0 top-0 size-16 rounded-full bg-primary/10 blur-xl transition-all group-hover:bg-primary/15" />
+                      <div className="mb-1 flex items-center justify-between gap-1 text-xs text-muted-foreground">
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <div className="grid size-6 shrink-0 place-items-center rounded-lg border border-primary/20 bg-primary/10 text-primary">
+                            <TrendingUp className="size-3" />
+                          </div>
+                          <span className="truncate text-[11px] font-bold text-foreground">
+                            {isSelectedToday
+                              ? isAr
+                                ? "تدفق مبيعات اليوم"
+                                : "Today Sales Inflow"
+                              : isAr
+                                ? `مبيعات (${selectedDateKey})`
+                                : `Inflow (${selectedDateKey})`}
+                          </span>
+                        </div>
+                        <span
+                          className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.2 text-[9px] font-bold ${
+                            isSelectedToday
+                              ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                              : "border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                          }`}
+                        >
+                          <span
+                            className={`size-1.5 rounded-full ${isSelectedToday ? "animate-pulse bg-emerald-500" : "bg-amber-500"}`}
+                          />
+                          <span>
+                            {isSelectedToday
+                              ? isAr
+                                ? "مباشر"
+                                : "Live"
+                              : isAr
+                                ? "محدد"
+                                : "Selected"}
+                          </span>
+                        </span>
+                      </div>
+
+                      <div className="mt-0.5 truncate font-mono text-base font-black tracking-tight text-foreground sm:text-lg">
+                        {money(selectedDayRevenue)}
+                      </div>
+
+                      <div className="mt-1 flex items-center justify-between border-t border-border/40 pt-1 text-[10px] text-muted-foreground">
+                        <span className="flex items-center gap-1 font-medium truncate">
+                          <ShoppingCart className="size-2.5 text-muted-foreground/70" />
+                          <span>
+                            {num(selectedDayOrders)} {isAr ? "فواتير مسجلة" : "invoices"}
+                          </span>
+                        </span>
+                        <Link
+                          to="/sales"
+                          className="flex shrink-0 items-center gap-0.5 font-bold text-primary hover:underline"
+                        >
+                          {isAr ? "سجل المبيعات" : "Sales log"}
+                          <ChevronLeft className="size-3 rotate-180 rtl:rotate-0" />
+                        </Link>
+                      </div>
+                    </div>
+
+                    {/* Vital Card 2: Market Liquidity & Receivables Exposure */}
+                    <div className="group relative flex-1 overflow-hidden rounded-xl sm:rounded-2xl border border-border/70 bg-surface/60 p-2.5 shadow-xs transition-all hover:border-amber-500/40 hover:shadow-sm">
+                      <div className="pointer-events-none absolute end-0 top-0 size-16 rounded-full bg-amber-500/10 blur-xl transition-all group-hover:bg-amber-500/15" />
+                      <div className="mb-1 flex items-center justify-between gap-1 text-xs text-muted-foreground">
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <div className="grid size-6 shrink-0 place-items-center rounded-lg border border-amber-500/20 bg-amber-500/10 text-amber-500">
+                            <Wallet className="size-3" />
+                          </div>
+                          <span className="truncate text-[11px] font-bold text-foreground">
+                            {isAr ? "مستحقات السوق والذمم" : "Receivables & Market"}
+                          </span>
+                        </div>
+                        <span className="shrink-0 rounded-full border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.2 text-[9px] font-bold text-amber-600 dark:text-amber-400">
+                          {isAr ? "تراكمي" : "Ledger"}
+                        </span>
+                      </div>
+
+                      <div className="mt-0.5 truncate font-mono text-base font-black tracking-tight text-foreground sm:text-lg">
+                        {money(data.receivables ?? 0)}
+                      </div>
+
+                      <div className="mt-1 flex items-center justify-between border-t border-border/40 pt-1 text-[10px] text-muted-foreground">
+                        <span className="truncate font-medium">
+                          {isAr ? "أرصدة عملاء بالسوق" : "Customer balances"}
+                        </span>
+                        <Link
+                          to="/debts"
+                          className="flex shrink-0 items-center gap-0.5 font-bold text-amber-600 hover:underline dark:text-amber-400"
+                        >
+                          {isAr ? "متابعة" : "Collect"}
+                          <ChevronLeft className="size-3 rotate-180 rtl:rotate-0" />
+                        </Link>
+                      </div>
+                    </div>
+
+                    {/* Vital Card 3: Supply Chain Readiness & Critical Stock */}
+                    <div className="group relative flex-1 overflow-hidden rounded-xl sm:rounded-2xl border border-border/70 bg-surface/60 p-2.5 shadow-xs transition-all hover:border-rose-500/40 hover:shadow-sm">
+                      <div className="pointer-events-none absolute end-0 top-0 size-16 rounded-full bg-rose-500/10 blur-xl transition-all group-hover:bg-rose-500/15" />
+                      <div className="mb-1 flex items-center justify-between gap-1 text-xs text-muted-foreground">
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <div className="grid size-6 shrink-0 place-items-center rounded-lg border border-primary/20 bg-primary/10 text-primary">
+                            <Activity className="size-3" />
+                          </div>
+                          <span className="truncate text-[11px] font-bold text-foreground">
+                            {isAr ? "جاهزية المخزون والإمداد" : "Stock Readiness"}
+                          </span>
+                        </div>
+                        <span className="shrink-0 font-mono text-[9px] font-semibold text-muted-foreground">
+                          {isAr ? "آلي" : "Auto"}
+                        </span>
+                      </div>
+
+                      {(data.alerts ?? 0) > 0 ? (
+                        <div className="mt-0.5 flex items-center gap-1 rounded-lg border border-rose-500/20 bg-rose-500/10 px-2 py-0.5 text-rose-600 dark:text-rose-400">
+                          <AlertTriangle className="size-3 shrink-0" />
+                          <span className="truncate text-[10px] font-bold">
+                            {data.alerts} {isAr ? "أصناف دون حد الأمان" : "below reorder"}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="mt-0.5 flex items-center gap-1 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-emerald-600 dark:text-emerald-400">
+                          <CheckCircle2 className="size-3 shrink-0" />
+                          <span className="truncate text-[10px] font-bold">
+                            {isAr ? "المستودعات في النطاق الآمن" : "Warehouses optimal"}
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="mt-1 flex items-center justify-between border-t border-border/40 pt-1 text-[10px] text-muted-foreground">
+                        <span className="truncate font-medium">
+                          {(data.alerts ?? 0) > 0
+                            ? isAr
+                              ? "تحتاج أمر شراء"
+                              : "Reorder needed"
+                            : isAr
+                              ? "لا نواقص حرجة"
+                              : "No critical gaps"}
+                        </span>
+                        <Link
+                          to="/inventory"
+                          className="flex shrink-0 items-center gap-0.5 font-bold text-primary hover:underline"
+                        >
+                          {isAr ? "فحص" : "Inspect"}
+                          <ChevronLeft className="size-3 rotate-180 rtl:rotate-0" />
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Card 3: Luxury Executive Chronos & Full Month Calendar (4 cols - Now on the LEFT, compact width) */}
+                <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-border/80 bg-gradient-to-br from-card via-surface/90 to-zinc-900/30 dark:from-zinc-950 dark:via-zinc-900/80 dark:to-zinc-950 p-3.5 sm:p-4 lg:col-span-4 shadow-panel backdrop-blur-xl flex flex-col justify-between">
                   {/* Ambient Lighting */}
                   <div className="pointer-events-none absolute -top-20 -end-20 size-60 rounded-full bg-amber-500/10 blur-3xl opacity-60" />
                   <div className="pointer-events-none absolute -bottom-20 -start-20 size-56 rounded-full bg-emerald-500/10 blur-3xl opacity-40" />
                   <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
 
-                  <div className="space-y-3.5">
-                    {/* Header: Month Navigator + Live Universal Clock (No Country Label) */}
-                    <div className="flex items-center justify-between gap-2 border-b border-border/50 pb-3">
+                  <div className="space-y-2.5">
+                    {/* Header: Month Navigator + Live Universal Clock */}
+                    <div className="flex items-center justify-between gap-1.5 border-b border-border/50 pb-2">
                       {/* Month Switcher with Circular Buttons */}
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
                         <button
                           type="button"
                           onClick={() => setCalendarMonth(new Date(calYear, calMonth - 1, 1))}
-                          className="size-8 rounded-full border border-border/80 bg-surface/80 hover:bg-surface-2 text-foreground flex items-center justify-center transition-all active:scale-95 shadow-xs"
+                          className="size-7 rounded-full border border-border/80 bg-surface/80 hover:bg-surface-2 text-foreground flex items-center justify-center transition-all active:scale-95 shadow-xs"
                           title={isAr ? "الشهر السابق" : "Previous Month"}
                         >
-                          <ChevronRight className="size-4 rtl:rotate-0 rotate-180" />
+                          <ChevronRight className="size-3.5 rtl:rotate-0 rotate-180" />
                         </button>
 
-                        <div className="text-center min-w-[110px]">
-                          <span className="block text-sm font-black text-foreground tracking-tight">
+                        <div className="text-center min-w-[85px]">
+                          <span className="block text-xs sm:text-sm font-black text-foreground tracking-tight">
                             {currentMonthName} {calYear}
                           </span>
                         </div>
@@ -671,10 +827,10 @@ function DashboardPage() {
                         <button
                           type="button"
                           onClick={() => setCalendarMonth(new Date(calYear, calMonth + 1, 1))}
-                          className="size-8 rounded-full border border-border/80 bg-surface/80 hover:bg-surface-2 text-foreground flex items-center justify-center transition-all active:scale-95 shadow-xs"
+                          className="size-7 rounded-full border border-border/80 bg-surface/80 hover:bg-surface-2 text-foreground flex items-center justify-center transition-all active:scale-95 shadow-xs"
                           title={isAr ? "الشهر التالي" : "Next Month"}
                         >
-                          <ChevronLeft className="size-4 rtl:rotate-0 rotate-180" />
+                          <ChevronLeft className="size-3.5 rtl:rotate-0 rotate-180" />
                         </button>
 
                         {!isSelectedToday && (
@@ -685,18 +841,18 @@ function DashboardPage() {
                               setSelectedDate(t);
                               setCalendarMonth(new Date(t.getFullYear(), t.getMonth(), 1));
                             }}
-                            className="size-8 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 flex items-center justify-center transition-all active:scale-95 shadow-xs"
+                            className="size-7 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 flex items-center justify-center transition-all active:scale-95 shadow-xs"
                             title={isAr ? "العودة لتاريخ اليوم" : "Reset to Today"}
                           >
-                            <RotateCcw className="size-3.5" />
+                            <RotateCcw className="size-3" />
                           </button>
                         )}
                       </div>
 
-                      {/* Clean Universal Digital Clock (Zero Country Label) */}
-                      <div className="rounded-2xl border border-border/80 bg-zinc-900/10 dark:bg-zinc-800/40 px-3 py-1.5 text-end shadow-xs backdrop-blur-md">
-                        <div className="flex items-center gap-1.5 text-xs sm:text-sm font-black font-mono text-foreground justify-end tracking-wider">
-                          <Clock className="size-3.5 text-amber-500 animate-pulse" />
+                      {/* Clean Universal Digital Clock */}
+                      <div className="rounded-xl border border-border/80 bg-zinc-900/10 dark:bg-zinc-800/40 px-2 py-1 text-end shadow-xs backdrop-blur-md">
+                        <div className="flex items-center gap-1 text-[11px] sm:text-xs font-black font-mono text-foreground justify-end tracking-wider">
+                          <Clock className="size-3 text-amber-500 animate-pulse" />
                           <span>
                             {now.toLocaleTimeString(isAr ? "ar-YE" : "en-US", {
                               hour: "2-digit",
@@ -705,21 +861,21 @@ function DashboardPage() {
                             })}
                           </span>
                         </div>
-                        <div className="flex items-center gap-1 text-[9px] text-muted-foreground font-semibold justify-end">
-                          <Radio className="size-2 text-emerald-500 animate-pulse" />
-                          <span>{isAr ? "مزامنة التوقيت الحي" : "Live Clock Sync"}</span>
+                        <div className="flex items-center gap-1 text-[8px] text-muted-foreground font-semibold justify-end">
+                          <Radio className="size-1.5 text-emerald-500 animate-pulse" />
+                          <span>{isAr ? "مزامنة حية" : "Live Sync"}</span>
                         </div>
                       </div>
                     </div>
 
-                    {/* Full Month Calendar Grid (7 Weekdays + Circular Day Buttons) */}
-                    <div className="rounded-2xl border border-border/60 bg-surface/40 p-2.5 backdrop-blur-xs">
+                    {/* Full Month Calendar Grid (Compact Circular Day Buttons) */}
+                    <div className="rounded-xl border border-border/60 bg-surface/40 p-2 backdrop-blur-xs">
                       {/* Weekday Labels Header */}
-                      <div className="grid grid-cols-7 gap-1 text-center mb-1.5">
+                      <div className="grid grid-cols-7 gap-0.5 text-center mb-1">
                         {weekHeaders.map((w, idx) => (
                           <span
                             key={idx}
-                            className="text-[10px] sm:text-[11px] font-bold text-muted-foreground/80 py-0.5"
+                            className="text-[9px] sm:text-[10px] font-bold text-muted-foreground/80 py-0.5"
                           >
                             {w.slice(0, 3)}
                           </span>
@@ -727,7 +883,7 @@ function DashboardPage() {
                       </div>
 
                       {/* Month Day Cells */}
-                      <div className="grid grid-cols-7 gap-1 place-items-center">
+                      <div className="grid grid-cols-7 gap-0.5 place-items-center">
                         {calendarCells.map((cell, idx) => {
                           const cellDateKey = `${cell.date.getFullYear()}-${String(cell.date.getMonth() + 1).padStart(2, "0")}-${String(cell.date.getDate()).padStart(2, "0")}`;
                           const isSelected = cellDateKey === selectedDateKey;
@@ -740,14 +896,14 @@ function DashboardPage() {
                               onClick={() => {
                                 setSelectedDate(cell.date);
                               }}
-                              className={`size-7 sm:size-8 rounded-full flex items-center justify-center font-mono text-xs font-semibold transition-all ${
+                              className={`size-6 sm:size-7 rounded-full flex items-center justify-center font-mono text-[10px] sm:text-[11px] font-semibold transition-all ${
                                 isSelected
-                                  ? "bg-gradient-to-tr from-amber-500 to-amber-600 text-white font-black shadow-md scale-105 ring-2 ring-amber-500/50"
+                                  ? "bg-gradient-to-tr from-amber-500 to-amber-600 text-white font-black shadow-xs scale-105 ring-2 ring-amber-500/50"
                                   : isTodayCell
                                     ? "border border-amber-500/60 bg-amber-500/10 text-amber-500 font-bold hover:bg-amber-500/20"
                                     : cell.isCurrentMonth
                                       ? "text-foreground hover:bg-surface-2 hover:scale-105"
-                                      : "text-muted-foreground/35 hover:text-muted-foreground/60 text-[11px]"
+                                      : "text-muted-foreground/35 hover:text-muted-foreground/60 text-[9px]"
                               }`}
                               title={
                                 formatLuxuryDate(cell.date, { showDayName: true, showYear: true })
@@ -762,15 +918,15 @@ function DashboardPage() {
                     </div>
 
                     {/* Selected Date Status & Daily Filter Feedback */}
-                    <div className="flex items-center justify-between text-xs pt-1 text-muted-foreground">
-                      <div className="flex items-center gap-1.5 font-medium truncate">
-                        <CalendarCheck className="size-3.5 text-amber-500 shrink-0" />
-                        <span className="font-bold text-foreground">
+                    <div className="flex items-center justify-between text-[10px] sm:text-[11px] pt-0.5 text-muted-foreground">
+                      <div className="flex items-center gap-1 font-medium truncate">
+                        <CalendarCheck className="size-3 text-amber-500 shrink-0" />
+                        <span className="font-bold text-foreground truncate">
                           {selectedLuxuryDate.weekday}، {selectedLuxuryDate.day}{" "}
-                          {selectedLuxuryDate.month} {selectedLuxuryDate.year}
+                          {selectedLuxuryDate.month}
                         </span>
                         {!isSelectedToday && (
-                          <span className="inline-flex items-center rounded-md bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.2 text-[9px] font-bold text-amber-600 dark:text-amber-400">
+                          <span className="inline-flex items-center rounded-md bg-amber-500/10 border border-amber-500/20 px-1 py-0.2 text-[8px] font-bold text-amber-600 dark:text-amber-400">
                             {isAr ? "مفلتر" : "Filtered"}
                           </span>
                         )}
@@ -778,7 +934,7 @@ function DashboardPage() {
 
                       <Link
                         to="/daily-journal"
-                        className="text-[11px] font-bold text-amber-500 hover:text-amber-600 dark:hover:text-amber-400 hover:underline flex items-center gap-0.5 shrink-0"
+                        className="text-[10px] font-bold text-amber-500 hover:text-amber-600 dark:hover:text-amber-400 hover:underline flex items-center gap-0.5 shrink-0"
                       >
                         {isAr ? "دفتر اليومية" : "Journal"}
                         <ChevronLeft className="size-3 rtl:rotate-0 rotate-180" />
@@ -787,174 +943,13 @@ function DashboardPage() {
                   </div>
                 </div>
               </div>
-
-              {/* Bottom Deck: Executive Business Vitals & Real-Time Pulse (3 Dynamic Cards) */}
-              {data && (
-                <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {/* Vital Card 1: Selected Day Sales Velocity (Dynamic according to chosen date) */}
-                  <div className="relative overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-br from-card via-card/95 to-surface-2/40 p-4.5 shadow-sm transition-all hover:shadow-md hover:border-primary/40 group">
-                    <div className="pointer-events-none absolute top-0 end-0 size-24 bg-primary/10 rounded-full blur-xl group-hover:bg-primary/15 transition-all" />
-                    <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className="grid size-8 place-items-center rounded-xl bg-primary/10 text-primary border border-primary/20">
-                          <TrendingUp className="size-4" />
-                        </div>
-                        <span className="font-bold text-foreground text-xs sm:text-sm">
-                          {isSelectedToday
-                            ? isAr
-                              ? "تدفق مبيعات اليوم"
-                              : "Today Sales Inflow"
-                            : isAr
-                              ? `مبيعات (${selectedDateKey})`
-                              : `Inflow (${selectedDateKey})`}
-                        </span>
-                      </div>
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold border ${
-                          isSelectedToday
-                            ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
-                            : "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400"
-                        }`}
-                      >
-                        <span
-                          className={`size-1.5 rounded-full ${isSelectedToday ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`}
-                        />
-                        <span>
-                          {isSelectedToday
-                            ? isAr
-                              ? "مباشر"
-                              : "Live"
-                            : isAr
-                              ? "يوم محدد"
-                              : "Selected"}
-                        </span>
-                      </span>
-                    </div>
-
-                    <div className="mt-2.5 flex items-baseline justify-between gap-2">
-                      <span className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-foreground">
-                        {money(selectedDayRevenue)}
-                      </span>
-                    </div>
-
-                    <div className="mt-2 pt-2 border-t border-border/50 flex items-center justify-between text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1 text-[11px] font-medium">
-                        <ShoppingCart className="size-3 text-muted-foreground/70" />
-                        <span>
-                          {num(selectedDayOrders)} {isAr ? "فواتير مسجلة" : "invoices recorded"}
-                        </span>
-                      </span>
-                      <Link
-                        to="/sales"
-                        className="text-[11px] font-bold text-primary hover:underline flex items-center gap-0.5"
-                      >
-                        {isAr ? "سجل المبيعات" : "Sales log"}
-                        <ChevronLeft className="size-3 rtl:rotate-0 rotate-180" />
-                      </Link>
-                    </div>
-                  </div>
-
-                  {/* Vital Card 2: Market Liquidity & Receivables Exposure (Lifetime Metric - Untouched) */}
-                  <div className="relative overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-br from-card via-card/95 to-surface-2/40 p-4.5 shadow-sm transition-all hover:shadow-md hover:border-amber-500/40 group">
-                    <div className="pointer-events-none absolute top-0 end-0 size-24 bg-amber-500/10 rounded-full blur-xl group-hover:bg-amber-500/15 transition-all" />
-                    <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className="grid size-8 place-items-center rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20">
-                          <Wallet className="size-4" />
-                        </div>
-                        <span className="font-bold text-foreground text-xs sm:text-sm">
-                          {isAr ? "مستحقات السوق والذمم" : "Receivables & Market"}
-                        </span>
-                      </div>
-                      <span className="rounded-full bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400">
-                        {isAr ? "إجمالي تراكمي" : "Total Ledger"}
-                      </span>
-                    </div>
-
-                    <div className="mt-2.5 flex items-baseline justify-between gap-2">
-                      <span className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-foreground">
-                        {money(data.receivables ?? 0)}
-                      </span>
-                    </div>
-
-                    <div className="mt-2 pt-2 border-t border-border/50 flex items-center justify-between text-xs text-muted-foreground">
-                      <span className="text-[11px] font-medium">
-                        {isAr ? "أرصدة عملاء قائمة بالسوق" : "Outstanding customer balances"}
-                      </span>
-                      <Link
-                        to="/debts"
-                        className="text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-0.5"
-                      >
-                        {isAr ? "متابعة وسندات" : "Collect"}
-                        <ChevronLeft className="size-3 rtl:rotate-0 rotate-180" />
-                      </Link>
-                    </div>
-                  </div>
-
-                  {/* Vital Card 3: Supply Chain Readiness & Critical Stock (Lifetime Metric - Untouched) */}
-                  <div className="relative overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-br from-card via-card/95 to-surface-2/40 p-4.5 shadow-sm transition-all hover:shadow-md hover:border-chart-4/40 group sm:col-span-2 lg:col-span-1">
-                    <div className="pointer-events-none absolute top-0 end-0 size-24 bg-chart-4/10 rounded-full blur-xl group-hover:bg-chart-4/15 transition-all" />
-                    <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className="grid size-8 place-items-center rounded-xl bg-primary/10 text-primary border border-primary/20">
-                          <Activity className="size-4" />
-                        </div>
-                        <span className="font-bold text-foreground text-xs sm:text-sm">
-                          {isAr ? "جاهزية المخزون وسلاسل الإمداد" : "Stock Readiness & Ops"}
-                        </span>
-                      </div>
-                      <span className="text-[10px] font-mono font-semibold text-muted-foreground">
-                        {isAr ? "فحص آلي" : "Auto Check"}
-                      </span>
-                    </div>
-
-                    <div className="mt-2.5 flex items-center gap-2">
-                      {(data.alerts ?? 0) > 0 ? (
-                        <div className="flex items-center gap-2 rounded-xl bg-rose-500/10 border border-rose-500/20 px-3 py-1.5 text-rose-600 dark:text-rose-400 w-full">
-                          <AlertTriangle className="size-4 shrink-0 animate-bounce" />
-                          <span className="text-xs sm:text-sm font-bold truncate">
-                            {data.alerts}{" "}
-                            {isAr ? "أصناف دون حد الأمان" : "items below reorder point"}
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 text-emerald-600 dark:text-emerald-400 w-full">
-                          <CheckCircle2 className="size-4 shrink-0" />
-                          <span className="text-xs sm:text-sm font-bold truncate">
-                            {isAr ? "المستودعات متزنة وفي النطاق الآمن" : "Warehouses optimal"}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="mt-2 pt-2 border-t border-border/50 flex items-center justify-between text-xs text-muted-foreground">
-                      <span className="text-[11px] font-medium truncate">
-                        {(data.alerts ?? 0) > 0
-                          ? isAr
-                            ? "تتطلب إصدار أمر شراء أو تحويل"
-                            : "Reorder or transfer needed"
-                          : isAr
-                            ? "لا توجد نواقص حرجة تتطلب تدخلاً"
-                            : "All safety limits honored"}
-                      </span>
-                      <Link
-                        to="/inventory"
-                        className="text-[11px] font-bold text-primary hover:underline flex items-center gap-0.5 shrink-0"
-                      >
-                        {isAr ? "فحص المستودعات" : "Inspect"}
-                        <ChevronLeft className="size-3 rtl:rotate-0 rotate-180" />
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              )}
             </>
           );
         })()}
       </div>
 
-      {/* Modern Vortex Metric Cards Grid - 2 cards per row on mobile */}
-      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4 mb-6">
+      {/* Modern Vortex Metric Cards Grid - Compact space-saving cards */}
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4 mb-4">
         <Link to="/sales" className="block focus:outline-none">
           <VortexMetricCard
             title={t("dash.sales")}
@@ -962,7 +957,8 @@ function DashboardPage() {
             subtitle={lang === "ar" ? "مبيعات آخر 30 يوماً" : "Last 30 days"}
             badge={lang === "ar" ? "فواتير" : "Orders"}
             currency=""
-            icon={<ShoppingCart className="size-5" />}
+            className="p-2.5 sm:p-3 rounded-xl sm:rounded-2xl"
+            icon={<ShoppingCart className="size-4 sm:size-4.5" />}
             iconClassName="bg-primary/10 text-primary"
             trend={{
               value: "+4.2%",
@@ -980,7 +976,8 @@ function DashboardPage() {
             subtitle={lang === "ar" ? "عملاء نشطون مسجلون" : "Registered customers"}
             badge={lang === "ar" ? "عميل" : "Clients"}
             currency=""
-            icon={<Users className="size-5" />}
+            className="p-2.5 sm:p-3 rounded-xl sm:rounded-2xl"
+            icon={<Users className="size-4 sm:size-4.5" />}
             iconClassName="bg-cyan-500/10 text-cyan-600 dark:text-cyan-400"
             trend={{
               value: "+2",
@@ -997,7 +994,8 @@ function DashboardPage() {
             value={money(data?.expenses ?? 0)}
             subtitle={lang === "ar" ? "المصروفات المسجلة" : "Logged expenses"}
             currency=""
-            icon={<Wallet className="size-5" />}
+            className="p-2.5 sm:p-3 rounded-xl sm:rounded-2xl"
+            icon={<Wallet className="size-4 sm:size-4.5" />}
             iconClassName="bg-amber-500/10 text-amber-600 dark:text-amber-400"
             trend={{
               value: "-3%",
@@ -1022,8 +1020,9 @@ function DashboardPage() {
                   : "Stock level healthy"
             }
             currency=""
+            className="p-2.5 sm:p-3 rounded-xl sm:rounded-2xl"
             badge={(data?.alerts ?? 0) > 0 ? (lang === "ar" ? "تنبيه" : "Alert") : undefined}
-            icon={<AlertTriangle className="size-5" />}
+            icon={<AlertTriangle className="size-4 sm:size-4.5" />}
             iconClassName={
               (data?.alerts ?? 0) > 0
                 ? "bg-rose-500/10 text-rose-600 dark:text-rose-400"

@@ -291,7 +291,7 @@ export interface GitUpdateCheck {
 // Supabase
 // ---------------------------------------------------------------------------
 
-export type SupabaseMode = "local" | "cloud" | "linked-both" | "unknown";
+export type SupabaseMode = "local" | "cloud";
 
 export interface SupabaseStatusReport {
   available: boolean;
@@ -316,8 +316,8 @@ export interface SupabaseStatusReport {
 export interface MigrationInfo {
   version: string;
   name: string;
-  /** local = موجودة محلياً فقط، remote = مطبقة سحابياً فقط، both. */
-  location: "local" | "remote" | "both";
+  /** local = ملف ينتظر التطبيق، database = موجودة في القاعدة، both. */
+  location: "local" | "database" | "both";
 }
 
 export interface MigrationStatusReport {
@@ -326,7 +326,7 @@ export interface MigrationStatusReport {
   /** مخرجات supabase migration list مجردة. */
   migrations: MigrationInfo[];
   pending: number;
-  appliedRemoteOnly: number;
+  appliedDatabaseOnly: number;
   seedFiles: {
     name: string;
     path: string;

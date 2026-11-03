@@ -89,10 +89,8 @@ DECLARE
     'next_stock_adjustment_number', 'next_stock_opening_number',
     'next_supplier_voucher_number', 'next_transfer_number',
     'fn_document_numbering_sequence_name',
-    -- حُرّاس الحذف — تُستدعى من مشغّلات، ورسائلها للمطوّر لا للمستخدم.
-    -- (product_reference_counts / warehouse_reference_counts ليست هنا: الواجهة
-    --  تستدعيها لعرض سبب منع الحذف قبل المحاولة.)
-    'product_delete_guard',
+    -- حُرّاس الحذف الخلفية فقط. product_delete_guard مستثناة لأنها تُستدعى
+    -- من الواجهة وتتحقق داخليًا من المالك/المدير قبل أي حذف.
     -- مساعدات حسابية داخلية
     'expense_actor', 'expense_assert_capability',
     'expense_can_write_document', 'expense_log_action',
@@ -147,6 +145,7 @@ DECLARE
     -- البحث والنسخ الاحتياطي والترقيم
     'search_products', 'backup_export_all', 'backup_restore_all',
     'backup_schema_fingerprint',
+    'product_delete_guard',
     'fn_next_document_number', 'fn_format_document_number',
     'fn_resolve_document_numbering', 'fn_set_document_numbering',
     -- مساعدات التخويل التي تستدعيها الواجهة مباشرة

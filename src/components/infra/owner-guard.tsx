@@ -1,6 +1,6 @@
 /**
- * حاجب الواجهة لمالك المنشأة — تكميلي لفحص الخادم الصارم في
- * src/lib/infra/functions.ts (الذي يفرض owner/superadmin فعلياً).
+ * حاجب الواجهة لسوبر أدمن المنصة — تكميلي لفحص الخادم الصارم في
+ * src/lib/infra/functions.ts.
  */
 import { useQuery } from "@tanstack/react-query";
 import { ShieldAlert } from "lucide-react";
@@ -24,8 +24,8 @@ export function OwnerGuard({ children }: { children: React.ReactNode }) {
             <ShieldAlert className="h-10 w-10 text-red-500" />
             <h2 className="font-bold">صلاحية غير كافية</h2>
             <p className="text-sm text-muted-foreground">
-              لوحة التطوير والبنية التحتية متاحة لمالك المتجر أو مسؤول المنصة الفائق فقط. كل العمليات
-              محمية أيضاً على مستوى الخادم ومسجّلة في سجل التدقيق.
+              أدوات النظام وDocker محصورة بسوبر أدمن المنصة النشط عند اختيار Docker. دور مالك
+              المتجر لا يمنح صلاحية التحكم بالخادم، وكل العمليات محمية على الخادم ومسجّلة للتدقيق.
             </p>
             <Button variant="outline" size="sm" onClick={() => void q.refetch()} disabled={q.isFetching}>
               إعادة التحقق من الصلاحية

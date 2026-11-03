@@ -4,19 +4,31 @@
 // For user-authenticated queries (with RLS), use the auth middleware instead.
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
+import { isPrivilegedSupabaseKey, parseSupabaseTarget, validateSupabaseTargetUrl } from "./target";
 
 function createSupabaseAdminClient() {
-  const SUPABASE_URL = process.env.SUPABASE_URL;
-  const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const target = parseSupabaseTarget(process.env.SUPABASE_TARGET);
+  if (
+    process.env.VITE_SUPABASE_TARGET &&
+    parseSupabaseTarget(process.env.VITE_SUPABASE_TARGET) !== target
+  ) {
+    throw new Error("Client and server Supabase targets do not match.");
+  }
+  const SUPABASE_URL = validateSupabaseTargetUrl(target, process.env.SUPABASE_URL ?? "");
+  const SUPABASE_SERVICE_ROLE_KEY =
+    process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     const missing = [
       ...(!SUPABASE_URL ? ["SUPABASE_URL"] : []),
-      ...(!SUPABASE_SERVICE_ROLE_KEY ? ["SUPABASE_SERVICE_ROLE_KEY"] : []),
+      ...(!SUPABASE_SERVICE_ROLE_KEY ? ["SUPABASE_SECRET_KEY"] : []),
     ];
-    const message = `Missing Supabase environment variable(s): ${missing.join(", ")}. Connect Supabase in Lovable Cloud.`;
+    const message = `Missing Supabase runtime configuration: ${missing.join(", ")}. Configure the explicitly selected Supabase target.`;
     console.error(`[Supabase] ${message}`);
     throw new Error(message);
+  }
+  if (!isPrivilegedSupabaseKey(SUPABASE_SERVICE_ROLE_KEY)) {
+    throw new Error("SUPABASE_SECRET_KEY must be a server-only secret/service-role key.");
   }
 
   return createClient<Database>(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {

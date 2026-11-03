@@ -7,18 +7,6 @@ import { clearSessionQueryCache } from "@/lib/query-keys";
 
 type Role = "owner" | "manager" | "accountant" | "cashier" | "warehouse";
 
-interface CachedAuthData {
-  userId: string;
-  roles: Role[];
-  isAdmin: boolean;
-  isSuperadmin: boolean;
-  isActive: boolean;
-  cachedAt: number;
-}
-
-const AUTH_CACHE_KEY = "vortex_auth_permissions_cache";
-const CACHE_TTL_MS = 1000 * 60 * 5; // 5 minutes
-
 function normalizeRole(value: unknown): Role | null {
   if (typeof value !== "string") return null;
   const role = value.trim().toLowerCase();
@@ -32,43 +20,6 @@ function normalizeRole(value: unknown): Role | null {
     return role;
   }
   return null;
-}
-
-function readCachedAuth(userId: string): CachedAuthData | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(AUTH_CACHE_KEY);
-    if (!raw) return null;
-    const parsed: CachedAuthData = JSON.parse(raw);
-    if (parsed.userId !== userId) return null;
-    if (Date.now() - parsed.cachedAt > CACHE_TTL_MS) return null;
-    return {
-      ...parsed,
-      roles: Array.from(
-        new Set((parsed.roles ?? []).map((role) => normalizeRole(role)).filter(Boolean) as Role[]),
-      ),
-    };
-  } catch {
-    return null;
-  }
-}
-
-function writeCachedAuth(data: CachedAuthData) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(AUTH_CACHE_KEY, JSON.stringify(data));
-  } catch {
-    /* localStorage unavailable (private mode / quota) — cache is best-effort */
-  }
-}
-
-function clearCachedAuth() {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.removeItem(AUTH_CACHE_KEY);
-  } catch {
-    /* localStorage unavailable — cache is best-effort */
-  }
 }
 
 interface AuthCtx {
@@ -92,10 +43,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [roles, setRoles] = useState<Role[]>([]);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [isPlatformSuperadmin, setIsPlatformSuperadmin] = useState(false);
-  const [isActive, setIsActive] = useState(true);
+  const [isActive, setIsActive] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isRefreshingPermissions, setIsRefreshingPermissions] = useState(false);
   const loadSeq = useRef(0);
+  const permissionUserIdRef = useRef<string | null>(null);
   /**
    * Identity the in-memory Query cache currently belongs to. The query cache is
    * session memory with a 2-minute stale window, so a second user signing in on
@@ -107,7 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let alive = true;
 
-    async function applySession(nextSession: Session | null, isInitial = false) {
+    async function applySession(nextSession: Session | null) {
       const seq = ++loadSeq.current;
       const nextUserId = nextSession?.user?.id ?? null;
 
@@ -120,13 +72,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (!nextSession?.user) {
-        clearCachedAuth();
+        permissionUserIdRef.current = null;
         if (alive && seq === loadSeq.current) {
           setSession(null);
           setRoles([]);
           setIsPlatformAdmin(false);
           setIsPlatformSuperadmin(false);
-          setIsActive(true);
+          setIsActive(false);
           setLoading(false);
           setIsRefreshingPermissions(false);
         }
@@ -134,68 +86,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const userId = nextSession.user.id;
-      const cached = readCachedAuth(userId);
+      const isNewPermissionIdentity = permissionUserIdRef.current !== userId;
 
-      // ضبط الجلسة فوراً لمنع حراس المسارات من طرد المستخدم أثناء جلب الصلاحيات
+      // لا نحمّل صلاحيات قديمة من localStorage؛ يبقى المستخدم محجوبًا عن الصفحات
+      // المحمية حتى تُقرأ الأدوار والحالة الحالية من قاعدة البيانات.
       setSession(nextSession);
-
-      if (cached) {
-        setRoles(cached.roles);
-        setIsPlatformAdmin(cached.isAdmin);
-        setIsPlatformSuperadmin(cached.isSuperadmin);
-        setIsActive(cached.isActive);
-        setLoading(false);
-        setIsRefreshingPermissions(true);
-      } else {
-        // إذا لم توجد صلاحيات مخزنة مسبقاً، نبقي التحميل شغالاً حتى تنتهي الاستعلامات
+      if (isNewPermissionIdentity) {
+        setRoles([]);
+        setIsPlatformAdmin(false);
+        setIsPlatformSuperadmin(false);
+        setIsActive(false);
         setLoading(true);
       }
+      setIsRefreshingPermissions(true);
 
       let nextRoles: Role[] = [];
       let adminFlags = { isAdmin: false, isSuperadmin: false };
-      let nextIsActive = true;
+      let profileIsActive = false;
 
       try {
-        [nextRoles, adminFlags, nextIsActive] = await Promise.all([
+        [nextRoles, adminFlags, profileIsActive] = await Promise.all([
           fetchRoles(userId),
           fetchAdminFlags(userId),
           fetchIsActive(userId),
         ]);
       } catch (err) {
         console.error("Failed to resolve session permissions", err);
-        if (cached) {
-          nextRoles = cached.roles;
-          adminFlags = { isAdmin: cached.isAdmin, isSuperadmin: cached.isSuperadmin };
-          nextIsActive = cached.isActive;
-        }
       }
 
       if (!alive || seq !== loadSeq.current) return;
 
+      // Platform account status is owned by platform_admins.is_active; store
+      // profile status only governs tenant staff.
+      const nextIsActive = adminFlags.isAdmin || profileIsActive;
+
       if (!nextIsActive && !adminFlags.isAdmin) {
-        clearCachedAuth();
-        setSession(null);
         setRoles([]);
         setIsPlatformAdmin(false);
         setIsPlatformSuperadmin(false);
         setIsActive(false);
         setLoading(false);
         setIsRefreshingPermissions(false);
-        // Do not forcibly log out a valid session purely because the inactive flag
-        // was not yet resolved or was temporarily stale. The user is blocked in
-        // the UI instead, and the session can be re-established cleanly after a
-        // real sign-out or a true account deactivation event.
+        permissionUserIdRef.current = userId;
+        // Keep the identity for a clear blocked state, but never grant route access
+        // when the active-profile check failed or returned no row.
         return;
       }
-
-      writeCachedAuth({
-        userId,
-        roles: nextRoles,
-        isAdmin: adminFlags.isAdmin,
-        isSuperadmin: adminFlags.isSuperadmin,
-        isActive: nextIsActive,
-        cachedAt: Date.now(),
-      });
 
       setSession(nextSession);
       setRoles(nextRoles);
@@ -204,29 +140,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsActive(nextIsActive);
       setLoading(false);
       setIsRefreshingPermissions(false);
+      permissionUserIdRef.current = userId;
     }
 
-    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
-      if (event === "TOKEN_REFRESHED" || event === "USER_UPDATED") {
-        clearCachedAuth();
-      }
-      setTimeout(() => void applySession(s, event === "INITIAL_SESSION"), 0);
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
+      setTimeout(() => void applySession(s), 0);
     });
+
+    const refreshPermissions = () => {
+      void supabase.auth
+        .getSession()
+        .then(({ data, error }) => {
+          if (!error && data.session) void applySession(data.session);
+          else if (!error && !data.session) void applySession(null);
+        })
+        .catch((error) => console.warn("Could not refresh the current session", error));
+    };
+    window.addEventListener("focus", refreshPermissions);
+    const permissionRefreshTimer = window.setInterval(refreshPermissions, 5 * 60 * 1000);
 
     supabase.auth
       .getSession()
-      .then(({ data }) => applySession(data.session, true))
+      .then(({ data }) => applySession(data.session))
       .catch(() => {
         if (!alive) return;
         setSession(null);
         setRoles([]);
         setIsPlatformAdmin(false);
         setIsPlatformSuperadmin(false);
+        setIsActive(false);
         setLoading(false);
       });
 
     return () => {
       alive = false;
+      window.removeEventListener("focus", refreshPermissions);
+      window.clearInterval(permissionRefreshTimer);
       sub.subscription.unsubscribe();
     };
     // `queryClient` is a stable reference for the app's lifetime (created once in
@@ -248,14 +197,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
   }
 
-  /*
-   * بعض قواعد البيانات المستضافة لم تُطبّق ترحيل profiles.is_active بعد
-   * (خطأ 42703). نحاول مرة واحدة فقط، وإذا كان العمود غائبًا نُعطّل الاستعلام
-   * لجلسة الصفحة كاملة بدل تكرار طلبات 400 في الكونسول مع كل تحديث حالة.
-   */
-  let profilesIsActiveColumnMissing = false;
   async function fetchIsActive(userId: string): Promise<boolean> {
-    if (profilesIsActiveColumnMissing) return true;
     try {
       const { data, error } = await supabase
         .from("profiles")
@@ -264,18 +206,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .maybeSingle();
       if (error) {
         if ((error as { code?: string }).code === "42703") {
-          profilesIsActiveColumnMissing = true;
           console.warn(
-            "profiles.is_active column is missing — run migration 20260918000100_add_profiles_is_active.sql",
+            "profiles.is_active is required to authorize staff. Apply the profile-activation migration.",
           );
-          return true;
         }
-        return true;
+        return false;
       }
-      if (!data) return true;
-      return (data as { is_active?: boolean }).is_active !== false;
+      if (!data) return false;
+      return (data as { is_active?: boolean }).is_active === true;
     } catch {
-      return true;
+      return false;
     }
   }
 
@@ -323,7 +263,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return roles.includes(r);
     },
     signOut: async () => {
-      clearCachedAuth();
       clearSessionQueryCache(queryClient);
       scopedUserIdRef.current = null;
       await supabase.auth.signOut();

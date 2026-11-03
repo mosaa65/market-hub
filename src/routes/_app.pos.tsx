@@ -40,6 +40,9 @@ import {
   ArrowRightLeft,
   DollarSign,
   PackageX,
+  Percent,
+  StickyNote,
+  Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
 import { BarcodeScanner } from "@/components/barcode-scanner";
@@ -85,6 +88,11 @@ import {
 } from "@/components/ui/dialog";
 import { usePaymentMethodsForContext } from "@/hooks/use-payment-methods";
 import { AmountInput } from "@/components/commerce/amount-input";
+import {
+  PosLabeledField,
+  POS_FIELD_CLASS,
+  POS_FIELD_EMPHASIS_CLASS,
+} from "@/components/commerce/pos-labeled-field";
 import { PartyPicker } from "@/components/commerce/party-picker";
 import { PosTotalsCard } from "@/components/commerce/pos-totals-card";
 import { PosDatePicker } from "@/components/commerce/pos-date-picker";
@@ -3280,7 +3288,7 @@ function POSPage() {
               className="max-h-[56dvh] shrink-0 space-y-1.5 overflow-y-auto overscroll-contain border-t border-border/70 bg-surface/95 pt-2 pr-0.5"
             >
               {/* ─── Payment & Summary Section ─── */}
-              <div className="grid min-w-0 grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.8fr)] items-end gap-1.5">
+              <div className="grid min-w-0 grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] items-end gap-1.5">
                 <div className="flex min-w-0 flex-col gap-1">
                   <span className="truncate text-[10px] font-semibold leading-none text-muted-foreground">
                     {lang === "ar" ? "طريقة الدفع" : "Payment method"}
@@ -3331,17 +3339,20 @@ function POSPage() {
                   />
                 </div>
                 {isSplitPayment ? (
-                  <div className="flex min-w-0 flex-col gap-1">
-                    <span className="truncate text-[10px] font-semibold leading-none text-muted-foreground">
-                      {lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}
-                    </span>
-                    <div className="flex h-8 min-w-0 items-center truncate rounded-lg border border-primary/20 bg-primary/[0.04] px-2.5 text-[10px] font-semibold text-primary tabular-nums">
+                  <PosLabeledField
+                    label={lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}
+                    icon={<Wallet className="size-3" />}
+                    emphasis
+                  >
+                    <div className="flex h-9 min-w-0 items-center truncate rounded-xl border border-primary/25 bg-primary/[0.04] px-2.5 text-xs font-semibold text-primary tabular-nums">
                       {money(splitPaidTotal)}
                     </div>
-                  </div>
+                  </PosLabeledField>
                 ) : (
                   <AmountInput
+                    id="pos-paid"
                     label={lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}
+                    icon={<Wallet className="size-3" />}
                     showLabel
                     dir={lang === "ar" ? "rtl" : "ltr"}
                     value={
@@ -3358,20 +3369,41 @@ function POSPage() {
                     }
                     data-form-nav
                     placeholder={lang === "ar" ? "المدفوع" : "Paid"}
-                    className="h-8 min-w-0 rounded-lg border border-border bg-background px-2 text-[10px] font-semibold outline-none focus:border-primary sm:px-2.5 sm:text-[11px]"
+                    className={POS_FIELD_EMPHASIS_CLASS}
                   />
                 )}
               </div>
 
-              {/* Notes stay beside the payment controls, not below the totals. */}
-              <input
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                data-form-nav
-                placeholder={t("pos.notes_placeholder")}
-                aria-label={t("pos.notes_placeholder")}
-                className="h-8 w-full rounded-xl border border-input/80 bg-background px-3 text-xs outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:ring-1 focus:ring-primary/20"
-              />
+              {/* Notes + discount share one row, both under the payment controls. */}
+              <div className="flex items-end gap-1.5">
+                <PosLabeledField
+                  label={lang === "ar" ? "الملاحظة" : "Note"}
+                  icon={<StickyNote className="size-3" />}
+                  htmlFor="pos-note"
+                  className="flex-1"
+                >
+                  <input
+                    id="pos-note"
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    data-form-nav
+                    placeholder={t("pos.notes_placeholder")}
+                    className={POS_FIELD_CLASS}
+                  />
+                </PosLabeledField>
+                <AmountInput
+                  id="pos-discount"
+                  label={t("pos.discount")}
+                  icon={<Percent className="size-3" />}
+                  showLabel
+                  dir={lang === "ar" ? "rtl" : "ltr"}
+                  value={discount}
+                  onValueChange={setDiscount}
+                  data-form-nav
+                  placeholder="0"
+                  className={`w-28 shrink-0 ${POS_FIELD_CLASS}`}
+                />
+              </div>
 
               <PosTotalsCard
                 countLabel={lang === "ar" ? "عدد الأصناف" : "Items"}
@@ -3384,28 +3416,6 @@ function POSPage() {
                   ...(discountN > 0
                     ? [{ label: t("pos.discount"), value: `−${money(discountN)}` }]
                     : []),
-                  {
-                    label: t("pos.discount"),
-                    /*
-                      حقل الخصم يعيش في صف الملخص.
-
-                      كان حقلًا ثالثًا في شريط التحكم بجانب الطريقة والمدفوع،
-                      فيضيق كل واحد منها إلى عرض غير مقروء. وفي الملخص يُكتب
-                      بجانب أثره مباشرةً — والصف نفسه يعرض الناتج بعده.
-                    */
-                    value: (
-                      <AmountInput
-                        label={t("pos.discount")}
-                        dir={lang === "ar" ? "rtl" : "ltr"}
-                        value={discount}
-                        onValueChange={setDiscount}
-                        data-form-nav
-                        placeholder="0"
-                        className="h-6 w-20 rounded-md border border-border bg-background px-1.5 text-end text-[11px] font-semibold outline-none focus:border-primary"
-                      />
-                    ),
-                    className: "bg-muted/30",
-                  },
                   {
                     label: lang === "ar" ? "المبلغ المدفوع" : "Amount paid",
                     value: money(effectivePaid),

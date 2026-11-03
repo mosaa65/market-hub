@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { getDigitPreference, toSystemDigits, type DigitStyle } from "@/lib/format-preferences";
 import { cn } from "@/lib/utils";
 
@@ -14,6 +14,14 @@ export interface AmountInputProps {
   decimals?: number;
   showLabel?: boolean;
   dir?: "auto" | "rtl" | "ltr";
+  /** Ties the field to its visible label (the label text is a real <label>). */
+  id?: string;
+  /**
+   * Optional leading icon drawn INSIDE the field. Used so the money fields of a
+   * screen (paid / discount / note) share one visual family instead of a mix of
+   * bordered inputs and bare text boxes.
+   */
+  icon?: ReactNode;
   "data-form-nav"?: boolean;
 }
 
@@ -74,6 +82,8 @@ export function AmountInput({
   decimals = 2,
   showLabel = false,
   dir = "auto",
+  icon,
+  id,
   "data-form-nav": formNav = false,
 }: AmountInputProps) {
   const [digitStyle, setDigitStyle] = useState<DigitStyle>("latin");
@@ -119,6 +129,7 @@ export function AmountInput({
   const input = (
     <input
       ref={inputRef}
+      id={id}
       type="text"
       inputMode="decimal"
       dir={dir}
@@ -184,9 +195,14 @@ export function AmountInput({
   if (!showLabel) return input;
 
   return (
-    <label className="flex min-w-0 flex-col gap-1 text-start">
-      <span className="truncate text-[10px] font-semibold leading-none text-muted-foreground sm:text-[11px]">
-        {label}
+    <label htmlFor={id} className="flex min-w-0 flex-col gap-1 text-start">
+      <span className="flex items-center gap-1 truncate text-[10px] font-semibold leading-none text-muted-foreground sm:text-[11px]">
+        {icon ? (
+          <span className="shrink-0 opacity-80 [&_svg]:size-3" aria-hidden>
+            {icon}
+          </span>
+        ) : null}
+        <span className="truncate">{label}</span>
       </span>
       {input}
     </label>

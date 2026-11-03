@@ -1,22 +1,22 @@
 // Market-Hub ERP - Resilient Supabase Client
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
+import { isPrivilegedSupabaseKey, parseSupabaseTarget, validateSupabaseTargetUrl } from "./target";
 
 function createSupabaseClient() {
-  const SUPABASE_URL =
-    (import.meta.env.VITE_SUPABASE_URL as string)?.trim() ||
-    (process.env.SUPABASE_URL as string)?.trim() ||
-    "https://kwzqvgdyadylwnvjghqn.supabase.co";
-
+  const target = parseSupabaseTarget(import.meta.env.VITE_SUPABASE_TARGET as string | undefined);
+  const SUPABASE_URL = validateSupabaseTargetUrl(
+    target,
+    (import.meta.env.VITE_SUPABASE_URL as string | undefined) ?? "",
+  );
   const SUPABASE_PUBLISHABLE_KEY =
-    (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string)?.trim() ||
-    (import.meta.env.VITE_SUPABASE_ANON_KEY as string)?.trim() ||
-    (process.env.SUPABASE_PUBLISHABLE_KEY as string)?.trim() ||
-    "sb_publishable_ODUnlFE4JLNBhtTJ0eaR4g_JpDLt8xa";
+    (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined)?.trim() ||
+    (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim() ||
+    "";
 
-  if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) {
-    console.warn(
-      "[Supabase] Environment variables missing or unconfigured. Operating with fallback endpoint.",
+  if (!SUPABASE_PUBLISHABLE_KEY || isPrivilegedSupabaseKey(SUPABASE_PUBLISHABLE_KEY)) {
+    throw new Error(
+      "Set VITE_SUPABASE_PUBLISHABLE_KEY to a publishable/anon key. Secret keys cannot be used in the browser.",
     );
   }
 

@@ -6,6 +6,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { parseSupabaseTarget } from "@/integrations/supabase/target";
 
 import { buildHealthReport, diagnose } from "./health";
 import { listImages, listVolumes, listNetworks } from "./docker";
@@ -35,28 +36,53 @@ import type { InfraActionId } from "./types";
 
 async function resolveInfraAccess(userId: string) {
   if (!userId || userId === "anonymous") {
-    return { userId: null, allowed: false, role: null, isSuperadmin: false };
+    return { userId: null, allowed: false, role: null, isSuperadmin: false, reason: null };
   }
-  // تحقق من الدور: مالك المنشأة (user_roles) أو مدير منصة فائق (platform_admins).
-  // التحميل الديناميكي يمنع تسريب عميل service-role إلى حزمة العميل.
+  let target: string;
+  try {
+    target = parseSupabaseTarget(process.env.SUPABASE_TARGET);
+  } catch {
+    return {
+      userId,
+      allowed: false,
+      role: null,
+      isSuperadmin: false,
+      reason: "حدد SUPABASE_TARGET صراحةً قبل فتح أدوات البنية التحتية.",
+    };
+  }
+  if (target !== "docker") {
+    return {
+      userId,
+      allowed: false,
+      role: null,
+      isSuperadmin: false,
+      reason: "أدوات Docker المحلية غير متاحة عند اختيار هدف السحابة.",
+    };
+  }
+
+  // أوامر Docker وGit والنسخ/الاستعادة محصورة بسوبر أدمن المنصة النشط.
+  // مالك المتجر لا يحصل على تحكم بنظام التشغيل عبر حساب العمل.
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const adminClient: any = supabaseAdmin;
-  const [rolesRes, adminRes] = await Promise.all([
-    adminClient.from("user_roles").select("role").eq("user_id", userId),
-    adminClient.from("platform_admins").select("role, is_active").eq("user_id", userId),
-  ]);
-  if (rolesRes.error || adminRes.error) {
-    throw new Error("تعذر التحقق من صلاحيات البنية التحتية. أعد المحاولة أو راجع اتصال قاعدة البيانات.");
+  const { data, error } = await adminClient
+    .from("platform_admins")
+    .select("role")
+    .eq("user_id", userId)
+    .eq("role", "superadmin")
+    .eq("is_active", true)
+    .maybeSingle();
+  if (error) {
+    throw new Error(
+      "تعذر التحقق من صلاحيات البنية التحتية. أعد المحاولة أو راجع اتصال قاعدة البيانات.",
+    );
   }
-  const roles = (rolesRes.data ?? []) as { role: string }[];
-  const isSuperadmin = ((adminRes.data ?? []) as { role: string; is_active: boolean }[]).some(
-    (a) => a.role === "superadmin" && a.is_active,
-  );
+  const isSuperadmin = data?.role === "superadmin";
   return {
     userId,
-    allowed: roles.some((r) => r.role === "owner") || isSuperadmin,
-    role: roles[0]?.role ?? null,
+    allowed: isSuperadmin,
+    role: isSuperadmin ? "superadmin" : null,
     isSuperadmin,
+    reason: null,
   };
 }
 
@@ -67,7 +93,9 @@ const guard = createServerFn({ method: "GET" })
 async function requireInfraAdmin(userId: string) {
   const g = await resolveInfraAccess(userId);
   if (!g.allowed) {
-    throw new Error("هذه اللوحة متاحة لمالك المتجر (Owner) أو مسؤول المنصة الفائق (Superadmin) فقط.");
+    throw new Error(
+      g.reason ?? "إدارة Docker والنظام متاحة لسوبر أدمن المنصة النشط فقط عند اختيار Docker.",
+    );
   }
   return g;
 }
@@ -289,7 +317,7 @@ export const seedAction = createServerFn({ method: "POST" })
 export const migrationAction = createServerFn({ method: "POST" })
   .validator(
     z.object({
-      action: z.enum(["list", "repair", "diff", "push", "pull"]),
+      action: z.enum(["list", "diff", "apply"]),
       confirm: z.string().max(120).optional(),
     }),
   )
@@ -305,29 +333,21 @@ export const migrationAction = createServerFn({ method: "POST" })
           return {
             ok: r.available,
             output: r.available
-              ? `الترحيلات: ${r.pending} معلقة، ${r.appliedRemoteOnly} سحابية فقط`
+              ? `الترحيلات: ${r.pending} معلقة محلياً، ${r.appliedDatabaseOnly} موجودة في قاعدة Docker فقط`
               : (r.error ?? "فشل"),
           };
         }
-        case "repair": {
-          if (data.confirm !== "REPAIR") return { ok: false, output: "التأكيد مطلوب: اكتب REPAIR" };
-          const r = await supabase(["migration", "repair", "--status", "reverted"], {
-            timeoutMs: 120_000,
+        case "diff": {
+          const r = await supabase(["db", "diff", "--local", "-f", "vortex_diff"], {
+            timeoutMs: 300_000,
           });
           return { ok: r.ok, output: r.output };
         }
-        case "diff": {
-          const r = await supabase(["db", "diff", "-f", "vortex_diff"], { timeoutMs: 300_000 });
-          return { ok: r.ok, output: r.output };
-        }
-        case "push": {
-          if (data.confirm !== "PUSH")
-            return { ok: false, output: "التأكيد مطلوب: اكتب PUSH لتطبيق الترحيلات على السحابة" };
-          const r = await supabase(["db", "push"], { timeoutMs: 600_000 });
-          return { ok: r.ok, output: r.output };
-        }
-        case "pull": {
-          const r = await supabase(["db", "pull"], { timeoutMs: 600_000 });
+        case "apply": {
+          if (data.confirm !== "APPLY LOCAL") {
+            return { ok: false, output: "التأكيد مطلوب: اكتب APPLY LOCAL لتطبيق الترحيلات على Docker المحلي." };
+          }
+          const r = await supabase(["migration", "up", "--local"], { timeoutMs: 600_000 });
           return { ok: r.ok, output: r.output };
         }
       }

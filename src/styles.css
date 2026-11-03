@@ -1018,3 +1018,254 @@ input::-ms-reveal {
   opacity: 0 !important;
   pointer-events: none !important;
 }
+
+/* ============================================================
+ * نظام الإشعارات والتنبيهات الموحد والفاخر (Vortex Toast System)
+ * تصميم فخم، متدرج، ألوان معبرة، أيقونات مضيئة، وانتقالات مرنة
+ * ========================================================== */
+
+/* حاوية الإشعارات العلوية والمتحركة */
+.vortex-toaster-container {
+  z-index: 99999 !important;
+  pointer-events: none;
+}
+
+.vortex-toaster-container [data-sonner-toast] {
+  pointer-events: auto;
+}
+
+/* بطاقة الإشعار الأساسية */
+.vortex-toast-card {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  padding: 14px 18px !important;
+  border-radius: 18px !important;
+  font-family: inherit !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  box-shadow: 0 20px 48px -12px rgba(0, 0, 0, 0.42), 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  overflow: hidden !important;
+  min-height: 56px !important;
+  max-width: 440px !important;
+  width: 100% !important;
+}
+
+/* تحسين موضع وظهور الإشعار على الجوال */
+@media (max-width: 640px) {
+  .vortex-toast-card {
+    padding: 12px 14px !important;
+    border-radius: 16px !important;
+    max-width: calc(100vw - 28px) !important;
+    margin: 0 auto !important;
+  }
+}
+
+/* نصوص الإشعار */
+.vortex-toast-title {
+  font-size: 0.885rem !important;
+  font-weight: 700 !important;
+  line-height: 1.4 !important;
+  letter-spacing: -0.01em !important;
+  color: inherit !important;
+}
+
+.vortex-toast-desc {
+  font-size: 0.775rem !important;
+  line-height: 1.45 !important;
+  opacity: 0.88 !important;
+  margin-top: 2px !important;
+  color: inherit !important;
+}
+
+/* شارات الأيقونات الفاخرة */
+.vortex-toast-icon-badge {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  flex-shrink: 0;
+  position: relative;
+  transition: transform 0.2s ease;
+}
+
+.vortex-toast-card:hover .vortex-toast-icon-badge {
+  transform: scale(1.08);
+}
+
+/* زر الإغلاق الأنيق */
+.vortex-toast-close-btn {
+  border-radius: 9999px !important;
+  width: 24px !important;
+  height: 24px !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  background: rgba(0, 0, 0, 0.18) !important;
+  color: inherit !important;
+  opacity: 0.7 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.2s ease !important;
+  cursor: pointer !important;
+}
+
+.vortex-toast-close-btn:hover {
+  opacity: 1 !important;
+  background: rgba(0, 0, 0, 0.35) !important;
+  transform: scale(1.1) !important;
+}
+
+/* ============================================================
+ * ثيمات الألوان: نجاح، خطأ، تحذير، تعليمات ومعلومات
+ * ========================================================== */
+
+/* 1. إشعار النجاح (Success - أخضر زمردي نضر) */
+.vortex-toast-theme-success,
+[data-sonner-toast][data-type="success"] {
+  background: linear-gradient(135deg, rgba(4, 47, 30, 0.94) 0%, rgba(6, 32, 22, 0.96) 100%) !important;
+  color: #ecfdf5 !important;
+  border: 1px solid rgba(16, 185, 129, 0.45) !important;
+  box-shadow: 0 20px 48px -12px rgba(5, 150, 105, 0.32), 0 0 0 1px rgba(16, 185, 129, 0.25) !important;
+}
+
+.vortex-toast-icon-success {
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.35) 0%, rgba(5, 150, 105, 0.15) 100%);
+  color: #34d399;
+  border: 1px solid rgba(52, 211, 153, 0.4);
+  box-shadow: 0 0 18px rgba(52, 211, 153, 0.3);
+}
+
+/* الوضع النهاري لإشعار النجاح */
+.light .vortex-toast-theme-success,
+.light [data-sonner-toast][data-type="success"],
+:root.light .vortex-toast-theme-success,
+:root.light [data-sonner-toast][data-type="success"] {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%) !important;
+  color: #065f46 !important;
+  border: 1px solid rgba(16, 185, 129, 0.45) !important;
+  box-shadow: 0 16px 36px -10px rgba(16, 185, 129, 0.22), 0 0 0 1px rgba(16, 185, 129, 0.2) !important;
+}
+
+.light .vortex-toast-icon-success,
+:root.light .vortex-toast-icon-success {
+  background: #bbf7d0;
+  color: #047857;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.25);
+}
+
+/* 2. إشعار الخطأ (Error - أحمر ياقوتي قرمزي) */
+.vortex-toast-theme-error,
+[data-sonner-toast][data-type="error"] {
+  background: linear-gradient(135deg, rgba(65, 10, 22, 0.94) 0%, rgba(42, 6, 14, 0.96) 100%) !important;
+  color: #fff1f2 !important;
+  border: 1px solid rgba(244, 63, 94, 0.5) !important;
+  box-shadow: 0 20px 48px -12px rgba(225, 29, 72, 0.36), 0 0 0 1px rgba(244, 63, 94, 0.28) !important;
+}
+
+.vortex-toast-icon-error {
+  background: radial-gradient(circle, rgba(244, 63, 94, 0.35) 0%, rgba(225, 29, 72, 0.15) 100%);
+  color: #fb7185;
+  border: 1px solid rgba(251, 113, 133, 0.4);
+  box-shadow: 0 0 18px rgba(251, 113, 133, 0.3);
+}
+
+/* الوضع النهاري لإشعار الخطأ */
+.light .vortex-toast-theme-error,
+.light [data-sonner-toast][data-type="error"],
+:root.light .vortex-toast-theme-error,
+:root.light [data-sonner-toast][data-type="error"] {
+  background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%) !important;
+  color: #9f1239 !important;
+  border: 1px solid rgba(244, 63, 94, 0.45) !important;
+  box-shadow: 0 16px 36px -10px rgba(244, 63, 94, 0.22), 0 0 0 1px rgba(244, 63, 94, 0.2) !important;
+}
+
+.light .vortex-toast-icon-error,
+:root.light .vortex-toast-icon-error {
+  background: #fecdd3;
+  color: #be123c;
+  border: 1px solid rgba(244, 63, 94, 0.4);
+  box-shadow: 0 0 12px rgba(244, 63, 94, 0.25);
+}
+
+/* 3. إشعار التحذير (Warning - برتقالي ذهبي / كهرماني دافئ) */
+.vortex-toast-theme-warning,
+[data-sonner-toast][data-type="warning"] {
+  background: linear-gradient(135deg, rgba(60, 32, 5, 0.94) 0%, rgba(38, 20, 3, 0.96) 100%) !important;
+  color: #fffbeb !important;
+  border: 1px solid rgba(245, 158, 11, 0.5) !important;
+  box-shadow: 0 20px 48px -12px rgba(217, 119, 6, 0.34), 0 0 0 1px rgba(245, 158, 11, 0.28) !important;
+}
+
+.vortex-toast-icon-warning {
+  background: radial-gradient(circle, rgba(245, 158, 11, 0.35) 0%, rgba(217, 119, 6, 0.15) 100%);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  box-shadow: 0 0 18px rgba(251, 191, 36, 0.3);
+}
+
+/* الوضع النهاري لإشعار التحذير */
+.light .vortex-toast-theme-warning,
+.light [data-sonner-toast][data-type="warning"],
+:root.light .vortex-toast-theme-warning,
+:root.light [data-sonner-toast][data-type="warning"] {
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%) !important;
+  color: #92400e !important;
+  border: 1px solid rgba(245, 158, 11, 0.45) !important;
+  box-shadow: 0 16px 36px -10px rgba(245, 158, 11, 0.22), 0 0 0 1px rgba(245, 158, 11, 0.2) !important;
+}
+
+.light .vortex-toast-icon-warning,
+:root.light .vortex-toast-icon-warning {
+  background: #fde68a;
+  color: #b45309;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.25);
+}
+
+/* 4. إشعار التعليمات والمعلومات (Info - أزرق سماوي صافٍ) */
+.vortex-toast-theme-info,
+[data-sonner-toast][data-type="info"] {
+  background: linear-gradient(135deg, rgba(8, 38, 70, 0.94) 0%, rgba(5, 24, 46, 0.96) 100%) !important;
+  color: #f0f9ff !important;
+  border: 1px solid rgba(14, 165, 233, 0.5) !important;
+  box-shadow: 0 20px 48px -12px rgba(2, 132, 199, 0.32), 0 0 0 1px rgba(14, 165, 233, 0.28) !important;
+}
+
+.vortex-toast-icon-info {
+  background: radial-gradient(circle, rgba(14, 165, 233, 0.35) 0%, rgba(2, 132, 199, 0.15) 100%);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  box-shadow: 0 0 18px rgba(56, 189, 248, 0.3);
+}
+
+/* الوضع النهاري لإشعار المعلومات */
+.light .vortex-toast-theme-info,
+.light [data-sonner-toast][data-type="info"],
+:root.light .vortex-toast-theme-info,
+:root.light [data-sonner-toast][data-type="info"] {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%) !important;
+  color: #0369a1 !important;
+  border: 1px solid rgba(14, 165, 233, 0.45) !important;
+  box-shadow: 0 16px 36px -10px rgba(14, 165, 233, 0.22), 0 0 0 1px rgba(14, 165, 233, 0.2) !important;
+}
+
+.light .vortex-toast-icon-info,
+:root.light .vortex-toast-icon-info {
+  background: #bae6fd;
+  color: #0284c7;
+  border: 1px solid rgba(14, 165, 233, 0.4);
+  box-shadow: 0 0 12px rgba(14, 165, 233, 0.25);
+}
+
+/* 5. شارة التحميل (Loading) */
+.vortex-toast-icon-loading {
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.35) 0%, rgba(79, 70, 229, 0.15) 100%);
+  color: #818cf8;
+  border: 1px solid rgba(129, 140, 248, 0.4);
+  box-shadow: 0 0 18px rgba(129, 140, 248, 0.3);
+}

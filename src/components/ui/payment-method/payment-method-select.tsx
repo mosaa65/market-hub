@@ -114,8 +114,21 @@ export function PaymentMethodSelect({
   const t = (key: keyof typeof import("@/lib/payments/payment-methods").PAYMENT_UI_TEXT) =>
     paymentUiText(key, isAr ? "ar" : "en");
 
-  const { activeCashboxes, defaultCashbox } = useCashboxes();
-  const { banks, wallets, defaultBank, defaultWallet } = useCompanyBankAccounts();
+  const { activeCashboxes, defaultCashbox, isLoading: cashboxesLoading } = useCashboxes();
+  const {
+    banks,
+    wallets,
+    defaultBank,
+    defaultWallet,
+    isLoading: bankAccountsLoading,
+  } = useCompanyBankAccounts();
+
+  /*
+   * بيانات الخزينة (الصناديق/البنوك/المحافظ) تصل بعد طرق الدفع، وقبل وصولها
+   * يبدو كل صندوق «مفقودًا» فيظهر تحذير «هذه الطريقة بلا حساب في دليل الحسابات»
+   * لجزء من الثانية ثم يختفي. لا نحكم على الربط قبل اكتمال الاستعلامات.
+   */
+  const treasuryLoading = cashboxesLoading || bankAccountsLoading;
 
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
@@ -246,6 +259,7 @@ export function PaymentMethodSelect({
    * افتراضي للعائلة* بدل *وجود الحساب نفسه*، فمرّت حالات بلا حساب بصمت.
    */
   const accountMissing =
+    !treasuryLoading &&
     !isCredit &&
     (selected?.ledgerKind === "CASH" ||
       selected?.ledgerKind === "BANK" ||

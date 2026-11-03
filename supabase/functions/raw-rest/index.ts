@@ -11,8 +11,7 @@
  *   الـ URL داخل Edge Runtime حيث لا يوجد حقن. الدالة تقرأ فقط (GET) ولا
  *   تُعيد أي كتابة على قاعدة البيانات.
  *
- * ملاحظة أمنية: الدالة تعمل بمفتاح الخدمة، لذلك تتحقق أولًا من هوية المستخدم
- *   (رمز الوصول) قبل تمرير أي طلب — لا تُقبل الطلبات المجهولة.
+ * كل طلب يمرر رمز المستخدم نفسه إلى PostgREST، فتظل سياسات RLS مطبقة.
  */
 
 /**
@@ -26,8 +25,19 @@ declare const Deno: {
 };
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
-const SERVICE_KEY =
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+const API_KEY = Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+
+function isPrivilegedKey(key: string): boolean {
+  if (/^sb_secret_/i.test(key)) return true;
+  const payload = key.split(".")[1];
+  if (!payload) return false;
+  try {
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    return JSON.parse(atob(normalized)).role === "service_role";
+  } catch {
+    return false;
+  }
+}
 
 const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -59,7 +69,7 @@ Deno.serve(async (req: Request) => {
   if (req.method !== "GET") {
     return json({ message: "Method not allowed" }, 405);
   }
-  if (!SUPABASE_URL || !SERVICE_KEY) {
+  if (!SUPABASE_URL || !API_KEY || isPrivilegedKey(API_KEY)) {
     return json({ message: "Proxy is not configured" }, 500);
   }
 
@@ -74,26 +84,26 @@ Deno.serve(async (req: Request) => {
   const path = (url.searchParams.get("path") ?? "").replace(/^\/+|\/+$/g, "");
   const query = url.searchParams.get("query") ?? "";
 
-  const table = path.split("/")[0];
-  if (!table || !ALLOWED_PREFIXES.includes(table)) {
-    return json({ message: `Table not allowed: ${table || "(empty)"}` }, 400);
+  if (!ALLOWED_PREFIXES.includes(path)) {
+    return json({ message: `Table not allowed: ${path || "(empty)"}` }, 400);
   }
 
-  // 2) تحقّق من هوية المستخدم قبل استخدام مفتاح الخدمة
+  // 2) تحقّق من الجلسة؛ هذا لا يمنح صلاحيات إضافية.
   const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-    headers: { Authorization: `Bearer ${token}`, apikey: SERVICE_KEY },
+    headers: { Authorization: `Bearer ${token}`, apikey: API_KEY },
   });
   if (!userRes.ok) {
     return json({ message: "Invalid session" }, 401);
   }
 
-  // 3) تمرير الطلب كما هو إلى PostgREST
-  const target = `${SUPABASE_URL}/rest/v1/${path}${query ? `?${query}` : ""}`;
+  // 3) تمرير هوية المستخدم إلى PostgREST كي تنطبق RLS على الصفوف.
+  const target = new URL(`/rest/v1/${path}`, SUPABASE_URL);
+  if (query) target.search = query;
   const upstream = await fetch(target, {
     method: "GET",
     headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
+      apikey: API_KEY,
+      Authorization: `Bearer ${token}`,
       Accept: "application/json",
       "Accept-Profile": "public",
     },

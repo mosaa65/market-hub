@@ -3,7 +3,8 @@
  * كل أوامر هنا ثابتة الوسائط أو معرفات متحقق منها — لا مخرجات المستخدم أبداً.
  */
 import { docker, resolveTools, firstExisting, dockerArgs } from "./tools";
-import { DEFAULT_PROJECT_REF, containerName, serviceDef } from "./services";
+import { LOCAL_PROJECT_ID, containerName, serviceDef } from "./services";
+import { requireDockerInfrastructureTarget } from "./target";
 import type {
   ContainerInfo,
   DockerImageInfo,
@@ -93,7 +94,8 @@ function serviceKeyFor(name: string): string | null {
   return svc;
 }
 
-export async function listContainers(projectRef = DEFAULT_PROJECT_REF): Promise<ContainerInfo[]> {
+export async function listContainers(projectId = LOCAL_PROJECT_ID): Promise<ContainerInfo[]> {
+  requireDockerInfrastructureTarget();
   const fmt =
     "{{json .ID}}\t{{json .Names}}\t{{json .Image}}\t{{json .State}}\t{{json .Health}}\t{{json .Status}}\t{{json .Ports}}\t{{json .StartedAt}}\t{{json .Labels}}";
   const res = await docker(["ps", "-a", "--format", fmt], { maxLines: 1000 });
@@ -150,7 +152,7 @@ export async function listContainers(projectRef = DEFAULT_PROJECT_REF): Promise<
     });
   }
   // عدد مرات إعادة التشغيل لكل حاوية supabase عبر inspect دفعة واحدة.
-  await enrichRestartCounts(containers, projectRef);
+  await enrichRestartCounts(containers, projectId);
   return containers;
 }
 
@@ -287,15 +289,18 @@ export async function composeVersion(): Promise<string | null> {
 /** إعادة إنشاء حاوية supabase — عبر supabase CLI فقط (لا docker rm يدوي). */
 export async function recreateSupabaseService(
   service: string,
-  projectRef = DEFAULT_PROJECT_REF,
+  projectId = LOCAL_PROJECT_ID,
 ): Promise<{ ok: boolean; output: string }> {
+  requireDockerInfrastructureTarget();
+  if (projectId !== LOCAL_PROJECT_ID) {
+    return { ok: false, output: "لا يمكن إعادة إنشاء خدمة خارج مشروع Docker المحلي المحدد." };
+  }
   const def = serviceDef(service);
   if (!def) return { ok: false, output: `Unknown service: ${service}` };
   // supabase stop <service> ثم start — إعادة إنشاء نظيفة عبر الأداة الرسمية.
   const { supabase } = await import("./tools");
   const stop = await supabase(["stop", def.service], { timeoutMs: 120_000 });
   const start = await supabase(["start"], { timeoutMs: 300_000 });
-  void projectRef;
   return { ok: stop.ok && start.ok, output: stop.output + "\n" + start.output };
 }
 

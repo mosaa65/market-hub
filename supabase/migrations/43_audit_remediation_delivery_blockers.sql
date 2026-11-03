@@ -2031,7 +2031,8 @@ DECLARE
     'fn_resolve_document_numbering', 'fn_set_document_numbering',
     'has_role', 'is_staff', 'is_platform_admin', 'is_platform_superadmin',
     'can_read_finance', 'can_read_expense_entry',
-    'product_reference_counts', 'warehouse_reference_counts'
+    'product_reference_counts', 'warehouse_reference_counts',
+    'product_delete_guard'
   ];
   v_name text;
 BEGIN
@@ -2073,7 +2074,7 @@ BEGIN
     AND has_function_privilege('authenticated', p.oid, 'EXECUTE')
     AND p.proname IN (
       'apply_cost_movement', 'next_invoice_number',
-      'next_journal_number', 'product_delete_guard',
+      'next_journal_number',
       'tg_stock_movements_engine_only', 'tg_customers_system_guard',
       'tg_suppliers_system_guard', 'tg_customer_ledger_system_guard'
     );

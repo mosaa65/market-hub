@@ -1193,7 +1193,7 @@ BEGIN
   IF NOT (
     public.has_role(auth.uid(), 'owner')
     OR public.has_role(auth.uid(), 'manager')
-    OR public.is_platform_admin(auth.uid())
+    OR public.is_platform_superadmin(auth.uid())
   ) THEN
     RETURN jsonb_build_object('deleted', false, 'reason', 'forbidden');
   END IF;

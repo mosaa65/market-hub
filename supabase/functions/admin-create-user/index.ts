@@ -190,15 +190,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   // ---- 2) Re-derive the caller's authorisation from the database ----
-  // `support` is deliberately not privileged: it is a read-only platform
-  // role and must not be able to create accounts. Only an explicit store
-  // `owner` role or an active `superadmin` row passes.
-  const [storeRoleRes, platformAdminRes] = await Promise.all([
+  // `support` and store managers cannot provision users. This matches the
+  // owner-only Users screen and the store's role-management policy.
+  const [storeRoleRes, platformAdminRes, profileRes] = await Promise.all([
     admin
       .from("user_roles")
       .select("role")
       .eq("user_id", callerId)
-      .in("role", ["owner", "manager"])
+      .eq("role", "owner")
       .maybeSingle(),
     admin
       .from("platform_admins")
@@ -206,9 +205,16 @@ Deno.serve(async (req: Request): Promise<Response> => {
       .eq("user_id", callerId)
       .eq("is_active", true)
       .maybeSingle(),
+    admin.from("profiles").select("is_active").eq("id", callerId).maybeSingle(),
   ]);
 
-  const isStorePrivileged = Boolean(storeRoleRes.data && ["owner", "manager"].includes(storeRoleRes.data.role));
+  if (storeRoleRes.error || platformAdminRes.error || profileRes.error) {
+    console.error("[admin-create-user] authorization lookup failed");
+    return fail("server_error", "تعذر التحقق من صلاحياتك. يرجى المحاولة مرة أخرى.", 500);
+  }
+
+  const isStorePrivileged =
+    profileRes.data?.is_active === true && storeRoleRes.data?.role === "owner";
   const platformRole = (platformAdminRes.data?.role as string | undefined) ?? "";
   const isPlatformPrivileged = platformRole === "superadmin";
 

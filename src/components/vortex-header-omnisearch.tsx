@@ -85,7 +85,7 @@ export const VortexHeaderOmnisearch = memo(function VortexHeaderOmnisearch({
       isModuleEnabled,
       isVisibleByMillingMode: (path) => isRouteVisibleByMillingMode(path, millingMode),
       canAccess: (entry) =>
-        canAccessRoute(entry.path.split("?")[0], {
+        canAccessRoute(entry.path, {
           roles,
           isPlatformAdmin,
           isPlatformSuperadmin,
@@ -315,7 +315,7 @@ export const VortexHeaderOmnisearch = memo(function VortexHeaderOmnisearch({
       isModuleEnabled,
       isVisibleByMillingMode: (path) => isRouteVisibleByMillingMode(path, millingMode),
       canAccess: (entry) =>
-        canAccessRoute(entry.path.split("?")[0], {
+        canAccessRoute(entry.path, {
           roles,
           isPlatformAdmin,
           isPlatformSuperadmin,

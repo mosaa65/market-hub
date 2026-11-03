@@ -4,10 +4,14 @@
  * فلا يمكن أن تُخفى صفحة من القائمة وتبقى مفتوحة بالرابط المباشر.
  *
  * القواعد:
- * - superadminOnly: لمدراء المنصة فقط. المالك لا يدخلها.
- * - allowedRoles: أدوار المنشأة المسموح لها. مدير المنصة يتجاوزها لأغراض الدعم.
- * - صفحة غير مذكورة هنا = مفتوحة لكل موظف نشط (لوحة التحكم، الإشعارات).
+ * - superadminOnly: لسوبر أدمن المنصة فقط. المالك ودعم المنصة لا يدخلانها.
+ * - allowedRoles: أدوار المنشأة؛ دعم المنصة لا يرث صلاحيات المتجر.
+ * - سجل التنقل هو مصدر صلاحيات الصفحات المسجلة؛ القواعد أدناه للتوافق مع
+ *   صفحات تشغيلية قديمة لم تدخل السجل بعد.
+ * - أي مسار غير معروف يُرفض افتراضيًا.
  */
+import { ROUTE_REGISTRY } from "./navigation/route-registry";
+
 export type TenantRole = "owner" | "manager" | "accountant" | "cashier" | "warehouse";
 
 export type RouteAccessRule = {
@@ -79,6 +83,7 @@ export const ROUTE_ACCESS: Record<string, RouteAccessRule> = {
     allowedRoles: ["owner", "manager", "accountant", "warehouse", "cashier"],
   },
   "/purchase-pos": { allowedRoles: STOCK },
+  "/purchase-invoice": { allowedRoles: STOCK },
   "/purchases": { allowedRoles: STOCK },
   "/suppliers": { allowedRoles: STOCK },
   "/purchase-returns": { allowedRoles: STOCK },
@@ -121,6 +126,7 @@ export type AccessContext = {
   roles: TenantRole[];
   isPlatformAdmin: boolean;
   isPlatformSuperadmin: boolean;
+  isActive?: boolean;
 };
 
 export function normalizeTenantRole(value: unknown): TenantRole | null {
@@ -143,7 +149,69 @@ function normalize(pathname: string): string {
   return clean === "" ? "/" : clean;
 }
 
-export function getRouteRule(pathname: string): RouteAccessRule | undefined {
+function queryFromPath(pathname: string): URLSearchParams {
+  const query = pathname.split("?")[1];
+  return new URLSearchParams(query ?? "");
+}
+
+function normalizeSearch(search?: Record<string, unknown>): URLSearchParams {
+  const result = new URLSearchParams();
+  for (const [key, value] of Object.entries(search ?? {})) {
+    if (value === undefined || value === null) continue;
+    if (Array.isArray(value)) {
+      for (const item of value) result.append(key, String(item));
+    } else {
+      result.set(key, String(value));
+    }
+  }
+  return result;
+}
+
+function combineRegistryRules(entries: typeof ROUTE_REGISTRY): RouteAccessRule {
+  if (entries.some((entry) => entry.superadminOnly)) return { superadminOnly: true };
+  const roleSets = entries
+    .map((entry) => entry.requiredRoles)
+    .filter((roles): roles is TenantRole[] => Array.isArray(roles));
+  if (roleSets.length === 0) return {};
+  const allowedRoles = roleSets.reduce((intersection, roles) =>
+    intersection.filter((role) => roles.includes(role)),
+  );
+  return { allowedRoles };
+}
+
+function findRegistryRule(pathname: string, search: URLSearchParams): RouteAccessRule | null {
+  const path = normalize(pathname);
+  const entries = ROUTE_REGISTRY.filter((entry) => normalize(entry.path) === path);
+  if (entries.length === 0) return null;
+
+  const queryEntries = entries.filter((entry) => entry.path.includes("?"));
+  const matchingQueryEntries = queryEntries.filter((entry) => {
+    const expected = queryFromPath(entry.path);
+    return Array.from(expected.entries()).every(([key, value]) => search.get(key) === value);
+  });
+  if (matchingQueryEntries.length > 0) return combineRegistryRules(matchingQueryEntries);
+
+  const baseEntries = entries.filter((entry) => !entry.path.includes("?"));
+  if (baseEntries.length > 0) {
+    // For an unrecognized query value, take the stricter rule from the
+    // registered query pages so changing a query string cannot shed access checks.
+    if (search.size > 0 && queryEntries.length > 0) {
+      return combineRegistryRules([...baseEntries, ...queryEntries]);
+    }
+    return combineRegistryRules(baseEntries);
+  }
+  return combineRegistryRules(queryEntries);
+}
+
+export function getRouteRule(
+  pathname: string,
+  routeSearch?: Record<string, unknown>,
+): RouteAccessRule | undefined {
+  const search = queryFromPath(pathname);
+  for (const [key, value] of normalizeSearch(routeSearch)) search.set(key, value);
+  const registeredRule = findRegistryRule(pathname, search);
+  if (registeredRule) return registeredRule;
+
   const path = normalize(pathname);
   if (ROUTE_ACCESS[path]) return ROUTE_ACCESS[path];
   // أطول بادئة مطابقة لدعم الصفحات الفرعية مثل /expenses/123
@@ -153,13 +221,16 @@ export function getRouteRule(pathname: string): RouteAccessRule | undefined {
   return match ? ROUTE_ACCESS[match] : undefined;
 }
 
-export function canAccessRoute(pathname: string, ctx: AccessContext): boolean {
-  const rule = getRouteRule(pathname);
-  if (!rule) return true;
-  const isPlatform = ctx.isPlatformAdmin || ctx.isPlatformSuperadmin;
-  if (rule.superadminOnly) return isPlatform;
-  if (!rule.allowedRoles) return true;
-  if (isPlatform) return true;
+export function canAccessRoute(
+  pathname: string,
+  ctx: AccessContext,
+  routeSearch?: Record<string, unknown>,
+): boolean {
+  if (ctx.isActive === false) return false;
+  const rule = getRouteRule(pathname, routeSearch);
+  if (!rule) return false;
+  if (rule.superadminOnly) return ctx.isPlatformSuperadmin;
+  if (ctx.isPlatformSuperadmin) return true;
 
   const normalizedRoles = Array.from(
     new Set(
@@ -171,6 +242,7 @@ export function canAccessRoute(pathname: string, ctx: AccessContext): boolean {
 
   // Role lookup failures and unassigned users must fail closed on restricted routes.
   if (normalizedRoles.length === 0) return false;
+  if (!rule.allowedRoles) return true;
 
   // المالك يملك حق الوصول لجميع صفحات المتجر التشغيلية دون استثناء
   if (normalizedRoles.includes("owner")) return true;

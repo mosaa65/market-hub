@@ -107,7 +107,15 @@ export function PartyPicker({
       <PopoverContent
         align={isArabic ? "end" : "start"}
         sideOffset={5}
-        className="w-[min(360px,calc(100vw-1rem))] overflow-hidden rounded-2xl border-border/70 bg-popover p-0 shadow-2xl"
+        /*
+         * `collisionPadding` و`sticky="always"` يمنحان Radix مساحة فعلية
+         * للاختيار: بلا هامش كان يلتصق بحافة الشاشة، وبلا `sticky` كان
+         * يتمرّر مع الصفحة فيبتعد عن زره. هامش 12px للفوتر والحدود.
+         */
+        collisionPadding={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        sticky="always"
+        avoidCollisions
+        className="max-h-[min(28rem,70dvh)] w-[min(360px,calc(100vw-1rem))] overflow-hidden rounded-2xl border-border/70 bg-popover p-0 shadow-2xl"
       >
         <div className="flex items-center justify-between border-b border-border/70 bg-primary/[0.035] px-3.5 py-3">
           <div className="flex min-w-0 items-center gap-2.5">
@@ -166,7 +174,7 @@ export function PartyPicker({
             placeholder={isArabic ? "ابحث بالاسم أو الهاتف..." : "Search name or phone..."}
             className="h-11 text-xs"
           />
-          <CommandList className="max-h-[min(22rem,55dvh)] p-1.5">
+          <CommandList className="max-h-[min(22rem,48dvh)] p-1.5">
             <CommandEmpty className="py-8 text-xs text-muted-foreground">
               {isArabic ? "لا توجد نتائج مطابقة" : "No matching results"}
             </CommandEmpty>

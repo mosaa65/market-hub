@@ -29,6 +29,7 @@ import { Check, ChevronDown, Package, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toSystemDigits } from "@/lib/format-preferences";
 import { productClassTone, type ProductClassTone } from "@/components/products/product-class-meta";
+import { AnchoredPanel } from "@/components/ui/anchored-panel";
 
 /* ------------------------------------------------------------------ types */
 
@@ -264,28 +265,12 @@ export function ProductPicker<T extends ProductPickerItem = ProductPickerItem>({
    * اتجاه فتح القائمة — نفس منطق منتقي الدفع.
    *
    * أسطر الأصناف تُضاف في أسفل الشاشات المزدحمة (الاستلام، التسليم، نقاط
-   * البيع)، فالقائمة التي تُفتح للأسفل تُدفن تحت الفوتر. نقيس المساحة عند
-   * الفتح ونقلب الاتجاه إن ضاق الأسفل.
+   * البيع)، فالقائمة التي تُفتح للأسفل تُدفن تحت الفوتر. القياس الفعلي
+   * والقلب للأعلى يقوم به `AnchoredPanel` الآن — بعد أن كانت القائمة
+   * `absolute` داخل النموذج فتُقصّ عند حاوية `MillingPanel` ذات
+   * `overflow-hidden` ويختفي نصّها. لا حاجة لقياس محلي هنا.
    */
-  const [placement, setPlacement] = React.useState<"bottom" | "top">("bottom");
   const triggerRef = React.useRef<HTMLButtonElement | null>(null);
-
-  React.useEffect(() => {
-    if (!open) return;
-    const measure = () => {
-      const rect = triggerRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const below = window.innerHeight - rect.bottom;
-      setPlacement(below < 260 && rect.top > below ? "top" : "bottom");
-    };
-    measure();
-    window.addEventListener("resize", measure);
-    window.addEventListener("scroll", measure, true);
-    return () => {
-      window.removeEventListener("resize", measure);
-      window.removeEventListener("scroll", measure, true);
-    };
-  }, [open]);
 
   return (
     <div ref={rootRef} className={cn("relative min-w-0", className)}>
@@ -340,15 +325,18 @@ export function ProductPicker<T extends ProductPickerItem = ProductPickerItem>({
         />
       </button>
 
-      {/* ── القائمة ── */}
-      {open && (
-        <div
-          className={cn(
-            "absolute inset-x-0 z-50 overflow-hidden rounded-xl border border-border/80 bg-popover shadow-2xl",
-            placement === "bottom" ? "top-[calc(100%+4px)]" : "bottom-[calc(100%+4px)]",
-          )}
-        >
-          <div className="flex items-center gap-2 border-b border-border/60 px-2.5 py-2">
+      {/* ── القائمة: لوحة عائمة على `document.body`، لا تُقصّ ولا تختفي ── */}
+      <AnchoredPanel
+        anchorRef={triggerRef}
+        open={open}
+        onDismiss={() => setOpen(false)}
+        preferredHeight={320}
+        minHeight={180}
+        minWidth={280}
+        className="overflow-hidden rounded-xl border border-border/80 bg-popover shadow-2xl"
+      >
+        <div className="flex h-full max-h-[inherit] flex-col">
+          <div className="flex shrink-0 items-center gap-2 border-b border-border/60 px-2.5 py-2">
             <Search className="size-3.5 shrink-0 text-muted-foreground" />
             <input
               ref={searchRef}
@@ -371,7 +359,7 @@ export function ProductPicker<T extends ProductPickerItem = ProductPickerItem>({
             role="listbox"
             aria-label={ariaLabel}
             onKeyDown={onListKeyDown}
-            className="max-h-72 overflow-y-auto p-1 custom-scrollbar"
+            className="min-h-0 flex-1 overflow-y-auto p-1 custom-scrollbar"
           >
             {flat.length === 0 ? (
               <p className="px-3 py-6 text-center text-[11px] text-muted-foreground">
@@ -442,7 +430,7 @@ export function ProductPicker<T extends ProductPickerItem = ProductPickerItem>({
             )}
           </div>
         </div>
-      )}
+      </AnchoredPanel>
     </div>
   );
 }

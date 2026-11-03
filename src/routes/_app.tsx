@@ -11,8 +11,17 @@ export const Route = createFileRoute("/_app")({
 });
 
 function AppLayout() {
-  const { session, loading, roles, isPlatformAdmin, isPlatformSuperadmin } = useAuth();
+  const {
+    session,
+    loading,
+    isRefreshingPermissions,
+    roles,
+    isPlatformAdmin,
+    isPlatformSuperadmin,
+    isActive,
+  } = useAuth();
   const pathname = useRouterState({ select: (st) => st.location.pathname });
+  const routeSearch = useRouterState({ select: (st) => st.location.search });
   const { t } = useI18n();
   const navigate = useNavigate();
 
@@ -20,7 +29,7 @@ function AppLayout() {
     if (!loading && !session) navigate({ to: "/auth", replace: true });
   }, [loading, session, navigate]);
 
-  if (loading || !session) {
+  if (loading || isRefreshingPermissions || !session) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="flex flex-col items-center gap-3 text-sm text-muted-foreground">
@@ -33,7 +42,11 @@ function AppLayout() {
 
   return (
     <AppShell>
-      {canAccessRoute(pathname, { roles, isPlatformAdmin, isPlatformSuperadmin }) ? (
+      {canAccessRoute(
+        pathname,
+        { roles, isPlatformAdmin, isPlatformSuperadmin, isActive },
+        routeSearch as Record<string, unknown>,
+      ) ? (
         <Outlet />
       ) : (
         <AccessDenied />

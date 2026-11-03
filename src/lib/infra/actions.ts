@@ -8,16 +8,18 @@ import { mkdir, stat, unlink, readdir } from "node:fs/promises";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { docker, supabase, assertSafeId, backupsDir } from "./tools";
-import { containerName } from "./services";
+import { containerName, LOCAL_PROJECT_ID } from "./services";
+import { requireDockerInfrastructureTarget } from "./target";
 import { pruneDocker, removeDanglingImages, dockerPath } from "./docker";
 import { supabaseStart, supabaseStop } from "./supabase";
 
 /** الحاويات المسموح التحكم بها: حاويات المشروع (supabase_*) فقط. */
 function validateProjectContainer(name: string): string {
+  requireDockerInfrastructureTarget();
   assertSafeId(name);
-  if (!name.startsWith("supabase_")) {
+  if (!name.startsWith("supabase_") || !name.endsWith(`_${LOCAL_PROJECT_ID}`)) {
     throw new Error(
-      "لا يُسمح بالتحكم إلا بحاويات المشروع (supabase_*) — حماية من التأثير على حاويات أخرى على الجهاز.",
+      "لا يُسمح بالتحكم إلا بحاويات مشروع Docker المحلي المحدد في supabase/config.toml.",
     );
   }
   return name;
@@ -82,6 +84,7 @@ export async function runSafeProbe(
 // ---------------------------------------------------------------------------
 
 async function dumpDatabase(): Promise<{ ok: boolean; output: string; file: string | null }> {
+  requireDockerInfrastructureTarget();
   const db = containerName("db");
   await mkdir(backupsDir(), { recursive: true });
   const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
@@ -116,6 +119,7 @@ export async function exportDump(): Promise<{ ok: boolean; output: string; file:
 }
 
 export async function restoreDatabase(dumpFile: string): Promise<{ ok: boolean; output: string }> {
+  requireDockerInfrastructureTarget();
   assertSafeId(dumpFile);
   if (!dumpFile.endsWith(".sql")) return { ok: false, output: "الملف يجب أن يكون .sql" };
   const filePath = path.join(backupsDir(), dumpFile);
@@ -136,6 +140,7 @@ export async function restoreDatabase(dumpFile: string): Promise<{ ok: boolean; 
 }
 
 export async function listBackups(): Promise<{ name: string; sizeKb: number; modified: string }[]> {
+  requireDockerInfrastructureTarget();
   try {
     await mkdir(backupsDir(), { recursive: true });
     const files = await readdir(backupsDir());
@@ -153,6 +158,7 @@ export async function listBackups(): Promise<{ name: string; sizeKb: number; mod
 }
 
 export async function deleteBackup(name: string): Promise<boolean> {
+  requireDockerInfrastructureTarget();
   assertSafeId(name);
   try {
     await unlink(path.join(backupsDir(), name));
@@ -167,13 +173,16 @@ export async function deleteBackup(name: string): Promise<boolean> {
  * (بإزالة الأقراص) ثم start. تتطلب تأكيداً نصياً حرفياً.
  */
 export async function resetDatabase(confirm: string): Promise<{ ok: boolean; output: string }> {
-  const expected = "RESET";
+  requireDockerInfrastructureTarget();
+  const expected = "RESET LOCAL";
   if (confirm !== expected) {
     return { ok: false, output: `التأكيد مطلوب: اكتب "${expected}" حرفياً في حقل التأكيد.` };
   }
-  const stop = await supabase(["stop", "--no-backup"], { timeoutMs: 300_000 });
-  const start = await supabaseStart();
-  return { ok: stop.ok && start.ok, output: `${stop.output}\n${start.output}` };
+  const reset = await supabase(["db", "reset", "--local"], {
+    timeoutMs: 900_000,
+    maxLines: 500,
+  });
+  return { ok: reset.ok, output: reset.output };
 }
 
 // ---------------------------------------------------------------------------
@@ -181,6 +190,7 @@ export async function resetDatabase(confirm: string): Promise<{ ok: boolean; out
 // ---------------------------------------------------------------------------
 
 export async function runSeedFile(relPath: string): Promise<{ ok: boolean; output: string }> {
+  requireDockerInfrastructureTarget();
   if (!relPath.endsWith(".sql") || relPath.includes("..")) {
     return { ok: false, output: "مسار غير صالح للملف" };
   }
@@ -212,6 +222,7 @@ export async function maintenance(
     | "removeDangling"
     | "restartAll",
 ): Promise<{ ok: boolean; output: string }> {
+  requireDockerInfrastructureTarget();
   switch (op) {
     case "pruneImages":
       return { ok: true, output: await pruneDocker("images") };
