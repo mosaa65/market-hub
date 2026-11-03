@@ -656,6 +656,8 @@ export interface UserThemePreferences {
   colorArchive: ArchivedColor[];
   /** درجة عرض النظام (الافتراضي/الفخم/النقي/الرمادي/المعتم) */
   modeVariant?: ModeVariantId;
+  /** نوع الخط المختار للواجهة */
+  fontTheme?: import("./font-theme").FontThemeId;
   updatedAt: number;
 }
 
@@ -676,6 +678,7 @@ export function serializeUserThemePreferences(prefs: UserThemePreferences): stri
     customColor: prefs.customColor,
     colorArchive: prefs.colorArchive,
     modeVariant: prefs.modeVariant || "default",
+    fontTheme: prefs.fontTheme || "ibm-plex",
     updatedAt: prefs.updatedAt || Date.now(),
   });
 }
@@ -721,12 +724,16 @@ export function parseUserThemePreferences(raw: unknown): UserThemePreferences | 
         ? data.modeVariant
         : "default";
 
+    const fontTheme =
+      typeof data.fontTheme === "string" ? (data.fontTheme as any) : "ibm-plex";
+
     return {
       theme,
       accentTheme,
       customColor,
       colorArchive,
       modeVariant,
+      fontTheme,
       updatedAt,
     };
   } catch {

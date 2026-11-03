@@ -20,6 +20,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useI18n } from "@/lib/i18n";
+import { useAuth } from "@/lib/auth";
 import { money, moneyCell } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -60,6 +61,7 @@ export function ExpenseDetailDrawer({
   onEdit?: (detail: ExpenseDetail) => void;
 }) {
   const { t, lang } = useI18n();
+  const { hasRole } = useAuth();
   const ar = lang === "ar";
   const { data, isLoading, error, refetch } = useExpenseDetail(open ? entryId : null);
   const mutations = useExpenseMutations();
@@ -72,6 +74,8 @@ export function ExpenseDetailDrawer({
   const [reverseOpen, setReverseOpen] = useState(false);
 
   const entry = data?.entry;
+  const approvalRank = hasRole("owner") ? 50 : hasRole("manager") ? 40 : 0;
+  const canApprove = Boolean(entry?.can_approve && approvalRank >= (entry?.approval_required_rank ?? 40));
 
   const overdue = useMemo(
     () => (entry ? isOverdue(entry.due_date, Number(entry.remaining_amount), entry.status) : false),
@@ -123,7 +127,7 @@ export function ExpenseDetailDrawer({
                   <>
                     <Button
                       size="sm"
-                      disabled={!entry.can_approve || mutations.isBusy}
+                      disabled={!canApprove || mutations.isBusy}
                       onClick={() =>
                         void run(() =>
                           mutations.decide.mutateAsync({
@@ -140,7 +144,7 @@ export function ExpenseDetailDrawer({
                     <Button
                       variant="outline"
                       size="sm"
-                      disabled={!entry.can_approve || mutations.isBusy}
+                      disabled={!canApprove || mutations.isBusy}
                       onClick={() => setRejectOpen(true)}
                     >
                       <X className="size-3.5" />
@@ -364,6 +368,21 @@ export function ExpenseDetailDrawer({
               <Meta label={t("expenses.field.warehouse")} value={entry.warehouse_name} />
               <Meta label={t("expenses.field.cost_center")} value={entry.cost_center_name} />
               <Meta label={t("expenses.field.project")} value={entry.project_name} />
+              <Meta label={ar ? "رقم فاتورة المورد" : "Supplier invoice"} value={entry.supplier_invoice_number} />
+              <Meta
+                label={ar ? "معالجة الضريبة" : "Tax treatment"}
+                value={
+                  entry.tax_mode === "NONE"
+                    ? ar ? "بدون ضريبة" : "No tax"
+                    : entry.tax_recoverable
+                      ? ar ? "قابلة للاسترداد" : "Recoverable"
+                      : ar ? "ضمن تكلفة المصروف" : "Included in expense cost"
+                }
+              />
+              <Meta
+                label={ar ? "مستوى الاعتماد" : "Approval level"}
+                value={entry.approval_required_rank >= 50 ? (ar ? "المالك" : "Owner") : (ar ? "مدير أو مالك" : "Manager or owner")}
+              />
               <Meta label={ar ? "أنشأه" : "Created by"} value={entry.created_by_name ?? "—"} />
             </div>
 

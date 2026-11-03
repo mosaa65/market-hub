@@ -3290,7 +3290,16 @@ function POSPage() {
                       context="pos"
                       value={paymentMethod}
                       settlement={settlement}
-                      onSettlementChange={setSettlement}
+                      onSettlementChange={(next) => {
+                        setSettlement(next);
+                        //
+                        // حقل المرجع الوحيد في الشاشة يرسمه المنتقي. وكان في
+                        // نقطة البيع حقلًا ثانيًا مستقلًا يكتب `transferRef`،
+                        // فيظهر رقمان مرجعيان لطريقة واحدة. الآن يقرأ `transferRef`
+                        // من نفس حالة التسوية، فيبقى التحقق من الإرسال كما هو
+                        // بلا حقل مكرر.
+                        setTransferRef(next.reference ?? "");
+                      }}
                       compact
                       onChange={(method) => {
                         setIsSplitPayment(false);
@@ -3356,26 +3365,6 @@ function POSPage() {
                   className="h-8 min-w-0 rounded-lg border border-border bg-background px-2 text-[10px] font-semibold outline-none focus:border-primary sm:px-2.5 sm:text-[11px]"
                 />
               </div>
-
-              {/* Transfer reference input */}
-              {!isSplitPayment &&
-                (selectedSingleMethod?.requiresReference ||
-                  paymentMethod === "bank_transfer" ||
-                  paymentMethod === "mobile_money") && (
-                  <input
-                    value={transferRef}
-                    onChange={(e) => setTransferRef(e.target.value)}
-                    data-form-nav
-                    // النص من الكتالوج الموحّد بدل نسخة محلية لكل شاشة.
-                    placeholder={
-                      paymentMethod === "mobile_money"
-                        ? paymentUiText("walletReference", lang === "ar" ? "ar" : "en")
-                        : t("pos.pm.transfer_ref")
-                    }
-                    aria-label={paymentUiText("reference", lang === "ar" ? "ar" : "en")}
-                    className="h-9 w-full rounded-xl border border-input/80 bg-background px-3 text-xs outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-                  />
-                )}
 
               {/* Split Payment Details */}
               {isSplitPayment ? (

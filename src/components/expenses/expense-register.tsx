@@ -65,6 +65,10 @@ export interface ExpenseRegisterProps {
   onOpen: (row: ExpenseListRow) => void;
   onEdit: (row: ExpenseListRow) => void;
   onPay: (row: ExpenseListRow) => void;
+  title?: string;
+  subtitle?: string;
+  showSummary?: boolean;
+  totalCount?: number;
 }
 
 export function ExpenseRegister({
@@ -85,6 +89,10 @@ export function ExpenseRegister({
   onOpen,
   onEdit,
   onPay,
+  title,
+  subtitle,
+  showSummary = true,
+  totalCount,
 }: ExpenseRegisterProps) {
   const { t, lang } = useI18n();
   const ar = lang === "ar";
@@ -406,8 +414,8 @@ export function ExpenseRegister({
   return (
     <>
       <PageHeader
-        title={t("expenses.title")}
-        subtitle={t("expenses.subtitle")}
+        title={title ?? t("expenses.title")}
+        subtitle={subtitle ?? t("expenses.subtitle")}
         actions={
           <div className="flex items-center gap-2">
             <Link
@@ -441,10 +449,11 @@ export function ExpenseRegister({
       />
 
       <div className="space-y-4">
-        <ExpenseSummaryCards
-          summary={summary}
-          loading={isLoading && !summary}
-          onSelect={(key) => {
+        {showSummary ? (
+          <ExpenseSummaryCards
+            summary={summary}
+            loading={isLoading && !summary}
+            onSelect={(key) => {
             // The cards double as the fastest filter, so a click narrows the
             // register rather than doing nothing.
             if (key === "pending_total") {
@@ -456,9 +465,10 @@ export function ExpenseRegister({
             } else if (key === "period_total") {
               onFiltersChange({ ...filters, status: [], paymentState: null });
             }
-          }}
-        />
-        {summaryError ? (
+            }}
+          />
+        ) : null}
+        {showSummary && summaryError ? (
           <div
             role="alert"
             className="flex items-center justify-between gap-3 rounded-xl border border-destructive/25 bg-destructive/5 px-3 py-2 text-xs text-destructive"
@@ -506,7 +516,7 @@ export function ExpenseRegister({
           hasMore={Boolean(hasNextPage)}
           onLoadMore={onLoadMore}
           loadingMore={isFetchingNextPage}
-          totalCount={summary?.total_count}
+          totalCount={totalCount ?? summary?.total_count}
           columns={columns}
           sort={sort}
           onSortChange={setSort}

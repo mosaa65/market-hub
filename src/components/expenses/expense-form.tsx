@@ -77,6 +77,7 @@ function blankHeader(): ExpenseFormHeader {
   return {
     expense_date: today(),
     due_date: "",
+    supplier_invoice_number: "",
     entry_type: "DIRECT",
     payee_type: "NONE",
     payee_name: "",
@@ -88,7 +89,12 @@ function blankHeader(): ExpenseFormHeader {
     description: "",
     note: "",
     tax_mode: "NONE",
+    tax_recoverable: false,
   };
+}
+
+function createRequestKey() {
+  return globalThis.crypto?.randomUUID?.() ?? `expense-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 function lineGross(line: ExpenseLineDraft): number | null {
@@ -141,6 +147,7 @@ export function ExpenseFormDialog({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [dirty, setDirty] = useState(false);
   const amountInputRef = useRef<HTMLInputElement>(null);
+  const idempotencyKeyRef = useRef("");
 
   /*
    * قائمة الموظفين تأتي من RPC المستأجر نفسه (expense_lookups) فلا تحمل
@@ -160,6 +167,7 @@ export function ExpenseFormDialog({
       setHeader({
         expense_date: entry.expense_date,
         due_date: entry.due_date ?? "",
+        supplier_invoice_number: entry.supplier_invoice_number ?? "",
         entry_type: entry.entry_type,
         payee_type: entry.payee_type,
         payee_name: entry.payee_name ?? "",
@@ -171,6 +179,7 @@ export function ExpenseFormDialog({
         description: entry.description ?? "",
         note: entry.note ?? "",
         tax_mode: entry.tax_mode,
+        tax_recoverable: entry.tax_recoverable,
       });
 
       if (editing.lines.length > 0) {
@@ -197,6 +206,7 @@ export function ExpenseFormDialog({
       setShowAdvanced(Boolean(entry.warehouse_id || entry.cost_center_id || entry.project_id));
     } else {
       setHeader({ ...blankHeader(), cost_center_id: initialCostCenterId ?? "" });
+      idempotencyKeyRef.current = createRequestKey();
       setLines([blankLine({ category_id: initialCategoryId ?? "" })]);
       setOpMode("CASH_PAYMENT");
       setPaymentMethod("cash");
@@ -212,7 +222,12 @@ export function ExpenseFormDialog({
   }, [open, editing, initialCostCenterId, initialCategoryId]);
 
   const primaryLine = lines[0] ?? blankLine();
-  const numAmount = lineGross(primaryLine) ?? 0;
+  const enteredAmount = lineGross(primaryLine) ?? 0;
+  const enteredTaxRate = parseAmount(primaryLine.tax_rate || "0");
+  const numAmount =
+    header.tax_mode === "EXCLUSIVE" && enteredTaxRate.ok
+      ? roundMoney(enteredAmount * (1 + enteredTaxRate.value / 100))
+      : enteredAmount;
 
   const selectedCategory = useMemo(() => {
     return lookups?.categories?.find((c) => c.id === primaryLine.category_id);
@@ -293,6 +308,14 @@ export function ExpenseFormDialog({
     if (numAmount <= 0) {
       errors.amount = ar ? "يرجى إدخال مبلغ المصروف" : "Please enter the expense amount";
     }
+    if (!enteredTaxRate.ok || enteredTaxRate.value > 100) {
+      errors.tax_rate = ar ? "أدخل نسبة ضريبة بين 0 و100" : "Enter a tax rate from 0 to 100";
+    }
+    if (header.tax_mode === "NONE" && enteredTaxRate.ok && enteredTaxRate.value > 0) {
+      errors.tax_rate = ar
+        ? "اختر معالجة ضريبية أو صفّر نسبة الضريبة"
+        : "Choose a tax treatment or clear the tax rate";
+    }
 
     if (!primaryLine.category_id) {
       errors.category = ar ? "يرجى اختيار تصنيف المصروف" : "Please choose expense category";
@@ -321,10 +344,26 @@ export function ExpenseFormDialog({
       if (header.payee_type === "EMPLOYEE" && !header.employee_id) {
         errors.employee_id = ar ? "اختر الموظف المستلم" : "Choose the employee";
       }
+      if (header.payee_type === "SUPPLIER" && !header.supplier_id) {
+        errors.supplier_id = ar ? "اختر المورد" : "Choose the supplier";
+      }
+    }
+
+    if (header.supplier_invoice_number.trim().length > 120) {
+      errors.supplier_invoice_number = ar
+        ? "رقم فاتورة المورد طويل جدًا (الحد 120 حرفًا)"
+        : "Supplier invoice number is too long (120 characters maximum)";
+    } else if (
+      header.supplier_invoice_number.trim() &&
+      (!header.supplier_id || (opMode === "CASH_PAYMENT" && header.payee_type !== "SUPPLIER"))
+    ) {
+      errors.supplier_invoice_number = ar
+        ? "رقم فاتورة المورد يتطلب اختيار المورد"
+        : "Select the supplier before entering its invoice number";
     }
 
     return { errors, valid: Object.keys(errors).length === 0 };
-  }, [header, numAmount, primaryLine.category_id, opMode, ar]);
+  }, [header, numAmount, primaryLine.category_id, enteredTaxRate.ok, enteredTaxRate.ok ? enteredTaxRate.value : null, opMode, ar]);
 
   /* -- الترحيل والتسجيل ---------------------------------------------- */
   const buildLinePayload = (): ExpenseLineInput[] => {
@@ -367,10 +406,29 @@ export function ExpenseFormDialog({
     const canPostDraft = hasRole("owner") || hasRole("manager");
     const submitForApproval = submit && (!isCashPayment || !canPostDraft);
 
+    if (isCashPayment && submit && canPostDraft) {
+      const unmappedCategory = payloadLines.some((line) => {
+        const category = lookups?.categories.find((item) => item.id === line.category_id);
+        return !category?.account_id;
+      });
+      if (unmappedCategory) {
+        toast.error(
+          ar
+            ? "اربط كل تصنيفات المصروف بحساب مصروف نشط قبل الترحيل. يمكنك حفظها كمسودة الآن."
+            : "Map each expense category to an active expense account before posting. You can save a draft meanwhile.",
+        );
+        return;
+      }
+    }
+
     const payload = {
       lines: payloadLines,
       expense_date: header.expense_date,
       due_date: isCashPayment ? null : header.due_date || null,
+      supplier_invoice_number:
+        header.payee_type === "SUPPLIER" || !isCashPayment
+          ? header.supplier_invoice_number.trim() || null
+          : null,
       entry_type: header.entry_type,
       payee_type: isCashPayment ? header.payee_type : ("SUPPLIER" as ExpensePayeeType),
       payee_name: isCashPayment ? header.payee_name || null : selectedSupplier?.name || null,
@@ -387,6 +445,7 @@ export function ExpenseFormDialog({
       description: header.description || null,
       note: header.note || null,
       tax_mode: header.tax_mode,
+      tax_recoverable: header.tax_recoverable,
     };
 
     try {
@@ -403,6 +462,7 @@ export function ExpenseFormDialog({
         const created = await mutations.create.mutateAsync({
           ...payload,
           submit: submitForApproval,
+          idempotency_key: idempotencyKeyRef.current,
         });
 
         // Draft vouchers are posted and paid immediately for owner/manager.
@@ -436,6 +496,7 @@ export function ExpenseFormDialog({
               : "Expense recorded successfully",
         );
         onSaved?.(created?.id ?? "");
+        idempotencyKeyRef.current = "";
       }
 
       setDirty(false);
@@ -616,7 +677,15 @@ export function ExpenseFormDialog({
 
           <div className="rounded-2xl border border-primary/25 bg-primary/5 p-4 space-y-1.5">
             <label className="text-xs font-bold text-foreground flex items-center justify-between">
-              <span>{ar ? "مبلغ المصروف المطلوب صرفه *" : "Expense Amount *"}</span>
+                <span>
+                  {header.tax_mode === "EXCLUSIVE"
+                    ? ar
+                      ? "المبلغ قبل الضريبة *"
+                      : "Amount before tax *"
+                    : ar
+                      ? "إجمالي مبلغ الفاتورة *"
+                      : "Invoice total *"}
+                </span>
               {validation.errors.amount && (
                 <span className="text-[11px] text-destructive font-semibold">
                   {validation.errors.amount}
@@ -707,8 +776,8 @@ export function ExpenseFormDialog({
                       ? `سيُرحّل إلى ${selectedAccountLabel}`
                       : `Posts to ${selectedAccountLabel}`
                     : ar
-                      ? "لا يوجد حساب مربوط؛ سيستخدم النظام حساب المصروفات المتنوعة 5911."
-                      : "No account is mapped; the system will use default expense account 5911."}
+                      ? "هذا التصنيف غير مربوط بحساب مصروف. يلزم ربطه من إعدادات المصروفات قبل الترحيل."
+                      : "No expense account is mapped. Link one in Expense Setup before posting."}
                 </span>
               )}
             </div>
@@ -729,6 +798,75 @@ export function ExpenseFormDialog({
                 </span>
               )}
             </div>
+          </div>
+
+          <div className="grid gap-4 rounded-xl border border-border/60 bg-surface/40 p-3 sm:grid-cols-3">
+            <div>
+              <label className="mb-1.5 block text-xs font-bold text-foreground">
+                {ar ? "معالجة الضريبة" : "Tax treatment"}
+              </label>
+              <select
+                value={header.tax_mode}
+                onChange={(event) =>
+                  (() => {
+                    const mode = event.target.value as ExpenseFormHeader["tax_mode"];
+                    setHeaderField("tax_mode", mode);
+                    if (mode === "NONE") {
+                      setHeaderField("tax_recoverable", false);
+                      setLines((current) =>
+                        current.map((line, index) => (index === 0 ? { ...line, tax_rate: "0" } : line)),
+                      );
+                    }
+                  })()
+                }
+                className={selectClass}
+              >
+                <option value="NONE">{ar ? "بدون ضريبة" : "No tax"}</option>
+                <option value="INCLUSIVE">{ar ? "السعر شامل الضريبة" : "Tax inclusive"}</option>
+                <option value="EXCLUSIVE">{ar ? "تضاف الضريبة للسعر" : "Add tax to amount"}</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-bold text-foreground">
+                {ar ? "نسبة الضريبة %" : "Tax rate %"}
+              </label>
+              <FieldInput
+                type="decimal"
+                value={primaryLine.tax_rate}
+                onValueChange={(value) => {
+                  setDirty(true);
+                  setLines((current) =>
+                    current.map((line, index) => (index === 0 ? { ...line, tax_rate: value } : line)),
+                  );
+                }}
+                placeholder="0"
+                disabled={header.tax_mode === "NONE"}
+              />
+              {validation.errors.tax_rate ? (
+                <span className="mt-1 block text-[11px] font-semibold text-destructive">
+                  {validation.errors.tax_rate}
+                </span>
+              ) : null}
+            </div>
+            <label className="flex items-start gap-2 self-end rounded-lg border border-border/60 p-2.5 text-xs">
+              <input
+                type="checkbox"
+                checked={header.tax_recoverable}
+                onChange={(event) => setHeaderField("tax_recoverable", event.target.checked)}
+                disabled={header.tax_mode === "NONE"}
+                className="mt-0.5 size-4 accent-primary"
+              />
+              <span>
+                <span className="block font-semibold text-foreground">
+                  {ar ? "ضريبة مدخلات قابلة للاسترداد" : "Recoverable input tax"}
+                </span>
+                <span className="mt-0.5 block text-[10px] leading-relaxed text-muted-foreground">
+                  {ar
+                    ? "عند عدم التأشير، تدخل الضريبة ضمن تكلفة المصروف. لا تحددها إلا إذا كانت قابلة للاسترداد نظاميًا."
+                    : "If unchecked, tax remains part of expense cost. Select only when legally recoverable."}
+                </span>
+              </span>
+            </label>
           </div>
 
           {/* البيان والوصف */}
@@ -859,6 +997,21 @@ export function ExpenseFormDialog({
                       </option>
                     ))}
                   </select>
+                  <div className="mt-3">
+                    <label className="mb-1.5 block text-xs font-semibold text-muted-foreground">
+                      {ar ? "رقم فاتورة المورد (اختياري)" : "Supplier invoice number (optional)"}
+                    </label>
+                    <FieldInput
+                      value={header.supplier_invoice_number}
+                      onValueChange={(value) => setHeaderField("supplier_invoice_number", value)}
+                      placeholder={ar ? "كما يظهر في فاتورة المورد" : "As printed on the supplier invoice"}
+                    />
+                    {validation.errors.supplier_invoice_number ? (
+                      <span className="mt-1 block text-[11px] font-semibold text-destructive">
+                        {validation.errors.supplier_invoice_number}
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
               )}
 
@@ -901,11 +1054,27 @@ export function ExpenseFormDialog({
                     </option>
                   ))}
                 </select>
-                {validation.errors.supplier_id && (
+              {validation.errors.supplier_id && (
                   <span className="mt-1 block text-[11px] font-semibold text-destructive">
                     {validation.errors.supplier_id}
                   </span>
                 )}
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="mb-1.5 block text-xs font-bold text-foreground">
+                  {ar ? "رقم فاتورة المورد" : "Supplier invoice number"}
+                </label>
+                <FieldInput
+                  value={header.supplier_invoice_number}
+                  onValueChange={(value) => setHeaderField("supplier_invoice_number", value)}
+                  placeholder={ar ? "أدخل رقم الفاتورة كما هو مطبوع" : "Enter the printed invoice number"}
+                />
+                {validation.errors.supplier_invoice_number ? (
+                  <span className="mt-1 block text-[11px] font-semibold text-destructive">
+                    {validation.errors.supplier_invoice_number}
+                  </span>
+                ) : null}
               </div>
 
               {/* تاريخ الاستحقاق */}
@@ -929,7 +1098,7 @@ export function ExpenseFormDialog({
             <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-200">
               <p>
                 {ar
-                  ? "سيتم إثبات المصروف كالتزام على المنشأة في ذمم الموردين (حـ/ 2111) ويظهر في قائمة المتأخرات حتى يتم سداده لاحقاً عبر شاشة سداد الموردين."
+                  ? "سيُثبت المصروف كالتزام على المنشأة وفق حساب المورد المربوط في إعدادات المصروفات، ثم تتم تسويته عند الدفع."
                   : "Recorded as an accrued liability under accounts payable until settled through supplier payments."}
               </p>
             </div>

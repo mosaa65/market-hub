@@ -1,15 +1,24 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowRight, Building2, Tags } from "lucide-react";
+import { ArrowRight, Building2, Landmark, ShieldCheck, Tags } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { ExpenseCategoriesSection } from "@/components/settings/sections/expense-categories-section";
 import { ExpenseCostCentersSection } from "@/components/settings/sections/expense-cost-centers-section";
+import { ExpenseLedgerAccountsSection } from "@/components/settings/sections/expense-ledger-accounts-section";
+import { ExpenseApprovalRulesSection } from "@/components/settings/sections/expense-approval-rules-section";
 import { ModuleGuard } from "@/lib/modules";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 
 export const Route = createFileRoute("/_app/expenses/setup")({
   validateSearch: (search: Record<string, unknown>) => ({
-    section: search.section === "cost-centers" ? "cost-centers" : "categories",
+    section:
+      search.section === "cost-centers"
+        ? "cost-centers"
+        : search.section === "accounts"
+          ? "accounts"
+          : search.section === "approvals"
+            ? "approvals"
+          : "categories",
   }),
   head: () => ({ meta: [{ title: "إعدادات المصروفات — فورتكس ERP" }] }),
   component: () => (
@@ -35,6 +44,16 @@ function ExpenseSetupPage() {
       id: "cost-centers" as const,
       label: isAr ? "مراكز التكلفة" : "Cost centers",
       icon: Building2,
+    },
+    {
+      id: "accounts" as const,
+      label: isAr ? "ربط الحسابات" : "Ledger accounts",
+      icon: Landmark,
+    },
+    {
+      id: "approvals" as const,
+      label: isAr ? "قواعد الاعتماد" : "Approval rules",
+      icon: ShieldCheck,
     },
   ];
 
@@ -83,8 +102,12 @@ function ExpenseSetupPage() {
 
       {section === "categories" ? (
         <ExpenseCategoriesSection canEdit={canEdit} lang={lang} />
-      ) : (
+      ) : section === "cost-centers" ? (
         <ExpenseCostCentersSection canEdit={canEdit} lang={lang} />
+      ) : section === "accounts" ? (
+        <ExpenseLedgerAccountsSection canEdit={canEdit} lang={lang} />
+      ) : (
+        <ExpenseApprovalRulesSection canEdit={canEdit} lang={lang} />
       )}
     </div>
   );

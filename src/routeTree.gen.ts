@@ -61,6 +61,9 @@ import { Route as AppTrialBalanceRouteImport } from './routes/_app.trial-balance
 import { Route as AppUsersRouteImport } from './routes/_app.users'
 import { Route as AppVortexUiRouteImport } from './routes/_app.vortex-ui'
 import { Route as AppWarehousesRouteImport } from './routes/_app.warehouses'
+import { Route as AppExpensesApprovalsRouteImport } from './routes/_app.expenses.approvals'
+import { Route as AppExpensesArchiveRouteImport } from './routes/_app.expenses.archive'
+import { Route as AppExpensesNewRouteImport } from './routes/_app.expenses.new'
 import { Route as AppExpensesSetupRouteImport } from './routes/_app.expenses.setup'
 import { Route as AppMillingCustodyDeliveryRouteImport } from './routes/_app.milling.custody-delivery'
 import { Route as AppMillingCustomerStatementRouteImport } from './routes/_app.milling.customer-statement'
@@ -340,6 +343,21 @@ const AppWarehousesRoute = AppWarehousesRouteImport.update({
   path: '/warehouses',
   getParentRoute: () => AppRoute,
 } as any)
+const AppExpensesApprovalsRoute = AppExpensesApprovalsRouteImport.update({
+  id: '/approvals',
+  path: '/approvals',
+  getParentRoute: () => AppExpensesRoute,
+} as any)
+const AppExpensesArchiveRoute = AppExpensesArchiveRouteImport.update({
+  id: '/archive',
+  path: '/archive',
+  getParentRoute: () => AppExpensesRoute,
+} as any)
+const AppExpensesNewRoute = AppExpensesNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => AppExpensesRoute,
+} as any)
 const AppExpensesSetupRoute = AppExpensesSetupRouteImport.update({
   id: '/setup',
   path: '/setup',
@@ -493,6 +511,9 @@ export interface FileRoutesByFullPath {
   '/users': typeof AppUsersRoute
   '/vortex-ui': typeof AppVortexUiRoute
   '/warehouses': typeof AppWarehousesRoute
+  '/expenses/approvals': typeof AppExpensesApprovalsRoute
+  '/expenses/archive': typeof AppExpensesArchiveRoute
+  '/expenses/new': typeof AppExpensesNewRoute
   '/expenses/setup': typeof AppExpensesSetupRoute
   '/milling/custody-delivery': typeof AppMillingCustodyDeliveryRoute
   '/milling/customer-statement': typeof AppMillingCustomerStatementRoute
@@ -565,6 +586,9 @@ export interface FileRoutesByTo {
   '/users': typeof AppUsersRoute
   '/vortex-ui': typeof AppVortexUiRoute
   '/warehouses': typeof AppWarehousesRoute
+  '/expenses/approvals': typeof AppExpensesApprovalsRoute
+  '/expenses/archive': typeof AppExpensesArchiveRoute
+  '/expenses/new': typeof AppExpensesNewRoute
   '/expenses/setup': typeof AppExpensesSetupRoute
   '/milling/custody-delivery': typeof AppMillingCustodyDeliveryRoute
   '/milling/customer-statement': typeof AppMillingCustomerStatementRoute
@@ -639,6 +663,9 @@ export interface FileRoutesById {
   '/_app/users': typeof AppUsersRoute
   '/_app/vortex-ui': typeof AppVortexUiRoute
   '/_app/warehouses': typeof AppWarehousesRoute
+  '/_app/expenses/approvals': typeof AppExpensesApprovalsRoute
+  '/_app/expenses/archive': typeof AppExpensesArchiveRoute
+  '/_app/expenses/new': typeof AppExpensesNewRoute
   '/_app/expenses/setup': typeof AppExpensesSetupRoute
   '/_app/milling/custody-delivery': typeof AppMillingCustodyDeliveryRoute
   '/_app/milling/customer-statement': typeof AppMillingCustomerStatementRoute
@@ -713,6 +740,9 @@ export interface FileRouteTypes {
     | '/users'
     | '/vortex-ui'
     | '/warehouses'
+    | '/expenses/approvals'
+    | '/expenses/archive'
+    | '/expenses/new'
     | '/expenses/setup'
     | '/milling/custody-delivery'
     | '/milling/customer-statement'
@@ -785,6 +815,9 @@ export interface FileRouteTypes {
     | '/users'
     | '/vortex-ui'
     | '/warehouses'
+    | '/expenses/approvals'
+    | '/expenses/archive'
+    | '/expenses/new'
     | '/expenses/setup'
     | '/milling/custody-delivery'
     | '/milling/customer-statement'
@@ -858,6 +891,9 @@ export interface FileRouteTypes {
     | '/_app/users'
     | '/_app/vortex-ui'
     | '/_app/warehouses'
+    | '/_app/expenses/approvals'
+    | '/_app/expenses/archive'
+    | '/_app/expenses/new'
     | '/_app/expenses/setup'
     | '/_app/milling/custody-delivery'
     | '/_app/milling/customer-statement'
@@ -1251,6 +1287,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppWarehousesRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/expenses/approvals': {
+      id: '/_app/expenses/approvals'
+      path: '/approvals'
+      fullPath: '/expenses/approvals'
+      preLoaderRoute: typeof AppExpensesApprovalsRouteImport
+      parentRoute: typeof AppExpensesRoute
+    }
+    '/_app/expenses/archive': {
+      id: '/_app/expenses/archive'
+      path: '/archive'
+      fullPath: '/expenses/archive'
+      preLoaderRoute: typeof AppExpensesArchiveRouteImport
+      parentRoute: typeof AppExpensesRoute
+    }
+    '/_app/expenses/new': {
+      id: '/_app/expenses/new'
+      path: '/new'
+      fullPath: '/expenses/new'
+      preLoaderRoute: typeof AppExpensesNewRouteImport
+      parentRoute: typeof AppExpensesRoute
+    }
     '/_app/expenses/setup': {
       id: '/_app/expenses/setup'
       path: '/setup'
@@ -1388,10 +1445,16 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppExpensesRouteChildren {
+  AppExpensesApprovalsRoute: typeof AppExpensesApprovalsRoute
+  AppExpensesArchiveRoute: typeof AppExpensesArchiveRoute
+  AppExpensesNewRoute: typeof AppExpensesNewRoute
   AppExpensesSetupRoute: typeof AppExpensesSetupRoute
 }
 
 const AppExpensesRouteChildren: AppExpensesRouteChildren = {
+  AppExpensesApprovalsRoute: AppExpensesApprovalsRoute,
+  AppExpensesArchiveRoute: AppExpensesArchiveRoute,
+  AppExpensesNewRoute: AppExpensesNewRoute,
   AppExpensesSetupRoute: AppExpensesSetupRoute,
 }
 

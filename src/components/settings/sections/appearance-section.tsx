@@ -18,11 +18,13 @@ import {
   RefreshCw,
   Laptop,
   Layers,
+  Type,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useI18n } from "@/lib/i18n";
 import { useTheme } from "@/lib/theme";
 import { MODE_VARIANTS, type ModeVariantId } from "@/lib/color-theme";
+import { CURATED_FONTS, DEFAULT_FONT_THEME, type FontThemeId } from "@/lib/font-theme";
 import { AutoSaveBadge } from "@/components/settings/auto-save-badge";
 import { ThemeVisualTestSuite } from "@/components/theme/theme-visual-test-suite";
 import { CURATED_THEMES, type AccentThemeId, type ArchivedColor } from "@/lib/color-theme";
@@ -39,6 +41,8 @@ export function AppearanceSection({ canEdit = true }: AppearanceSectionProps) {
     setTheme,
     modeVariant,
     setModeVariant,
+    fontTheme,
+    setFontTheme,
     accentTheme,
     setAccentTheme,
     customColor,
@@ -57,12 +61,12 @@ export function AppearanceSection({ canEdit = true }: AppearanceSectionProps) {
   const [hexInput, setHexInput] = useState(customColor);
   const [colorNameInput, setColorNameInput] = useState("");
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
-  // كل تغيير في المظهر/اللغة/اللون يُحفظ فوراً في مخزن التفضيلات —
+  // كل تغيير في المظهر/اللغة/اللون/الخط يُحفظ فوراً في مخزن التفضيلات —
   // الشارة تُعلم المستخدم بذلك دون زر حفظ.
   const [savePulse, setSavePulse] = useState(0);
   useEffect(() => {
     setSavePulse((n) => n + 1);
-  }, [theme, lang, accentTheme, customColor]);
+  }, [theme, lang, accentTheme, customColor, fontTheme]);
 
   const handleHexChange = (value: string) => {
     let clean = value.trim();
@@ -361,7 +365,136 @@ export function AppearanceSection({ canEdit = true }: AppearanceSectionProps) {
         </div>
       </div>
 
-      {/* 2. منظومة الثيمات التنفيذية الستة (الافتراضي + 5 ألوان مدروسة بعناية) */}
+      {/* 2. خط النظام ونمط النصوص الطباعي (10 خطوط محملة محلياً بالكامل بدون سحابة جوجل) */}
+      <Card className="rounded-3xl border-border/80 shadow-xs">
+        <CardHeader className="border-b border-border/50 pb-4">
+          <CardTitle className="text-base font-bold flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                <Type className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span>{isAr ? "خط النظام ونمط النصوص" : "System Typography & Fonts"}</span>
+                  <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                    {isAr ? "محلي 100% دون إنترنت" : "100% Local / Offline"}
+                  </span>
+                </div>
+                <div className="text-xs text-muted-foreground font-normal mt-0.5">
+                  {isAr
+                    ? "اختر الخط المناسب لواجهة النظام من بين 10 خطوط عربية فائقة الجمال محملة محلياً بالكامل، والخط الافتراضي المعتمد هو آي بي إم بلكس."
+                    : "Select your preferred typeface from 10 beautiful offline fonts. Default is IBM Plex Sans Arabic."}
+                </div>
+              </div>
+            </div>
+            {fontTheme !== DEFAULT_FONT_THEME && canEdit && (
+              <button
+                type="button"
+                onClick={() => setFontTheme(DEFAULT_FONT_THEME)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-surface text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-all shadow-2xs"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                <span>{isAr ? "استعادة الخط الافتراضي" : "Reset to Default"}</span>
+              </button>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-5 space-y-4">
+          {/* شريط المعاينة الحية للخط النشط */}
+          <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 space-y-2">
+            <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <Eye className="h-3.5 w-3.5 text-primary" />
+                {isAr ? "معاينة حية للخط المختار حالياً:" : "Live Active Font Preview:"}
+                <strong className="text-foreground">
+                  {isAr ? CURATED_FONTS[fontTheme]?.name_ar : CURATED_FONTS[fontTheme]?.name_en}
+                </strong>
+              </span>
+              <span className="px-2 py-0.5 rounded-md bg-surface border border-border text-[11px] font-medium text-foreground">
+                {CURATED_FONTS[fontTheme]?.category_ar}
+              </span>
+            </div>
+            <div
+              className="text-base sm:text-lg font-bold text-foreground transition-all duration-200"
+              style={{ fontFamily: CURATED_FONTS[fontTheme]?.fontFamily }}
+            >
+              {isAr
+                ? "نظام فورتيكس ERP المتكامل • إدارة المبيعات، المخزون، ونقاط البيع السريعة بدقة متناهية (123,456 ر.س)"
+                : "Vortex ERP Platform • Sales, Inventory & High-Speed POS Operations (SAR 123,456)"}
+            </div>
+          </div>
+
+          {/* شبكة الخطوط العشرة */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {(Object.keys(CURATED_FONTS) as FontThemeId[]).map((fid) => {
+              const fontDef = CURATED_FONTS[fid];
+              const isSelected = fontTheme === fid;
+              const isDefault = fid === DEFAULT_FONT_THEME;
+
+              return (
+                <button
+                  key={fid}
+                  type="button"
+                  disabled={!canEdit}
+                  onClick={() => setFontTheme(fid)}
+                  className={`relative text-start p-4 rounded-2xl border transition-all duration-200 flex flex-col justify-between group ${
+                    isSelected
+                      ? "border-primary bg-primary/10 shadow-sm ring-2 ring-primary/20"
+                      : "border-border/80 bg-surface/60 hover:bg-surface hover:border-primary/40 hover:shadow-2xs"
+                  } disabled:opacity-60 disabled:cursor-not-allowed`}
+                >
+                  {/* رأس بطاقة الخط */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span
+                          className="text-sm font-bold text-foreground"
+                          style={{ fontFamily: fontDef.fontFamily }}
+                        >
+                          {isAr ? fontDef.name_ar : fontDef.name_en}
+                        </span>
+                        {isDefault && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25">
+                            {isAr ? "الافتراضي المعتمد" : "System Default"}
+                          </span>
+                        )}
+                      </div>
+                      <div
+                        className={`h-5 w-5 rounded-full flex items-center justify-center shrink-0 transition-colors ${
+                          isSelected
+                            ? "bg-primary text-primary-foreground"
+                            : "border border-border/70 group-hover:border-primary/50"
+                        }`}
+                      >
+                        {isSelected && <Check className="h-3 w-3 stroke-[3]" />}
+                      </div>
+                    </div>
+
+                    <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
+                      {fontDef.description_ar}
+                    </p>
+                  </div>
+
+                  {/* عينة النص بالخط الفعلي */}
+                  <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between gap-2">
+                    <span
+                      className="text-sm font-semibold text-foreground/90 truncate"
+                      style={{ fontFamily: fontDef.fontFamily }}
+                    >
+                      {isAr ? "أبجد هوز حطي كلمن • 123456" : "The quick brown fox • 123456"}
+                    </span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-surface-2 border border-border/60 text-muted-foreground shrink-0 font-medium">
+                      {fontDef.category_ar}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 3. منظومة الثيمات التنفيذية الستة (الافتراضي + 5 ألوان مدروسة بعناية) */}
       <Card className="rounded-3xl border-border/80 shadow-xs">
         <CardHeader className="border-b border-border/50 pb-4">
           <CardTitle className="text-base font-bold flex items-center justify-between">

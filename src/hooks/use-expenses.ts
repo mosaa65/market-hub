@@ -289,6 +289,7 @@ export interface CreateExpenseInput {
   lines: ExpenseLineInput[];
   expense_date: string;
   due_date?: string | null;
+  supplier_invoice_number?: string | null;
   entry_type?: ExpenseEntryType;
   payee_type?: ExpensePayeeType;
   payee_name?: string | null;
@@ -300,8 +301,10 @@ export interface CreateExpenseInput {
   description?: string | null;
   note?: string | null;
   tax_mode?: ExpenseTaxMode;
+  tax_recoverable?: boolean;
   reference?: string | null;
   submit?: boolean;
+  idempotency_key?: string;
 }
 
 /** Every write in the module, in one hook, sharing one invalidation policy. */
@@ -319,7 +322,7 @@ export function useExpenseMutations() {
 
   const create = useMutation({
     mutationFn: async (input: CreateExpenseInput): Promise<ExpenseEntry> => {
-      const { data, error } = await (supabase as any).rpc("create_expense", {
+      const { data, error } = await (supabase as any).rpc("create_expense_v2", {
         p_lines: input.lines,
         p_expense_date: input.expense_date,
         p_due_date: input.due_date || null,
@@ -334,6 +337,9 @@ export function useExpenseMutations() {
         p_description: input.description || null,
         p_note: input.note || null,
         p_tax_mode: input.tax_mode ?? "NONE",
+        p_tax_recoverable: input.tax_recoverable ?? false,
+        p_supplier_invoice_number: input.supplier_invoice_number || null,
+        p_idempotency_key: input.idempotency_key || null,
         p_reference: input.reference || null,
         p_submit: input.submit ?? false,
       });
@@ -363,7 +369,7 @@ export function useExpenseMutations() {
       header: Partial<CreateExpenseInput>;
     }): Promise<ExpenseEntry> => {
       const h = input.header;
-      const { data, error } = await (supabase as any).rpc("update_expense", {
+      const { data, error } = await (supabase as any).rpc("update_expense_v2", {
         p_entry_id: input.id,
         p_expected_version: input.version,
         p_lines: input.lines,
@@ -380,6 +386,8 @@ export function useExpenseMutations() {
         p_description: h.description || null,
         p_note: h.note || null,
         p_tax_mode: h.tax_mode ?? null,
+        p_tax_recoverable: h.tax_recoverable ?? false,
+        p_supplier_invoice_number: h.supplier_invoice_number || null,
       });
       if (error) throw error;
       return data as ExpenseEntry;

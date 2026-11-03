@@ -184,6 +184,7 @@ export interface ExpenseEntry {
   project_name: string | null;
   expense_date: string;
   due_date: string | null;
+  supplier_invoice_number: string | null;
   posting_date: string | null;
   description: string | null;
   note: string | null;
@@ -191,6 +192,8 @@ export interface ExpenseEntry {
   paid_amount: number;
   remaining_amount: number;
   tax_mode: ExpenseTaxMode;
+  tax_recoverable: boolean;
+  approval_required_rank: number;
   currency: string;
   currency_symbol: string;
   line_count: number;
@@ -320,6 +323,7 @@ export interface ExpenseLineDraft {
 export interface ExpenseFormHeader {
   expense_date: string;
   due_date: string;
+  supplier_invoice_number: string;
   entry_type: ExpenseEntryType;
   payee_type: ExpensePayeeType;
   payee_name: string;
@@ -331,6 +335,7 @@ export interface ExpenseFormHeader {
   description: string;
   note: string;
   tax_mode: ExpenseTaxMode;
+  tax_recoverable: boolean;
 }
 
 /** A fully populated form. */

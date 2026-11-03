@@ -57,7 +57,7 @@
   --font-sans: "Inter", "SF Pro Display", "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: "Inter", "Geist", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "Geist Mono", ui-monospace, monospace;
-  --font-arabic: "IBM Plex Sans Arabic", "Cairo", "Tajawal", "Noto Sans Arabic", sans-serif;
+  --font-arabic: var(--font-active-arabic, "IBM Plex Sans Arabic", "Cairo", "Tajawal", "Noto Sans Arabic", sans-serif);
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -548,7 +548,7 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
-    font-family: "IBM Plex Sans Arabic", "Cairo", "Tajawal", "Noto Sans Arabic", var(--font-sans);
+    font-family: var(--font-arabic), var(--font-sans);
     font-feature-settings: "cv11", "ss01", "ss03";
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
@@ -557,8 +557,7 @@
 
   html[dir="rtl"] body,
   html[dir="rtl"] body * {
-    font-family:
-      "IBM Plex Sans Arabic", "Cairo", "Tajawal", "Noto Sans Arabic", var(--font-arabic) !important;
+    font-family: var(--font-arabic) !important;
   }
 
   h1,
