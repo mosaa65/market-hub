@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { AlertCircle, Check, ChevronDown, Search } from "lucide-react";
+import { AlertCircle, Check, ChevronDown, Hash, Layers, Search } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
@@ -10,6 +10,7 @@ import {
   ledgerKindLabel,
   paymentMethodIcon,
   paymentMethodIconAsset,
+  paymentReferenceLabel,
   paymentUiText,
   type PaymentContext,
 } from "@/lib/payments/payment-methods";
@@ -74,6 +75,18 @@ export interface PaymentMethodSelectProps {
   id?: string;
   /** يمرَّر إلى حقل المرجع/الشيك ليأخذه التنقل العام. */
   navProps?: Record<string, unknown>;
+  /**
+   * يُضيف «توزيع الدفع على أكثر من طريقة» كخيار داخل القائمة نفسها.
+   *
+   * كان زرًّا منفصلًا تحت الحقل في كل شاشة، فيأخذ سطرًا كاملًا لِفعل تحدث
+   * مرات قليلة. الخيار في القائمة يزيله من المساحة المرئية بالكلية ويضعه
+   * مع بقية خيارات الدفع، حيث يبحث عنه المشغّل أصلًا.
+   */
+  onChooseSplit?: () => void;
+  /** هذه الشاشة في وضع التوزيع بالفعل — يُبرز الخيار ويُظهر «رجوع». */
+  isSplitMode?: boolean;
+  /** ملخص التوزيع (عدد الطرق) يُعرض في الحقل حين يكون الوضع split. */
+  splitSummary?: string;
 }
 
 export function PaymentMethodSelect({
@@ -92,6 +105,9 @@ export function PaymentMethodSelect({
   loading = false,
   id,
   navProps,
+  onChooseSplit,
+  isSplitMode = false,
+  splitSummary,
 }: PaymentMethodSelectProps) {
   const { lang } = useI18n();
   const isAr = lang === "ar";
@@ -397,11 +413,13 @@ export function PaymentMethodSelect({
           </span>
           {selected && (
             <span className="block truncate text-[10px] text-muted-foreground">
-              {isCredit
-                ? t("customerReceivable")
-                : selectedAccount
-                  ? selectedAccount.name
-                  : t("notLinked")}
+              {isSplitMode
+                ? (splitSummary ?? t("methodLabel"))
+                : isCredit
+                  ? t("customerReceivable")
+                  : selectedAccount
+                    ? selectedAccount.name
+                    : t("notLinked")}
             </span>
           )}
         </span>
@@ -489,6 +507,51 @@ export function PaymentMethodSelect({
                 );
               })
             )}
+
+            {/*
+              خيار التوزيع: آخر عنصر في القائمة، مفصول بخط رقيق.
+
+              ليس طريقة دفع، بل وضع: الفاتورة تُسدد بأكثر من طريقة، فيفتح
+              محرر التوزيع. وجوده هنا يلغي الحاجة لزر دائم تحت الحقل.
+            */}
+            {onChooseSplit ? (
+              <>
+                <div className="my-1 border-t border-border/50" />
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={isSplitMode}
+                  onClick={() => {
+                    setOpen(false);
+                    setQuery("");
+                    onChooseSplit();
+                  }}
+                  className={cn(
+                    "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-start transition-colors",
+                    isSplitMode ? "bg-primary/10" : "hover:bg-muted/50",
+                  )}
+                >
+                  <span className="grid size-6 shrink-0 place-items-center rounded-md bg-primary/10 text-primary">
+                    <Layers className="size-3.5" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-xs font-semibold text-foreground">
+                      {isAr ? "توزيع الدفع" : "Split payment"}
+                    </span>
+                    <span className="block truncate text-[10px] text-muted-foreground">
+                      {isSplitMode
+                        ? isAr
+                          ? "مُوزّع حاليًا — ارجع لتغيير الطريقة"
+                          : "Currently split — reopen to change"
+                        : isAr
+                          ? "السداد بأكثر من طريقة واحدة"
+                          : "Pay with more than one method"}
+                    </span>
+                  </span>
+                  {isSplitMode ? <Check className="size-3.5 shrink-0 text-primary" /> : null}
+                </button>
+              </>
+            ) : null}
           </div>
         </div>
       )}
@@ -577,16 +640,39 @@ export function PaymentMethodSelect({
               </select>
             )}
 
+            {/*
+              حقل المرجع.
+
+              كان `input` عاريًا بعنوان مؤقت يُـختفي عند الكتابة، فلا يعرف
+              المشغّل بعد إدخال الرقم ما الذي كتبه. الآن:
+                • عنوان صغير ثابت فوق الحقل يختلف بحسب الطريقة
+                  (رقم الحوالة / رقم عملية المحفظة / رقم الشيك).
+                • أيقونة المرجع في البداية.
+                • «مطلوب» ظاهرة بدل عنوان عام.
+                • `inputMode="numeric"` على الجوال حين يكون الرقم رقميًا.
+            */}
             {needsReference && (
-              <input
-                {...(navProps ?? {})}
-                data-form-nav
-                value={settlement.reference ?? ""}
-                onChange={(e) => onSettlementChange({ ...settlement, reference: e.target.value })}
-                placeholder={t("referencePlaceholder")}
-                aria-label={t("reference")}
-                className="h-7 min-w-0 flex-1 rounded-md border border-border/70 bg-surface px-1.5 text-[11px] text-foreground outline-none focus:border-primary/60"
-              />
+              <label className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="flex items-center gap-1 ps-0.5 text-[9px] font-bold text-muted-foreground">
+                  <Hash className="size-2.5" />
+                  {paymentReferenceLabel(selected, isAr ? "ar" : "en")}
+                  <span className="font-normal text-destructive/80">
+                    {isAr ? "مطلوب" : "required"}
+                  </span>
+                </span>
+                <input
+                  {...(navProps ?? {})}
+                  data-form-nav
+                  value={settlement.reference ?? ""}
+                  onChange={(e) => onSettlementChange({ ...settlement, reference: e.target.value })}
+                  placeholder={t("referencePlaceholder")}
+                  aria-label={paymentReferenceLabel(selected, isAr ? "ar" : "en")}
+                  aria-required
+                  autoComplete="off"
+                  dir="ltr"
+                  className="h-7 min-w-0 rounded-md border border-border/70 bg-surface px-1.5 text-start font-mono text-[11px] text-foreground outline-none placeholder:font-sans placeholder:text-muted-foreground/60 focus:border-primary/60"
+                />
+              </label>
             )}
 
             {/* تحذير الحساب المفقود — لا يظهر إلا إذا لم يوجد رابط فعلي */}

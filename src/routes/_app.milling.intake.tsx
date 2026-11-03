@@ -2,7 +2,7 @@
  * /milling/intake — استلام وفواتير (كاونتر المطحنة ونقطة الخدمة الموحدة).
  *
  * العميل + الحبوب (أنواع متعددة) + الأكياس + الوزن (من الميزان)
- * + أجرة الطحن (إجمالي الأكياس × سعر الكيس) + الخصم + طريقة الدفع + المدفوع/الآجل
+ * + أجرة الطحن حسب وحدة الخدمة (كيس أو كجم) + الخصم + طريقة الدفع + المدفوع/الآجل
  * = مستند أمانة واحد + فاتورة مبيعات رسمية في نفس المعاملة الفورية.
  */
 import { createFileRoute, useSearch, useNavigate } from "@tanstack/react-router";
@@ -143,7 +143,7 @@ function MillingIntakePage() {
   ]);
 
   // الفاتورة والمالية
-  const [feePerBag, setFeePerBag] = useState<string>("");
+  const [feePerUnit, setFeePerUnit] = useState<string>("");
   const [servicePrice, setServicePrice] = useState("");
   const [discount, setDiscount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cash");
@@ -224,13 +224,26 @@ function MillingIntakePage() {
     queryFn: fetchServiceItem,
   });
 
-  // ضبط السعر الافتراضي لطحن الكيس من صنف الخدمة
+  const serviceUnit = useMemo(() => {
+    const shortName = serviceItem.data?.base_unit?.short_name ?? "";
+    const unitName = `${serviceItem.data?.base_unit?.name_ar ?? ""} ${serviceItem.data?.base_unit?.name ?? ""}`;
+    const bagUnit = /bag|sack|كيس|جوال/i.test(`${shortName} ${unitName}`);
+    const kgUnit = /\bkg\b|كجم|كغ|كيلو|kilogram/i.test(`${shortName} ${unitName}`);
+    return {
+      basis: bagUnit || !kgUnit ? ("PER_BAG" as const) : ("PER_KG" as const),
+      recognized: bagUnit || kgUnit,
+    };
+  }, [serviceItem.data]);
+  const billingBasis = serviceUnit.basis;
+  const billingUnitLabel = billingBasis === "PER_BAG" ? "كيس" : "كجم";
+
+  // ضبط السعر الافتراضي من سعر البيع في صنف الخدمة لكل وحدة فوترة.
   useEffect(() => {
-    if (!feePerBag && serviceItem.data) {
-      const defaultRate = String(serviceItem.data.sale_price || 1000);
-      setFeePerBag(defaultRate);
+    if (!feePerUnit && serviceItem.data) {
+      const defaultRate = Number(serviceItem.data.sale_price || 0);
+      if (defaultRate > 0) setFeePerUnit(String(defaultRate));
     }
-  }, [serviceItem.data, feePerBag]);
+  }, [serviceItem.data, feePerUnit]);
 
   // رصيد أمانات العميل
   const balances = useQuery({
@@ -267,10 +280,12 @@ function MillingIntakePage() {
   }
 
   function addLine() {
+    setServicePrice("");
     setLines((ls) => [...ls, { itemId: "", bags: "", kg: "" }]);
   }
 
   function removeLine(idx: number) {
+    setServicePrice("");
     setLines((ls) => (ls.length > 1 ? ls.filter((_, i) => i !== idx) : ls));
   }
 
@@ -291,6 +306,7 @@ function MillingIntakePage() {
 
   /** تغيير الصنف لسطر — يعيد تعبئة الوزن تلقائياً إذا كان هناك عدد أكياس */
   function setLineItem(idx: number, itemId: string) {
+    setServicePrice("");
     const line = lines[idx];
     const item = (grainItems.data ?? []).find((g: ProductOption) => g.id === itemId);
     const unit = Number(item?.package_weight_kg ?? 0);
@@ -301,22 +317,24 @@ function MillingIntakePage() {
 
   /** تعديل الوزن يدوياً لسطر (من الميزان) — يبقى كما أدخله دون الكتابة فوقه */
   function setLineKg(idx: number, v: string) {
+    setServicePrice("");
     updateLine(idx, { kg: v });
   }
 
   // إجماليات العملية (كل الأسطر) — الأكياس والوزن
   const totalBags = useMemo(() => lines.reduce((s, l) => s + (Number(l.bags) || 0), 0), [lines]);
   const totalKg = useMemo(() => lines.reduce((s, l) => s + (Number(l.kg) || 0), 0), [lines]);
+  const billedQuantity = billingBasis === "PER_BAG" ? totalBags : totalKg;
 
   // الحسابات المالية اللحظية (نمط الكاشير POS) — الإجمالي على مستوى العملية
-  const bagCount = totalBags;
   const currentSubtotal = useMemo(() => {
     if (servicePrice !== "") return Number(servicePrice) || 0;
-    const rate = Number(feePerBag) || 0;
-    return bagCount > 0 ? bagCount * rate : 0;
-  }, [servicePrice, feePerBag, bagCount]);
+    const rate = Number(feePerUnit) || 0;
+    return billedQuantity > 0 ? billedQuantity * rate : 0;
+  }, [servicePrice, feePerUnit, billedQuantity]);
 
   const currentDiscount = Number(discount) || 0;
+  const discountInvalid = currentDiscount > 0 && currentDiscount >= currentSubtotal;
   const grandTotal = Math.max(0, currentSubtotal - currentDiscount);
   const paymentSplits = splitPayments;
 
@@ -354,6 +372,9 @@ function MillingIntakePage() {
     warehouseId &&
     Boolean(serviceItem.data?.id) &&
     lines.some((l) => l.itemId && ((Number(l.bags) || 0) > 0 || (Number(l.kg) || 0) > 0)) &&
+    billedQuantity > 0 &&
+    currentSubtotal > 0 &&
+    !discountInvalid &&
     payment.isPayable,
   );
 
@@ -372,6 +393,8 @@ function MillingIntakePage() {
           })),
         serviceItemId: serviceItem.data?.id ?? "",
         serviceTotal: currentSubtotal,
+        billingBasis,
+        feeQuantity: billedQuantity,
         discount: currentDiscount,
         paymentMethod: toLegacyPaymentValue(paymentMethod),
         paid: currentPaid,
@@ -676,7 +699,9 @@ function MillingIntakePage() {
                   extraColumn={{
                     label: "أجر السطر",
                     unit: currencySymbol,
-                    value: (_index, line) => (Number(line.bags) || 0) * (Number(feePerBag) || 0),
+                    value: (_index, line) =>
+                      (billingBasis === "PER_BAG" ? Number(line.bags) || 0 : Number(line.kg) || 0) *
+                      (Number(feePerUnit) || 0),
                   }}
                 />
 
@@ -793,16 +818,16 @@ function MillingIntakePage() {
                     </span>
                   </div>
 
-                  {/* احتساب أجر الكيس × عدد الأكياس */}
+                  {/* سعر الخدمة حسب وحدة صنف الخدمة (كيس أو كجم) */}
                   <div className="grid gap-2.5 sm:grid-cols-2">
-                    <MillingField label="أجر طحن الكيس الواحد" hint="سعر الخدمة لكل كيس">
+                    <MillingField label={`أجر الطحن لكل ${billingUnitLabel}`} hint={`سعر الخدمة لكل ${billingUnitLabel}`}>
                       <AmountInput
                         min={0}
                         showInWords={false}
                         placeholder="1000"
-                        aria-label="أجر طحن الكيس الواحد"
-                        value={feePerBag === "" ? null : Number(feePerBag)}
-                        onValueChange={(v) => setFeePerBag(v == null ? "" : String(v))}
+                        aria-label={`أجر الطحن لكل ${billingUnitLabel}`}
+                        value={feePerUnit === "" ? null : Number(feePerUnit)}
+                        onValueChange={(v) => { setFeePerUnit(v == null ? "" : String(v)); setServicePrice(""); }}
                         className="font-bold"
                       />
                     </MillingField>
@@ -810,8 +835,8 @@ function MillingIntakePage() {
                     <MillingField
                       label="إجمالي أجور الخدمة"
                       hint={
-                        bagCount > 0
-                          ? `${bagCount} كيس × ${feePerBag || 0} = ${fmtNum(currentSubtotal)}`
+                        billedQuantity > 0
+                          ? `${fmtNum(billedQuantity)} ${billingUnitLabel} × ${feePerUnit || 0} = ${fmtNum(currentSubtotal)}`
                           : "المبلغ الإجمالي"
                       }
                     >
@@ -825,15 +850,20 @@ function MillingIntakePage() {
                       />
                     </MillingField>
                   </div>
+                  {Number(serviceItem.data?.sale_price) <= 0 && !feePerUnit ? (
+                    <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+                      لم يُحدد سعر بيع للخدمة؛ أدخل الأجرة لكل {billingUnitLabel} قبل إصدار الفاتورة.
+                    </p>
+                  ) : null}
 
                   {/* ملخص عملية الحساب اللحظية */}
-                  {bagCount > 0 && Number(feePerBag) > 0 && (
+                  {billedQuantity > 0 && Number(feePerUnit) > 0 && (
                     <div className="flex items-center justify-between rounded-xl bg-background/90 px-3 py-2 text-xs font-semibold text-foreground border border-border/70">
                       <span className="text-muted-foreground">حسبة الخدمة:</span>
                       <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-foreground">{bagCount} كيس</span>
+                        <span className="font-bold text-foreground">{fmtNum(billedQuantity)} {billingUnitLabel}</span>
                         <span>×</span>
-                        <span className="font-bold">{fmtNum(Number(feePerBag))}</span>
+                        <span className="font-bold">{fmtNum(Number(feePerUnit))}</span>
                         <span>=</span>
                         <span className="font-black text-amber-600 dark:text-amber-400 text-sm">
                           {fmtNum(currentSubtotal)} {currencySymbol}
@@ -841,6 +871,12 @@ function MillingIntakePage() {
                       </div>
                     </div>
                   )}
+                  <p className="text-[11px] leading-5 text-muted-foreground">
+                    التكلفة المرجعية للصنف: {Number(serviceItem.data?.cost_price) > 0
+                      ? `${fmtNum(Number(serviceItem.data?.cost_price))} ${currencySymbol} / ${billingUnitLabel}`
+                      : "غير محددة"}. التكلفة الفعلية تُحسب من المصروفات المرحلة على مركز خدمة الطحن.
+                    {!serviceUnit.recognized ? " تحقق من أن وحدة صنف الخدمة الأساسية هي كيس أو كجم حتى تتطابق التكلفة المرجعية مع وحدة الفوترة." : ""}
+                  </p>
                 </div>
 
                 {/* ملاحظات الفاتورة مثل كاونتر POS */}
@@ -884,64 +920,38 @@ function MillingIntakePage() {
                       </button>
                     </div>
                   </div>
-                  {paymentMethod !== "split" ? (
-                    <div className="flex items-center gap-1.5">
-                      <DynamicPaymentSelector
-                        context="sales"
-                        value={paymentMethod}
-                        settlement={settlement}
-                        onSettlementChange={setSettlement}
-                        compact
-                        includeCredit
-                        onChange={(method) => {
-                          setPaymentMethod(method);
-                          setSplitPayments([]);
-                          if (getPaymentMethodDefinition(method)?.isCreditTerm) {
-                            setPaid("");
-                          }
-                        }}
-                        disabled={submit.isPending}
-                        className="min-w-0 flex-1"
-                      />
-                      {/*
-                        «توزيع الدفع» زرّ أيقوني بجانب طريقة الدفع نفسها، لا زرًّا
-                        نصيًا تحتها يأخذ سطرًا في كل عملية. الطريقة المنفردة هي
-                        الأصل، والتجزئة استثناء فلا تستحق مساحة دائمة.
-                      */}
-                      <button
-                        type="button"
-                        disabled={submit.isPending || grandTotal <= 0}
-                        onClick={() => setSplitEditorOpen(true)}
-                        aria-label="توزيع الدفع على أكثر من طريقة"
-                        title="توزيع الدفع على أكثر من طريقة"
-                        className="grid size-9 shrink-0 place-items-center rounded-lg border border-border/70 bg-surface text-muted-foreground transition hover:border-primary/40 hover:text-primary disabled:pointer-events-none disabled:opacity-40"
-                      >
-                        <Layers className="size-3.5" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex min-h-8 items-center justify-between rounded-lg border border-primary/25 bg-primary/[0.05] px-2 text-[11px] font-semibold text-primary">
-                      <span className="flex items-center gap-1">
-                        <Layers className="size-3" />
-                        موزّع على عدة طرق
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSplitPayments([]);
-                          setPaymentMethod("cash");
-                          setSettlement((current) => ({
-                            ...current,
-                            method: "cash",
-                            paymentMethodId: "cash",
-                          }));
-                        }}
-                        className="underline underline-offset-2"
-                      >
-                        إلغاء
-                      </button>
-                    </div>
-                  )}
+                  {/*
+                    المنتقي مرئي **دائمًا** — حتى في وضع التوزيع.
+
+                    السابق كان يستبدل المنتقي بشريط حالة فيه زر «إلغاء» منفصل،
+                    فيختفي خيار طريقة الدفع ويبقى زر مستقل. الآن المنتقي كما هو،
+                    وفي وضع التوزيع يحمل خانة «الإجمالي الموزّع» + سهمًا يفتح
+                    المحرر — ولا يوجد أي زر منفصل في الشاشة.
+                  */}
+                  <DynamicPaymentSelector
+                    context="sales"
+                    value={paymentMethod}
+                    settlement={settlement}
+                    onSettlementChange={setSettlement}
+                    compact
+                    includeCredit
+                    onChange={(method) => {
+                      setPaymentMethod(method);
+                      setSplitPayments([]);
+                      if (getPaymentMethodDefinition(method)?.isCreditTerm) {
+                        setPaid("");
+                      }
+                    }}
+                    disabled={submit.isPending}
+                    className="min-w-0"
+                    onChooseSplit={() => setSplitEditorOpen(true)}
+                    isSplitMode={paymentMethod === "split"}
+                    splitSummary={
+                      paymentMethod === "split"
+                        ? `${splitPayments.length} ${splitPayments.length === 1 ? "طريقة" : "طرق"}`
+                        : undefined
+                    }
+                  />
                 </div>
 
                 {/* المبلغ المدفوع */}
@@ -982,13 +992,18 @@ function MillingIntakePage() {
                     placeholder="0.00"
                     className="h-8 min-w-0 rounded-lg border border-border bg-background px-2 text-[11px] font-semibold outline-none focus:border-primary"
                   />
+                  {discountInvalid ? (
+                    <span role="alert" className="text-[10px] font-semibold text-destructive">
+                      يجب أن يبقى صافي أجرة الخدمة أكبر من صفر بعد الخصم.
+                    </span>
+                  ) : null}
                 </div>
               </div>
 
               {/* بطاقة الإجماليات الذكية بنمط POS Totals Card */}
               <PosTotalsCard
                 countLabel="الأكياس المستلمة"
-                count={bagCount}
+                count={totalBags}
                 rows={[
                   {
                     label: "المجموع قبل الخصم",

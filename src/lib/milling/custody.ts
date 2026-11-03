@@ -38,6 +38,9 @@ export interface ProductOption {
   item_class: string;
   sale_price: number;
   cost_price?: number | null;
+  base_uom_id?: string | null;
+  unit_id?: string | null;
+  base_unit?: { id?: string; name: string; name_ar: string | null; short_name: string } | null;
   /** سعة العبوة بالكجم إن كان الصنف معبّأً — تُستخدم لاحتساب الوزن تلقائياً. */
   package_weight_kg: number | null;
 }
@@ -325,7 +328,7 @@ export async function fetchServiceItem(): Promise<ProductOption | null> {
   // م5: جلب خدمة أجور الطحن بدقة (بالكود أو الاسم) وتجنب الترتيب العشوائي حسب UUID
   const { data, error } = await db
     .from("products")
-    .select("id, sku, name, name_ar, item_class, sale_price, package_weight_kg")
+    .select("id, sku, name, name_ar, item_class, sale_price, cost_price, package_weight_kg, base_uom_id, unit_id")
     .eq("item_class", "SERVICE")
     .eq("is_active", true);
 
@@ -342,7 +345,17 @@ export async function fetchServiceItem(): Promise<ProductOption | null> {
       (p.name && p.name.toLowerCase().includes("milling")),
   );
 
-  return millingService || list[0];
+  const selected = millingService || list[0];
+  const unitId = selected.base_uom_id || selected.unit_id;
+  if (!unitId) return selected;
+
+  const { data: unit, error: unitError } = await db
+    .from("units")
+    .select("id, name, name_ar, short_name")
+    .eq("id", unitId)
+    .maybeSingle();
+  if (unitError) throw unitError;
+  return { ...selected, base_unit: unit ?? null };
 }
 
 /**
@@ -528,6 +541,8 @@ export async function createMillingServiceDocumentMulti(input: {
   grains: CustodyIntakeLineInput[];
   serviceItemId: string;
   serviceTotal: number;
+  billingBasis: "PER_BAG" | "PER_KG";
+  feeQuantity: number;
   discount?: number;
   paymentMethod: string;
   paid: number;
@@ -550,26 +565,35 @@ export async function createMillingServiceDocumentMulti(input: {
   if (valid.length === 0) {
     return { ok: false, message: "سجّل نوع حبوب واحد على الأقل مع كميته." };
   }
+  const expectedQuantity = valid.reduce(
+    (sum, line) => sum + (input.billingBasis === "PER_BAG" ? Number(line.bags || 0) : Number(line.kg || 0)),
+    0,
+  );
+  if (input.feeQuantity <= 0 || Math.abs(expectedQuantity - input.feeQuantity) > 0.001) {
+    return { ok: false, message: "كمية الفوترة لا تطابق كمية الاستلام حسب وحدة خدمة الطحن." };
+  }
 
   const paymentSplits = (input.paymentSplits ?? []).filter((line) => Number(line.amount) > 0);
 
   const rpcArgs: Record<string, unknown> = {
-    _customer_id: input.customerId,
-    _warehouse_id: input.warehouseId,
-    _grains: valid.map((g) => ({ item_id: g.itemId, bags: g.bags, kg: g.kg })),
-    _service_item_id: input.serviceItemId,
-    _service_unit_price: input.serviceTotal ?? 0,
-    _discount: input.discount ?? 0,
-    _payment_method: paymentSplits.length > 1 ? "split" : input.paymentMethod,
-    _paid:
+    p_customer_id: input.customerId,
+    p_warehouse_id: input.warehouseId,
+    p_grains: valid.map((g) => ({ item_id: g.itemId, bags: g.bags, kg: g.kg })),
+    p_service_item_id: input.serviceItemId,
+    p_service_gross: input.serviceTotal ?? 0,
+    p_discount: input.discount ?? 0,
+    p_payment_method: paymentSplits.length > 1 ? "split" : input.paymentMethod,
+    p_paid:
       paymentSplits.length > 1
         ? Math.round(paymentSplits.reduce((sum, line) => sum + Number(line.amount), 0) * 100) / 100
         : (input.paid ?? 0),
-    _notes: input.notes ?? null,
+    p_notes: input.notes ?? null,
+    p_payment_splits: paymentSplits.length > 1 ? paymentSplits : [],
+    p_billing_basis: input.billingBasis,
+    p_fee_quantity: input.feeQuantity,
   };
-  if (paymentSplits.length > 1) rpcArgs._payment_splits = paymentSplits;
 
-  const { data, error } = await (db.rpc as any)("create_milling_service_document_multi", rpcArgs);
+  const { data, error } = await (db.rpc as any)("create_milling_service_document_multi_priced", rpcArgs);
   if (error) return { ok: false, message: translateCustodyError(error.message) };
   return { ok: true, data: data as MillingServiceDocumentCreated };
 }

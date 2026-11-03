@@ -338,6 +338,25 @@ export interface ExpenseFormHeader {
   tax_recoverable: boolean;
 }
 
+export interface MillingServiceCostSummary {
+  cost_center_id: string;
+  cost_center_name: string;
+  expense_amount: number | string;
+  expense_document_count: number | string;
+  processed_bags: number | string;
+  processed_kg: number | string;
+  estimated_service_cost: number | string;
+  estimate_covered_bags: number | string;
+  estimate_covered_kg: number | string;
+  completed_invoice_revenue: number | string;
+  completed_document_count: number | string;
+  actual_cost_per_bag: number | string | null;
+  actual_cost_per_kg: number | string | null;
+  estimated_cost_per_bag: number | string | null;
+  estimated_cost_per_kg: number | string | null;
+  service_contribution_after_allocated_cost: number | string;
+}
+
 /** A fully populated form. */
 export interface ExpenseFormState {
   header: ExpenseFormHeader;

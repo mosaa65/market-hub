@@ -36,7 +36,7 @@ BEGIN;
 -- مركز تكلفة للعيّنة المحلية حتى يمكن تجربة أوامر تصنيع المنشأة بعد إعادة البناء.
 -- يبقى المركز الخاص بالمنشأة ضمن بيانات العيّنة ولا يضاف إلى بيانات النظام العامة.
 INSERT INTO public.expense_cost_centers (code, name, name_ar, is_active)
-SELECT 'PROD', 'Production', 'الإنتاج', true
+SELECT 'PROD', 'الإنتاج', 'الإنتاج', true
 WHERE NOT EXISTS (
   SELECT 1 FROM public.expense_cost_centers WHERE lower(btrim(code)) = 'prod'
 );
@@ -109,15 +109,27 @@ INSERT INTO public.products (
   is_custody_item
 )
 SELECT
-  NULL::text,   -- name: بدون نص إنجليزي (فارغ — لا تكرار نص)
+  v.name_ar,   -- name: تعبئة تلقائية من النص العربي (بدون نصوص إنجليزية)
   v.name_ar, v.description,
   -- التصنيف يُحلّ بالاسم العربي (LIMIT 1 = دفاع ضد أي صف مكرر قديم)
   (SELECT id FROM public.categories WHERE name_ar = v.category LIMIT 1),
-  -- الوحدة الكيلوجرام من بيانات النظام (وليست وحدة خاصة بالمطحنة)
-  (SELECT id FROM public.units WHERE name = 'Kilogram'),
-  (SELECT id FROM public.units WHERE name = 'Kilogram'),
-  (SELECT id FROM public.units WHERE name = 'Kilogram'),
-  (SELECT id FROM public.units WHERE name = 'Kilogram'),
+  -- الوحدة: كيس أو قطمة (القطب) بحسب نوع الصنف بدلاً من الكيلوجرام
+  (SELECT id FROM public.units 
+   WHERE (v.name_ar LIKE '%قطمة%' AND (name_ar = 'قطمة' OR name = 'قطمة'))
+      OR (v.name_ar NOT LIKE '%قطمة%' AND (name_ar = 'كيس' OR name = 'كيس' OR name = 'Bag'))
+   LIMIT 1),
+  (SELECT id FROM public.units 
+   WHERE (v.name_ar LIKE '%قطمة%' AND (name_ar = 'قطمة' OR name = 'قطمة'))
+      OR (v.name_ar NOT LIKE '%قطمة%' AND (name_ar = 'كيس' OR name = 'كيس' OR name = 'Bag'))
+   LIMIT 1),
+  (SELECT id FROM public.units 
+   WHERE (v.name_ar LIKE '%قطمة%' AND (name_ar = 'قطمة' OR name = 'قطمة'))
+      OR (v.name_ar NOT LIKE '%قطمة%' AND (name_ar = 'كيس' OR name = 'كيس' OR name = 'Bag'))
+   LIMIT 1),
+  (SELECT id FROM public.units 
+   WHERE (v.name_ar LIKE '%قطمة%' AND (name_ar = 'قطمة' OR name = 'قطمة'))
+      OR (v.name_ar NOT LIKE '%قطمة%' AND (name_ar = 'كيس' OR name = 'كيس' OR name = 'Bag'))
+   LIMIT 1),
   v.cost, v.price, 0, 0,
   v.is_service,
   true,
@@ -250,13 +262,25 @@ INSERT INTO public.products (
   is_custody_item
 )
 SELECT
-  NULL::text,
+  v.name_ar,   -- name: تعبئة تلقائية من النص العربي (بدون نصوص إنجليزية)
   v.name_ar, v.description,
   (SELECT id FROM public.categories WHERE name_ar = v.category LIMIT 1),
-  (SELECT id FROM public.units WHERE name = 'Kilogram'),
-  (SELECT id FROM public.units WHERE name = 'Kilogram'),
-  (SELECT id FROM public.units WHERE name = 'Kilogram'),
-  (SELECT id FROM public.units WHERE name = 'Kilogram'),
+  (SELECT id FROM public.units 
+   WHERE (v.name_ar LIKE '%قطمة%' AND (name_ar = 'قطمة' OR name = 'قطمة'))
+      OR (v.name_ar NOT LIKE '%قطمة%' AND (name_ar = 'كيس' OR name = 'كيس' OR name = 'Bag'))
+   LIMIT 1),
+  (SELECT id FROM public.units 
+   WHERE (v.name_ar LIKE '%قطمة%' AND (name_ar = 'قطمة' OR name = 'قطمة'))
+      OR (v.name_ar NOT LIKE '%قطمة%' AND (name_ar = 'كيس' OR name = 'كيس' OR name = 'Bag'))
+   LIMIT 1),
+  (SELECT id FROM public.units 
+   WHERE (v.name_ar LIKE '%قطمة%' AND (name_ar = 'قطمة' OR name = 'قطمة'))
+      OR (v.name_ar NOT LIKE '%قطمة%' AND (name_ar = 'كيس' OR name = 'كيس' OR name = 'Bag'))
+   LIMIT 1),
+  (SELECT id FROM public.units 
+   WHERE (v.name_ar LIKE '%قطمة%' AND (name_ar = 'قطمة' OR name = 'قطمة'))
+      OR (v.name_ar NOT LIKE '%قطمة%' AND (name_ar = 'كيس' OR name = 'كيس' OR name = 'Bag'))
+   LIMIT 1),
   0, 0, 0, 0,
   false,
   true,
@@ -322,13 +346,25 @@ INSERT INTO public.products (
   is_custody_item
 )
 SELECT
-  NULL::text,
+  v.name_ar,   -- name: تعبئة تلقائية من النص العربي (بدون نصوص إنجليزية)
   v.name_ar, v.description,
   (SELECT id FROM public.categories WHERE name_ar = v.category LIMIT 1),
-  (SELECT id FROM public.units WHERE name = 'Kilogram'),
-  (SELECT id FROM public.units WHERE name = 'Kilogram'),
-  (SELECT id FROM public.units WHERE name = 'Kilogram'),
-  (SELECT id FROM public.units WHERE name = 'Kilogram'),
+  (SELECT id FROM public.units 
+   WHERE (v.name_ar LIKE '%قطمة%' AND (name_ar = 'قطمة' OR name = 'قطمة'))
+      OR (v.name_ar NOT LIKE '%قطمة%' AND (name_ar = 'كيس' OR name = 'كيس' OR name = 'Bag'))
+   LIMIT 1),
+  (SELECT id FROM public.units 
+   WHERE (v.name_ar LIKE '%قطمة%' AND (name_ar = 'قطمة' OR name = 'قطمة'))
+      OR (v.name_ar NOT LIKE '%قطمة%' AND (name_ar = 'كيس' OR name = 'كيس' OR name = 'Bag'))
+   LIMIT 1),
+  (SELECT id FROM public.units 
+   WHERE (v.name_ar LIKE '%قطمة%' AND (name_ar = 'قطمة' OR name = 'قطمة'))
+      OR (v.name_ar NOT LIKE '%قطمة%' AND (name_ar = 'كيس' OR name = 'كيس' OR name = 'Bag'))
+   LIMIT 1),
+  (SELECT id FROM public.units 
+   WHERE (v.name_ar LIKE '%قطمة%' AND (name_ar = 'قطمة' OR name = 'قطمة'))
+      OR (v.name_ar NOT LIKE '%قطمة%' AND (name_ar = 'كيس' OR name = 'كيس' OR name = 'Bag'))
+   LIMIT 1),
   0, 0, 0, 0,
   false,
   true,

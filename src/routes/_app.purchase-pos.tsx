@@ -1,4 +1,4 @@
-﻿import { ModuleGuard, useModules } from "@/lib/modules";
+import { ModuleGuard, useModules } from "@/lib/modules";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -2126,9 +2126,10 @@ function PurchasePOSPage() {
                 {/*
                  * المكوّن الموحّد (يعرض معه المؤسسة وسطرها) بدل المنتقي القديم.
                  *
-                 * `showSettlement={false}`: هذه الشاشة تدير حساب التحصيل بنفسها
-                 * من خلال `paymentSelection`؛ فتح الصندوق/البنك داخل المكوّن
-                 * كان سيُنشئ مسارين للحقيقة في مستند واحد.
+                 * `showSettlement`: كان `false`، فلم تُعرض سوى قائمة الطريقة —
+                 * أي أن شراءً بحوالة بنكية كان يمكن حفظه **بلا رقم مرجعي أصلًا**.
+                 * المرجع هو ما يطابق الدفعة بإشعار البنك، وحرمان هذه الشاشة منه
+                 * يجعل مطابقة كشف الموردين مستحيلة. الحقل يعود هنا كما في كل شاشة.
                  */}
                 <PaymentMethodSelect
                   context="purchases"
@@ -2147,10 +2148,28 @@ function PurchasePOSPage() {
                     }));
                   }}
                   includeCredit
-                  showSettlement={false}
+                  showSettlement={paymentMethod !== "split"}
                   ensureIds={[paymentMethod]}
                   label={lang === "ar" ? "طريقة الدفع" : "Payment method"}
                   className="min-w-0"
+                  /*
+                    حقل المرجع يرسمه المكوّن الآن. `transferRef` يظل مرآة له
+                    لأن منطق الإرسال والتحقق يقرأ منه — لا حقل ثانٍ في الشاشة.
+                  */
+                  settlement={{
+                    method: paymentMethod,
+                    paymentMethodId: paymentSelection.paymentMethodId ?? null,
+                    reference: transferRef,
+                  }}
+                  onSettlementChange={(next) => {
+                    setTransferRef(next.reference ?? "");
+                    setPaymentSelection((s) => ({ ...s, reference: next.reference ?? "" }));
+                  }}
+                  onChooseSplit={() => {
+                    setPaymentMethod("split");
+                    setPaid("");
+                  }}
+                  isSplitMode={paymentMethod === "split"}
                 />
               </div>
               {paymentMethod === "split" && (
@@ -2195,31 +2214,6 @@ function PurchasePOSPage() {
                 className="h-8 rounded-lg border border-border/80 bg-surface px-2 text-[10px] outline-none focus:border-primary sm:text-[11px]"
               />
             </div>
-
-            {/* Transfer reference input */}
-            {(selectedPurchasePaymentMethod?.requiresReference ||
-              paymentMethod === "bank_transfer" ||
-              paymentMethod === "mobile_money") && (
-              <input
-                type="text"
-                value={transferRef}
-                onChange={(e) => {
-                  setTransferRef(e.target.value);
-                  setPaymentSelection((s) => ({ ...s, reference: e.target.value }));
-                }}
-                placeholder={
-                  paymentMethod === "mobile_money"
-                    ? paymentUiText("walletReference", lang === "ar" ? "ar" : "en")
-                    : t("pos.pm.transfer_ref")
-                }
-                aria-label={
-                  paymentMethod === "mobile_money"
-                    ? paymentUiText("walletReference", lang === "ar" ? "ar" : "en")
-                    : t("pos.pm.transfer_ref")
-                }
-                className="h-8 w-full rounded-xl border border-border/80 bg-surface px-2.5 text-xs text-foreground outline-none transition focus:border-primary"
-              />
-            )}
 
             {isOverpaid && (
               <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-2.5 py-1.5 text-[11px] font-medium text-destructive">

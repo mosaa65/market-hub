@@ -30,6 +30,12 @@ export interface DynamicPaymentSelectorProps {
   /** محفوظ للتوافق: الغلاف الآن أحادي السطر دائمًا. */
   compact?: boolean;
   label?: string;
+  /** يُضيف «توزيع الدفع» كخيار في القائمة بدل زر منفصل. */
+  onChooseSplit?: () => void;
+  /** الشاشة في وضع التوزيع حاليًا. */
+  isSplitMode?: boolean;
+  /** ملخص التوزيع المبدئي. */
+  splitSummary?: string;
 }
 
 export function DynamicPaymentSelector({
@@ -42,6 +48,9 @@ export function DynamicPaymentSelector({
   disabled = false,
   className,
   label,
+  onChooseSplit,
+  isSplitMode = false,
+  splitSummary,
 }: DynamicPaymentSelectorProps) {
   const { methods, isLoading } = usePaymentMethodsForContext(context, { includeCredit });
 
@@ -58,6 +67,9 @@ export function DynamicPaymentSelector({
       disabled={disabled}
       className={className}
       label={label}
+      onChooseSplit={onChooseSplit}
+      isSplitMode={isSplitMode}
+      splitSummary={splitSummary}
     />
   );
 }

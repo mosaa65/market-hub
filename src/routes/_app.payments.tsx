@@ -754,23 +754,24 @@ function PaymentsPage() {
                           if (next.reference) setReference(next.reference);
                         }}
                         includeCredit={false}
+                        /*
+                          «تجزئة التحصيل» خيار في القائمة فقط. لا زر منفصل،
+                          ولا سطر حالة تحت الحقل — الملخص يظهر في الحقل نفسه.
+                        */
+                        onChooseSplit={() => setSplitCollectionOpen(true)}
+                        isSplitMode={isSplitCollection}
+                        splitSummary={
+                          isSplitCollection
+                            ? `${
+                                [
+                                  splitCollectionValues.cash,
+                                  splitCollectionValues.bank_transfer,
+                                  splitCollectionValues.mobile_money,
+                                ].filter((v) => Number(v) > 0).length
+                              } ${lang === "ar" ? "طرق" : "methods"}`
+                            : undefined
+                        }
                       />
-                      <button
-                        type="button"
-                        onClick={() => setSplitCollectionOpen(true)}
-                        disabled={!Number(amount) || saving}
-                        className="mt-2 inline-flex min-h-9 items-center gap-2 rounded-xl border border-primary/25 bg-primary/[0.04] px-3 text-xs font-semibold text-primary hover:bg-primary/10 disabled:opacity-40"
-                      >
-                        <Layers className="size-4" />
-                        {lang === "ar" ? "تجزئة التحصيل" : "Split collection"}
-                      </button>
-                      {isSplitCollection && (
-                        <p className="mt-1 text-[11px] font-medium text-primary">
-                          {lang === "ar"
-                            ? "تم اختيار توزيع التحصيل على عدة طرق"
-                            : "Multiple collection tenders selected"}
-                        </p>
-                      )}
                     </div>
                     <Field label={lang === "ar" ? "تاريخ السند" : "Receipt date"}>
                       <div className="relative">

@@ -41,6 +41,7 @@ import type {
   ExpenseStatus,
   ExpenseSummary,
   ExpenseTaxMode,
+  MillingServiceCostSummary,
 } from "@/lib/expenses/types";
 
 const PAGE_SIZE = 50;
@@ -248,6 +249,30 @@ export function useExpenseReport(
     },
     enabled,
     staleTime: 60_000,
+  });
+}
+
+/** Actual milling-service costs allocated through the dedicated cost center. */
+export function useMillingServiceCostReport(
+  dateFrom: string | null,
+  dateTo: string | null,
+  costCenterId: string | null,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: ["expenses", "milling-service-cost", dateFrom, dateTo, costCenterId],
+    queryFn: async (): Promise<MillingServiceCostSummary | null> => {
+      const { data, error } = await (supabase as any).rpc("milling_service_cost_report", {
+        p_date_from: dateFrom,
+        p_date_to: dateTo,
+        p_cost_center_id: costCenterId,
+      });
+      if (error) throw error;
+      const row = Array.isArray(data) ? data[0] : data;
+      return (row ?? null) as MillingServiceCostSummary | null;
+    },
+    enabled,
+    staleTime: 30_000,
   });
 }
 

@@ -36,31 +36,50 @@ BEGIN;
 
 INSERT INTO public.units (name, short_name, name_ar, dimension_code, factor_to_reference) VALUES
   -- ── العدّ ──────────────────────────────────────────────────────────────────
-  ('Piece',       'pc',  'قطعة',       'COUNT',     1),
-  ('Dozen',       'dz',  'دستة',       'COUNT',    12),
-  ('Set',         'st',  'طقم',        'PACKAGING', NULL),
+  ('قطعة',        'قطعة', 'قطعة',       'COUNT',     1),
+  ('دستة',        'دستة', 'دستة',       'COUNT',    12),
+  ('طقم',         'طقم',  'طقم',        'PACKAGING', NULL),
+  ('Piece',       'قطعة', 'قطعة',       'COUNT',     1),
+  ('Dozen',       'دستة', 'دستة',       'COUNT',    12),
+  ('Set',         'طقم',  'طقم',        'PACKAGING', NULL),
 
   -- ── الوزن ──────────────────────────────────────────────────────────────────
-  ('Gram',        'g',   'جرام',       'MASS',      1),
-  ('Kilogram',    'kg',  'كيلوجرام',   'MASS',   1000),
-  ('Ton',         't',   'طن متري',    'MASS',1000000),
+  ('جرام',        'جم',   'جرام',       'MASS',      1),
+  ('كيلوجرام',    'كجم',  'كيلوجرام',   'MASS',   1000),
+  ('طن متري',     'طن',   'طن متري',    'MASS',1000000),
+  ('Gram',        'جم',   'جرام',       'MASS',      1),
+  ('Kilogram',    'كجم',  'كيلوجرام',   'MASS',   1000),
+  ('Ton',         'طن',   'طن متري',    'MASS',1000000),
 
   -- ── الحجم ──────────────────────────────────────────────────────────────────
-  ('Millilitre',  'ml',  'مليلتر',     'VOLUME',    1),
-  ('Litre',       'L',   'لتر',        'VOLUME', 1000),
+  ('مليلتر',      'مل',   'مليلتر',     'VOLUME',    1),
+  ('لتر',         'لتر',  'لتر',        'VOLUME', 1000),
+  ('Millilitre',  'مل',   'مليلتر',     'VOLUME',    1),
+  ('Litre',       'لتر',  'لتر',        'VOLUME', 1000),
 
   -- ── الطول والمساحة ─────────────────────────────────────────────────────────
-  ('Metre',       'm',   'متر',        'LENGTH',    1),
-  ('SquareMetre', 'm2',  'متر مربع',   'AREA',       1),
+  ('متر',         'م',    'متر',        'LENGTH',    1),
+  ('متر مربع',    'م²',   'متر مربع',   'AREA',       1),
+  ('Metre',       'م',    'متر',        'LENGTH',    1),
+  ('SquareMetre', 'م²',   'متر مربع',   'AREA',       1),
+
+  -- ── الحبوب والمطاحن والعبوات الزراعية (أكياس وقطب) ────────────────────────
+  ('كيس',         'كيس',  'كيس',        'PACKAGING', NULL),
+  ('قطمة',        'قطمة', 'قطمة',       'PACKAGING', NULL),
+  ('قطب',         'قطب',  'قطب',        'PACKAGING', NULL),
+  ('Bag',         'كيس',  'كيس',        'PACKAGING', NULL),
 
   -- ── التعبئة القياسية ───────────────────────────────────────────────────────
-  -- هذه أنواع تغليف عامة، لا عبوات بوزن محدّد. «صندوق» و«حزمة» و«رزمة»
-  -- مفاهيم يستخدمها كل نشاط تجاري تقريبًا.
-  ('Box',         'bx',  'صندوق',      'PACKAGING', NULL),
-  ('Pack',        'pk',  'حزمة',       'PACKAGING', NULL),
-  ('Ream',        'rm',  'رزمة ورق',   'PACKAGING', NULL)
+  ('صندوق',       'صندوق','صندوق',      'PACKAGING', NULL),
+  ('حزمة',        'حزمة', 'حزمة',       'PACKAGING', NULL),
+  ('رزمة ورق',    'رزمة', 'رزمة ورق',   'PACKAGING', NULL),
+  ('Box',         'صندوق','صندوق',      'PACKAGING', NULL),
+  ('Pack',        'حزمة', 'حزمة',       'PACKAGING', NULL),
+  ('Ream',        'رزمة', 'رزمة ورق',   'PACKAGING', NULL)
 ON CONFLICT (name) DO UPDATE
-  SET dimension_code = EXCLUDED.dimension_code,
+  SET name_ar = EXCLUDED.name_ar,
+      short_name = EXCLUDED.short_name,
+      dimension_code = EXCLUDED.dimension_code,
       factor_to_reference = EXCLUDED.factor_to_reference;
 
 COMMIT;

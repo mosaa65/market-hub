@@ -3311,6 +3311,13 @@ function POSPage() {
                       }}
                       disabled={loading}
                       className="col-span-1 sm:col-span-2"
+                      /*
+                        «توزيع الدفع» خيار داخل القائمة، لا زرًّا مستقلًا أسفل الحقل.
+                        في وضع التوزيع تُبقى القائمة متاحة («رجوع»)، فلا حاجة لزر
+                        ثالث لإلغاء التوزيع.
+                      */
+                      onChooseSplit={() => setSplitEditorOpen(true)}
+                      isSplitMode={false}
                     />
                   ) : (
                     <div className="flex h-8 min-w-0 items-center truncate rounded-lg border border-primary/20 bg-primary/[0.04] px-2 text-[10px] font-medium text-primary sm:px-3 sm:text-[11px]">
