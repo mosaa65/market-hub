@@ -134,7 +134,7 @@ const settlementGuideConfig: PageGuideConfig = {
           type: "تسوية بالنقص (Adjustment Out)",
           stockImpact: "تخفيض الرصيد المتاح للصنف لمنع البيع السالب أو الوهمي.",
           financialImpact: "من حـ/ عجز وفاقد مخزني (مدين) إلى حـ/ المخزون (دائن) بقيمة التكلفة.",
-          triggerCondition: "تلف بضاعة، انتهاء صلاحية، أو نقص مثبت بمحضر جرد رسمي.",
+          triggerCondition: "تلف بضاعة، نافذة، أو نقص مثبت بمحضر جرد رسمي.",
         },
       },
       {
@@ -575,9 +575,6 @@ function SettlementsPage() {
         cell: (row) => (
           <div className="py-0.5">
             <div className="truncate font-medium text-foreground">{productLabel(row) ?? "—"}</div>
-            <div className="font-mono text-[11px] text-muted-foreground">
-              {row.products?.sku ?? "—"}
-            </div>
           </div>
         ),
       },
@@ -879,11 +876,6 @@ function SettlementsPage() {
                     >
                       {getArabicMovementLabel(selectedMovement.movement_type)}
                     </span>
-                    {selectedMovement.products?.sku && (
-                      <span className="font-mono text-xs text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-md">
-                        {selectedMovement.products.sku}
-                      </span>
-                    )}
                   </div>
                 </div>
               </div>
@@ -1103,9 +1095,6 @@ function SettlementCard({
             >
               <Eye className="size-3.5" />
             </button>
-          </div>
-          <div className="truncate font-mono text-[11px] text-muted-foreground">
-            {row.products?.sku ?? "—"}
           </div>
           <span
             className={`mt-1 inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-[9px] font-bold ${

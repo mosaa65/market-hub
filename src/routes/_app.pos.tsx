@@ -49,6 +49,7 @@ import { useMillingMode } from "@/lib/milling-mode";
 import { useIsDesktop, useMediaQuery } from "@/hooks/use-media-query";
 import { usePersistedViewMode } from "@/hooks/use-persisted-view-mode";
 import { CartLine as CartLineRow } from "@/components/commerce/cart-line";
+import { useNegativeSalesSetting } from "@/hooks/use-negative-sales-setting";
 import { MobileProductPicker } from "@/components/commerce/mobile-product-picker";
 import { RecordsSortPanel, RecordsFilterPanel } from "@/components/ui/records-panels";
 import { RecordsToolbar } from "@/components/ui/records-toolbar";
@@ -446,6 +447,7 @@ function POSPage() {
 
   // Company settings for invoice generation
   const [companySettings, setCompanySettings] = useState<any>(null);
+  const { data: allowNegativeSales = false } = useNegativeSalesSetting();
 
   const productCompatMap = useMemo(() => {
     const modelLookup = new Map(models.map((m) => [m.id, m]));
@@ -1359,7 +1361,7 @@ function POSPage() {
       const reservedBase = cart
         .filter((line) => line.product_id === p.id)
         .reduce((sum, line) => sum + line.quantity * (line.uom_factor ?? 1), 0);
-      if (stock - reservedBase < uomFactor) {
+      if (!allowNegativeSales && stock - reservedBase < uomFactor) {
         return toast.error(
           lang === "ar"
             ? `الكمية المتاحة لا تكفي لوحدة ${saleUom.label || baseUomLabel}: ${Math.max(0, (stock - reservedBase) / uomFactor)}`
@@ -1382,7 +1384,10 @@ function POSPage() {
           const otherReservedBase = c
             .filter((l) => l.product_id === p.id && l.line_id !== existing.line_id)
             .reduce((sum, line) => sum + line.quantity * (line.uom_factor ?? 1), 0);
-          if (stock - otherReservedBase < (existing.quantity + 1) * uomFactor) {
+          if (
+            !allowNegativeSales &&
+            stock - otherReservedBase < (existing.quantity + 1) * uomFactor
+          ) {
             toast.error(
               lang === "ar"
                 ? `الحد الأقصى المتاح في المخزون: ${Math.max(0, (stock - otherReservedBase) / uomFactor)}`
@@ -1501,7 +1506,7 @@ function POSPage() {
         .filter((l) => l.product_id === line.product_id && l.line_id !== lineId)
         .reduce((sum, item) => sum + item.quantity * (item.uom_factor ?? 1), 0);
       const factor = line.uom_factor ?? 1;
-      if (qty * factor + reservedByOtherLines > stock + 1e-9) {
+      if (!allowNegativeSales && qty * factor + reservedByOtherLines > stock + 1e-9) {
         toast.error(
           lang === "ar"
             ? `الحد الأقصى المتاح: ${Math.max(0, (stock - reservedByOtherLines) / factor)}`
@@ -1532,7 +1537,10 @@ function POSPage() {
       const reservedByOtherLines = cart
         .filter((entry) => entry.product_id === line.product_id && entry.line_id !== lineId)
         .reduce((sum, entry) => sum + entry.quantity * (entry.uom_factor ?? 1), 0);
-      if (line.quantity * option.factor_to_base + reservedByOtherLines > stock + 1e-9) {
+      if (
+        !allowNegativeSales &&
+        line.quantity * option.factor_to_base + reservedByOtherLines > stock + 1e-9
+      ) {
         toast.error(
           lang === "ar"
             ? "الكمية الحالية تتجاوز المتاح بهذه الوحدة"

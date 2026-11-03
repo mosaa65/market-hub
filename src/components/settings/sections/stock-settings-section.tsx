@@ -27,6 +27,8 @@ export function StockSettingsSection({ canEdit = true, lang = "ar" }: StockSetti
   const isAr = lang === "ar";
   const queryClient = useQueryClient();
   const [settings, setSettings] = useState<StockSettings>(() => getStockSettings());
+  const [allowNegativeSales, setAllowNegativeSales] = useState(false);
+  const [savedAllowNegativeSales, setSavedAllowNegativeSales] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [savedSnapshot, setSavedSnapshot] = useState(() => getStockSettings());
   const [costingMethod, setCostingMethod] = useState<CostingMethod>("MOVING_AVERAGE");
@@ -37,14 +39,34 @@ export function StockSettingsSection({ canEdit = true, lang = "ar" }: StockSetti
   const [costingSaveState, setCostingSaveState] = useState<"idle" | "saving">("idle");
 
   const isDirty = useMemo(
-    () => JSON.stringify(settings) !== JSON.stringify(savedSnapshot),
-    [settings, savedSnapshot],
+    () =>
+      JSON.stringify(settings) !== JSON.stringify(savedSnapshot) ||
+      allowNegativeSales !== savedAllowNegativeSales,
+    [settings, savedSnapshot, allowNegativeSales, savedAllowNegativeSales],
   );
 
   useEffect(() => {
     const s = getStockSettings();
     setSettings(s);
     setSavedSnapshot(s);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      const { data, error } = await (supabase as any)
+        .from("company_settings")
+        .select("allow_negative_sales")
+        .eq("id", 1)
+        .maybeSingle();
+      if (!active || error) return;
+      const enabled = Boolean(data?.allow_negative_sales);
+      setAllowNegativeSales(enabled);
+      setSavedAllowNegativeSales(enabled);
+    })();
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -74,17 +96,33 @@ export function StockSettingsSection({ canEdit = true, lang = "ar" }: StockSetti
     };
   }, []);
 
-  function handleSave() {
+  async function handleSave() {
     if (!canEdit || !isDirty) return;
     setIsSaving(true);
     try {
+      const { error } = await (supabase as any)
+        .from("company_settings")
+        .upsert({ id: 1, allow_negative_sales: allowNegativeSales }, { onConflict: "id" });
+      if (error) throw error;
       const saved = saveStockSettings(settings);
       setSettings(saved);
       setSavedSnapshot(saved);
+      setSavedAllowNegativeSales(allowNegativeSales);
+      await queryClient.invalidateQueries({
+        queryKey: ["company-settings", "allow-negative-sales"],
+      });
       toast.success(
         isAr
           ? "تم حفظ إعدادات المخزون والرموز (Stacks) بنجاح"
           : "Stock & Stacks settings saved successfully",
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : isAr
+            ? "تعذر حفظ إعداد البيع بالسالب"
+            : "Could not save negative-sales setting",
       );
     } finally {
       setIsSaving(false);
@@ -456,17 +494,17 @@ export function StockSettingsSection({ canEdit = true, lang = "ar" }: StockSetti
               <div className="flex items-center justify-between p-4 rounded-2xl border border-border/70 bg-surface/60">
                 <div className="space-y-0.5 me-2">
                   <div className="text-xs font-bold text-foreground">
-                    {isAr ? "السماح بالرصيد بالسالب" : "Allow Negative Stock Balance"}
+                    {isAr ? "السماح بالبيع بالسالب" : "Allow Negative Sales"}
                   </div>
                   <div className="text-[11px] text-muted-foreground">
                     {isAr
-                      ? "إمكانية إتمام حركات الصرف والبيع حتى لو كان المخزون المتاح صفر"
-                      : "Allow outgoing movements when available quantity is zero"}
+                      ? "يسمح لفواتير البيع فقط بتجاوز الرصيد المتاح. لا يغير ضوابط المطحنة أو التحويل أو التسوية."
+                      : "Allows sales invoices only to exceed available stock. Milling, transfers, and adjustments remain protected."}
                   </div>
                 </div>
                 <Switch
-                  checked={settings.allowNegativeStock}
-                  onCheckedChange={(val) => setSettings({ ...settings, allowNegativeStock: val })}
+                  checked={allowNegativeSales}
+                  onCheckedChange={setAllowNegativeSales}
                   disabled={!canEdit}
                 />
               </div>

@@ -502,7 +502,9 @@ export function GuidedItemDialog({ onClose, onCreated, units, categories }: Guid
                   </Field>
                   {/* اختياري لأي سلعة مخزنية ذات محتوى ثابت الوزن. */}
                   <Field
-                    label={ar ? "الوزن الصافي المعتاد للعبوة (كجم)" : "Usual net package weight (kg)"}
+                    label={
+                      ar ? "الوزن الصافي المعتاد للعبوة (كجم)" : "Usual net package weight (kg)"
+                    }
                     hint={
                       ar
                         ? "اختياري لأي سلعة مخزنية لها وزن صافٍ ثابت لكل كيس أو عبوة. يفيد في شراء الأكياس وبعض عمليات الطحن. لا يعرّف تحويلًا عامًا مثل كرتون إلى حبة."
@@ -540,7 +542,7 @@ export function GuidedItemDialog({ onClose, onCreated, units, categories }: Guid
               {tracksStock && (
                 <p className="text-[11px] text-muted-foreground">
                   {ar
-                    ? "رصيد أول المدة يُسجَّل لاحقًا من صفحة المخزون كمستند مستقل، وليس كفاتورة شراء."
+                    ? "رصيد أول المدة يُدار ضمن إجراءات الترحيل المعتمدة، وليس كفاتورة شراء."
                     : "Opening stock is recorded later from the Inventory page as its own document — never as a purchase invoice."}
                 </p>
               )}

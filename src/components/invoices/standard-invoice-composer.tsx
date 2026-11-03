@@ -53,6 +53,7 @@ import { toSystemDigits } from "@/lib/format-preferences";
 import { toast } from "sonner";
 import { PosBatchSelectorModal } from "@/components/batches/pos-batch-selector-modal";
 import { useBatchSettings } from "@/hooks/use-batch-settings";
+import { useNegativeSalesSetting } from "@/hooks/use-negative-sales-setting";
 
 type Kind = "sales" | "purchase";
 type Party = {
@@ -90,21 +91,30 @@ type ProductRow = {
   sale_uoms?: ProductUomOption[];
   purchase_uoms?: ProductUomOption[];
 };
-function getProductUnitOptions(product: ProductRow, sales: boolean, ar: boolean): ProductUomOption[] {
-  const options = sales ? product.sale_uoms ?? [] : product.purchase_uoms ?? [];
+function getProductUnitOptions(
+  product: ProductRow,
+  sales: boolean,
+  ar: boolean,
+): ProductUomOption[] {
+  const options = sales ? (product.sale_uoms ?? []) : (product.purchase_uoms ?? []);
   if (options.length) return options;
-  const baseLabel = product.unit?.short_name
-    || (ar ? product.unit?.name_ar || product.unit?.name : product.unit?.name || product.unit?.name_ar)
-    || (ar ? "وحدة الأساس" : "Base unit");
-  return [{
-    unit_id: product.unit_id ?? "",
-    factor_to_base: 1,
-    price: Number(sales ? product.sale_price : product.cost_price) || 0,
-    label: baseLabel,
-    quantity_increment: 1,
-    is_default: true,
-    barcodes: product.barcode ? [product.barcode] : [],
-  }];
+  const baseLabel =
+    product.unit?.short_name ||
+    (ar
+      ? product.unit?.name_ar || product.unit?.name
+      : product.unit?.name || product.unit?.name_ar) ||
+    (ar ? "وحدة الأساس" : "Base unit");
+  return [
+    {
+      unit_id: product.unit_id ?? "",
+      factor_to_base: 1,
+      price: Number(sales ? product.sale_price : product.cost_price) || 0,
+      label: baseLabel,
+      quantity_increment: 1,
+      is_default: true,
+      barcodes: product.barcode ? [product.barcode] : [],
+    },
+  ];
 }
 type CartLine = {
   line_key: string;
@@ -135,6 +145,7 @@ const fieldClass =
 export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
   const { lang } = useI18n();
   const ar = lang === "ar";
+  const { data: allowNegativeSales = false } = useNegativeSalesSetting();
   const navigate = useNavigate();
   const scopeRef = useFormNavigationScope<HTMLDivElement>();
   const searchRef = useRef<HTMLInputElement>(null);
@@ -182,9 +193,11 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
   };
   const defaultUnit = (product: ProductRow) => {
     const options = unitOptions(product);
-    return options.find((option) => option.is_default)
-      ?? options.find((option) => option.unit_id === product.unit_id)
-      ?? options[0];
+    return (
+      options.find((option) => option.is_default) ??
+      options.find((option) => option.unit_id === product.unit_id) ??
+      options[0]
+    );
   };
 
   function quantityDecimals(increment: number) {
@@ -229,98 +242,156 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
         .order("name")
         .limit(200),
       productQuery.order("name").limit(1000),
-    ]).then(async ([partyRes, whRes, productRes]) => {
-      if (!live) return;
-      if (partyRes.error || whRes.error || productRes.error) {
-        toast.error(ar ? "تعذر تحميل بيانات الفاتورة" : "Could not load invoice data");
-      }
-      const partyRows = (partyRes.data ?? []) as Party[];
-      const whRows = (whRes.data ?? []) as WarehouseRow[];
-      setParties(partyRows);
-      setWarehouses(whRows);
-      const productRows = (productRes.data ?? []) as ProductRow[];
-      const uomsByProduct = new Map<string, { sale: ProductUomOption[]; purchase: ProductUomOption[] }>();
-      const baseSalePrice = new Map<string, number>();
-      const basePurchasePrice = new Map<string, number>();
-      if (productRows.length) {
-        const ids = productRows.map((product) => product.id);
-        const [uomResult, companyItemsResult] = await Promise.all([
-          (supabase as any)
-            .from("product_uoms")
-            .select("id,product_id,unit_id,factor_to_base,quantity_increment,can_sell,can_purchase,is_default_sale,is_default_purchase,unit:units!product_uoms_unit_id_fkey(short_name,name,name_ar)")
-            .in("product_id", ids)
-            .eq("is_active", true),
-          (supabase as any)
-            .from("company_items")
-            .select("item_id,default_sale_price,default_cost")
-            .eq("company_id", 1)
-            .eq("is_active", true)
-            .in("item_id", ids),
-        ]);
-        const missingUomSchema = uomResult.error && ["42P01", "PGRST205"].includes(uomResult.error.code ?? "");
-        if (uomResult.error && !missingUomSchema) throw uomResult.error;
-        if (companyItemsResult.error) throw companyItemsResult.error;
-        for (const row of companyItemsResult.data ?? []) {
-          if (row.default_sale_price != null) baseSalePrice.set(row.item_id, Number(row.default_sale_price));
-          if (row.default_cost != null) basePurchasePrice.set(row.item_id, Number(row.default_cost));
+    ])
+      .then(async ([partyRes, whRes, productRes]) => {
+        if (!live) return;
+        if (partyRes.error || whRes.error || productRes.error) {
+          toast.error(ar ? "تعذر تحميل بيانات الفاتورة" : "Could not load invoice data");
         }
-        const uomRows = missingUomSchema ? [] : (uomResult.data ?? []) as any[];
-        const uomIds = uomRows.map((row: any) => row.id);
-        const [priceResult, barcodeResult] = uomIds.length
-          ? await Promise.all([
-              (supabase as any).from("product_uom_prices").select("product_uom_id,sale_price,purchase_price").in("product_uom_id", uomIds).eq("company_id", 1),
-              (supabase as any).from("product_uom_barcodes").select("product_uom_id,barcode").in("product_uom_id", uomIds).eq("company_id", 1).eq("is_active", true),
-            ])
-          : [{ data: [], error: null }, { data: [], error: null }];
-        if (priceResult.error) throw priceResult.error;
-        if (barcodeResult.error) throw barcodeResult.error;
-        const prices = new Map<string, { sale?: number; purchase?: number }>();
-        for (const row of priceResult.data ?? []) prices.set(row.product_uom_id, {
-          sale: row.sale_price == null ? undefined : Number(row.sale_price),
-          purchase: row.purchase_price == null ? undefined : Number(row.purchase_price),
-        });
-        const barcodes = new Map<string, string[]>();
-        for (const row of barcodeResult.data ?? []) barcodes.set(row.product_uom_id, [...(barcodes.get(row.product_uom_id) ?? []), row.barcode]);
-        for (const row of uomRows) {
-          const product = productRows.find((entry) => entry.id === row.product_id);
-          if (!product) continue;
-          const factor = Number(row.factor_to_base);
-          const configured = prices.get(row.id);
-          const unitName = ar ? row.unit?.name_ar || row.unit?.name : row.unit?.name || row.unit?.name_ar;
-          const label = unitName
-            ? `${unitName}${row.unit?.short_name ? ` (${row.unit.short_name})` : ""}`
-            : (ar ? "وحدة" : "Unit");
-          const bucket = uomsByProduct.get(row.product_id) ?? { sale: [], purchase: [] };
-          const baseSale = baseSalePrice.get(row.product_id) ?? Number(product.sale_price ?? 0);
-          const basePurchase = basePurchasePrice.get(row.product_id) ?? Number(product.cost_price ?? 0);
-          if (row.can_sell) bucket.sale.push({ unit_id: row.unit_id, factor_to_base: factor, price: configured?.sale ?? baseSale * factor, label, quantity_increment: Number(row.quantity_increment ?? 1), is_default: row.is_default_sale === true, barcodes: barcodes.get(row.id) ?? [] });
-          if (row.can_purchase) bucket.purchase.push({ unit_id: row.unit_id, factor_to_base: factor, price: configured?.purchase ?? basePurchase * factor, label, quantity_increment: Number(row.quantity_increment ?? 1), is_default: row.is_default_purchase === true, barcodes: barcodes.get(row.id) ?? [] });
-          if (row.unit_id === product.unit_id && product.barcode) {
-            const saleOption = bucket.sale.find((option) => option.unit_id === row.unit_id);
-            const purchaseOption = bucket.purchase.find((option) => option.unit_id === row.unit_id);
-            if (saleOption && !saleOption.barcodes.includes(product.barcode)) saleOption.barcodes.push(product.barcode);
-            if (purchaseOption && !purchaseOption.barcodes.includes(product.barcode)) purchaseOption.barcodes.push(product.barcode);
+        const partyRows = (partyRes.data ?? []) as Party[];
+        const whRows = (whRes.data ?? []) as WarehouseRow[];
+        setParties(partyRows);
+        setWarehouses(whRows);
+        const productRows = (productRes.data ?? []) as ProductRow[];
+        const uomsByProduct = new Map<
+          string,
+          { sale: ProductUomOption[]; purchase: ProductUomOption[] }
+        >();
+        const baseSalePrice = new Map<string, number>();
+        const basePurchasePrice = new Map<string, number>();
+        if (productRows.length) {
+          const ids = productRows.map((product) => product.id);
+          const [uomResult, companyItemsResult] = await Promise.all([
+            (supabase as any)
+              .from("product_uoms")
+              .select(
+                "id,product_id,unit_id,factor_to_base,quantity_increment,can_sell,can_purchase,is_default_sale,is_default_purchase,unit:units!product_uoms_unit_id_fkey(short_name,name,name_ar)",
+              )
+              .in("product_id", ids)
+              .eq("is_active", true),
+            (supabase as any)
+              .from("company_items")
+              .select("item_id,default_sale_price,default_cost")
+              .eq("company_id", 1)
+              .eq("is_active", true)
+              .in("item_id", ids),
+          ]);
+          const missingUomSchema =
+            uomResult.error && ["42P01", "PGRST205"].includes(uomResult.error.code ?? "");
+          if (uomResult.error && !missingUomSchema) throw uomResult.error;
+          if (companyItemsResult.error) throw companyItemsResult.error;
+          for (const row of companyItemsResult.data ?? []) {
+            if (row.default_sale_price != null)
+              baseSalePrice.set(row.item_id, Number(row.default_sale_price));
+            if (row.default_cost != null)
+              basePurchasePrice.set(row.item_id, Number(row.default_cost));
           }
-          uomsByProduct.set(row.product_id, bucket);
+          const uomRows = missingUomSchema ? [] : ((uomResult.data ?? []) as any[]);
+          const uomIds = uomRows.map((row: any) => row.id);
+          const [priceResult, barcodeResult] = uomIds.length
+            ? await Promise.all([
+                (supabase as any)
+                  .from("product_uom_prices")
+                  .select("product_uom_id,sale_price,purchase_price")
+                  .in("product_uom_id", uomIds)
+                  .eq("company_id", 1),
+                (supabase as any)
+                  .from("product_uom_barcodes")
+                  .select("product_uom_id,barcode")
+                  .in("product_uom_id", uomIds)
+                  .eq("company_id", 1)
+                  .eq("is_active", true),
+              ])
+            : [
+                { data: [], error: null },
+                { data: [], error: null },
+              ];
+          if (priceResult.error) throw priceResult.error;
+          if (barcodeResult.error) throw barcodeResult.error;
+          const prices = new Map<string, { sale?: number; purchase?: number }>();
+          for (const row of priceResult.data ?? [])
+            prices.set(row.product_uom_id, {
+              sale: row.sale_price == null ? undefined : Number(row.sale_price),
+              purchase: row.purchase_price == null ? undefined : Number(row.purchase_price),
+            });
+          const barcodes = new Map<string, string[]>();
+          for (const row of barcodeResult.data ?? [])
+            barcodes.set(row.product_uom_id, [
+              ...(barcodes.get(row.product_uom_id) ?? []),
+              row.barcode,
+            ]);
+          for (const row of uomRows) {
+            const product = productRows.find((entry) => entry.id === row.product_id);
+            if (!product) continue;
+            const factor = Number(row.factor_to_base);
+            const configured = prices.get(row.id);
+            const unitName = ar
+              ? row.unit?.name_ar || row.unit?.name
+              : row.unit?.name || row.unit?.name_ar;
+            const label = unitName
+              ? `${unitName}${row.unit?.short_name ? ` (${row.unit.short_name})` : ""}`
+              : ar
+                ? "وحدة"
+                : "Unit";
+            const bucket = uomsByProduct.get(row.product_id) ?? { sale: [], purchase: [] };
+            const baseSale = baseSalePrice.get(row.product_id) ?? Number(product.sale_price ?? 0);
+            const basePurchase =
+              basePurchasePrice.get(row.product_id) ?? Number(product.cost_price ?? 0);
+            if (row.can_sell)
+              bucket.sale.push({
+                unit_id: row.unit_id,
+                factor_to_base: factor,
+                price: configured?.sale ?? baseSale * factor,
+                label,
+                quantity_increment: Number(row.quantity_increment ?? 1),
+                is_default: row.is_default_sale === true,
+                barcodes: barcodes.get(row.id) ?? [],
+              });
+            if (row.can_purchase)
+              bucket.purchase.push({
+                unit_id: row.unit_id,
+                factor_to_base: factor,
+                price: configured?.purchase ?? basePurchase * factor,
+                label,
+                quantity_increment: Number(row.quantity_increment ?? 1),
+                is_default: row.is_default_purchase === true,
+                barcodes: barcodes.get(row.id) ?? [],
+              });
+            if (row.unit_id === product.unit_id && product.barcode) {
+              const saleOption = bucket.sale.find((option) => option.unit_id === row.unit_id);
+              const purchaseOption = bucket.purchase.find(
+                (option) => option.unit_id === row.unit_id,
+              );
+              if (saleOption && !saleOption.barcodes.includes(product.barcode))
+                saleOption.barcodes.push(product.barcode);
+              if (purchaseOption && !purchaseOption.barcodes.includes(product.barcode))
+                purchaseOption.barcodes.push(product.barcode);
+            }
+            uomsByProduct.set(row.product_id, bucket);
+          }
         }
-      }
-      if (!live) return;
-      setProducts(productRows.map((product) => ({
-        ...product,
-        sale_price: baseSalePrice.get(product.id) ?? product.sale_price,
-        cost_price: basePurchasePrice.get(product.id) ?? product.cost_price,
-        sale_uoms: uomsByProduct.get(product.id)?.sale ?? [],
-        purchase_uoms: uomsByProduct.get(product.id)?.purchase ?? [],
-      })));
-      setPartyId(partyRows[0]?.id ?? "");
-      setWarehouseId(whRows[0]?.id ?? "");
-      setLoading(false);
-    }).catch((error) => {
-      if (!live) return;
-      console.error("Failed to load invoice units and products:", error);
-      toast.error(ar ? "تعذر تحميل وحدات الأصناف وأسعارها" : "Could not load item units and prices");
-      setLoading(false);
-    });
+        if (!live) return;
+        setProducts(
+          productRows.map((product) => ({
+            ...product,
+            sale_price: baseSalePrice.get(product.id) ?? product.sale_price,
+            cost_price: basePurchasePrice.get(product.id) ?? product.cost_price,
+            sale_uoms: uomsByProduct.get(product.id)?.sale ?? [],
+            purchase_uoms: uomsByProduct.get(product.id)?.purchase ?? [],
+          })),
+        );
+        setPartyId(partyRows[0]?.id ?? "");
+        setWarehouseId(whRows[0]?.id ?? "");
+        setLoading(false);
+      })
+      .catch((error) => {
+        if (!live) return;
+        console.error("Failed to load invoice units and products:", error);
+        toast.error(
+          ar ? "تعذر تحميل وحدات الأصناف وأسعارها" : "Could not load item units and prices",
+        );
+        setLoading(false);
+      });
     return () => {
       live = false;
     };
@@ -353,11 +424,13 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
     if (!q) return [];
     return products
       .filter((p) =>
-        [p.name, p.name_ar, p.sku, p.barcode,
+        [
+          p.name,
+          p.name_ar,
+          p.sku,
+          p.barcode,
           ...getProductUnitOptions(p, sales, ar).flatMap((unit) => unit.barcodes),
-        ].some((v) =>
-          (v ?? "").toLocaleLowerCase().includes(q),
-        ),
+        ].some((v) => (v ?? "").toLocaleLowerCase().includes(q)),
       )
       .slice(0, 5);
   }, [products, search, sales, ar]);
@@ -377,16 +450,24 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
   function addProduct(product: ProductRow) {
     const exactCode = search.trim().toLocaleLowerCase();
     const options = unitOptions(product);
-    const selectedUnit = (product.barcode?.toLocaleLowerCase() === exactCode
-      ? options.find((option) => option.unit_id === product.unit_id)
-      : undefined)
-      ?? options.find((option) => option.barcodes.some((code) => code.toLocaleLowerCase() === exactCode))
-      ?? defaultUnit(product);
-    const scannedQuantity = Math.ceil(1 / selectedUnit.quantity_increment) * selectedUnit.quantity_increment;
+    const selectedUnit =
+      (product.barcode?.toLocaleLowerCase() === exactCode
+        ? options.find((option) => option.unit_id === product.unit_id)
+        : undefined) ??
+      options.find((option) =>
+        option.barcodes.some((code) => code.toLocaleLowerCase() === exactCode),
+      ) ??
+      defaultUnit(product);
+    const scannedQuantity =
+      Math.ceil(1 / selectedUnit.quantity_increment) * selectedUnit.quantity_increment;
     setCart((previous) => {
-      const found = product.tracking === "BATCH" || product.tracking === "SERIAL"
-        ? -1
-        : previous.findIndex((line) => line.product.id === product.id && line.uom_id === (selectedUnit.unit_id || null));
+      const found =
+        product.tracking === "BATCH" || product.tracking === "SERIAL"
+          ? -1
+          : previous.findIndex(
+              (line) =>
+                line.product.id === product.id && line.uom_id === (selectedUnit.unit_id || null),
+            );
       if (found >= 0)
         return previous.map((line, i) =>
           i === found ? { ...line, quantity: line.quantity + scannedQuantity } : line,
@@ -416,19 +497,31 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
     const line = cart.find((item) => item.line_key === lineKey);
     const option = line && unitOptions(line.product).find((unit) => unit.unit_id === unitId);
     if (!line || !option) return;
-    const quantity = line.quantity * line.uom_factor / option.factor_to_base;
+    const quantity = (line.quantity * line.uom_factor) / option.factor_to_base;
     const steps = quantity / option.quantity_increment;
     if (Math.abs(steps - Math.round(steps)) > 1e-7) {
-      toast.error(ar
-        ? `لا يمكن تمثيل هذه الكمية بوحدة ${option.label} وفق خطوة الكمية المحددة`
-        : `This quantity cannot be represented in ${option.label} using its configured increment`);
+      toast.error(
+        ar
+          ? `لا يمكن تمثيل هذه الكمية بوحدة ${option.label} وفق خطوة الكمية المحددة`
+          : `This quantity cannot be represented in ${option.label} using its configured increment`,
+      );
       return;
     }
-    setCart((previous) => previous.map((item) => item.line_key === lineKey
-      ? { ...item, uom_id: option.unit_id || null, uom_factor: option.factor_to_base,
-          uom_label: option.label, quantity_increment: option.quantity_increment,
-          quantity: Number(quantity.toFixed(9)), price: option.price }
-      : item));
+    setCart((previous) =>
+      previous.map((item) =>
+        item.line_key === lineKey
+          ? {
+              ...item,
+              uom_id: option.unit_id || null,
+              uom_factor: option.factor_to_base,
+              uom_label: option.label,
+              quantity_increment: option.quantity_increment,
+              quantity: Number(quantity.toFixed(9)),
+              price: option.price,
+            }
+          : item,
+      ),
+    );
   }
 
   async function submit() {
@@ -445,7 +538,10 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
         (line) =>
           !Number.isFinite(line.quantity) ||
           line.quantity <= 0 ||
-          Math.abs(line.quantity / line.quantity_increment - Math.round(line.quantity / line.quantity_increment)) > 1e-7 ||
+          Math.abs(
+            line.quantity / line.quantity_increment -
+              Math.round(line.quantity / line.quantity_increment),
+          ) > 1e-7 ||
           !Number.isFinite(line.price) ||
           line.price < 0,
       )
@@ -473,7 +569,9 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
       )
     ) {
       return toast.error(
-        ar ? "اختر دفعة لكل صنف يتطلب صرفاً يدوياً" : "Choose a batch for each item requiring manual dispatch",
+        ar
+          ? "اختر دفعة لكل صنف يتطلب صرفاً يدوياً"
+          : "Choose a batch for each item requiring manual dispatch",
       );
     }
     if (discount && discount > subtotal + tax)
@@ -486,8 +584,11 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
     }, {});
     if (
       sales &&
-      Object.entries(requestedBaseByProduct).some(([productId, quantity]) =>
-        Object.hasOwn(stockMap, productId) && quantity > (stockMap[productId] ?? 0),
+      Object.entries(requestedBaseByProduct).some(
+        ([productId, quantity]) =>
+          !allowNegativeSales &&
+          Object.hasOwn(stockMap, productId) &&
+          quantity > (stockMap[productId] ?? 0),
       )
     ) {
       return toast.error(
@@ -513,19 +614,21 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
       let invoiceId = "";
       let invoiceNumber = "";
       if (sales) {
-        const lines: InvoiceLine[] = cart.map(({ product, quantity, price, batch_id, batch_number, uom_id, uom_label }) => ({
-          kind: "catalog",
-          product_id: product.id,
-          name: label(product),
-          sku: product.sku,
-          quantity,
-          unit_price: price,
-          tax_rate: Number(product.tax_rate) || 0,
-          uom_id,
-          unit_label: uom_label,
-          batch_id,
-          batch_number,
-        }));
+        const lines: InvoiceLine[] = cart.map(
+          ({ product, quantity, price, batch_id, batch_number, uom_id, uom_label }) => ({
+            kind: "catalog",
+            product_id: product.id,
+            name: label(product),
+            sku: product.sku,
+            quantity,
+            unit_price: price,
+            tax_rate: Number(product.tax_rate) || 0,
+            uom_id,
+            unit_label: uom_label,
+            batch_id,
+            batch_number,
+          }),
+        );
         const result = await createSalesInvoice({
           warehouseId,
           customerId: partyId,
@@ -939,11 +1042,15 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
                               <select
                                 aria-label={ar ? "وحدة الفاتورة" : "Invoice unit"}
                                 value={line.uom_id ?? ""}
-                                onChange={(event) => changeLineUnit(line.line_key, event.target.value)}
+                                onChange={(event) =>
+                                  changeLineUnit(line.line_key, event.target.value)
+                                }
                                 className="mt-2 h-8 max-w-52 rounded-md border border-input bg-background px-2 text-xs"
                               >
                                 {unitOptions(line.product).map((unit) => (
-                                  <option key={unit.unit_id} value={unit.unit_id}>{unit.label}</option>
+                                  <option key={unit.unit_id} value={unit.unit_id}>
+                                    {unit.label}
+                                  </option>
                                 ))}
                               </select>
                             )}
@@ -992,7 +1099,9 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
                               >
                                 {line.batch_number
                                   ? `${ar ? "الدفعة" : "Batch"}: ${line.batch_number}`
-                                  : ar ? "اختيار دفعة الصرف" : "Choose dispatch batch"}
+                                  : ar
+                                    ? "اختيار دفعة الصرف"
+                                    : "Choose dispatch batch"}
                               </button>
                             )}
                           </td>
@@ -1004,7 +1113,11 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
                               value={line.quantity}
                               onValueChange={(v) =>
                                 setCart((prev) =>
-                                  prev.map((r) => (r.line_key === line.line_key ? { ...r, quantity: v ?? line.quantity_increment } : r)),
+                                  prev.map((r) =>
+                                    r.line_key === line.line_key
+                                      ? { ...r, quantity: v ?? line.quantity_increment }
+                                      : r,
+                                  ),
                                 )
                               }
                               unit={line.uom_label}
@@ -1018,7 +1131,9 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
                               disabled={sales}
                               onValueChange={(v) =>
                                 setCart((prev) =>
-                                  prev.map((r) => (r.line_key === line.line_key ? { ...r, price: v ?? 0 } : r)),
+                                  prev.map((r) =>
+                                    r.line_key === line.line_key ? { ...r, price: v ?? 0 } : r,
+                                  ),
                                 )
                               }
                               className="h-9"
@@ -1030,7 +1145,9 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
                           <td className="px-2 py-2">
                             <button
                               type="button"
-                              onClick={() => setCart((prev) => prev.filter((r) => r.line_key !== line.line_key))}
+                              onClick={() =>
+                                setCart((prev) => prev.filter((r) => r.line_key !== line.line_key))
+                              }
                               className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-rose-500/10 hover:text-rose-600"
                               aria-label={ar ? "حذف الصنف" : "Remove item"}
                             >
