@@ -85,6 +85,18 @@ const DEFAULT_DOCUMENT_OVERRIDES: UnifiedPrintSettings["overrides"] = {
     paperId: "a4",
     method: "browser",
   },
+  mill_document: {
+    templateId: "thermal-milling",
+    theme: "standard",
+    paperId: "thermal-80",
+    method: "thermal",
+  },
+  daily_ticket: {
+    templateId: "thermal-milling",
+    theme: "standard",
+    paperId: "thermal-80",
+    method: "thermal",
+  },
 };
 
 export const DEFAULT_UNIFIED_PRINT_SETTINGS: UnifiedPrintSettings = {

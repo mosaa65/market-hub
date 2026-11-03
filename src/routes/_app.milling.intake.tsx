@@ -43,7 +43,6 @@ import { ModuleGuard } from "@/lib/modules";
 import { CustomerFormDialog } from "@/components/contacts/customer-form-dialog";
 import { PartyPicker } from "@/components/commerce/party-picker";
 import { useI18n } from "@/lib/i18n";
-import { LuxuryPrintPreviewModal } from "@/components/luxury-print-preview-modal";
 import { UnifiedPrintModal } from "@/components/milling/unified-print-modal";
 import { DocumentShareDialog } from "@/components/communication/document-share-dialog";
 import { QuickProductDialog } from "@/components/milling/quick-product-dialog";

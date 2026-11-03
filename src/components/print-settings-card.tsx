@@ -120,6 +120,24 @@ const DEPARTMENTS: DepartmentConfig[] = [
     defaultTemplate: "milling-clean",
     defaultPaper: "a4",
   },
+  {
+    id: "mill_document",
+    titleAr: "قسم المطحنة والأمانات العينية",
+    descAr: "سندات استلام الحبوب، طحن الأمانات، وتذاكر كاونتر الخدمة الموحدة",
+    icon: Scale,
+    defaultMethod: "thermal",
+    defaultTemplate: "thermal-milling",
+    defaultPaper: "thermal-80",
+  },
+  {
+    id: "daily_ticket",
+    titleAr: "التذاكر اليومية وسندات الصالة",
+    descAr: "تذاكر العمليات والإيصالات السريعة اليومية لخدمات الطحن",
+    icon: Receipt,
+    defaultMethod: "thermal",
+    defaultTemplate: "thermal-milling",
+    defaultPaper: "thermal-80",
+  },
 ];
 
 export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
@@ -564,6 +582,9 @@ export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
                               </>
                             ) : (
                               <>
+                                <option value="milling-master">
+                                  🌾 قالب خدمات المطحنة والتسليم المعتمد
+                                </option>
                                 <option value="elegant">
                                   ✨ قالب تنفيذي فاخر (Executive Luxury)
                                 </option>
