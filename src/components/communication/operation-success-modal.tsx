@@ -95,9 +95,11 @@ export function OperationSuccessModal({
       remainingBalance:
         remainingBalance !== undefined
           ? remainingBalance
-          : customer?.remainingDebt !== undefined
-            ? customer.remainingDebt
-            : null,
+          : customer?.balance !== undefined
+            ? customer.balance
+            : invoice?.remaining !== undefined
+              ? invoice.remaining
+              : null,
       notes: notes || payment?.notes,
     };
   }, [

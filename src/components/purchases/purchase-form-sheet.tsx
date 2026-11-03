@@ -66,6 +66,7 @@ export interface PurchaseProduct {
 export interface PurchaseSupplier {
   id: string;
   name: string;
+  phone?: string | null;
 }
 
 export interface PurchaseWarehouse {
@@ -361,7 +362,7 @@ export function PurchaseFormSheet({
 
     setSaving(true);
     try {
-      const { error } = await supabase.rpc("create_purchase", {
+      const { data: purchaseData, error } = await supabase.rpc("create_purchase", {
         _warehouse_id: warehouseId,
         _supplier_id: supplierId,
         // Catalogue id -> the value the ENUM stores, at the RPC boundary only.
@@ -382,8 +383,8 @@ export function PurchaseFormSheet({
 
       const sup = suppliers.find((s) => s.id === supplierId);
       const refNum =
-        (data as any)?.invoice_number ||
-        (data as any)?.order_number ||
+        (purchaseData as any)?.invoice_number ||
+        (purchaseData as any)?.order_number ||
         String(Date.now()).slice(-6);
 
       setCompletedVoucher({
