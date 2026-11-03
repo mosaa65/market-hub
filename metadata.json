@@ -1,0 +1,6 @@
+{
+  "name": "Market Hub - Vortex ERP",
+  "description": "نظام ERP متكامل لإدارة المبيعات، المشتريات، المخزون، نقاط البيع، والمالية في منصة واحدة.",
+  "permissions": [],
+  "capabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

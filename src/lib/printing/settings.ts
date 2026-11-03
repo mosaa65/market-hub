@@ -1,0 +1,183 @@
+import type { InvoiceTemplateId } from "@/lib/templates";
+import type { PrintingDocumentType } from "./document-types";
+import type { PrintOrientation, PrintPaperId } from "./paper";
+import type { PrintTheme } from "./themes";
+
+export type PrintBehavior = "ask" | "direct" | "off" | "default";
+export type PrintMethod = "browser" | "pdf" | "thermal";
+
+export interface DocumentPrintOverride {
+  templateId?: InvoiceTemplateId;
+  theme?: PrintTheme;
+  paperId?: PrintPaperId;
+  orientation?: PrintOrientation;
+  copies?: number;
+  method?: PrintMethod;
+  behavior?: PrintBehavior;
+  showBarcode?: boolean;
+  showQrCode?: boolean;
+  showSignatures?: boolean;
+  accentColor?: string; // لون مخصص لهذا القسم إن وجد
+}
+
+export interface UnifiedPrintSettings {
+  behavior: PrintBehavior;
+  method: PrintMethod;
+  preview: boolean;
+  copies: number;
+  paperId: PrintPaperId;
+  orientation: PrintOrientation;
+  theme: PrintTheme;
+  footerEnabled: boolean;
+  showBarcode: boolean;
+  showQrCode: boolean;
+  showSignatures: boolean;
+  /** مفاتيح إظهار/إخفاء عناصر المستند — تُدار من تبويب «تخصيص الحقول». */
+  showLogo: boolean;
+  showCompanyInfo: boolean;
+  showCustomerInfo: boolean;
+  showDocNumberDate: boolean;
+  showMovementInfo: boolean;
+  showFinancialDetails: boolean;
+  showPaymentInfo: boolean;
+  showNotes: boolean;
+  showFooter: boolean;
+  standardAccentColor?: string; // لون القالب القياسي المؤسسي المخصص
+  luxuryAccentColor?: string; // لون القالب التنفيذي الفاخر المخصص
+  overrides: Partial<Record<PrintingDocumentType, DocumentPrintOverride>>;
+}
+
+export const PRINT_SETTINGS_KEY = "vortex_print_settings_v2";
+const DEFAULT_DOCUMENT_OVERRIDES: UnifiedPrintSettings["overrides"] = {
+  customer_invoice: {
+    templateId: "thermal-milling",
+    theme: "standard",
+    paperId: "thermal-80",
+    method: "thermal",
+  },
+  purchase_invoice: {
+    templateId: "milling-clean",
+    theme: "standard",
+    paperId: "a4",
+    method: "browser",
+  },
+  delivery_note: {
+    templateId: "thermal-milling",
+    theme: "standard",
+    paperId: "thermal-80",
+    method: "thermal",
+  },
+  inventory_document: {
+    templateId: "milling-clean",
+    theme: "standard",
+    paperId: "a4",
+    method: "browser",
+  },
+  sales_return: {
+    templateId: "thermal-milling",
+    theme: "standard",
+    paperId: "thermal-80",
+    method: "thermal",
+  },
+  payment_receipt: {
+    templateId: "milling-clean",
+    theme: "standard",
+    paperId: "a4",
+    method: "browser",
+  },
+};
+
+export const DEFAULT_UNIFIED_PRINT_SETTINGS: UnifiedPrintSettings = {
+  behavior: "default",
+  method: "browser",
+  preview: true,
+  copies: 1,
+  paperId: "thermal-80",
+  orientation: "portrait",
+  theme: "standard",
+  footerEnabled: false,
+  showBarcode: true,
+  showQrCode: true,
+  showSignatures: false,
+  showLogo: true,
+  showCompanyInfo: true,
+  showCustomerInfo: true,
+  showDocNumberDate: true,
+  showMovementInfo: true,
+  showFinancialDetails: true,
+  showPaymentInfo: true,
+  showNotes: true,
+  showFooter: false,
+  standardAccentColor: undefined, // يستخدم اللون الافتراضي الأزرق الملكي
+  luxuryAccentColor: undefined, // يستخدم اللون الافتراضي الذهبي الفاخر
+  overrides: DEFAULT_DOCUMENT_OVERRIDES,
+};
+
+function validCopies(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.max(1, Math.min(20, Math.round(n))) : 1;
+}
+
+export function normalizePrintSettings(
+  raw: Partial<UnifiedPrintSettings> | null | undefined,
+): UnifiedPrintSettings {
+  const legacy = raw as Partial<UnifiedPrintSettings> & {
+    printMode?: string;
+    defaultCustomerTemplate?: string;
+    paperSize?: string;
+  };
+  const behavior: PrintBehavior =
+    legacy.behavior ??
+    (legacy.printMode === "auto" ? "direct" : legacy.printMode === "off" ? "off" : "ask");
+  const paperId =
+    legacy.paperId ??
+    (legacy.paperSize === "58mm" ? "thermal-58" : legacy.paperSize === "A4" ? "a4" : "thermal-80");
+  return {
+    ...DEFAULT_UNIFIED_PRINT_SETTINGS,
+    ...raw,
+    overrides: Object.fromEntries(
+      Object.entries({ ...DEFAULT_DOCUMENT_OVERRIDES, ...raw?.overrides }).map(([key, value]) => [
+        key,
+        { ...DEFAULT_DOCUMENT_OVERRIDES[key as PrintingDocumentType], ...value },
+      ]),
+    ) as UnifiedPrintSettings["overrides"],
+    behavior,
+    paperId,
+    copies: validCopies(raw?.copies),
+  };
+}
+
+export function getUnifiedPrintSettings(): UnifiedPrintSettings {
+  if (typeof window === "undefined") return DEFAULT_UNIFIED_PRINT_SETTINGS;
+  try {
+    const raw = localStorage.getItem(PRINT_SETTINGS_KEY);
+    if (raw) return normalizePrintSettings(JSON.parse(raw));
+    return normalizePrintSettings(
+      JSON.parse(localStorage.getItem("vortex_print_settings") ?? "null"),
+    );
+  } catch {
+    return DEFAULT_UNIFIED_PRINT_SETTINGS;
+  }
+}
+
+export function saveUnifiedPrintSettings(
+  patch: Partial<UnifiedPrintSettings>,
+): UnifiedPrintSettings {
+  const next = normalizePrintSettings({ ...getUnifiedPrintSettings(), ...patch });
+  if (typeof window !== "undefined") localStorage.setItem(PRINT_SETTINGS_KEY, JSON.stringify(next));
+  return next;
+}
+
+/**
+ * Persist the current user's device-level printing preference only after an
+ * explicit save action. The settings store is intentionally local: printing
+ * behavior belongs to the signed-in operator/device, not the whole company.
+ */
+export function commitPrintSettings(settings: UnifiedPrintSettings): UnifiedPrintSettings {
+  const next = normalizePrintSettings(settings);
+  if (typeof window !== "undefined") {
+    localStorage.setItem(PRINT_SETTINGS_KEY, JSON.stringify(next));
+    localStorage.setItem("vortex_print_settings", JSON.stringify(next));
+  }
+  return next;
+}

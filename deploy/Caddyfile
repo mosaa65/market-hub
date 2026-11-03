@@ -1,0 +1,9 @@
+{$APP_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy app:3000
+}
+
+{$SUPABASE_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy api-gw:8000
+}

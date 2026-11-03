@@ -1,0 +1,23 @@
+﻿{
+    "id":  "1f0db426-e70b-41ae-8079-d3450fd057aa",
+    "store_id":  "f901e934-7ecf-4f1a-a192-12cd42df85fd",
+    "job_number":  "MJ-501",
+    "intake_receipt_id":  "3e1ebe5c-f95a-43cf-988f-32863dba49cf",
+    "customer_id":  "06c87932-d0a8-4771-9eab-7c0a59c75924",
+    "input_bag_count":  400,
+    "input_bag_size_kg":  50.00,
+    "input_weight_kg":  20000.000,
+    "milling_fee_per_bag":  8.00,
+    "milling_fee_per_ton":  160.00,
+    "service_product_id":  null,
+    "expected_extraction_rate":  78.00,
+    "allowed_loss_percentage":  2.00,
+    "actual_loss_kg":  400.000,
+    "loss_excess_kg":  0.000,
+    "status":  "COMPLETED",
+    "started_at":  "2026-09-29T00:19:56.795068+00:00",
+    "finished_at":  "2026-09-30T00:19:56.795068+00:00",
+    "notes":  "تم تشغيل خط الطحن رقم 1 واكتمال الدفعة بنجاح",
+    "created_by":  null,
+    "created_at":  "2026-09-29T00:19:56.795068+00:00"
+}

@@ -1,0 +1,14 @@
+﻿{
+    "id":  "85509f11-4cab-4315-a488-df1f2f6b6f9c",
+    "store_id":  "f901e934-7ecf-4f1a-a192-12cd42df85fd",
+    "delivery_number":  "MDN-01",
+    "customer_id":  "06c87932-d0a8-4771-9eab-7c0a59c75924",
+    "job_id":  "1f0db426-e70b-41ae-8079-d3450fd057aa",
+    "truck_plate_number":  "7412-أ-ب-ج",
+    "driver_name":  "أحمد صالح",
+    "total_bags":  150,
+    "total_weight_kg":  7500.000,
+    "notes":  "تسليم الدفعة الأولى - شاحنة العميل",
+    "delivered_by":  null,
+    "created_at":  "2026-09-30T12:19:56.795068+00:00"
+}

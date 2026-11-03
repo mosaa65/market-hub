@@ -1,0 +1,923 @@
+/**
+ * المصدر المركزي لطرق الدفع في الواجهة (Developer Payment Catalog — client side).
+ *
+ * WHY THIS FILE EXISTS
+ * --------------------
+ * Before this module, each screen carried its own union type, its own label map
+ * and its own icon switch. `_app.pos.tsx` offered five options, `_app.purchases.tsx`
+ * four buttons, the returns screens a Radix Select whose `bank` value did not
+ * even exist in the database ENUM. Adding بنك الكريمي meant editing eight files.
+ *
+ * Now every screen reads from here. Two rules keep it that way:
+ *
+ *   1. A screen never writes a payment method label, icon, or option list.
+ *      It asks this module, or the `usePaymentMethods` hook which merges the
+ *      tenant's own settings on top of these definitions.
+ *
+ *   2. The identity of a method is its stable string `id`. Codes that reach the
+ *      database come from `legacyValue`, never from guessing.
+ *
+ * RELATIONSHIP TO THE DATABASE
+ * ----------------------------
+ * `PAYMENT_METHOD_CATALOG` mirrors the rows seeded by
+ * `supabase/migrations/20261206000000_payment_methods_catalog.sql`. It is the
+ * FALLBACK and the ICON REGISTRY: the app renders instantly from it, before the
+ * catalogue query resolves and if that query ever fails. The database remains
+ * the authority for which methods exist, are active, and are enabled for this
+ * business.
+ *
+ * ICONS
+ * -----
+ * `iconKey` is a KEY, not a URL. It resolves to a lucide-react component that is
+ * already in the bundle, so a payment icon costs zero network requests, is
+ * identical in light and dark mode, and cannot fail to load. The fallback chain
+ * is: iconKey -> ledger-kind default -> wallet.
+ */
+
+import {
+  Banknote,
+  Bitcoin,
+  Building2,
+  Coins,
+  CreditCard,
+  FileCheck2,
+  Globe,
+  HandCoins,
+  Landmark,
+  Layers,
+  PiggyBank,
+  Receipt,
+  Scale,
+  ScrollText,
+  Smartphone,
+  Store,
+  Wallet,
+  type LucideIcon,
+} from "lucide-react";
+
+/* ==========================================================================
+   Contexts — the sections of the system that offer a payment method
+   ========================================================================== */
+
+/**
+ * A context is where a payment method can be chosen. Adding one is a two-step
+ * change: add the id here, and add it to the migration's CHECK constraint plus
+ * the developers' `allowed_contexts`. Nothing else in the codebase enumerates
+ * contexts, so nothing else needs touching.
+ */
+export const PAYMENT_CONTEXTS = [
+  "pos",
+  "sales",
+  "purchases",
+  "expenses",
+  "customer_collection",
+  "sales_returns",
+  "purchase_returns",
+] as const;
+
+export type PaymentContext = (typeof PAYMENT_CONTEXTS)[number];
+
+/** Arabic/English name of each context, used by the settings screen. */
+export const PAYMENT_CONTEXT_LABELS: Record<PaymentContext, { ar: string; en: string }> = {
+  pos: { ar: "نقطة البيع POS", en: "Point of Sale" },
+  sales: { ar: "المبيعات", en: "Sales" },
+  purchases: { ar: "المشتريات", en: "Purchases" },
+  expenses: { ar: "المصروفات", en: "Expenses" },
+  customer_collection: { ar: "تحصيل العملاء", en: "Customer Collection" },
+  sales_returns: { ar: "مرتجعات المبيعات", en: "Sales Returns" },
+  purchase_returns: { ar: "مرتجعات المشتريات", en: "Purchase Returns" },
+};
+
+export function isPaymentContext(value: string): value is PaymentContext {
+  return (PAYMENT_CONTEXTS as readonly string[]).includes(value);
+}
+
+/* ==========================================================================
+   عرض عائلة الحساب — النص العربي الوحيد لـ LedgerKind
+   ========================================================================== */
+
+/**
+ * اسم عائلة الحساب كما يقرأه المستخدم (الجدول في نهاية الملف).
+ *
+ * قبل هذا كانت شاشة الإعدادات تطبع `CASH` / `BANK` / `WALLET` كما هي — مفتاح
+ * تقني في واجهة عربية. أي مكان يعرض العائلة يستخدم `ledgerKindLabel`.
+ */
+/**
+ * الحساب الذي تُسوّى إليه عائلةُ الحساب في دليل الحسابات.
+ *
+ * طبق أصل `public.payment_method_ledger_account()` (migration 63) حرفيًا: صندوق
+ * 1101، بنك 1111، محفظة 1131، شيك 1221، وآجل بلا حساب تحصيل.
+ * إن اختلف هذا الجدول عن الدالة فأحدهما خطأ — والثاني هو المرجع المحاسبي.
+ */
+export const LEDGER_KIND_ACCOUNT_CODE: Record<LedgerKind, string | null> = {
+  CASH: "1101",
+  BANK: "1111",
+  WALLET: "1131",
+  CARD: "1111",
+  CREDIT: null,
+  OTHER: "1101",
+};
+
+/**
+ * أسماء الحسابات التجريبية في شجرة الحسابات المزروعة (`seeds/01_system/03`).
+ *
+ * تُستخدم **للعرض فقط** حين لا تُحمّل الشجرة: كان السجل يعرض «1111 — البنك
+ * التجاري» وهو اسم لا وجود له؛ الحساب 1111 هو «حسابات البنوك» التجميعي.
+ */
+export const DEFAULT_ACCOUNT_NAMES: Record<string, { ar: string; en: string }> = {
+  "1101": { ar: "النقدية بالصندوق", en: "Cash on hand" },
+  "1111": { ar: "حسابات البنوك", en: "Bank accounts" },
+  "1131": { ar: "المحافظ الإلكترونية", en: "E-wallets" },
+  "1211": { ar: "ذمم العملاء", en: "Customer receivables" },
+  "1221": { ar: "أوراق القبض", en: "Notes receivable" },
+};
+
+export function defaultAccountName(code: string | null | undefined, lang: "ar" | "en" = "ar") {
+  if (!code) return "";
+  return DEFAULT_ACCOUNT_NAMES[code]?.[lang] ?? code;
+}
+
+/* ==========================================================================
+   نصوص التسوية الموحّدة
+   ========================================================================== */
+
+/**
+ * كل جملة تظهر حول طريقة الدفع، في مكان واحد.
+ *
+ * الشاشات كانت تكتبها بنفسها ("لم يتم ربط حساب افتراضي بعد"، "بنك الكريمي
+ * (الحساب الافتراضي)"…) فتتغيّر الصياغة بين شاشة وأخرى ويظهر نص لا معنى له.
+ */
+export const PAYMENT_UI_TEXT = {
+  methodLabel: { ar: "طريقة الدفع", en: "Payment method" },
+  methodAndAccount: { ar: "طريقة الدفع والحساب", en: "Payment method and account" },
+  search: { ar: "ابحث عن طريقة الدفع…", en: "Search payment methods…" },
+  noResults: { ar: "لا توجد طريقة مطابقة", en: "No matching method" },
+  receivingCashbox: { ar: "الصندوق المستلم", en: "Receiving cash box" },
+  depositBank: { ar: "الحساب البنكي المودع فيه", en: "Deposit bank account" },
+  receivingWallet: { ar: "المحفظة المستلمة", en: "Receiving wallet" },
+  reference: { ar: "رقم المرجع / الإشعار", en: "Reference / receipt no." },
+  referencePlaceholder: {
+    ar: "رقم مرجع الحوالة أو الإشعار…",
+    en: "Transfer or receipt reference…",
+  },
+  chequeNumber: { ar: "رقم الشيك", en: "Cheque number" },
+  chequeBank: { ar: "البنك المسحوب عليه", en: "Drawn on bank" },
+  chequeDueDate: { ar: "تاريخ الاستحقاق", en: "Due date" },
+  chequeDrawer: { ar: "اسم الساحب", en: "Drawer" },
+  customerReceivable: {
+    ar: "ذمم العميل — لا يُحصَّل الآن",
+    en: "Customer receivable — nothing collected",
+  },
+  cardSettlesToBank: { ar: "تُسوّى عبر البنك مباشرة", en: "Settles through the bank" },
+  ledgerLinked: { ar: "مرتبط بالدليل", en: "Ledger linked" },
+  notLinked: { ar: "لا يوجد حساب في الدليل", en: "No linked ledger account" },
+  notLinkedHelp: {
+    ar: "هذه الطريقة بلا حساب في دليل الحسابات — لن تُرحَّل قيودها. اربطها من إعدادات المحاسبة.",
+    en: "This method has no ledger account, so its entries cannot post. Link it in accounting settings.",
+  },
+  defaultSuffix: { ar: "افتراضي", en: "default" },
+  walletReference: { ar: "رقم عملية المحفظة", en: "Wallet transaction reference" },
+  transferReference: { ar: "رقم الحوالة / المرجع", en: "Transfer / payment reference" },
+  defaultTill: { ar: "الصندوق الرئيسي", en: "Main till" },
+  requiredSuffix: { ar: "(مطلوب)", en: "(required)" },
+  optionalSuffix: { ar: "(اختياري)", en: "(optional)" },
+} as const;
+
+export function paymentUiText(key: keyof typeof PAYMENT_UI_TEXT, lang: "ar" | "en" = "ar") {
+  return PAYMENT_UI_TEXT[key][lang];
+}
+
+/**
+ * اسم حقل المرجع كما يختلف بحسب الطريقة (شيك / محفظة / حوالة).
+ *
+ * كان هذا الاختيار الثلاثي مكررًا حرفيًا في شاشة تحصيل العملاء وفي شيت
+ * التحصيل، فتختلف صياغة الحقل نفسه بين الشاشتين. الآن تعريف واحد.
+ */
+export function paymentReferenceLabel(
+  method: { legacyValue?: string | null; ledgerKind?: LedgerKind | null } | null | undefined,
+  lang: "ar" | "en" = "ar",
+): string {
+  if (method?.legacyValue === "cheque") return PAYMENT_UI_TEXT.chequeNumber[lang];
+  if (method?.ledgerKind === "WALLET") return PAYMENT_UI_TEXT.walletReference[lang];
+  return PAYMENT_UI_TEXT.transferReference[lang];
+}
+
+/* ==========================================================================
+   Ledger kind — which pot the money lands in
+   ========================================================================== */
+
+/**
+ * The account family a method settles into. This exists so the posting engine
+ * can branch on a *kind* instead of listing ENUM values:
+ *
+ *   before:  payment_method IN ('bank_transfer','card','mobile_money') -> bank
+ *   after:   ledger_kind IN ('BANK','WALLET','CARD')                   -> bank
+ *
+ * Otherwise adding بنك الكريمي would post to the cash drawer, silently
+ * overstating the till and understating the bank.
+ */
+export type LedgerKind = "CASH" | "BANK" | "WALLET" | "CARD" | "CREDIT" | "OTHER";
+
+/** The `public.payment_method` values a document may store. */
+export type LegacyPaymentValue =
+  "cash" | "card" | "bank_transfer" | "credit" | "mobile_money" | "split" | "cheque";
+
+/**
+ * A business's own wording and icon for a catalogue method, keyed by catalogue
+ * id.
+ *
+ * Deliberately a plain lookup and not the full resolved row: a screen that only
+ * has a stored ENUM value (a report, a printed invoice) still needs to render
+ * the business's name, and it cannot join a catalogue it never loaded.
+ */
+export interface PaymentMethodOverride {
+  nameAr: string;
+  nameEn?: string;
+  iconKey: string;
+}
+
+export type PaymentMethodOverrides = Record<string, PaymentMethodOverride>;
+
+/**
+ * The values a BUSINESS may bind a method it creates to.
+ *
+ * `split` is excluded on purpose: it means "this invoice was settled by more
+ * than one method" and is written by the split engine, not chosen by an
+ * operator. `credit` is excluded because آجل is the absence of a payment, and a
+ * tenant-created method is a way of collecting one.
+ */
+export const TENANT_SELECTABLE_LEGACY_VALUES: readonly LegacyPaymentValue[] = [
+  "cash",
+  "bank_transfer",
+  "mobile_money",
+];
+
+/** The four methods exposed for new transactions across the application. */
+export const CORE_PAYMENT_METHOD_IDS = ["cash", "credit", "bank_transfer", "mobile_money"] as const;
+const CORE_PAYMENT_METHOD_ID_SET = new Set<string>(CORE_PAYMENT_METHOD_IDS);
+
+/**
+ * The catalogue row a tenant may edit freely. Mirrors the migration's
+ * `payment_methods.is_system`: a developer row may be renamed and re-iconed,
+ * never re-pointed; a tenant row may be edited and removed.
+ */
+export interface PaymentMethodProvenance {
+  isSystem: boolean;
+  /** A developer row whose label no longer matches the shipped Arabic name. */
+  isRenamed?: boolean;
+}
+
+/**
+ * The catalogue REPLACES its developer definition once the database answers.
+ * Exported so the hook's doc comment can point at a type rather than scrub the
+ * difference in prose.
+ */
+export type PaymentMethodSource = "database" | "fallback";
+
+/* ==========================================================================
+   The developer catalogue
+   ========================================================================== */
+
+export interface PaymentMethodDefinition {
+  /** Stable identity. Never translated, never reordered, never reused. */
+  id: string;
+  nameAr: string;
+  /** Optional English name, for a future bilingual document. */
+  nameEn?: string;
+  /** Key resolved by `paymentMethodIcon()`. Not a URL. */
+  iconKey: string;
+  /** Developer-level availability. A tenant cannot change this. */
+  isActive: boolean;
+  /** Default presentation order across all businesses. */
+  sortOrder: number;
+  /** Contexts the developers allow. A tenant may narrow, never widen. */
+  allowedContexts: readonly PaymentContext[];
+  ledgerKind: LedgerKind;
+  /**
+   * حساب الدليل الذي تُقيَّد عليه النقدية المستلمة بهذه الطريقة.
+   *
+   * `null` مقصود لِـ «آجل»: لا يُستلم مال الآن، فلا يوجد حساب صندوق أو بنك
+   * تُقيَّد فيه. القيمة هنا تطابق حرفياً `public.payment_method_ledger_account`
+   * في قاعدة البيانات — وهي السلطة عند الترحيل. أي اختلاف بينهما يعني أن
+   * الشاشة تعد بشيء لا تفعله القيود.
+   */
+  defaultAccountCode?: string | null;
+  /** `credit` / آجل — nothing is collected now. */
+  isCreditTerm?: boolean;
+  /** Requires a transfer / wallet reference number to be captured. */
+  requiresReference?: boolean;
+  /**
+   * The ENUM value a document stores for this method. This is the ONLY
+   * sanctioned way a catalogue id becomes a database value.
+   */
+  legacyValue: LegacyPaymentValue;
+  /**
+   * The ENUM values this row REPRESENTS historically, mirroring the database's
+   * `payment_methods.legacy_ids`. A named method that was never a distinct ENUM
+   * value (بنك الكريمي، جيب، فلوسك، ون كاش) carries an empty list on purpose:
+   * it shares the generic `bank_transfer` / `mobile_money` value rather than
+   * redefining it. Used to resolve a stored document back to a method.
+   */
+  legacyIds?: readonly LegacyPaymentValue[];
+}
+
+/**
+ * Every value `public.payment_method` can hold. Kept in one place so the
+ * runtime guard below and the compile-time union cannot drift apart.
+ */
+export const LEGACY_PAYMENT_VALUES: readonly LegacyPaymentValue[] = [
+  "cash",
+  "card",
+  "bank_transfer",
+  "credit",
+  "mobile_money",
+  "split",
+  "cheque",
+] as const;
+
+const LEGACY_PAYMENT_VALUE_SET = new Set<string>(LEGACY_PAYMENT_VALUES);
+
+/**
+ * Is this a value the ENUM (`public.payment_method`) can actually store?
+ *
+ * Exists because the columns are enums: writing `"transfer"` or `"bank"` to
+ * one raises at the database, and writing an arbitrary string would only be
+ * caught at runtime. A guard here lets the app fail honestly and in Arabic
+ * before the round-trip.
+ */
+export function isLegacyPaymentValue(value: string): value is LegacyPaymentValue {
+  return LEGACY_PAYMENT_VALUE_SET.has(value);
+}
+
+const ALL_CONTEXTS: readonly PaymentContext[] = PAYMENT_CONTEXTS;
+
+/**
+ * The methods the developers ship, mirroring the migration's seed.
+ * Array order is cosmetic; `sortOrder` is what the app sorts by.
+ */
+export const PAYMENT_METHOD_CATALOG: readonly PaymentMethodDefinition[] = [
+  {
+    id: "cash",
+    nameAr: "نقدًا",
+    nameEn: "Cash",
+    iconKey: "cash",
+    isActive: true,
+    sortOrder: 10,
+    allowedContexts: ALL_CONTEXTS,
+    ledgerKind: "CASH",
+    defaultAccountCode: "1101",
+    legacyValue: "cash",
+  },
+  {
+    id: "credit",
+    nameAr: "آجل",
+    nameEn: "Credit",
+    iconKey: "credit",
+    isActive: true,
+    sortOrder: 20,
+    // آجل on a purchase means "we owe the supplier"; offering it while
+    // collecting cash from a customer is meaningless.
+    allowedContexts: ["pos", "sales", "purchases", "sales_returns", "purchase_returns"],
+    ledgerKind: "CREDIT",
+    // لا حساب: آجل لا يُحصِّل نقدًا، وقاعدة البيانات تُرجع NULL لها.
+    defaultAccountCode: null,
+    isCreditTerm: true,
+    legacyValue: "credit",
+  },
+  {
+    id: "bank_transfer",
+    nameAr: "تحويل بنكي",
+    nameEn: "Bank transfer",
+    iconKey: "bank-transfer",
+    isActive: true,
+    sortOrder: 30,
+    // المرتجعات مشمولة: استرداد العميل أو قبض المورد يمرّ عبر البنك فعلًا. حرمانه
+    // كان يجبر الكاشير على تسجيل استرداد بنكي كأنه نقد من الصندوق.
+    allowedContexts: [
+      "pos",
+      "sales",
+      "purchases",
+      "expenses",
+      "customer_collection",
+      "sales_returns",
+      "purchase_returns",
+    ],
+    ledgerKind: "BANK",
+    defaultAccountCode: "1111",
+    requiresReference: true,
+    legacyValue: "bank_transfer",
+  },
+  /*
+   * الطرق الثماني المتقاعدة (بنك الكريمي، بنك اليمن الدولي، جوالي، جيب، فلوسك،
+   * ون كاش، البطاقة، الشيك) كانت مُدرَجة هنا حتى تحمل المستندات القديمة اسمًا
+   * وأيقونة. أحيلت إلى `RETIRED_PAYMENT_METHOD_LABELS` أدناه: بيانات بسيطة بلا
+   * أقسام ولا حساب ولا تفعيل، فلا يمكن أن تُعرض كخيار مرة أخرى.
+   *
+   * حُذفت من القاعدة كلها في الترحيل 9910، لأن المستند يخزّن قيمة التعداد
+   * (`payment_method` / `refund_method`) لا حقلًا مرجعيًا إلى هذا الجدول.
+   */
+  {
+    id: "mobile_money",
+    nameAr: "محفظة إلكترونية",
+    nameEn: "Mobile money",
+    iconKey: "mobile-money",
+    isActive: true,
+    sortOrder: 110,
+    // نفس سبب تحويل بنكي: الاسترداد إلى المحفظة تحصيل عكسي مشروع.
+    allowedContexts: [
+      "pos",
+      "sales",
+      "purchases",
+      "expenses",
+      "customer_collection",
+      "sales_returns",
+      "purchase_returns",
+    ],
+    ledgerKind: "WALLET",
+    defaultAccountCode: "1131",
+    requiresReference: true,
+    legacyValue: "mobile_money",
+  },
+  {
+    // Not a tender the operator picks — it is what an invoice records when the
+    // cashier split the payment across several methods. It lives in the
+    // catalogue so historic split invoices get a name and an icon from the same
+    // registry as everything else.
+    id: "split",
+    nameAr: "دفع بأكثر من طريقة",
+    nameEn: "Split payment",
+    iconKey: "split",
+    isActive: true,
+    sortOrder: 900,
+    allowedContexts: ["pos", "sales"],
+    ledgerKind: "OTHER",
+    legacyValue: "split",
+    legacyIds: ["split"],
+  },
+];
+
+/**
+ * أسماء الطرق المتقاعدة، للعرض التاريخي فقط.
+ *
+ * حُذفت صفوفها من `payment_methods` وتعدادها لم يُحذف: مستند من 2024 يقول
+ * `card` يجب أن يُطبع «بطاقة / شبكة» لا `card`. هذا الجدول هو المكان الوحيد
+ * الذي تحتفظ فيه الواجهة بتلك الأسماء — بيانات عرض فقط، لا تعريف طريقة:
+ * بلا `allowedContexts` ولا `ledgerKind` ولا حساب، فلا يمكن أن تظهر كخيار.
+ */
+export const RETIRED_PAYMENT_METHOD_LABELS: Record<string, { nameAr: string; nameEn: string }> = {
+  kuraimi_bank: { nameAr: "بنك الكريمي", nameEn: "Al-Kuraimi Bank" },
+  yemen_kuwait_bank: { nameAr: "بنك اليمن الدولي", nameEn: "Yemen International Bank" },
+  jawali: { nameAr: "جوالي", nameEn: "Jawali" },
+  jaib: { nameAr: "جيب", nameEn: "Jaib Wallet" },
+  floosak: { nameAr: "فلوسك", nameEn: "Floosak" },
+  one_cash: { nameAr: "ون كاش", nameEn: "One Cash" },
+  card: { nameAr: "بطاقة / شبكة", nameEn: "Card" },
+  cheque: { nameAr: "شيك", nameEn: "Cheque" },
+};
+
+/**
+ * القيم التي تحتاج مرجعًا، ومنها المتقاعدة.
+ *
+ * معرّفات البنوك والمحافظ المسماة ليست قيم تعداد، فمرجعها يلزم لأن مستندًا
+ * قديمًا كتب عليها تحويلًا لا يُطابق بأي إشعار آخر. القائمة صغيرة وباينة
+ * ومقصورة على ما عاد يُكتب، فلا خطر أن تتضخم.
+ */
+const REQUIRES_REFERENCE_LEGACY = new Set<string>([
+  "bank_transfer",
+  "mobile_money",
+  "cheque",
+  "card",
+  // هويات المؤسسات المتقاعدة: كانت `requiresReference = true` في صفوفها.
+  "kuraimi_bank",
+  "yemen_kuwait_bank",
+  "jawali",
+  "jaib",
+  "floosak",
+  "one_cash",
+]);
+
+/**
+ * Is this id something an OPERATOR may pick as a single tender?
+ *
+ * `split` is excluded on purpose and for one reason: it is not a payment, it is
+ * the RESULT of paying with more than one method, written by the split engine.
+ * Offering it in a picker would let an operator record "دفع بأكثر من طريقة" as
+ * the sole tender of an invoice that was in fact settled once, and `credit` is
+ * excluded where it is meaningless (see `isCreditTerm`).
+ */
+export function isSelectableTender(method: Pick<PaymentMethodDefinition, "id">): boolean {
+  return CORE_PAYMENT_METHOD_ID_SET.has(method.id);
+}
+
+/**
+ * The methods the settings screen manages, IN PRESENTATION ORDER.
+ *
+ * This is the order of the approved operator choices. Retired catalog identities
+ * remain in PAYMENT_METHOD_CATALOG for labels on existing records, but are not
+ * in this list and cannot be stored by new operations.
+ */
+export const SHIPPED_PAYMENT_METHOD_ORDER = [
+  "cash",
+  "credit",
+  "bank_transfer",
+  "mobile_money",
+  "split",
+] as const;
+
+/** Index for O(1) lookups. Built once at module load. */
+const CATALOG_BY_ID = new Map<string, PaymentMethodDefinition>(
+  PAYMENT_METHOD_CATALOG.map((m) => [m.id, m]),
+);
+
+/**
+ * Index by the ENUM value a document stores, for labelling historic records.
+ * The lowest `sortOrder` wins, so the canonical method represents a shared
+ * legacy value: a document that merely says `bank_transfer` is labelled
+ * "تحويل بنكي" and not "بنك الكريمي".
+ */
+const CATALOG_BY_LEGACY = new Map<string, PaymentMethodDefinition>();
+for (const method of PAYMENT_METHOD_CATALOG) {
+  const existing = CATALOG_BY_LEGACY.get(method.legacyValue);
+  if (!existing || method.sortOrder < existing.sortOrder) {
+    CATALOG_BY_LEGACY.set(method.legacyValue, method);
+  }
+}
+
+export function getPaymentMethodDefinition(id: string): PaymentMethodDefinition | undefined {
+  return CATALOG_BY_ID.get(id);
+}
+
+/** The developer definition of a method, ignoring any tenant override. */
+export function getShippedPaymentMethod(id: string): PaymentMethodDefinition | undefined {
+  return CATALOG_BY_ID.get(id);
+}
+
+/**
+ * Is this an id the developers shipped, as opposed to one a business created?
+ * The settings screen uses it to decide whether to offer Delete (tenant) or
+ * only Disable (developer).
+ */
+export function isShippedPaymentMethod(id: string): boolean {
+  return CATALOG_BY_ID.has(id);
+}
+
+/**
+ * The ENUM value a document must store for a catalogue id.
+ *
+ * An id the catalogue does not know is passed through UNCHANGED rather than
+ * quietly rewritten to 'cash'. Coercing it would record a bank transfer as a
+ * till payment with no error anywhere — the exact bug the catalogue exists to
+ * remove. Callers that must GUARANTEE a storable value use
+ * `toStorablePaymentValue`, and the database's `resolve_writable_payment_method`
+ * is the final authority that rejects an unknown value outright.
+ */
+export function toLegacyPaymentValue(id: string): LegacyPaymentValue {
+  const known = CATALOG_BY_ID.get(id)?.legacyValue;
+  if (known) return known;
+  return id as LegacyPaymentValue;
+}
+
+/**
+ * Convert a catalogue id to a value the database ENUM can actually hold, or
+ * `null` when it cannot be converted at all. The honest alternative to
+ * `toLegacyPaymentValue` for write paths that must NOT guess: a caller that
+ * gets `null` reports the problem instead of silently booking cash.
+ */
+export function toStorablePaymentValue(id: string | null | undefined): LegacyPaymentValue | null {
+  if (!id) return null;
+  const catalogId = CATALOG_BY_ID.has(id) ? id : toCatalogId(id);
+  if (!catalogId || !CORE_PAYMENT_METHOD_ID_SET.has(catalogId)) return null;
+  return CATALOG_BY_ID.get(catalogId)?.legacyValue ?? null;
+}
+
+/**
+ * Does this method need a transfer / wallet / cheque reference to be meaningful?
+ *
+ * Reads the catalogue rather than matching two hard-coded ids, so a method a
+ * business adds later inherits the behaviour without a code change. A method
+ * supplied by the database at runtime is checked by the caller against its own
+ * resolved row, because this registry only knows the shipped set.
+ */
+export function requiresPaymentReference(id: string | null | undefined): boolean {
+  if (!id) return false;
+
+  const shipped = CATALOG_BY_ID.get(id);
+  if (shipped) return Boolean(shipped.requiresReference);
+
+  // القيمة المخزّنة نفسها: `mobile_money` / `bank_transfer` تحلّ إلى الطريقة
+  // المعتمدة المعادلة.
+  const byLegacy = CATALOG_BY_LEGACY.get(id);
+  if (byLegacy) return Boolean(byLegacy.requiresReference);
+
+  //
+  // متقاعد أو غير معروف. `cheque` و`card` تحتاجان مرجعًا إن ظهرتا على مستند
+  // قديم، وكذلك معرّفات البنوك والمحافظ المسماة (`jawali`، `jaib`، …): مرجع
+  // التحويل/المحفظة هو ما يطابق الدفعة بإشعارها.
+  //
+  // قبل حذف الصفوف كان هذا يُقرأ من الكتالوج. بقي دلاليًا كما كان: كل طريقة
+  // تحصيل غير نقدية تحتاج مرجعًا، والنقد وحده لا.
+  return REQUIRES_REFERENCE_LEGACY.has(id);
+}
+
+/**
+ * The chart-of-accounts code a method settles into, or `null` when nothing is
+ * collected by it.
+ *
+ * This mirrors `public.payment_method_ledger_account()` exactly. It exists so a
+ * screen can tell the operator *before* posting that a method has no ledger
+ * account — the alternative is discovering it at posting time from a database
+ * error, long after the customer has left.
+ */
+export function paymentLedgerAccountCode(method: {
+  id?: string | null;
+  legacyValue?: string | null;
+  defaultAccountCode?: string | null;
+}): string | null {
+  if (method.legacyValue === "credit" || method.legacyValue === "split") return null;
+  if (method.defaultAccountCode) return method.defaultAccountCode;
+  const shipped = method.id ?? method.legacyValue;
+  return (shipped && CATALOG_BY_ID.get(shipped)?.defaultAccountCode) || null;
+}
+
+/** The catalogue id that represents an ENUM value found on an old document. */
+export function toCatalogId(legacy: string | null | undefined): string | undefined {
+  if (!legacy) return undefined;
+  return CATALOG_BY_LEGACY.get(legacy)?.id;
+}
+
+/**
+ * هل هذه القيمة قيمة `payment_method` يعرفها الكتالوج؟
+ *
+ * تستخدمها سجلات تدقيق عامة تحمل قيمًا من أنواع كثيرة، فتسأل أولًا «أهذه
+ * طريقة دفع؟» ثم تترجمها بالكتالوج، بدل تكرار أسماء الطرق في كل سجل.
+ */
+export function isPaymentMethodValue(value: string | null | undefined): boolean {
+  if (!value) return false;
+  return CATALOG_BY_LEGACY.has(value.trim().toLowerCase());
+}
+
+/**
+ * البحث عن تعريف الكتالوج بقيمة ENUM مخزّنة.
+ *
+ * مشتق من نفس فهرس `CATALOG_BY_LEGACY`، ومُصدَّر حتى تقرأ الشاشات التي تحتاج
+ * «ما حساب هذه الطريقة؟» من الكتالوج بدل كتابة الكود في نص الشرح.
+ */
+export const CATALOG_BY_LEGACY_VALUE: ReadonlyMap<string, PaymentMethodDefinition> =
+  CATALOG_BY_LEGACY;
+
+/* ============================================================================
+   Icons — one registry, resolved locally, with a fallback chain
+   ============================================================================ */
+
+/**
+ * iconKey -> bundled component. Tenant-provided URLs and uploads are never
+ * accepted. Locally supplied Yemeni wallet SVGs are selected through the
+ * separate method-id asset registry below, only for positively identified brands.
+ */
+const ICON_REGISTRY: Record<string, LucideIcon> = {
+  cash: Banknote,
+  "bank-transfer": Landmark,
+  bank: Building2,
+  kuraimi: Landmark,
+  "mobile-money": Smartphone,
+  wallet: Wallet,
+  card: CreditCard,
+  credit: Coins,
+  split: Coins,
+  cheque: FileCheck2,
+  exchange: Scale,
+  "exchange-house": Store,
+  "digital-wallet": Bitcoin,
+  savings: PiggyBank,
+  transfer: Globe,
+  share: Layers,
+  contract: ScrollText,
+  invoice: Receipt,
+  agent: HandCoins,
+  generic: Wallet,
+};
+
+/** Only confidently identified, checked-in Yemeni wallet assets are registered by stable method id. */
+export const PAYMENT_METHOD_ICON_ASSETS = {
+  floosak: { src: "/yemeni_wallet_icons_svg/floosak.svg", alt: "Floosak" },
+  one_cash: { src: "/yemeni_wallet_icons_svg/one-cash.svg", alt: "One Cash" },
+  jaib: {
+    src: "/yemeni_wallet_icons_svg/%D8%B4%D8%B9%D8%A7%D8%B1-%D9%85%D8%AD%D9%81%D8%B7%D8%A9-%D8%AC%D9%8A%D8%A8.svg",
+    alt: "Jaib",
+  },
+} as const;
+
+export function paymentMethodIconAsset(methodId?: string | null) {
+  return methodId
+    ? PAYMENT_METHOD_ICON_ASSETS[methodId as keyof typeof PAYMENT_METHOD_ICON_ASSETS]
+    : undefined;
+}
+
+/**
+ * The icon keys the settings screen offers when a business creates or re-icons a
+ * method. Every entry is already in the bundle, so this list is a convenience
+ * over `ICON_REGISTRY`, never a second source of truth: a key the database
+ * holds but this build does not know still resolves through the fallback chain
+ * in `paymentMethodIcon`.
+ */
+export const PAYMENT_ICON_CHOICES: readonly { key: string; labelAr: string; labelEn: string }[] = [
+  { key: "cash", labelAr: "نقد", labelEn: "Cash" },
+  { key: "bank", labelAr: "بنك", labelEn: "Bank" },
+  { key: "bank-transfer", labelAr: "حوالة", labelEn: "Transfer" },
+  { key: "kuraimi", labelAr: "مبنى بنكي", labelEn: "Bank building" },
+  { key: "cheque", labelAr: "شيك", labelEn: "Cheque" },
+  { key: "card", labelAr: "بطاقة", labelEn: "Card" },
+  { key: "wallet", labelAr: "محفظة", labelEn: "Wallet" },
+  { key: "mobile-money", labelAr: "هاتف/محفظة", labelEn: "Mobile wallet" },
+  { key: "digital-wallet", labelAr: "محفظة رقمية", labelEn: "Digital wallet" },
+  { key: "savings", labelAr: "توفير", labelEn: "Savings" },
+  { key: "exchange", labelAr: "صرافة", labelEn: "Exchange" },
+  { key: "exchange-house", labelAr: "شركة صرافة", labelEn: "Exchange house" },
+  { key: "transfer", labelAr: "تحويل دولي", labelEn: "International" },
+  { key: "share", labelAr: "تجميع", labelEn: "Aggregate" },
+  { key: "contract", labelAr: "عقد", labelEn: "Contract" },
+  { key: "invoice", labelAr: "فاتورة", labelEn: "Invoice" },
+  { key: "agent", labelAr: "وكيل", labelEn: "Agent" },
+  { key: "credit", labelAr: "آجل", labelEn: "Credit" },
+  { key: "generic", labelAr: "عام", labelEn: "Generic" },
+];
+
+/** Human name of each account family, shared by the settings screen and reports. */
+export const LEDGER_KIND_LABELS: Record<LedgerKind, { ar: string; en: string }> = {
+  CASH: { ar: "صندوق", en: "Cash" },
+  BANK: { ar: "بنك", en: "Bank" },
+  WALLET: { ar: "محفظة", en: "Wallet" },
+  CARD: { ar: "بطاقة", en: "Card" },
+  CREDIT: { ar: "آجل", en: "Credit" },
+  OTHER: { ar: "أخرى", en: "Other" },
+};
+
+/**
+ * اسم عائلة الحساب بأي لغة، مع بديل آمن لمفتاح لا يعرفه هذا الإصدار.
+ * كل واجهة تعرض العائلة تمرّ من هنا بدل طباعة `CASH` / `BANK` كما هي.
+ */
+export function ledgerKindLabel(
+  kind: LedgerKind | string | null | undefined,
+  lang: "ar" | "en" = "ar",
+): string {
+  const key = (kind ?? "OTHER") as LedgerKind;
+  return LEDGER_KIND_LABELS[key]?.[lang] ?? LEDGER_KIND_LABELS.OTHER[lang];
+}
+
+/** Fallback by ledger kind, so a new method with an unknown key still looks right. */
+const LEDGER_KIND_ICON: Record<LedgerKind, LucideIcon> = {
+  CASH: Banknote,
+  BANK: Landmark,
+  WALLET: Wallet,
+  CARD: CreditCard,
+  CREDIT: Coins,
+  OTHER: Wallet,
+};
+
+/**
+ * Resolve the icon for a method. `iconKey` is tried first; if a future
+ * migration introduces a key this build does not know, the ledger kind decides,
+ * and the generic wallet is the last resort. Never throws, never renders empty.
+ */
+export function paymentMethodIcon(iconKey: string, ledgerKind?: LedgerKind): LucideIcon {
+  return (
+    ICON_REGISTRY[iconKey] ??
+    (ledgerKind ? LEDGER_KIND_ICON[ledgerKind] : undefined) ??
+    ICON_REGISTRY.generic
+  );
+}
+
+/**
+ * Tone class for an icon, derived from the ledger kind rather than from a
+ * hand-written switch per screen. Keeps light and dark mode correct without a
+ * second set of literals.
+ */
+export function paymentMethodIconTone(ledgerKind: LedgerKind | undefined): string {
+  switch (ledgerKind) {
+    case "CASH":
+      return "text-emerald-600 dark:text-emerald-400";
+    case "BANK":
+      return "text-indigo-600 dark:text-indigo-400";
+    case "WALLET":
+      return "text-sky-600 dark:text-sky-400";
+    case "CARD":
+      return "text-blue-600 dark:text-blue-400";
+    case "CREDIT":
+      return "text-amber-600 dark:text-amber-400";
+    default:
+      return "text-muted-foreground";
+  }
+}
+
+/* ==========================================================================
+   Labels — for read-only display of historic documents
+   ========================================================================== */
+
+/**
+ * The name of a payment value found on a stored document.
+ *
+ * Accepts EITHER a catalogue id or a raw ENUM value, because callers deal with
+ * both: a settings screen has ids, a sales table has whatever the invoice
+ * stored. An unrecognised value is returned verbatim rather than replaced with
+ * a dash — a payment method we do not know about is information, not an error.
+ *
+ * `overrides` is the tenant's own naming layer. A business that renamed
+ * بنك الكريمي to «حوالات صنعاء» must see its own word in every table, report
+ * and printed document — otherwise the same money would read differently on two
+ * screens. Keyed by catalogue id, so it survives a shared stored value: two
+ * business methods may both resolve to `bank_transfer` while the generic
+ * «تحويل بنكي» keeps its own row untouched.
+ *
+ * Signature note: the extra parameters are tolerated rather than required.
+ * React Query calls a `queryFn` with a context object, and callers in this
+ * project pass label helpers directly into memoized pipelines, so this function
+ * accepts being invoked with arguments it does not want.
+ */
+export function paymentMethodLabel(
+  value: string | null | undefined,
+  lang: "ar" | "en" = "ar",
+  overrides?: PaymentMethodOverrides | null,
+): string {
+  if (!value) return "—";
+
+  // A split sale stores 'split'; its tender breakdown lives in the note.
+  if (value === "split") {
+    return lang === "ar" ? "دفع بأكثر من طريقة" : "Split payment";
+  }
+
+  // A catalogue id is checked first: an override is keyed by id, and an id is
+  // also what the settings screen hands in. Falling back to the legacy index
+  // keeps a raw ENUM value from an old document working.
+  const byId = CATALOG_BY_ID.get(value);
+  const override = overrides?.[value] ?? (byId ? overrides?.[byId.id] : undefined);
+  if (override) {
+    return lang === "ar" ? override.nameAr : (override.nameEn ?? override.nameAr);
+  }
+
+  const def = byId ?? CATALOG_BY_LEGACY.get(value);
+  if (def) return lang === "ar" ? def.nameAr : (def.nameEn ?? def.nameAr);
+
+  // معرّف لطريقة متقاعدة (بنك الكريمي، جيب، …) قد يظهر في سجل تدقيق أو مستند
+  // قديم، وأيضًا القيمتان `card` / `cheque` التي لم تعد لهما طريقة في الكتالوج.
+  // اسمه العربي معروف في سجل الأسماء التاريخية، فلا نُطبع معرّفًا لاتينيًا في
+  // واجهة عربية.
+  const retired = RETIRED_PAYMENT_METHOD_LABELS[value];
+  if (retired) return lang === "ar" ? retired.nameAr : retired.nameEn;
+
+  return value;
+}
+
+/**
+ * The name to render for a stored document value, preferring the tenant's own
+ * wording when the method it belongs to has one.
+ *
+ * This is the function a table cell, a report or a print template should call.
+ * It exists because a stored value alone cannot identify which of two methods
+ * sharing it the operator actually used — the caller must pass the catalogue id
+ * when it knows it (a settings row, a picker) and accept the generic name when
+ * it does not (a historic invoice that never recorded the institution).
+ */
+export function paymentMethodDisplayName(
+  value: string | null | undefined,
+  lang: "ar" | "en",
+  overrides?: PaymentMethodOverrides | null,
+): string {
+  return paymentMethodLabel(value, lang, overrides);
+}
+
+/**
+ * Is this method showing a name or an icon the business chose, rather than the
+ * one the developers shipped?
+ *
+ * Used by the settings screen to show "معدّلة" and offer a reset. Compared
+ * against the developer catalogue rather than against a stored copy, so the
+ * comparison stays correct after a migration improves a shipped label.
+ */
+export function hasAuthoredIdentity(method: {
+  id: string;
+  nameAr: string;
+  nameEn?: string;
+  iconKey: string;
+}): boolean {
+  const shipped = CATALOG_BY_ID.get(method.id);
+  if (!shipped) return true; // a tenant-created method is authored by definition
+  return (
+    shipped.nameAr !== method.nameAr ||
+    (shipped.nameEn ?? "") !== (method.nameEn ?? "") ||
+    shipped.iconKey !== method.iconKey
+  );
+}
+
+/**
+ * Split detection, which used to be re-implemented inside the sales screen.
+ * A split sale is either recorded as 'split', or as a single method whose note
+ * carries the tender breakdown.
+ */
+export function isSplitPaymentValue(
+  value: string | null | undefined,
+  note?: string | null,
+): boolean {
+  if (value === "split") return true;
+  if (!note) return false;
+  return note.includes("[دفع مجزأ:") || note.includes("[Split:");
+}

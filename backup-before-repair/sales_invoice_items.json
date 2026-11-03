@@ -1,0 +1,30 @@
+﻿[
+    {
+        "id":  "78aae152-0f81-41f9-a3ac-a09e62ff2ab7",
+        "invoice_id":  "b1d61dab-e9a9-4b88-b1fe-8dc57cdf7c17",
+        "product_id":  "c9c4c873-f890-422b-aa1e-4b6179f5a644",
+        "quantity":  400.000,
+        "unit_price":  8.00,
+        "discount":  0.00,
+        "tax":  0.00,
+        "total":  3200.00,
+        "description":  null,
+        "line_type":  "SERVICE",
+        "stock_effect":  "NONE",
+        "uom_id":  null
+    },
+    {
+        "id":  "d2c9eac1-050e-481d-b15c-d05fe1fc117c",
+        "invoice_id":  "b1d61dab-e9a9-4b88-b1fe-8dc57cdf7c17",
+        "product_id":  "c9c4c873-f890-422b-aa1e-4b6179f5a644",
+        "quantity":  20.000,
+        "unit_price":  8.00,
+        "discount":  0.00,
+        "tax":  0.00,
+        "total":  160.00,
+        "description":  null,
+        "line_type":  "SERVICE",
+        "stock_effect":  "NONE",
+        "uom_id":  null
+    }
+]

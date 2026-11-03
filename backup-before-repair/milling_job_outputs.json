@@ -1,0 +1,44 @@
+﻿[
+    {
+        "id":  "86a5bf61-1f44-4c56-82fe-ea650b112c80",
+        "job_id":  "1f0db426-e70b-41ae-8079-d3450fd057aa",
+        "output_type":  "FLOUR_GRADE_1",
+        "bag_size_kg":  50.00,
+        "produced_bag_count":  312,
+        "produced_weight_kg":  15600.000,
+        "bags_source":  "CUSTOMER",
+        "mill_bag_product_id":  null,
+        "mill_bags_used":  0,
+        "delivered_bag_count":  150,
+        "delivered_weight_kg":  7500.000,
+        "created_at":  "2026-09-30T00:19:56.795068+00:00"
+    },
+    {
+        "id":  "9bcb1a35-b291-4e8b-8e1c-b6487a5031eb",
+        "job_id":  "1f0db426-e70b-41ae-8079-d3450fd057aa",
+        "output_type":  "BRAN",
+        "bag_size_kg":  40.00,
+        "produced_bag_count":  100,
+        "produced_weight_kg":  4000.000,
+        "bags_source":  "CUSTOMER",
+        "mill_bag_product_id":  null,
+        "mill_bags_used":  0,
+        "delivered_bag_count":  0,
+        "delivered_weight_kg":  0.000,
+        "created_at":  "2026-09-30T00:19:56.795068+00:00"
+    },
+    {
+        "id":  "04c66bdf-2281-4885-a8c4-20571d4f48f3",
+        "job_id":  "1f0db426-e70b-41ae-8079-d3450fd057aa",
+        "output_type":  "WASTE",
+        "bag_size_kg":  1.00,
+        "produced_bag_count":  0,
+        "produced_weight_kg":  400.000,
+        "bags_source":  "CUSTOMER",
+        "mill_bag_product_id":  null,
+        "mill_bags_used":  0,
+        "delivered_bag_count":  0,
+        "delivered_weight_kg":  0.000,
+        "created_at":  "2026-09-30T00:19:56.795068+00:00"
+    }
+]

@@ -1,0 +1,93 @@
+﻿[
+    {
+        "id":  "8c2af46c-95be-4a54-9633-48afb1cc4c8c",
+        "name":  "موسئ",
+        "phone":  null,
+        "email":  null,
+        "address":  null,
+        "credit_limit":  0.00,
+        "balance":  0.00,
+        "is_active":  true,
+        "created_at":  "2026-09-29T14:37:03.691348+00:00",
+        "updated_at":  "2026-10-01T00:19:56.795068+00:00",
+        "loyalty_points":  0
+    },
+    {
+        "id":  "c2b375b6-8fa0-458d-9a74-4f4d7a1d52be",
+        "name":  "يونس",
+        "phone":  "772317950",
+        "email":  null,
+        "address":  null,
+        "credit_limit":  20000.00,
+        "balance":  0.00,
+        "is_active":  true,
+        "created_at":  "2026-09-29T14:40:44.993962+00:00",
+        "updated_at":  "2026-10-01T00:19:56.795068+00:00",
+        "loyalty_points":  0
+    },
+    {
+        "id":  "07ae7bf4-ceec-4d29-b5f4-9fda30238c49",
+        "name":  "زين العبادين علي محمد",
+        "phone":  "777441170",
+        "email":  null,
+        "address":  "المجمعة",
+        "credit_limit":  0.00,
+        "balance":  0.00,
+        "is_active":  true,
+        "created_at":  "2026-09-29T15:44:29.246439+00:00",
+        "updated_at":  "2026-10-01T00:19:56.795068+00:00",
+        "loyalty_points":  0
+    },
+    {
+        "id":  "6ea856cb-8ccb-4db4-a1be-5483128ae65e",
+        "name":  "سعيد احمد سعيد الهجا مي",
+        "phone":  "774621435",
+        "email":  null,
+        "address":  "المجمعه",
+        "credit_limit":  0.00,
+        "balance":  0.00,
+        "is_active":  true,
+        "created_at":  "2026-09-29T15:48:07.848174+00:00",
+        "updated_at":  "2026-10-01T00:19:56.795068+00:00",
+        "loyalty_points":  0
+    },
+    {
+        "id":  "9a235fd3-120a-441e-a6ef-fbea2055184e",
+        "name":  "وليد السحو لي",
+        "phone":  "774334348",
+        "email":  null,
+        "address":  "المجمعة",
+        "credit_limit":  0.00,
+        "balance":  0.00,
+        "is_active":  true,
+        "created_at":  "2026-09-29T15:50:12.99877+00:00",
+        "updated_at":  "2026-10-01T00:19:56.795068+00:00",
+        "loyalty_points":  0
+    },
+    {
+        "id":  "7c82eeb0-6a1b-46fa-b30c-84f532fa5dea",
+        "name":  "محمد نعمان المحطه",
+        "phone":  null,
+        "email":  null,
+        "address":  "اب",
+        "credit_limit":  0.00,
+        "balance":  0.00,
+        "is_active":  true,
+        "created_at":  "2026-09-29T17:50:07.476432+00:00",
+        "updated_at":  "2026-10-01T00:19:56.795068+00:00",
+        "loyalty_points":  0
+    },
+    {
+        "id":  "06c87932-d0a8-4771-9eab-7c0a59c75924",
+        "name":  "سا لم علي محمد سعيد",
+        "phone":  "774822290",
+        "email":  null,
+        "address":  "المجمعة",
+        "credit_limit":  0.00,
+        "balance":  3360.00,
+        "is_active":  true,
+        "created_at":  "2026-09-29T15:40:49.017651+00:00",
+        "updated_at":  "2026-10-01T19:15:00.492673+00:00",
+        "loyalty_points":  0
+    }
+]

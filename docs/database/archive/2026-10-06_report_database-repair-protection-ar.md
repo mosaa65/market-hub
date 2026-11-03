@@ -1,0 +1,57 @@
+سأعيد جمع التنبيهات الحالية والسياسات، ثم أتحقق من حالة العروض والدوال والفهارس من كتالوج قاعدة البيانات. تنبيه بحدود الوصول: لا أملك هنا ملفات المشروع أو migrations ولا واجهة إعداد Auth، لذا سأميّز بوضوح بين ما أستطيع فحصه/تطبيقه على قاعدة البيانات وما يتطلب وصولًا للمستودع أو لوحة Auth؛ ولن أزعم اختبار كود أو إنشاء migration محلية لا أستطيع الوصول إليها.
+الفحص الحالي تغيّر عن التقرير السابق: ظهرت مجموعة إضافية من تنبيهات المصروفات، كما أن أعداد التنبيهات ليست هي نفسها. سأجمع الآن تعريفات العروض، صلاحيات وتواقيع دوال `SECURITY DEFINER`، تغطية مفاتيح الربط وإحصاءات الفهارس؛ وهذا يحدد ما يمكن تغييره بأمان دون تخمين.
+سأجري استعلامات قراءة فقط الآن: تحققًا مستقلًا من خيارات العروض السبعة، وملخصًا لصلاحيات كل دالة ذات `SECURITY DEFINER`، ومفاتيح الربط والفهارس والسياسات. كما سأتحقق من توثيق إعداد حماية كلمات المرور؛ لن تُجرى تغييرات في هذه الخطوة.
+تعذّر الاستعلام المركّب بسبب التباس اسم عمود الفهرس؛ لم يُجرِ أي تعديل. سأصحح مرجع العمود وأعيد القراءة فقط.
+تحقّق catalog أكد أن **العروض الستة المذكورة سابقًا كلها** مضبوطة فعلًا على `security_invoker=true`، وأن عرض الحبوب يضم `cost_price`. كما ظهر عرض أمني إضافي هو `expense_legacy_reconciliation`، ومؤشر Advisor الحالي لمفاتيح الربط صار 79 لا 63. سأستكمل تعداد الحالة الفعلية وسياسات RLS قبل أي تغيير.
+تحقّق العدّادات تعثّر بسبب صياغة تجميع أسماء السياسات المتداخلة؛ لم تُنفّذ أي كتابة. سأعيد صياغته في CTE منفصلة وأكرر الاستعلام للقراءة فقط.
+الحالة الحالية تؤكد أن `milling_grain_grades` صار لديه RLS مفعّل وسياسة قراءة `milling_grain_grades_read`، بعكس نتيجة Advisor الأقدم؛ ووجدت أيضًا أن `anon` ما زال يملك `SELECT` على الجدول، لكن لا تظهر له سياسة قراءة. سأعيد تشغيل Advisor لتثبيت التنبيهات الحالية بعد هذه التغييرات.
+## نتيجة الفحص الحالي
+
+أعدت تشغيل Supabase Advisor بتاريخ **2 أكتوبر 2026، 23:06 UTC**، وفحصت كتالوج قاعدة البيانات. **لم أنفّذ أي كتابة في هذه الجولة**؛ لأن أداة المحادثة لا تتيح لي قراءة ملفات المستودع أو إنشاء migration فيه. لذلك لا أستطيع تثبيت تغييرات قاعدة البيانات في migration أو التحقق من استدعاءات التطبيق قبل تغيير صلاحيات RPC.
+
+### التحقق من التغييرات المباشرة السابقة
+
+تقرير التنفيذ السابق تضمن **ستة أوامر `ALTER VIEW` في دفعة واحدة**، وليس أمرًا واحدًا. وفحص كتالوج PostgreSQL أكد أن العروض الستة كلها تحمل `security_invoker=true`:
+
+`milling_intake_health`, `milling_revenue_report`, `milling_efficiency_report`, `milling_pricing_diagnostics`, `milling_grain_grades_view`, `milling_agreements_view`.
+
+لكن Advisor ما زال يجد عرضًا آخر مخالفًا: `public.expense_legacy_reconciliation`.
+
+كما أن `milling_grain_grades_view` ما زال يعرض العمود `cost_price`. لا أستطيع تقرير حذفه من الواجهة أو من العرض بأمان دون فحص استعماله في كود التطبيق.
+
+## التنبيهات الحالية وأهدافها
+
+### الأمان
+
+- **خطأ واحد — Security Definer View:** `public.expense_legacy_reconciliation`.
+- **4 تحذيرات — search_path غير مثبت:** `public.expense_round(p_value numeric)`, `public.expense_line_net(p_gross numeric, p_tax_rate numeric, p_mode public.expense_tax_mode)`, `public.expense_line_tax(p_gross numeric, p_tax_rate numeric, p_mode public.expense_tax_mode)`, `public.expense_settlement_status(p_current public.expense_status, p_paid numeric, p_total numeric)`.
+- **12 تحذيرًا — دوال `SECURITY DEFINER` متاحة لـ`anon`:**
+  `expense_actor()`, `expense_assert_capability(p_user uuid, p_capability text)`, `expense_can(p_user uuid, p_capability text)`, `expense_can_write_document(p_entry_id uuid, p_user uuid)`, `has_role(_user_id uuid, _role public.app_role)`, `is_staff(_user_id uuid)`, `next_expense_reference()`, `normalize_auth_user_token_columns()`, `tg_expense_entries_guard()`, `tg_expense_lines_sync_total()`, `tg_expense_payments_sync_entry()`, `tg_guard_item_policy_change()`.
+- **75 تحذيرًا — دوال `SECURITY DEFINER` متاحة لـ`authenticated`:**
+  `add_milling_output`, `adjust_loyalty`, `can_operate_milling`, `can_read_expense_entry`, `can_read_finance`, `can_view_milling`, `cancel_expense`, `cancel_milling_intake`, `cancel_milling_job`, `close_expense`, `complete_milling_job`, `create_expense`, `create_milling_agreement`, `create_milling_intake`, `create_milling_job`, `create_milling_job_v2`, `create_purchase`, `create_purchase_return`, `create_sale` **(3 تواقيع مختلفة)**, `create_sales_return`, `create_stock_transfer`, `customer_credit_limit_allows`, `customer_ledger_balance`, `decide_expense`, `delete_expense_category`, `expense_actor`, `expense_assert_capability`, `expense_can`, `expense_can_write_document`, `expense_role_rank`, `has_role`, `is_platform_admin`, `is_platform_superadmin`, `is_staff`, `issue_milling_service_invoice`, `issue_milling_service_invoice_v2`, `item_effective_policy`, `item_has_stock_history`, `item_line_type`, `item_stock_effect`, `migrate_legacy_expenses`, `milling_kg_per_unit`, `milling_match_grain_grade`, `next_expense_reference`, `next_invoice_number`, `next_purchase_number`, `next_purchase_return_number`, `next_sales_return_number`, `next_transfer_number`, `normalize_auth_user_token_columns`, `post_expense`, `post_opening_stock`, `post_stock_adjustment`, `process_milling_delivery`, `product_delete_guard`, `product_reference_counts`, `receive_customer_owned_stock`, `record_customer_payment`, `record_expense_payment`, `release_customer_owned_stock`, `resolve_sale_line`, `reverse_expense`, `reverse_expense_payment`, `sales_invoice_tender_breakdown`, `save_expense_category`, `save_expense_dimension`, `submit_expense`, `tg_expense_entries_guard`, `tg_expense_lines_sync_total`, `tg_expense_payments_sync_entry`, `tg_guard_item_policy_change`, `update_expense`, `warehouse_reference_counts`.
+  
+  لا تعني هذه التحذيرات وحدها أن كل دالة يجب حجبها؛ كثير منها عمليات RPC للمخزون والطحن والمصروفات. كما أن ملاحظة المشروع تشترط إبقاء صلاحية `has_role` و`is_staff` عند `anon` و`authenticated` كي لا تتعطل سياسات الدخول وRLS. لن أغيّر صلاحيات هذه المجموعة قبل فحص مراجع التطبيق والمigrations.
+
+- **حماية كلمات المرور المسرّبة معطّلة.** هذا إعداد Auth، لا SQL. توثيق Supabase يذكر أن الميزة متاحة على Pro وما فوق، وتُضبط من إعدادات Auth/Email. لا أملك أداة لتغييرها أو للتحقق من خطة المشروع. [التوثيق](https://supabase.com/docs/guides/auth/password-security)
+
+### الأداء
+
+- **79 مفتاح ربط أجنبي بلا فهرس بادئ مطابق.** الجداول المتأثرة:
+  `ad_hoc_service_lines`, `audit_logs`, `categories`, `customer_ledger`, `customer_payment_splits`, `customer_payments`, `expense_approvals`, `expense_attachments`, `expense_categories`, `expense_cost_centers`, `expense_entries`, `expense_lines`, `expense_payments`, `expense_projects`, `expenses`, `item_policy_review_queue`, `loyalty_transactions`, `milling_delivery_notes`, `milling_intake_receipts`, `milling_job_outputs`, `milling_jobs`, `milling_service_agreements`, `platform_audit_logs`, `product_batches`, `product_compatibilities`, `products`, `purchase_invoice_items`, `purchase_invoices`, `purchase_return_items`, `purchase_returns`, `sales_invoice_items`, `sales_invoices`, `sales_return_items`, `sales_returns`, `stock_adjustments`, `stock_movements`, `stock_openings`, `stock_transfer_items`, `stock_transfers`, `tenant_subscriptions`. أسماء القيود والأعمدة ظهرت في نتائج الفحص؛ يلزم تدقيق تغطية الفهارس قبل الإنشاء.
+- **94 سياسة RLS** متأثرة بتحذير إعادة تقييم Auth، ضمن الجداول:
+  `ad_hoc_service_lines`, `audit_logs`, `brands`, `categories`, `company_items`, `company_settings`, `countries_of_origin`, `customer_ledger`, `customer_payment_splits`, `customer_payments`, `customers`, `expense_approvals`, `expense_attachments`, `expense_categories`, `expense_cost_centers`, `expense_entries`, `expense_lines`, `expense_payments`, `expense_projects`, `expenses`, `inventory`, `item_policy_review_queue`, `loyalty_transactions`, `milling_grain_grades`, `milling_service_agreements`, `milling_unit_conversions`, `platform_admins`, `platform_audit_logs`, `product_batches`, `product_compatibilities`, `products`, `profiles`, `purchase_invoice_items`, `purchase_invoices`, `purchase_return_items`, `purchase_returns`, `quality_grades`, `sales_invoice_items`, `sales_invoices`, `sales_return_items`, `sales_returns`, `stock_adjustment_items`, `stock_adjustments`, `stock_movements`, `stock_opening_items`, `stock_openings`, `stock_transfer_items`, `stock_transfers`, `suppliers`, `tenant_subscriptions`, `units`, `user_roles`, `vehicle_makes`, `vehicle_models`, `warehouses`.
+- **26 مجموعات سياسات permissive متداخلة** على:
+  `brands`, `categories`, `company_items`, `customers`, `expense_categories`, `expense_cost_centers`, `expense_projects`, `expenses`, `inventory`, `item_policy_review_queue`, `platform_admins`, `product_batches`, `products`, `profiles`, `purchase_invoice_items`, `purchase_invoices`, `purchase_return_items`, `purchase_returns`, `sales_return_items`, `sales_returns`, `stock_transfer_items`, `stock_transfers`, `suppliers`, `tenant_subscriptions`, `units`, `warehouses`.
+- **47 فهرسًا عاديًا بلا استخدام مرصود من Advisor.** إحصاءات قاعدة البيانات مصفّرة منذ `2026-08-25T20:41:21Z`. لا يكفي ذلك لإثبات أن الفهرس زائد، لذا لم أحذف أي فهرس. من الأسماء المرصودة: `idx_stock_movements_warehouse`, `idx_inventory_product`, `idx_inventory_warehouse`, `idx_products_item_nature`, `idx_products_inventory_policy`, `idx_products_status`, `idx_company_items_company`, `idx_inventory_owner`, `idx_stock_movements_kind`, `idx_stock_movements_source`, `idx_stock_movements_owner`, `idx_stock_opening_items_opening`, `idx_stock_adjustment_items_adj`, `customer_payment_splits_occurred_at_idx`, `products_name_idx`, `idx_milling_jobs_status`, `idx_milling_outputs_job`, `idx_milling_outputs_type`, `idx_milling_delivery_customer`, `idx_milling_delivery_job`, `idx_milling_delivery_items_ot`, `idx_audit_entity`, `idx_batches_expiry`, `idx_loyalty_customer`, `idx_sales_invoices_milling_job`, `idx_milling_intake_grade`, `idx_milling_agreements_intake`, `idx_milling_agreements_status`, `idx_milling_jobs_agreement`، إضافة إلى فهارس المصروفات التي تبدأ بـ`expense_categories_` و`expense_entries_` و`expense_lines_` و`expense_payments_` و`expense_approvals_` و`expense_attachments_` كما وردت في Advisor.
+
+## وضع `milling_grain_grades` واختبارات الوصول
+
+كتالوج قاعدة البيانات الآن يبيّن أن `public.milling_grain_grades` **لديه RLS مفعّل** وسياسة قراءة واحدة `milling_grain_grades_read` بشرط `is_staff(auth.uid())`. لا توجد سياسات كتابة؛ لذا يمنع RLS الكتابة المباشرة عبر هذا المسار. لكن `anon` ما زال يملك امتياز `SELECT` على الجدول؛ ومع عدم وجود سياسة `anon`، يفترض أن يمنع RLS ظهور الصفوف له. **هذا استنتاج من التعريفات، وليس اختبار API فعليًا**. كما لا أستطيع تحديد من أنشأ السياسة أو إثبات وجودها في migration دون ملفات المشروع.
+
+## ما لم أنفذه ولماذا
+
+- لم أنشئ migration أو أعدّل ملفات: لا توجد لدي أداة للوصول إلى المستودع أو migrations، وتثبيت التغييرات المباشرة دون migration سيترك المشروع غير متزامن.
+- لم أغيّر دوال RPC أو السياسات أو الفهارس؛ لا أستطيع فحص استدعاءاتها في التطبيق أو تشغيل اختبارات المستخدمين المصرّح وغير المصرّح من أدوات هذه الجلسة.
+- لم أغيّر إعداد كلمات المرور المسرّبة؛ يلزم فتح **Authentication → Providers → Email → Password Strength and Leaked Password Protection** في `https://supabase.com/dashboard/project/kwzqvgdyadylwnvjghqn/auth/providers?provider=Email`، إن كانت الخطة تدعم الميزة.
+
+لتنفيذ طلبك كاملًا دون تعطيل التطبيق، أحتاج وصولًا إلى ملفات migrations وكود العميل الذي يستدعي RPC/العروض، أو تزويدي بهذه الملفات/المقاطع **من دون أي أسرار أو ملفات `.env`**. حينها يمكن إعداد migration forward-only، ثم تطبيقها على البيئة التي تؤكدها واختبار المسارات قبل إعادة فحص Advisor.

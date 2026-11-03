@@ -1,0 +1,18 @@
+﻿{
+    "id":  "b1d61dab-e9a9-4b88-b1fe-8dc57cdf7c17",
+    "invoice_number":  "INV--202610-0007",
+    "customer_id":  "06c87932-d0a8-4771-9eab-7c0a59c75924",
+    "warehouse_id":  "f901e934-7ecf-4f1a-a192-12cd42df85fd",
+    "status":  "unpaid",
+    "subtotal":  3360.00,
+    "discount":  0.00,
+    "tax":  0.00,
+    "total":  3360.00,
+    "paid":  0.00,
+    "payment_method":  "credit",
+    "note":  "— أجرة طحن MJ-501",
+    "created_by":  "f31d85f1-e63e-4f98-9c8d-6257db953e93",
+    "created_at":  "2026-10-01T19:15:00.492673+00:00",
+    "updated_at":  "2026-10-01T19:15:00.492673+00:00",
+    "milling_job_id":  "1f0db426-e70b-41ae-8079-d3450fd057aa"
+}

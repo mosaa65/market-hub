@@ -1,0 +1,118 @@
+import {
+  UnifiedDocumentData,
+  InvoiceLabels,
+  escapeHtml,
+  formatMoney,
+  CustomFieldOptions,
+} from "./types";
+import { getCachedCompanyProfile } from "@/lib/printing/company-profile";
+import { COMPANY_RIGHTS_TEXT } from "@/lib/printing/footer";
+import { formatPrintedDateTime } from "@/lib/printing/date-time";
+
+export function renderThermalTemplate(
+  doc: UnifiedDocumentData,
+  L: InvoiceLabels,
+  rtl: boolean,
+  options?: CustomFieldOptions,
+): string {
+  const c = doc.currency ?? "";
+  const esc = escapeHtml;
+  const money = (n?: number) => formatMoney(n, c);
+  const company = getCachedCompanyProfile();
+  const companyArabicName =
+    doc.company?.arabicName ||
+    doc.company?.name ||
+    company.arabicName ||
+    company.name;
+  const companyAddress = doc.company?.address || company.address || "";
+  const companyPhone = doc.company?.phone || company.phone || "";
+  const companyVat = doc.company?.vat || company.taxNumber || "";
+  const opts = {
+    showLogo: true,
+    showCompanyInfo: true,
+    showCustomerInfo: true,
+    showDocNumberDate: true,
+    showMovementInfo: true,
+    showFinancialDetails: true,
+    showPaymentInfo: true,
+    showNotes: true,
+    showSignatures: false,
+    showFooter: true,
+    ...options,
+    ...doc.options,
+  };
+
+  const rows = doc.lines
+    .map(
+      (l) => `
+    <div class="li">
+      <div class="ln">${esc(l.product)}</div>
+      <div class="lr"><span>${l.qty} ${l.unit ? esc(l.unit) : ""} × ${money(l.price)}</span><span>${money(l.total)}</span></div>
+    </div>`,
+    )
+    .join("");
+
+  return `<!doctype html><html dir="${rtl ? "rtl" : "ltr"}" lang="${rtl ? "ar" : "en"}"><head><meta charset="utf-8"><title>${esc(doc.number)}</title>
+<style>
+  @page { size: var(--print-paper-width, 80mm) auto; margin: 0; }
+  * { box-sizing: border-box; }
+  html,body { margin:0; padding:0; background:#fff; color:#000; font-family: 'Courier New', ui-monospace, monospace; }
+  .r { width: var(--print-paper-width, 80mm); padding: 6mm 5mm; font-size: 12px; line-height: 1.35; }
+  .c { text-align: center; }
+  h1 { font-size: 15px; margin: 0 0 2px; letter-spacing: .5px; }
+  .muted { color:#333; font-size: 11px; }
+  .hr { border-top: 1px dashed #000; margin: 6px 0; }
+  .row { display:flex; justify-content:space-between; gap:8px; font-size: 11px; }
+  .li { margin: 4px 0; }
+  .ln { font-weight: 600; font-size: 12px; }
+  .lr { display:flex; justify-content:space-between; font-size: 11px; }
+  .tot { display:flex; justify-content:space-between; font-size: 12px; margin: 2px 0; }
+  .grand { font-size: 15px; font-weight: 700; margin-top: 4px; }
+  .foot { text-align:center; font-size: 10px; margin-top: 8px; }
+  @media screen { body { background:#eee; padding: 20px 0; } .r { margin: 0 auto; background:#fff; box-shadow: 0 2px 20px rgba(0,0,0,.15); } }
+</style></head><body onload="window.print()">
+<div class="r">
+  <div class="c">
+    ${opts.showCompanyInfo && companyArabicName ? `<h1>${esc(companyArabicName)}</h1>` : ""}
+    ${opts.showCompanyInfo && companyAddress ? `<div class="muted">${esc(companyAddress)}</div>` : ""}
+    ${opts.showCompanyInfo && companyPhone ? `<div class="muted" dir="ltr">${esc(companyPhone)}</div>` : ""}
+    ${opts.showCompanyInfo && companyVat ? `<div class="muted">VAT: ${esc(companyVat)}</div>` : ""}
+  </div>
+  <div class="hr"></div>
+  ${
+    opts.showDocNumberDate
+      ? `
+  <div class="row"><span>${L.invoice}</span><b>${esc(doc.number)}</b></div>
+  <div class="row"><span>${L.date}</span><span>${esc(formatPrintedDateTime(doc.date))}</span></div>
+  `
+      : ""
+  }
+  ${opts.showCustomerInfo && doc.partyName ? `<div class="row"><span>${L.billTo}</span><span>${esc(doc.partyName)}</span></div>` : ""}
+  ${opts.showPaymentInfo && doc.payment ? `<div class="row"><span>${L.payment}</span><span>${esc(doc.payment)}</span></div>` : ""}
+  ${doc.operatorName ? `<div class="row"><span>${rtl ? "البائع / المستخدم" : "Sold by"}</span><span>${esc(doc.operatorName)}</span></div>` : ""}
+  <div class="hr"></div>
+  ${rows}
+  <div class="hr"></div>
+  ${
+    opts.showFinancialDetails
+      ? `
+  <div class="tot"><span>${L.subtotal}</span><span>${money(doc.subtotal)}</span></div>
+  <div class="tot"><span>${L.tax}</span><span>${money(doc.tax)}</span></div>
+  <div class="tot"><span>${L.discount}</span><span>${money(doc.discount)}</span></div>
+  <div class="hr"></div>
+  <div class="tot grand"><span>${L.grandTotal}</span><span>${money(doc.total)}</span></div>
+  ${
+    doc.paid !== undefined
+      ? `
+  <div class="tot"><span>${L.paid}</span><span>${money(doc.paid)}</span></div>
+  <div class="tot"><span>${L.balance}</span><span>${money((doc.total ?? 0) - doc.paid)}</span></div>`
+      : ""
+  }
+  <div class="hr"></div>
+  `
+      : ""
+  }
+  ${opts.showFooter ? `<div class="foot">${L.thanks}</div>` : ""}
+  <div class="foot" style="font-size:7px;color:#9ca3af;border:none;padding-top:2px;">${COMPANY_RIGHTS_TEXT}</div>
+</div></body></html>`;
+}

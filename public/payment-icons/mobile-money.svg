@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="محفظة إلكترونية">
+  <rect x="12" y="4" width="24" height="40" rx="6" fill="#f59e0b"/>
+  <rect x="15" y="9" width="18" height="26" rx="3" fill="#fffbeb"/>
+  <circle cx="24" cy="39" r="2" fill="#ffffff" opacity="0.9"/>
+  <path d="M20 20h8M24 16v8" stroke="#f59e0b" stroke-width="2.8" stroke-linecap="round"/>
+</svg>

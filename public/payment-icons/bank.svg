@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="بنك">
+  <path d="M24 5 44 17v3H4v-3L24 5z" fill="#1d4ed8"/>
+  <rect x="7" y="22" width="5" height="15" rx="1" fill="#1d4ed8"/>
+  <rect x="16" y="22" width="5" height="15" rx="1" fill="#1d4ed8"/>
+  <rect x="25" y="22" width="5" height="15" rx="1" fill="#1d4ed8"/>
+  <rect x="34" y="22" width="5" height="15" rx="1" fill="#1d4ed8"/>
+  <rect x="4" y="39" width="40" height="4" rx="2" fill="#1e3a8a"/>
+  <circle cx="24" cy="14" r="3" fill="#ffffff"/>
+</svg>
