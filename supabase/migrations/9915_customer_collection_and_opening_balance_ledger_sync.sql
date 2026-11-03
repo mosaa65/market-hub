@@ -64,6 +64,7 @@ BEGIN
   END IF;
   IF NOT (
     public.has_role(v_user, 'owner')
+    OR public.is_platform_superadmin(v_user)
     OR public.has_role(v_user, 'manager')
     OR public.has_role(v_user, 'accountant')
     OR public.has_role(v_user, 'cashier')
@@ -121,10 +122,9 @@ BEGIN
       RAISE EXCEPTION 'Payment exceeds the invoice outstanding balance';
     END IF;
   ELSE
-    IF v_amount > greatest(coalesce(v_ledger_balance, 0), 0) + 0.001 THEN
-      RAISE EXCEPTION
-        'Payment exceeds the customer outstanding balance (ledger %)', v_ledger_balance;
-    END IF;
+    -- تحصيل عام أو دفعة مقدمة (Advance payment):
+    -- يُقبل المبلغ كاملاً؛ يُوزَّع على الفواتير المفتوحة وما يتبقى يُقيد كرصيد دائن للعميل
+    NULL;
   END IF;
 
   INSERT INTO public.customer_payments (
@@ -264,6 +264,7 @@ BEGIN
   END IF;
   IF NOT (
     public.has_role(v_user, 'owner')
+    OR public.is_platform_superadmin(v_user)
     OR public.has_role(v_user, 'manager')
     OR public.has_role(v_user, 'accountant')
     OR public.has_role(v_user, 'cashier')
@@ -336,15 +337,8 @@ BEGIN
       RAISE EXCEPTION 'Payment exceeds the invoice outstanding balance';
     END IF;
   ELSE
-    SELECT round(coalesce(sum(total - paid), 0), 2)
-      INTO v_customer_outstanding
-      FROM public.sales_invoices
-     WHERE customer_id = _customer_id AND total > paid
-       AND status NOT IN ('cancelled'::public.invoice_status, 'returned'::public.invoice_status);
-    IF v_total > greatest(coalesce(v_ledger_balance, 0), 0) + 0.001
-       OR (v_customer_outstanding > 0 AND v_total > v_customer_outstanding + 0.001) THEN
-      RAISE EXCEPTION 'Payment exceeds the customer outstanding balance (ledger %)', v_ledger_balance;
-    END IF;
+    -- تحصيل عام أو دفعة مقدمة مجزأة: يُقبل المبلغ كاملاً وما يفيض عن الفواتير يُسجل كرصيد دائن
+    NULL;
   END IF;
 
   v_remaining := v_total;

@@ -19,6 +19,7 @@ import {
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
+import { todayKey, dateOnlyIso } from "@/lib/time/business-date";
 import { useI18n } from "@/lib/i18n";
 import { todayKey, dateOnlyIso } from "@/lib/time/business-date";
 import { money } from "@/lib/format";
@@ -121,8 +122,8 @@ function PaymentsPage() {
   const { banks, wallets } = useCompanyBankAccounts();
   const [reference, setReference] = useState("");
   const [note, setNote] = useState("");
-  // التاريخ المحلي لليوم. `toISOString()` يحوّل إلى UTC فيزحف اليوم في اليمن
-  // (UTC+3) بين منتصف الليل والثالثة صباحًا — فيُسجَّل تحصيل اليوم بتاريخ الأمس.
+  // التاريخ المحلي لليوم. `toISOString()` يحوّل إلى UTC فيتصحّر اليوم في اليمن
+  // (UTC+3) بين منتصف الليل والثالثة صباحًا، فيُسجّل التحصيل بتاريخ الأمس.
   const [date, setDate] = useState(todayKey);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
@@ -276,15 +277,15 @@ function PaymentsPage() {
         t("payments.invalid_amount") || (lang === "ar" ? "أدخل مبلغ صحيح" : "Enter a valid amount"),
       );
     }
-    // لا نُقصّ الرصيد عند الصفر هنا: رصيد دائن (دفعة مقدمة/مرتجع) حقيقي يجب أن
-    // يظهر كما هو، والقرار المالي يُترك للخادم الذي يقرأ دفتر العميل.
-    const payableAmount = selectedInvoice ? remaining : Number(selected.balance);
-    if (amt > payableAmount + 0.001) {
+    // التحقق من متبقي الفاتورة المحددة فقط؛ أما في التحصيل العام فيُقبل المبلغ كدفعة على الحساب أو دفعة مقدمة
+    if (selectedInvoice && amt > remaining + 0.001) {
       savingRef.current = false;
       setSaving(false);
       return toast.error(
         t("payments.exceeds_remaining") ||
-          (lang === "ar" ? "المبلغ يتجاوز المتبقي" : "Amount exceeds remaining"),
+          (lang === "ar"
+            ? "المبلغ يتجاوز متبقي الفاتورة المحددة"
+            : "Amount exceeds invoice remaining"),
       );
     }
     if (!isSplitCollection && needsReference && !reference.trim()) {
@@ -648,8 +649,8 @@ function PaymentsPage() {
                         ? "تحصيل فاتورة"
                         : "Invoice collection"
                       : lang === "ar"
-                        ? "تحصيل تلقائي"
-                        : "Automatic collection"
+                        ? "تحصيل عام / دفعة مقدمة"
+                        : "General collection / Advance payment"
                   }
                   subtitle={
                     selectedInvoice
@@ -657,8 +658,8 @@ function PaymentsPage() {
                         ? `سداد الفاتورة #${selectedInvoice.invoice_number}`
                         : `Payment for invoice #${selectedInvoice.invoice_number}`
                       : lang === "ar"
-                        ? "توزيع الدفعة من الأقدم إلى الأحدث"
-                        : "Allocate payment from oldest to newest"
+                        ? "سداد الفواتير المستحقة تلقائياً وقيد الفائض كدفعة مقدمة"
+                        : "Settle due invoices and credit surplus as advance payment"
                   }
                   icon={<Wallet className="h-5 w-5" />}
                   className="border-primary/30 shadow-primary/20"
@@ -1001,7 +1002,7 @@ function PaymentsPage() {
                           >
                             <td className="px-3 py-2">
                               {/* payment_date عمود date بلا وقت: عرضه كطابع زمني
-                                  يُظهر ساعة مستنبتة وقد يزحف اليوم يومًا. */}
+                                  يُظهر ساعة مستنبتة وتاريخًا قد ينزاح يومًا. */}
                               <VortexDateBadge
                                 date={dateOnlyIso(p.payment_date)}
                                 size="sm"

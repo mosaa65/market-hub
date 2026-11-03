@@ -88,8 +88,8 @@ BEGIN
     RAISE EXCEPTION 'No items';
   END IF;
   IF _refund_method IS NULL
-     OR NOT (_refund_method::public.payment_method = ANY (ARRAY['cash','card','bank_transfer','mobile_money','split']::public.payment_method[])) THEN
-    RAISE EXCEPTION 'A return refund method cannot be credit — pick the account the money leaves from';
+     OR NOT (_refund_method::public.payment_method = ANY (ARRAY['cash','card','bank_transfer','mobile_money','split','credit']::public.payment_method[])) THEN
+    RAISE EXCEPTION 'A return refund method must be one of: cash, card, bank_transfer, mobile_money, split, credit';
   END IF;
 
   -- ── الفاتورة الأصلية: مقفولة، مؤكدة، وبطرفيها ───────────────────────────
@@ -270,22 +270,13 @@ BEGIN
 
     IF v_credit_applied > 0 THEN
       UPDATE public.sales_invoices
-         SET paid = greatest(round(coalesce(paid, 0) - v_credit_applied, 2), 0),
-             status = 'confirmed'::public.invoice_status,
-             payment_status = public.derive_payment_status(
-               greatest(round(coalesce(paid, 0) - v_credit_applied, 2), 0), total),
-             updated_at = now()
-       WHERE id = _invoice_id;
-    END IF;
-
-    IF v_credit_applied < 0.005 THEN
-      v_credit_applied := 0;
-      UPDATE public.sales_invoices
-         SET status = CASE
-               WHEN round(coalesce(total, 0) - coalesce(paid, 0), 2) <= 0.005
+         SET paid = round(coalesce(paid, 0) + v_credit_applied, 2),
+             status = CASE
+               WHEN round(coalesce(total, 0) - (coalesce(paid, 0) + v_credit_applied), 2) <= 0.005
                  THEN 'returned'::public.invoice_status
-               ELSE status END,
-             payment_status = public.derive_payment_status(paid, total),
+               ELSE 'confirmed'::public.invoice_status END,
+             payment_status = public.derive_payment_status(
+               round(coalesce(paid, 0) + v_credit_applied, 2), total),
              updated_at = now()
        WHERE id = _invoice_id;
     END IF;
@@ -302,22 +293,43 @@ BEGIN
       );
     END IF;
 
-    -- مبلغ صفري لا يمرّ على قيود الدفتر (debit + credit > 0)، فنسجّله في سجل
-    -- المرتجعات الصريح بدل حركة صفرية محرّمة.
-    IF v_cash_refund > 0 THEN
-      INSERT INTO public.customer_ledger (
-        customer_id, entry_type, credit, reference_id, reference_type,
-        occurred_at, created_by, source_key, note
-      )
-      VALUES (
-        v_inv.customer_id, 'return', v_cash_refund, v_id, 'sales_return_refund',
-        now(), v_user, 'return-refund:' || v_id,
-        'مرتجع مبيعات — استرداد نقدي (لا يمسّ الذمة)'
-      );
+    IF _refund_method = 'credit' THEN
+      -- إذا كان الاسترداد على الحساب (آجل)، يُضاف أي فائض كرصيد دائن للعميل
+      IF v_cash_refund > 0 THEN
+        INSERT INTO public.customer_ledger (
+          customer_id, entry_type, credit, reference_id, reference_type,
+          occurred_at, created_by, source_key, note
+        )
+        VALUES (
+          v_inv.customer_id, 'return', v_cash_refund, v_id, 'sales_return_credit',
+          now(), v_user, 'return-credit:' || v_id,
+          'مرتجع مبيعات — رصيد دائن للعميل'
+        );
+      END IF;
+    ELSE
+      -- استرداد نقدي من الصندوق أو البنك: يخرج المبلغ نقدًا للمشتري
+      IF v_cash_refund > 0 THEN
+        INSERT INTO public.customer_ledger (
+          customer_id, entry_type, credit, reference_id, reference_type,
+          occurred_at, created_by, source_key, note
+        )
+        VALUES (
+          v_inv.customer_id, 'return', v_cash_refund, v_id, 'sales_return_refund',
+          now(), v_user, 'return-refund:' || v_id,
+          'مرتجع مبيعات — استرداد نقدي'
+        );
+        INSERT INTO public.customer_ledger (
+          customer_id, entry_type, debit, reference_id, reference_type,
+          occurred_at, created_by, source_key, note
+        )
+        VALUES (
+          v_inv.customer_id, 'refund', v_cash_refund, v_id, 'sales_return_refund_out',
+          now(), v_user, 'return-cash-out:' || v_id,
+          'صرف نقدية المرتجع للعميل'
+        );
+      END IF;
     END IF;
 
-    -- ما يُردّ نقدًا لا يخصم من العميل: العميل أخذ بضاعة ثم ردّها وأخذ ماله،
-    -- وذمته لم تتغيّر. الأثر في الجانب النقدي وحده.
     PERFORM public.recalculate_customer_balance(
       v_inv.customer_id, 'مرتجع مبيعات ' || v_no, 'document_repost');
   END IF;
@@ -347,24 +359,31 @@ BEGIN
       'memo', 'عكس ضريبة القيمة المضافة');
   END IF;
 
-  -- الذمة الدائنة تساوي ما خُصم من الفاتورة بالضبط، وما زاد يُردّ من الصندوق.
-  IF v_credit_applied > 0 THEN
+  -- معالجة الطرف الدائن للقيد: الذمة أو الصندوق بحسب طريقة الاسترداد
+  IF _refund_method = 'credit' THEN
     v_lines := v_lines || jsonb_build_object(
-      'account_code', '1211', 'credit', v_credit_applied,
+      'account_code', '1211', 'credit', v_tot,
       'partner_type', 'customer', 'partner_id', v_inv.customer_id,
-      'memo', 'عكس ذم العميل');
-  END IF;
-
-  IF v_cash_refund > 0 THEN
-    v_cash_acct := public.payment_method_ledger_account(_refund_method::text);
-    IF v_cash_acct IS NULL THEN
-      RAISE EXCEPTION
-        'No ledger account could be resolved for refund tender % — record the refund through the treasury',
-        _refund_method;
+      'memo', 'عكس ذمم مبيعات — مرتجع آجل');
+  ELSE
+    IF v_credit_applied > 0 THEN
+      v_lines := v_lines || jsonb_build_object(
+        'account_code', '1211', 'credit', v_credit_applied,
+        'partner_type', 'customer', 'partner_id', v_inv.customer_id,
+        'memo', 'عكس ذم العميل');
     END IF;
-    v_lines := v_lines || jsonb_build_object(
-      'account_code', v_cash_acct, 'credit', v_cash_refund,
-      'memo', 'استرداد نقدي للعميل');
+
+    IF v_cash_refund > 0 THEN
+      v_cash_acct := public.payment_method_ledger_account(_refund_method::text);
+      IF v_cash_acct IS NULL THEN
+        RAISE EXCEPTION
+          'No ledger account could be resolved for refund tender % — record the refund through the treasury',
+          _refund_method;
+      END IF;
+      v_lines := v_lines || jsonb_build_object(
+        'account_code', v_cash_acct, 'credit', v_cash_refund,
+        'memo', 'استرداد نقدي للعميل');
+    END IF;
   END IF;
 
   -- عكس COGS وقيمة المخزون مباشرة من حركات المرتجع، بلا ربط مضاعف بأسطر الصنف.
