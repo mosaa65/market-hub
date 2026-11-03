@@ -301,7 +301,7 @@ export function ProductFormDialog({
       const ownUnits = mode === "custody";
       const payload: Record<string, unknown> = {
         name_ar: trimmed,
-        name: nameEn.trim() || null,
+        name: nameEn.trim() || trimmed,
         sku: finalSku,
         item_class: itemClass,
         package_weight_kg: weightKg != null && weightKg > 0 ? weightKg : null,

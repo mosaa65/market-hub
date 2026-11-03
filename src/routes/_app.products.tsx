@@ -3170,7 +3170,7 @@ function ProductDialog({
         ? {
             code: quickAddCode.trim().toUpperCase(),
             name_ar: nameAr,
-            name_en: quickAddNameEn.trim() || null,
+            name_en: quickAddNameEn.trim() || nameAr,
             is_active: true,
             sort_order: Math.max(0, ...meta.packagingTypes.map((item) => item.sort_order)) + 1,
           }

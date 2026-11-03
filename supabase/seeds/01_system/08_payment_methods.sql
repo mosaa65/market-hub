@@ -75,14 +75,14 @@ INSERT INTO public.payment_methods (
   legacy_ids, legacy_id, notes, shipped_name_ar
 ) VALUES
   -- ─── النقد: الأصل، ومتاح في كل قسم بما فيه المرتجعات ──────────────────────
-  ('cash', 'نقداً', 'Cash', 'cash', true, 10,
+  ('cash', 'نقداً', 'نقداً', 'cash', true, 10,
    ARRAY['pos','sales','purchases','expenses','customer_collection','sales_returns','purchase_returns'],
    'CASH', '1101', false, false, ARRAY['cash'], 'cash',
    'الصندوق. الأكثر استخداماً في السوق اليمني.',
    'نقداً'),
 
   -- ─── الآجل ────────────────────────────────────────────────────────────────
-  ('credit', 'آجل', 'Credit', 'credit', true, 20,
+  ('credit', 'آجل', 'آجل', 'credit', true, 20,
    ARRAY['pos','sales','purchases','sales_returns','purchase_returns'],
    'CREDIT', '1211', true, false, ARRAY['credit'], 'credit',
    'لا يُحصَّل الآن: يصبح ذمة على العميل أو للمورد. لا معنى له في المصروفات أو التحصيل.',
@@ -90,7 +90,7 @@ INSERT INTO public.payment_methods (
 
   -- ─── تحويل بنكي عام: غير مرتبط ببنك بعينه ────────────────────────────────
   -- المرتجعات مشمولة: الاسترداد البنكي للعميل وقبض المورد يمرّان عبر البنك.
-  ('bank_transfer', 'تحويل بنكي', 'Bank transfer', 'bank-transfer', true, 30,
+  ('bank_transfer', 'تحويل بنكي', 'تحويل بنكي', 'bank-transfer', true, 30,
    ARRAY['pos','sales','purchases','expenses','customer_collection','sales_returns','purchase_returns'],
    'BANK', '1111', false, true, ARRAY['bank_transfer'], 'bank_transfer',
    'حوالة مصرفية عامة. يتطلب رقم الحوالة.',
@@ -98,14 +98,14 @@ INSERT INTO public.payment_methods (
 
   -- ─── المحفظة الإلكترونية العامة: البديل التاريخي بلا مؤسسة محددة ─────────
   -- المرتجعات مشمولة لسبب تحويل بنكي نفسه.
-  ('mobile_money', 'محفظة إلكترونية', 'Mobile money', 'mobile-money', true, 110,
+  ('mobile_money', 'محفظة إلكترونية', 'محفظة إلكترونية', 'mobile-money', true, 110,
    ARRAY['pos','sales','purchases','expenses','customer_collection','sales_returns','purchase_returns'],
    'WALLET', '1131', false, true, ARRAY['mobile_money'], 'mobile_money',
    'محفظة محلية غير محددة. تبقى للتوافق مع العمليات القديمة.',
    'محفظة إلكترونية'),
 
   -- ─── خط الدفع المجزأ: اسم وأيقونة للفاتورة التي سُدّدت بأكثر من وسيلة ────
-  ('split', 'دفع بأكثر من طريقة', 'Split payment', 'split', true, 900,
+  ('split', 'دفع بأكثر من طريقة', 'دفع بأكثر من طريقة', 'split', true, 900,
    ARRAY['pos','sales'],
    'OTHER', NULL, false, false, ARRAY['split'], 'split',
    'ليس وسيلة يختارها الكاشير؛ ما تسجّله الفاتورة عند تعدد وسائل السداد.',

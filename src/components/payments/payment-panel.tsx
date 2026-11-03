@@ -314,18 +314,13 @@ export function PaymentPanel(props: PaymentPanelProps) {
         )}
 
         {onSplitChange && (
-          <button
-            type="button"
-            disabled={disabled || total <= 0}
-            onClick={() => setSplitOpen(true)}
-            className="inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-xl border border-primary/25 bg-primary/[0.04] px-3 text-[11px] font-semibold text-primary transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Layers className="size-3.5" />
-            {isRtl ? "توزيع الدفع على أكثر من طريقة" : "Split across payment methods"}
-            {splitAllocated > 0 && (
-              <span className="font-mono">{money(splitAllocated)}</span>
-            )}
-          </button>
+          <div className="flex min-h-8 items-center justify-between gap-2 rounded-xl border border-primary/25 bg-primary/[0.04] px-3 text-[11px] font-semibold text-primary">
+            <span className="inline-flex items-center gap-1.5">
+              <Layers className="size-3.5" />
+              {isRtl ? "موزّع على عدة طرق" : "Split allocation"}
+            </span>
+            <span className="font-mono tabular-nums">{money(splitAllocated)}</span>
+          </div>
         )}
 
         {result.needsReference && onReferenceChange && (

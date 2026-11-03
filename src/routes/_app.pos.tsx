@@ -3285,59 +3285,59 @@ function POSPage() {
                   <span className="truncate text-[10px] font-semibold leading-none text-muted-foreground">
                     {lang === "ar" ? "طريقة الدفع" : "Payment method"}
                   </span>
-                  {!isSplitPayment ? (
-                    <DynamicPaymentSelector
+                  {/*
+                    المنتقي مرئي دائمًا، حتى في وضع التوزيع — الخيار داخل القائمة،
+                    والحقل نفسه يحمل ملخص التوزيع. لا شريط حالة ولا زر مستقل.
+                  */}
+                  <DynamicPaymentSelector
                       context="pos"
-                      value={paymentMethod}
-                      settlement={settlement}
-                      onSettlementChange={(next) => {
-                        setSettlement(next);
-                        //
-                        // حقل المرجع الوحيد في الشاشة يرسمه المنتقي. وكان في
-                        // نقطة البيع حقلًا ثانيًا مستقلًا يكتب `transferRef`،
-                        // فيظهر رقمان مرجعيان لطريقة واحدة. الآن يقرأ `transferRef`
-                        // من نفس حالة التسوية، فيبقى التحقق من الإرسال كما هو
-                        // بلا حقل مكرر.
-                        setTransferRef(next.reference ?? "");
-                      }}
-                      compact
-                      onChange={(method) => {
-                        setIsSplitPayment(false);
-                        setSplitPayments([]);
-                        setPaymentMethod(method);
-                        setSettlement((current) => ({ ...current, method }));
-                        setPaid(method === "credit" ? "0" : "");
-                        setPaidManuallyEdited(false);
-                      }}
-                      disabled={loading}
-                      className="col-span-1 sm:col-span-2"
-                      /*
-                        «توزيع الدفع» خيار داخل القائمة، لا زرًّا مستقلًا أسفل الحقل.
-                        في وضع التوزيع تُبقى القائمة متاحة («رجوع»)، فلا حاجة لزر
-                        ثالث لإلغاء التوزيع.
-                      */
-                      onChooseSplit={() => setSplitEditorOpen(true)}
-                      isSplitMode={false}
+                        value={paymentMethod}
+                        settlement={settlement}
+                        onSettlementChange={(next) => {
+                          setSettlement(next);
+                          //
+                          // حقل المرجع الوحيد في الشاشة يرسمه المنتقي. وكان في
+                          // نقطة البيع حقلًا ثانيًا مستقلًا يكتب `transferRef`،
+                          // فيظهر رقمان مرجعيان لطريقة واحدة. الآن يقرأ `transferRef`
+                          // من نفس حالة التسوية، فيبقى التحقق من الإرسال كما هو
+                          // بلا حقل مكرر.
+                          setTransferRef(next.reference ?? "");
+                        }}
+                        compact
+                        onChange={(method) => {
+                          setIsSplitPayment(false);
+                          setSplitPayments([]);
+                          setPaymentMethod(method);
+                          setSettlement((current) => ({ ...current, method }));
+                          setPaid(method === "credit" ? "0" : "");
+                          setPaidManuallyEdited(false);
+                        }}
+                        disabled={loading}
+                        className="col-span-1 sm:col-span-2"
+                        /*
+                          «توزيع الدفع» خيار داخل القائمة، لا زرًّا مستقلًا أسفل الحقل.
+                          في وضع التوزيع تُبقى القائمة متاحة («رجوع»)، فلا حاجة لزر
+                          ثالث لإلغاء التوزيع.
+                        */
+                        onChooseSplit={() => setSplitEditorOpen(true)}
+                        isSplitMode={isSplitPayment}
+                        splitSummary={
+                          isSplitPayment
+                            ? `${splitPayments.filter((l) => Number(l.amount) > 0).length} ${
+                                lang === "ar" ? "طرق" : "methods"
+                            }`
+                          : undefined
+                      }
                     />
-                  ) : (
-                    <div className="flex h-8 min-w-0 items-center truncate rounded-lg border border-primary/20 bg-primary/[0.04] px-2 text-[10px] font-medium text-primary sm:px-3 sm:text-[11px]">
-                      {lang === "ar" ? "طرق دفع متعددة" : "Multiple methods"}
-                    </div>
-                  )}
-                </div>
+                  </div>
                 {isSplitPayment ? (
                   <div className="flex min-w-0 flex-col gap-1">
                     <span className="truncate text-[10px] font-semibold leading-none text-muted-foreground">
                       {lang === "ar" ? "المبلغ المدفوع" : "Amount paid"}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => setSplitEditorOpen(true)}
-                      className="h-8 min-w-0 truncate rounded-lg border border-primary/20 bg-primary/[0.04] px-2.5 text-start text-[10px] font-medium text-primary"
-                      title={lang === "ar" ? "تعديل توزيع الدفعات" : "Edit payment allocation"}
-                    >
+                    <div className="flex h-8 min-w-0 items-center truncate rounded-lg border border-primary/20 bg-primary/[0.04] px-2.5 text-[10px] font-semibold text-primary tabular-nums">
                       {money(splitPaidTotal)}
-                    </button>
+                    </div>
                   </div>
                 ) : (
                   <AmountInput
