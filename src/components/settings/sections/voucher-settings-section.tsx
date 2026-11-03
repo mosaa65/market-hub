@@ -44,17 +44,20 @@ export function VoucherSettingsSection({
   const { settings, updateSettings, resetSettings, playChime } = useVoucherSettings();
   const [copiedPreview, setCopiedPreview] = React.useState(false);
 
-  // Mock data for the live interactive preview
+  // Mock data for the live interactive preview (styled like custody delivery)
   const sampleVoucherData = {
+    companyName: isAr ? "فورتيكس ERP — فرع المبيعات والتوزيع" : "Vortex ERP — Store Branch",
     partyName: isAr ? "مؤسسة الأمل للتجارة والاستيراد" : "Al-Amal Trading Corp",
-    operationTitle: isAr ? "فاتورة مبيعات وسند استلام" : "Sales Invoice & Receipt",
+    operationType: "invoice" as const,
+    operationTitle: isAr ? "فاتورة مبيعات إلكترونية" : "Sales Invoice",
     amount: 85000,
     currency: isAr ? "ر.ي" : "YER",
     referenceNumber: "INV-94021",
     date: new Date().toLocaleDateString(isAr ? "ar-YE" : "en-US"),
+    paymentMethod: isAr ? "نقداً (كاش)" : "Cash",
     treasury: isAr ? "الصندوق الرئيسي (كاش)" : "Main Cashbox",
     remainingBalance: settings.showRemainingBalance ? 24500 : null,
-    notes: isAr ? "تم الاستلام نقدًا مع خصم الترويج" : "Received in cash with promotion",
+    notes: isAr ? "تم الاستلام نقدًا مع تطبيق خصم الترويج" : "Received in cash with promotion",
   };
 
   const previewText = buildVoucherMessage(

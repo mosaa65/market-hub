@@ -18,7 +18,7 @@ import { VortexDateBadge } from "../display/vortex-date-badge";
 import { formatSystemNumber, toSystemDigits } from "@/lib/format-preferences";
 import { useCompanyCurrency } from "@/hooks/use-company-currency";
 import { playSuccessChime } from "@/lib/communication/audio";
-import { useVoucherSettings } from "@/lib/settings/voucher-settings-store";
+import { useVoucherSettings, buildVoucherMessage } from "@/lib/settings/voucher-settings-store";
 
 export interface VortexTransaction {
   id: string;
@@ -53,14 +53,26 @@ export function VortexTransactionDetailContent({
 
   const isPayment = transaction.type === "payment";
 
+  const { settings } = useVoucherSettings();
+
   const generateMessage = () => {
-    return `مرحباً أستاذ/ة ${transaction.customerName}،
-إشعار بعملية: ${transaction.title}
-المبلغ: ${formatSystemNumber(transaction.amount, { currency: currencySymbol })}
-رقم المرجع: #${transaction.referenceNumber || transaction.id.slice(-6)}
-التاريخ: ${transaction.date}
-${transaction.cashboxName || transaction.bankAccountName ? `الجهة/الوعاء: ${transaction.cashboxName || transaction.bankAccountName}\n` : ""}${transaction.remainingBalance !== undefined ? `المتبقي في الحساب: ${formatSystemNumber(transaction.remainingBalance, { currency: currencySymbol })}` : ""}
-شاكرين لكم ومقدرين حسن تعاونكم.`;
+    return buildVoucherMessage(
+      {
+        partyName: transaction.customerName,
+        operationType: transaction.type,
+        operationTitle: transaction.title,
+        amount: transaction.amount,
+        currency: currencySymbol,
+        referenceNumber: transaction.referenceNumber || transaction.id.slice(-6),
+        date: transaction.date,
+        paymentMethod: transaction.method,
+        treasury: transaction.cashboxName || transaction.bankAccountName,
+        remainingBalance: transaction.remainingBalance,
+        notes: transaction.notes,
+      },
+      settings.defaultTemplate,
+      true,
+    );
   };
 
   const shareWhatsApp = () => {
