@@ -110,7 +110,7 @@ export interface RecordsViewProps<T> {
 }
 
 const DEFAULT_CARDS_GRID =
-  "grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5";
+  "grid grid-cols-1 min-[480px]:grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5";
 
 export function RecordsView<T>({
   rows,

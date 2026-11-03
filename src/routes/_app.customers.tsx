@@ -42,6 +42,7 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
 import { money } from "@/lib/format";
+import { toSystemDigits } from "@/lib/format-preferences";
 import { useDebtIndex } from "@/hooks/use-debts-overview";
 import { StatementIntegrityBadge } from "@/components/statements/statement-integrity-badge";
 import { VortexCollectionSheet, VortexMetricCard } from "@/components/vortex-ui";
@@ -1059,63 +1060,70 @@ function CustomersPage() {
               onMouseEnter={() => setHoveredRow(r.id)}
               onMouseLeave={() => setHoveredRow(null)}
               style={{ animationDelay: `${i * 30}ms` }}
-              className="card-mullak group relative flex h-full flex-col justify-between p-4 cursor-pointer animate-in fade-in slide-in-from-bottom-2 duration-200"
+              className="card-mullak group relative flex h-full flex-col justify-between p-3.5 sm:p-4 cursor-pointer animate-in fade-in slide-in-from-bottom-2 duration-200 overflow-hidden w-full max-w-full"
             >
               {/* Top Section: Colored Strip + Avatar + Name + Badges */}
-              <div className="flex items-start gap-3">
+              <div className="flex items-start gap-2.5 sm:gap-3 min-w-0">
                 {/* Mullak Signature: Rounded colored vertical bar on the right (RTL start) */}
                 <span
                   aria-hidden
-                  className={`h-14 w-1.5 shrink-0 rounded-full transition-all duration-300 ${meta.barClass}`}
+                  className={`h-11 sm:h-12 w-1.5 shrink-0 rounded-full transition-all duration-300 ${meta.barClass}`}
                 />
 
                 {/* Customer Avatar Squircle */}
-                <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary font-bold text-base border border-primary/20 shadow-xs group-hover:scale-105 transition-transform">
+                <div className="grid size-9 sm:size-11 shrink-0 place-items-center rounded-xl sm:rounded-2xl bg-primary/10 text-primary font-bold text-sm sm:text-base border border-primary/20 shadow-xs group-hover:scale-105 transition-transform">
                   {r.name.slice(0, 1)}
                 </div>
 
                 {/* Customer Information */}
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-1">
-                    <h4 className="truncate text-sm font-bold text-foreground group-hover:text-primary transition-colors">
+                  <div className="flex items-center justify-between gap-1.5 min-w-0">
+                    <h4 className="truncate text-xs sm:text-sm font-bold text-foreground group-hover:text-primary transition-colors">
                       {r.name}
                     </h4>
                     {/* Status Tag */}
                     <span
-                      className={`rounded-full px-2 py-0.5 text-[9px] font-bold border shrink-0 ${meta.toneClass}`}
+                      className={`rounded-full px-1.5 sm:px-2 py-0.5 text-[8.5px] sm:text-[9px] font-bold border shrink-0 whitespace-nowrap ${meta.toneClass}`}
                     >
                       {meta.label}
                     </span>
                   </div>
 
                   {/* Contact & Extra Details */}
-                  <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] sm:text-[11px] text-muted-foreground min-w-0 max-w-full">
                     {r.phone && (
-                      <span className="flex items-center gap-1 font-mono" dir="ltr">
-                        <Phone className="size-3 text-muted-foreground" />
-                        {r.phone}
+                      <span
+                        className="inline-flex max-w-full items-center gap-1 truncate rounded-md border border-border/50 bg-surface-2/70 px-1.5 py-0.5 font-mono text-[10px] sm:text-xs"
+                        dir="ltr"
+                      >
+                        <Phone className="size-2.5 sm:size-3 text-muted-foreground shrink-0" />
+                        <span className="truncate">{toSystemDigits(r.phone)}</span>
                       </span>
                     )}
                     {r.email && (
-                      <span className="flex items-center gap-1 truncate max-w-[140px]">
-                        <Mail className="size-3 text-muted-foreground" />
-                        {r.email}
+                      <span className="inline-flex max-w-full items-center gap-1 truncate rounded-md border border-border/50 bg-surface-2/70 px-1.5 py-0.5 text-[10px]">
+                        <Mail className="size-2.5 sm:size-3 text-muted-foreground shrink-0" />
+                        <span className="truncate">{r.email}</span>
                       </span>
                     )}
                   </div>
 
                   {/* Credit limit / Loyalty pills */}
-                  <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                  <div className="mt-1.5 flex items-center gap-1.5 flex-wrap min-w-0 max-w-full">
                     {limit > 0 && (
-                      <span className="rounded-lg bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 text-[9px] font-mono font-medium text-rose-400 flex items-center gap-1">
-                        <ShieldCheck className="size-2.5" />
-                        {lang === "ar" ? "حد الائتمان:" : "Limit:"} <Ltr>{money(limit)}</Ltr>
+                      <span className="inline-flex max-w-full items-center gap-1 rounded-md bg-rose-500/10 border border-rose-500/20 px-1.5 py-0.5 text-[8.5px] sm:text-[9px] font-mono font-medium text-rose-400 truncate">
+                        <ShieldCheck className="size-2.5 shrink-0" />
+                        <span className="truncate">
+                          {lang === "ar" ? "حد الائتمان:" : "Limit:"} <Ltr>{money(limit)}</Ltr>
+                        </span>
                       </span>
                     )}
                     {Number(r.loyalty_points) > 0 && (
-                      <span className="rounded-lg bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[9px] font-mono font-medium text-amber-400 flex items-center gap-1">
-                        <Star className="size-2.5 fill-amber-400 text-amber-400" />
-                        <Ltr>{r.loyalty_points}</Ltr> {lang === "ar" ? "نقطة" : "pts"}
+                      <span className="inline-flex max-w-full items-center gap-1 rounded-md bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 text-[8.5px] sm:text-[9px] font-mono font-medium text-amber-400 truncate">
+                        <Star className="size-2.5 fill-amber-400 text-amber-400 shrink-0" />
+                        <span className="truncate">
+                          <Ltr>{r.loyalty_points}</Ltr> {lang === "ar" ? "نقطة" : "pts"}
+                        </span>
                       </span>
                     )}
                   </div>
@@ -1123,10 +1131,10 @@ function CustomersPage() {
               </div>
 
               {/* Balance & Actions Section */}
-              <div className="mt-3.5 pt-3 border-t border-border/60 flex items-center justify-between gap-2">
-                {/* Financial Balance Status */}
-                <div className="min-w-0 flex-1 truncate">
-                  <span className="block text-[10px] text-muted-foreground truncate">
+              <div className="mt-3 pt-2.5 border-t border-border/60 flex flex-col gap-2 min-w-0">
+                {/* Financial Balance */}
+                <div className="flex items-baseline justify-between gap-2 min-w-0">
+                  <span className="text-[10px] sm:text-[11px] text-muted-foreground truncate">
                     {bal > 0
                       ? lang === "ar"
                         ? "الرصيد المستحق (عليه)"
@@ -1140,7 +1148,7 @@ function CustomersPage() {
                           : "Current Balance"}
                   </span>
                   <span
-                    className={`font-mono text-sm sm:text-base font-bold tracking-tight truncate block ${
+                    className={`font-mono text-xs sm:text-sm font-bold tracking-tight truncate ${
                       bal > 0
                         ? "text-amber-400"
                         : bal < 0
@@ -1153,7 +1161,10 @@ function CustomersPage() {
                 </div>
 
                 {/* Action Buttons Row */}
-                <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                <div
+                  className="grid grid-cols-4 gap-1 w-full pt-0.5"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   {/* Communication Actions Menu */}
                   <CustomerCommunicationMenu
                     customer={{
@@ -1173,7 +1184,7 @@ function CustomersPage() {
                         title={
                           lang === "ar" ? "إجراءات المراسلة والتواصل" : "Communication options"
                         }
-                        className={`grid size-7 sm:size-7.5 place-items-center rounded-xl border transition active:scale-95 ${
+                        className={`flex h-7 sm:h-7.5 w-full items-center justify-center rounded-xl border transition active:scale-95 ${
                           r.phone
                             ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border-emerald-500/20"
                             : "bg-muted/40 text-muted-foreground/50 border-border/60"
@@ -1185,21 +1196,23 @@ function CustomersPage() {
                   />
 
                   {/* Quick Payment Button (F3) */}
-                  {isModuleEnabled("payments") && (
+                  {isModuleEnabled("payments") ? (
                     <button
                       onClick={() => goPayment(r)}
                       title={lang === "ar" ? "تحصيل دفعة (F3)" : "Collect payment (F3)"}
-                      className="grid size-7 sm:size-7.5 place-items-center rounded-xl bg-primary/10 hover:bg-primary hover:text-primary-foreground border border-primary/20 text-primary transition active:scale-95"
+                      className="flex h-7 sm:h-7.5 w-full items-center justify-center rounded-xl bg-primary/10 hover:bg-primary hover:text-primary-foreground border border-primary/20 text-primary transition active:scale-95"
                     >
                       <Wallet className="size-3.5" />
                     </button>
+                  ) : (
+                    <div className="h-7 sm:h-7.5 w-full" />
                   )}
 
                   {/* Quick Statement Button (F5) */}
                   <button
                     onClick={() => goStatement(r)}
                     title={lang === "ar" ? "كشف حساب (F5)" : "Statement (F5)"}
-                    className="grid size-7 sm:size-7.5 place-items-center rounded-xl bg-surface-2 hover:bg-surface-3 border border-border text-muted-foreground hover:text-foreground transition active:scale-95"
+                    className="flex h-7 sm:h-7.5 w-full items-center justify-center rounded-xl bg-surface-2 hover:bg-surface-3 border border-border text-muted-foreground hover:text-foreground transition active:scale-95"
                   >
                     <FileText className="size-3.5" />
                   </button>
@@ -1212,7 +1225,7 @@ function CustomersPage() {
                           ? "حساب نظامي رسمي (نقدي) — محمي من التعديل والحذف"
                           : "Official system entity (Cash) — protected"
                       }
-                      className="grid size-7 sm:size-7.5 place-items-center rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                      className="flex h-7 sm:h-7.5 w-full items-center justify-center rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
                     >
                       <Lock className="size-3.5" />
                     </span>
@@ -1220,7 +1233,7 @@ function CustomersPage() {
                     <button
                       onClick={() => setEdit(r)}
                       title={lang === "ar" ? "تعديل (F2)" : "Edit (F2)"}
-                      className="grid size-7 sm:size-7.5 place-items-center rounded-xl bg-surface-2 hover:bg-surface-3 border border-border text-muted-foreground hover:text-foreground transition active:scale-95"
+                      className="flex h-7 sm:h-7.5 w-full items-center justify-center rounded-xl bg-surface-2 hover:bg-surface-3 border border-border text-muted-foreground hover:text-foreground transition active:scale-95"
                     >
                       <Pencil className="size-3.5" />
                     </button>

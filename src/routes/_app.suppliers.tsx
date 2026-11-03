@@ -1225,13 +1225,13 @@ function SupplierCard({
   const bal = Number(r.balance);
 
   return (
-    <div className="card-mullak group relative flex h-full flex-col justify-between rounded-2xl p-3 transition-all duration-200 hover:shadow-md sm:p-4.5">
-      <div className="flex items-start gap-2.5">
+    <div className="card-mullak group relative flex h-full flex-col justify-between rounded-2xl p-3 transition-all duration-200 hover:shadow-md sm:p-4 overflow-hidden w-full max-w-full">
+      <div className="flex items-start gap-2 sm:gap-2.5 min-w-0">
         <span
           aria-hidden
-          className={`h-12 w-1.5 shrink-0 rounded-full transition-all duration-300 ${meta.barClass}`}
+          className={`h-11 sm:h-12 w-1.5 shrink-0 rounded-full transition-all duration-300 ${meta.barClass}`}
         />
-        <div className="grid size-11 shrink-0 place-items-center rounded-2xl border border-primary/20 bg-primary/10 text-sm font-bold text-primary transition-transform group-hover:scale-105">
+        <div className="grid size-9 sm:size-11 shrink-0 place-items-center rounded-xl sm:rounded-2xl border border-primary/20 bg-primary/10 text-xs sm:text-sm font-bold text-primary transition-transform group-hover:scale-105">
           {(r.name ?? "?").slice(0, 1)}
         </div>
         <div className="min-w-0 flex-1">
@@ -1239,7 +1239,7 @@ function SupplierCard({
             {r.name || "—"}
           </h4>
           <span
-            className={`mt-1 inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-[9px] font-bold ${meta.toneClass}`}
+            className={`mt-1 inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 sm:px-2 py-0.5 text-[8.5px] sm:text-[9px] font-bold ${meta.toneClass}`}
           >
             <span className={`size-1.5 rounded-full ${meta.barClass}`} />
             {meta.label}
@@ -1247,43 +1247,45 @@ function SupplierCard({
         </div>
       </div>
 
-      <div className="mt-2 flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground">
+      <div className="mt-2 flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground min-w-0 max-w-full">
         {r.phone && (
           <span
-            className="inline-flex max-w-[130px] items-center gap-1 truncate rounded-md border border-border/50 bg-surface-2/70 px-1.5 py-0.5"
+            className="inline-flex max-w-full items-center gap-1 truncate rounded-md border border-border/50 bg-surface-2/70 px-1.5 py-0.5"
             dir="ltr"
           >
             <span className="truncate font-mono">{toSystemDigits(r.phone)}</span>
           </span>
         )}
         {r.email && (
-          <span className="inline-flex max-w-[130px] items-center gap-1 truncate rounded-md border border-border/50 bg-surface-2/70 px-1.5 py-0.5">
+          <span className="inline-flex max-w-full items-center gap-1 truncate rounded-md border border-border/50 bg-surface-2/70 px-1.5 py-0.5">
             <span className="truncate">{r.email}</span>
           </span>
         )}
       </div>
 
-      <div className="mt-2.5 flex items-center justify-between gap-1.5 border-t border-border/60 pt-2">
-        <div className="min-w-0">
-          <p className="text-[9px] font-medium text-muted-foreground sm:text-[10px]">
+      <div className="mt-2.5 flex flex-col gap-1.5 border-t border-border/60 pt-2 min-w-0">
+        <div className="flex items-baseline justify-between gap-2 min-w-0">
+          <p className="text-[9px] font-medium text-muted-foreground sm:text-[10px] truncate">
             {balanceLabel(bal, isRtl)}
           </p>
           <p
-            className={`truncate font-mono text-sm font-bold tracking-tight sm:text-base ${balanceTone(bal)}`}
+            className={`truncate font-mono text-xs sm:text-sm font-bold tracking-tight ${balanceTone(bal)}`}
           >
             <Ltr>{moneyOf(bal)}</Ltr>
           </p>
         </div>
 
-        <SupplierRowActions
-          supplier={r}
-          onEdit={onEdit}
-          onDelete={onDelete}
-          deleting={deleting}
-          whatsAppMessage={whatsAppMessage}
-          editLabel={editLabel}
-          deleteLabel={deleteLabel}
-        />
+        <div className="flex items-center justify-end gap-1 w-full pt-0.5">
+          <SupplierRowActions
+            supplier={r}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            deleting={deleting}
+            whatsAppMessage={whatsAppMessage}
+            editLabel={editLabel}
+            deleteLabel={deleteLabel}
+          />
+        </div>
       </div>
     </div>
   );
