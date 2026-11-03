@@ -20,6 +20,7 @@ import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { useI18n } from "@/lib/i18n";
+import { todayKey, dateOnlyIso } from "@/lib/time/business-date";
 import { money } from "@/lib/format";
 import {
   paymentMethodLabel,
@@ -120,7 +121,9 @@ function PaymentsPage() {
   const { banks, wallets } = useCompanyBankAccounts();
   const [reference, setReference] = useState("");
   const [note, setNote] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  // التاريخ المحلي لليوم. `toISOString()` يحوّل إلى UTC فيزحف اليوم في اليمن
+  // (UTC+3) بين منتصف الليل والثالثة صباحًا — فيُسجَّل تحصيل اليوم بتاريخ الأمس.
+  const [date, setDate] = useState(todayKey);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
   const [paymentFormOpen, setPaymentFormOpen] = useState(false);
@@ -780,6 +783,7 @@ function PaymentsPage() {
                         <input
                           type="date"
                           value={date}
+                          max={todayKey()}
                           onChange={(e) => setDate(e.target.value)}
                           className="h-11 w-full rounded-xl border border-primary/20 bg-card ps-10 pe-3 text-sm focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
                         />
@@ -996,7 +1000,13 @@ function PaymentsPage() {
                             className="min-h-[56px] cursor-pointer border-b border-border/50 transition-all hover:bg-surface-2/60 hover:shadow-sm hover:outline hover:outline-1 hover:outline-border/60"
                           >
                             <td className="px-3 py-2">
-                              <VortexDateBadge date={p.payment_date} size="sm" />
+                              {/* payment_date عمود date بلا وقت: عرضه كطابع زمني
+                                  يُظهر ساعة مستنبتة وقد يزحف اليوم يومًا. */}
+                              <VortexDateBadge
+                                date={dateOnlyIso(p.payment_date)}
+                                size="sm"
+                                showTime={false}
+                              />
                             </td>
                             <td className="px-3 py-2 font-mono text-xs">
                               <span className="rounded-full bg-muted/70 px-2 py-0.5 text-muted-foreground">

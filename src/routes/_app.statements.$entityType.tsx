@@ -80,6 +80,7 @@ import { reportTypeForEntity, type ReportType } from "@/lib/statements/report-re
 import { SearchInput } from "@/components/ui/search-input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { VortexDateBadge } from "@/components/vortex-ui";
+import { dateOnlyIso } from "@/lib/time/business-date";
 import {
   CustomerFormDialog,
   type CustomerRecord,
@@ -927,9 +928,10 @@ export function StatementPage() {
                           else if (col.key === "date")
                             content = result?.period.from ? (
                               <VortexDateBadge
-                                date={result.period.from}
+                                date={dateOnlyIso(result.period.from)}
                                 size="sm"
                                 showWeekday={false}
+                                showTime={false}
                               />
                             ) : (
                               <span className="text-xs text-muted-foreground">—</span>

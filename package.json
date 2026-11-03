@@ -41,7 +41,8 @@
     "test:column-registry": "npx tsx src/lib/records/__tests__/column-registry.test.ts",
     "test:sidebar-settings": "npx tsx --tsconfig tsconfig.json src/lib/navigation/__tests__/sidebar-settings-sections.test.ts",
     "audit:customer-balances": "node scripts/audit-customer-balances.mjs",
-    "test:customer-balances": "npx supabase db query --linked --file supabase/tests/customer_balance_reconciliation_acceptance.sql"
+    "test:customer-balances": "npx supabase db query --linked --file supabase/tests/customer_balance_reconciliation_acceptance.sql",
+    "test:business-date": "npx tsx src/lib/time/__tests__/business-date.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

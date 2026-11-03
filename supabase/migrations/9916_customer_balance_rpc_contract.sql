@@ -49,6 +49,7 @@ AS $$
     'recalculate_customer_balance',
     'recalculate_all_customer_balances',
     'customer_balance_reconciliation_report',
+    'customer_ledger_time_mismatches',
     -- ── أمانات المطحنة ──
     'custody_intake', 'custody_milling', 'custody_deliver', 'custody_adjust',
     'custody_balances', 'custody_link_invoice',
