@@ -272,11 +272,21 @@ BEGIN
       UPDATE public.sales_invoices
          SET paid = round(coalesce(paid, 0) + v_credit_applied, 2),
              status = CASE
-               WHEN round(coalesce(total, 0) - (coalesce(paid, 0) + v_credit_applied), 2) <= 0.005
+               WHEN round(coalesce(total, 0) - (round(coalesce(paid, 0) + v_credit_applied, 2)), 2) <= 0.005
                  THEN 'returned'::public.invoice_status
                ELSE 'confirmed'::public.invoice_status END,
              payment_status = public.derive_payment_status(
                round(coalesce(paid, 0) + v_credit_applied, 2), total),
+             updated_at = now()
+       WHERE id = _invoice_id;
+    ELSE
+      -- لا يوجد ما يُخصم من الذمة (فاتورة مسدَّدة). نحدّث حالة الفاتورة وحدها.
+      UPDATE public.sales_invoices
+         SET status = CASE
+               WHEN round(coalesce(total, 0) - coalesce(paid, 0), 2) <= 0.005
+                 THEN 'returned'::public.invoice_status
+               ELSE status END,
+             payment_status = public.derive_payment_status(paid, total),
              updated_at = now()
        WHERE id = _invoice_id;
     END IF;
@@ -294,7 +304,7 @@ BEGIN
     END IF;
 
     IF _refund_method = 'credit' THEN
-      -- إذا كان الاسترداد على الحساب (آجل)، يُضاف أي فائض كرصيد دائن للعميل
+      -- الاسترداد على الحساب: يبقى المبلغ ذمة دائنة للعميل (لا نقد يخرج).
       IF v_cash_refund > 0 THEN
         INSERT INTO public.customer_ledger (
           customer_id, entry_type, credit, reference_id, reference_type,
@@ -306,28 +316,13 @@ BEGIN
           'مرتجع مبيعات — رصيد دائن للعميل'
         );
       END IF;
-    ELSE
-      -- استرداد نقدي من الصندوق أو البنك: يخرج المبلغ نقدًا للمشتري
-      IF v_cash_refund > 0 THEN
-        INSERT INTO public.customer_ledger (
-          customer_id, entry_type, credit, reference_id, reference_type,
-          occurred_at, created_by, source_key, note
-        )
-        VALUES (
-          v_inv.customer_id, 'return', v_cash_refund, v_id, 'sales_return_refund',
-          now(), v_user, 'return-refund:' || v_id,
-          'مرتجع مبيعات — استرداد نقدي'
-        );
-        INSERT INTO public.customer_ledger (
-          customer_id, entry_type, debit, reference_id, reference_type,
-          occurred_at, created_by, source_key, note
-        )
-        VALUES (
-          v_inv.customer_id, 'refund', v_cash_refund, v_id, 'sales_return_refund_out',
-          now(), v_user, 'return-cash-out:' || v_id,
-          'صرف نقدية المرتجع للعميل'
-        );
-      END IF;
+    ELSIF v_cash_refund > 0 THEN
+      -- استرداد نقدي: المال يخرج من الصندوق/البنك، فلا يبقى منه أثر على الذمة.
+      -- ⚠️ لا يُسجَّل هنا سطر في دفتر العميل:
+      --    • سطر دائن يجعل الدفتر يخصم مبلغًا أعاده العميل نقدًا ← رصيد دائن وهمي.
+      --    • سطر مدين يُنشئ حركة مصطنعة تُعادل الدائن وتُخفي النقد ← مصالحة صورية.
+      -- الأثر النقدي كامل في القيد المحاسبي (credit على حساب الصندوق/البنك).
+      NULL;
     END IF;
 
     PERFORM public.recalculate_customer_balance(

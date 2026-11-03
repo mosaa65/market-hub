@@ -622,7 +622,9 @@ function SuppliersPage() {
       <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4">
         <VortexMetricCard
           title={isRtl ? "إجمالي الموردين" : "Total Suppliers"}
-          value={toSystemDigits(rows.length.toString())}
+          value={rows.length}
+          type="count"
+          currency=""
           subtitle={`${toSystemDigits(activeCount.toString())} ${isRtl ? "مورد نشط" : "active"}`}
           icon={<Truck className="size-5" />}
           iconClassName="bg-primary/10 text-primary border border-primary/20"
@@ -633,7 +635,8 @@ function SuppliersPage() {
         />
         <VortexMetricCard
           title={isRtl ? "المبالغ المستحقة لهم" : "Payables (Owed)"}
-          value={toSystemDigits(money(totalPayable))}
+          value={totalPayable}
+          type="currency"
           subtitle={`${toSystemDigits(payableCount.toString())} ${isRtl ? "مورد له مبالغ" : "with balance"}`}
           icon={<Wallet className="size-5" />}
           iconClassName="bg-amber-500/10 text-amber-500 border border-amber-500/20"
@@ -644,7 +647,8 @@ function SuppliersPage() {
         />
         <VortexMetricCard
           title={isRtl ? "الدفعات المقدمة" : "Advances Paid"}
-          value={toSystemDigits(money(totalAdvance))}
+          value={totalAdvance}
+          type="currency"
           subtitle={isRtl ? "مبالغ مدفوعة مقدماً" : "prepaid to vendors"}
           icon={<PackageCheck className="size-5" />}
           iconClassName="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
@@ -655,7 +659,8 @@ function SuppliersPage() {
         />
         <VortexMetricCard
           title={isRtl ? "صافي الموقف" : "Net Position"}
-          value={toSystemDigits(money(totalPayable - totalAdvance))}
+          value={totalPayable - totalAdvance}
+          type="currency"
           subtitle={isRtl ? "الرصيد الصافي للدفتر" : "Net ledger position"}
           icon={<TrendingDown className="size-5" />}
           iconClassName="bg-sky-500/10 text-sky-500 border border-sky-500/20"

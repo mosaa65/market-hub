@@ -165,21 +165,23 @@ export async function fetchOpeningLines(documentId: string): Promise<OpeningLine
   );
 }
 
-export async function fetchStockableItems(): Promise<
-  {
-    id: string;
-    sku: string;
-    name: string;
-    name_ar: string | null;
-    package_weight_kg?: number | null;
-    cost_price?: number | null;
-  }[]
-> {
+export interface StockableItem {
+  id: string;
+  sku: string;
+  name: string;
+  name_ar: string | null;
+  package_weight_kg?: number | null;
+  cost_price?: number | null;
+  item_class?: string | null;
+  item_nature?: string | null;
+  unit?: { name: string; name_ar: string | null; short_name: string | null } | null;
+}
+
+export async function fetchStockableItems(): Promise<StockableItem[]> {
   const rows = unwrap(
     await db
       .from("products")
-      .select("id, sku, name, name_ar, package_weight_kg, cost_price")
-      .eq("item_nature", "GOOD")
+      .select("id, sku, name, name_ar, package_weight_kg, cost_price, item_class, item_nature, unit:units!products_unit_id_fkey(name, name_ar, short_name)")
       .eq("inventory_policy", "TRACKED")
       .eq("is_active", true)
       .order("name_ar"),
