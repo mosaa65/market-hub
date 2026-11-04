@@ -213,8 +213,8 @@
 | `npm run lint` / `tsc` | ❌ لم يُنفَّذ — لا Node/npm |
 | اختبار العقود | ⚠️ مكتوب ولم يُنفَّذ — لا Node |
 | اختبار SQL | ⚠️ مكتوب ولم يُنفَّذ — لا قاعدة اختبار |
-| Commit محلي | ✅ `phase1-accounting-fixes` (������ ������ ��� commit) على الفرع الحالي `yunis-fix-slidbar-names-v1` |
-| Push إلى GitHub | ❌ فشل: تعذّر الاتصال بـ github.com:443 (شبكة غير متاحة) — التعديلات محفوظة محلياً فقط |
+| Commit محلي | ✅ `c30d8e9` على الفرع الحالي `yunis-fix-slidbar-names-v1` |
+| Push إلى GitHub | ✅ نجح: HEAD -> yunis-fix-slidbar-names-v1 على github.com/mosaa65/market-hub |
 
 ---
 
@@ -229,10 +229,4 @@
 
 لم يُنفَّذ أي عمل من المرحلة الثانية عمداً.
 
-**ملاحظة تشغيلية:** تعذّر رفع الـ commit (`phase1-accounting-fixes` (������ ������ ��� commit)) إلى GitHub بسبب انقطاع الاتصال بالشبكة. الأمر المطلوب عند توفر الاتصال:
-
-```powershell
-git push origin HEAD
-```
-
-الفرع الحالي: `yunis-fix-slidbar-names-v1`. لم يُنشأ أي فرع جديد، ولم يحدث دمج مع `main`.
+**ملاحظة تشغيلية:** رُفع الـ commit `c30d8e9` إلى GitHub بنجاح على الفرع `yunis-fix-slidbar-names-v1`، ولم يُدمج مع `main` ولم يُفتح طلب دمج.
