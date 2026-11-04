@@ -850,6 +850,8 @@ export function CustomerCustodyPageBase({ mode }: { mode: CustodyMode }) {
           <VortexMetricCard
             title="إجمالي رصيد الأمانات"
             value={fmtNum(stats.totalRemainingBags)}
+            type="quantity"
+            currency={false}
             subtitle={`الوزن الصافي: ${fmtNum(stats.totalRemainingKg)} كجم`}
             icon={<Scale className="size-5" />}
             iconClassName="bg-primary/10 text-primary border border-primary/20"
@@ -861,6 +863,8 @@ export function CustomerCustodyPageBase({ mode }: { mode: CustodyMode }) {
           <VortexMetricCard
             title="حبوب خام (بانتظار الطحن)"
             value={fmtNum(stats.rawBags)}
+            type="quantity"
+            currency={false}
             subtitle={`الوزن: ${fmtNum(stats.rawKg)} كجم بانتظار الطحن`}
             icon={<Wheat className="size-5" />}
             iconClassName="bg-amber-500/10 text-amber-500 border border-amber-500/20"
@@ -872,6 +876,8 @@ export function CustomerCustodyPageBase({ mode }: { mode: CustodyMode }) {
           <VortexMetricCard
             title="نواتج (جاهزة للتسليم)"
             value={fmtNum(stats.outputBags)}
+            type="quantity"
+            currency={false}
             subtitle={`الوزن: ${fmtNum(stats.outputKg)} كجم دقيق ونخالة`}
             icon={<Boxes className="size-5" />}
             iconClassName="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
@@ -883,6 +889,8 @@ export function CustomerCustodyPageBase({ mode }: { mode: CustodyMode }) {
           <VortexMetricCard
             title="العملاء النشطون"
             value={fmtNum(stats.activeCustomersCount)}
+            type="count"
+            currency={false}
             subtitle={`موزعة في ${stats.activeWarehousesCount} مستودعات`}
             icon={<User className="size-5" />}
             iconClassName="bg-sky-500/10 text-sky-500 border border-sky-500/20"

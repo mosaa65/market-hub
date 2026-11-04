@@ -775,6 +775,7 @@ function DebtsPage() {
         <VortexMetricCard
           title={t("debts.total_debt")}
           value={totals.totalDebt}
+          type="currency"
           highlight
           icon={<Wallet className="size-5 text-amber-600 dark:text-amber-400" />}
           iconClassName="bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
@@ -787,7 +788,8 @@ function DebtsPage() {
         <VortexMetricCard
           title={t("debts.debtors")}
           value={totals.debtors}
-          currency={isAr ? "عميل" : "customers"}
+          type="count"
+          currency={false}
           icon={<UserCheck className="size-5 text-sky-600 dark:text-sky-400" />}
           iconClassName="bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20"
           subtitle={isAr ? "عملاء عليهم أرصدة مدينة قائمة" : "Customers holding an open balance"}
@@ -798,7 +800,8 @@ function DebtsPage() {
         <VortexMetricCard
           title={t("debts.over_limit")}
           value={totals.overLimit}
-          currency={isAr ? "حساب" : "accounts"}
+          type="count"
+          currency={false}
           icon={<AlertTriangle className="size-5 text-rose-600 dark:text-rose-400" />}
           iconClassName="bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
           subtitle={

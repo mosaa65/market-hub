@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { useCompanyCurrency } from "@/hooks/use-company-currency";
 import { splitAmountAndCurrency, formatCount } from "@/lib/format";
+import { formatSystemNumber } from "@/lib/format-preferences";
 
 export interface VortexMetricCardProps {
   title?: string;
@@ -62,6 +63,23 @@ const COUNT_KEYWORDS = [
   "موظف",
   "مستخدم",
   "فواتير",
+  "دفعة",
+  "دفعات",
+  "صالح",
+  "قريب",
+  "منتهي",
+  "منتهية",
+  "نشط",
+  "نشطة",
+  "غير نشط",
+  "افتراضي",
+  "إضافات",
+  "خصومات",
+  "نتائج",
+  "حركة",
+  "حركات",
+  "تنبيه",
+  "تنبيهات",
   "تشغيل",
   "مستودع",
   "تصنيف",
@@ -75,6 +93,19 @@ const COUNT_KEYWORDS = [
   "user",
   "employee",
   "invoice",
+  "batch",
+  "valid",
+  "soon",
+  "expired",
+  "active",
+  "inactive",
+  "default",
+  "addition",
+  "deduction",
+  "result",
+  "movement",
+  "alert",
+  "notification",
   "batch",
   "warehouse",
   "category",
@@ -146,7 +177,11 @@ export function VortexMetricCard({
       displayValue = formatCount(value);
       finalCurrencySymbol = null;
     } else {
-      displayValue = value.toLocaleString("ar-YE");
+      // Do not use an Arabic browser locale here: digit style is controlled by
+      // Settings and `formatSystemNumber` is the single formatter that honours it.
+      displayValue = formatSystemNumber(value, {
+        decimals: Number.isInteger(value) ? 0 : 2,
+      });
       finalCurrencySymbol = typeof currency === "string" ? currency : currencySymbol;
     }
   } else {

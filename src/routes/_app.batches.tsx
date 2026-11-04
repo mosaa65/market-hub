@@ -568,6 +568,8 @@ function BatchesPage() {
         <VortexMetricCard
           title={isRtl ? "إجمالي الدفعات" : "Total batches"}
           value={counts.total}
+          type="count"
+          currency={false}
           subtitle={isRtl ? "إجمالي السجلات المسجلة" : "Total in system"}
           icon={<CalendarClock className="size-5" />}
           tone="info"
@@ -575,6 +577,8 @@ function BatchesPage() {
         <VortexMetricCard
           title={isRtl ? "صالح للاستخدام" : t("batches.status.valid")}
           value={counts.valid}
+          type="count"
+          currency={false}
           subtitle={isRtl ? "آمن للصرف والبيع" : "Safe to use"}
           icon={<ShieldCheck className="size-5" />}
           tone="success"
@@ -584,6 +588,8 @@ function BatchesPage() {
         <VortexMetricCard
           title={isRtl ? "قريب الانتهاء" : t("batches.status.soon")}
           value={counts.soon}
+          type="count"
+          currency={false}
           subtitle={
             isRtl
               ? `خلال ${settings.warning_days || 30} يوماً`
@@ -597,6 +603,8 @@ function BatchesPage() {
         <VortexMetricCard
           title={isRtl ? "منتهي الصلاحية" : t("batches.status.expired")}
           value={counts.expired}
+          type="count"
+          currency={false}
           subtitle={isRtl ? "محظور من البيع" : "Past expiry"}
           icon={<PackageX className="size-5" />}
           tone="danger"

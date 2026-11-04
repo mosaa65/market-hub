@@ -48,7 +48,7 @@ import { RecordsViewToggle } from "@/components/ui/records-view-toggle";
 import { QuickFilterBar } from "@/components/ui/quick-filter-bar";
 import { usePersistedViewMode } from "@/hooks/use-persisted-view-mode";
 import { buildSearchIndex, fuzzySearch } from "@/design/fuzzy";
-import { moneyCell, qtyCell } from "@/lib/format";
+import { formatCount, moneyCell, qtyCell } from "@/lib/format";
 import { useBreakpoint } from "@/design/breakpoints";
 import { useRealtimeTable } from "@/lib/realtime";
 import { QUERY_KEYS } from "@/lib/query-keys";
@@ -654,7 +654,7 @@ function InventoryPage() {
               {t("inventory.kpi.total")}
             </p>
             <h3 className="mt-1 font-mono text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-              {(totalCount ?? rows.length).toLocaleString()}
+              {formatCount(totalCount ?? rows.length)}
             </h3>
             <span className="mt-1 inline-flex items-center gap-1 text-[10px] text-muted-foreground/80">
               <Sparkles className="size-3 text-primary" />
@@ -673,7 +673,7 @@ function InventoryPage() {
               {t("inventory.kpi.low")}
             </p>
             <h3 className="mt-1 font-mono text-xl font-bold tracking-tight text-amber-400 sm:text-2xl">
-              {kpi.low.toLocaleString()}
+              {formatCount(kpi.low)}
             </h3>
             <span className="mt-1 inline-flex items-center gap-1 text-[10px] text-amber-500/80">
               <TrendingDown className="size-3" />
@@ -692,7 +692,7 @@ function InventoryPage() {
               {t("inventory.kpi.out")}
             </p>
             <h3 className="mt-1 font-mono text-xl font-bold tracking-tight text-red-400 sm:text-2xl">
-              {kpi.out.toLocaleString()}
+              {formatCount(kpi.out)}
             </h3>
             <span className="mt-1 inline-flex items-center gap-1 text-[10px] text-red-500/80">
               <AlertTriangle className="size-3" />

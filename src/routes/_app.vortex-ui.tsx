@@ -71,6 +71,7 @@ function VortexUiShowcasePage() {
           <VortexMetricCard
             title="إجمالي التحصيلات اليومية"
             value={24850}
+            type="currency"
             trend={{ value: 14.2, isPositive: true }}
             icon={<TrendingUp />}
             variant="default"
@@ -79,6 +80,7 @@ function VortexUiShowcasePage() {
           <VortexMetricCard
             title="الذمم والديون المستحقة"
             value={186200}
+            type="currency"
             trend={{ value: 5.8, isPositive: false }}
             icon={<DollarSign />}
             variant="warning"
@@ -87,7 +89,8 @@ function VortexUiShowcasePage() {
           <VortexMetricCard
             title="فواتير مسددة بالكامل"
             value={342}
-            currency=""
+            type="count"
+            currency={false}
             icon={<Receipt />}
             variant="success"
             description="نسبة التغطية النقدية 92%"
@@ -95,7 +98,8 @@ function VortexUiShowcasePage() {
           <VortexMetricCard
             title="عملاء بحاجة للمتابعة"
             value={18}
-            currency=""
+            type="count"
+            currency={false}
             icon={<Users />}
             variant="danger"
             description="تجاوزوا مهلة السداد المقررة"
