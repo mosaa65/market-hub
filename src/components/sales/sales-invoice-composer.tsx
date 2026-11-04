@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Market-Hub ERP — Sales invoice, two selling modes on one screen.
  *
  * WHY THIS SCREEN EXISTS SEPARATELY FROM THE POS
@@ -313,22 +313,35 @@ export function SalesInvoiceComposer() {
   function changeLineUom(index: number, unitId: string | null) {
     const line = cart[index];
     if (!line) return;
+    const oldFactor = line.uomFactor && line.uomFactor > 0 ? line.uomFactor : 1;
     const unit = (line.product.sale_uoms ?? []).find((option) => option.unit_id === unitId);
-    if (!unit) {
+
+    if (!unit || unitId === line.product.unit_id) {
       // الوحدة الأساسية: السعر الأساسي وعامل 1.
       const baseUnit = (line.product.sale_uoms ?? []).find(
         (option) => option.unit_id === line.product.unit_id,
       );
+      const newFactor = baseUnit?.factor_to_base ?? 1;
+      const rawQty = (Number(line.quantity || 0) * oldFactor) / newFactor;
+      const nextQty = Math.max(1, Math.round(rawQty));
+
       updateLine(index, {
         uomId: line.product.unit_id,
-        uomFactor: baseUnit?.factor_to_base ?? 1,
+        uomFactor: newFactor,
         uomLabel: baseUnit?.label ?? line.product.base_unit_label,
-        quantityStep: baseUnit?.quantity_increment ?? 0.001,
+        quantity: String(nextQty),
+        quantityStep: baseUnit?.quantity_increment ?? 1,
         unitPrice: String(baseUnit?.sale_price ?? line.product.sale_price ?? 0),
         priceEditable: false,
       });
       return;
     }
+
+    const newFactor = unit.factor_to_base && unit.factor_to_base > 0 ? unit.factor_to_base : 1;
+    const increment = Math.max(1, Math.round(unit.quantity_increment ?? 1));
+    const rawQty = (Number(line.quantity || 0) * oldFactor) / newFactor;
+    let nextQty = Math.max(increment, Math.round(rawQty));
+
     const reservedByOtherLines = cart.reduce(
       (sum, other, otherIndex) =>
         otherIndex === index || other.product.id !== line.product.id
@@ -337,18 +350,31 @@ export function SalesInvoiceComposer() {
       0,
     );
     const availableForLine = Math.max(0, line.product.on_hand - reservedByOtherLines);
-    if ((Number(line.quantity) || 0) * unit.factor_to_base > availableForLine + 1e-9) {
-      toast.error(
-        isRtl
-          ? "الكمية الحالية تتجاوز الرصيد المتاح بهذه الوحدة"
-          : "The quantity exceeds the available stock in this unit.",
-      );
-      return;
+    const availableInNewUom = availableForLine / newFactor;
+
+    if (nextQty > availableInNewUom) {
+      if (availableInNewUom >= increment) {
+        nextQty = Math.max(increment, Math.floor(availableInNewUom));
+        toast.info(
+          isRtl
+            ? `تم ضبط الكمية إلى المتاح في المخزون (${nextQty} ${unit.label})`
+            : `Quantity adjusted to available stock (${nextQty} ${unit.label})`,
+        );
+      } else {
+        toast.error(
+          isRtl
+            ? `الكمية المتاحة في المخزون لا تكفي لوحدة ${unit.label}`
+            : `Insufficient stock for ${unit.label}`,
+        );
+        return;
+      }
     }
+
     updateLine(index, {
       uomId: unit.unit_id,
-      uomFactor: unit.factor_to_base,
+      uomFactor: newFactor,
       uomLabel: unit.label,
+      quantity: String(nextQty),
       quantityStep: unit.quantity_increment,
       unitPrice: String(unit.sale_price),
       priceEditable: false,

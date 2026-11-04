@@ -70,7 +70,6 @@ import { AmountInput } from "@/components/ui/amount-input";
 import { QuantityInput } from "@/components/ui/quantity-input";
 import { ProductPicker } from "@/components/products/product-picker";
 import { ProductLinesEditor } from "@/components/products/product-lines-editor";
-import { QuickAddButton } from "@/components/ui/quick-add-button";
 import { WarehouseBadge } from "@/components/ui/warehouse-badge";
 import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
 import {
@@ -585,6 +584,12 @@ function MillingIntakePage() {
                   </div>
                 </MillingField>
 
+                {/*
+                  زر «إضافة حبوب» يُعرض مرة واحدة فقط، داخل رأس قسم «أنواع الحبوب
+                  المستلمة» أسفل هذه الكتلة. تكراره بجانب شارة المستودع كان
+                  يضع فعلين متطابقين على الشاشة نفسها، فأي منهما يضغطه المشغّل
+                  يُدرك أنه لا يفرق بينهما.
+                */}
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <WarehouseBadge
                     value={warehouseId}
@@ -595,13 +600,6 @@ function MillingIntakePage() {
                       nameAr: w.name_ar || w.name,
                       isDefault: Boolean(w.is_default),
                     }))}
-                  />
-                  <QuickAddButton
-                    label="إضافة أصناف حبوب إلى دليل الأمانات"
-                    icon={Plus}
-                    tone="amber"
-                    size="sm"
-                    onClick={() => setQuickGrainDialogOpen(true)}
                   />
                 </div>
               </div>
@@ -636,20 +634,17 @@ function MillingIntakePage() {
 
               {/* أسطر الحبوب المستلمة — المحرّر الموحّد المشترك مع الطحن والتسليم */}
               <div className="space-y-2.5 rounded-2xl border border-border/80 bg-surface-2/30 p-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <h4 className="text-xs font-bold text-foreground">أنواع الحبوب المستلمة</h4>
-                    <p className="text-[11px] leading-relaxed text-muted-foreground">
-                      سطر لكل نوع حبوب: اختر الصنف، ثم عدد الأكياس، والوزن الفعلي من الميزان.
-                    </p>
-                  </div>
-                  <QuickAddButton
-                    label="إضافة نوع حبوب جديد إلى الأصناف"
-                    icon={Plus}
-                    tone="amber"
-                    size="sm"
-                    onClick={() => setQuickGrainDialogOpen(true)}
-                  />
+                {/*
+                  لا زر «إضافة نوع حبوب» هنا: زر الإضافة موجود فوق عند اختيار
+                  المستودع، وتكراره في ترويسة القسم كان يعطي نفس الإجراء
+                  باسمين مختلفين في شاشة واحدة. يبقى زر واحد فقط، ويظهر
+                  زر «أضف أول نوع» أدناه حين لا توجد أصناف إطلاقًا.
+                */}
+                <div className="min-w-0">
+                  <h4 className="text-xs font-bold text-foreground">أنواع الحبوب المستلمة</h4>
+                  <p className="text-[11px] leading-relaxed text-muted-foreground">
+                    سطر لكل نوع حبوب: اختر الصنف، ثم عدد الأكياس، والوزن الفعلي من الميزان.
+                  </p>
                 </div>
 
                 {grainItems.data && grainItems.data.length === 0 ? (
@@ -696,13 +691,6 @@ function MillingIntakePage() {
                   kgLabel="الوزن الفعلي (كجم)"
                   addLabel="إضافة نوع حبوب آخر"
                   ariaLabel="الحبوب المستلمة"
-                  extraColumn={{
-                    label: "أجر السطر",
-                    unit: currencySymbol,
-                    value: (_index, line) =>
-                      (billingBasis === "PER_BAG" ? Number(line.bags) || 0 : Number(line.kg) || 0) *
-                      (Number(feePerUnit) || 0),
-                  }}
                 />
 
                 {/* شريط إجماليات الاستلام */}
@@ -818,12 +806,17 @@ function MillingIntakePage() {
                     </span>
                   </div>
 
-                  {/* سعر الخدمة حسب وحدة صنف الخدمة (كيس أو كجم) */}
+                  {/*
+                    حقلان فقط: أجرة الوحدة، والإجمالي.
+
+                    كان فيهما تكرار مرّتين: `hint` الحقل الأول يقول «سعر الخدمة
+                    لكل …» بينما العنوان نفسه يقولها، و`hint` الثاني يعيد كتابة
+                    ضرب «الكمية × السعر» كاملة تحت المبلغ؛ ثم يظهر نفس الضرب
+                    ثالث مرة في شريط «حسبة الخدمة». أرقام الحقل وقيمه المكررة
+                    لا تضيف معلومة، بل تدفع المحتوى للأسفل.
+                  */}
                   <div className="grid gap-2.5 sm:grid-cols-2">
-                    <MillingField
-                      label={`أجر الطحن لكل ${billingUnitLabel}`}
-                      hint={`سعر الخدمة لكل ${billingUnitLabel}`}
-                    >
+                    <MillingField label={`أجر الطحن لكل ${billingUnitLabel}`}>
                       <AmountInput
                         min={0}
                         showInWords={false}
@@ -838,16 +831,10 @@ function MillingIntakePage() {
                       />
                     </MillingField>
 
-                    <MillingField
-                      label="إجمالي أجور الخدمة"
-                      hint={
-                        billedQuantity > 0
-                          ? `${fmtNum(billedQuantity)} ${billingUnitLabel} × ${feePerUnit || 0} = ${fmtNum(currentSubtotal)}`
-                          : "المبلغ الإجمالي"
-                      }
-                    >
+                    <MillingField label="إجمالي أجور الخدمة">
                       <AmountInput
                         min={0}
+                        showInWords={false}
                         placeholder="0.00"
                         aria-label="إجمالي أجور الخدمة"
                         value={currentSubtotal === 0 ? null : currentSubtotal}
@@ -863,23 +850,6 @@ function MillingIntakePage() {
                     </p>
                   ) : null}
 
-                  {/* ملخص عملية الحساب اللحظية */}
-                  {billedQuantity > 0 && Number(feePerUnit) > 0 && (
-                    <div className="flex items-center justify-between rounded-xl bg-background/90 px-3 py-2 text-xs font-semibold text-foreground border border-border/70">
-                      <span className="text-muted-foreground">حسبة الخدمة:</span>
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-foreground">
-                          {fmtNum(billedQuantity)} {billingUnitLabel}
-                        </span>
-                        <span>×</span>
-                        <span className="font-bold">{fmtNum(Number(feePerUnit))}</span>
-                        <span>=</span>
-                        <span className="font-black text-amber-600 dark:text-amber-400 text-sm">
-                          {fmtNum(currentSubtotal)} {currencySymbol}
-                        </span>
-                      </div>
-                    </div>
-                  )}
                   <p className="text-[11px] leading-5 text-muted-foreground">
                     التكلفة المرجعية للصنف:{" "}
                     {Number(serviceItem.data?.cost_price) > 0

@@ -609,13 +609,11 @@ function MillingMillPage() {
                   </div>
                 )}
 
-                {/* ترويسة أعمدة النواتج للشاشات المتوسطة والكبيرة */}
-                <div className="hidden sm:grid sm:grid-cols-[1fr_90px_110px_36px] gap-2 px-3 py-1.5 text-[11px] font-bold text-muted-foreground bg-muted/50 rounded-xl">
-                  <div>صنف الناتج المستخرج (دقيق / نخالة / سميد)</div>
-                  <div className="text-center">الأكياس</div>
-                  <div className="text-center">الوزن (كجم)</div>
-                  <div className="text-center">حذف</div>
-                </div>
+                {/*
+                  لا ترويسة أعمدة هنا: المحرّر الموحّد يعرض تسمية كل رقم فوقه
+                  داخل السطر نفسه. الترويسة الخارجية كانت تصف شبكة قديمة
+                  (صنف / أكياس / وزن / حذف) لم تعد موجودة.
+                */}
 
                 <ProductLinesEditor
                   lines={outputs.map((line) => ({
@@ -954,13 +952,21 @@ function MillingMillPage() {
         <CustomerFormDialog
           open={newCustomerOpen}
           onClose={() => setNewCustomerOpen(false)}
-          hint={lang === "ar" ? "سيتم اختيار العميل تلقائياً فور حفظه لتنفيذ الطحن." : "Customer will be selected automatically."}
+          hint={
+            lang === "ar"
+              ? "سيتم اختيار العميل تلقائياً فور حفظه لتنفيذ الطحن."
+              : "Customer will be selected automatically."
+          }
           onSaved={(newCust) => {
             void qc.invalidateQueries({ queryKey: ["milling", "customers"] });
             setCustomerId(newCust.id);
             setGrains([{ itemId: "", bags: 0, kg: 0 }]);
             setNewCustomerOpen(false);
-            toast.success(lang === "ar" ? `تمت إضافة واختيار العميل: ${newCust.name}` : `Customer selected: ${newCust.name}`);
+            toast.success(
+              lang === "ar"
+                ? `تمت إضافة واختيار العميل: ${newCust.name}`
+                : `Customer selected: ${newCust.name}`,
+            );
           }}
         />
       </div>

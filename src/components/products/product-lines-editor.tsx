@@ -19,14 +19,19 @@
  * ════════════════════════════════════════════════════════════════════════════
  * القاعدة البصرية
  * ════════════════════════════════════════════════════════════════════════════
- * كل سطر بطاقة من مستويين فقط:
+ * كل سطر **صف واحد** بخُطّ من ستة أعمدة، والأرقام كلها في الصف الأفقي نفسه:
  *
- *   1. رأس: منتقي الصنف + زر «الكل» + زر الحذف.
- *   2. شريط مقاييس واحد: خلية لكل رقم، تفصلها شعرة رأسية لا صندوق ملون.
+ *   الصنف · الأكياس · الوزن · المتاح · المتبقي · الحذف
  *
- * لماذا شريط لا ثلاث بطاقات؟ لأن البطاقات الملونة الثلاث تأخذ ارتفاعها من
- * الحشو والحدود، لا من المعلومة. الشريط الذي تقرؤه العين أفقياً يعرض الأرقام
- * الأربعة في صف واحد على الجوال، وارتفاعه نصف ارتفاع ثلاث بطاقات.
+ * لماذا صف واحد؟
+ *   • البطاقة من مستويين تستهلك ~١٦٠px للسطر، فسطران يملآن الشاشة.
+ *   • الصف الواحد ~٤٤px، فترى أربعة أسطر في نفس المساحة وتقارن الأرقام أفقيًا
+ *     (وهذا ما تفعله فعلًا عند مطابقة الوزن مع المتاح).
+ *   • على الجوال يبقى الصف صفًا: شريط الأرقام يمرر أفقيًّا بدل التفاف كل خلية
+ *     إلى سطر ثانٍ، فلا يتضاعف الارتفاع ولا يضيع زر الحذف.
+ *
+ * زر «الكل» (طحن الكل / تسليم الكل) صار أيقونة صغيرة داخل حقل الصنف، فيبقى
+ * متاحًا بضغطة واحدة ولا يشغل رأسًا منفصلًا.
  *
  * ════════════════════════════════════════════════════════════════════════════
  * التحذير من التجاوز
@@ -36,7 +41,7 @@
  * المشغّل وهو يكتب.
  */
 
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Wand2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { toSystemDigits } from "@/lib/format-preferences";
@@ -95,7 +100,13 @@ export interface ProductLinesEditorProps<T extends ProductPickerItem> {
   /** الصفوف المحسوبة (متاح / متبقٍ) لكل سطر، مقاسة بالفهرس. */
   metrics?: (index: number, line: ProductLineValue) => ProductLineMetric[];
 
-  /** عمود خامس اختياري — «أجر السطر» في الاستلام وحده. */
+  /**
+   * عمود خامس اختياري — «أجر السطر» في الاستلام وحده.
+   *
+   * @deprecated لم يعد يُرسم: أجرة الطحن تُحتسب على إجمالي العملية في بطاقة
+   * أجور الخدمة، وتكرار الرقم في كل سطر كان يستهلك عمودًا كاملًا مقابل معلومة
+   * موجودة أصلاً. تُقبل الخاصية للتوافق ولا تُرسم.
+   */
   extraColumn?: {
     label: string;
     value: (index: number, line: ProductLineValue) => number;
@@ -126,14 +137,13 @@ export function ProductLinesEditor<T extends ProductPickerItem>({
   onFillAll,
   fillAllLabel = "الكل",
   metrics,
-  extraColumn,
   addLabel = "إضافة سطر",
   ariaLabel = "أسطر الأصناف",
   className,
   emptyHint,
 }: ProductLinesEditorProps<T>) {
   return (
-    <div className={cn("space-y-2", className)} role="group" aria-label={ariaLabel}>
+    <div className={cn("space-y-1.5", className)} role="group" aria-label={ariaLabel}>
       {lines.length === 0 && emptyHint ? (
         <p className="rounded-xl border border-dashed border-border/70 px-3 py-6 text-center text-xs text-muted-foreground">
           {emptyHint}
@@ -143,18 +153,19 @@ export function ProductLinesEditor<T extends ProductPickerItem>({
       {lines.map((line, index) => {
         const overlay = metrics?.(index, line) ?? [];
         return (
-          <article
+          <div
             key={index}
+            role="group"
             aria-label={`السطر ${index + 1}`}
             className={cn(
-              "group relative rounded-xl border transition-colors",
+              "group flex items-center gap-1 rounded-xl border py-1 pe-1 ps-1.5 transition-colors",
               overlay.some((m) => m.isOver)
-                ? "border-rose-400/60 bg-rose-500/[0.03]"
+                ? "border-rose-400/60 bg-rose-500/[0.04]"
                 : "border-border/70 bg-card/70 focus-within:border-primary/40",
             )}
           >
-            {/* ── المستوى الأول: الصنف وإجراءاته ── */}
-            <div className="flex items-center gap-1.5 p-1.5">
+            {/* ── الصنف: المساحة الحرة ── */}
+            <div className="flex min-w-0 flex-1 items-center gap-0.5">
               <ProductPicker
                 value={line.itemId}
                 items={items}
@@ -170,27 +181,18 @@ export function ProductLinesEditor<T extends ProductPickerItem>({
                 <button
                   type="button"
                   onClick={() => onFillAll(index)}
-                  className="shrink-0 rounded-lg border border-border/70 bg-surface px-2 py-1.5 text-[10px] font-bold text-muted-foreground transition hover:border-primary/40 hover:text-primary"
+                  title={fillAllLabel}
+                  aria-label={fillAllLabel}
+                  className="grid size-7 shrink-0 place-items-center rounded-lg text-muted-foreground/70 transition hover:bg-primary/10 hover:text-primary"
                 >
-                  {fillAllLabel}
+                  <Wand2 className="size-3.5" />
                 </button>
               ) : null}
-
-              <button
-                type="button"
-                onClick={() => onRemove(index)}
-                disabled={lines.length === 1}
-                aria-label={`حذف السطر ${index + 1}`}
-                title="حذف السطر"
-                className="grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground/70 transition hover:bg-rose-500/10 hover:text-rose-600 disabled:pointer-events-none disabled:opacity-25"
-              >
-                <Trash2 className="size-3.5" />
-              </button>
             </div>
 
-            {/* ── المستوى الثاني: شريط المقاييس ── */}
-            <div className="grid grid-cols-2 rounded-b-xl border-t border-border/60 bg-surface/60 sm:grid-cols-4">
-              <MetricCell label={bagsLabel} accent="primary">
+            {/* ── الأرقام: شريط أفقي واحد (تمرير أفقي على الجوال) ── */}
+            <div className="flex min-w-0 shrink-0 items-stretch overflow-x-auto scrollbar-x-none">
+              <NumberCell label={bagsLabel} accent="primary" className="w-[62px] sm:w-[76px]">
                 <QuantityInput
                   decimals={0}
                   min={0}
@@ -199,11 +201,11 @@ export function ProductLinesEditor<T extends ProductPickerItem>({
                   aria-label={bagsLabel}
                   value={line.bags || null}
                   onValueChange={(v) => onChange(index, { bags: v ?? 0 })}
-                  className="h-9 border-0 bg-transparent px-1 text-center font-bold"
+                  className="h-8 border-0 bg-transparent px-1 text-center text-xs font-bold shadow-none"
                 />
-              </MetricCell>
+              </NumberCell>
 
-              <MetricCell label={kgLabel}>
+              <NumberCell label={kgLabel} className="w-[74px] sm:w-[92px]">
                 <QuantityInput
                   decimals={2}
                   min={0}
@@ -212,43 +214,46 @@ export function ProductLinesEditor<T extends ProductPickerItem>({
                   aria-label={kgLabel}
                   value={line.kg || null}
                   onValueChange={(v) => onChange(index, { kg: v ?? 0 })}
-                  className="h-9 border-0 bg-transparent px-1 text-center font-bold"
+                  className="h-8 border-0 bg-transparent px-1 text-center text-xs font-bold shadow-none"
                 />
-              </MetricCell>
+              </NumberCell>
 
               {overlay.slice(0, 2).map((metric) => (
-                <MetricCell
+                <NumberCell
                   key={metric.key}
                   label={metric.label}
                   tone={metric.tone}
                   isOver={metric.isOver}
+                  className="w-[68px] sm:w-[86px]"
                 >
                   <ReadOnlyValue
                     value={metric.value}
                     unit={metric.unit}
                     secondary={metric.secondary}
                   />
-                </MetricCell>
+                </NumberCell>
               ))}
-
-              {extraColumn ? (
-                <MetricCell label={extraColumn.label} tone="neutral" spanFull>
-                  <ReadOnlyValue
-                    value={extraColumn.value(index, line)}
-                    unit={extraColumn.unit}
-                    secondary={null}
-                  />
-                </MetricCell>
-              ) : null}
             </div>
-          </article>
+
+            {/* ── الحذف ── */}
+            <button
+              type="button"
+              onClick={() => onRemove(index)}
+              disabled={lines.length === 1}
+              aria-label={`حذف السطر ${index + 1}`}
+              title="حذف السطر"
+              className="grid w-7 shrink-0 self-center place-items-center rounded-lg text-muted-foreground/60 transition hover:bg-rose-500/10 hover:text-rose-600 disabled:pointer-events-none disabled:opacity-25"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
+          </div>
         );
       })}
 
       <button
         type="button"
         onClick={onAdd}
-        className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-primary/30 bg-primary/[0.03] py-2.5 text-xs font-bold text-primary transition hover:bg-primary/[0.07] active:scale-[0.995]"
+        className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-primary/30 bg-primary/[0.03] py-2 text-xs font-bold text-primary transition hover:bg-primary/[0.07] active:scale-[0.995]"
       >
         <Plus className="size-3.5" />
         {addLabel}
@@ -259,43 +264,43 @@ export function ProductLinesEditor<T extends ProductPickerItem>({
 
 /* ------------------------------------------------------------------ atoms */
 
-function MetricCell({
+function NumberCell({
   label,
   children,
   tone = "neutral",
   isOver,
   accent,
-  spanFull,
+  className,
 }: {
   label: string;
   children: React.ReactNode;
   tone?: ProductLineMetric["tone"];
   isOver?: boolean;
   accent?: "primary";
-  spanFull?: boolean;
+  className?: string;
 }) {
   const labelTone = isOver
     ? "text-rose-600 dark:text-rose-400"
     : accent === "primary"
       ? "text-primary/80"
-      : tone === "warning"
-        ? "text-amber-600/90 dark:text-amber-400/90"
-        : tone === "success"
-          ? "text-emerald-600/90 dark:text-emerald-400/90"
-          : "text-muted-foreground";
+      : tone === "primary"
+        ? "text-primary/80"
+        : tone === "warning"
+          ? "text-amber-600/90 dark:text-amber-400/90"
+          : tone === "success"
+            ? "text-emerald-600/90 dark:text-emerald-400/90"
+            : "text-muted-foreground";
 
   return (
     <div
       className={cn(
-        "min-w-0 px-1.5 pb-1 pt-1.5",
+        "flex min-w-0 shrink-0 flex-col justify-center px-1",
         // فواصل رأسية بين الخلايا بدل صناديق منفصلة.
         "[&:not(:first-child)]:border-s [&:not(:first-child)]:border-border/50",
-        spanFull && "col-span-2 sm:col-span-1",
+        className,
       )}
     >
-      <span
-        className={cn("block truncate text-[9px] font-bold uppercase tracking-wide", labelTone)}
-      >
+      <span className={cn("block truncate text-[8.5px] font-bold leading-tight", labelTone)}>
         {label}
       </span>
       {children}
@@ -314,15 +319,15 @@ function ReadOnlyValue({
 }) {
   const missing = value == null;
   return (
-    <div className="h-9 min-w-0">
+    <div className="flex h-8 min-w-0 flex-col justify-center">
       <span className="block truncate text-center font-mono text-xs font-bold tabular-nums text-foreground">
         {missing ? "—" : toSystemDigits(value)}
         {!missing && unit ? (
-          <span className="ms-0.5 font-sans text-[9px] font-medium opacity-60">{unit}</span>
+          <span className="ms-0.5 font-sans text-[8px] font-medium opacity-60">{unit}</span>
         ) : null}
       </span>
       {secondary ? (
-        <span className="block truncate text-center text-[9px] leading-tight text-muted-foreground/80">
+        <span className="block truncate text-center font-mono text-[8px] leading-tight text-muted-foreground/75">
           {secondary}
         </span>
       ) : null}

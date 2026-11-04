@@ -424,6 +424,15 @@ function ContainersTab({
     },
     onError: (e) => toast.error(String(e).slice(0, 300)),
   });
+  const groupAct = useMutation({
+    mutationFn: (p: { action: "start" | "stop" }) => supabaseAction({ data: p }),
+    onSuccess: (res) => {
+      if (res.ok) toast.success("تم التنفيذ بنجاح");
+      else toast.error(res.output.slice(0, 300));
+      void qc.invalidateQueries({ queryKey: ["infra"] });
+    },
+    onError: (e) => toast.error(String(e).slice(0, 300)),
+  });
   if (!report) return <LoadingBlock />;
   const ordered = [...report.services].sort((a, b) => {
     const rank = (s: typeof a) => (s.state === "running" ? 1 : 0);
@@ -440,18 +449,18 @@ function ContainersTab({
             <Button
               size="sm"
               variant="outline"
-              onClick={() => act.mutate({ action: "start", container: containerName("kong") })}
-              disabled={act.isPending}
+              onClick={() => groupAct.mutate({ action: "start" })}
+              disabled={groupAct.isPending}
             >
-              <Play className="h-3.5 w-3.5" /> تشغيل المجموعة (Supabase start)
+              <Play className="h-3.5 w-3.5" /> تشغيل مجموعة Docker المحلية
             </Button>
             <Button
               size="sm"
               variant="outline"
-              onClick={() => act.mutate({ action: "stop", container: containerName("kong") })}
-              disabled={act.isPending}
+              onClick={() => groupAct.mutate({ action: "stop" })}
+              disabled={groupAct.isPending}
             >
-              <Square className="h-3.5 w-3.5" /> إيقاف الكل (Supabase stop)
+              <Square className="h-3.5 w-3.5" /> إيقاف مجموعة Docker المحلية
             </Button>
           </span>
         </CardTitle>
@@ -1050,7 +1059,9 @@ function MigrationsTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
               size="sm"
               variant="destructive"
               onClick={() => {
-                const c = window.prompt("سيطبق الترحيلات المعلقة على قاعدة Docker المحلية. اكتب APPLY LOCAL للتأكيد:");
+                const c = window.prompt(
+                  "سيطبق الترحيلات المعلقة على قاعدة Docker المحلية. اكتب APPLY LOCAL للتأكيد:",
+                );
                 if (c) run({ action: "apply", confirm: c });
               }}
             >
@@ -1533,25 +1544,37 @@ function UpdatesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
 
 const MAINT_OPS = [
   { op: "restartAll", label: "إعادة تشغيل كل الخدمات", icon: RotateCcw, danger: false },
-  { op: "removeDangling", label: "إزالة الصور المعلقة", icon: Trash2, danger: false },
+  {
+    op: "removeDangling",
+    label: "إزالة الصور المؤقتة غير المستخدمة على الجهاز",
+    icon: Trash2,
+    danger: true,
+    word: "REMOVE DANGLING IMAGES",
+  },
   {
     op: "pruneImages",
-    label: "تنظيف كل الصور (Prune Images)",
+    label: "تنظيف الصور غير المستخدمة على الجهاز",
     icon: HardDrive,
     danger: true,
     word: "PRUNE IMAGES",
   },
   {
     op: "pruneContainers",
-    label: "تنظيف الحاويات المتوقفة",
+    label: "تنظيف الحاويات المتوقفة على الجهاز",
     icon: Boxes,
     danger: true,
     word: "PRUNE CONTAINERS",
   },
-  { op: "pruneNetworks", label: "تنظيف الشبكات", icon: Network, danger: false },
+  {
+    op: "pruneNetworks",
+    label: "تنظيف الشبكات غير المستخدمة على الجهاز",
+    icon: Network,
+    danger: true,
+    word: "PRUNE NETWORKS",
+  },
   {
     op: "pruneVolumes",
-    label: "تنظيف الأقراص (يحذف البيانات!)",
+    label: "تنظيف أقراص Docker غير المستخدمة (يحذف البيانات!)",
     icon: Database,
     danger: true,
     word: "PRUNE VOLUMES",

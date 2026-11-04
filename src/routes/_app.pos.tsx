@@ -885,16 +885,41 @@ function POSPage() {
         }
       }
 
-      const enrichedProducts = rawProducts.map((p: any) => ({
-        ...p,
-        sale_price: baseSalePrices.get(p.id) ?? Number(p.sale_price ?? 0),
-        sale_uoms: saleUomsByProduct.get(p.id) ?? [],
-        category: p.category_id ? catMap.get(p.category_id) || null : null,
-        brand: p.brand_id ? brandMap.get(p.brand_id) || null : null,
-        unit: p.unit_id ? unitMap.get(p.unit_id) || null : null,
-        origin: p.origin_id ? origMap.get(p.origin_id) || null : null,
-        quality: p.quality_grade_id ? qualMap.get(p.quality_grade_id) || null : null,
-      }));
+      const enrichedProducts = rawProducts.map((p: any) => {
+        const baseUnit = p.unit_id ? unitMap.get(p.unit_id) || null : null;
+        const basePrice = baseSalePrices.get(p.id) ?? Number(p.sale_price ?? 0);
+        const secondaryUoms = saleUomsByProduct.get(p.id) ?? [];
+        const baseUomLabel = baseUnit
+          ? (lang === "ar" ? baseUnit.name_ar || baseUnit.name : baseUnit.name || baseUnit.name_ar) +
+            (baseUnit.short_name ? ` (${baseUnit.short_name})` : "")
+          : (lang === "ar" ? "وحدة الأساس" : "Base unit");
+
+        const hasSecondaryDefault = secondaryUoms.some((u) => u.is_default_sale);
+        const baseUom: SaleUom = {
+          unit_id: p.unit_id || "",
+          factor_to_base: 1,
+          sale_price: basePrice,
+          label: baseUomLabel,
+          quantity_increment: 1,
+          is_default_sale: !hasSecondaryDefault,
+        };
+
+        const allSaleUoms: SaleUom[] = [
+          baseUom,
+          ...secondaryUoms.filter((u) => u.unit_id && u.unit_id !== p.unit_id),
+        ];
+
+        return {
+          ...p,
+          sale_price: basePrice,
+          sale_uoms: allSaleUoms,
+          category: p.category_id ? catMap.get(p.category_id) || null : null,
+          brand: p.brand_id ? brandMap.get(p.brand_id) || null : null,
+          unit: baseUnit,
+          origin: p.origin_id ? origMap.get(p.origin_id) || null : null,
+          quality: p.quality_grade_id ? qualMap.get(p.quality_grade_id) || null : null,
+        };
+      });
 
       setProducts(enrichedProducts);
       setSaleUomsLoaded(unitSettingsReady);
@@ -1471,7 +1496,8 @@ function POSPage() {
   function getDefaultSaleUom(product: Product): SaleUom {
     return (
       product.sale_uoms?.find((uom) => uom.is_default_sale) ??
-      product.sale_uoms?.find((uom) => uom.unit_id === product.unit_id) ?? {
+      product.sale_uoms?.find((uom) => uom.unit_id === product.unit_id) ??
+      product.sale_uoms?.[0] ?? {
         unit_id: product.unit_id ?? "",
         factor_to_base: 1,
         sale_price: Number(product.sale_price),
@@ -1535,28 +1561,50 @@ function POSPage() {
     const line = cart.find((entry) => entry.line_id === lineId);
     const option = line?.sale_uoms?.find((uom) => uom.unit_id === unitId);
     if (!line || !option) return;
+
+    const oldFactor = line.uom_factor && line.uom_factor > 0 ? line.uom_factor : 1;
+    const newFactor = option.factor_to_base && option.factor_to_base > 0 ? option.factor_to_base : 1;
+    const increment = Math.max(1, Math.round(option.quantity_increment ?? 1));
+
+    // تحويل نسبي وذكي للكمية بين الوحدات (مثلاً: 12 حبة تصبح 1 كرتون، 1 كرتون يصبح 12 حبة، 1 حبة تصبح 1 كرتون)
+    const rawConvertedQty = (line.quantity * oldFactor) / newFactor;
+    let nextQty = Math.max(increment, Math.round(rawConvertedQty));
+
     if (!line.is_service) {
       const stock = stockMap[line.product_id] ?? 0;
       const reservedByOtherLines = cart
         .filter((entry) => entry.product_id === line.product_id && entry.line_id !== lineId)
         .reduce((sum, entry) => sum + entry.quantity * (entry.uom_factor ?? 1), 0);
-      if (line.quantity * option.factor_to_base + reservedByOtherLines > stock + 1e-9) {
-        toast.error(
-          lang === "ar"
-            ? "الكمية الحالية تتجاوز المتاح بهذه الوحدة"
-            : "The current quantity exceeds stock in this unit.",
-        );
-        return;
+      const availableInNewUom = Math.max(0, (stock - reservedByOtherLines) / newFactor);
+
+      if (nextQty > availableInNewUom) {
+        if (availableInNewUom >= increment) {
+          nextQty = Math.max(increment, Math.floor(availableInNewUom));
+          toast.info(
+            lang === "ar"
+              ? `تم ضبط الكمية إلى الحد الأقصى المتاح (${nextQty} ${option.label})`
+              : `Quantity adjusted to available stock (${nextQty} ${option.label})`,
+          );
+        } else {
+          toast.error(
+            lang === "ar"
+              ? `الكمية المتاحة في المخزون لا تكفي لوحدة ${option.label}`
+              : `Insufficient stock for ${option.label}`,
+          );
+          return;
+        }
       }
     }
+
     setCart((current) =>
       current.map((entry) =>
         entry.line_id === lineId
           ? {
               ...entry,
               uom_id: option.unit_id,
-              uom_factor: option.factor_to_base,
+              uom_factor: newFactor,
               uom_label: option.label,
+              quantity: nextQty,
               quantity_increment: option.quantity_increment,
               unit_price: option.sale_price,
               base_price: option.sale_price,
@@ -3232,7 +3280,7 @@ function POSPage() {
                         taxRate: l.tax_rate,
                         isService: l.is_service,
                         priceEditable: true,
-                        unitId: l.uom_id,
+                        unitId: l.uom_id ?? l.sale_uoms?.[0]?.unit_id,
                         unit: l.uom_label,
                         unitOptions: l.sale_uoms?.map((uom) => ({
                           id: uom.unit_id,

@@ -110,9 +110,9 @@ export function CartLine({
           {line.unitOptions && line.unitOptions.length > 1 && onUnitChange ? (
             <select
               aria-label={line.unit || "Unit"}
-              value={line.unitId ?? ""}
+              value={line.unitId ?? line.unitOptions[0]?.id ?? ""}
               onChange={(event) => onUnitChange(event.target.value)}
-              className="h-6 max-w-[85px] truncate rounded-md border border-border/70 bg-card px-1 text-[10px] font-medium text-foreground outline-none transition focus:border-primary"
+              className="h-6 min-w-[65px] max-w-[115px] truncate rounded-md border border-primary/30 bg-primary/5 px-1.5 text-[10px] font-bold text-primary outline-none transition hover:bg-primary/10 focus:border-primary focus:ring-1 focus:ring-primary/20 cursor-pointer shadow-2xs"
             >
               {line.unitOptions.map((option) => (
                 <option key={option.id} value={option.id}>
@@ -121,7 +121,7 @@ export function CartLine({
               ))}
             </select>
           ) : line.unit ? (
-            <span className="inline-flex items-center rounded bg-muted/60 px-1 py-0.2 text-[10px] font-semibold text-muted-foreground">
+            <span className="inline-flex items-center rounded-md border border-border/60 bg-muted/50 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
               {line.unit}
             </span>
           ) : null}

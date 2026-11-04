@@ -195,24 +195,42 @@ export async function fetchSellableProducts(warehouseId?: string, lang: "ar" | "
   }
 
   return rows.map((r) => {
-    const saleUoms = saleUomsByProduct.get(r.id) ?? [];
-    const defaultUom = saleUoms.find((unit) => unit.is_default_sale) ?? saleUoms.find((unit) => unit.unit_id === r.unit_id);
+    const secondaryUoms = saleUomsByProduct.get(r.id) ?? [];
+    const basePrice = basePrices.get(r.id) ?? Number(r.sale_price ?? 0);
+    const baseUnitLabel = r.unit
+      ? r.unit.short_name || (lang === "ar" ? r.unit.name_ar || r.unit.name : r.unit.name || r.unit.name_ar)
+      : null;
+    const hasSecondaryDefault = secondaryUoms.some((unit) => unit.is_default_sale);
+    const baseUom: SellableUom = {
+      unit_id: r.unit_id || "",
+      factor_to_base: 1,
+      sale_price: basePrice,
+      quantity_increment: 1,
+      label: baseUnitLabel || (lang === "ar" ? "وحدة الأساس" : "Base unit"),
+      is_default_sale: !hasSecondaryDefault,
+      barcodes: r.barcode ? [r.barcode] : [],
+    };
+    const saleUoms = [
+      baseUom,
+      ...secondaryUoms.filter((unit) => unit.unit_id && unit.unit_id !== r.unit_id),
+    ];
+    const defaultUom = saleUoms.find((unit) => unit.is_default_sale) ?? saleUoms[0];
     return {
-    id: r.id as string,
-    sku: r.sku as string | null,
-    barcode: r.barcode as string | null,
-    name: (r.name_ar || r.name) as string,
-    sale_price: defaultUom?.sale_price ?? basePrices.get(r.id) ?? Number(r.sale_price ?? 0),
-    tax_rate: Number(r.tax_rate ?? 0),
-    unit_id: r.unit_id as string | null,
-    base_unit_label: r.unit ? (r.unit.short_name || (lang === "ar" ? r.unit.name_ar || r.unit.name : r.unit.name || r.unit.name_ar)) : null,
-    sale_uoms: saleUoms,
-    default_sales_uom_id: defaultUom?.unit_id ?? r.unit_id,
-    default_sales_factor: defaultUom?.factor_to_base ?? 1,
-    default_unit_label: defaultUom?.label ?? (r.unit?.short_name || (lang === "ar" ? r.unit?.name_ar || r.unit?.name : r.unit?.name || r.unit?.name_ar) || null),
-    item_class: r.item_class as string | null,
-    on_hand: onHand[r.id] ?? 0,
-  };
+      id: r.id as string,
+      sku: r.sku as string | null,
+      barcode: r.barcode as string | null,
+      name: (r.name_ar || r.name) as string,
+      sale_price: defaultUom?.sale_price ?? basePrice,
+      tax_rate: Number(r.tax_rate ?? 0),
+      unit_id: r.unit_id as string | null,
+      base_unit_label: baseUnitLabel,
+      sale_uoms: saleUoms,
+      default_sales_uom_id: defaultUom?.unit_id ?? r.unit_id,
+      default_sales_factor: defaultUom?.factor_to_base ?? 1,
+      default_unit_label: defaultUom?.label ?? baseUnitLabel,
+      item_class: r.item_class as string | null,
+      on_hand: onHand[r.id] ?? 0,
+    };
   });
 }
 

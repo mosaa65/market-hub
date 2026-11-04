@@ -5,6 +5,77 @@ import { CheckCircle2, AlertTriangle, AlertOctagon, Info, Loader2 } from "lucide
 import { playToastSound, getStoredToastPosition, type ToastPositionType } from "@/lib/toast-sound";
 
 // =========================================================================
+// التحقق الذكي: هل الرسالة قاعدة عمل / تحقق تشغيلي وليست خطأ فادحاً غير متوقع؟
+// كاختيار عميل، تحديد طريقة دفع، كمية غير متوفرة، حقول مطلوبة
+// =========================================================================
+function isBusinessRuleNotice(msg: unknown): boolean {
+  if (typeof msg !== "string") return false;
+  const text = msg.toLowerCase();
+
+  // أخطاء فنية واستثناءات غير متوقعة يجب أن تبقى حمراء
+  const technicalErrors = [
+    "database",
+    "server error",
+    "500",
+    "crash",
+    "network error",
+    "failed to fetch",
+    "تعذر الاتصال",
+    "خطأ غير متوقع",
+    "خطأ برمجي",
+    "استثناء",
+    "internal error",
+  ];
+
+  if (technicalErrors.some((kw) => text.includes(kw))) {
+    return false;
+  }
+
+  // كلمات قواعد العمل والتحقق والملاحظات الإجرائية
+  const ruleKeywords = [
+    "يرجى",
+    "الرجاء",
+    "رجاء",
+    "فضلاً",
+    "فضلا",
+    "يجب",
+    "تأكد",
+    "مطلوب",
+    "تحديد",
+    "اختر",
+    "اختيار",
+    "غير كاف",
+    "غير متوفر",
+    "لا يمكن",
+    "لا يوجد",
+    "أدخل",
+    "ادخل",
+    "أضف",
+    "اضف",
+    "تنبيه",
+    "تحذير",
+    "قواعد",
+    "الحد الأدنى",
+    "الحد الاقصى",
+    "فارغ",
+    "عميل",
+    "طريقة الدفع",
+    "الآجل",
+    "الرصيد",
+    "please",
+    "required",
+    "must",
+    "cannot",
+    "choose",
+    "select",
+    "insufficient",
+    "missing",
+  ];
+
+  return ruleKeywords.some((kw) => text.includes(kw));
+}
+
+// =========================================================================
 // اعتراض وتطوير دوال الإشعارات الموحدة للنظام بأكمله
 // =========================================================================
 const originalSuccess = sonnerToast.success;
@@ -31,13 +102,27 @@ if (!(sonnerToast as unknown as Record<string, boolean>)[INTERCEPTED_FLAG]) {
   };
 
   sonnerToast.error = (message, data) => {
+    // إذا كانت الرسالة قاعدة عمل أو ملاحظة تمنع العملية (كالتحقق واختيار العميل)
+    // نوجهها تلقائياً إلى تحذير برتقالي أنيق مع صوت التنبيه الهادئ
+    if (isBusinessRuleNotice(message)) {
+      try {
+        playToastSound("warning");
+      } catch {
+        /* ignore */
+      }
+      return originalWarning(message, {
+        duration: data?.duration ?? 4500,
+        ...data,
+      });
+    }
+
     try {
       playToastSound("error");
     } catch {
       /* ignore */
     }
     return originalError(message, {
-      // إعطاء مدة أطول لرسائل الخطأ حتى يتمكن المستخدم من قراءتها بوضوح
+      // إعطاء مدة أطول لرسائل الخطأ التقني غير المتوقع
       duration: data?.duration ?? 5500,
       ...data,
     });
@@ -105,27 +190,27 @@ const Toaster = ({ ...props }: ToasterProps) => {
       icons={{
         success: (
           <div className="vortex-toast-icon-badge vortex-toast-icon-success">
-            <CheckCircle2 className="size-4.5 shrink-0" strokeWidth={2.4} />
+            <CheckCircle2 className="size-4 shrink-0" strokeWidth={2.4} />
           </div>
         ),
         error: (
           <div className="vortex-toast-icon-badge vortex-toast-icon-error">
-            <AlertOctagon className="size-4.5 shrink-0" strokeWidth={2.4} />
+            <AlertOctagon className="size-4 shrink-0" strokeWidth={2.4} />
           </div>
         ),
         warning: (
           <div className="vortex-toast-icon-badge vortex-toast-icon-warning">
-            <AlertTriangle className="size-4.5 shrink-0" strokeWidth={2.4} />
+            <AlertTriangle className="size-4 shrink-0" strokeWidth={2.4} />
           </div>
         ),
         info: (
           <div className="vortex-toast-icon-badge vortex-toast-icon-info">
-            <Info className="size-4.5 shrink-0" strokeWidth={2.4} />
+            <Info className="size-4 shrink-0" strokeWidth={2.4} />
           </div>
         ),
         loading: (
           <div className="vortex-toast-icon-badge vortex-toast-icon-loading">
-            <Loader2 className="size-4.5 shrink-0 animate-spin" strokeWidth={2.4} />
+            <Loader2 className="size-4 shrink-0 animate-spin" strokeWidth={2.4} />
           </div>
         ),
       }}

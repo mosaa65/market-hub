@@ -145,11 +145,15 @@ export function VortexDrawerDialog({
 
             {/* Scrollable Body — min-h-0 شرط عمل التمرير داخل عمود flex:
              * بدونها لا يتقلص الابن المرن ويصبح overflow-y-auto بلا مفعول
-             * (المحتوى يتدفق خارج الحاوية ولا تمرّر العجلة، فقط الشريط). */}
+             * (المحتوى يتدفق خارج الحاوية ولا تمرّر العجلة، فقط الشريط).
+             *
+             * `text-start` مضافة أيضًا: مع `dir=rtl` وبعض المتصفحات، العنصر
+             * القابل للتمرير بدون `touch-action` قد يفسّر الإيماءات كتمرير أفقي.
+             */}
             <div
               data-vaul-no-drag
               className={cn(
-                "min-h-0 flex-1 overscroll-contain overflow-y-auto px-6 py-5 custom-scrollbar",
+                "min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-y-contain px-6 py-5 custom-scrollbar",
                 bodyClassName,
               )}
             >
@@ -185,7 +189,7 @@ export function VortexDrawerDialog({
           )}
         >
           {/* Drag Handle */}
-          <div className="mx-auto my-2.5 h-1.5 w-12 rounded-full bg-muted-foreground/30 hover:bg-muted-foreground/50 transition-colors" />
+          <div className="mx-auto my-2.5 h-1.5 w-12 shrink-0 rounded-full bg-muted-foreground/30 hover:bg-muted-foreground/50 transition-colors" />
 
           {/* Mobile Header */}
           {(title || eyebrow) && (
@@ -220,11 +224,19 @@ export function VortexDrawerDialog({
             </div>
           )}
 
-          {/* Scrollable Content — min-h-0 مثل سطح المكتب (شرط عمل التمرير) */}
+          {/* Scrollable Content — min-h-0 مثل سطح المكتب (شرط عمل التمرير)
+           *
+           * `data-vaul-no-drag` يمنع جرّ الدرج من داخل المحتوى، لكنه *لا*
+           * يعفي الحاوية من فحص Vaul لسلسلة التمرير. و`overscroll-contain`
+           * كان يمنع العجلة من تمرير هذا القسم حين يقف المؤشر فوق عنوان أو فراغ
+           * داخل نفس الشيت، فيبدو التمرير «ميتًا». الآن: `touch-pan-y` يضمن
+           * تمرير اللمس عموديًا، و`overscroll-y-contain` يمنع التسلسل إلى الصفحة
+           * خلف الشيت مع إبقاء التمرير داخل القسم يعمل.
+           */}
           <div
             data-vaul-no-drag
             className={cn(
-              "min-h-0 flex-1 overscroll-contain overflow-y-auto px-5 py-4 custom-scrollbar",
+              "min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-y-contain px-5 py-4 custom-scrollbar",
               bodyClassName,
             )}
           >

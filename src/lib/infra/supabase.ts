@@ -1,7 +1,6 @@
 /**
- * جامع حالة Supabase المحلية + عمليات CLI (بقائمة بيضاء).
- * يدعم الوضعين تلقائياً: local (Docker) و cloud (ربط رسمي فقط —
- * لا محاولة لإدارة الخدمات السحابية لأنها خارج نطاق Docker المحلي).
+ * جامع حالة Supabase وفق الهدف الصريح. فشل Docker يبقى فشلاً محلياً، ولا يُستدل
+ * على السحابة من ملف CLI المرتبط ولا تُرسل إليها أوامر من هذا الموديول.
  */
 import { readdir } from "node:fs/promises";
 import path from "node:path";
@@ -18,13 +17,14 @@ interface LocalStatusJson {
 export async function supabaseStatus(): Promise<SupabaseStatusReport> {
   const target = parseSupabaseTarget(process.env.SUPABASE_TARGET);
   if (target === "cloud") {
+    const projectRef = process.env.SUPABASE_PROJECT_REF?.trim() || null;
     return {
       available: true,
       mode: "cloud",
       local: { running: false, stoppedServices: [], urls: {}, projectRef: null },
       cloud: {
-        linked: true,
-        projectRef: process.env.SUPABASE_PROJECT_REF?.trim() || null,
+        linked: projectRef !== null,
+        projectRef,
         projectName: null,
       },
     };

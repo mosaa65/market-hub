@@ -44,6 +44,14 @@ const cases: Array<[string, boolean]> = [
     canAccessRoute("/platform-admin", { ...baseContext, isPlatformSuperadmin: true }),
   ],
   [
+    "store owner cannot open the host infrastructure console",
+    !canAccessRoute("/infrastructure", { ...baseContext, roles: ["owner"] }),
+  ],
+  [
+    "active platform superadmin can open the host infrastructure console",
+    canAccessRoute("/infrastructure", { ...baseContext, isPlatformSuperadmin: true }),
+  ],
+  [
     "settings query parameters keep their registered access rule",
     JSON.stringify(getRouteRule("/settings", { section: "backup" })) ===
       JSON.stringify(getRouteRule("/settings?section=backup")),

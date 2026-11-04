@@ -57,7 +57,14 @@
   --font-sans: "Inter", "SF Pro Display", "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: "Inter", "Geist", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "Geist Mono", ui-monospace, monospace;
-  --font-arabic: var(--font-active-arabic, "IBM Plex Sans Arabic", "Cairo", "Tajawal", "Noto Sans Arabic", sans-serif);
+  --font-arabic: var(
+    --font-active-arabic,
+    "IBM Plex Sans Arabic",
+    "Cairo",
+    "Tajawal",
+    "Noto Sans Arabic",
+    sans-serif
+  );
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -168,8 +175,8 @@
   --secondary: oklch(0.215 0.025 260);
   --secondary-foreground: oklch(0.96 0.008 260);
 
-  --muted: oklch(0.20 0.022 260);
-  --muted-foreground: oklch(0.70 0.018 260);
+  --muted: oklch(0.2 0.022 260);
+  --muted-foreground: oklch(0.7 0.018 260);
 
   --accent: oklch(0.225 0.026 260);
   --accent-foreground: oklch(0.98 0.006 260);
@@ -182,7 +189,7 @@
   --warning-foreground: oklch(0.15 0 0);
 
   --border: oklch(1 0 0 / 0.09);
-  --input: oklch(1 0 0 / 0.10);
+  --input: oklch(1 0 0 / 0.1);
   --ring: oklch(0.66 0.22 255 / 0.6);
   --scrollbar-thumb: oklch(1 0 0 / 0.14);
   --scrollbar-thumb-hover: oklch(1 0 0 / 0.28);
@@ -204,42 +211,42 @@
   /* الحلقة الداخلية لعتصر القائمة النشط: بيضاء في الليلي، وداكنة في الفاتح.
      كانت مكتوبة oklch(1 0 0 / 0.08) مباشرة في الوسم، فتصير غير مرئية في
      الوضع الفاتح. */
-  --sidebar-active-ring: oklch(1 0 0 / 0.10);
+  --sidebar-active-ring: oklch(1 0 0 / 0.1);
 
   /* Status tones (dark) */
   --tone-neutral: oklch(0.26 0.018 260);
   --tone-neutral-fg: oklch(0.78 0.014 260);
-  --tone-info: oklch(0.66 0.20 255 / 0.20);
+  --tone-info: oklch(0.66 0.2 255 / 0.2);
   --tone-info-fg: oklch(0.84 0.14 255);
-  --tone-success: oklch(0.68 0.18 152 / 0.20);
+  --tone-success: oklch(0.68 0.18 152 / 0.2);
   --tone-success-fg: oklch(0.85 0.14 152);
-  --tone-warning: oklch(0.79 0.16 78 / 0.20);
+  --tone-warning: oklch(0.79 0.16 78 / 0.2);
   --tone-warning-fg: oklch(0.88 0.13 80);
-  --tone-danger: oklch(0.63 0.23 27 / 0.20);
+  --tone-danger: oklch(0.63 0.23 27 / 0.2);
   --tone-danger-fg: oklch(0.84 0.16 27);
-  --tone-primary: oklch(0.66 0.22 255 / 0.20);
+  --tone-primary: oklch(0.66 0.22 255 / 0.2);
   --tone-primary-fg: oklch(0.84 0.14 255);
 }
 
 .light {
   /* Luxury Alabaster & Warm Porcelain Canvas (Mullak aesthetic) — soothing, elite, pristine */
   --background: oklch(0.985 0.006 60);
-  --foreground: oklch(0.17 0.040 258); /* Rich Charcoal Slate / Deep Ink */
+  --foreground: oklch(0.17 0.04 258); /* Rich Charcoal Slate / Deep Ink */
   --surface: oklch(0.972 0.008 60);
   --surface-elevated: oklch(1 0 0);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.17 0.040 258);
+  --card-foreground: oklch(0.17 0.04 258);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.17 0.040 258);
+  --popover-foreground: oklch(0.17 0.04 258);
   --primary: oklch(0.55 0.22 258); /* Deep Majestic Royal Sapphire */
   --primary-foreground: oklch(0.99 0.01 55);
   --secondary: oklch(0.948 0.008 60);
   --secondary-foreground: oklch(0.18 0.035 258);
   --muted: oklch(0.948 0.008 60);
   --muted-foreground: oklch(0.48 0.024 258);
-  --accent: oklch(0.945 0.010 60);
-  --accent-foreground: oklch(0.17 0.040 258);
-  --destructive: oklch(0.60 0.23 27);
+  --accent: oklch(0.945 0.01 60);
+  --accent-foreground: oklch(0.17 0.04 258);
+  --destructive: oklch(0.6 0.23 27);
   --destructive-foreground: oklch(1 0 0);
   --success: oklch(0.56 0.18 152);
   --success-foreground: oklch(1 0 0);
@@ -248,42 +255,42 @@
 
   /* ألوان الرسوم البيانية: الـ fallback في tokens.ts يشير إلى هذه المتغيّرات،
      فبدونها تفقد المخططات ألوانها في الوضع الفاتح. */
-  --chart-1: oklch(0.55 0.20 255);
-  --chart-2: oklch(0.60 0.16 175);
+  --chart-1: oklch(0.55 0.2 255);
+  --chart-2: oklch(0.6 0.16 175);
   --chart-3: oklch(0.66 0.14 80);
-  --chart-4: oklch(0.58 0.20 325);
+  --chart-4: oklch(0.58 0.2 325);
   --chart-5: oklch(0.56 0.16 152);
-  --border: oklch(0.20 0.03 258 / 0.09);
-  --input: oklch(0.20 0.03 258 / 0.09);
+  --border: oklch(0.2 0.03 258 / 0.09);
+  --input: oklch(0.2 0.03 258 / 0.09);
   --ring: oklch(0.55 0.22 258 / 0.5);
-  --scrollbar-thumb: oklch(0.30 0.03 258 / 0.24);
-  --scrollbar-thumb-hover: oklch(0.30 0.03 258 / 0.42);
+  --scrollbar-thumb: oklch(0.3 0.03 258 / 0.24);
+  --scrollbar-thumb-hover: oklch(0.3 0.03 258 / 0.42);
   --sidebar: oklch(0.99 0.004 60);
   --sidebar-foreground: oklch(0.22 0.035 258);
   /* لازم معرّفة هنا أيضاً: هي ما يلوّن عنصر القائمة النشط، وغيابها في الوضع
      الفاتح كان يجعل القائمة بلا لون إطلاقاً. */
-  --sidebar-primary: oklch(0.52 0.20 258);
+  --sidebar-primary: oklch(0.52 0.2 258);
   --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.94 0.010 60);
-  --sidebar-accent-foreground: oklch(0.16 0.040 258);
-  --sidebar-border: oklch(0.20 0.03 258 / 0.08);
-  --sidebar-ring: oklch(0.52 0.20 258 / 0.5);
-  --sidebar-active-ring: oklch(0.52 0.20 258 / 0.18);
+  --sidebar-accent: oklch(0.94 0.01 60);
+  --sidebar-accent-foreground: oklch(0.16 0.04 258);
+  --sidebar-border: oklch(0.2 0.03 258 / 0.08);
+  --sidebar-ring: oklch(0.52 0.2 258 / 0.5);
+  --sidebar-active-ring: oklch(0.52 0.2 258 / 0.18);
 
-  --surface-2: oklch(0.945 0.010 60);
+  --surface-2: oklch(0.945 0.01 60);
   --surface-3: oklch(0.915 0.012 60);
 
   /* Status tones (light) */
   --tone-neutral: oklch(0.93 0.008 60);
-  --tone-neutral-fg: oklch(0.38 0.020 258);
+  --tone-neutral-fg: oklch(0.38 0.02 258);
   --tone-info: oklch(0.55 0.18 255 / 0.12);
   --tone-info-fg: oklch(0.38 0.18 255);
   --tone-success: oklch(0.56 0.18 152 / 0.14);
   --tone-success-fg: oklch(0.34 0.16 152);
   --tone-warning: oklch(0.74 0.16 78 / 0.18);
-  --tone-warning-fg: oklch(0.40 0.15 75);
-  --tone-danger: oklch(0.60 0.23 27 / 0.12);
-  --tone-danger-fg: oklch(0.44 0.20 27);
+  --tone-warning-fg: oklch(0.4 0.15 75);
+  --tone-danger: oklch(0.6 0.23 27 / 0.12);
+  --tone-danger-fg: oklch(0.44 0.2 27);
   --tone-primary: oklch(0.55 0.22 258 / 0.12);
   --tone-primary-fg: oklch(0.38 0.18 258);
 }
@@ -298,60 +305,60 @@
 :root.light-luxe,
 .light-luxe {
   --background: oklch(0.962 0.014 60);
-  --foreground: oklch(0.20 0.030 258);
+  --foreground: oklch(0.2 0.03 258);
   --surface: oklch(0.942 0.016 60);
   --surface-elevated: oklch(0.978 0.012 60);
   --card: oklch(0.975 0.012 60);
-  --card-foreground: oklch(0.20 0.030 258);
-  --popover: oklch(0.980 0.010 60);
-  --popover-foreground: oklch(0.20 0.030 258);
+  --card-foreground: oklch(0.2 0.03 258);
+  --popover: oklch(0.98 0.01 60);
+  --popover-foreground: oklch(0.2 0.03 258);
   --secondary: oklch(0.925 0.018 60);
-  --secondary-foreground: oklch(0.24 0.030 258);
+  --secondary-foreground: oklch(0.24 0.03 258);
   --muted: oklch(0.925 0.018 60);
   --muted-foreground: oklch(0.47 0.024 258);
-  --accent: oklch(0.905 0.020 60);
-  --accent-foreground: oklch(0.24 0.030 258);
-  --border: oklch(0.30 0.030 50 / 0.11);
-  --input: oklch(0.30 0.030 50 / 0.13);
-  --sidebar: oklch(0.950 0.014 60);
-  --sidebar-foreground: oklch(0.24 0.030 258);
+  --accent: oklch(0.905 0.02 60);
+  --accent-foreground: oklch(0.24 0.03 258);
+  --border: oklch(0.3 0.03 50 / 0.11);
+  --input: oklch(0.3 0.03 50 / 0.13);
+  --sidebar: oklch(0.95 0.014 60);
+  --sidebar-foreground: oklch(0.24 0.03 258);
   --sidebar-accent: oklch(0.915 0.018 60);
-  --sidebar-accent-foreground: oklch(0.24 0.030 258);
-  --sidebar-border: oklch(0.30 0.030 50 / 0.10);
-  --surface-2: oklch(0.915 0.020 60);
-  --surface-3: oklch(0.880 0.024 60);
-  --scrollbar-thumb: oklch(0.30 0.03 50 / 0.24);
-  --scrollbar-thumb-hover: oklch(0.30 0.03 50 / 0.40);
+  --sidebar-accent-foreground: oklch(0.24 0.03 258);
+  --sidebar-border: oklch(0.3 0.03 50 / 0.1);
+  --surface-2: oklch(0.915 0.02 60);
+  --surface-3: oklch(0.88 0.024 60);
+  --scrollbar-thumb: oklch(0.3 0.03 50 / 0.24);
+  --scrollbar-thumb-hover: oklch(0.3 0.03 50 / 0.4);
 }
 
 /* ---- النهاري الأبيض النقي: أعلى وضوح ---- */
 :root.light-pure,
 .light-pure {
   --background: oklch(1 0 0);
-  --foreground: oklch(0.16 0.030 258);
+  --foreground: oklch(0.16 0.03 258);
   --surface: oklch(0.985 0.003 60);
   --surface-elevated: oklch(1 0 0);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.16 0.030 258);
+  --card-foreground: oklch(0.16 0.03 258);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.16 0.030 258);
-  --secondary: oklch(0.960 0.006 60);
-  --secondary-foreground: oklch(0.20 0.030 258);
-  --muted: oklch(0.960 0.006 60);
+  --popover-foreground: oklch(0.16 0.03 258);
+  --secondary: oklch(0.96 0.006 60);
+  --secondary-foreground: oklch(0.2 0.03 258);
+  --muted: oklch(0.96 0.006 60);
   --muted-foreground: oklch(0.46 0.024 258);
   --accent: oklch(0.945 0.008 60);
-  --accent-foreground: oklch(0.20 0.030 258);
-  --border: oklch(0.20 0.02 258 / 0.08);
-  --input: oklch(0.20 0.02 258 / 0.10);
-  --sidebar: oklch(0.990 0.003 60);
-  --sidebar-foreground: oklch(0.20 0.030 258);
+  --accent-foreground: oklch(0.2 0.03 258);
+  --border: oklch(0.2 0.02 258 / 0.08);
+  --input: oklch(0.2 0.02 258 / 0.1);
+  --sidebar: oklch(0.99 0.003 60);
+  --sidebar-foreground: oklch(0.2 0.03 258);
   --sidebar-accent: oklch(0.955 0.006 60);
-  --sidebar-accent-foreground: oklch(0.20 0.030 258);
-  --sidebar-border: oklch(0.20 0.02 258 / 0.08);
-  --surface-2: oklch(0.950 0.008 60);
-  --surface-3: oklch(0.920 0.010 60);
-  --scrollbar-thumb: oklch(0.20 0.02 258 / 0.22);
-  --scrollbar-thumb-hover: oklch(0.20 0.02 258 / 0.38);
+  --sidebar-accent-foreground: oklch(0.2 0.03 258);
+  --sidebar-border: oklch(0.2 0.02 258 / 0.08);
+  --surface-2: oklch(0.95 0.008 60);
+  --surface-3: oklch(0.92 0.01 60);
+  --scrollbar-thumb: oklch(0.2 0.02 258 / 0.22);
+  --scrollbar-thumb-hover: oklch(0.2 0.02 258 / 0.38);
 }
 
 /* ---- الليلي الرمادي الفحمي: متوسط بين الوضعين ---- */
@@ -362,52 +369,52 @@
   --surface: oklch(0.255 0.014 260);
   --surface-elevated: oklch(0.295 0.016 260);
   --surface-2: oklch(0.335 0.016 260);
-  --surface-3: oklch(0.380 0.018 260);
+  --surface-3: oklch(0.38 0.018 260);
   --card: oklch(0.265 0.014 260);
   --card-foreground: oklch(0.975 0.006 60);
   --popover: oklch(0.285 0.014 260);
   --popover-foreground: oklch(0.975 0.006 60);
-  --secondary: oklch(0.310 0.014 260);
+  --secondary: oklch(0.31 0.014 260);
   --secondary-foreground: oklch(0.955 0.008 260);
   --muted: oklch(0.295 0.012 260);
   --muted-foreground: oklch(0.735 0.014 260);
   --accent: oklch(0.325 0.016 260);
   --accent-foreground: oklch(0.975 0.006 260);
-  --border: oklch(1 0 0 / 0.10);
+  --border: oklch(1 0 0 / 0.1);
   --input: oklch(1 0 0 / 0.12);
-  --sidebar: oklch(0.195 0.010 260);
-  --sidebar-foreground: oklch(0.870 0.012 260);
+  --sidebar: oklch(0.195 0.01 260);
+  --sidebar-foreground: oklch(0.87 0.012 260);
   --sidebar-accent: oklch(0.255 0.012 260);
   --sidebar-accent-foreground: oklch(0.975 0.006 260);
   --sidebar-border: oklch(1 0 0 / 0.09);
   --scrollbar-thumb: oklch(1 0 0 / 0.15);
-  --scrollbar-thumb-hover: oklch(1 0 0 / 0.30);
+  --scrollbar-thumb-hover: oklch(1 0 0 / 0.3);
 }
 
 /* ---- الليلي المعتم العميق: أسود ملكي ---- */
 :root.dark-deep,
 .dark-deep {
-  --background: oklch(0.070 0.008 260);
+  --background: oklch(0.07 0.008 260);
   --foreground: oklch(0.985 0.006 60);
-  --surface: oklch(0.100 0.010 260);
+  --surface: oklch(0.1 0.01 260);
   --surface-elevated: oklch(0.135 0.012 260);
   --surface-2: oklch(0.165 0.012 260);
-  --surface-3: oklch(0.200 0.014 260);
-  --card: oklch(0.112 0.010 260);
+  --surface-3: oklch(0.2 0.014 260);
+  --card: oklch(0.112 0.01 260);
   --card-foreground: oklch(0.985 0.006 60);
-  --popover: oklch(0.130 0.010 260);
+  --popover: oklch(0.13 0.01 260);
   --popover-foreground: oklch(0.985 0.006 60);
   --secondary: oklch(0.155 0.012 260);
-  --secondary-foreground: oklch(0.960 0.008 260);
-  --muted: oklch(0.130 0.010 260);
-  --muted-foreground: oklch(0.640 0.014 260);
-  --accent: oklch(0.170 0.014 260);
+  --secondary-foreground: oklch(0.96 0.008 260);
+  --muted: oklch(0.13 0.01 260);
+  --muted-foreground: oklch(0.64 0.014 260);
+  --accent: oklch(0.17 0.014 260);
   --accent-foreground: oklch(0.985 0.006 260);
   --border: oklch(1 0 0 / 0.07);
   --input: oklch(1 0 0 / 0.08);
   --sidebar: oklch(0.055 0.006 260);
-  --sidebar-foreground: oklch(0.850 0.012 260);
-  --sidebar-accent: oklch(0.115 0.010 260);
+  --sidebar-foreground: oklch(0.85 0.012 260);
+  --sidebar-accent: oklch(0.115 0.01 260);
   --sidebar-accent-foreground: oklch(0.985 0.006 260);
   --sidebar-border: oklch(1 0 0 / 0.06);
   --scrollbar-thumb: oklch(1 0 0 / 0.11);
@@ -425,23 +432,23 @@
   --card-foreground: oklch(0.22 0.028 60);
   --popover: oklch(0.972 0.016 82);
   --popover-foreground: oklch(0.22 0.028 60);
-  --secondary: oklch(0.910 0.028 82);
+  --secondary: oklch(0.91 0.028 82);
   --secondary-foreground: oklch(0.26 0.028 60);
-  --muted: oklch(0.910 0.028 82);
+  --muted: oklch(0.91 0.028 82);
   --muted-foreground: oklch(0.46 0.024 60);
-  --accent: oklch(0.888 0.030 82);
+  --accent: oklch(0.888 0.03 82);
   --accent-foreground: oklch(0.26 0.028 60);
   --border: oklch(0.35 0.035 70 / 0.13);
   --input: oklch(0.35 0.035 70 / 0.15);
-  --sidebar: oklch(0.940 0.024 82);
+  --sidebar: oklch(0.94 0.024 82);
   --sidebar-foreground: oklch(0.26 0.028 60);
-  --sidebar-accent: oklch(0.900 0.028 82);
+  --sidebar-accent: oklch(0.9 0.028 82);
   --sidebar-accent-foreground: oklch(0.26 0.028 60);
   --sidebar-border: oklch(0.35 0.035 70 / 0.12);
-  --surface-2: oklch(0.900 0.030 82);
+  --surface-2: oklch(0.9 0.03 82);
   --surface-3: oklch(0.865 0.034 82);
   --scrollbar-thumb: oklch(0.35 0.035 70 / 0.24);
-  --scrollbar-thumb-hover: oklch(0.35 0.035 70 / 0.40);
+  --scrollbar-thumb-hover: oklch(0.35 0.035 70 / 0.4);
 }
 
 /* ---- النهاري الرمادي الناعم: ضبابي هادئ بارد ---- */
@@ -449,7 +456,7 @@
 .light-mist {
   --background: oklch(0.958 0.008 255);
   --foreground: oklch(0.18 0.026 258);
-  --surface: oklch(0.932 0.010 255);
+  --surface: oklch(0.932 0.01 255);
   --surface-elevated: oklch(0.975 0.008 255);
   --card: oklch(0.972 0.008 255);
   --card-foreground: oklch(0.18 0.026 258);
@@ -463,41 +470,41 @@
   --accent-foreground: oklch(0.22 0.026 258);
   --border: oklch(0.25 0.025 258 / 0.11);
   --input: oklch(0.25 0.025 258 / 0.13);
-  --sidebar: oklch(0.945 0.010 255);
+  --sidebar: oklch(0.945 0.01 255);
   --sidebar-foreground: oklch(0.22 0.026 258);
   --sidebar-accent: oklch(0.895 0.012 255);
   --sidebar-accent-foreground: oklch(0.22 0.026 258);
-  --sidebar-border: oklch(0.25 0.025 258 / 0.10);
+  --sidebar-border: oklch(0.25 0.025 258 / 0.1);
   --surface-2: oklch(0.895 0.014 255);
-  --surface-3: oklch(0.860 0.016 255);
+  --surface-3: oklch(0.86 0.016 255);
   --scrollbar-thumb: oklch(0.25 0.025 258 / 0.24);
-  --scrollbar-thumb-hover: oklch(0.25 0.025 258 / 0.40);
+  --scrollbar-thumb-hover: oklch(0.25 0.025 258 / 0.4);
 }
 
 /* ---- الليلي الأزرق النيلي: ليل فلكي عميق ---- */
 :root.dark-navy,
 .dark-navy {
-  --background: oklch(0.145 0.030 265);
+  --background: oklch(0.145 0.03 265);
   --foreground: oklch(0.985 0.006 60);
-  --surface: oklch(0.180 0.032 265);
+  --surface: oklch(0.18 0.032 265);
   --surface-elevated: oklch(0.215 0.034 265);
   --surface-2: oklch(0.245 0.034 265);
-  --surface-3: oklch(0.280 0.034 265);
-  --card: oklch(0.190 0.032 265);
+  --surface-3: oklch(0.28 0.034 265);
+  --card: oklch(0.19 0.032 265);
   --card-foreground: oklch(0.985 0.006 60);
-  --popover: oklch(0.210 0.032 265);
+  --popover: oklch(0.21 0.032 265);
   --popover-foreground: oklch(0.985 0.006 60);
   --secondary: oklch(0.235 0.032 265);
-  --secondary-foreground: oklch(0.960 0.008 260);
-  --muted: oklch(0.218 0.030 265);
-  --muted-foreground: oklch(0.700 0.018 260);
+  --secondary-foreground: oklch(0.96 0.008 260);
+  --muted: oklch(0.218 0.03 265);
+  --muted-foreground: oklch(0.7 0.018 260);
   --accent: oklch(0.255 0.034 265);
   --accent-foreground: oklch(0.985 0.006 260);
-  --border: oklch(1 0 0 / 0.10);
+  --border: oklch(1 0 0 / 0.1);
   --input: oklch(1 0 0 / 0.11);
   --sidebar: oklch(0.125 0.026 265);
-  --sidebar-foreground: oklch(0.860 0.012 260);
-  --sidebar-accent: oklch(0.185 0.030 265);
+  --sidebar-foreground: oklch(0.86 0.012 260);
+  --sidebar-accent: oklch(0.185 0.03 265);
   --sidebar-accent-foreground: oklch(0.985 0.006 260);
   --sidebar-border: oklch(1 0 0 / 0.08);
   --scrollbar-thumb: oklch(1 0 0 / 0.13);
@@ -507,27 +514,27 @@
 /* ---- الليلي القهوة الدافئة: بني إسبريسو فاخر ---- */
 :root.dark-cocoa,
 .dark-cocoa {
-  --background: oklch(0.150 0.022 58);
+  --background: oklch(0.15 0.022 58);
   --foreground: oklch(0.985 0.006 60);
   --surface: oklch(0.185 0.024 58);
-  --surface-elevated: oklch(0.220 0.026 58);
-  --surface-2: oklch(0.250 0.026 58);
+  --surface-elevated: oklch(0.22 0.026 58);
+  --surface-2: oklch(0.25 0.026 58);
   --surface-3: oklch(0.288 0.026 58);
   --card: oklch(0.196 0.024 58);
   --card-foreground: oklch(0.985 0.006 60);
   --popover: oklch(0.216 0.024 58);
   --popover-foreground: oklch(0.985 0.006 60);
-  --secondary: oklch(0.240 0.024 58);
-  --secondary-foreground: oklch(0.960 0.008 60);
+  --secondary: oklch(0.24 0.024 58);
+  --secondary-foreground: oklch(0.96 0.008 60);
   --muted: oklch(0.222 0.022 58);
-  --muted-foreground: oklch(0.710 0.016 60);
-  --accent: oklch(0.260 0.026 58);
+  --muted-foreground: oklch(0.71 0.016 60);
+  --accent: oklch(0.26 0.026 58);
   --accent-foreground: oklch(0.985 0.006 60);
-  --border: oklch(1 0 0 / 0.10);
+  --border: oklch(1 0 0 / 0.1);
   --input: oklch(1 0 0 / 0.12);
   --sidebar: oklch(0.128 0.018 58);
-  --sidebar-foreground: oklch(0.860 0.012 60);
-  --sidebar-accent: oklch(0.190 0.022 58);
+  --sidebar-foreground: oklch(0.86 0.012 60);
+  --sidebar-accent: oklch(0.19 0.022 58);
   --sidebar-accent-foreground: oklch(0.985 0.006 60);
   --sidebar-border: oklch(1 0 0 / 0.09);
   --scrollbar-thumb: oklch(1 0 0 / 0.13);
@@ -576,14 +583,30 @@
     pointer-events: none;
     z-index: 0;
     background:
-      radial-gradient(60rem 40rem at 80% -10%, color-mix(in srgb, var(--primary) 9%, transparent), transparent 65%),
-      radial-gradient(50rem 30rem at -10% 100%, color-mix(in srgb, var(--primary) 5%, transparent), transparent 60%);
+      radial-gradient(
+        60rem 40rem at 80% -10%,
+        color-mix(in srgb, var(--primary) 9%, transparent),
+        transparent 65%
+      ),
+      radial-gradient(
+        50rem 30rem at -10% 100%,
+        color-mix(in srgb, var(--primary) 5%, transparent),
+        transparent 60%
+      );
   }
 
   html.light body::before {
     background:
-      radial-gradient(60rem 40rem at 80% -10%, color-mix(in srgb, var(--primary) 5%, transparent), transparent 65%),
-      radial-gradient(50rem 30rem at -10% 100%, color-mix(in srgb, var(--primary) 3%, transparent), transparent 60%);
+      radial-gradient(
+        60rem 40rem at 80% -10%,
+        color-mix(in srgb, var(--primary) 5%, transparent),
+        transparent 65%
+      ),
+      radial-gradient(
+        50rem 30rem at -10% 100%,
+        color-mix(in srgb, var(--primary) 3%, transparent),
+        transparent 60%
+      );
   }
 
   ::selection {
@@ -839,7 +862,14 @@
 .custom-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: color-mix(in oklab, var(--muted-foreground) 32%, transparent) transparent;
-  overscroll-behavior: contain;
+  /*
+   * `contain` يمنع «سلسلة التمرير» حين تصل الحاوية إلى حدّها، وهو مفيد للصفحة
+   * كاملة لكنه ضارّ داخل الفورمات المنبثقة: حين يقف المؤشر فوق عنوان قسم أو
+   * فراغ صغير لا تُمرّر العجلة شيئًا، فيبدو الفورم «بلا تمرير». القيمة
+   * `auto` تُبقي التمرير داخل القسم وتسمح للعجلة بأن تكمل إلى الحاوية الأم
+   * (جسم الشيت) فلا يتوقف التمرير أبدًا في منتصف الطريق.
+   */
+  overscroll-behavior: auto;
 }
 
 .custom-scrollbar::-webkit-scrollbar {
@@ -1034,238 +1064,285 @@ input::-ms-reveal {
   pointer-events: auto;
 }
 
-/* بطاقة الإشعار الأساسية */
+/* بطاقة الإشعار الأساسية - تصميم فخم، أنيق، غير فاقع، وبوردر معبر */
 .vortex-toast-card {
   position: relative !important;
   display: flex !important;
   align-items: center !important;
-  gap: 12px !important;
-  padding: 14px 18px !important;
-  border-radius: 18px !important;
+  gap: 0 !important;
+  padding: 13px 16px !important;
+  border-radius: 16px !important;
   font-family: inherit !important;
+  background: oklch(0.185 0.022 260) !important;
+  color: #f8fafc !important;
   backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
-  box-shadow: 0 20px 48px -12px rgba(0, 0, 0, 0.42), 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
-  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1) !important;
-  overflow: hidden !important;
-  min-height: 56px !important;
+  box-shadow:
+    0 16px 40px -12px rgba(0, 0, 0, 0.5),
+    0 2px 8px -2px rgba(0, 0, 0, 0.3) !important;
+  transition: all 0.26s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  overflow: visible !important;
+  min-height: 52px !important;
   max-width: 440px !important;
   width: 100% !important;
+}
+
+/* الوضع النهاري: خلفية بيضاء ناصعة وأنيقة طبقاً لثيم النظام */
+.light .vortex-toast-card,
+:root.light .vortex-toast-card,
+[data-sonner-toaster][data-theme="light"] [data-sonner-toast] {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  box-shadow:
+    0 16px 36px -10px rgba(0, 0, 0, 0.08),
+    0 3px 10px -2px rgba(0, 0, 0, 0.04) !important;
+}
+
+/* حل جذري لمنع تداخل الأيقونة مع نص الإشعار */
+[data-sonner-toast] [data-icon] {
+  width: auto !important;
+  height: auto !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  margin-inline-end: 12px !important;
+  margin-inline-start: 0 !important;
+  margin-top: 1px !important;
+  position: static !important;
+}
+
+[data-sonner-toast] [data-content] {
+  flex: 1 1 0% !important;
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2.5px !important;
 }
 
 /* تحسين موضع وظهور الإشعار على الجوال */
 @media (max-width: 640px) {
   .vortex-toast-card {
-    padding: 12px 14px !important;
-    border-radius: 16px !important;
-    max-width: calc(100vw - 28px) !important;
+    padding: 11px 13px !important;
+    border-radius: 14px !important;
+    max-width: calc(100vw - 24px) !important;
     margin: 0 auto !important;
   }
 }
 
 /* نصوص الإشعار */
 .vortex-toast-title {
-  font-size: 0.885rem !important;
+  font-size: 0.86rem !important;
   font-weight: 700 !important;
-  line-height: 1.4 !important;
+  line-height: 1.38 !important;
   letter-spacing: -0.01em !important;
-  color: inherit !important;
+  color: #f8fafc !important;
+}
+
+.light .vortex-toast-title,
+:root.light .vortex-toast-title {
+  color: #0f172a !important;
 }
 
 .vortex-toast-desc {
-  font-size: 0.775rem !important;
+  font-size: 0.76rem !important;
   line-height: 1.45 !important;
-  opacity: 0.88 !important;
-  margin-top: 2px !important;
-  color: inherit !important;
+  opacity: 0.85 !important;
+  color: #94a3b8 !important;
 }
 
-/* شارات الأيقونات الفاخرة */
+.light .vortex-toast-desc,
+:root.light .vortex-toast-desc {
+  color: #475569 !important;
+  opacity: 0.9 !important;
+}
+
+/* شارات الأيقونات الرشيقة والواضحة */
 .vortex-toast-icon-badge {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 11px;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
   flex-shrink: 0;
   position: relative;
   transition: transform 0.2s ease;
 }
 
 .vortex-toast-card:hover .vortex-toast-icon-badge {
-  transform: scale(1.08);
+  transform: scale(1.06);
 }
 
 /* زر الإغلاق الأنيق */
 .vortex-toast-close-btn {
   border-radius: 9999px !important;
-  width: 24px !important;
-  height: 24px !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  background: rgba(0, 0, 0, 0.18) !important;
-  color: inherit !important;
-  opacity: 0.7 !important;
+  width: 22px !important;
+  height: 22px !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #94a3b8 !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   transition: all 0.2s ease !important;
   cursor: pointer !important;
+  flex-shrink: 0 !important;
+}
+
+.light .vortex-toast-close-btn,
+:root.light .vortex-toast-close-btn {
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  background: rgba(0, 0, 0, 0.04) !important;
+  color: #64748b !important;
 }
 
 .vortex-toast-close-btn:hover {
-  opacity: 1 !important;
-  background: rgba(0, 0, 0, 0.35) !important;
-  transform: scale(1.1) !important;
+  background: rgba(255, 255, 255, 0.2) !important;
+  color: #ffffff !important;
+  transform: scale(1.08) !important;
+}
+
+.light .vortex-toast-close-btn:hover,
+:root.light .vortex-toast-close-btn:hover {
+  background: rgba(0, 0, 0, 0.09) !important;
+  color: #0f172a !important;
 }
 
 /* ============================================================
- * ثيمات الألوان: نجاح، خطأ، تحذير، تعليمات ومعلومات
+ * ثيمات الألوان والبوردرات المعبرة: أخضر، برتقالي، أحمر، أزرق
  * ========================================================== */
 
-/* 1. إشعار النجاح (Success - أخضر زمردي نضر) */
+/* 1. إشعار النجاح (Success - بوردر أخضر زمردي معبر) */
 .vortex-toast-theme-success,
 [data-sonner-toast][data-type="success"] {
-  background: linear-gradient(135deg, rgba(4, 47, 30, 0.94) 0%, rgba(6, 32, 22, 0.96) 100%) !important;
-  color: #ecfdf5 !important;
-  border: 1px solid rgba(16, 185, 129, 0.45) !important;
-  box-shadow: 0 20px 48px -12px rgba(5, 150, 105, 0.32), 0 0 0 1px rgba(16, 185, 129, 0.25) !important;
+  border: 1.5px solid #10b981 !important;
+  box-shadow:
+    0 14px 34px -8px rgba(16, 185, 129, 0.2),
+    0 2px 6px -1px rgba(0, 0, 0, 0.1) !important;
 }
 
 .vortex-toast-icon-success {
-  background: radial-gradient(circle, rgba(16, 185, 129, 0.35) 0%, rgba(5, 150, 105, 0.15) 100%);
+  background: rgba(16, 185, 129, 0.16);
   color: #34d399;
-  border: 1px solid rgba(52, 211, 153, 0.4);
-  box-shadow: 0 0 18px rgba(52, 211, 153, 0.3);
+  border: 1px solid rgba(52, 211, 153, 0.35);
 }
 
-/* الوضع النهاري لإشعار النجاح */
 .light .vortex-toast-theme-success,
 .light [data-sonner-toast][data-type="success"],
 :root.light .vortex-toast-theme-success,
 :root.light [data-sonner-toast][data-type="success"] {
-  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%) !important;
-  color: #065f46 !important;
-  border: 1px solid rgba(16, 185, 129, 0.45) !important;
-  box-shadow: 0 16px 36px -10px rgba(16, 185, 129, 0.22), 0 0 0 1px rgba(16, 185, 129, 0.2) !important;
+  border: 1.5px solid #10b981 !important;
+  box-shadow:
+    0 12px 30px -8px rgba(16, 185, 129, 0.15),
+    0 2px 6px -1px rgba(0, 0, 0, 0.04) !important;
 }
 
 .light .vortex-toast-icon-success,
 :root.light .vortex-toast-icon-success {
-  background: #bbf7d0;
-  color: #047857;
-  border: 1px solid rgba(16, 185, 129, 0.4);
-  box-shadow: 0 0 12px rgba(16, 185, 129, 0.25);
+  background: #ecfdf5;
+  color: #059669;
+  border: 1px solid #a7f3d0;
 }
 
-/* 2. إشعار الخطأ (Error - أحمر ياقوتي قرمزي) */
-.vortex-toast-theme-error,
-[data-sonner-toast][data-type="error"] {
-  background: linear-gradient(135deg, rgba(65, 10, 22, 0.94) 0%, rgba(42, 6, 14, 0.96) 100%) !important;
-  color: #fff1f2 !important;
-  border: 1px solid rgba(244, 63, 94, 0.5) !important;
-  box-shadow: 0 20px 48px -12px rgba(225, 29, 72, 0.36), 0 0 0 1px rgba(244, 63, 94, 0.28) !important;
-}
-
-.vortex-toast-icon-error {
-  background: radial-gradient(circle, rgba(244, 63, 94, 0.35) 0%, rgba(225, 29, 72, 0.15) 100%);
-  color: #fb7185;
-  border: 1px solid rgba(251, 113, 133, 0.4);
-  box-shadow: 0 0 18px rgba(251, 113, 133, 0.3);
-}
-
-/* الوضع النهاري لإشعار الخطأ */
-.light .vortex-toast-theme-error,
-.light [data-sonner-toast][data-type="error"],
-:root.light .vortex-toast-theme-error,
-:root.light [data-sonner-toast][data-type="error"] {
-  background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%) !important;
-  color: #9f1239 !important;
-  border: 1px solid rgba(244, 63, 94, 0.45) !important;
-  box-shadow: 0 16px 36px -10px rgba(244, 63, 94, 0.22), 0 0 0 1px rgba(244, 63, 94, 0.2) !important;
-}
-
-.light .vortex-toast-icon-error,
-:root.light .vortex-toast-icon-error {
-  background: #fecdd3;
-  color: #be123c;
-  border: 1px solid rgba(244, 63, 94, 0.4);
-  box-shadow: 0 0 12px rgba(244, 63, 94, 0.25);
-}
-
-/* 3. إشعار التحذير (Warning - برتقالي ذهبي / كهرماني دافئ) */
+/* 2. إشعار الملاحظات وقواعد العمل (Warning - بوردر برتقالي دافئ) */
 .vortex-toast-theme-warning,
 [data-sonner-toast][data-type="warning"] {
-  background: linear-gradient(135deg, rgba(60, 32, 5, 0.94) 0%, rgba(38, 20, 3, 0.96) 100%) !important;
-  color: #fffbeb !important;
-  border: 1px solid rgba(245, 158, 11, 0.5) !important;
-  box-shadow: 0 20px 48px -12px rgba(217, 119, 6, 0.34), 0 0 0 1px rgba(245, 158, 11, 0.28) !important;
+  border: 1.5px solid #f59e0b !important;
+  box-shadow:
+    0 14px 34px -8px rgba(245, 158, 11, 0.2),
+    0 2px 6px -1px rgba(0, 0, 0, 0.1) !important;
 }
 
 .vortex-toast-icon-warning {
-  background: radial-gradient(circle, rgba(245, 158, 11, 0.35) 0%, rgba(217, 119, 6, 0.15) 100%);
+  background: rgba(245, 158, 11, 0.16);
   color: #fbbf24;
-  border: 1px solid rgba(251, 191, 36, 0.4);
-  box-shadow: 0 0 18px rgba(251, 191, 36, 0.3);
+  border: 1px solid rgba(251, 191, 36, 0.35);
 }
 
-/* الوضع النهاري لإشعار التحذير */
 .light .vortex-toast-theme-warning,
 .light [data-sonner-toast][data-type="warning"],
 :root.light .vortex-toast-theme-warning,
 :root.light [data-sonner-toast][data-type="warning"] {
-  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%) !important;
-  color: #92400e !important;
-  border: 1px solid rgba(245, 158, 11, 0.45) !important;
-  box-shadow: 0 16px 36px -10px rgba(245, 158, 11, 0.22), 0 0 0 1px rgba(245, 158, 11, 0.2) !important;
+  border: 1.5px solid #f59e0b !important;
+  box-shadow:
+    0 12px 30px -8px rgba(245, 158, 11, 0.15),
+    0 2px 6px -1px rgba(0, 0, 0, 0.04) !important;
 }
 
 .light .vortex-toast-icon-warning,
 :root.light .vortex-toast-icon-warning {
-  background: #fde68a;
-  color: #b45309;
-  border: 1px solid rgba(245, 158, 11, 0.4);
-  box-shadow: 0 0 12px rgba(245, 158, 11, 0.25);
+  background: #fffbeb;
+  color: #d97706;
+  border: 1px solid #fde68a;
 }
 
-/* 4. إشعار التعليمات والمعلومات (Info - أزرق سماوي صافٍ) */
+/* 3. إشعار الخطأ التقني غير المتوقع (Error - بوردر أحمر قرمزي معبر) */
+.vortex-toast-theme-error,
+[data-sonner-toast][data-type="error"] {
+  border: 1.5px solid #ef4444 !important;
+  box-shadow:
+    0 14px 34px -8px rgba(239, 68, 68, 0.22),
+    0 2px 6px -1px rgba(0, 0, 0, 0.1) !important;
+}
+
+.vortex-toast-icon-error {
+  background: rgba(239, 68, 68, 0.16);
+  color: #f87171;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+}
+
+.light .vortex-toast-theme-error,
+.light [data-sonner-toast][data-type="error"],
+:root.light .vortex-toast-theme-error,
+:root.light [data-sonner-toast][data-type="error"] {
+  border: 1.5px solid #ef4444 !important;
+  box-shadow:
+    0 12px 30px -8px rgba(239, 68, 68, 0.16),
+    0 2px 6px -1px rgba(0, 0, 0, 0.04) !important;
+}
+
+.light .vortex-toast-icon-error,
+:root.light .vortex-toast-icon-error {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+/* 4. إشعار التعليمات والإرشادات (Info - بوردر أزرق سماوي معبر) */
 .vortex-toast-theme-info,
 [data-sonner-toast][data-type="info"] {
-  background: linear-gradient(135deg, rgba(8, 38, 70, 0.94) 0%, rgba(5, 24, 46, 0.96) 100%) !important;
-  color: #f0f9ff !important;
-  border: 1px solid rgba(14, 165, 233, 0.5) !important;
-  box-shadow: 0 20px 48px -12px rgba(2, 132, 199, 0.32), 0 0 0 1px rgba(14, 165, 233, 0.28) !important;
+  border: 1.5px solid #0ea5e9 !important;
+  box-shadow:
+    0 14px 34px -8px rgba(14, 165, 233, 0.2),
+    0 2px 6px -1px rgba(0, 0, 0, 0.1) !important;
 }
 
 .vortex-toast-icon-info {
-  background: radial-gradient(circle, rgba(14, 165, 233, 0.35) 0%, rgba(2, 132, 199, 0.15) 100%);
+  background: rgba(14, 165, 233, 0.16);
   color: #38bdf8;
-  border: 1px solid rgba(56, 189, 248, 0.4);
-  box-shadow: 0 0 18px rgba(56, 189, 248, 0.3);
+  border: 1px solid rgba(56, 189, 248, 0.35);
 }
 
-/* الوضع النهاري لإشعار المعلومات */
 .light .vortex-toast-theme-info,
 .light [data-sonner-toast][data-type="info"],
 :root.light .vortex-toast-theme-info,
 :root.light [data-sonner-toast][data-type="info"] {
-  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%) !important;
-  color: #0369a1 !important;
-  border: 1px solid rgba(14, 165, 233, 0.45) !important;
-  box-shadow: 0 16px 36px -10px rgba(14, 165, 233, 0.22), 0 0 0 1px rgba(14, 165, 233, 0.2) !important;
+  border: 1.5px solid #0ea5e9 !important;
+  box-shadow:
+    0 12px 30px -8px rgba(14, 165, 233, 0.15),
+    0 2px 6px -1px rgba(0, 0, 0, 0.04) !important;
 }
 
 .light .vortex-toast-icon-info,
 :root.light .vortex-toast-icon-info {
-  background: #bae6fd;
+  background: #f0f9ff;
   color: #0284c7;
-  border: 1px solid rgba(14, 165, 233, 0.4);
-  box-shadow: 0 0 12px rgba(14, 165, 233, 0.25);
+  border: 1px solid #bae6fd;
 }
 
 /* 5. شارة التحميل (Loading) */
 .vortex-toast-icon-loading {
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.35) 0%, rgba(79, 70, 229, 0.15) 100%);
+  background: rgba(99, 102, 241, 0.16);
   color: #818cf8;
-  border: 1px solid rgba(129, 140, 248, 0.4);
-  box-shadow: 0 0 18px rgba(129, 140, 248, 0.3);
+  border: 1px solid rgba(129, 140, 248, 0.35);
 }

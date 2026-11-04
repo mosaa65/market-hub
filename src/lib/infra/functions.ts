@@ -1,7 +1,7 @@
 /**
  * نقاط الخادم الوحيدة لنظام البنية التحتية — عبر createServerFn.
- * كل عملية تتحقق من الهوية (requireSupabaseAuth) ومن الدور (owner /
- * superadmin فقط) قبل التنفيذ، وتسجَّل في سجل التدقيق.
+ * كل عملية تتحقق من الهوية والهدف (Docker) ومن دور سوبر أدمن المنصة فقط،
+ * ثم تُسجّل في سجل التدقيق.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -31,7 +31,7 @@ import { writeAudit, readAudit } from "./tools";
 import type { InfraActionId } from "./types";
 
 // ---------------------------------------------------------------------------
-// حارس الدور — owner أو مدير منصة فقط
+// الحارس — سوبر أدمن المنصة النشط وهدف Docker فقط
 // ---------------------------------------------------------------------------
 
 async function resolveInfraAccess(userId: string) {
@@ -345,7 +345,10 @@ export const migrationAction = createServerFn({ method: "POST" })
         }
         case "apply": {
           if (data.confirm !== "APPLY LOCAL") {
-            return { ok: false, output: "التأكيد مطلوب: اكتب APPLY LOCAL لتطبيق الترحيلات على Docker المحلي." };
+            return {
+              ok: false,
+              output: "التأكيد مطلوب: اكتب APPLY LOCAL لتطبيق الترحيلات على Docker المحلي.",
+            };
           }
           const r = await supabase(["migration", "up", "--local"], { timeoutMs: 600_000 });
           return { ok: r.ok, output: r.output };
@@ -387,10 +390,11 @@ export const maintenanceAction = createServerFn({ method: "POST" })
   .handler(async ({ data, context }: any) => {
     const g = await requireInfraAdmin(context.userId);
     const dangerous: Record<string, string> = {
+      removeDangling: "REMOVE DANGLING IMAGES",
       pruneImages: "PRUNE IMAGES",
       pruneContainers: "PRUNE CONTAINERS",
+      pruneNetworks: "PRUNE NETWORKS",
       pruneVolumes: "PRUNE VOLUMES",
-      restartAll: "",
     };
     const need = dangerous[data.op];
     if (need && data.confirm !== need) {

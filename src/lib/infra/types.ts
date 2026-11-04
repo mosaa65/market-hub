@@ -174,10 +174,8 @@ export type InfraActionId =
   | "supabase.stop"
   | "supabase.status"
   | "migrations.list"
-  | "migrations.repair"
   | "migrations.diff"
-  | "migrations.push"
-  | "migrations.pull"
+  | "migrations.applyLocal"
   // Seeds
   | "seed.list"
   // Git

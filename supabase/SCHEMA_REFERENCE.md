@@ -1,6 +1,6 @@
 # مرجع مخطط تصنيع منتجات المنشأة
 
-آخر تحديث: 2026-11-02 — الترحيلات `9906_company_production_orders_and_costing.sql` و`9907_payment_account_linkage_audit.sql` و`9908_reverse_untouched_production_order.sql` و`9911_expense_category_production_account_link.sql` و`9912_guard_company_production_material_scope.sql`.
+آخر تحديث: 2026-11-04 — يشمل الترحيلات `9906_company_production_orders_and_costing.sql` و`9907_payment_account_linkage_audit.sql` و`9908_reverse_untouched_production_order.sql` و`9911_expense_category_production_account_link.sql` و`9912_guard_company_production_material_scope.sql` و`9913_expense_accounting_lifecycle_integrity.sql` و`9914_expense_service_costing_and_milling_estimates.sql` و`9915_security_permissions_fail_closed.sql` و`9916_payment_linkage_split_is_not_a_method.sql`.
 
 ## فصل المسارات
 

@@ -73,6 +73,49 @@ export const PRODUCTS_COLUMNS: ColumnRegistry = {
   ],
 };
 
+/**
+ * Custody items (أصناف الأمانات) — حبوب خام ونواتج طحن.
+ *
+ * واجهة مستقلة عن كتالوج البيع، لكنها تشارك نفس شريط السجلات الموحّد، لذا
+ * تحتاج تعريفاً مستقلاً حتى لا تخلط تفضيلات أعمدة المنتجات بأعمدة الأمانات.
+ */
+export const CUSTODY_PRODUCTS_COLUMNS: ColumnRegistry = {
+  id: "custody-products",
+  columns: [
+    {
+      key: "name",
+      labelAr: "اسم الصنف",
+      labelEn: "Item name",
+      essential: true,
+      defaultVisible: true,
+    },
+    { key: "role", labelAr: "نوع الأمانة", labelEn: "Custody type", defaultVisible: true },
+    {
+      key: "package_weight_kg",
+      labelAr: "سعة العبوة",
+      labelEn: "Package weight",
+      defaultVisible: true,
+    },
+    { key: "sku", labelAr: "رمز الصنف", labelEn: "SKU", defaultVisible: false },
+    {
+      key: "created_at",
+      labelAr: "تاريخ الإضافة",
+      labelEn: "Created at",
+      defaultVisible: false,
+      groupAr: "متقدم",
+      groupEn: "Advanced",
+    },
+    { key: "is_active", labelAr: "الحالة", labelEn: "Status", defaultVisible: true },
+    {
+      key: "actions",
+      labelAr: "الإجراءات",
+      labelEn: "Actions",
+      essential: true,
+      defaultVisible: true,
+    },
+  ],
+};
+
 /** Inventory movements / balances — the identifier is the product itself. */
 export const INVENTORY_COLUMNS: ColumnRegistry = {
   id: "inventory",
@@ -259,6 +302,7 @@ export const PAYMENT_METHODS_COLUMNS: ColumnRegistry = {
 /** All registries by screen id. */
 export const COLUMN_REGISTRIES: Record<string, ColumnRegistry> = {
   products: PRODUCTS_COLUMNS,
+  "custody-products": CUSTODY_PRODUCTS_COLUMNS,
   inventory: INVENTORY_COLUMNS,
   sales: SALES_COLUMNS,
   purchases: PURCHASES_COLUMNS,

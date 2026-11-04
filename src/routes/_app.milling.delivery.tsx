@@ -610,13 +610,21 @@ function MillingDeliveryPage() {
         <CustomerFormDialog
           open={newCustomerOpen}
           onClose={() => setNewCustomerOpen(false)}
-          hint={lang === "ar" ? "سيتم اختيار العميل تلقائياً فور حفظه لتسليم أمانته فوراً." : "Customer will be selected automatically."}
+          hint={
+            lang === "ar"
+              ? "سيتم اختيار العميل تلقائياً فور حفظه لتسليم أمانته فوراً."
+              : "Customer will be selected automatically."
+          }
           onSaved={(newCust) => {
             void qc.invalidateQueries({ queryKey: ["milling", "customers"] });
             setCustomerId(newCust.id);
             setLines([{ itemId: "", bags: 0, kg: 0 }]);
             setNewCustomerOpen(false);
-            toast.success(lang === "ar" ? `تمت إضافة واختيار العميل: ${newCust.name}` : `Customer selected: ${newCust.name}`);
+            toast.success(
+              lang === "ar"
+                ? `تمت إضافة واختيار العميل: ${newCust.name}`
+                : `Customer selected: ${newCust.name}`,
+            );
           }}
         />
       </div>

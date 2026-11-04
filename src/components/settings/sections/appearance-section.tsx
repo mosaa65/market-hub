@@ -1032,46 +1032,57 @@ export function AppearanceSection({ canEdit = true }: AppearanceSectionProps) {
                 onClick={() => {
                   toast.success(isAr ? "تم حفظ الفاتورة بنجاح" : "Invoice saved successfully", {
                     description: isAr
-                      ? "تم تسجيل العملية في دفتر اليومية وتحديث المخزون فورياً."
+                      ? "تم ترحيل السند المحاسبي وتحديث أرصدة المخزون فورياً."
                       : "Entry recorded in general ledger and stock updated immediately.",
                   });
                 }}
                 className="flex items-center justify-center gap-2 py-3 px-3.5 rounded-xl text-xs font-bold transition-all border bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 hover:scale-[1.02] active:scale-[0.98]"
               >
                 <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
-                <span>{isAr ? "تجربة إشعار نجاح (أخضر)" : "Success Toast"}</span>
+                <span>{isAr ? "نجاح العملية (أخضر)" : "Success Toast"}</span>
               </button>
 
-              {/* 2. تجربة خطأ */}
+              {/* 2. تجربة ملاحظة قاعدة تشغيلية تمنع العملية (برتقالي) */}
               <button
                 type="button"
                 onClick={() => {
-                  toast.error(isAr ? "تعذر إتمام عملية الترحيل" : "Failed to post entry", {
-                    description: isAr
-                      ? "رصيد الصندوق أو الكمية المتاحة لا تكفي لإتمام هذه الحركة."
-                      : "Insufficient cash box balance or item stock for this transaction.",
-                  });
-                }}
-                className="flex items-center justify-center gap-2 py-3 px-3.5 rounded-xl text-xs font-bold transition-all border bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 hover:scale-[1.02] active:scale-[0.98]"
-              >
-                <AlertOctagon className="h-4 w-4 text-rose-500 shrink-0" />
-                <span>{isAr ? "تجربة إشعار خطأ (أحمر)" : "Error Toast"}</span>
-              </button>
-
-              {/* 3. تجربة تحذير */}
-              <button
-                type="button"
-                onClick={() => {
-                  toast.warning(isAr ? "تنبيه: اقتراب نفاد المخزون" : "Warning: Low stock level", {
-                    description: isAr
-                      ? "وصل رصيد المادة إلى حد إعادة الطلب الأدنى (متبقي 3 قطع)."
-                      : "Current inventory reached reorder point (3 items remaining).",
-                  });
+                  // هنا يتم استدعاء خطأ يحتوي على قاعدة عمل فيتحول تلقائياً إلى برتقالي
+                  toast.error(
+                    isAr
+                      ? "يرجى اختيار عميل لطريقة الدفع الآجل"
+                      : "Please select a customer for credit payment",
+                    {
+                      description: isAr
+                        ? "البيع بالآجل يتطلب ربط الفاتورة بحساب عميل مسجل بالسوق."
+                        : "Credit sales require associating an active customer profile.",
+                    },
+                  );
                 }}
                 className="flex items-center justify-center gap-2 py-3 px-3.5 rounded-xl text-xs font-bold transition-all border bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 hover:scale-[1.02] active:scale-[0.98]"
               >
                 <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
-                <span>{isAr ? "تجربة إشعار تحذير (برتقالي)" : "Warning Toast"}</span>
+                <span>{isAr ? "قاعدة عمل تمنع البيع (برتقالي)" : "Rule Notice"}</span>
+              </button>
+
+              {/* 3. تجربة خطأ تقني غير متوقع (أحمر) */}
+              <button
+                type="button"
+                onClick={() => {
+                  toast.error(
+                    isAr
+                      ? "تعذر الاتصال بقاعدة البيانات (Server Crash)"
+                      : "Database connection failed",
+                    {
+                      description: isAr
+                        ? "استجابة الخادم غير متوقعة (500 Internal Error) تم إبلاغ الدعم الفني."
+                        : "Unexpected 500 error encountered. Technical log submitted.",
+                    },
+                  );
+                }}
+                className="flex items-center justify-center gap-2 py-3 px-3.5 rounded-xl text-xs font-bold transition-all border bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <AlertOctagon className="h-4 w-4 text-rose-500 shrink-0" />
+                <span>{isAr ? "خطأ تقني غير متوقع (أحمر)" : "Technical Error"}</span>
               </button>
 
               {/* 4. تجربة معلومات وتعليمات */}
@@ -1087,7 +1098,7 @@ export function AppearanceSection({ canEdit = true }: AppearanceSectionProps) {
                 className="flex items-center justify-center gap-2 py-3 px-3.5 rounded-xl text-xs font-bold transition-all border bg-sky-500/10 border-sky-500/30 text-sky-600 dark:text-sky-400 hover:bg-sky-500/20 hover:scale-[1.02] active:scale-[0.98]"
               >
                 <Info className="h-4 w-4 text-sky-500 shrink-0" />
-                <span>{isAr ? "تجربة إشعار تعليمات (أزرق)" : "Info Toast"}</span>
+                <span>{isAr ? "إرشادات وتعليمات (أزرق)" : "Info Toast"}</span>
               </button>
             </div>
           </div>

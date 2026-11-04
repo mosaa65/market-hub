@@ -194,8 +194,10 @@ export async function runSeedFile(relPath: string): Promise<{ ok: boolean; outpu
   if (!relPath.endsWith(".sql") || relPath.includes("..")) {
     return { ok: false, output: "مسار غير صالح للملف" };
   }
+  const seedsRoot = path.resolve(process.cwd(), "supabase", "seeds");
   const abs = path.resolve(process.cwd(), relPath);
-  if (!abs.startsWith(path.join(process.cwd(), "supabase", "seeds"))) {
+  const relativeToSeeds = path.relative(seedsRoot, abs);
+  if (relativeToSeeds.startsWith("..") || path.isAbsolute(relativeToSeeds)) {
     return { ok: false, output: "خارج مجلد Seeds" };
   }
   const db = containerName("db");

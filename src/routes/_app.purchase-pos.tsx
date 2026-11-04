@@ -1,4 +1,4 @@
-﻿import { ModuleGuard, useModules } from "@/lib/modules";
+import { ModuleGuard, useModules } from "@/lib/modules";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -730,10 +730,32 @@ function PurchasePOSPage() {
       }
       setUnitBarcodeMap(barcodeLookup);
       setProducts(
-        productRows.map((product) => ({
-          ...product,
-          purchase_uoms: purchaseUomsByProduct.get(product.id) ?? [],
-        })),
+        productRows.map((product) => {
+          const baseUnit = product.unit_id ? uns?.find((u) => u.id === product.unit_id) || null : null;
+          const baseCost = Number(product.cost_price || 0);
+          const secondaryUoms = purchaseUomsByProduct.get(product.id) ?? [];
+          const baseUomLabel = baseUnit
+            ? (lang === "ar" ? baseUnit.name_ar || baseUnit.name : baseUnit.name || baseUnit.name_ar) +
+              (baseUnit.short_name ? ` (${baseUnit.short_name})` : "")
+            : (lang === "ar" ? "وحدة الأساس" : "Base unit");
+          const hasSecondaryDefault = secondaryUoms.some((u) => u.is_default_purchase);
+          const baseUom: PurchaseUom = {
+            unit_id: product.unit_id || "",
+            factor_to_base: 1,
+            purchase_price: baseCost,
+            label: baseUomLabel,
+            quantity_increment: 1,
+            is_default_purchase: !hasSecondaryDefault,
+          };
+          const allPurchaseUoms = [
+            baseUom,
+            ...secondaryUoms.filter((u) => u.unit_id && u.unit_id !== product.unit_id),
+          ];
+          return {
+            ...product,
+            purchase_uoms: allPurchaseUoms,
+          };
+        }),
       );
       setPurchaseUomsLoaded(unitSettingsReady);
       setCatalogComplete(true);
@@ -1090,14 +1112,22 @@ function PurchasePOSPage() {
     const line = cart.find((entry) => entry.line_id === lineId);
     const option = line?.purchase_uoms.find((uom) => uom.unit_id === unitId);
     if (!line || !option) return;
+
+    const oldFactor = line.uom_factor && line.uom_factor > 0 ? line.uom_factor : 1;
+    const newFactor = option.factor_to_base && option.factor_to_base > 0 ? option.factor_to_base : 1;
+    const increment = Math.max(1, Math.round(option.quantity_increment ?? 1));
+    const rawConvertedQty = (line.quantity * oldFactor) / newFactor;
+    const nextQty = Math.max(increment, Math.round(rawConvertedQty));
+
     setCart((current) =>
       current.map((entry) =>
         entry.line_id === lineId
           ? {
               ...entry,
               uom_id: option.unit_id,
-              uom_factor: option.factor_to_base,
+              uom_factor: newFactor,
               uom_label: option.label,
+              quantity: nextQty,
               quantity_increment: option.quantity_increment,
               unit_cost: option.purchase_price,
             }
@@ -2503,7 +2533,7 @@ function PurchasePOSPage() {
                         unitPrice: line.unit_cost,
                         taxRate: line.tax_rate,
                         priceEditable: true,
-                        unitId: line.uom_id,
+                        unitId: line.uom_id ?? line.purchase_uoms?.[0]?.unit_id,
                         unit: line.uom_label,
                         unitOptions: line.purchase_uoms.map((uom) => ({
                           id: uom.unit_id,
