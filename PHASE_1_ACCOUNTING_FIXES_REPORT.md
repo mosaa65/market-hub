@@ -1,4 +1,4 @@
-# تقرير تنفيذ المرحلة الأولى — إصلاحات المراجعة المحاسبية
+﻿# تقرير تنفيذ المرحلة الأولى — إصلاحات المراجعة المحاسبية
 
 **النظام:** Market Hub / Vortex ERP
 **الفرع:** الفرع الحالي المفتوح فقط (لم يُنشأ فرع جديد، ولم يُدمج شيء مع `main`)
@@ -181,7 +181,7 @@
 
 | الملف | الغرض |
 |---|---|
-| `supabase/migrations/9916_phase1_expense_control_ledger_and_production_tax.sql` | كل إصلاحات قاعدة البيانات للمرحلة الأولى (بما فيها إعادة تعريف `complete_production_order`، منسوخة آلية من 9906 ومُعدَّلة في موضع حساب المتاح فقط) |
+| `supabase/migrations/9923_phase1_expense_control_ledger_and_production_tax.sql` | كل إصلاحات قاعدة البيانات للمرحلة الأولى (بما فيها إعادة تعريف `complete_production_order`، منسوخة آلية من 9906 ومُعدَّلة في موضع حساب المتاح فقط) |
 | `src/lib/expenses/__tests__/phase1-accounting-fixes.test.mjs` | اختبارات عقود نصية بلا تبعيات |
 | `supabase/tests/phase1_expense_fixes_acceptance.sql` | اختبار قبول يدوي معزول داخل معاملة تُلغى |
 | `PHASE_1_ACCOUNTING_FIXES_REPORT.md` | هذا التقرير |

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * كيف تشغّل هذا الملف:
  *   node --test src/lib/expenses/__tests__/phase1-accounting-fixes.test.mjs
  *
@@ -25,7 +25,7 @@ const root = resolve(here, "../../../..");
 
 const read = (...parts) => readFileSync(join(root, ...parts), "utf8").replace(/\r\n/g, "\n");
 
-const M9916 = "supabase/migrations/9916_phase1_expense_control_ledger_and_production_tax.sql";
+const M9916 = "supabase/migrations/9923_phase1_expense_control_ledger_and_production_tax.sql";
 const M9906 = "supabase/migrations/9906_company_production_orders_and_costing.sql";
 const M9913 = "supabase/migrations/9913_expense_accounting_lifecycle_integrity.sql";
 const FORM = "src/components/expenses/expense-form.tsx";
