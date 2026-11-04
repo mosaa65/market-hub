@@ -472,6 +472,13 @@ export function useExpenseMutations() {
   });
 
   const post = useMutation({
+    /*
+     * أدوات إعادة الطلب: Supabase لا يعيد المحاولة تلقائياً، لكن إعادة الإرسال
+     * اليدوية (نقرة مزدوجة أو فشل شبكة بعد وصول الطلب) لا يجب أن تنشئ قيداً
+     * ثانياً. المفتاح ثابت للمصروف نفسه، ورقم الإصدار يستخدم للتحقق التفاؤلي
+     * وحده، فلا يغيّر هوية الطلب.
+     */
+    mutationKey: ["expenses", "post"],
     mutationFn: async (input: {
       id: string;
       version: number;
@@ -492,7 +499,7 @@ export function useExpenseMutations() {
         p_payment_method: toLegacyPaymentValue(input.paymentMethod ?? "cash"),
         p_account_label: input.accountLabel || null,
         p_payment_date: input.paymentDate || null,
-        p_idempotency_key: input.payNow ? makeIdempotencyKey(`post:${input.id}`) : null,
+        p_idempotency_key: input.payNow ? `post:${input.id}` : null,
         p_account_id: input.accountId || null,
         p_cashbox_id: input.cashboxId || null,
         p_bank_account_id: input.bankAccountId || null,
@@ -530,6 +537,11 @@ export function useExpenseMutations() {
       accountLabel?: string | null;
       referenceNo?: string | null;
       note?: string | null;
+      /**
+       * مفتاح الطلب يأتي من النموذج ويبقى ثابتاً عبر إعادة المحاولة؛ مولّد
+       * جديد في كل استدعاء كان يجعل إعادة الإرسال تعني دفعة جديدة.
+       */
+      idempotencyKey?: string;
     }): Promise<ExpenseEntry> => {
       const { data, error } = await (supabase as any).rpc("record_expense_payment", {
         p_entry_id: input.id,
@@ -539,7 +551,8 @@ export function useExpenseMutations() {
         p_account_label: input.accountLabel || null,
         p_reference_no: input.referenceNo || null,
         p_note: input.note || null,
-        p_idempotency_key: makeIdempotencyKey(`pay:${input.id}`),
+        p_idempotency_key:
+          input.idempotencyKey || makeIdempotencyKey(`pay:${input.id}`),
         p_account_id: input.accountId || null,
         p_cashbox_id: input.cashboxId || null,
         p_bank_account_id: input.bankAccountId || null,
