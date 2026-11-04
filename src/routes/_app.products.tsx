@@ -89,7 +89,7 @@ import { RecordsSkeleton, RecordsEmpty } from "@/components/ui/records-states";
 import { LoadMoreFooter } from "@/components/ui/records-view";
 import { RecordsViewToggle } from "@/components/ui/records-view-toggle";
 import { RecordsFilterPanel, RecordsSortPanel } from "@/components/ui/records-panels";
-import { quietChipClass } from "@/components/ui/action-button";
+import { QuickFilterBar } from "@/components/ui/quick-filter-bar";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
   ItemRoleBadge,
@@ -577,6 +577,7 @@ function ProductsPage() {
         brand: (p) => p.brand_id ?? "",
         unit: (p) => p.unit_id ?? "",
         origin: (p) => p.origin_id ?? "",
+        role: (p) => p.item_class ?? "",
         status: (p) => (p.is_active ? "active" : "inactive"),
       }),
     [searched, filters],
@@ -676,6 +677,24 @@ function ProductsPage() {
         options: [
           { value: "active", label: t("common.active") },
           { value: "inactive", label: t("common.inactive") },
+        ],
+      },
+      /*
+        دور الصنف: أهم تبويب في شاشة مطحنة.
+
+        الكتالوج يحمل أصنافًا خامًا ومنتجات نهائية ونواتج ثانوية وخدمات، وعين
+        المشغّل تفرّقها باللون وحده. الفلترة تجعلها سؤلاً مباشرًا، وقد كانت
+        غائبة عن شاشة المنتجات تمامًا.
+      */
+      {
+        key: "role",
+        label: lang === "ar" ? "دور الصنف" : "Item role",
+        type: "select",
+        options: [
+          { value: "RAW_MATERIAL", label: lang === "ar" ? "حبوب خام" : "Raw material" },
+          { value: "FINISHED_GOOD", label: lang === "ar" ? "منتج نهائي" : "Finished good" },
+          { value: "BY_PRODUCT", label: lang === "ar" ? "ناتج ثانوي" : "By-product" },
+          { value: "TRADED_GOOD", label: lang === "ar" ? "منتج تجاري" : "Traded good" },
         ],
       },
     ];
@@ -1175,12 +1194,12 @@ function ProductsPage() {
             />
             <Button
               variant="primary"
-              size="sm"
+              size="lg"
               icon={<Plus className="size-4" />}
               onClick={() => openNew()}
-              className="rounded-xl font-bold shadow-xs shadow-primary/20"
+              className="gap-0 rounded-full px-5 text-sm font-bold shadow-md shadow-primary/25"
             >
-              {t("common.new")}
+              {lang === "ar" ? "إضافة منتج جديد" : "Add new product"}
             </Button>
           </div>
         }
@@ -1269,59 +1288,57 @@ function ProductsPage() {
           columnVisibility={productColumns.visibility}
           onToggleColumn={productColumns.toggle}
           onResetColumns={productColumns.reset}
-          action={
-            <PrimaryAction
-              label={t("common.new")}
-              icon={<Plus className="size-4" />}
-              onClick={() => openNew()}
-            />
-          }
+          /*
+            لا زر إضافة هنا.
+
+            كان «منتج جديد» يظهر مرّتين: زرًا في ترويسة الصفحة وزرًا في شريط
+            السجلات. ثم صار الثاني زرًّا أيقونيًّا بجانب الفلترة والترتيب،
+            فقرئ كأداة عرض لا كإجراء إنشاء. الآن زر الإضافة **واحد فقط**
+            في أعلى الصفحة، واضحًا باقترانه باسم المنتج.
+          */
         >
           {/*
-           * Quick segments render OUTSIDE any view-mode condition. They used to
-           * be wrapped in `viewMode === "grid" && ...`, so switching to list or
-           * table silently dropped the status filter row — the plan requires
-           * the filter bar to appear equally in all three modes (§9.3).
-           */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-x-none">
-            {[
+            Quick segments render OUTSIDE any view-mode condition. They used to
+            be wrapped in `viewMode === "grid" && ...`, so switching to list or
+            table silently dropped the status filter row — the plan requires
+            the filter bar to appear equally in all three modes (§9.3).
+
+            يستخدم الآن `QuickFilterBar` الموحّد بدل شرائح مصنوعة يدويًّا في هذه
+            الشاشة: الشريط اليدوي كان رماديًا بلا لون، فبدا «الكل» و«غير النشطة»
+            متطابقين في الشكل. الموحّد يعطي كل شريحة لونها الدلالي (أخضر
+            للنشطة، رمادي محايد لغير النشطة، كهرمان لتحدب الطلب).
+          */}
+          <QuickFilterBar
+            value={quickFilter}
+            onChange={(id) => setQuickFilter(id as typeof quickFilter)}
+            ariaLabel={lang === "ar" ? "فلترة المنتجات السريعة" : "Product quick filters"}
+            items={[
               {
                 id: "all",
                 label: lang === "ar" ? "الكل" : "All",
                 count: productCount ?? products.length,
+                tone: "primary",
               },
-              { id: "active", label: lang === "ar" ? "النشطة" : "Active", count: activeCount },
+              {
+                id: "active",
+                label: lang === "ar" ? "النشطة" : "Active",
+                count: activeCount,
+                tone: "success",
+              },
               {
                 id: "inactive",
                 label: lang === "ar" ? "غير النشطة" : "Inactive",
                 count: inactiveCount,
+                tone: "info",
               },
               {
                 id: "has_min_stock",
                 label: lang === "ar" ? "له حد أدنى" : "Has threshold",
                 count: hasMinStockCount,
+                tone: "warning",
               },
-            ].map((filter) => (
-              <button
-                key={filter.id}
-                type="button"
-                onClick={() => setQuickFilter(filter.id as typeof quickFilter)}
-                aria-pressed={quickFilter === filter.id}
-                className={quietChipClass(quickFilter === filter.id, "font-semibold")}
-              >
-                <span>{filter.label}</span>
-                <span
-                  className={`rounded-full px-1.5 py-0.5 text-[10px] font-mono ${
-                    quickFilter === filter.id
-                      ? "bg-primary/18 text-primary"
-                      : "bg-muted text-muted-foreground"
-                  }`}
-                >
-                  {filter.count}
-                </span>
-              </button>
-            ))}
-          </div>
+            ]}
+          />
         </RecordsToolbar>
 
         {/* Shared panels: bottom sheet on phones, small anchored panel on

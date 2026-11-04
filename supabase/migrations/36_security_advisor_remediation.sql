@@ -223,7 +223,12 @@ DROP POLICY IF EXISTS "Authenticated users can check and insert idempotency keys
 
 CREATE POLICY "Idempotency keys are service managed" ON public.sync_idempotency_keys
   AS PERMISSIVE FOR SELECT TO authenticated
-  USING (origin_device_id = (auth.jwt() ->> 'device_id'));
+  USING (
+    origin_device_id = (
+      COALESCE(NULLIF(current_setting('request.jwt.claims', true), ''), '{}')::jsonb
+        ->> 'device_id'
+    )
+  );
 
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON public.sync_idempotency_keys FROM authenticated, anon;
 

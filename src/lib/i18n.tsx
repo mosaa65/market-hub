@@ -299,6 +299,10 @@ const en: Dict = {
   "auth.have_account": "Already have an account?",
   "auth.no_account": "Don't have an account?",
   "auth.roles_loading": "Loading your permissions…",
+  "auth.permissions_unavailable_title": "Permissions could not be verified",
+  "auth.permissions_unavailable_description":
+    "Permission data could not be read from the database. Access stays blocked until your permissions can be verified.",
+  "auth.retry_permissions": "Retry",
   "auth.name_placeholder": "Full name",
   "auth.email_placeholder": "you@company.com",
   "auth.account_created": "Account created. You're signed in.",
@@ -1490,6 +1494,10 @@ const ar: Dict = {
   "auth.have_account": "لديك حساب بالفعل؟",
   "auth.no_account": "ليس لديك حساب؟",
   "auth.roles_loading": "جارٍ تحميل صلاحياتك...",
+  "auth.permissions_unavailable_title": "تعذّر التحقق من الصلاحيات",
+  "auth.permissions_unavailable_description":
+    "تعذّرت قراءة بيانات الصلاحيات من قاعدة البيانات. سيظل الدخول محجوبًا حتى يمكن التحقق من صلاحياتك.",
+  "auth.retry_permissions": "إعادة المحاولة",
   "auth.name_placeholder": "الاسم الكامل",
   "auth.email_placeholder": "you@company.com",
   "auth.account_created": "تم إنشاء الحساب. أنت مسجل الدخول الآن.",

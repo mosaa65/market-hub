@@ -340,53 +340,51 @@ function DashboardPage() {
 
   return (
     <>
-      <PageHeader title={t("dash.title")} subtitle={t("dash.subtitle")} />
-
       {/* ═══════════════════════════════════════════════════════════════════════
-          TOP EXECUTIVE BANNER — FULL WIDTH, COMPACT HEIGHT, UNIFIED ELEGANCE
+          TOP EXECUTIVE BANNER — CRISP WHITE, COMPACT HEIGHT, UNIFIED ELEGANCE
           ═══════════════════════════════════════════════════════════════════════ */}
-      <div className="mb-4 w-full rounded-2xl border border-border/70 bg-gradient-to-r from-card via-card/95 to-surface-2/40 dark:from-zinc-950 dark:via-zinc-900/90 dark:to-zinc-950 px-4 sm:px-6 py-3 sm:py-3.5 shadow-sm backdrop-blur-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 transition-all">
+      <div className="mb-3 w-full rounded-2xl border border-border/70 bg-white dark:bg-card px-4 py-2.5 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 sm:gap-3 transition-all">
         {/* User Identity & Smart Greeting (Single Unified Color, Zero Clutter) */}
-        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+        <div className="flex items-center gap-3 min-w-0">
           {/* User Avatar: Luxury Circular Frosted Glass Badge with Live Pulse */}
           <div className="relative shrink-0">
             {profile?.avatar_url ? (
               <img
                 src={profile.avatar_url}
                 alt={userName}
-                className="size-11 sm:size-12 rounded-full object-cover ring-2 ring-amber-500/30 shadow-md"
+                className="size-9 sm:size-10 rounded-full object-cover ring-2 ring-amber-500/30 shadow-xs"
               />
             ) : (
-              <div className="relative grid size-11 sm:size-12 place-items-center rounded-full bg-gradient-to-tr from-amber-500/20 via-zinc-800/40 to-emerald-500/20 dark:from-amber-400/15 dark:via-zinc-800/60 dark:to-emerald-400/15 backdrop-blur-xl border border-white/20 dark:border-white/10 shadow-md ring-1 ring-amber-500/25">
-                <roleMeta.icon className="size-5 sm:size-6 text-amber-500 dark:text-amber-400 filter drop-shadow-sm" />
+              <div className="relative grid size-9 sm:size-10 place-items-center rounded-full bg-gradient-to-tr from-amber-500/15 via-zinc-800/20 to-emerald-500/15 dark:from-amber-400/15 dark:via-zinc-800/60 dark:to-emerald-400/15 border border-border/60 shadow-xs">
+                <roleMeta.icon className="size-4 sm:size-5 text-amber-500 dark:text-amber-400" />
               </div>
             )}
             <span
-              className="absolute -bottom-0.5 -end-0.5 flex size-4 items-center justify-center"
+              className="absolute -bottom-0.5 -end-0.5 flex size-3.5 items-center justify-center"
               title={isAr ? "جلسة موثقة ومتصلة لحظياً" : "Live Session"}
             >
               <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-              <span className="relative inline-flex size-2.5 rounded-full bg-emerald-500 ring-2 ring-card shadow-xs" />
+              <span className="relative inline-flex size-2 rounded-full bg-emerald-500 ring-2 ring-card shadow-xs" />
             </span>
           </div>
 
           {/* Smart Greeting & User Name in Clean Unified High-End Typography */}
           <div className="space-y-0.5 min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs sm:text-sm font-semibold text-muted-foreground flex items-center gap-1.5">
-                <GreetingIcon className={`size-3.5 ${greeting.color}`} />
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+              <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
+                <GreetingIcon className={`size-3 ${greeting.color}`} />
                 <span>{greeting.title}،</span>
               </span>
-              <span className="text-sm sm:text-base font-black text-foreground tracking-tight">
+              <span className="text-xs sm:text-sm font-black text-foreground tracking-tight">
                 {userName}
               </span>
               <span
-                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.2 text-[10px] font-bold shadow-xs ${roleMeta.badgeCls}`}
+                className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.2 text-[9px] font-bold shadow-xs ${roleMeta.badgeCls}`}
               >
                 <span>{roleMeta.label}</span>
               </span>
             </div>
-            <p className="text-[11px] sm:text-xs text-muted-foreground font-medium truncate">
+            <p className="text-[10px] sm:text-[11px] text-muted-foreground font-medium truncate">
               {isAr
                 ? "لوحة القيادة التنفيذية • متابعة مباشرة لتدفقات الأعمال والعمليات التشغيلية"
                 : "Executive Command Deck • Live operational monitoring & business workflows"}
@@ -396,8 +394,8 @@ function DashboardPage() {
 
         {/* Live System Indicator Badge */}
         <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 shadow-xs">
-            <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 shadow-xs">
+            <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
             <span>{isAr ? "مركز العمليات متصل" : "Command Deck Active"}</span>
           </span>
         </div>
@@ -480,16 +478,8 @@ function DashboardPage() {
           ];
           const currentMonthName = isAr ? monthNamesAr[calMonth] : monthNamesEn[calMonth];
 
-          const weekHeadersAr = [
-            "السبت",
-            "الأحد",
-            "الاثنين",
-            "الثلاثاء",
-            "الأربعاء",
-            "الخميس",
-            "الجمعة",
-          ];
-          const weekHeadersEn = ["Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri"];
+          const weekHeadersAr = ["سبت", "أحد", "إثن", "ثلا", "أرب", "خمي", "جمع"];
+          const weekHeadersEn = ["Sa", "Su", "Mo", "Tu", "We", "Th", "Fr"];
           const weekHeaders = isAr ? weekHeadersAr : weekHeadersEn;
 
           // Sales rows calculation for selected date
@@ -516,72 +506,67 @@ function DashboardPage() {
           return (
             <>
               {/* Top Row: Operational Briefing + Vitals in Center + Compact Chronos on the Left */}
-              <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-12 items-stretch">
+              <div className="grid grid-cols-1 gap-2.5 sm:gap-3 lg:grid-cols-12 items-stretch">
                 {/* Card 1: Operational Briefing & Quick Launchers Dock (4 cols - Right side in RTL) */}
-                <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-border/80 bg-gradient-to-br from-card via-card/95 to-zinc-900/40 dark:from-zinc-950 dark:via-zinc-900/90 dark:to-zinc-950 p-3.5 sm:p-4 lg:col-span-4 shadow-panel backdrop-blur-xl flex flex-col justify-between">
-                  {/* Ambient Lighting */}
-                  <div className="pointer-events-none absolute -top-24 -start-24 size-72 rounded-full bg-amber-500/10 blur-3xl opacity-70" />
-                  <div className="pointer-events-none absolute -bottom-24 -end-24 size-64 rounded-full bg-emerald-500/10 blur-3xl opacity-60" />
-                  <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
-
+                <div className="relative overflow-hidden rounded-2xl border border-border/70 bg-white dark:bg-card p-2.5 sm:p-3 lg:col-span-4 shadow-xs flex flex-col justify-between">
                   {/* Operational Briefing Header */}
-                  <div className="relative space-y-3">
+                  <div className="relative space-y-2">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2.5">
-                        <div className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-amber-500/20 via-amber-500/10 to-transparent border border-amber-500/30 text-amber-500 shadow-inner">
-                          <Activity className="size-4" />
+                      <div className="flex items-center gap-2">
+                        <div className="grid size-7 place-items-center rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400">
+                          <Activity className="size-3.5" />
                         </div>
                         <div>
-                          <h3 className="text-sm sm:text-base font-black text-foreground tracking-tight">
+                          <h3 className="text-xs sm:text-[13px] font-bold text-foreground tracking-tight">
                             {isAr
                               ? "الموجز التنفيذي والجاهزية اليومية"
                               : "Executive Operations Briefing"}
                           </h3>
-                          <p className="text-[11px] text-muted-foreground font-medium">
+                          <p className="text-[10px] text-muted-foreground font-medium">
                             {isAr
                               ? "كفاءة حركة النقد ومسارات الإنجاز الفوري"
                               : "Cash velocity & rapid execution paths"}
                           </p>
                         </div>
                       </div>
-                      <span className="hidden sm:inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-                        <CheckCircle2 className="size-3" />
+                      <span className="hidden sm:inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.2 text-[9px] font-bold text-emerald-600 dark:text-emerald-400">
+                        <CheckCircle2 className="size-2.5" />
                         <span>{isAr ? "تشغيلي" : "Optimal"}</span>
                       </span>
                     </div>
 
                     {/* Operational Pulse Metrics */}
-                    <div className="grid grid-cols-3 gap-2 pt-0.5">
-                      <div className="rounded-xl border border-border/70 bg-surface/60 p-2 backdrop-blur-xs">
-                        <span className="block text-[10px] font-semibold text-muted-foreground mb-0.5 truncate">
+                    <div className="grid grid-cols-3 gap-1.5 pt-0.5">
+                      <div className="rounded-xl border border-border/60 bg-zinc-50/70 dark:bg-zinc-900/50 p-1.5">
+                        <span className="block text-[9px] font-semibold text-muted-foreground mb-0.5 truncate">
                           {isAr ? "الوردية والبيع" : "Shift Status"}
                         </span>
                         <div className="flex items-center gap-1">
                           <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                          <span className="text-[11px] sm:text-xs font-bold text-foreground truncate">
+                          <span className="text-[10px] sm:text-[11px] font-bold text-foreground truncate">
                             {isAr ? "نقطة البيع نشطة" : "POS Ready"}
                           </span>
                         </div>
                       </div>
 
-                      <div className="rounded-xl border border-border/70 bg-surface/60 p-2 backdrop-blur-xs">
-                        <span className="block text-[10px] font-semibold text-muted-foreground mb-0.5 truncate">
+                      <div className="rounded-xl border border-border/60 bg-zinc-50/70 dark:bg-zinc-900/50 p-1.5">
+                        <span className="block text-[9px] font-semibold text-muted-foreground mb-0.5 truncate">
                           {isAr ? "عمليات اليوم المختار" : "Selected Day"}
                         </span>
-                        <div className="flex items-center gap-1 font-mono text-[11px] sm:text-xs font-black text-foreground truncate">
-                          <ShoppingCart className="size-3 text-amber-500 shrink-0" />
+                        <div className="flex items-center gap-1 font-mono text-[10px] sm:text-[11px] font-black text-foreground truncate">
+                          <ShoppingCart className="size-2.5 text-amber-500 shrink-0" />
                           <span>
                             {num(selectedDayOrders)} {isAr ? "فاتورة" : "orders"}
                           </span>
                         </div>
                       </div>
 
-                      <div className="rounded-xl border border-border/70 bg-surface/60 p-2 backdrop-blur-xs">
-                        <span className="block text-[10px] font-semibold text-muted-foreground mb-0.5 truncate">
+                      <div className="rounded-xl border border-border/60 bg-zinc-50/70 dark:bg-zinc-900/50 p-1.5">
+                        <span className="block text-[9px] font-semibold text-muted-foreground mb-0.5 truncate">
                           {isAr ? "جاهزية البيانات" : "Data Sync"}
                         </span>
-                        <div className="flex items-center gap-1 text-[11px] sm:text-xs font-bold text-foreground truncate">
-                          <Zap className="size-3 text-amber-500 shrink-0" />
+                        <div className="flex items-center gap-1 text-[10px] sm:text-[11px] font-bold text-foreground truncate">
+                          <Zap className="size-2.5 text-amber-500 shrink-0" />
                           <span className="text-emerald-600 dark:text-emerald-400 truncate">
                             {isAr ? "محدثة" : "Live"}
                           </span>
@@ -591,12 +576,12 @@ function DashboardPage() {
                   </div>
 
                   {/* Fast Launchers Dock */}
-                  <div className="relative mt-3 pt-2.5 border-t border-border/50">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[11px] font-bold text-muted-foreground">
+                  <div className="relative mt-2 pt-2 border-t border-border/50">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[10px] font-bold text-muted-foreground">
                         {isAr ? "مسارات الإطلاق السريع:" : "Fast Actions:"}
                       </span>
-                      <span className="text-[10px] font-medium text-muted-foreground/80">
+                      <span className="text-[9px] font-medium text-muted-foreground/80">
                         {isAr ? "اختصارات سريعة" : "Shortcuts"}
                       </span>
                     </div>
@@ -604,9 +589,9 @@ function DashboardPage() {
                     <div className="flex flex-wrap items-center gap-1.5">
                       <Link
                         to="/pos"
-                        className="inline-flex h-7 sm:h-8 items-center gap-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 px-2.5 text-[11px] font-bold text-white shadow-xs hover:from-amber-600 hover:to-amber-700 transition-all active:scale-95"
+                        className="inline-flex h-7 items-center gap-1 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 px-2 text-[10.5px] font-bold text-white shadow-xs hover:from-amber-600 hover:to-amber-700 transition-all active:scale-95"
                       >
-                        <Zap className="size-3" />
+                        <Zap className="size-2.5" />
                         <span>{lang === "ar" ? "نقطة البيع" : "POS"}</span>
                         <kbd className="hidden sm:inline-block rounded bg-black/20 px-1 py-0.2 text-[8px] font-mono">
                           F2
@@ -615,46 +600,43 @@ function DashboardPage() {
 
                       <Link
                         to="/sales"
-                        className="inline-flex h-7 sm:h-8 items-center gap-1 rounded-lg border border-border/80 bg-surface/80 px-2 text-[11px] font-semibold text-foreground hover:bg-surface-2 transition-all active:scale-95"
+                        className="inline-flex h-7 items-center gap-1 rounded-lg border border-border/70 bg-zinc-50 dark:bg-zinc-900/60 px-2 text-[10.5px] font-semibold text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all active:scale-95"
                       >
-                        <Receipt className="size-3 text-muted-foreground" />
+                        <Receipt className="size-2.5 text-muted-foreground" />
                         <span>{lang === "ar" ? "الفواتير" : "Invoices"}</span>
                       </Link>
 
                       <Link
                         to="/debts"
-                        className="inline-flex h-7 sm:h-8 items-center gap-1 rounded-lg border border-border/80 bg-surface/80 px-2 text-[11px] font-semibold text-foreground hover:bg-surface-2 transition-all active:scale-95"
+                        className="inline-flex h-7 items-center gap-1 rounded-lg border border-border/70 bg-zinc-50 dark:bg-zinc-900/60 px-2 text-[10.5px] font-semibold text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all active:scale-95"
                       >
-                        <Wallet className="size-3 text-amber-500" />
+                        <Wallet className="size-2.5 text-amber-500" />
                         <span>{lang === "ar" ? "الديون" : "Debts"}</span>
                       </Link>
 
                       <Link
                         to={"/products" as any}
                         search={{ barcode: undefined } as any}
-                        className="inline-flex h-7 sm:h-8 items-center gap-1 rounded-lg border border-border/80 bg-surface/80 px-2 text-[11px] font-semibold text-foreground hover:bg-surface-2 transition-all active:scale-95"
+                        className="inline-flex h-7 items-center gap-1 rounded-lg border border-border/70 bg-zinc-50 dark:bg-zinc-900/60 px-2 text-[10.5px] font-semibold text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all active:scale-95"
                       >
-                        <Package className="size-3 text-muted-foreground" />
+                        <Package className="size-2.5 text-muted-foreground" />
                         <span>{lang === "ar" ? "المنتجات" : "Products"}</span>
                       </Link>
                     </div>
                   </div>
                 </div>
 
-                {/* Column 2: Executive Vitals Stack (4 cols - Now in the Center, compact size) */}
+                {/* Column 2: Executive Vitals Stack (4 cols - In the Center, compact & crisp white) */}
                 {data && (
-                  <div className="relative flex flex-col justify-between gap-2 rounded-2xl sm:rounded-3xl border border-border/80 bg-gradient-to-br from-card via-surface/90 to-zinc-900/30 dark:from-zinc-950 dark:via-zinc-900/80 dark:to-zinc-950 p-2.5 sm:p-3 lg:col-span-4 shadow-panel backdrop-blur-xl">
-                    <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
-
+                  <div className="relative flex flex-col justify-between gap-1.5 rounded-2xl border border-border/70 bg-white dark:bg-card p-2 sm:p-2.5 lg:col-span-4 shadow-xs">
                     {/* Vital Card 1: Selected Day Sales Velocity */}
-                    <div className="group relative flex-1 overflow-hidden rounded-xl sm:rounded-2xl border border-border/70 bg-surface/60 p-2.5 shadow-xs transition-all hover:border-primary/40 hover:shadow-sm">
-                      <div className="pointer-events-none absolute end-0 top-0 size-16 rounded-full bg-primary/10 blur-xl transition-all group-hover:bg-primary/15" />
-                      <div className="mb-1 flex items-center justify-between gap-1 text-xs text-muted-foreground">
+                    <div className="group relative flex-1 overflow-hidden rounded-xl border border-border/60 bg-zinc-50/70 dark:bg-zinc-900/50 p-2 shadow-2xs transition-all hover:bg-zinc-100/60 dark:hover:bg-zinc-900">
+                      <div className="mb-0.5 flex items-center justify-between gap-1 text-xs text-muted-foreground">
                         <div className="flex min-w-0 items-center gap-1.5">
-                          <div className="grid size-6 shrink-0 place-items-center rounded-lg border border-primary/20 bg-primary/10 text-primary">
-                            <TrendingUp className="size-3" />
+                          <div className="grid size-5 shrink-0 place-items-center rounded-md border border-primary/20 bg-primary/10 text-primary">
+                            <TrendingUp className="size-2.5" />
                           </div>
-                          <span className="truncate text-[11px] font-bold text-foreground">
+                          <span className="truncate text-[10.5px] font-bold text-foreground">
                             {isSelectedToday
                               ? isAr
                                 ? "تدفق مبيعات اليوم"
@@ -665,14 +647,14 @@ function DashboardPage() {
                           </span>
                         </div>
                         <span
-                          className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.2 text-[9px] font-bold ${
+                          className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.2 text-[8.5px] font-bold ${
                             isSelectedToday
                               ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                               : "border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400"
                           }`}
                         >
                           <span
-                            className={`size-1.5 rounded-full ${isSelectedToday ? "animate-pulse bg-emerald-500" : "bg-amber-500"}`}
+                            className={`size-1 rounded-full ${isSelectedToday ? "animate-pulse bg-emerald-500" : "bg-amber-500"}`}
                           />
                           <span>
                             {isSelectedToday
@@ -686,13 +668,13 @@ function DashboardPage() {
                         </span>
                       </div>
 
-                      <div className="mt-0.5 truncate font-mono text-base font-black tracking-tight text-foreground sm:text-lg">
+                      <div className="truncate font-mono text-sm sm:text-base font-black tracking-tight text-foreground">
                         {money(selectedDayRevenue)}
                       </div>
 
-                      <div className="mt-1 flex items-center justify-between border-t border-border/40 pt-1 text-[10px] text-muted-foreground">
+                      <div className="mt-0.5 flex items-center justify-between border-t border-border/40 pt-0.5 text-[9.5px] text-muted-foreground">
                         <span className="flex items-center gap-1 font-medium truncate">
-                          <ShoppingCart className="size-2.5 text-muted-foreground/70" />
+                          <ShoppingCart className="size-2 text-muted-foreground/70" />
                           <span>
                             {num(selectedDayOrders)} {isAr ? "فواتير مسجلة" : "invoices"}
                           </span>
@@ -702,33 +684,32 @@ function DashboardPage() {
                           className="flex shrink-0 items-center gap-0.5 font-bold text-primary hover:underline"
                         >
                           {isAr ? "سجل المبيعات" : "Sales log"}
-                          <ChevronLeft className="size-3 rotate-180 rtl:rotate-0" />
+                          <ChevronLeft className="size-2.5 rotate-180 rtl:rotate-0" />
                         </Link>
                       </div>
                     </div>
 
                     {/* Vital Card 2: Market Liquidity & Receivables Exposure */}
-                    <div className="group relative flex-1 overflow-hidden rounded-xl sm:rounded-2xl border border-border/70 bg-surface/60 p-2.5 shadow-xs transition-all hover:border-amber-500/40 hover:shadow-sm">
-                      <div className="pointer-events-none absolute end-0 top-0 size-16 rounded-full bg-amber-500/10 blur-xl transition-all group-hover:bg-amber-500/15" />
-                      <div className="mb-1 flex items-center justify-between gap-1 text-xs text-muted-foreground">
+                    <div className="group relative flex-1 overflow-hidden rounded-xl border border-border/60 bg-zinc-50/70 dark:bg-zinc-900/50 p-2 shadow-2xs transition-all hover:bg-zinc-100/60 dark:hover:bg-zinc-900">
+                      <div className="mb-0.5 flex items-center justify-between gap-1 text-xs text-muted-foreground">
                         <div className="flex min-w-0 items-center gap-1.5">
-                          <div className="grid size-6 shrink-0 place-items-center rounded-lg border border-amber-500/20 bg-amber-500/10 text-amber-500">
-                            <Wallet className="size-3" />
+                          <div className="grid size-5 shrink-0 place-items-center rounded-md border border-amber-500/20 bg-amber-500/10 text-amber-500">
+                            <Wallet className="size-2.5" />
                           </div>
-                          <span className="truncate text-[11px] font-bold text-foreground">
+                          <span className="truncate text-[10.5px] font-bold text-foreground">
                             {isAr ? "مستحقات السوق والذمم" : "Receivables & Market"}
                           </span>
                         </div>
-                        <span className="shrink-0 rounded-full border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.2 text-[9px] font-bold text-amber-600 dark:text-amber-400">
+                        <span className="shrink-0 rounded-full border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.2 text-[8.5px] font-bold text-amber-600 dark:text-amber-400">
                           {isAr ? "تراكمي" : "Ledger"}
                         </span>
                       </div>
 
-                      <div className="mt-0.5 truncate font-mono text-base font-black tracking-tight text-foreground sm:text-lg">
+                      <div className="truncate font-mono text-sm sm:text-base font-black tracking-tight text-foreground">
                         {money(data.receivables ?? 0)}
                       </div>
 
-                      <div className="mt-1 flex items-center justify-between border-t border-border/40 pt-1 text-[10px] text-muted-foreground">
+                      <div className="mt-0.5 flex items-center justify-between border-t border-border/40 pt-0.5 text-[9.5px] text-muted-foreground">
                         <span className="truncate font-medium">
                           {isAr ? "أرصدة عملاء بالسوق" : "Customer balances"}
                         </span>
@@ -737,45 +718,44 @@ function DashboardPage() {
                           className="flex shrink-0 items-center gap-0.5 font-bold text-amber-600 hover:underline dark:text-amber-400"
                         >
                           {isAr ? "متابعة" : "Collect"}
-                          <ChevronLeft className="size-3 rotate-180 rtl:rotate-0" />
+                          <ChevronLeft className="size-2.5 rotate-180 rtl:rotate-0" />
                         </Link>
                       </div>
                     </div>
 
                     {/* Vital Card 3: Supply Chain Readiness & Critical Stock */}
-                    <div className="group relative flex-1 overflow-hidden rounded-xl sm:rounded-2xl border border-border/70 bg-surface/60 p-2.5 shadow-xs transition-all hover:border-rose-500/40 hover:shadow-sm">
-                      <div className="pointer-events-none absolute end-0 top-0 size-16 rounded-full bg-rose-500/10 blur-xl transition-all group-hover:bg-rose-500/15" />
-                      <div className="mb-1 flex items-center justify-between gap-1 text-xs text-muted-foreground">
+                    <div className="group relative flex-1 overflow-hidden rounded-xl border border-border/60 bg-zinc-50/70 dark:bg-zinc-900/50 p-2 shadow-2xs transition-all hover:bg-zinc-100/60 dark:hover:bg-zinc-900">
+                      <div className="mb-0.5 flex items-center justify-between gap-1 text-xs text-muted-foreground">
                         <div className="flex min-w-0 items-center gap-1.5">
-                          <div className="grid size-6 shrink-0 place-items-center rounded-lg border border-primary/20 bg-primary/10 text-primary">
-                            <Activity className="size-3" />
+                          <div className="grid size-5 shrink-0 place-items-center rounded-md border border-primary/20 bg-primary/10 text-primary">
+                            <Activity className="size-2.5" />
                           </div>
-                          <span className="truncate text-[11px] font-bold text-foreground">
+                          <span className="truncate text-[10.5px] font-bold text-foreground">
                             {isAr ? "جاهزية المخزون والإمداد" : "Stock Readiness"}
                           </span>
                         </div>
-                        <span className="shrink-0 font-mono text-[9px] font-semibold text-muted-foreground">
+                        <span className="shrink-0 font-mono text-[8.5px] font-semibold text-muted-foreground">
                           {isAr ? "آلي" : "Auto"}
                         </span>
                       </div>
 
                       {(data.alerts ?? 0) > 0 ? (
-                        <div className="mt-0.5 flex items-center gap-1 rounded-lg border border-rose-500/20 bg-rose-500/10 px-2 py-0.5 text-rose-600 dark:text-rose-400">
-                          <AlertTriangle className="size-3 shrink-0" />
-                          <span className="truncate text-[10px] font-bold">
+                        <div className="flex items-center gap-1 rounded-lg border border-rose-500/20 bg-rose-500/10 px-1.5 py-0.2 text-rose-600 dark:text-rose-400">
+                          <AlertTriangle className="size-2.5 shrink-0" />
+                          <span className="truncate text-[9.5px] font-bold">
                             {data.alerts} {isAr ? "أصناف دون حد الأمان" : "below reorder"}
                           </span>
                         </div>
                       ) : (
-                        <div className="mt-0.5 flex items-center gap-1 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-emerald-600 dark:text-emerald-400">
-                          <CheckCircle2 className="size-3 shrink-0" />
-                          <span className="truncate text-[10px] font-bold">
+                        <div className="flex items-center gap-1 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.2 text-emerald-600 dark:text-emerald-400">
+                          <CheckCircle2 className="size-2.5 shrink-0" />
+                          <span className="truncate text-[9.5px] font-bold">
                             {isAr ? "المستودعات في النطاق الآمن" : "Warehouses optimal"}
                           </span>
                         </div>
                       )}
 
-                      <div className="mt-1 flex items-center justify-between border-t border-border/40 pt-1 text-[10px] text-muted-foreground">
+                      <div className="mt-0.5 flex items-center justify-between border-t border-border/40 pt-0.5 text-[9.5px] text-muted-foreground">
                         <span className="truncate font-medium">
                           {(data.alerts ?? 0) > 0
                             ? isAr
@@ -790,36 +770,31 @@ function DashboardPage() {
                           className="flex shrink-0 items-center gap-0.5 font-bold text-primary hover:underline"
                         >
                           {isAr ? "فحص" : "Inspect"}
-                          <ChevronLeft className="size-3 rotate-180 rtl:rotate-0" />
+                          <ChevronLeft className="size-2.5 rotate-180 rtl:rotate-0" />
                         </Link>
                       </div>
                     </div>
                   </div>
                 )}
 
-                {/* Card 3: Luxury Executive Chronos & Full Month Calendar (4 cols - Now on the LEFT, compact width) */}
-                <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-border/80 bg-gradient-to-br from-card via-surface/90 to-zinc-900/30 dark:from-zinc-950 dark:via-zinc-900/80 dark:to-zinc-950 p-3.5 sm:p-4 lg:col-span-4 shadow-panel backdrop-blur-xl flex flex-col justify-between">
-                  {/* Ambient Lighting */}
-                  <div className="pointer-events-none absolute -top-20 -end-20 size-60 rounded-full bg-amber-500/10 blur-3xl opacity-60" />
-                  <div className="pointer-events-none absolute -bottom-20 -start-20 size-56 rounded-full bg-emerald-500/10 blur-3xl opacity-40" />
-                  <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
-
-                  <div className="space-y-2.5">
+                {/* Card 3: Luxury Executive Chronos & Full Month Calendar (4 cols - Now on the LEFT, compact & crisp white) */}
+                <div className="relative overflow-hidden rounded-2xl border border-border/70 bg-white dark:bg-card p-2.5 sm:p-3 lg:col-span-4 shadow-xs flex flex-col justify-between">
+                  <div className="space-y-1.5">
                     {/* Header: Month Navigator + Live Universal Clock */}
-                    <div className="flex items-center justify-between gap-1.5 border-b border-border/50 pb-2">
+                    <div className="flex items-center justify-between gap-1.5 border-b border-border/50 pb-1.5">
                       {/* Month Switcher with Circular Buttons */}
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1">
                         <button
                           type="button"
                           onClick={() => setCalendarMonth(new Date(calYear, calMonth - 1, 1))}
-                          className="size-7 rounded-full border border-border/80 bg-surface/80 hover:bg-surface-2 text-foreground flex items-center justify-center transition-all active:scale-95 shadow-xs"
+                          className="size-6 rounded-full border border-border/70 bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 text-foreground flex items-center justify-center transition-all active:scale-95 shadow-2xs"
                           title={isAr ? "الشهر السابق" : "Previous Month"}
                         >
-                          <ChevronRight className="size-3.5 rtl:rotate-0 rotate-180" />
+                          <ChevronRight className="size-3 rtl:rotate-0 rotate-180" />
                         </button>
 
-                        <div className="text-center min-w-[85px]">
-                          <span className="block text-xs sm:text-sm font-black text-foreground tracking-tight">
+                        <div className="text-center min-w-[75px]">
+                          <span className="block text-xs font-bold text-foreground tracking-tight">
                             {currentMonthName} {calYear}
                           </span>
                         </div>
@@ -827,10 +802,10 @@ function DashboardPage() {
                         <button
                           type="button"
                           onClick={() => setCalendarMonth(new Date(calYear, calMonth + 1, 1))}
-                          className="size-7 rounded-full border border-border/80 bg-surface/80 hover:bg-surface-2 text-foreground flex items-center justify-center transition-all active:scale-95 shadow-xs"
+                          className="size-6 rounded-full border border-border/70 bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 text-foreground flex items-center justify-center transition-all active:scale-95 shadow-2xs"
                           title={isAr ? "الشهر التالي" : "Next Month"}
                         >
-                          <ChevronLeft className="size-3.5 rtl:rotate-0 rotate-180" />
+                          <ChevronLeft className="size-3 rtl:rotate-0 rotate-180" />
                         </button>
 
                         {!isSelectedToday && (
@@ -841,24 +816,30 @@ function DashboardPage() {
                               setSelectedDate(t);
                               setCalendarMonth(new Date(t.getFullYear(), t.getMonth(), 1));
                             }}
-                            className="size-7 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 flex items-center justify-center transition-all active:scale-95 shadow-xs"
+                            className="size-6 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 flex items-center justify-center transition-all active:scale-95 shadow-2xs"
                             title={isAr ? "العودة لتاريخ اليوم" : "Reset to Today"}
                           >
-                            <RotateCcw className="size-3" />
+                            <RotateCcw className="size-2.5" />
                           </button>
                         )}
                       </div>
 
-                      {/* Clean Universal Digital Clock */}
-                      <div className="rounded-xl border border-border/80 bg-zinc-900/10 dark:bg-zinc-800/40 px-2 py-1 text-end shadow-xs backdrop-blur-md">
-                        <div className="flex items-center gap-1 text-[11px] sm:text-xs font-black font-mono text-foreground justify-end tracking-wider">
-                          <Clock className="size-3 text-amber-500 animate-pulse" />
+                      {/* Clean Universal Digital Clock (English digits) */}
+                      <div className="rounded-xl border border-border/70 bg-zinc-50 dark:bg-zinc-900/60 px-2 py-0.5 text-end shadow-2xs">
+                        <div
+                          className="flex items-center gap-1 text-[11px] font-black font-mono text-foreground justify-end tracking-wider"
+                          dir="ltr"
+                        >
+                          <Clock className="size-2.5 text-amber-500 animate-pulse" />
                           <span>
-                            {now.toLocaleTimeString(isAr ? "ar-YE" : "en-US", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                              second: "2-digit",
-                            })}
+                            {(() => {
+                              const h = now.getHours();
+                              const m = String(now.getMinutes()).padStart(2, "0");
+                              const s = String(now.getSeconds()).padStart(2, "0");
+                              const h12 = String(h % 12 || 12).padStart(2, "0");
+                              const period = isAr ? (h >= 12 ? "م" : "ص") : (h >= 12 ? "PM" : "AM");
+                              return `${h12}:${m}:${s} ${period}`;
+                            })()}
                           </span>
                         </div>
                         <div className="flex items-center gap-1 text-[8px] text-muted-foreground font-semibold justify-end">
@@ -869,15 +850,15 @@ function DashboardPage() {
                     </div>
 
                     {/* Full Month Calendar Grid (Compact Circular Day Buttons) */}
-                    <div className="rounded-xl border border-border/60 bg-surface/40 p-2 backdrop-blur-xs">
+                    <div className="rounded-xl border border-border/50 bg-zinc-50/50 dark:bg-zinc-900/40 p-1.5">
                       {/* Weekday Labels Header */}
-                      <div className="grid grid-cols-7 gap-0.5 text-center mb-1">
+                      <div className="grid grid-cols-7 gap-0.5 text-center mb-0.5">
                         {weekHeaders.map((w, idx) => (
                           <span
                             key={idx}
-                            className="text-[9px] sm:text-[10px] font-bold text-muted-foreground/80 py-0.5"
+                            className="text-[9px] font-bold text-muted-foreground/80 py-0.5"
                           >
-                            {w.slice(0, 3)}
+                            {w}
                           </span>
                         ))}
                       </div>
@@ -896,14 +877,14 @@ function DashboardPage() {
                               onClick={() => {
                                 setSelectedDate(cell.date);
                               }}
-                              className={`size-6 sm:size-7 rounded-full flex items-center justify-center font-mono text-[10px] sm:text-[11px] font-semibold transition-all ${
+                              className={`size-5 sm:size-6 rounded-full flex items-center justify-center font-mono text-[9px] sm:text-[10px] font-semibold transition-all ${
                                 isSelected
-                                  ? "bg-gradient-to-tr from-amber-500 to-amber-600 text-white font-black shadow-xs scale-105 ring-2 ring-amber-500/50"
+                                  ? "bg-gradient-to-tr from-amber-500 to-amber-600 text-white font-black shadow-xs scale-105 ring-1.5 ring-amber-500/50"
                                   : isTodayCell
                                     ? "border border-amber-500/60 bg-amber-500/10 text-amber-500 font-bold hover:bg-amber-500/20"
                                     : cell.isCurrentMonth
-                                      ? "text-foreground hover:bg-surface-2 hover:scale-105"
-                                      : "text-muted-foreground/35 hover:text-muted-foreground/60 text-[9px]"
+                                      ? "text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:scale-105"
+                                      : "text-muted-foreground/35 hover:text-muted-foreground/60 text-[8.5px]"
                               }`}
                               title={
                                 formatLuxuryDate(cell.date, { showDayName: true, showYear: true })
@@ -918,15 +899,15 @@ function DashboardPage() {
                     </div>
 
                     {/* Selected Date Status & Daily Filter Feedback */}
-                    <div className="flex items-center justify-between text-[10px] sm:text-[11px] pt-0.5 text-muted-foreground">
+                    <div className="flex items-center justify-between text-[9.5px] sm:text-[10px] pt-0.5 text-muted-foreground">
                       <div className="flex items-center gap-1 font-medium truncate">
-                        <CalendarCheck className="size-3 text-amber-500 shrink-0" />
+                        <CalendarCheck className="size-2.5 text-amber-500 shrink-0" />
                         <span className="font-bold text-foreground truncate">
                           {selectedLuxuryDate.weekday}، {selectedLuxuryDate.day}{" "}
                           {selectedLuxuryDate.month}
                         </span>
                         {!isSelectedToday && (
-                          <span className="inline-flex items-center rounded-md bg-amber-500/10 border border-amber-500/20 px-1 py-0.2 text-[8px] font-bold text-amber-600 dark:text-amber-400">
+                          <span className="inline-flex items-center rounded-md bg-amber-500/10 border border-amber-500/20 px-1 py-0.2 text-[7.5px] font-bold text-amber-600 dark:text-amber-400">
                             {isAr ? "مفلتر" : "Filtered"}
                           </span>
                         )}
@@ -934,10 +915,10 @@ function DashboardPage() {
 
                       <Link
                         to="/daily-journal"
-                        className="text-[10px] font-bold text-amber-500 hover:text-amber-600 dark:hover:text-amber-400 hover:underline flex items-center gap-0.5 shrink-0"
+                        className="text-[9.5px] font-bold text-amber-500 hover:text-amber-600 dark:hover:text-amber-400 hover:underline flex items-center gap-0.5 shrink-0"
                       >
                         {isAr ? "دفتر اليومية" : "Journal"}
-                        <ChevronLeft className="size-3 rtl:rotate-0 rotate-180" />
+                        <ChevronLeft className="size-2.5 rtl:rotate-0 rotate-180" />
                       </Link>
                     </div>
                   </div>

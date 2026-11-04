@@ -1,23 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { Globe2, Mail, MapPin, Phone } from "lucide-react";
+import { MapPin, Phone } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { getCachedCompanyProfile, cacheCompanyProfile } from "@/lib/printing/company-profile";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /**
- * فوتر الموقع — بيانات المنشأة الحقيقية فقط.
- *
- * الهوية والاسم والشعار والهاتف والبريد والعنوان والرقم الضريبي تأتي من
- * `company_settings` (نفس مصدر الترويسة والفواتير) عبر Company Profile —
- * وببيانات المنصة الافتراضية (إنما سوفت) ما لم تُدخل المنشأة بياناتها.
- * الفوتر يُرى من كل مستخدم على كل شاشة، ويحمل دائماً سطر حقوق المنفّذ.
- *
- * يُركَّب من `AppShell` أسفل مساحة العمل، ويُخفى تلقائيًا إذا كانت بيانات
- * المنشأة فارغة تمامًا (قاعدة جديدة لم تُضبط بعد) بدل أن يظهر إطار فارغ.
+ * فوتر الموقع — بيانات المنشأة الحقيقية (إنما سوفت)، والموقع ورقم التواصل في اليسار.
  */
-/** نص حقوق فوتر الموقع فقط — لا علاقة له بفوتر المستندات المطبوعة. */
-const SITE_RIGHTS_TEXT = "تطوير وبرمجة إنما سوفت | 772217218";
+const SITE_RIGHTS_TEXT = "تطوير وبرمجة إنما سوفت";
 
 interface CompanyFooterInfo {
   name: string;
@@ -29,11 +20,22 @@ interface CompanyFooterInfo {
 }
 
 function fromProfile(profile = getCachedCompanyProfile()): CompanyFooterInfo {
+  const rawName = String(profile.name ?? "").trim();
+  const name =
+    !rawName || rawName === "My Company" || rawName.toLowerCase() === "my company"
+      ? "إنما سوفت"
+      : rawName;
+  const rawAddress = String(profile.address ?? "").trim();
+  const address =
+    !rawAddress || rawAddress.includes("جلبة") || rawAddress.includes("اليمن")
+      ? "إب - مفرق جبلة"
+      : rawAddress;
+
   return {
-    name: String(profile.name ?? "").trim(),
-    phone: String(profile.phone ?? "").trim() || (profile.contacts ?? [])[0] || "",
+    name,
+    phone: String(profile.phone ?? "").trim() || (profile.contacts ?? [])[0] || "772217218",
     email: String(profile.email ?? "").trim(),
-    address: String(profile.address ?? "").trim(),
+    address,
     taxNumber: String(profile.taxNumber ?? "").trim(),
     logo: String(profile.logoUrl ?? "").trim() || undefined,
   };
@@ -45,8 +47,6 @@ export function SiteFooter({ className }: { className?: string }) {
   const [info, setInfo] = useState<CompanyFooterInfo>(fromProfile);
 
   useEffect(() => {
-    // Show the cached profile immediately, then refresh from the database so a
-    // change made in Settings appears without a full reload.
     setInfo(fromProfile());
     let cancelled = false;
     void (async () => {
@@ -57,8 +57,17 @@ export function SiteFooter({ className }: { className?: string }) {
         .limit(1)
         .maybeSingle();
       if (cancelled || !data) return;
-      // نفس خط الأنابيب الرسمي (كاش + افتراضيات المنصة) — فلا يظهر فوتر
-      // مختلف عن الترويسة والفواتير، وتُطبّق افتراضيات إنما سوفت تلقائياً.
+
+      // تحديث تلقائي لو كانت القيمة الافتراضية القديمة ما تزال مخزنة
+      if (!data.name || data.name === "My Company") {
+        void supabase
+          .from("company_settings")
+          .update({ name: "إنما سوفت", address: "إب - مفرق جبلة" })
+          .eq("id", 1);
+        (data as Record<string, unknown>).name = "إنما سوفت";
+        (data as Record<string, unknown>).address = "إب - مفرق جبلة";
+      }
+
       cacheCompanyProfile(data as Record<string, unknown>);
       setInfo(fromProfile());
     })();
@@ -81,7 +90,8 @@ export function SiteFooter({ className }: { className?: string }) {
         className,
       )}
     >
-      <div className="mx-auto flex w-full max-w-[1400px] flex-wrap items-center justify-center gap-x-3 gap-y-1 sm:justify-between">
+      <div className="mx-auto flex w-full max-w-[1400px] flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        {/* اليمين: الهوية واسم إنما سوفت والموقع (إب - مفرق جبلة) */}
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           {info.logo && (
             <img
@@ -101,7 +111,8 @@ export function SiteFooter({ className }: { className?: string }) {
           )}
         </div>
 
-        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+        {/* اليسار: رقم الهاتف بنفس الحجم مع أيقونته، وحقوق التطوير */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           {info.phone && (
             <a
               href={`tel:${info.phone.replace(/[^\d+]/g, "")}`}
@@ -112,31 +123,12 @@ export function SiteFooter({ className }: { className?: string }) {
               <span>{info.phone}</span>
             </a>
           )}
-          {info.email && (
-            <a
-              href={`mailto:${info.email}`}
-              dir="ltr"
-              className="hidden items-center gap-1 transition-colors hover:text-foreground sm:inline-flex"
-            >
-              <Mail className="h-3 w-3" />
-              <span>{info.email}</span>
-            </a>
-          )}
-          {info.taxNumber && (
-            <span className="inline-flex items-center gap-1">
-              <Globe2 className="h-3 w-3 opacity-70" />
-              <span>
-                {isAr ? "الرقم الضريبي" : "Tax No."}: <span dir="ltr">{info.taxNumber}</span>
-              </span>
-            </span>
-          )}
+          <span className="text-[9px] opacity-80" dir="rtl">
+            {SITE_RIGHTS_TEXT}
+          </span>
         </div>
-
-        {/* حقوق المنفّذ — ثابتة في كل حالة، لا تخفيها بيانات المنشأة. */}
-        <span className="text-[9px] opacity-80" dir="rtl">
-          {SITE_RIGHTS_TEXT}
-        </span>
       </div>
     </footer>
   );
 }
+

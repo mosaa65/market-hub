@@ -19,6 +19,8 @@ function AppLayout() {
     isPlatformAdmin,
     isPlatformSuperadmin,
     isActive,
+    permissionLoadError,
+    retryPermissionLoad,
   } = useAuth();
   const pathname = useRouterState({ select: (st) => st.location.pathname });
   const routeSearch = useRouterState({ select: (st) => st.location.search });
@@ -26,8 +28,36 @@ function AppLayout() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!loading && !session) navigate({ to: "/auth", replace: true });
-  }, [loading, session, navigate]);
+    if (!loading && !session && !permissionLoadError) navigate({ to: "/auth", replace: true });
+  }, [loading, session, permissionLoadError, navigate]);
+
+  if (permissionLoadError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center px-4">
+        <div
+          aria-live="assertive"
+          className="flex w-full max-w-md flex-col items-center gap-4 rounded-xl border bg-card p-6 text-center shadow-sm"
+        >
+          <ShieldAlert className="h-10 w-10 text-destructive" />
+          <div>
+            <h1 className="text-lg font-semibold text-foreground">
+              {t("auth.permissions_unavailable_title")}
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {t("auth.permissions_unavailable_description")}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={retryPermissionLoad}
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            {t("auth.retry_permissions")}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (loading || isRefreshingPermissions || !session) {
     return (

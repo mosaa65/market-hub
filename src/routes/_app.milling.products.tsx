@@ -63,8 +63,7 @@ import { VortexMetricCard } from "@/components/vortex-ui";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { PrimaryAction } from "@/components/ui/primary-action";
-import { quietChipClass } from "@/components/ui/action-button";
+import { QuickFilterBar } from "@/components/ui/quick-filter-bar";
 import { DataTable, type DataTableColumn, type DataTableSort } from "@/components/ui/data-table";
 import { RecordsToolbar } from "@/components/ui/records-toolbar";
 import { RecordsSkeleton, RecordsEmpty } from "@/components/ui/records-states";
@@ -995,12 +994,18 @@ function CustodyProductsPage() {
           actions={
             <Button
               variant="primary"
-              size="sm"
+              size="lg"
               icon={<Plus className="size-4" />}
               onClick={openNew}
-              className="rounded-xl font-bold shadow-xs shadow-primary/20"
+              className="gap-0 rounded-full px-5 text-sm font-bold shadow-md shadow-primary/25"
             >
-              {t("common.new")}
+              {isAr
+                ? tab === "raw"
+                  ? "إضافة نوع حبوب"
+                  : "إضافة ناتج طحن"
+                : tab === "raw"
+                  ? "Add grain type"
+                  : "Add milled output"}
             </Button>
           }
         />
@@ -1125,47 +1130,33 @@ function CustodyProductsPage() {
             columnVisibility={productColumns.visibility}
             onToggleColumn={productColumns.toggle}
             onResetColumns={productColumns.reset}
-            action={
-              <PrimaryAction
-                label={isAr ? "صنف جديد" : "New item"}
-                icon={<Plus className="size-4" />}
-                onClick={openNew}
-              />
-            }
+            /* زر الإضافة واحد في أعلى الصفحة — لا يتكرر داخل الشريط. */
           >
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-x-none">
-              {(
-                [
-                  { id: "all", label: isAr ? "الكل" : "All", count: tabRows.length },
-                  { id: "active", label: isAr ? "النشطة" : "Active", count: activeCount },
-                  {
-                    id: "inactive",
-                    label: isAr ? "غير النشطة" : "Inactive",
-                    count: inactiveCount,
-                  },
-                ] as { id: QuickFilter; label: string; count: number }[]
-              ).map((filter) => (
-                <button
-                  key={filter.id}
-                  type="button"
-                  onClick={() => setQuickFilter(filter.id)}
-                  aria-pressed={quickFilter === filter.id}
-                  className={quietChipClass(quickFilter === filter.id, "font-semibold")}
-                >
-                  <span>{filter.label}</span>
-                  <span
-                    className={cn(
-                      "rounded-full px-1.5 py-0.5 text-[10px] font-mono",
-                      quickFilter === filter.id
-                        ? "bg-primary/18 text-primary"
-                        : "bg-muted text-muted-foreground",
-                    )}
-                  >
-                    {filter.count}
-                  </span>
-                </button>
-              ))}
-            </div>
+            <QuickFilterBar
+              value={quickFilter}
+              onChange={(id) => setQuickFilter(id as QuickFilter)}
+              ariaLabel={isAr ? "فلترة الأصناف السريعة" : "Item quick filters"}
+              items={[
+                {
+                  id: "all",
+                  label: isAr ? "الكل" : "All",
+                  count: tabRows.length,
+                  tone: "primary",
+                },
+                {
+                  id: "active",
+                  label: isAr ? "النشطة" : "Active",
+                  count: activeCount,
+                  tone: "success",
+                },
+                {
+                  id: "inactive",
+                  label: isAr ? "غير النشطة" : "Inactive",
+                  count: inactiveCount,
+                  tone: "info",
+                },
+              ]}
+            />
           </RecordsToolbar>
 
           <RecordsFilterPanel

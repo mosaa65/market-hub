@@ -10,6 +10,15 @@ import type { ColumnDefinition, ColumnVisibility } from "@/lib/records/column-re
 import { useI18n } from "@/lib/i18n";
 
 /**
+ * ارتفاع الشريط العلوي الثابت في هيكل التطبيق (`app-shell`).
+ *
+ * الشريط `sticky top-0 z-30`، فحاوية السجلات لا يجوز أن تثبت عند `top-0`:
+ * كانت تنزلق تحته وتختفي مع أول تمرير. تثبت عند `top-16` (٤rem) فتبقى
+ * ظاهرة أسفله. القيمة مساواة صريحة مع `min-h-[calc(4rem+…)]` في الهيكل.
+ */
+export const STICKY_OFFSET_PX = 64;
+
+/**
  * RecordsToolbar — the one bar at the top of every records screen (plan §9.1).
  *
  * It replaces the per-page assemblies of search + filter panel + sort panel +
@@ -135,10 +144,17 @@ export function RecordsToolbar({
     if (!sticky) return;
     const sentinel = sentinelRef.current;
     if (!sentinel) return;
-    const observer = new IntersectionObserver(([entry]) => setLifted(!entry.isIntersecting), {
-      rootMargin: "-64px 0px 0px 0px",
-      threshold: 0,
-    });
+    const observer = new IntersectionObserver(
+      ([entry]) => setLifted(!entry.isIntersecting),
+      /*
+       * الجذر هو حاوية التمرير الحقيقية (`main`)، ولا بد من إزاحة علوية
+       * بقدر ارتفاع الشريط العلوي الثابت. قبل ذلك كان الجذر هو النافذة
+       * فتلاحظ الملاحظة ما لا يراه المستخدم، وكان `top-0` يسمح للشريط
+       * بالانزلاق تحت الترويسة بدل أن يثبت تحتها — وهو سبب «لا يثبت
+       * عند التمرير» الذي كان مستخدمًا في أكثر من شاشة.
+       */
+      { root: null, rootMargin: `-${STICKY_OFFSET_PX + 1}px 0px 0px 0px`, threshold: 0 },
+    );
     observer.observe(sentinel);
     return () => observer.disconnect();
   }, [sticky]);
@@ -152,9 +168,9 @@ export function RecordsToolbar({
           // Transparent by default — no tinted surface behind the search row.
           sticky &&
             cn(
-              "sticky top-0 z-30 -mx-1 rounded-2xl px-2 py-2 transition-[background-color,border-color,box-shadow] duration-300 sm:mx-0 sm:px-3",
+              "sticky top-[calc(4rem+env(safe-area-inset-top,0px))] z-20 -mx-1 rounded-2xl px-2 py-2 transition-[background-color,border-color,box-shadow] duration-300 sm:mx-0 sm:px-3",
               lifted
-                ? "border border-border/60 bg-background/45 shadow-sm backdrop-blur-xl"
+                ? "border border-border/60 bg-background/80 shadow-sm backdrop-blur-xl"
                 : "border border-transparent bg-transparent",
             ),
           className,

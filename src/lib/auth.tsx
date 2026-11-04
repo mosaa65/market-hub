@@ -31,7 +31,9 @@ interface AuthCtx {
   isActive: boolean;
   loading: boolean;
   isRefreshingPermissions: boolean;
+  permissionLoadError: boolean;
   hasRole: (r: Role) => boolean;
+  retryPermissionLoad: () => void;
   signOut: () => Promise<void>;
 }
 
@@ -46,8 +48,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isActive, setIsActive] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isRefreshingPermissions, setIsRefreshingPermissions] = useState(false);
+  const [permissionLoadError, setPermissionLoadError] = useState(false);
   const loadSeq = useRef(0);
   const permissionUserIdRef = useRef<string | null>(null);
+  const retryPermissionLoadRef = useRef<() => void>(() => {});
   /**
    * Identity the in-memory Query cache currently belongs to. The query cache is
    * session memory with a 2-minute stale window, so a second user signing in on
@@ -58,6 +62,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let alive = true;
+
+    function getSessionWithTimeout() {
+      let timeoutHandle: number | undefined;
+      return Promise.race([
+        supabase.auth.getSession(),
+        new Promise<never>((_, reject) => {
+          timeoutHandle = window.setTimeout(
+            () => reject(new Error("Session verification timed out")),
+            15_000,
+          );
+        }),
+      ]).finally(() => {
+        if (timeoutHandle !== undefined) window.clearTimeout(timeoutHandle);
+      });
+    }
+
+    function failSessionCheck(error: unknown) {
+      console.error("Could not verify the current session", error);
+      if (!alive) return;
+      setRoles([]);
+      setIsPlatformAdmin(false);
+      setIsPlatformSuperadmin(false);
+      setIsActive(false);
+      setLoading(false);
+      setIsRefreshingPermissions(false);
+      setPermissionLoadError(true);
+    }
 
     async function applySession(nextSession: Session | null) {
       const seq = ++loadSeq.current;
@@ -81,6 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setIsActive(false);
           setLoading(false);
           setIsRefreshingPermissions(false);
+          setPermissionLoadError(false);
         }
         return;
       }
@@ -99,19 +131,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(true);
       }
       setIsRefreshingPermissions(true);
+      setPermissionLoadError(false);
 
       let nextRoles: Role[] = [];
       let adminFlags = { isAdmin: false, isSuperadmin: false };
       let profileIsActive = false;
+      let timeoutHandle: number | undefined;
+      const permissionAbort = new AbortController();
 
       try {
-        [nextRoles, adminFlags, profileIsActive] = await Promise.all([
-          fetchRoles(userId),
-          fetchAdminFlags(userId),
-          fetchIsActive(userId),
+        [nextRoles, adminFlags, profileIsActive] = await Promise.race([
+          Promise.all([
+            fetchRoles(userId, permissionAbort.signal),
+            fetchAdminFlags(userId, permissionAbort.signal),
+            fetchIsActive(userId, permissionAbort.signal),
+          ]),
+          new Promise<never>((_, reject) => {
+            timeoutHandle = window.setTimeout(
+              () => {
+                permissionAbort.abort();
+                reject(new Error("Permission verification timed out"));
+              },
+              15_000,
+            );
+          }),
         ]);
       } catch (err) {
         console.error("Failed to resolve session permissions", err);
+        if (!alive || seq !== loadSeq.current) return;
+        setRoles([]);
+        setIsPlatformAdmin(false);
+        setIsPlatformSuperadmin(false);
+        setIsActive(false);
+        setLoading(false);
+        setIsRefreshingPermissions(false);
+        setPermissionLoadError(true);
+        return;
+      } finally {
+        if (timeoutHandle !== undefined) window.clearTimeout(timeoutHandle);
       }
 
       if (!alive || seq !== loadSeq.current) return;
@@ -127,6 +184,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsActive(false);
         setLoading(false);
         setIsRefreshingPermissions(false);
+        setPermissionLoadError(false);
         permissionUserIdRef.current = userId;
         // Keep the identity for a clear blocked state, but never grant route access
         // when the active-profile check failed or returned no row.
@@ -140,6 +198,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsActive(nextIsActive);
       setLoading(false);
       setIsRefreshingPermissions(false);
+      setPermissionLoadError(false);
       permissionUserIdRef.current = userId;
     }
 
@@ -148,29 +207,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     const refreshPermissions = () => {
-      void supabase.auth
-        .getSession()
+      const requestSeq = loadSeq.current;
+      void getSessionWithTimeout()
         .then(({ data, error }) => {
-          if (!error && data.session) void applySession(data.session);
-          else if (!error && !data.session) void applySession(null);
+          if (error) throw error;
+          if (data.session) void applySession(data.session);
+          else void applySession(null);
         })
-        .catch((error) => console.warn("Could not refresh the current session", error));
+        .catch((error) => {
+          if (requestSeq === loadSeq.current) failSessionCheck(error);
+        });
     };
+    retryPermissionLoadRef.current = refreshPermissions;
     window.addEventListener("focus", refreshPermissions);
     const permissionRefreshTimer = window.setInterval(refreshPermissions, 5 * 60 * 1000);
 
-    supabase.auth
-      .getSession()
-      .then(({ data }) => applySession(data.session))
-      .catch(() => {
-        if (!alive) return;
-        setSession(null);
-        setRoles([]);
-        setIsPlatformAdmin(false);
-        setIsPlatformSuperadmin(false);
-        setIsActive(false);
-        setLoading(false);
-      });
+    getSessionWithTimeout()
+      .then(({ data, error }) => {
+        if (error) throw error;
+        return applySession(data.session);
+      })
+      .catch(failSessionCheck);
 
     return () => {
       alive = false;
@@ -182,12 +239,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // `createQueryClient`), so this effect still runs exactly once on mount.
   }, [queryClient]);
 
-  async function fetchRoles(userId: string): Promise<Role[]> {
-    const { data, error } = await supabase.from("user_roles").select("role").eq("user_id", userId);
-    if (error) {
-      console.error("Failed to load user roles", error);
-      return [];
-    }
+  async function fetchRoles(userId: string, signal: AbortSignal): Promise<Role[]> {
+    const { data, error } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .abortSignal(signal);
+    if (error) throw error;
     return Array.from(
       new Set(
         (data ?? [])
@@ -197,51 +255,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
   }
 
-  async function fetchIsActive(userId: string): Promise<boolean> {
-    try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("is_active")
-        .eq("id", userId)
-        .maybeSingle();
-      if (error) {
-        if ((error as { code?: string }).code === "42703") {
-          console.warn(
-            "profiles.is_active is required to authorize staff. Apply the profile-activation migration.",
-          );
-        }
-        return false;
+  async function fetchIsActive(userId: string, signal: AbortSignal): Promise<boolean> {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("is_active")
+      .eq("id", userId)
+      .abortSignal(signal)
+      .maybeSingle();
+    if (error) {
+      if ((error as { code?: string }).code === "42703") {
+        console.warn(
+          "profiles.is_active is required to authorize staff. Apply the profile-activation migration.",
+        );
       }
-      if (!data) return false;
-      return (data as { is_active?: boolean }).is_active === true;
-    } catch {
-      return false;
+      throw error;
     }
+    if (!data) return false;
+    return (data as { is_active?: boolean }).is_active === true;
   }
 
   async function fetchAdminFlags(
     userId: string,
+    signal: AbortSignal,
   ): Promise<{ isAdmin: boolean; isSuperadmin: boolean }> {
-    try {
-      const { data, error } = await (supabase as any)
-        .from("platform_admins")
-        .select("role, is_active")
-        .eq("user_id", userId)
-        .eq("is_active", true)
-        .maybeSingle();
+    const { data, error } = await (supabase as any)
+      .from("platform_admins")
+      .select("role, is_active")
+      .eq("user_id", userId)
+      .eq("is_active", true)
+      .abortSignal(signal)
+      .maybeSingle();
 
-      if (error || !data) return { isAdmin: false, isSuperadmin: false };
+    if (error) throw error;
+    if (!data) return { isAdmin: false, isSuperadmin: false };
 
-      // The table stores exactly two roles: 'superadmin' and 'support'.
-      // 'support' is a platform admin but not a superadmin — it must not
-      // satisfy superadmin-only policies or reveal the platform screens.
-      return {
-        isAdmin: true,
-        isSuperadmin: data.role === "superadmin",
-      };
-    } catch {
-      return { isAdmin: false, isSuperadmin: false };
-    }
+    // The table stores exactly two roles: 'superadmin' and 'support'.
+    // 'support' is a platform admin but not a superadmin — it must not
+    // satisfy superadmin-only policies or reveal the platform screens.
+    return {
+      isAdmin: true,
+      isSuperadmin: data.role === "superadmin",
+    };
   }
 
   const value: AuthCtx = {
@@ -253,6 +307,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isActive,
     loading,
     isRefreshingPermissions,
+    permissionLoadError,
     hasRole: (r) => {
       // سوبر أدمن المنصة يملك كافة الصلاحيات
       if (isPlatformSuperadmin) return true;
@@ -262,6 +317,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (roles.includes("manager") && (r === "cashier" || r === "warehouse")) return true;
       return roles.includes(r);
     },
+    retryPermissionLoad: () => retryPermissionLoadRef.current(),
     signOut: async () => {
       clearSessionQueryCache(queryClient);
       scopedUserIdRef.current = null;

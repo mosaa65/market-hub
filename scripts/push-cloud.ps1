@@ -5,6 +5,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
+$cloudDbUrlOverride = $env:SUPABASE_CLOUD_DB_URL
 
 function Invoke-Supabase {
   param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
@@ -48,9 +49,18 @@ try {
         $parts = $trimmed -split '=', 2
         $name = $parts[0].Trim()
         $value = $parts[1].Trim().Trim('"').Trim("'")
+        if ($cloudDbUrlOverride -and $name -in @("SUPABASE_DB_URL", "SUPABASE_DB_PASSWORD")) {
+          continue
+        }
         [Environment]::SetEnvironmentVariable($name, $value, "Process")
       }
     }
+  }
+
+  # Keep the app's local .env target intact while allowing a one-process cloud
+  # connection override. The URI is validated below and is never printed.
+  if ($cloudDbUrlOverride) {
+    $env:SUPABASE_DB_URL = $cloudDbUrlOverride
   }
 
   $linkedRefPath = Join-Path $repoRoot "supabase\.temp\project-ref"
@@ -69,7 +79,7 @@ try {
   }
 
   if (-not $env:SUPABASE_DB_URL) {
-    throw "Set SUPABASE_DB_URL to this project's direct database URL before deployment. Its value is never printed or stored by this script."
+    throw "Set SUPABASE_DB_URL in .env or SUPABASE_CLOUD_DB_URL in this process to this project's direct database URL. Its value is never printed or stored by this script."
   }
   try {
     $databaseHost = ([uri]$env:SUPABASE_DB_URL).Host
