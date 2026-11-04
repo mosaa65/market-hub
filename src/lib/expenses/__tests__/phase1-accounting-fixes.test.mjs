@@ -215,9 +215,21 @@ test("أزرار الترحيل والسداد في الواجهة تستخدم 
 });
 
 test("السداد يعيد المستند عند تكرار المفتاح، ويرفض إعادة استعماله بمبلغ مختلف", () => {
+  // النفح الفعلي داخل body: (1) البحث عن المفتاح في expense_payments،
+  // (2) مقارنة المستند والمبلغ، (3) رمي الخطأ. ترتيب التعليقات بين (1) و(2)
+  // ليس جزءاً من العقد، لذلك نطابق كل خطوة مستقلة بدل مسافة ثابتة.
   const body = sqlFunctionBody(migration, "record_expense_payment");
-  assert.match(body, /WHERE idempotency_key = v_key;[\s\S]{0,220}RETURN v_entry;/);
-  assert.match(body, /already used for a different payment/);
+  const lookupAt = body.search(/WHERE idempotency_key = v_key;/);
+  const rejectAt = body.search(/already used for a different payment/);
+  const returnAt = body.search(/RETURN v_entry;/);
+  assert.ok(lookupAt >= 0, "الاستعلام عن مفتاح الدفعة يجب أن يكون بالمفتاح الفريد");
+  assert.ok(rejectAt > lookupAt, "رفض إعادة استعمال المفتاح بمبلغ مختلف يأتي بعد البحث عنه");
+  assert.ok(returnAt > lookupAt, "إعادة المستند عند إعادة الطلب بالنفس المفتاح");
+  assert.match(
+    body,
+    /v_existing\.entry_id <> p_entry_id OR v_existing\.amount <> v_amount/,
+    "مقارنة المستند والمبلغ قبل إعادة المستند",
+  );
 });
 
 test("إنشاء المصروف يملك مفتاح idempotency وفهرساً فريداً (يحافظ على 9913)", () => {

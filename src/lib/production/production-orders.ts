@@ -98,7 +98,11 @@ export async function loadProductionLookups() {
   const [warehouses, centers, products, units, productUoms, batches, inventory, costs] =
     await Promise.all([
       db.from("warehouses").select("id,name,name_ar,is_default").eq("is_active", true),
-      db.from("expense_cost_centers").select("id,code,name,name_ar").eq("is_active", true).order("name"),
+      db
+        .from("expense_cost_centers")
+        .select("id,code,name,name_ar")
+        .eq("is_active", true)
+        .order("name"),
       db
         .from("products")
         .select(
@@ -122,16 +126,7 @@ export async function loadProductionLookups() {
       db.rpc("production_cost_sources"),
     ]);
 
-  const result = [
-    warehouses,
-    centers,
-    products,
-    units,
-    productUoms,
-    batches,
-    inventory,
-    costs,
-  ];
+  const result = [warehouses, centers, products, units, productUoms, batches, inventory, costs];
   const failure = result.find((item) => item.error);
   if (failure?.error) throw failure.error;
 
@@ -163,14 +158,10 @@ export async function loadProductionLookups() {
 }
 
 export async function loadProductionOrderHistory() {
+  // السجل يُقرأ من production_order_history (9918): عمود الصفوف الخفيفة فقط،
+  // فإضافة عمود جديد على production_orders لا تكسر صفحة السجل بعد اليوم.
   const [orders, centers] = await Promise.all([
-    db
-      .from("production_orders")
-      .select(
-        "id,order_number,production_date,status,warehouse_id,cost_center_id,material_cost,conversion_cost,total_cost,output_cost,abnormal_loss_cost,notes,completed_at,reversed_at,reversal_reason",
-      )
-      .order("created_at", { ascending: false })
-      .limit(250),
+    db.rpc("production_order_history", { p_limit: 250 }),
     db.from("expense_cost_centers").select("id,name,name_ar").order("name"),
   ]);
   if (orders.error) throw orders.error;
@@ -358,6 +349,12 @@ export interface ProductionOrderCostDetail {
     wip_credit: number;
     conversion_from_expenses: number;
     unallocated_conversion: number;
+    /** مجاميع من السجلات (9918): لا تحسبها الواجهة. */
+    material_subtotal?: number;
+    conversion_subtotal?: number;
+    wip_total_from_parts?: number;
+    rounding_variance?: number;
+    wip_balanced?: boolean;
     allocation_basis: string;
   };
 }

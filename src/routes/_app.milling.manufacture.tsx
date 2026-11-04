@@ -47,7 +47,15 @@ type OutputDraft = {
   expiryDate: string;
 };
 type ExpenseDraft = { expenseLineId: string; amount: string; basis: string; note: string };
-type LossDraft = { type: "NORMAL" | "ABNORMAL"; quantity: string; uomId: string; reason: string };
+type LossDraft = {
+  type: "NORMAL" | "ABNORMAL";
+  quantity: string;
+  /** وحدة كتلة للفاقد المقاس بالوزن. */
+  uomId: string;
+  /** فاقد عددي بوحدة الصنف: عند اختيار ناتج يُطلب أن تكون الكمية بوحدته. */
+  productId: string;
+  reason: string;
+};
 
 const blankMaterial = (): MaterialDraft => ({
   productId: "",
@@ -92,10 +100,14 @@ export function CompanyProductionPage() {
         (center) =>
           center.code?.trim().toUpperCase() === "PROD" ||
           [center.name, center.name_ar].some((name) =>
-            ["production", "الإنتاج", "الانتاج"].includes(name?.trim().toLocaleLowerCase("ar") ?? ""),
+            ["production", "الإنتاج", "الانتاج"].includes(
+              name?.trim().toLocaleLowerCase("ar") ?? "",
+            ),
           ),
       );
-      setCostCenterId(productionCenter?.id ?? (data.centers.length === 1 ? data.centers[0].id : ""));
+      setCostCenterId(
+        productionCenter?.id ?? (data.centers.length === 1 ? data.centers[0].id : ""),
+      );
     }
   }, [data, warehouseId, costCenterId]);
 
@@ -107,14 +119,20 @@ export function CompanyProductionPage() {
       product.inventory_policy === "TRACKED" &&
       !product.is_custody_item,
   );
-  const rawMaterialProducts = materialProducts.filter((product) => product.item_class === "RAW_MATERIAL");
-  const packagingProducts = materialProducts.filter((product) => product.item_class === "PACKAGING");
+  const rawMaterialProducts = materialProducts.filter(
+    (product) => product.item_class === "RAW_MATERIAL",
+  );
+  const packagingProducts = materialProducts.filter(
+    (product) => product.item_class === "PACKAGING",
+  );
+  // السياسة المطبقة في 9918: المنتج التام يكفي أن يكون مخزنياً مملوكاً؛ الناتج
+  // الجانبي يجب أن يكون قابلاً للبيع لأنه بلا توزيع تكلفة في مسار البيع.
   const outputProducts = products.filter(
     (product) =>
-      product.is_sellable &&
       product.inventory_policy === "TRACKED" &&
       !product.is_custody_item &&
-      ["FINISHED_GOOD", "BY_PRODUCT"].includes(product.item_class ?? ""),
+      (product.item_class === "FINISHED_GOOD" ||
+        (product.item_class === "BY_PRODUCT" && product.is_sellable)),
   );
   const massUnits = data?.units.filter((u) => u.dimension_code === "MASS") ?? [];
   const kiloUnit =
@@ -199,12 +217,11 @@ export function CompanyProductionPage() {
   }, 0);
 
   const expenseSources = (data?.expenseSources ?? []).filter(
-    (source) =>
-      source.cost_center_id === costCenterId &&
-      Number(source.available_amount) > 0,
+    (source) => source.cost_center_id === costCenterId && Number(source.available_amount) > 0,
   );
   const selectedCostCenter = data?.centers.find((center) => center.id === costCenterId);
-  const selectedCostCenterLabel = selectedCostCenter?.name_ar || selectedCostCenter?.name || "مركز التكلفة المحدد";
+  const selectedCostCenterLabel =
+    selectedCostCenter?.name_ar || selectedCostCenter?.name || "مركز التكلفة المحدد";
   const estimatedConversionCost = expenses.reduce(
     (sum, line) => sum + (Number(line.amount) || 0),
     0,
@@ -234,12 +251,15 @@ export function CompanyProductionPage() {
           basis: line.basis.trim(),
           note: line.note.trim() || null,
         }));
+      // الفاقد العددي: صنف ناتج + كميته بوحدة الصنف، ويُحوّل الخادم للمكافئ
+      // الكتلي. الفاقد الكتلي: وحدة كتلة صريحة بلا صنف.
       const cleanLosses: ProductionLossInput[] = losses
         .filter((line) => Number(line.quantity) > 0)
         .map((line) => ({
           loss_type: line.type,
           quantity: Number(line.quantity),
-          uom_id: line.uomId || null,
+          uom_id: line.productId ? null : line.uomId || null,
+          product_id: line.productId || null,
           reason: line.reason.trim(),
         }));
 
@@ -287,7 +307,9 @@ export function CompanyProductionPage() {
       (line) => !line.expenseLineId || (Number(line.amount) > 0 && line.basis.trim().length >= 3),
     ) &&
     losses.every(
-      (line) => !Number(line.quantity) || (line.uomId && line.reason.trim().length >= 3),
+      (line) =>
+        !Number(line.quantity) ||
+        (Boolean(line.uomId || line.productId) && line.reason.trim().length >= 3),
     ),
   );
 
@@ -317,8 +339,8 @@ export function CompanyProductionPage() {
     setOutputs((current) =>
       current.map((line, i) => (i === index ? { ...line, ...values } : line)),
     );
-  const productOption = (product: ProductionProduct) =>
-    `${product.name_ar}${product.sku ? ` · ${product.sku}` : ""}`;
+  const productOption = (product: ProductionProduct | undefined) =>
+    product ? `${product.name_ar}${product.sku ? ` · ${product.sku}` : ""}` : "—";
 
   return (
     <ModuleGuard moduleId="milling_operations">
@@ -486,7 +508,8 @@ export function CompanyProductionPage() {
                     </MillingSelect>
                     {!materialProducts.length && (
                       <p className="mt-1 text-[11px] text-amber-700">
-                        لا توجد مواد خام أو مواد تعبئة مخزنية مملوكة للمنشأة. أصناف الأمانات والمنتجات التامة لا تُصرف كمواد خام.
+                        لا توجد مواد خام أو مواد تعبئة مخزنية مملوكة للمنشأة. أصناف الأمانات
+                        والمنتجات التامة لا تُصرف كمواد خام.
                       </p>
                     )}
                     {product && (
@@ -707,14 +730,19 @@ export function CompanyProductionPage() {
           <div className="space-y-3 p-4">
             {!data?.canAllocateExpenses && (
               <p className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-3 text-xs leading-5 text-muted-foreground">
-                تعذر تحميل بنود المصروفات المؤهلة. تحقق من صلاحية قراءة المالية أو إعداد قاعدة البيانات.
-                {data?.expenseSourcesError ? <span className="sr-only"> {data.expenseSourcesError}</span> : null}
+                تعذر تحميل بنود المصروفات المؤهلة. تحقق من صلاحية قراءة المالية أو إعداد قاعدة
+                البيانات.
+                {data?.expenseSourcesError ? (
+                  <span className="sr-only"> {data.expenseSourcesError}</span>
+                ) : null}
               </p>
             )}
             {data?.canAllocateExpenses && expenseSources.length === 0 && (
               <div className="space-y-3 rounded-xl border border-dashed border-border p-4">
                 <div>
-                  <p className="text-sm font-semibold">لا يوجد مصروف مرحّل متاح لهذا المركز حتى الآن</p>
+                  <p className="text-sm font-semibold">
+                    لا يوجد مصروف مرحّل متاح لهذا المركز حتى الآن
+                  </p>
                   <p className="mt-1 text-xs leading-5 text-muted-foreground">
                     {costCenterId
                       ? `تأهيل التصنيف لا يسجل مبلغاً. سجّل المصروف أولاً، واختر تصنيفه ومركز «${selectedCostCenterLabel}»، ثم استخدم «حفظ وصرف» أو رحّله من سجل المصروفات. بعد الترحيل سيظهر هنا تلقائياً.`
@@ -849,7 +877,13 @@ export function CompanyProductionPage() {
                 onClick={() =>
                   setLosses((current) => [
                     ...current,
-                    { type: "NORMAL", quantity: "", uomId: kiloUnit?.id ?? "", reason: "" },
+                    {
+                      type: "NORMAL",
+                      quantity: "",
+                      uomId: kiloUnit?.id ?? "",
+                      productId: "",
+                      reason: "",
+                    },
                   ])
                 }
                 className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-2 text-xs font-bold disabled:opacity-50"
@@ -895,23 +929,80 @@ export function CompanyProductionPage() {
                       }
                     />
                   </MillingField>
-                  <MillingField label="وحدة الكتلة">
-                    <MillingSelect
-                      value={line.uomId}
-                      onChange={(event) =>
-                        setLosses((current) =>
-                          current.map((item, i) =>
-                            i === index ? { ...item, uomId: event.target.value } : item,
-                          ),
-                        )
-                      }
-                    >
-                      {massUnits.map((unit) => (
-                        <option key={unit.id} value={unit.id}>
-                          {unit.name_ar || unit.short_name}
-                        </option>
-                      ))}
-                    </MillingSelect>
+                  <MillingField
+                    label={line.productId ? "الوحدة (وحدة الصنف)" : "وحدة الكتلة"}
+                    hint={
+                      line.productId
+                        ? "الخادم يحوّل الكمية إلى مكافئ كتلي من صنف الناتج."
+                        : "اختر صنفاً ناتجاً للفاقد العددي أو اتركه فارغاً لفاقد كتلي."
+                    }
+                  >
+                    {line.productId ? (
+                      <MillingSelect
+                        value={line.productId}
+                        onChange={(event) =>
+                          setLosses((current) =>
+                            current.map((item, i) =>
+                              i === index ? { ...item, productId: event.target.value } : item,
+                            ),
+                          )
+                        }
+                      >
+                        {outputs
+                          .filter((output) => output.productId)
+                          .map((output, outputIndex) => (
+                            <option
+                              key={`${output.productId}-${outputIndex}`}
+                              value={output.productId}
+                            >
+                              {productOption(
+                                products.find((item) => item.id === output.productId)!,
+                              )}
+                            </option>
+                          ))}
+                      </MillingSelect>
+                    ) : (
+                      <MillingSelect
+                        value={line.uomId}
+                        onChange={(event) =>
+                          setLosses((current) =>
+                            current.map((item, i) =>
+                              i === index ? { ...item, uomId: event.target.value } : item,
+                            ),
+                          )
+                        }
+                      >
+                        {massUnits.map((unit) => (
+                          <option key={unit.id} value={unit.id}>
+                            {unit.name_ar || unit.short_name}
+                          </option>
+                        ))}
+                      </MillingSelect>
+                    )}
+                    {outputs.every((output) => !output.productId) ? null : (
+                      <label className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(line.productId)}
+                          onChange={(event) =>
+                            setLosses((current) =>
+                              current.map((item, i) =>
+                                i === index
+                                  ? {
+                                      ...item,
+                                      productId: event.target.checked
+                                        ? (outputs.find((output) => output.productId)?.productId ??
+                                          "")
+                                        : "",
+                                    }
+                                  : item,
+                              ),
+                            )
+                          }
+                        />
+                        فاقد عددي بوحدة الصنف (كيس تالف مثلاً)
+                      </label>
+                    )}
                   </MillingField>
                   <MillingField label="سبب الفاقد">
                     <MillingInput
@@ -957,7 +1048,6 @@ export function CompanyProductionPage() {
             {submit.isPending ? "جارٍ ترحيل التشغيلة…" : "ترحيل تشغيلة الإنتاج"}
           </button>
         </div>
-
       </div>
     </ModuleGuard>
   );

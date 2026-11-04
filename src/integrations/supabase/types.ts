@@ -2346,6 +2346,10 @@ export type Database = {
         };
         Returns: string;
       };
+      production_order_history: {
+        Args: { p_limit?: number };
+        Returns: Json;
+      };
       production_order_cost_detail: {
         Args: { p_order_id: string };
         Returns: Json;

@@ -732,7 +732,10 @@ REVOKE ALL ON FUNCTION public.decide_expense(uuid, boolean, text, integer)
 GRANT EXECUTE ON FUNCTION public.decide_expense(uuid, boolean, text, integer)
   TO authenticated, service_role;
 
-COMMIT;
+-- لا COMMIT هنا: القسمان 9 و10 (تكلفة الإنتاج من المصروفات المؤهلة، وإعادة
+-- تعريف complete_production_order) جزء من نفس المعاملة. تُطبّق كلها أو
+-- تتراجع كلها، ولا تُنشر دالة production_expense_line_available دون مستدعيها
+-- ولا العكس. COMMIT واحد فقط في نهاية الملف (سطر 1263 سابقاً).
 
 -- Rollback (manual, after data review):
 --   DROP FUNCTION public.expense_reverse_supplier_ledger(uuid, text, text, uuid, text, text, uuid);

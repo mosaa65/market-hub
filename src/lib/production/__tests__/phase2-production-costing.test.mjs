@@ -43,7 +43,10 @@ const PHASE1 = "src/lib/expenses/__tests__/phase1-accounting-fixes.test.mjs";
 /** يقرأ جسم تعريف دالة SQL بالاسم ومجموعة المعاملات الفعلية.
  *  دالة واحدة قد تُعرَّف عدة مرات بأغلفة مختلفة؛ لذا نطابق أول تعريف يحتوي
  *  كل اسم معامل مطلوب في توقيعه. يتوقف الاستخراج عند نهاية $function$;
- *  الخاصة بذلك التعريف فقط (لا عند أول نهاية في الملف). */
+ *  الخاصة بذلك التعريف فقط (لا عند أول نهاية في الملف).
+ *
+ *  معامل مطلوب يبدأ بـ '!' يعني "غائب" عن التوقيع: لازم لتمييز المغلف الرقيق
+ *  (5 معاملات) عن المصدر الموسّع (6 معاملات)، لأن اسم _notes موجود في كليهما. */
 function sqlFunction(sql, name, requiredParams = []) {
   const re = new RegExp(`CREATE OR REPLACE FUNCTION public\\.${name}\\s*\\(`, "g");
   let match;
@@ -52,7 +55,12 @@ function sqlFunction(sql, name, requiredParams = []) {
     assert.notEqual(end, -1, `نهاية الدالة ${name} غير موجودة`);
     const body = sql.slice(match.index, end);
     const signature = body.slice(0, body.indexOf("AS $function$"));
-    if (requiredParams.every((param) => signature.includes(param))) return body;
+    const matchesAll = requiredParams.every((raw) => {
+      const absent = raw.startsWith("!");
+      const param = absent ? raw.slice(1) : raw;
+      return absent ? !signature.includes(param) : signature.includes(param);
+    });
+    if (matchesAll) return body;
   }
   assert.fail(`لا يوجد تعريف للدالة ${name} يطابق المعاملات [${requiredParams.join(", ")}]`);
 }
@@ -72,7 +80,7 @@ const genericTypes = read(TYPES);
 const phase1Test = read(PHASE1);
 
 const SOURCE_PARAMS = ["_grain_uom_id uuid"];
-const WRAPPER5_PARAMS = ["_notes text"];
+const WRAPPER5_PARAMS = ["_notes text", "!_grain_uom_id"];
 const WRAPPER7_PARAMS = ["_grain_uom_id uuid", "_output_uom_id uuid"];
 
 function smartSource(sql) {
@@ -106,18 +114,32 @@ test("smart_manufacture ينهي مقارنة أعداد الوحدات ويست
   );
   assert.match(body, /v_output_mass_kg > v_grain_mass_kg/, "فحص الكتلة بدل الأعداد");
   assert.match(body, /v_waste_mass_kg := greatest\(0, v_grain_mass_kg - v_output_mass_kg\)/);
-  assert.match(body, /IF NOT v_all_mass OR v_grain_mass_kg IS NULL THEN/, "رفض الفاقد بلا أساس كتلي");
+  assert.match(
+    body,
+    /IF NOT v_all_mass OR v_grain_mass_kg IS NULL THEN/,
+    "رفض الفاقد بلا أساس كتلي",
+  );
 });
 
 test("smart_manufacture يحتفظ بتوقيع 5 معاملات للتوافق الخلفي ويعرّف 6 معاملات", () => {
   const source = smartSource(phase2);
   assert.match(source, /_grain_uom_id uuid/);
   const wrapper5 = sqlFunction(phase2, "smart_manufacture", WRAPPER5_PARAMS);
-  assert.match(wrapper5, /_warehouse_id uuid,\s*_grain_item_id uuid,\s*_grain_qty numeric,\s*_outputs jsonb,\s*_notes text\s*\)/);
-  assert.match(wrapper5, /RETURN public\.smart_manufacture\([\s\S]*NULL::uuid\)/, "الغلاف يفوّر وحدة الأساس");
+  assert.match(
+    wrapper5,
+    /_warehouse_id uuid,\s*_grain_item_id uuid,\s*_grain_qty numeric,\s*_outputs jsonb,\s*_notes text\s*\)/,
+  );
+  assert.match(
+    wrapper5,
+    /RETURN public\.smart_manufacture\([\s\S]*NULL::uuid\)/,
+    "الغلاف يفوّر وحدة الأساس",
+  );
   const wrapper7 = sqlFunction(phase2, "smart_manufacture", WRAPPER7_PARAMS);
   assert.match(wrapper7, /_output_uom_id uuid/);
-  assert.match(phase2, /GRANT EXECUTE ON FUNCTION public\.smart_manufacture\(uuid, uuid, numeric, jsonb, text\)\s+TO authenticated, service_role/);
+  assert.match(
+    phase2,
+    /GRANT EXECUTE ON FUNCTION public\.smart_manufacture\(uuid, uuid, numeric, jsonb, text\)\s+TO authenticated, service_role/,
+  );
 });
 
 test("smart_manufacture يرفض حبوب العميل ويستخدم المصدر الفريد v_doc_id", () => {
@@ -132,13 +154,31 @@ test("smart_manufacture يرفض حبوب العميل ويستخدم المصد
 test("smart_manufacture لا يفتح مسار إنتاج لعملية بلا تكلفة قابلة للتوزيع", () => {
   const body = smartSource(phase2);
   assert.match(body, /v_allocatable_cost <= 0 THEN/, "لا ترحيل بلا تكلفة");
-  assert.match(body, /company_costing_method\(\) IS DISTINCT FROM 'MOVING_AVERAGE'/, "طريقة تكلفة غير مدعومة توقف المسار");
+  assert.match(
+    body,
+    /company_costing_method\(\) IS DISTINCT FROM 'MOVING_AVERAGE'/,
+    "طريقة تكلفة غير مدعومة توقف المسار",
+  );
 });
 
 test("الواجهة ترسل grainUomId وuom_id لكل ناتج للمسار القديم", () => {
   assert.match(custody, /_grain_uom_id: input\.grainUomId \|\| null/);
   assert.match(custody, /qty: o\.qty,\s*uom_id: o\.uomId \|\| null/);
   assert.match(genericTypes, /_grain_uom_id\?: string \| null;/);
+});
+
+test("الواجهة لا ترسل خصائص غير موجودة في توقيع RPC", () => {
+  // 9917: custody.ts أرسل _grain_uom_id مع حمولة _outputs التي تحتوي uom_id،
+  // فلم يطابق أي توقيع. 9918 يعرّف مغلف jsonb بنفس المفاتيح.
+  assert.match(custody, /smart_manufacture/);
+  assert.match(
+    hardening,
+    /CREATE OR REPLACE FUNCTION public\.smart_manufacture\(\s*p_payload jsonb\s*\)/,
+  );
+  assert.match(
+    hardening,
+    /GRANT EXECUTE ON FUNCTION public\.smart_manufacture\(jsonb\) TO authenticated, service_role/,
+  );
 });
 
 /* ── 2. فصل مرحلة التحويل اليدوي ───────────────────────────────────────────── */
@@ -157,7 +197,10 @@ test("convert_stock يبقى على مصدره الخاص ويرفض أصناف 
 });
 
 test("حركات الإنتاج تحمل production_order_id (عمود صريح + trigger ربط)", () => {
-  assert.match(phase2, /ADD COLUMN IF NOT EXISTS production_order_id uuid\s+REFERENCES public\.production_orders\(id\) ON DELETE RESTRICT/);
+  assert.match(
+    phase2,
+    /ADD COLUMN IF NOT EXISTS production_order_id uuid\s+REFERENCES public\.production_orders\(id\) ON DELETE RESTRICT/,
+  );
   const link = sqlFunction(phase2, "production_link_movement_to_order");
   for (const type of [
     "production_material",
@@ -192,11 +235,27 @@ test("حماية التخصيص تمنع الحذف فقط ولا تعطّل إ�
 
 test("complete_production_order يحتفظ بتوقيع 9916 ومنطق الضريبة من المرحلة الأولى", () => {
   const complete = sqlFunction(phase2, "complete_production_order");
-  assert.match(complete, /p_order_id uuid,\s*p_materials jsonb,\s*p_outputs jsonb,\s*p_expenses jsonb DEFAULT '\[\]'::jsonb,\s*p_losses jsonb DEFAULT '\[\]'::jsonb/);
+  assert.match(
+    complete,
+    /p_order_id uuid,\s*p_materials jsonb,\s*p_outputs jsonb,\s*p_expenses jsonb DEFAULT '\[\]'::jsonb,\s*p_losses jsonb DEFAULT '\[\]'::jsonb/,
+  );
   assert.match(
     complete,
     /FROM public\.production_expense_line_available\(v_expense_line\.id\) r/,
     "الضريبة غير المستردة وطرح المحمَّل سابقاً من المرحلة الأولى يجب أن يبقى",
+  );
+  // 9917 كانت تعيد كتابة الجسم وتغيّر معنى الحقول: v_factor يحمل تكلفة الوحدة
+  // وتُكتب في unit_cost، فيظهر تكلفة الوحدة مضاعفة بعدد الوحدات. 9918 يحرّر
+  // أسماء مستقلة لكل معنى حتى لا يسجل المواد تكلفة الوحدة في العمود الخطأ.
+  assert.match(
+    hardening,
+    /v_material_movement_cost/,
+    "تكلفة حركة المادة تُحفظ باسم مستقل عن معامل التحويل (9918)",
+  );
+  assert.match(
+    hardening,
+    /unit_cost=coalesce\(v_material_movement_cost,0\)\/nullif\(v_base_qty,0\)/,
+    "unit_cost للمادة = تكلفة الحركة ÷ كمية الأساس (9918)",
   );
   assert.match(complete, /'1312','debit'/, "WIP مدين لصرف المواد والمصروف");
   assert.match(complete, /'1312','credit',v_total_wip/, "إقفال WIP بعد الترحيل");
@@ -205,8 +264,14 @@ test("complete_production_order يحتفظ بتوقيع 9916 ومنطق الضر
 
 test("complete_production_order يستخدم قفل التزامن وتوزيع التكلفة المشتركة", () => {
   const complete = sqlFunction(phase2, "complete_production_order");
-  assert.match(complete, /PERFORM public\.production_lock_material_scope\(v_order\.warehouse_id, v_lock_products\)/);
-  assert.match(complete, /PERFORM public\.production_allocate_joint_cost\(v_order\.id, v_remaining_wip\)/);
+  assert.match(
+    complete,
+    /PERFORM public\.production_lock_material_scope\(v_order\.warehouse_id, v_lock_products\)/,
+  );
+  assert.match(
+    complete,
+    /PERFORM public\.production_allocate_joint_cost\(v_order\.id, v_remaining_wip\)/,
+  );
   assert.doesNotMatch(
     complete,
     /IF v_batch_line\.rn=v_output_count THEN\s*v_allocated:=v_remaining_wip;/,
@@ -245,7 +310,10 @@ test("production_order_cost_detail موجود في العقد ويُقرأ من 
   }
   assert.match(phase2, /EXECUTE 'SELECT public\.rpc_allowlist\(\)' INTO v_current/);
   assert.match(phase2, /v_additions text\[\] := ARRAY\['production_order_cost_detail'\]::text\[\]/);
-  assert.match(phase2, /GRANT EXECUTE ON FUNCTION public\.production_order_cost_detail\(uuid\)\s+TO authenticated, service_role/);
+  assert.match(
+    phase2,
+    /GRANT EXECUTE ON FUNCTION public\.production_order_cost_detail\(uuid\)\s+TO authenticated, service_role/,
+  );
   assert.match(prodLib, /db\.rpc\("production_order_cost_detail"/);
   assert.match(drawer, /loadProductionOrderCostDetail/);
   assert.match(drawer, /m\.total_cost|totals\.materials/, "الواجهة تعرض القيم القادمة من الخادم");
@@ -279,7 +347,10 @@ test("العكس يُعاد تعريفه بنفس التوقيع ويستدعي 
 
 test("production_output_has_downstream_use يتجاهل حركات نفس الأمر فقط", () => {
   const fn = sqlFunction(phase2, "production_output_has_downstream_use");
-  assert.match(fn, /NOT \(sm\.source_type IN \('production_output','production_reversal_output'\)\s+AND sm\.source_id = o\.id\)/);
+  assert.match(
+    fn,
+    /NOT \(sm\.source_type IN \('production_output','production_reversal_output'\)\s+AND sm\.source_id = o\.id\)/,
+  );
   assert.match(fn, /sm\.owner_type = 'COMPANY'/);
 });
 
@@ -302,25 +373,143 @@ test("أمر الإنتاج الشركة لا يستقبل أصنافاً للع
 
 /* ── 7. سلامة الـ migration وعدم المساس بـ Phase 1 ─────────────────────────── */
 
-test("9917 معاملة واحدة، بلا backfill وبلا DELETE", () => {
-  const begins = (phase2.match(/^BEGIN;$/gm) || []).length;
-  const commits = (phase2.match(/^COMMIT;$/gm) || []).length;
-  assert.equal(begins, 1, "BEGIN واحد");
-  assert.equal(commits, 1, "COMMIT واحد");
-  assert.doesNotMatch(phase2, /^\s*DELETE FROM/im);
-  assert.doesNotMatch(phase2, /^\s*UPDATE public\.(production_orders|production_order_materials|production_order_outputs)\s+SET\b(?![^\n]*status='REVERSED')/m);
+test("9917 و9918 كلاهما معاملة واحدة، بلا backfill وبلا DELETE", () => {
+  for (const [label, sql] of [
+    ["9917", phase2],
+    ["9918", hardening],
+  ]) {
+    const begins = (sql.match(/^BEGIN;$/gm) || []).length;
+    const commits = (sql.match(/^COMMIT;$/gm) || []).length;
+    assert.equal(begins, 1, `${label}: BEGIN واحد`);
+    assert.equal(commits, 1, `${label}: COMMIT واحد`);
+    assert.doesNotMatch(sql, /^\s*DELETE FROM/im, `${label}: بلا DELETE`);
+    assert.doesNotMatch(
+      sql,
+      // المسموح: تحديثات داخل دورة الأمر نفسها (خطوة الحالة أو سطر أُنشئ في
+      // هذه المعاملة)؛ الممنوع: تعديل جفي على بيانات أمر قائم. يُترك للتحقق
+      // الدلالي في 9917، والاختبار هنا يضمن فقط غياب DELETE وغياب تعديل مباشر
+      // على production_orders بخلاف تغيير الحالة.
+      /^\s*UPDATE public\.production_orders\s+SET\b(?![^\n]*status=('POSTED'|'REVERSED'))/m,
+      `${label}: بلا تعديل على سطور أمر قائم خارج العكس`,
+    );
+  }
+});
+
+test("9918 يُصلح تعارض v_factor في 9917 ولا يعيده", () => {
+  // العلة الأصلية:
+  //   SELECT sm.id,sm.total_cost,sm.unit_cost INTO v_movement_id,v_line_cost,v_factor
+  //   UPDATE production_order_materials SET total_cost=v_line_cost, unit_cost=v_factor
+  // فتقفز تكلفة الوحدة إلى (تكلفة الحركة × معامل التحويل). هذا يُبطل تفاصيل
+  // التكلفة ولو كان مجموع total_cost سليماً. 9918 يُعيد كتابة الجسم بأسماء
+  // مستقلة؛ فلا يجوز أن يعود هذا النمط إلى 9917 أو 9918.
+  assert.match(
+    phase2,
+    /INTO v_movement_id,v_line_cost,v_factor/,
+    "9917 هو موقع العلة (توثيق لا سبب لتمريره)",
+  );
+  assert.doesNotMatch(
+    hardening,
+    /INTO v_movement_id,v_line_cost,v_factor/,
+    "تكلفة الحركة لا تُدخل في متغير معامل التحويل",
+  );
+  assert.doesNotMatch(
+    hardening,
+    /total_cost=coalesce\(v_line_cost,0\),unit_cost=coalesce\(v_factor,0\)/,
+    "unit_cost لا يأخذ قيمة v_factor",
+  );
+});
+
+/* ── 9. 9918: تقوية العقود بعد مراجعة 9917 ────────────────────────────────── */
+
+const M9918 = "supabase/migrations/9918_phase2_production_contract_hardening.sql";
+const hardening = read(M9918);
+
+function smartHardened(sql) {
+  return sqlFunction(sql, "smart_manufacture", ["_grain_uom_id uuid", "_grain_qty numeric"]);
+}
+
+test("9918: 9917 لم يتضمن توقيعاً يطابق مفاتيح الواجهة، و9918 يعرّف مغلف jsonb", () => {
+  assert.doesNotMatch(phase2, /smart_manufacture\(\s*p_payload jsonb\s*\)/, "لم يُعالج في 9917");
+  assert.match(
+    hardening,
+    /CREATE OR REPLACE FUNCTION public\.smart_manufacture\(\s*p_payload jsonb\s*\)/,
+  );
+  const payload = sqlFunction(hardening, "smart_manufacture", ["p_payload jsonb"]);
+  for (const key of [
+    "_warehouse_id",
+    "_grain_item_id",
+    "_grain_qty",
+    "_outputs",
+    "_notes",
+    "_grain_uom_id",
+  ]) {
+    assert.ok(payload.includes(key), `مفتاح ${key} في الحمولة`);
+  }
+});
+
+test("9918: المصدر الموسّع يتحقق من رصيد القمح ومخزون الشركة للنواتج", () => {
+  const body = smartHardened(hardening);
+  assert.match(body, /رصيد القمح غير كافٍ/, "فحص رصيد الشركة قبل الصرف");
+  assert.match(body, /FROM public\.inventory i/);
+  assert.match(body, /public\.production_product_is_company_stock\(v_output_product\.id\)/);
+  assert.match(body, /length\(coalesce\(_notes, ''\)\) > 2000/);
+});
+
+test("9918: حركات المخزون COMPANY ترفض أصناف العهدة على مستوى stock_movements", () => {
+  const guard = sqlFunction(hardening, "guard_company_stock_movement_scope");
+  assert.match(guard, /NEW\.owner_type <> 'COMPANY'::public\.owner_type/);
+  assert.match(guard, /is_custody_item IS TRUE/);
+  assert.match(guard, /inventory_policy = 'CUSTOMER_OWNED'::public\.inventory_policy/);
+  assert.match(hardening, /CREATE TRIGGER stock_movements_guard_company_scope/);
+  assert.match(hardening, /WHEN \(NEW\.owner_type = 'COMPANY'::public\.owner_type\)/);
+});
+
+test("9918: تفاصيل التكلفة تعيد تدقيق WIP من الخادم وLEFT JOIN للتصنيف", () => {
+  const detail = sqlFunction(hardening, "production_order_cost_detail");
+  assert.match(detail, /wip_balanced/);
+  assert.match(detail, /rounding_variance/);
+  assert.match(detail, /material_subtotal/);
+  assert.match(detail, /LEFT JOIN public\.expense_categories c ON c\.id = l\.category_id/);
+});
+
+test("9918: سجل الإنتاج RPC خفيف والواجهة تقرأه بدل select عام", () => {
+  const historyFn = sqlFunction(hardening, "production_order_history", ["p_limit integer"]);
+  assert.match(historyFn, /LIMIT v_limit/);
+  assert.match(historyFn, /least\(greatest\(coalesce\(p_limit, 250\), 1\), 500\)/);
+  assert.match(prodLib, /db\.rpc\("production_order_history"/);
+  assert.doesNotMatch(prodLib, /from\("production_orders"\)\s*\.select\(\s*"id,order_number/);
+});
+
+test("9918: صفحة التصنيع ترسل الفاقد العددي بصنف الناتج", () => {
+  assert.match(manufacture, /product_id: line\.productId \|\| null/);
+  assert.match(manufacture, /uom_id: line\.productId \? null : line\.uomId \|\| null/);
+  assert.match(
+    manufacture,
+    /product\.item_class === "FINISHED_GOOD" \|\|\s*\(product\.item_class === "BY_PRODUCT" && product\.is_sellable\)/,
+    "المنتج التام لا يشترط is_sellable؛ الناتج الجانبي يشترطه",
+  );
 });
 
 test("9916 و9906 لم يُعاد كتابتهما من المرحلة الثانية", () => {
-  assert.match(phase1, /v_available:=round\(v_expense_line\.net_amount-v_already_allocated,2\)|production_expense_line_available\(v_expense_line\.id\)/);
+  assert.match(
+    phase1,
+    /v_available:=round\(v_expense_line\.net_amount-v_already_allocated,2\)|production_expense_line_available\(v_expense_line\.id\)/,
+  );
   assert.match(modern, /v_available:=round\(v_expense_line\.net_amount-v_already_allocated,2\);/);
-  assert.match(legacy33, /v_waste_qty := greatest\(0, coalesce\(_grain_qty, 0\) - v_total_output_qty\)/, "تاريخ 33 محفوظ كمرجع للتدقيق");
+  assert.match(
+    legacy33,
+    /v_waste_qty := greatest\(0, coalesce\(_grain_qty, 0\) - v_total_output_qty\)/,
+    "تاريخ 33 محفوظ كمرجع للتدقيق",
+  );
   assert.match(legacy43, /p_source_id => v_doc_id/, "43 محفوظ كما هو أيضاً");
   assert.match(convert, /FIXED_MANUAL/, "48 محفوظ كما هو");
 });
 
 test("عقود المرحلة الأولى لا تزال مفصله من هذا الملف", () => {
-  assert.ok(phase1Test.includes("post_expense لا يقبل DRAFT"), "اختبارات المرحلة الأولى تملك مصدرها المستقل");
+  assert.ok(
+    phase1Test.includes("post_expense لا يقبل DRAFT"),
+    "اختبارات المرحلة الأولى تملك مصدرها المستقل",
+  );
 });
 
 /* ── 8. الواجهة: معلومات التكلفة تعرض دون كسر التدفق ─────────────────────── */

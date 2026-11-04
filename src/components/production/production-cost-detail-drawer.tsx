@@ -51,7 +51,12 @@ export function ProductionCostDetailDrawer({
     const wip = Number(header.total_cost) || 0;
     const outputs = Number(header.output_cost) || 0;
     const abnormal = Number(header.abnormal_loss_cost) || 0;
-    const variance = Math.round((wip - outputs - abnormal) * 100) / 100;
+    // يفضَّل فرق التقريب الذي يقيّمه الخادم (summary.rounding_variance) إن وصَل،
+    // وإلا فالفرق الحسابي من رؤوس الأرقام — لا ربط منطقي إضافي هنا.
+    const variance =
+      summary?.rounding_variance === undefined || summary.rounding_variance === null
+        ? Math.round((wip - outputs - abnormal) * 100) / 100
+        : Number(summary.rounding_variance);
     return {
       materials,
       conversion,
@@ -59,6 +64,7 @@ export function ProductionCostDetailDrawer({
       outputs,
       abnormal,
       variance,
+      wipBalanced: summary?.wip_balanced ?? Math.abs(variance) < 0.01,
       wipDebit: Number(summary?.wip_debit) || 0,
       wipCredit: Number(summary?.wip_credit) || 0,
       conversionAllocated: Number(summary?.conversion_from_expenses) || 0,
@@ -82,13 +88,17 @@ export function ProductionCostDetailDrawer({
       size="lg"
     >
       {query.isLoading ? (
-        <div className="p-10 text-center text-sm text-muted-foreground">جارٍ تحميل تفاصيل التكلفة…</div>
+        <div className="p-10 text-center text-sm text-muted-foreground">
+          جارٍ تحميل تفاصيل التكلفة…
+        </div>
       ) : query.error ? (
         <div className="m-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
           تعذر تحميل تفاصيل التكلفة. {String(query.error)}
         </div>
       ) : !detail || !totals ? (
-        <div className="p-10 text-center text-sm text-muted-foreground">لا توجد تفاصيل لهذه التشغيلة.</div>
+        <div className="p-10 text-center text-sm text-muted-foreground">
+          لا توجد تفاصيل لهذه التشغيلة.
+        </div>
       ) : (
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -129,7 +139,14 @@ export function ProductionCostDetailDrawer({
                   <EmptyRow text="لا توجد مواد مسجلة." />
                 ) : (
                   <Table
-                    head={["الصنف", "الكمية المدخلة", "كمية الأساس", "الكتلة (كجم)", "تكلفة الوحدة", "التكلفة"]}
+                    head={[
+                      "الصنف",
+                      "الكمية المدخلة",
+                      "كمية الأساس",
+                      "الكتلة (كجم)",
+                      "تكلفة الوحدة",
+                      "التكلفة",
+                    ]}
                     rows={detail.materials.map((m) => [
                       m.product_name ?? m.product_id,
                       `${qty(m.entered_quantity)} ${m.entered_uom ?? ""}`.trim(),
@@ -173,7 +190,9 @@ export function ProductionCostDetailDrawer({
                       `${e.reference ?? "—"} · ${e.expense_date}`,
                       e.category ?? "—",
                       money(e.net_amount),
-                      e.tax_recoverable ? `${money(e.tax_amount)} (قابلة للاسترداد)` : money(e.tax_amount),
+                      e.tax_recoverable
+                        ? `${money(e.tax_amount)} (قابلة للاسترداد)`
+                        : money(e.tax_amount),
                       e.reason ?? "—",
                     ])}
                   />
@@ -225,8 +244,19 @@ export function ProductionCostDetailDrawer({
                 />
               )}
               <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
-                فرق التقريب بين WIP والنواتج: <span className="font-bold">{money(totals.variance)}</span> —
-                يُحمَّل على حساب فروق التكلفة عند الاستلام ولا يبقى WIP مفتوحاً.
+                فرق التقريب بين WIP والنواتج:{" "}
+                <span className="font-bold">{money(totals.variance)}</span> — يُحمَّل على حساب فروق
+                التكلفة عند الاستلام ولا يبقى WIP مفتوحاً.
+              </p>
+              <p
+                className={cn(
+                  "mt-1 inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold",
+                  totals.wipBalanced
+                    ? "bg-emerald-500/10 text-emerald-700"
+                    : "bg-amber-500/10 text-amber-700",
+                )}
+              >
+                {totals.wipBalanced ? "توازن WIP مطابق للسجلات" : "توازن WIP يحتاج مراجعة محاسبية"}
               </p>
             </Section>
           )}
@@ -279,7 +309,10 @@ export function ProductionCostDetailDrawer({
               </Section>
               <div className="grid gap-3 sm:grid-cols-2">
                 <SummaryCard label="مدين الإنتاج تحت التنفيذ 1312" value={money(totals.wipDebit)} />
-                <SummaryCard label="دائن الإنتاج تحت التنفيذ 1312" value={money(totals.wipCredit)} />
+                <SummaryCard
+                  label="دائن الإنتاج تحت التنفيذ 1312"
+                  value={money(totals.wipCredit)}
+                />
               </div>
             </div>
           )}
@@ -330,7 +363,9 @@ function Section({
         <span className="mt-0.5 text-muted-foreground">{icon}</span>
         <div>
           <h3 className="text-sm font-bold">{title}</h3>
-          {note ? <p className="mt-0.5 text-[11px] leading-5 text-muted-foreground">{note}</p> : null}
+          {note ? (
+            <p className="mt-0.5 text-[11px] leading-5 text-muted-foreground">{note}</p>
+          ) : null}
         </div>
       </header>
       {children}
