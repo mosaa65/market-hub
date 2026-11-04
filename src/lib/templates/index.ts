@@ -183,6 +183,8 @@ const ALL_SUPPORTED_DOC_TYPES: DocumentType[] = [
   "quotation",
   "delivery_note",
   "inventory_document",
+  "mill_document",
+  "daily_ticket",
 ];
 
 // Register built-in default templates

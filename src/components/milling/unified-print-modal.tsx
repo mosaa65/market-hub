@@ -18,6 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { WhatsAppIcon } from "@/components/whatsapp-icon";
 import { getCachedCompanyProfile } from "@/lib/printing/company-profile";
+import { formatPrintedDateTime } from "@/lib/printing/date-time";
 import { numberToArabicWords } from "@/lib/templates/tafqeet";
 import { generateBarcodeSvg } from "@/lib/printing/barcode-qr";
 import type { MillingDocumentDetails } from "@/lib/milling";
@@ -325,7 +326,7 @@ export function UnifiedPrintModal({
       msg += `📄 *سند تسليم نواتج أمانات*\n`;
       msg += `🔢 رقم السند: ${data.ticketNumber}\n`;
       msg += `👤 العميل: ${data.customerName}\n`;
-      msg += `📅 التاريخ: ${new Date(data.createdAt).toLocaleDateString("ar-EG")}\n`;
+      msg += `📅 التاريخ: ${formatPrintedDateTime(data.createdAt)}\n`;
       if (data.items && data.items.length > 0) {
         msg += `📦 *النواتج المسلمة:*\n`;
         data.items.forEach((it) => {
@@ -339,13 +340,14 @@ export function UnifiedPrintModal({
       msg += `⚙️ *سند طحن أمانة*\n`;
       msg += `🔢 رقم السند: ${data.ticketNumber}\n`;
       msg += `👤 العميل: ${data.customerName}\n`;
+      msg += `📅 التاريخ: ${formatPrintedDateTime(data.createdAt)}\n`;
       msg += `🌾 الحبوب: ${data.grainType} (${data.bagCount} كيس — ${(data.totalWeightKg || 0).toLocaleString()} كجم)\n`;
     } else {
       msg += `🧾 *سند استلام أمانة وفاتورة أجور*\n`;
       msg += `🔢 رقم السند: ${data.ticketNumber}\n`;
       if (data.invoiceNumber) msg += `📋 فاتورة الأجور: #${data.invoiceNumber}\n`;
       msg += `👤 العميل: ${data.customerName}\n`;
-      msg += `📅 التاريخ: ${new Date(data.createdAt).toLocaleDateString("ar-EG")}\n`;
+      msg += `📅 التاريخ: ${formatPrintedDateTime(data.createdAt)}\n`;
       msg += `🌾 نوع الحبوب: ${data.grainType || "—"}\n`;
       msg += `⚖️ الأكياس والوزن: ${data.bagCount} كيس${bagSizePart} (${(data.totalWeightKg || 0).toLocaleString()} كجم)\n`;
       msg += `💰 الإجمالي المستحق: ${data.grandTotal.toLocaleString()} ر.ي\n`;
@@ -558,12 +560,8 @@ export function UnifiedPrintModal({
                 )}
                 <div className="flex justify-between items-center">
                   <span className="text-slate-500 font-medium">التاريخ:</span>
-                  <span className="font-semibold text-slate-700">
-                    {new Date(data.createdAt).toLocaleDateString("ar-EG")}{" "}
-                    {new Date(data.createdAt).toLocaleTimeString("ar-EG", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                  <span className="font-semibold text-slate-700 font-mono">
+                    {formatPrintedDateTime(data.createdAt)}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
@@ -819,8 +817,8 @@ export function UnifiedPrintModal({
                   <p className="text-sm font-mono font-black text-slate-950 tracking-wider">
                     {data.ticketNumber}
                   </p>
-                  <p className="text-xs text-slate-500 font-medium">
-                    {new Date(data.createdAt).toLocaleDateString("ar-EG")}
+                  <p className="text-xs text-slate-500 font-mono font-medium">
+                    {formatPrintedDateTime(data.createdAt)}
                   </p>
                 </div>
               </div>
@@ -1171,7 +1169,7 @@ function renderThermalHtml(d: UnifiedTicketPrintData, width: ThermalWidth = "80m
   <div class="dashed"></div>
   <div class="flex"><span>رقم السند:</span><span class="bold" style="font-family: monospace;">${d.ticketNumber}</span></div>
   ${d.invoiceNumber && isIntake ? `<div class="flex"><span>فاتورة الأجور:</span><span style="font-family: monospace;">#${d.invoiceNumber}</span></div>` : ""}
-  <div class="flex"><span>التاريخ:</span><span>${new Date(d.createdAt).toLocaleDateString("ar-EG")} ${new Date(d.createdAt).toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" })}</span></div>
+  <div class="flex"><span>التاريخ:</span><span style="font-family: monospace;">${formatPrintedDateTime(d.createdAt)}</span></div>
   <div class="flex"><span>العميل:</span><span class="bold">${d.customerName}</span></div>
   ${d.customerPhone ? `<div class="flex"><span>الهاتف:</span><span style="font-family: monospace;">${d.customerPhone}</span></div>` : ""}
   <div class="dashed"></div>
@@ -1311,7 +1309,7 @@ function renderA4Html(d: UnifiedTicketPrintData): string {
     <div style="text-align: left;">
       <h3 style="margin: 0; color: #b45309;">${isDelivery ? "سند تسليم نواتج الأمانة" : isMilled ? "سند طحن أمانة" : "سند استلام أمانة وفاتورة أجور"}</h3>
       <p style="margin: 4px 0; font-weight: bold; font-family: monospace;">${d.ticketNumber}</p>
-      <p style="margin: 0; color: #64748b;">${new Date(d.createdAt).toLocaleDateString("ar-EG")}</p>
+      <p style="margin: 0; color: #64748b; font-family: monospace;">${formatPrintedDateTime(d.createdAt)}</p>
     </div>
   </div>
 

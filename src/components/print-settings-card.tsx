@@ -711,13 +711,15 @@ export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
                                 ? "إيصال نقطة البيع"
                                 : rawTemplate === "thermal-qr"
                                   ? "إيصال باركود وQR"
-                                  : rawTemplate === "milling-clean"
-                                    ? "الفاتورة الرسمية المبسطة"
-                                    : rawTemplate === "elegant"
-                                      ? "تنفيذي فاخر"
-                                      : rawTemplate === "formal"
-                                        ? "رسمي معتمد"
-                                        : "قياسي مؤسسي"}
+                                  : rawTemplate === "milling-master"
+                                    ? "خدمات المطحنة والتسليم"
+                                    : rawTemplate === "milling-clean"
+                                      ? "الفاتورة الرسمية المبسطة"
+                                      : rawTemplate === "elegant"
+                                        ? "تنفيذي فاخر"
+                                        : rawTemplate === "formal"
+                                          ? "رسمي معتمد"
+                                          : "قياسي مؤسسي"}
                           </span>
                           <span>·</span>
                           <span className="font-mono text-muted-foreground">
@@ -776,8 +778,14 @@ export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
                   </Button>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
                   {[
+                    {
+                      id: "milling-master" as InvoiceTemplateId,
+                      title: "🌾 خدمات المطحنة المعتمد",
+                      sub: "قالب استلام الأمانات ونواتج الطحن والتسليم المعتمد",
+                      theme: "standard" as PrintTheme,
+                    },
                     {
                       id: "elegant" as InvoiceTemplateId,
                       title: "✨ القالب التنفيذي الفاخر",
