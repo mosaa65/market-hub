@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { useCatalogModules } from "@/lib/catalog-modules";
 import { CatalogModulesDialog } from "@/components/catalog-modules-dialog";
-import { VortexMetricCard, VortexSearchInput, VortexDrawerDialog } from "@/components/vortex-ui";
+import { VortexMetricCard, VortexDrawerDialog } from "@/components/vortex-ui";
 import {
   Layers,
   FolderTree,
@@ -25,12 +25,15 @@ import {
   Boxes,
   Check,
   CheckCircle2,
-  Wheat,
-  PackagePlus,
 } from "lucide-react";
 import { toast } from "sonner";
-import { PackagingBagsCatalogView } from "@/components/catalog/packaging-bags-catalog";
 import { QuantityInput } from "@/components/ui/quantity-input";
+import { RecordsToolbar } from "@/components/ui/records-toolbar";
+import { RecordsView } from "@/components/ui/records-view";
+import { PrimaryAction } from "@/components/ui/primary-action";
+import { type DataTableColumn, type DataTableSort } from "@/components/ui/data-table";
+import { usePersistedViewMode } from "@/hooks/use-persisted-view-mode";
+import { useBreakpoint } from "@/design/breakpoints";
 
 export const Route = createFileRoute("/_app/catalog")({
   head: () => ({ meta: [{ title: "الفهرس والتصنيفات — فورتيكس ERP" }] }),
@@ -38,15 +41,7 @@ export const Route = createFileRoute("/_app/catalog")({
 });
 
 /** كل أبعاد الفهرس قابلة للعرض من خلال إعداد النشاط. */
-type Tab =
-  | "categories"
-  | "packaging_bags"
-  | "units"
-  | "brands"
-  | "origins"
-  | "qualities"
-  | "makes"
-  | "models";
+type Tab = "categories" | "units" | "brands" | "origins" | "qualities" | "makes" | "models";
 
 type Item = {
   id: string;
@@ -61,7 +56,6 @@ type Item = {
 
 const TAB_ICONS: Record<Tab, any> = {
   categories: FolderTree,
-  packaging_bags: PackagePlus,
   units: Scale,
   brands: Tag,
   origins: Globe,
@@ -78,11 +72,6 @@ function CatalogPage() {
   const allTabs = useMemo<{ key: Tab; label: string; icon: any }[]>(
     () => [
       { key: "categories", label: t("catalog.categories") || "التصنيفات", icon: FolderTree },
-      {
-        key: "packaging_bags",
-        label: lang === "ar" ? "أكياس ومستلزمات التعبئة" : "Packaging Bags",
-        icon: PackagePlus,
-      },
       { key: "brands", label: lang === "ar" ? "العلامات التجارية" : "Brands", icon: Tag },
       { key: "units", label: t("catalog.units") || "وحدات القياس", icon: Scale },
       { key: "origins", label: lang === "ar" ? "بلدان المنشأ" : "Origins", icon: Globe },
@@ -111,21 +100,21 @@ function CatalogPage() {
   const { data: stats } = useQuery({
     queryKey: ["catalog-metrics-overview"],
     queryFn: async () => {
-      const [cats, bags, units] = await Promise.all([
+      const [cats, brands, units] = await Promise.all([
         supabase.from("categories").select("id", { count: "exact", head: true }),
-        (supabase as any).from("packaging_bags").select("id", { count: "exact", head: true }),
+        supabase.from("brands").select("id", { count: "exact", head: true }),
         supabase.from("units").select("id", { count: "exact", head: true }),
       ]);
       return {
         categories: cats.count ?? 0,
-        bags: bags.count ?? 0,
+        brands: brands.count ?? 0,
         units: units.count ?? 0,
       };
     },
   });
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-4 pb-12">
       <PageHeader
         title={lang === "ar" ? "فهرس المنتجات والأبعاد" : t("catalog.title")}
         subtitle={
@@ -145,39 +134,56 @@ function CatalogPage() {
         }
       />
 
-      {/* Top Metric Cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Same KPI surface used by the products screen. */}
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4">
         <VortexMetricCard
-          label={lang === "ar" ? "أقسام التصنيفات" : "Categories"}
+          title={lang === "ar" ? "إجمالي التصنيفات" : "Total categories"}
           value={stats?.categories ?? 0}
-          currency=""
-          icon={FolderTree}
-          tone="default"
+          type="count"
+          currency={false}
+          icon={<FolderTree className="size-5" />}
+          iconClassName="bg-primary/10 text-primary border border-primary/20"
+          badge={lang === "ar" ? "الفهرس" : "Catalog"}
           subtitle={lang === "ar" ? "تصنيف شجري للمنتجات" : "Product categories"}
+          onClick={() => setTab("categories")}
+          highlight={tab === "categories"}
+          className="cursor-pointer"
         />
         <VortexMetricCard
-          label={lang === "ar" ? "عبوات وأكياس التعبئة" : "Packaging Bags"}
-          value={stats?.bags ?? 0}
-          currency=""
-          icon={Wheat}
-          tone="info"
-          subtitle={lang === "ar" ? "أحجام وسعات الأكياس" : "Bag sizes & capacities"}
+          title={lang === "ar" ? "العلامات التجارية" : "Brands"}
+          value={stats?.brands ?? 0}
+          type="count"
+          currency={false}
+          icon={<Tag className="size-5" />}
+          iconClassName="bg-blue-500/10 text-blue-500 border border-blue-500/20"
+          badge={lang === "ar" ? "علامة" : "Brand"}
+          subtitle={lang === "ar" ? "العلامات المسجلة للمنتجات" : "Registered product brands"}
+          onClick={() => setTab("brands")}
+          highlight={tab === "brands"}
+          className="cursor-pointer"
         />
         <VortexMetricCard
-          label={lang === "ar" ? "وحدات القياس" : "Measurement Units"}
+          title={lang === "ar" ? "وحدات القياس" : "Measurement units"}
           value={stats?.units ?? 0}
-          currency=""
-          icon={Scale}
-          tone="success"
+          type="count"
+          currency={false}
+          icon={<Scale className="size-5" />}
+          iconClassName="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+          badge={lang === "ar" ? "وحدة" : "Unit"}
           subtitle={lang === "ar" ? "كجم، طن، شوال، كيس، قطعة" : "kg, tonne, sack, bag, piece"}
+          onClick={() => setTab("units")}
+          highlight={tab === "units"}
+          className="cursor-pointer"
         />
         <VortexMetricCard
-          label={lang === "ar" ? "مستلزمات التعبئة" : "Packaging"}
-          value={stats?.bags ?? 0}
-          currency=""
-          icon={PackagePlus}
-          tone="warning"
-          subtitle={lang === "ar" ? "أبعاد الفهرسة المُفعّلة" : "Enabled catalogue dimensions"}
+          title={lang === "ar" ? "الأقسام المفعّلة" : "Enabled sections"}
+          value={availableTabs.length}
+          type="count"
+          currency={false}
+          icon={<Layers className="size-5" />}
+          iconClassName="bg-amber-500/10 text-amber-500 border border-amber-500/20"
+          badge={lang === "ar" ? "نشط" : "Active"}
+          subtitle={lang === "ar" ? "أبعاد الفهرسة الظاهرة" : "Visible catalogue dimensions"}
         />
       </div>
 
@@ -215,8 +221,7 @@ function CatalogPage() {
         </button>
       </div>
 
-      {/* Main Catalog View */}
-      {tab === "packaging_bags" ? <PackagingBagsCatalogView /> : <CatalogTable tab={tab} />}
+      <CatalogTable tab={tab} />
 
       {/* Catalog Modules Customization Dialog */}
       <CatalogModulesDialog open={modulesDialogOpen} onClose={() => setModulesDialogOpen(false)} />
@@ -227,11 +232,16 @@ function CatalogPage() {
 function CatalogTable({ tab }: { tab: Tab }) {
   const { t, lang } = useI18n();
   const qc = useQueryClient();
+  const breakpoint = useBreakpoint();
+  const tableUsesHorizontalScroll =
+    breakpoint === "xs" || breakpoint === "sm" || breakpoint === "md";
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState<Item | null>(null);
   const [open, setOpen] = useState(false);
   const [filterMakeId, setFilterMakeId] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = usePersistedViewMode("catalog", "cards");
+  const [sort, setSort] = useState<DataTableSort | null>(null);
 
   const table =
     tab === "categories"
@@ -261,7 +271,7 @@ function CatalogTable({ tab }: { tab: Tab }) {
             ? "id, name, name_ar, make_id, vehicle_makes(id, name, name_ar)"
             : "id, name, name_ar";
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ["catalog", tab],
     queryFn: async () => {
       const { data, error } = await (supabase as any)
@@ -415,25 +425,152 @@ function CatalogTable({ tab }: { tab: Tab }) {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const itemName = (item: Item) =>
+    lang === "ar" ? item.name_ar || item.name || "—" : item.name || item.name_ar || "—";
+  const itemSecondaryName = (item: Item) =>
+    lang === "ar" ? item.name || item.name_ar || "—" : item.name_ar || item.name || "—";
+  const itemDetail = (item: Item) => {
+    if (tab === "units") return item.short_name || "—";
+    if (tab === "models") {
+      return lang === "ar"
+        ? item.vehicle_makes?.name_ar || item.vehicle_makes?.name || "—"
+        : item.vehicle_makes?.name || item.vehicle_makes?.name_ar || "—";
+    }
+    if (tab === "origins" || tab === "qualities") return item.code || "—";
+    return "—";
+  };
+
+  const openEditor = (item: Item | null = null) => {
+    setEditing(item);
+    setOpen(true);
+  };
+
+  const requestDelete = (item: Item) => {
+    if (confirm(lang === "ar" ? "هل أنت متأكد من حذف هذا العنصر؟" : t("catalog.confirm_delete"))) {
+      remove.mutate(item.id);
+    }
+  };
+
+  const sorted = (() => {
+    if (!sort) return filtered;
+    const direction = sort.direction === "asc" ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      const aValue =
+        sort.key === "details"
+          ? itemDetail(a)
+          : sort.key === "name"
+            ? itemName(a)
+            : itemSecondaryName(a);
+      const bValue =
+        sort.key === "details"
+          ? itemDetail(b)
+          : sort.key === "name"
+            ? itemName(b)
+            : itemSecondaryName(b);
+      return String(aValue).localeCompare(String(bValue), lang === "ar" ? "ar" : "en") * direction;
+    });
+  })();
+
+  const columns: DataTableColumn<Item>[] = [
+    {
+      key: "name",
+      header: lang === "ar" ? "الاسم" : "Name",
+      sortable: true,
+      width: "w-[280px]",
+      sortValue: itemName,
+      cell: (item) => <CatalogIdentity name={itemName(item)} />,
+    },
+    {
+      key: "secondary",
+      header: lang === "ar" ? "الاسم اللاتيني" : "Arabic name",
+      sortable: true,
+      width: "w-[220px]",
+      sortValue: itemSecondaryName,
+      cell: (item) => (
+        <span className="font-mono text-xs text-muted-foreground">{itemSecondaryName(item)}</span>
+      ),
+    },
+    ...(tab === "units" || tab === "models" || tab === "origins" || tab === "qualities"
+      ? [
+          {
+            key: "details",
+            header:
+              tab === "units"
+                ? lang === "ar"
+                  ? "الرمز المختصر"
+                  : "Short code"
+                : tab === "models"
+                  ? lang === "ar"
+                    ? "الماركة التابعة"
+                    : "Make"
+                  : lang === "ar"
+                    ? "الكود"
+                    : "Code",
+            sortable: true,
+            width: "w-[180px]",
+            sortValue: itemDetail,
+            cell: (item: Item) => <CatalogDetail value={itemDetail(item)} tab={tab} />,
+          } satisfies DataTableColumn<Item>,
+        ]
+      : []),
+    {
+      key: "actions",
+      header: t("common.actions"),
+      width: "w-[150px]",
+      align: "end",
+      cell: (item) => (
+        <CatalogRecordActions
+          item={item}
+          copied={copiedId === item.id}
+          isRtl={lang === "ar"}
+          onCopy={copyText}
+          onEdit={openEditor}
+          onDelete={requestDelete}
+        />
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-4">
-      {/* Search & Actions Bar */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-1 flex-wrap items-center gap-2">
-          <div className="w-full sm:w-80">
-            <VortexSearchInput
-              value={q}
-              onValueChange={setQ}
-              placeholder={lang === "ar" ? `بحث في ${tabTitle}...` : `Search ${tab}...`}
-            />
-          </div>
-
-          {tab === "models" && makesList.length > 0 && (
-            <div className="relative shrink-0">
+      <RecordsToolbar
+        searchValue={q}
+        onSearchChange={setQ}
+        searchPlaceholder={lang === "ar" ? `ابحث في ${tabTitle}` : `Search ${tabTitle}`}
+        resultCount={sorted.length}
+        searchLoading={isFetching && !isLoading}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        end={
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            disabled={sorted.length === 0}
+            className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-border/80 bg-card px-3 text-xs font-semibold text-muted-foreground shadow-xs transition hover:bg-muted hover:text-foreground disabled:opacity-40 active:scale-95"
+          >
+            <Download className="size-3.5" />
+            <span>{lang === "ar" ? "تصدير" : "Export"}</span>
+          </button>
+        }
+        action={
+          <PrimaryAction
+            label={newLabel}
+            icon={<Plus className="size-4" />}
+            onClick={() => openEditor()}
+          />
+        }
+      >
+        {tab === "models" && makesList.length > 0 ? (
+          <div className="flex items-center gap-2">
+            <label className="sr-only" htmlFor="catalog-make-filter">
+              {lang === "ar" ? "تصفية الماركة" : "Filter by make"}
+            </label>
+            <div className="relative">
               <select
+                id="catalog-make-filter"
                 value={filterMakeId}
                 onChange={(e) => setFilterMakeId(e.target.value)}
-                className="h-10 appearance-none rounded-xl border border-border/80 bg-card px-4 pe-9 text-xs font-medium text-foreground outline-none transition hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                className="h-10 appearance-none rounded-xl border border-border/80 bg-card px-3 pe-9 text-xs font-medium text-foreground outline-none transition hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/20"
               >
                 <option value="">{lang === "ar" ? "جميع الماركات" : "All makes"}</option>
                 {makesList.map((make) => (
@@ -442,219 +579,69 @@ function CatalogTable({ tab }: { tab: Tab }) {
                   </option>
                 ))}
               </select>
-              <ChevronDown className="pointer-events-none absolute end-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <ChevronDown className="pointer-events-none absolute end-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
             </div>
-          )}
+          </div>
+        ) : null}
+      </RecordsToolbar>
 
-          <span className="rounded-xl border border-border/60 bg-muted/40 px-3 py-1.5 text-xs font-semibold text-muted-foreground tabular-nums">
-            {lang === "ar" ? `${filtered.length} عنصر` : `${filtered.length} items`}
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleExportCsv}
-            disabled={filtered.length === 0}
-            className="flex h-10 items-center gap-1.5 rounded-xl border border-border/80 bg-card px-3 text-xs font-semibold text-muted-foreground shadow-xs transition hover:bg-muted hover:text-foreground disabled:opacity-40 active:scale-95"
-            title={lang === "ar" ? "تصدير إلى CSV" : "Export to CSV"}
-          >
-            <Download className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">{lang === "ar" ? "تصدير" : "Export"}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setEditing(null);
-              setOpen(true);
-            }}
-            className="flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-md shadow-primary/25 transition hover:opacity-90 active:scale-95"
-          >
-            <Plus className="h-4 w-4" />
-            <span>{newLabel}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Luxury Table */}
-      <div className="overflow-hidden rounded-2xl border border-border/70 bg-card/70 shadow-sm backdrop-blur-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-start text-sm">
-            <thead>
-              <tr className="border-b border-border/70 bg-muted/30 text-[11px] font-bold text-muted-foreground">
-                <th className="px-4 py-3 text-start">
-                  {lang === "ar" ? "العنصر / الاسم العربي" : t("catalog.name_ar")}
-                </th>
-                <th className="px-4 py-3 text-start">
-                  {lang === "ar" ? "الاسم اللاتيني" : t("catalog.name_en")}
-                </th>
-                {tab === "units" && (
-                  <th className="px-4 py-3 text-start">
-                    {lang === "ar" ? "الرمز المختصر" : t("catalog.short_name")}
-                  </th>
-                )}
-                {tab === "models" && (
-                  <th className="px-4 py-3 text-start">
-                    {lang === "ar" ? "الماركة التابعة" : "Make"}
-                  </th>
-                )}
-                {(tab === "origins" || tab === "qualities") && (
-                  <th className="px-4 py-3 text-start">{lang === "ar" ? "الكود" : "Code"}</th>
-                )}
-                {tab === "qualities" && (
-                  <th className="px-4 py-3 text-start">
-                    {lang === "ar" ? "الترتيب" : "Sort Order"}
-                  </th>
-                )}
-                <th className="px-4 py-3 text-end">{t("common.actions")}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/50">
-              {isLoading &&
-                Array.from({ length: 4 }).map((_, i) => (
-                  <tr key={i} className="shimmer">
-                    <td colSpan={6} className="px-4 py-4">
-                      <div className="h-5 w-full rounded-xl bg-muted/50" />
-                    </td>
-                  </tr>
-                ))}
-
-              {!isLoading && filtered.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-4 py-16 text-center">
-                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-dashed border-border/80 bg-muted/20 text-muted-foreground">
-                      <Layers className="h-6 w-6 opacity-60" />
-                    </div>
-                    <p className="mt-3 text-sm font-semibold text-foreground">
-                      {q
-                        ? lang === "ar"
-                          ? "لا توجد نتائج مطابقة لبحثك"
-                          : "No matches found"
-                        : t("catalog.empty") || "لا توجد عناصر بعد"}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {lang === "ar"
-                        ? "يمكنك إضافة عنصر جديد بالضغط على زر الإضافة أعلاه"
-                        : "You can add a new item using the button above"}
-                    </p>
-                  </td>
-                </tr>
-              )}
-
-              {filtered.map((r) => {
-                const initialLetter = (r.name_ar || r.name || "?").trim().charAt(0);
-                return (
-                  <tr key={r.id} className="group transition-colors hover:bg-muted/30">
-                    {/* Arabic Name + Avatar */}
-                    <td className="px-4 py-3 font-medium text-foreground">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-xs font-bold text-primary">
-                          {initialLetter}
-                        </div>
-                        <div>
-                          <div className="font-semibold text-foreground">{r.name_ar || "—"}</div>
-                          <div className="text-[11px] text-muted-foreground sm:hidden">
-                            {r.name || "—"}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* Latin Name */}
-                    <td className="px-4 py-3 text-muted-foreground">
-                      <span className="font-mono text-xs">{r.name || "—"}</span>
-                    </td>
-
-                    {/* Unit short code */}
-                    {tab === "units" && (
-                      <td className="px-4 py-3">
-                        <span className="inline-flex rounded-lg border border-border/80 bg-muted/40 px-2.5 py-0.5 font-mono text-xs font-bold text-foreground">
-                          {r.short_name || "—"}
-                        </span>
-                      </td>
-                    )}
-
-                    {tab === "models" && (
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center gap-1.5 rounded-xl border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
-                          <Car className="h-3 w-3" />
-                          {lang === "ar"
-                            ? r.vehicle_makes?.name_ar || r.vehicle_makes?.name || "—"
-                            : r.vehicle_makes?.name || r.vehicle_makes?.name_ar || "—"}
-                        </span>
-                      </td>
-                    )}
-
-                    {(tab === "origins" || tab === "qualities") && (
-                      <td className="px-4 py-3">
-                        <span className="inline-flex rounded-lg border border-border/80 bg-muted/50 px-2.5 py-0.5 font-mono text-xs font-bold text-primary">
-                          {r.code || "—"}
-                        </span>
-                      </td>
-                    )}
-
-                    {tab === "qualities" && (
-                      <td className="px-4 py-3">
-                        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs font-bold text-foreground">
-                          {r.sort_order ?? 0}
-                        </span>
-                      </td>
-                    )}
-
-                    {/* Actions */}
-                    <td className="px-4 py-3 text-end">
-                      <div className="inline-flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => copyText(r.name_ar || r.name || "", r.id)}
-                          className="grid h-8 w-8 place-items-center rounded-xl border border-border/60 bg-card text-muted-foreground transition hover:bg-muted hover:text-foreground active:scale-95"
-                          title={lang === "ar" ? "نسخ الاسم" : "Copy name"}
-                        >
-                          {copiedId === r.id ? (
-                            <Check className="h-3.5 w-3.5 text-emerald-500" />
-                          ) : (
-                            <Copy className="h-3.5 w-3.5" />
-                          )}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditing(r);
-                            setOpen(true);
-                          }}
-                          className="grid h-8 w-8 place-items-center rounded-xl border border-border/60 bg-card text-muted-foreground transition hover:bg-muted hover:text-foreground active:scale-95"
-                          title={t("common.edit")}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (
-                              confirm(
-                                lang === "ar"
-                                  ? "هل أنت متأكد من حذف هذا العنصر؟"
-                                  : t("catalog.confirm_delete"),
-                              )
-                            ) {
-                              remove.mutate(r.id);
-                            }
-                          }}
-                          className="grid h-8 w-8 place-items-center rounded-xl border border-destructive/20 bg-destructive/10 text-destructive transition hover:bg-destructive/20 active:scale-95"
-                          title={t("common.delete")}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <RecordsView<Item>
+        rows={sorted}
+        getRowId={(item) => item.id}
+        viewMode={viewMode}
+        loading={isLoading}
+        refreshing={isFetching && !isLoading}
+        error={error}
+        onRetry={() => void refetch()}
+        columns={columns}
+        sort={sort}
+        onSortChange={setSort}
+        minWidth={860}
+        horizontalScroll={tableUsesHorizontalScroll}
+        renderCard={(item) => (
+          <CatalogCard
+            item={item}
+            name={itemName(item)}
+            secondaryName={itemSecondaryName(item)}
+            detail={itemDetail(item)}
+            tab={tab}
+            copied={copiedId === item.id}
+            isRtl={lang === "ar"}
+            onCopy={copyText}
+            onEdit={openEditor}
+            onDelete={requestDelete}
+          />
+        )}
+        renderListRow={(item) => (
+          <CatalogListRow
+            item={item}
+            name={itemName(item)}
+            secondaryName={itemSecondaryName(item)}
+            detail={itemDetail(item)}
+            tab={tab}
+            copied={copiedId === item.id}
+            isRtl={lang === "ar"}
+            onCopy={copyText}
+            onEdit={openEditor}
+            onDelete={requestDelete}
+          />
+        )}
+        empty={{
+          icon: <Layers className="size-8" />,
+          title: q
+            ? lang === "ar"
+              ? "لا توجد نتائج مطابقة لبحثك"
+              : "No matching results"
+            : lang === "ar"
+              ? "لا توجد عناصر بعد"
+              : "No items yet",
+          description:
+            lang === "ar"
+              ? "أضف عنصراً جديداً أو غيّر عبارة البحث."
+              : "Add a new item or change the search phrase.",
+          action: <PrimaryAction label={newLabel} icon={<Plus />} onClick={() => openEditor()} />,
+        }}
+      />
 
       {/* Vortex Luxury Dialog */}
       {open && (
@@ -673,6 +660,139 @@ function CatalogTable({ tab }: { tab: Tab }) {
           }}
         />
       )}
+    </div>
+  );
+}
+
+function CatalogIdentity({ name }: { name: string }) {
+  const initial = name.trim().charAt(0) || "?";
+  return (
+    <div className="flex min-w-0 items-center gap-3">
+      <div className="grid size-9 shrink-0 place-items-center rounded-xl border border-primary/20 bg-primary/10 text-xs font-bold text-primary">
+        {initial}
+      </div>
+      <span className="truncate font-semibold text-foreground">{name}</span>
+    </div>
+  );
+}
+
+function CatalogDetail({ value, tab }: { value: string; tab: Tab }) {
+  if (tab === "models") {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-xl border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
+        <Car className="size-3" />
+        {value}
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex rounded-lg border border-border/80 bg-muted/50 px-2.5 py-0.5 font-mono text-xs font-bold text-foreground">
+      {value}
+    </span>
+  );
+}
+
+interface CatalogRecordActionProps {
+  item: Item;
+  copied: boolean;
+  isRtl: boolean;
+  onCopy: (text: string, id: string) => void;
+  onEdit: (item: Item) => void;
+  onDelete: (item: Item) => void;
+}
+
+function CatalogRecordActions({
+  item,
+  copied,
+  isRtl,
+  onCopy,
+  onEdit,
+  onDelete,
+}: CatalogRecordActionProps) {
+  const controlClass =
+    "grid size-8 place-items-center rounded-xl border border-border/60 bg-card text-muted-foreground transition hover:bg-muted hover:text-foreground active:scale-95";
+  return (
+    <div className="inline-flex items-center gap-1.5">
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onCopy(item.name_ar || item.name || "", item.id);
+        }}
+        className={controlClass}
+        title={isRtl ? "نسخ الاسم" : "Copy name"}
+        aria-label={isRtl ? "نسخ الاسم" : "Copy name"}
+      >
+        {copied ? <Check className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
+      </button>
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onEdit(item);
+        }}
+        className={controlClass}
+        title={isRtl ? "تعديل" : "Edit"}
+        aria-label={isRtl ? "تعديل" : "Edit"}
+      >
+        <Pencil className="size-3.5" />
+      </button>
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onDelete(item);
+        }}
+        className="grid size-8 place-items-center rounded-xl border border-destructive/20 bg-destructive/10 text-destructive transition hover:bg-destructive/20 active:scale-95"
+        title={isRtl ? "حذف" : "Delete"}
+        aria-label={isRtl ? "حذف" : "Delete"}
+      >
+        <Trash2 className="size-3.5" />
+      </button>
+    </div>
+  );
+}
+
+interface CatalogRecordProps extends CatalogRecordActionProps {
+  name: string;
+  secondaryName: string;
+  detail: string;
+  tab: Tab;
+}
+
+function CatalogCard({ item, name, secondaryName, detail, tab, ...actions }: CatalogRecordProps) {
+  return (
+    <div className="card-mullak group relative flex h-full flex-col justify-between rounded-2xl p-3 transition-all duration-200 hover:border-primary/40 hover:shadow-md sm:p-4">
+      <div className="flex min-w-0 items-start justify-between gap-2">
+        <CatalogIdentity name={name} />
+        <CatalogRecordActions item={item} {...actions} />
+      </div>
+      <div className="mt-4 space-y-2 border-t border-border/60 pt-3">
+        <p className="truncate font-mono text-xs text-muted-foreground">{secondaryName}</p>
+        {detail !== "—" ? <CatalogDetail value={detail} tab={tab} /> : null}
+      </div>
+    </div>
+  );
+}
+
+function CatalogListRow({
+  item,
+  name,
+  secondaryName,
+  detail,
+  tab,
+  ...actions
+}: CatalogRecordProps) {
+  return (
+    <div className="card-mullak flex flex-col gap-3 rounded-2xl border p-3.5 transition hover:border-primary/40 hover:shadow-sm sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <CatalogIdentity name={name} />
+        <span className="hidden font-mono text-xs text-muted-foreground sm:inline">
+          {secondaryName}
+        </span>
+        {detail !== "—" ? <CatalogDetail value={detail} tab={tab} /> : null}
+      </div>
+      <CatalogRecordActions item={item} {...actions} />
     </div>
   );
 }

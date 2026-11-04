@@ -1,16 +1,6 @@
 import { useCatalogModules } from "@/lib/catalog-modules";
 import { useI18n } from "@/lib/i18n";
-import {
-  Box,
-  CheckCircle2,
-  Globe2,
-  Layers,
-  Medal,
-  Package,
-  Sprout,
-  Tags,
-  Warehouse,
-} from "lucide-react";
+import { Box, CheckCircle2, Globe2, Layers, Medal, Sprout, Tags, Warehouse } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { FormSection } from "@/components/ui/form-layout";
@@ -51,16 +41,6 @@ export function CatalogModulesDialog({ open, onClose }: CatalogModulesDialogProp
       descEn: "Classify wheat, maize and barley into commercial grades for purchasing.",
       icon: Sprout,
       current: config.enableGrainGrades,
-    },
-    {
-      key: "enablePackagingBags" as const,
-      titleAr: "مستلزمات التعبئة والتغليف",
-      titleEn: "Packaging supplies",
-      descAr:
-        "الأكياس والشوالات والخيوط. تُستخدم مع أي منتج نهائي، ولذلك هي أصناف مستهلكة تُشترى ولا تُطحن.",
-      descEn: "Bags, sacks and thread: consumables bought, never milled.",
-      icon: Package,
-      current: config.enablePackagingBags,
     },
     {
       key: "enableBrands" as const,
