@@ -103,8 +103,8 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
   {
     id: "analytics",
     path: "/analytics",
-    titleAr: "التحليلات",
-    titleEn: "Analytics",
+    titleAr: "تحليل الأداء والأرباح",
+    titleEn: "Performance & Profit Analysis",
     descriptionAr: "تحليل الأداء والمبيعات والأرباح",
     descriptionEn: "Performance & profit analytics",
     keywords: ["تحليلات", "إحصاء", "analytics", "charts"],
@@ -117,8 +117,8 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
   {
     id: "pos",
     path: "/pos",
-    titleAr: "نقطة البيع / الكاشير",
-    titleEn: "POS Cashier",
+    titleAr: "نقطة البيع",
+    titleEn: "Point of Sale",
     descriptionAr: "تسجيل المبيعات وطباعة الفواتير السريعة",
     descriptionEn: "Quick sales & receipt printing",
     keywords: ["كاشير", "بيع", "نقطة البيع", "pos", "cashier", "فاتورة"],
@@ -130,7 +130,7 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
   {
     id: "sales",
     path: "/sales",
-    titleAr: "المبيعات / الفواتير",
+    titleAr: "المبيعات والفواتير",
     titleEn: "Sales Invoices",
     descriptionAr: "سجل ومتابعة جميع فواتير البيع",
     descriptionEn: "Manage sales records & invoices",
@@ -161,8 +161,8 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
   {
     id: "returns",
     path: "/returns",
-    titleAr: "المرتجعات",
-    titleEn: "Returns",
+    titleAr: "مرتجعات البيع والشراء",
+    titleEn: "Sales & Purchase Returns",
     descriptionAr: "مركز المرتجعات للمبيعات والمشتريات",
     descriptionEn: "Returns center for sales & purchases",
     keywords: ["مرتجعات", "مرتجع", "returns"],
@@ -187,8 +187,8 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
   {
     id: "payments",
     path: "/payments",
-    titleAr: "سندات القبض والتحصيل",
-    titleEn: "Customer Payments",
+    titleAr: "الدفعات وسندات القبض",
+    titleEn: "Payments & Receipts",
     descriptionAr: "تسجيل تحصيلات العملاء والسندات",
     descriptionEn: "Record customer payments & receipts",
     keywords: ["سند", "قبض", "تحصيل", "دفعات", "payments", "receipts"],
@@ -200,8 +200,8 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
   {
     id: "debts",
     path: "/debts",
-    titleAr: "سجل الديون والتحصيل",
-    titleEn: "Debts & Collection",
+    titleAr: "ديون وتحصيل العملاء",
+    titleEn: "Customer Debts & Collections",
     descriptionAr: "تحصيل مديونيات العملاء والآجال",
     descriptionEn: "Overdue customer balances",
     keywords: ["ديون", "مديونية", "تحصيل", "آجل", "debts"],
@@ -214,8 +214,8 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
   {
     id: "statement-customers",
     path: "/statements/customer",
-    titleAr: "كشف حساب العملاء",
-    titleEn: "Customer Statements",
+    titleAr: "حركة وأرصدة العملاء",
+    titleEn: "Customer Movements & Balances",
     descriptionAr: "حركات العملاء والأرصدة المتسلسلة والطباعة والتصدير",
     descriptionEn: "Customer movements, running balances, printing and export",
     keywords: withSynonyms(["كشف", "عميل", "عملاء", "حساب"], SEARCH_SYNONYMS.statement),
@@ -227,8 +227,8 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
   {
     id: "statement-suppliers",
     path: "/statements/supplier",
-    titleAr: "كشف حساب الموردين",
-    titleEn: "Supplier Statements",
+    titleAr: "حركة وأرصدة الموردين",
+    titleEn: "Supplier Movements & Balances",
     descriptionAr: "حركات الموردين والأرصدة المتسلسلة والطباعة والتصدير",
     descriptionEn: "Supplier movements, running balances, printing and export",
     keywords: withSynonyms(["كشف", "مورد", "موردين", "حساب"], SEARCH_SYNONYMS.statement),
@@ -240,8 +240,8 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
   {
     id: "statement-cash",
     path: "/statements/cash",
-    titleAr: "كشف الصندوق والبنك",
-    titleEn: "Cash & Bank Statement",
+    titleAr: "حركة الصندوق والبنك",
+    titleEn: "Cash & Bank Movements",
     descriptionAr: "حركات الصندوق والبنك والرصيد المتسلسل",
     descriptionEn: "Cash and bank movements with a running balance",
     keywords: withSynonyms(["كشف", "صندوق", "بنك", "خزينة"], SEARCH_SYNONYMS.statement),
@@ -459,7 +459,7 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
   {
     id: "products",
     path: "/products",
-    titleAr: "المنتجات / الأصناف",
+    titleAr: "المنتجات والأسعار",
     titleEn: "Products",
     descriptionAr: "إدارة بطاقات المنتجات والتسعير والباركود",
     descriptionEn: "Catalog, pricing & barcodes",
@@ -485,7 +485,7 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
   {
     id: "catalog",
     path: "/catalog",
-    titleAr: "تصنيفات المنتجات (الفهرس)",
+    titleAr: "تصنيفات ووحدات المنتجات",
     titleEn: "Product Catalog",
     descriptionAr: "تصنيفات المنتجات وعلاماتها التجارية ووحدات القياس",
     descriptionEn: "Categories, brands & units",
@@ -498,7 +498,7 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
   {
     id: "barcodes",
     path: "/barcodes",
-    titleAr: "ملصقات الباركود",
+    titleAr: "إنشاء وطباعة الباركود",
     titleEn: "Barcode Labels",
     descriptionAr: "توليد وطباعة ملصقات الباركود",
     descriptionEn: "Generate & print barcode labels",
@@ -558,7 +558,7 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
   {
     id: "batches",
     path: "/batches",
-    titleAr: "الدفعات وتواريخ الصلاحية",
+    titleAr: "دفعات وصلاحية المنتجات",
     titleEn: "Batches & Expiry",
     descriptionAr: "تتبع الدفعات وتواريخ الانتهاء",
     descriptionEn: "Batch & expiry tracking",
@@ -599,7 +599,7 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
   {
     id: "suppliers",
     path: "/suppliers",
-    titleAr: "الموردين والشركات",
+    titleAr: "الموردون والحسابات",
     titleEn: "Suppliers",
     descriptionAr: "سجل الموردين وحساباتهم",
     descriptionEn: "Vendor accounts & balances",
@@ -627,7 +627,7 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
   {
     id: "opening-balances",
     path: "/opening-balances",
-    titleAr: "الأرصدة الافتتاحية",
+    titleAr: "أرصدة الحسابات الافتتاحية",
     titleEn: "Opening Balances",
     descriptionAr: "إدخال الأرصدة الافتتاحية للحسابات",
     descriptionEn: "Enter opening account balances",
@@ -640,7 +640,7 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
   {
     id: "expenses",
     path: "/expenses",
-    titleAr: "لوحة المصروفات",
+    titleAr: "المصروفات والاعتمادات",
     titleEn: "Expense Dashboard",
     descriptionAr: "ملخص الإنفاق والاعتمادات والمدفوعات",
     descriptionEn: "Expense, approval, and settlement overview",
@@ -666,7 +666,7 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
   {
     id: "expense-approvals",
     path: "/expenses/approvals",
-    titleAr: "اعتمادات المصروفات",
+    titleAr: "مراجعة واعتماد المصروفات",
     titleEn: "Expense Approvals",
     descriptionAr: "مراجعة واعتماد أو رفض المصروفات المرسلة",
     descriptionEn: "Review submitted expenses and record decisions",
@@ -679,7 +679,7 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
   {
     id: "expense-archive",
     path: "/expenses/archive",
-    titleAr: "أرشيف وتقارير المصروفات",
+    titleAr: "أرشيف المصروفات وتقاريرها",
     titleEn: "Expense Archive & Reports",
     descriptionAr: "البحث في السجل وتحليل المصروفات والتسويات",
     descriptionEn: "Search and analyze expense records and settlements",
@@ -692,7 +692,7 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
   {
     id: "expense-management",
     path: "/expenses/setup",
-    titleAr: "إعدادات المصروفات",
+    titleAr: "تصنيفات ومراكز التكلفة",
     titleEn: "Expense Setup",
     descriptionAr: "إدارة تصنيفات المصروفات ومراكز التكلفة من قسم المصروفات",
     descriptionEn: "Manage expense categories and cost centers in the expenses section",
@@ -795,7 +795,7 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
   {
     id: "fiscal-year-close",
     path: "/fiscal-year-close",
-    titleAr: "إقفال السنة المالية",
+    titleAr: "إقفال السنة وترحيل الأرباح",
     titleEn: "Fiscal Year Close",
     descriptionAr: "إقفال السنة وترحيل الأرباح والخسائر إلى الأرباح المحتجزة",
     descriptionEn: "Close fiscal year and roll over P&L into retained earnings",
@@ -808,7 +808,7 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
   {
     id: "fixed-assets",
     path: "/fixed-assets",
-    titleAr: "الأصول الثابتة",
+    titleAr: "الأصول والإهلاك",
     titleEn: "Fixed Assets",
     descriptionAr: "إدارة الأصول الرأسمالية وإهلاكها الدوري واستبعادها",
     descriptionEn: "Fixed assets register, depreciation and disposal",
@@ -847,7 +847,7 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
   {
     id: "supplier-ledger",
     path: "/supplier-ledger",
-    titleAr: "دفتر أستاذ الموردين وسندات الصرف",
+    titleAr: "حسابات الموردين وسندات الصرف",
     titleEn: "Supplier Ledger & Payment Vouchers",
     descriptionAr:
       "كشف حساب المورد التفصيلي، وسندات الصرف النقدية والبنكية مع الترحيل المحاسبي الذري",
@@ -862,7 +862,7 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
   {
     id: "chart-of-accounts",
     path: "/chart-of-accounts",
-    titleAr: "شجرة دليل الحسابات",
+    titleAr: "دليل الحسابات وأرصدتها",
     titleEn: "Chart of Accounts Tree",
     descriptionAr:
       "الهيكل الشجري المحاسبي الموحد لكافة الحسابات الرئيسية والتجميعية والتشغيلية وأرصدتها",
@@ -891,7 +891,7 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
   {
     id: "milling-intake",
     path: "/milling/intake",
-    titleAr: "استلام الأمانات",
+    titleAr: "استلام الحبوب والأجور",
     titleEn: "Custody Intake",
     descriptionAr: "استلام أنواع الحبوب المتعددة بسند واحد وفاتورة أجور رسمية",
     descriptionEn: "Receive multiple grain types with one document and fee invoice",
@@ -920,7 +920,7 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
   {
     id: "milling-delivery",
     path: "/milling/delivery",
-    titleAr: "تسليم الأمانات",
+    titleAr: "تسليم الحبوب والنواتج",
     titleEn: "Custody Delivery",
     descriptionAr: "تسليم النواتج والحبوب لصاحب الأمانة بسند تسليم رسمي",
     descriptionEn: "Deliver custody outputs with an official delivery voucher",
@@ -959,7 +959,7 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
   {
     id: "milling-performance",
     path: "/milling/performance",
-    titleAr: "تقرير أداء المطحنة",
+    titleAr: "إيرادات ومصروفات المطحنة",
     titleEn: "Milling Performance",
     descriptionAr: "تقرير شهري: إيراد أجور الطحن، الكميات المطحونة، ومصروفات القسم",
     descriptionEn:
@@ -976,7 +976,7 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
   {
     id: "milling-statement",
     path: "/milling/customer-statement",
-    titleAr: "أمانات الطحن",
+    titleAr: "أرصدة الحبوب والطحن",
     titleEn: "Grain Custody — Milling",
     descriptionAr: "متابعة أرصدة الحبوب الخام المودعة للعملاء وتسجيل عمليات الطحن",
     descriptionEn: "Track raw grain custody and record milling operations",
@@ -992,7 +992,7 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
   {
     id: "milling-custody-delivery",
     path: "/milling/custody-delivery",
-    titleAr: "أمانات التسليم",
+    titleAr: "نواتج الطحن والتسليم",
     titleEn: "Output Custody — Delivery",
     descriptionAr: "متابعة نواتج الطحن الجاهزة وتسليمها للعملاء بسند تسليم رسمي",
     descriptionEn: "Track milled outputs and deliver them to customers",

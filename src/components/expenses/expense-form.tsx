@@ -148,6 +148,13 @@ export function ExpenseFormDialog({
   const [dirty, setDirty] = useState(false);
   const amountInputRef = useRef<HTMLInputElement>(null);
   const idempotencyKeyRef = useRef("");
+  /*
+   * توقيع المالك للسند النقدي: ترحيل مسودة لا يمر عبر الاعتماد إلا بتوقيع مكتوب
+   * صريح (allow_draft_post + draft_post_reason). لا نملأ التوقيع تلقائياً: التدفق
+   * الافتراضي للمالك هو إرسال للاعتماد، ثم اعتماد، ثم ترحيل وسداد.
+   */
+  const [ownerDraftOverride, setOwnerDraftOverride] = useState(false);
+  const [ownerDraftReason, setOwnerDraftReason] = useState("");
 
   /*
    * قائمة الموظفين تأتي من RPC المستأجر نفسه (expense_lookups) فلا تحمل
@@ -403,10 +410,22 @@ export function ExpenseFormDialog({
     }
 
     const isCashPayment = opMode === "CASH_PAYMENT";
-    const canPostDraft = hasRole("owner") || hasRole("manager");
-    const submitForApproval = submit && (!isCashPayment || !canPostDraft);
+    const canApproveNow = hasRole("owner") || hasRole("manager");
+    const canPostNow = hasRole("owner") || hasRole("manager") || hasRole("accountant");
+    const directDraftPost =
+      isCashPayment && submit && !editing && canPostNow && hasRole("owner") && ownerDraftOverride;
+    const submitForApproval = submit && !directDraftPost;
 
-    if (isCashPayment && submit && canPostDraft) {
+    if (directDraftPost && ownerDraftReason.trim().length < 10) {
+      toast.error(
+        ar
+          ? "اكتب سبباً واضحاً (١٠ أحرف على الأقل) لترحيل السند دون اعتماد مسبق"
+          : "Write a clear reason (at least 10 characters) to post without prior approval",
+      );
+      return;
+    }
+
+    if (isCashPayment && submit) {
       const unmappedCategory = payloadLines.some((line) => {
         const category = lookups?.categories.find((item) => item.id === line.category_id);
         return !category?.account_id;
@@ -465,13 +484,19 @@ export function ExpenseFormDialog({
           idempotency_key: idempotencyKeyRef.current,
         });
 
-        // Draft vouchers are posted and paid immediately for owner/manager.
-        // Lower roles submit them for approval and must not receive a false
-        // "paid" success when the database correctly rejects posting.
-        if (isCashPayment && submit && created?.id && created.status === "DRAFT") {
+        // التدفق الإلزامي: إرسال → اعتماد (بشخص آخر أو المالك) → ترحيل.
+        // التجاوز الوحيد: مالك وقّع سبباً صريحاً فيُعتمد المستند اعتماداً مباشراً
+        // مسجّلاً ثم يُرحَّل ويُسدد. المحاسب والمدير لا يمرران قرار الاعتماد.
+        if (directDraftPost && created?.id && created.status === "DRAFT") {
+          const approved = await mutations.decide.mutateAsync({
+            id: created.id,
+            approve: true,
+            version: created.version,
+            reason: ownerDraftReason.trim(),
+          });
           await mutations.post.mutateAsync({
             id: created.id,
-            version: created.version,
+            version: approved?.version ?? created.version,
             payNow: true,
             paymentMethod: settlement.paymentMethodId || paymentMethod || "cash",
             paymentMethodId: settlement.paymentMethodId || paymentMethod || "cash",
@@ -482,6 +507,12 @@ export function ExpenseFormDialog({
             paymentDate: header.expense_date,
             referenceNo: settlement.reference || null,
           });
+        } else if (isCashPayment && submit && canApproveNow && !directDraftPost) {
+          toast.info(
+            ar
+              ? "تم إرسال السند للاعتماد. رحّله وسدّده من شاشة الاعتماد."
+              : "Voucher sent for approval. Post and settle it from the approvals screen.",
+          );
         }
 
         toast.success(
@@ -497,6 +528,8 @@ export function ExpenseFormDialog({
         );
         onSaved?.(created?.id ?? "");
         idempotencyKeyRef.current = "";
+        setOwnerDraftOverride(false);
+        setOwnerDraftReason("");
       }
 
       setDirty(false);
@@ -1104,6 +1137,47 @@ export function ExpenseFormDialog({
             </div>
           </div>
         )}
+
+        {/*
+          الترحيل لا يتخطى الاعتماد: التدفق الإلزامي هو إرسال ← اعتماد ← ترحيل.
+          التجاوز متاح للمالك فقط، ويتطلب سبباً مكتوباً يُحفظ في المستند وسجل التدقيق.
+        */}
+        {opMode === "CASH_PAYMENT" && hasRole("owner") && !isEditing ? (
+          <div className="rounded-2xl border border-border/70 bg-surface/50 p-4 sm:p-5 space-y-3">
+            <label className="flex items-start gap-2 text-xs font-semibold text-foreground">
+              <input
+                type="checkbox"
+                checked={ownerDraftOverride}
+                onChange={(event) => setOwnerDraftOverride(event.target.checked)}
+                className="mt-0.5 size-4 rounded border-border"
+              />
+              <span>
+                {ar
+                  ? "توقيع المالك: اعتماد مباشر ثم ترحيل وسداد دون انتظار شخص آخر (يسجّل في سجل الاعتماد)"
+                  : "Owner override: approve and post this voucher in one step without a second approver (recorded in the approval log)"}
+              </span>
+            </label>
+            {ownerDraftOverride ? (
+              <textarea
+                value={ownerDraftReason}
+                onChange={(event) => setOwnerDraftReason(event.target.value)}
+                rows={2}
+                placeholder={
+                  ar
+                    ? "سبب التجاوز (١٠ أحرف على الأقل)، مثلاً: سداد فوري لفاتورة طارئة"
+                    : "Override reason (at least 10 characters)"
+                }
+                className="w-full rounded-xl border border-border bg-surface px-3 py-2 text-xs text-foreground"
+              />
+            ) : (
+              <p className="text-[11px] leading-5 text-muted-foreground">
+                {ar
+                  ? "بدون تفعيل هذا الخيار يُرسل السند للاعتماد، ثم يرحّله المحاسب أو المدير بعد الموافقة."
+                  : "Without this, the voucher is submitted for approval and posted after it is approved."}
+              </p>
+            )}
+          </div>
+        ) : null}
 
         {/* ─── خيارات محاسبية اختيارية ─── */}
         <div className="rounded-2xl border border-border/70 bg-surface/30 p-3">

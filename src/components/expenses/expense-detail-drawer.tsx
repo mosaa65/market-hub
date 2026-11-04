@@ -40,6 +40,7 @@ import {
   CircleDollarSign,
   Clock,
   FileText,
+  Lock,
   RotateCcw,
   Send,
   Undo2,
@@ -69,6 +70,8 @@ export function ExpenseDetailDrawer({
 
   const [tab, setTab] = useState<TabKey>("lines");
   const [payOpen, setPayOpen] = useState(false);
+  /** هوية محاولة الدفع الحالية: تبقى ثابتة عبر إعادة المحاولة وتتغير في نافذة جديدة. */
+  const [payAttemptKey, setPayAttemptKey] = useState(() => Date.now().toString(36));
   const [rejectOpen, setRejectOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [reverseOpen, setReverseOpen] = useState(false);
@@ -171,24 +174,15 @@ export function ExpenseDetailDrawer({
                       <Clock className="size-3.5" />
                       {ar ? "ترحيل كمستحق" : "Post as payable"}
                     </Button>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      disabled={!entry.can_post || mutations.isBusy}
-                      onClick={() =>
-                        void run(() =>
-                          mutations.post.mutateAsync({
-                            id: entry.id,
-                            version: entry.version,
-                            payNow: true,
-                          }),
-                        )
-                      }
-                    >
-                      <CircleDollarSign className="size-3.5" />
-                      {ar ? "ترحيل وسداد" : "Post & settle"}
-                    </Button>
                   </>
+                ) : null}
+
+                {entry.status === "DRAFT" ? (
+                  // الاعتماد هو ما يفتح الترحيل: لا يوجد زر ترحيل للمسودة.
+                  <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+                    <Lock className="size-3" />
+                    {ar ? "مسودة: تنتظر الإرسال والاعتماد" : "Draft: awaiting submit & approval"}
+                  </span>
                 ) : null}
 
                 {entry.status === "POSTED" || entry.status === "PARTIALLY_PAID" ? (
@@ -462,7 +456,10 @@ export function ExpenseDetailDrawer({
         <>
           <PaymentModal
             open={payOpen}
-            onOpenChange={setPayOpen}
+            onOpenChange={(open) => {
+              if (open) setPayAttemptKey(`${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`);
+              setPayOpen(open);
+            }}
             remaining={Number(entry.remaining_amount)}
             defaultDate={today()}
             busy={mutations.isBusy}
@@ -481,6 +478,11 @@ export function ExpenseDetailDrawer({
                   accountLabel: values.label,
                   referenceNo: values.settlement?.reference || null,
                   note: values.note,
+                  /**
+                   * مفتاح الدفعة يُصدر مرة واحدة لكل نافذة دفع؛ إعادة الإرسال
+                   * بعد خطأ شبكة تحمل نفس المفتاح فلا تُسجَّل دفعة مزدوجة.
+                   */
+                  idempotencyKey: `pay:${entry.id}:${payAttemptKey}`,
                 }),
               );
               setPayOpen(false);
