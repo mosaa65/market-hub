@@ -30,6 +30,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { money } from "@/lib/format";
+import { decomposeStock, formatDecomposed } from "@/lib/stock-decompose";
 import { type PageGuideConfig, PageGuideButton } from "@/components/page-guide";
 import {
   ShoppingCart,
@@ -2786,6 +2787,12 @@ function POSPage() {
                         lang === "ar"
                           ? p.unit?.name_ar || p.unit?.name || p.unit?.short_name || ""
                           : p.unit?.short_name || p.unit?.name || p.unit?.name_ar || "";
+                      const decompSegments = decomposeStock(
+                        stock,
+                        p.sale_uoms || [],
+                        unitLabel || (lang === "ar" ? "حبة" : "unit"),
+                      );
+                      const decompText = formatDecomposed(decompSegments, lang);
                       const originLabel =
                         lang === "ar"
                           ? p.origin?.name_ar || p.origin?.name
@@ -2888,6 +2895,7 @@ function POSPage() {
                               {money(saleUom.sale_price)}
                             </span>
                             <span
+                              title={unitLabel ? `${stock} ${unitLabel}` : undefined}
                               className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-semibold ${
                                 low
                                   ? "hidden"
@@ -2896,7 +2904,7 @@ function POSPage() {
                                     : "bg-muted text-muted-foreground"
                               }`}
                             >
-                              {`${stockInSaleUnit} · ${saleUom.label || unitLabel || ""}`}
+                              {decompText}
                             </span>
                           </div>
                         </button>
@@ -2909,12 +2917,21 @@ function POSPage() {
                     {visibleFiltered.map((p) => {
                       const stock = stockMap[p.id] ?? 0;
                       const saleUom = getDefaultSaleUom(p);
-                      const stockInSaleUnit = stock / Math.max(saleUom.factor_to_base, 0.000000001);
                       const low = p.is_service !== true && stock <= 0;
                       const catLabel =
                         lang === "ar"
                           ? p.category?.name_ar || p.category?.name
                           : p.category?.name || p.category?.name_ar;
+                      const unitLabel =
+                        lang === "ar"
+                          ? p.unit?.name_ar || p.unit?.name || p.unit?.short_name || ""
+                          : p.unit?.short_name || p.unit?.name || p.unit?.name_ar || "";
+                      const decompSegments = decomposeStock(
+                        stock,
+                        p.sale_uoms || [],
+                        unitLabel || (lang === "ar" ? "حبة" : "unit"),
+                      );
+                      const decompText = formatDecomposed(decompSegments, lang);
 
                       return (
                         <div
@@ -2948,6 +2965,7 @@ function POSPage() {
                           {/* Stock */}
                           <div className="shrink-0 text-end">
                             <span
+                              title={unitLabel ? `${stock} ${unitLabel}` : undefined}
                               className={`rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold ${
                                 low
                                   ? "bg-destructive/15 text-destructive"
@@ -2960,7 +2978,7 @@ function POSPage() {
                                 ? lang === "ar"
                                   ? "نفد"
                                   : "0"
-                                : `${stockInSaleUnit} ${saleUom.label}`}
+                                : decompText}
                             </span>
                           </div>
 
@@ -3079,13 +3097,21 @@ function POSPage() {
                         {visibleTableRows.map((p) => {
                           const stock = stockMap[p.id] ?? 0;
                           const saleUom = getDefaultSaleUom(p);
-                          const stockInSaleUnit =
-                            stock / Math.max(saleUom.factor_to_base, 0.000000001);
                           const low = p.is_service !== true && stock <= 0;
                           const catLabel =
                             lang === "ar"
                               ? p.category?.name_ar || p.category?.name
                               : p.category?.name || p.category?.name_ar;
+                          const unitLabel =
+                            lang === "ar"
+                              ? p.unit?.name_ar || p.unit?.name || p.unit?.short_name || ""
+                              : p.unit?.short_name || p.unit?.name || p.unit?.name_ar || "";
+                          const decompSegments = decomposeStock(
+                            stock,
+                            p.sale_uoms || [],
+                            unitLabel || (lang === "ar" ? "حبة" : "unit"),
+                          );
+                          const decompText = formatDecomposed(decompSegments, lang);
 
                           return (
                             <tr
@@ -3109,6 +3135,7 @@ function POSPage() {
                               </td>
                               <td className="py-2 px-3 text-center font-mono font-semibold">
                                 <span
+                                  title={unitLabel ? `${stock} ${unitLabel}` : undefined}
                                   className={`rounded-md px-1.5 py-0.5 text-[10px] ${
                                     low
                                       ? "bg-destructive/15 text-destructive"
@@ -3117,7 +3144,7 @@ function POSPage() {
                                         : "bg-muted/70 text-foreground"
                                   }`}
                                 >
-                                  {low ? (lang === "ar" ? "نفد" : "0") : stockInSaleUnit}
+                                  {low ? (lang === "ar" ? "نفد" : "0") : decompText}
                                 </span>
                               </td>
                               <td className="py-2 px-3 text-end font-mono font-bold text-primary [unicode-bidi:isolate]">
@@ -3855,13 +3882,22 @@ function POSPage() {
         products={filtered.map((p) => {
           const stock = stockMap[p.id] ?? 0;
           const saleUom = getDefaultSaleUom(p);
-          const stockInSaleUnit = stock / Math.max(saleUom.factor_to_base, 0.000000001);
+          const unitLabel =
+            lang === "ar"
+              ? p.unit?.name_ar || p.unit?.name || p.unit?.short_name || ""
+              : p.unit?.short_name || p.unit?.name || p.unit?.name_ar || "";
+          const decompSegments = decomposeStock(
+            stock,
+            p.sale_uoms || [],
+            unitLabel || (lang === "ar" ? "حبة" : "unit"),
+          );
+          const decompText = formatDecomposed(decompSegments, lang);
           return {
             id: p.id,
             name: lang === "ar" && p.name_ar ? p.name_ar : p.name,
             meta: p.barcode || p.sku || null,
             value: money(saleUom.sale_price),
-            sub: `${t("pos.stock")}: ${stockInSaleUnit} ${saleUom.label}`,
+            sub: `${t("pos.stock")}: ${decompText}`,
             disabled: p.is_service !== true && stock <= 0,
           };
         })}

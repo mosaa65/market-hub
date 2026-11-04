@@ -44,6 +44,15 @@ export interface ReferenceCounts {
   stockMovements: number;
   inventoryRows: number;
   compatibilities: number;
+  /**
+   * ﺑﻨﻮﺩ دﻓﺘﺮ اﻷﻣﺎﻧﺎﺕ (custody_ledger) — استلام/طحن/تسليم المطحنة.
+   *
+   * يُحتسب هنا لأن `product_reference_counts` في القاعدة لا يعرفه: يعدّ
+   * الأصناف في فواتير البيع والشراء والمرتجعات والتحويلات وحركات المخزون فقط.
+   * فلو اعتمدنا عليه وحده لبدا صنف أمانة استُلم وطُحن وسُلّم «غير مرتبط» وحُذف —
+   * فيمسح تاريخ العميل، ويقف الدفتر بعدّه في وجه مفتاح RESTRICT.
+   */
+  custodyEntries: number;
   blockingTotal: number;
   canDelete: boolean;
   hasHistory: boolean;
@@ -75,6 +84,51 @@ export async function getProductReferenceCounts(
   return countReferencesOnClient(productId);
 }
 
+/*
+ * دفتر الأمانات: الاختبار والعدّ مفصولان عن بقية الجداول عن قصد.
+ *
+ * `custody_ledger` يحمل بند المطحنة لكل استلام وطحن وتسليم، ومفتاحه `item_id`
+ * لا `product_id`. وهو ليس جزءًا من دالة القاعدة، لذلك يُقاس هنا ويُضاف إلى
+ * الإجمالي المانع بدل أن يُترك للحذف كومونز. وإذا كان الجدول غير موجود في
+ * تثبيت أقدم، نعيد 0 — «لا سجلات» وليس «تعذّر التحقق»، وإلا مُنع الحذف في
+ * كل التثبيتات التي لا مطحنة فيها.
+ */
+async function custodyLedgerCount(productId: string): Promise<number> {
+  try {
+    const { count, error } = await db
+      .from("custody_ledger")
+      .select("id", { count: "exact", head: true })
+      .eq("item_id", productId);
+    if (error) {
+      // PGRST205 = الجدول غير موجود في مخطط PostgREST؛ 42P01 = غير موجود في القاعدة.
+      if (error.code === "PGRST205" || error.code === "42P01") return 0;
+      // أي خطأ آخر يعني أننا لا نعرف، و«لا نعرف» لا يجوز أن يسمح بالحذف،
+      // لكنه أيضًا لا يجوز أن يمنع الحذف في منتج لا مطحنة له. نرفع الخطأ
+      // ليُترجم إلى تعذّر التحقق في الطبقة اللي تحوّل `null`.
+      throw error;
+    }
+    return count ?? 0;
+  } catch (error) {
+    const code = (error as { code?: string } | null)?.code;
+    if (code === "PGRST205" || code === "42P01") return 0;
+    throw error;
+  }
+}
+
+/**
+ * هل يرتبط الصنف بدفتر الأمانات؟ يرجع `null` حين يتعذّر السؤال، والمستدعي
+ * يعامل `null` كـ«ممنوع الحذف» لا كـ«آمن».
+ */
+export async function getCustodyLinkState(
+  productId: string,
+): Promise<{ ok: true; count: number } | { ok: false; message: string }> {
+  try {
+    return { ok: true, count: await custodyLedgerCount(productId) };
+  } catch (error) {
+    return { ok: false, message: (error as Error)?.message ?? "unavailable" };
+  }
+}
+
 async function countReferencesOnClient(productId: string): Promise<ReferenceCounts | null> {
   const countOf = async (table: string, column = "product_id"): Promise<number> => {
     try {
@@ -99,6 +153,7 @@ async function countReferencesOnClient(productId: string): Promise<ReferenceCoun
       stockMovements,
       inventoryRows,
       compatibilities,
+      custodyEntries,
     ] = await Promise.all([
       countOf("sales_invoice_items"),
       countOf("purchase_invoice_items"),
@@ -108,10 +163,17 @@ async function countReferencesOnClient(productId: string): Promise<ReferenceCoun
       countOf("stock_movements"),
       countOf("inventory"),
       countOf("product_compatibilities"),
+      custodyLedgerCount(productId),
     ]);
 
     const blockingTotal =
-      salesItems + purchaseItems + salesReturns + purchaseReturns + transfers + stockMovements;
+      salesItems +
+      purchaseItems +
+      salesReturns +
+      purchaseReturns +
+      transfers +
+      stockMovements +
+      custodyEntries;
 
     return {
       salesItems,
@@ -122,9 +184,10 @@ async function countReferencesOnClient(productId: string): Promise<ReferenceCoun
       stockMovements,
       inventoryRows,
       compatibilities,
+      custodyEntries,
       blockingTotal,
       canDelete: blockingTotal === 0,
-      hasHistory: stockMovements > 0 || inventoryRows > 0,
+      hasHistory: stockMovements > 0 || inventoryRows > 0 || custodyEntries > 0,
     };
   } catch {
     // If even the fallback fails we cannot prove the product is unreferenced, so
@@ -145,6 +208,7 @@ function normalizeCounts(raw: Record<string, unknown>): ReferenceCounts {
     stockMovements: num("stock_movements"),
     inventoryRows: num("inventory_rows"),
     compatibilities: num("compatibilities"),
+    custodyEntries: num("custody_entries"),
     blockingTotal,
     canDelete: raw.can_delete === true || blockingTotal === 0,
     hasHistory: raw.has_history === true || num("stock_movements") > 0 || num("inventory_rows") > 0,
@@ -243,6 +307,7 @@ export function describeReferences(counts: ReferenceCounts, lang: string): strin
   push(counts.purchaseReturns, "بند مرتجع شراء", "purchase return line(s)");
   push(counts.transfers, "بند تحويل مخزون", "stock transfer line(s)");
   push(counts.stockMovements, "حركة مخزون", "stock movement(s)");
+  push(counts.custodyEntries, "بند في دفتر أمانات المطحنة", "milling custody ledger line(s)");
 
   return out;
 }

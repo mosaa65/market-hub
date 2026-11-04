@@ -1,0 +1,10 @@
+services:
+  app:
+    env_file: !override
+      - .env.local-production
+    ports: !override
+      - "127.0.0.1:3001:3000"
+
+  # This local-only deployment has no public reverse proxy or public ports.
+  proxy:
+    ports: !override []

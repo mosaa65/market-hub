@@ -35,6 +35,7 @@ import {
   CheckCircle2,
   Boxes,
   Loader2,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -44,6 +45,15 @@ import { ModuleGuard } from "@/lib/modules";
 import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
+import { useAuth } from "@/lib/auth";
+import {
+  deleteProductSafely,
+  describeReferences,
+  getCustodyLinkState,
+  setProductActive,
+  type DeleteOutcome,
+  type ReferenceCounts,
+} from "@/lib/safety";
 import { useBreakpoint } from "@/design/breakpoints";
 import { fuzzySearch, buildSearchIndex } from "@/design/fuzzy";
 import { toSystemDigits } from "@/lib/format-preferences";
@@ -70,6 +80,7 @@ import { usePersistedViewMode } from "@/hooks/use-persisted-view-mode";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { CUSTODY_PRODUCTS_COLUMNS } from "@/lib/records/registries";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { ConfirmDialog, Modal } from "@/components/ui/modal";
 import {
   CustodyProductFormDialog,
   type CustodyProductFormData,
@@ -106,6 +117,22 @@ type QuickFilter = "all" | "active" | "inactive";
 const RAW_CLASSES = ["RAW_MATERIAL"];
 const OUTPUT_CLASSES = ["FINISHED_GOOD", "BY_PRODUCT"];
 
+/** أعداد محايدة — تُستخدم قبل أن يجيب فاحص الارتباطات. */
+const EMPTY_COUNTS: ReferenceCounts = {
+  salesItems: 0,
+  purchaseItems: 0,
+  salesReturns: 0,
+  purchaseReturns: 0,
+  transfers: 0,
+  stockMovements: 0,
+  inventoryRows: 0,
+  compatibilities: 0,
+  custodyEntries: 0,
+  blockingTotal: 0,
+  canDelete: false,
+  hasHistory: false,
+};
+
 /* --------------------------------------------------------- component -- */
 
 function CustodyProductsPage() {
@@ -114,6 +141,15 @@ function CustodyProductsPage() {
   const { t, lang } = useI18n();
   const isAr = lang === "ar";
   const breakpoint = useBreakpoint();
+
+  /*
+   * الحذف صلاحية في القاعدة لا في الواجهة، لكننا نمنع المحاولة العابثة:
+   * `product_delete_guard` ترجع `forbidden` لغير المالك/المدير، فلا يُعرض
+   * الزر لهم أصلًا. المطابقة مع دالة القاعدة ضرورية، وإلا أُظهر زر لا يعمل.
+   */
+  const { hasRole, isPlatformAdmin, isPlatformSuperadmin } = useAuth();
+  const canDelete =
+    isPlatformAdmin || isPlatformSuperadmin || hasRole("owner") || hasRole("manager");
 
   /* سياق عرض السجلات الموحّد — نفس الذي تستخدمه /products. */
   const tableUsesHorizontalScroll =
@@ -127,6 +163,14 @@ function CustodyProductsPage() {
   const [viewMode, setViewMode] = usePersistedViewMode("milling-custody-products", "cards");
   const [detail, setDetail] = useState<CustodyProduct | null>(null);
   const [copiedSku, setCopiedSku] = useState<string | null>(null);
+
+  /* مسار الحذف: تأكيد ثم نتيجة. أي مرجع ⇒ إلغاء التنشيط بدلًا من الحذف. */
+  const [confirmDelete, setConfirmDelete] = useState<CustodyProduct | null>(null);
+  const [blockedDelete, setBlockedDelete] = useState<{
+    product: CustodyProduct | null;
+    counts: ReferenceCounts;
+  } | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const productColumns = useColumnVisibility("custody-products", CUSTODY_PRODUCTS_COLUMNS);
   const col = productColumns.visibility;
@@ -276,6 +320,97 @@ function CustodyProductsPage() {
     setDialogDefaultClass(p.item_class as any);
     setDialogOpen(true);
   };
+
+  /**
+   * الحذف الآمن: "صنف أمانة" ليس كتالوجًا مجرّدًا، بل تاريخ عميل.
+   *
+   * ثلاثة مستويات قبل أي كتابة على القاعدة:
+   *   1. `getCustodyLinkState` — هل له بند في دفتر الأمانات (استلام/طحن/تسليم)؟
+   *      دالة القاعدة تعرف الفواتير والحركات ولا تعرف الدفتر؛ نجمعها معًا،
+   *      فأيّهما يرجّح وجود مرجع يمنع الحذف.
+   *   2. `deleteProductSafely` — بوابة القاعدة نفسها، وهي الحاكمة، وتعرض
+   *      بالتفصيل ما يمنع الحذف.
+   *   3. أي رفض ⇒ نعرض نافذة «مرتبط» بزر إلغاء التنشيط، لا حذف. فالسجلات
+   *      التي تخصّ العميل لا تُمحى من شاشة كتالوج.
+   */
+  const remove = useMutation({
+    mutationFn: async (target: CustodyProduct) => {
+      setDeletingId(target.id);
+      const link = await getCustodyLinkState(target.id);
+      if (!link.ok) {
+        return {
+          status: "unknown" as const,
+          message: link.message,
+        };
+      }
+      if (link.count > 0) {
+        return { status: "linked" as const, count: link.count };
+      }
+      return await deleteProductSafely(target.id);
+    },
+    onSuccess: (
+      outcome:
+        | DeleteOutcome
+        | { status: "unknown"; message: string }
+        | { status: "linked"; count: number },
+      target,
+    ) => {
+      setDeletingId(null);
+
+      if (outcome.status === "deleted") {
+        toast.success(isAr ? "تم حذف الصنف نهائيًا" : "Item deleted");
+        qc.invalidateQueries({ queryKey: ["custody-products"] });
+        qc.invalidateQueries({ queryKey: ["milling"] });
+        setDetail(null);
+        return;
+      }
+
+      if (outcome.status === "blocked") {
+        setBlockedDelete({ product: target, counts: outcome.counts });
+        return;
+      }
+
+      if (outcome.status === "forbidden") {
+        toast.error(
+          isAr
+            ? "ليس لديك صلاحية حذف الأصناف — استخدم إلغاء التنشيط."
+            : "You cannot delete items — use deactivation instead.",
+        );
+        return;
+      }
+
+      if (outcome.status === "linked") {
+        setBlockedDelete({
+          product: target,
+          counts: {
+            salesItems: 0,
+            purchaseItems: 0,
+            salesReturns: 0,
+            purchaseReturns: 0,
+            transfers: 0,
+            stockMovements: 0,
+            inventoryRows: 0,
+            compatibilities: 0,
+            custodyEntries: outcome.count,
+            blockingTotal: outcome.count,
+            canDelete: false,
+            hasHistory: true,
+          },
+        });
+        return;
+      }
+
+      toast.error(
+        isAr
+          ? "تعذّر التحقق من ارتباطات الصنف؛ لم يُحذف شيئًا."
+          : "Could not verify the item's links; nothing was deleted.",
+      );
+    },
+    onError: (err: any) => {
+      setDeletingId(null);
+      toast.error(err?.message || (isAr ? "تعذّر حذف الصنف" : "Delete failed"));
+    },
+  });
 
   /* ---- class display helpers ---- */
   const classIcon = (cls: string) =>
@@ -456,7 +591,7 @@ function CustodyProductsPage() {
       key: "actions",
       header: t("common.actions"),
       align: "end",
-      width: "w-[110px]",
+      width: canDelete ? "w-[148px]" : "w-[110px]",
       cell: (p) => (
         <div className="inline-flex items-center gap-1.5 pe-2">
           <IconButton
@@ -493,13 +628,28 @@ function CustodyProductsPage() {
               toggleMutation.mutate({ id: p.id, active: !p.is_active });
             }}
           />
+          {canDelete ? (
+            <IconButton
+              size="sm"
+              variant="danger"
+              tooltip
+              ariaLabel={isAr ? "حذف الصنف" : "Delete item"}
+              icon={<Trash2 />}
+              round
+              loading={deletingId === p.id}
+              onClick={(event) => {
+                event.stopPropagation();
+                setConfirmDelete(p);
+              }}
+            />
+          ) : null}
         </div>
       ),
     });
 
     return cols;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [col, isAr, t]);
+  }, [col, isAr, t, canDelete, deletingId]);
 
   /* ---- card markup — same design language as /products cards ---- */
   const renderCard = (p: CustodyProduct) => {
@@ -633,6 +783,22 @@ function CustodyProductsPage() {
                 handleEdit(p);
               }}
             />
+            {/* الحذف قرار لا إجراء سريع: يفتح تأكيدًا، والحماية في القاعدة. */}
+            {canDelete ? (
+              <IconButton
+                size="sm"
+                variant="danger"
+                tooltip
+                ariaLabel={isAr ? "حذف الصنف" : "Delete item"}
+                icon={<Trash2 className="size-3.5" />}
+                round
+                loading={deletingId === p.id}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setConfirmDelete(p);
+                }}
+              />
+            ) : null}
           </div>
         </div>
       </div>
@@ -747,6 +913,21 @@ function CustodyProductsPage() {
                 handleEdit(p);
               }}
             />
+            {canDelete ? (
+              <IconButton
+                size="sm"
+                variant="danger"
+                tooltip
+                ariaLabel={isAr ? "حذف الصنف" : "Delete item"}
+                icon={<Trash2 className="size-3.5" />}
+                round
+                loading={deletingId === p.id}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setConfirmDelete(p);
+                }}
+              />
+            ) : null}
           </div>
         </div>
       </div>
@@ -1229,6 +1410,42 @@ function CustodyProductsPage() {
                       />
                     ) : null}
                   </div>
+
+                  {/*
+                    الحذف من داخل التفاصيل: نفس المسار الآمن المستخدم في
+                    البطاقة والصف والجدول — تأكيد، ثم فحص الارتباط، ثم إلغاء
+                    التنشيط إن كان الصنف مرتبطًا بأي مستند أو عميل.
+                  */}
+                  {canDelete ? (
+                    <div className="rounded-xl border border-destructive/25 bg-destructive/[0.04] p-3">
+                      <div className="flex items-start gap-2">
+                        <Trash2 className="mt-0.5 size-4 shrink-0 text-destructive" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-bold text-foreground">
+                            {isAr ? "حذف الصنف نهائيًّا" : "Delete permanently"}
+                          </p>
+                          <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
+                            {isAr
+                              ? "يُسمح بالحذف فقط إذا لم يكن الصنف مرتبطًا بأي مستند أو عميل أو حركة مخزون. غير ذلك نعرض إلغاء التنشيط بدلًا منه."
+                              : "Allowed only when the item is not referenced by any document, customer or stock movement. Otherwise deactivation is offered instead."}
+                          </p>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="mt-2 border-destructive/40 text-destructive hover:bg-destructive/10"
+                            icon={<Trash2 className="size-3.5" />}
+                            loading={deletingId === detail.id}
+                            onClick={() => {
+                              setConfirmDelete(detail);
+                              setDetail(null);
+                            }}
+                          >
+                            {isAr ? "حذف الصنف" : "Delete item"}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               </>
             )}
@@ -1250,6 +1467,97 @@ function CustodyProductsPage() {
           defaultClass={dialogDefaultClass}
           editing={editingProduct}
         />
+
+        {/* ─── تأكيد الحذف (الخطوة الأولى فقط — الفحص في الثانية) ─── */}
+        <ConfirmDialog
+          open={confirmDelete != null}
+          onClose={() => setConfirmDelete(null)}
+          tone="danger"
+          title={isAr ? "تأكيد حذف الصنف" : "Confirm item deletion"}
+          description={
+            confirmDelete ? (
+              <>
+                {isAr
+                  ? `سيتم حذف «${confirmDelete.name_ar || confirmDelete.name}» نهائيًّا إن لم يكن مرتبطًا بأي مستند أو عميل.`
+                  : `“${confirmDelete.name || confirmDelete.name_ar}” will be deleted if it has no linked documents or customers.`}
+                <br />
+                <span className="text-caption">
+                  {isAr
+                    ? "إن كان مرتبطًا فسيُقترح إلغاء التنشيط بدلًا من الحذف."
+                    : "If it is linked, deactivation will be offered instead."}
+                </span>
+              </>
+            ) : null
+          }
+          confirmLabel={isAr ? "فحص وحذف" : "Check and delete"}
+          cancelLabel={t("common.cancel")}
+          onConfirm={() => {
+            const target = confirmDelete;
+            setConfirmDelete(null);
+            if (target) remove.mutate(target);
+          }}
+        />
+
+        {/*
+          رُفض الحذف لأن الصنف مرتبط. لا نسمح بتجاوز هذا: نعرض بالتفصيل
+          ما يمنع الحذف، ونقدّم إلغاء التنشيط كإجراء آمن يحفظ سجل العميل.
+        */}
+        <Modal
+          open={blockedDelete != null}
+          onClose={() => setBlockedDelete(null)}
+          size="md"
+          mobile="sheet"
+          title={isAr ? "لا يمكن حذف هذا الصنف" : "This item cannot be deleted"}
+          eyebrow={isAr ? "مرتبط بسجلات" : "Referenced"}
+          footer={
+            <div className="flex flex-col gap-2">
+              <Button
+                type="button"
+                variant="primary"
+                block
+                icon={<Power />}
+                onClick={() => {
+                  const target = blockedDelete?.product;
+                  if (!target) return;
+                  toggleMutation.mutate({ id: target.id, active: false });
+                  setBlockedDelete(null);
+                }}
+              >
+                {isAr ? "إلغاء التنشيط بدلًا من الحذف" : "Deactivate instead"}
+              </Button>
+              <Button type="button" variant="outline" block onClick={() => setBlockedDelete(null)}>
+                {isAr ? "إغلاق" : "Close"}
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-4">
+            <p className="text-sm leading-6 text-muted-foreground">
+              {isAr
+                ? "هذا الصنف مسجّل في عمليات سابقة (استلام أو طحن أو تسليم، أو فواتير وحركات مخزون). حذفه يمسح تاريخ العميل، لذلك يُقفل. إلغاء التنشيط يُخفي الصنف من عمليات جديدة ويُبقي كل السجلات."
+                : "This item is recorded in earlier operations (intake, milling or delivery, or invoices and stock movements). Deleting it would erase that customer history, so it is blocked. Deactivation hides it from new operations and keeps every record."}
+            </p>
+
+            <div className="rounded-[12px] border border-border/60 bg-surface-2/50 p-3">
+              <p className="mb-2 text-label text-muted-foreground">
+                {isAr ? "مرتبط بـ" : "Referenced by"}
+              </p>
+              <ul className="space-y-1.5">
+                {describeReferences(blockedDelete?.counts ?? EMPTY_COUNTS, lang).map((line) => (
+                  <li key={line} className="flex items-center gap-2 text-[13px]">
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-tone-warning-fg/70" />
+                    <span dir="auto">{line}</span>
+                  </li>
+                ))}
+                {blockedDelete && blockedDelete.counts.blockingTotal === 0 ? (
+                  <li className="text-[13px] text-muted-foreground">
+                    {isAr ? "سجلات مؤكدة مرتبطة بهذا الصنف." : "Records confirmed for this item."}
+                  </li>
+                ) : null}
+              </ul>
+            </div>
+          </div>
+        </Modal>
       </div>
     </ModuleGuard>
   );

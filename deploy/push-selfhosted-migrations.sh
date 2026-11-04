@@ -4,12 +4,46 @@ set -Eeuo pipefail
 readonly REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly STACK_DIR="$REPO_ROOT/deploy/supabase-stack"
 readonly COMPOSE_FILE="$STACK_DIR/docker-compose.yml"
-readonly OVERRIDE_FILE="$STACK_DIR/docker-compose.production.override.yaml"
 readonly ENV_FILE="$STACK_DIR/.env"
 readonly DATABASE_URL="postgresql://postgres@127.0.0.1:5433/postgres?sslmode=disable"
+MODE="public"
+if [[ "${1:-}" == "--local" ]]; then
+  MODE="local"
+  shift
+fi
+if [[ $# -ne 0 ]]; then
+  echo "Usage: bash deploy/push-selfhosted-migrations.sh [--local]" >&2
+  exit 2
+fi
+if [[ "$MODE" == "local" ]]; then
+  readonly OVERRIDE_FILE="$STACK_DIR/docker-compose.local-production.override.yaml"
+else
+  readonly OVERRIDE_FILE="$STACK_DIR/docker-compose.production.override.yaml"
+fi
+
+# Supabase tracks applied migrations by the numeric filename prefix. Fail before
+# connecting to production if a duplicate version could make the ledger ambiguous.
+declare -A migration_versions=()
+for migration_path in "$REPO_ROOT"/supabase/migrations/*.sql; do
+  migration_name="${migration_path##*/}"
+  if [[ ! "$migration_name" =~ ^([0-9]+)_[a-z0-9_]+\.sql$ ]]; then
+    echo "Invalid migration filename: $migration_name" >&2
+    exit 1
+  fi
+  migration_version="${BASH_REMATCH[1]}"
+  if [[ -n "${migration_versions[$migration_version]:-}" ]]; then
+    echo "Duplicate migration version $migration_version: ${migration_versions[$migration_version]} and $migration_name" >&2
+    exit 1
+  fi
+  migration_versions[$migration_version]="$migration_name"
+done
 
 if [[ ! -f "$ENV_FILE" || ! -f "$COMPOSE_FILE" || ! -f "$OVERRIDE_FILE" ]]; then
-  echo "Self-hosted Supabase is not prepared. Run deploy/bootstrap-self-hosted-supabase.sh on the Linux server first." >&2
+  if [[ "$MODE" == "local" ]]; then
+    echo "Local self-hosted Supabase is not prepared. Run deploy/bootstrap-self-hosted-supabase.sh --local from WSL first." >&2
+  else
+    echo "Self-hosted Supabase is not prepared. Run deploy/bootstrap-self-hosted-supabase.sh on the Linux server first." >&2
+  fi
   exit 1
 fi
 
@@ -24,7 +58,11 @@ if [[ ! "$postgres_password" =~ ^[[:xdigit:]]{32}$ ]]; then
   exit 1
 fi
 
-echo "This applies pending migrations to the self-hosted production database. It does not reset or delete database data."
+if [[ "$MODE" == "local" ]]; then
+  echo "This applies pending migrations to the local Docker production database. It does not reset or delete database data."
+else
+  echo "This applies pending migrations to the self-hosted production database. It does not reset or delete database data."
+fi
 read -r -p 'Type APPLY SELF-HOSTED MIGRATIONS to continue: ' confirmation
 if [[ "$confirmation" != "APPLY SELF-HOSTED MIGRATIONS" ]]; then
   echo "Cancelled."

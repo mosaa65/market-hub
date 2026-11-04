@@ -223,6 +223,7 @@ const EMPTY_COUNTS: ReferenceCounts = {
   stockMovements: 0,
   inventoryRows: 0,
   compatibilities: 0,
+  custodyEntries: 0,
   blockingTotal: 0,
   canDelete: false,
   hasHistory: false,

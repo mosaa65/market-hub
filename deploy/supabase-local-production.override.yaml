@@ -1,0 +1,14 @@
+services:
+  # The browser needs the API, but it must be reachable only from this PC.
+  api-gw:
+    ports: !override
+      - "127.0.0.1:8000:8000/tcp"
+
+  # Do not expose a database pooler on the host.
+  supavisor:
+    ports: !override []
+
+  # Local migration/backup access only; not available to the LAN.
+  db:
+    ports: !override
+      - "127.0.0.1:5433:5432"

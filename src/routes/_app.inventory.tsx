@@ -53,6 +53,7 @@ import { QuickFilterBar } from "@/components/ui/quick-filter-bar";
 import { usePersistedViewMode } from "@/hooks/use-persisted-view-mode";
 import { buildSearchIndex, fuzzySearch } from "@/design/fuzzy";
 import { moneyCell, qtyCell } from "@/lib/format";
+import { decomposeStock, formatDecomposed, type DecomposeUnit } from "@/lib/stock-decompose";
 import { useBreakpoint } from "@/design/breakpoints";
 import { useRealtimeTable } from "@/lib/realtime";
 import { QUERY_KEYS } from "@/lib/query-keys";
@@ -96,6 +97,7 @@ type Row = {
   item_class?: string | null;
   inventory_policy?: string | null;
   byWarehouse: Record<string, number>;
+  uoms?: DecomposeUnit[];
 };
 
 /** The shape public.stock_positions returns for one item/warehouse/owner. */
@@ -271,6 +273,31 @@ function InventoryPage() {
         // Fallback gracefully with initialized 0 quantities
       }
 
+      // 3. Fetch packaging units for stock decomposition
+      const uomsByItem: Record<string, DecomposeUnit[]> = {};
+      try {
+        const { data: uomData } = await (supabase.from("product_uoms") as any)
+          .select("product_id, unit_id, factor_to_base, unit:units!product_uoms_unit_id_fkey(name, name_ar, short_name)")
+          .in("product_id", pageIds)
+          .eq("is_active", true);
+
+        if (Array.isArray(uomData)) {
+          for (const u of uomData) {
+            if (!uomsByItem[u.product_id]) uomsByItem[u.product_id] = [];
+            const label = lang === "ar"
+              ? u.unit?.name_ar || u.unit?.name || u.unit?.short_name || ""
+              : u.unit?.name || u.unit?.name_ar || u.unit?.short_name || "";
+            uomsByItem[u.product_id].push({
+              unit_id: u.unit_id,
+              label,
+              factor_to_base: Number(u.factor_to_base),
+            });
+          }
+        }
+      } catch {
+        // Fallback gracefully without extra units
+      }
+
       const metaById = new Map<string, any>((detailRows ?? []).map((d: any) => [d.id, d]));
       const rows: Row[] = pageIds
         .map((id): Row | null => {
@@ -292,6 +319,7 @@ function InventoryPage() {
             item_class: meta.item_class ?? null,
             inventory_policy: meta.inventory_policy ?? null,
             byWarehouse: byWarehouseByItem[meta.id] ?? {},
+            uoms: uomsByItem[meta.id] ?? [],
           };
         })
         .filter((r): r is Row => Boolean(r));
@@ -371,6 +399,22 @@ function InventoryPage() {
         : s === "near"
           ? t("inventory.status.near")
           : t("inventory.status.healthy");
+
+  /** Decomposes a quantity into higher packing units if available (e.g. 5 كرتون و 3 حبة). */
+  const decomposedFor = (r: Row, qty: number) => {
+    const baseLabel =
+      (lang === "ar" ? r.unit?.name_ar || r.unit?.name : r.unit?.name || r.unit?.name_ar) ||
+      r.unit?.short_name ||
+      "";
+    const segments = r.uoms && r.uoms.length > 0 ? decomposeStock(qty, r.uoms, baseLabel) : [];
+    const hasPackaging = segments.length > 1 || (segments.length === 1 && segments[0].factor > 1);
+    return {
+      segments,
+      hasPackaging,
+      text: hasPackaging ? formatDecomposed(segments, lang === "ar" ? "ar" : "en") : null,
+      baseText: `${qtyCell(qty)} ${baseLabel}`.trim(),
+    };
+  };
 
   const barClass = (s: StockState) =>
     s === "out"
@@ -591,7 +635,7 @@ function InventoryPage() {
         header: t("inventory.on_hand"),
         align: "end",
         sortable: true,
-        width: "w-[124px]",
+        width: "w-[136px]",
         sortValue: (r) => qtyFor(r),
         cell: (r) => {
           const s = stateFor(r);
@@ -605,17 +649,32 @@ function InventoryPage() {
                   : s === "healthy"
                     ? "text-emerald-500"
                     : "text-muted-foreground";
+          const qty = qtyFor(r);
+          const decomp = decomposedFor(r, qty);
           return (
-            <span
-              className={`font-mono text-xs font-bold tabular-nums ${tone} inline-flex items-center gap-1`}
-            >
-              <span>{qtyCell(qtyFor(r))}</span>
-              {(r.unit?.name_ar || r.unit?.name || r.unit?.short_name) && (
-                <span className="text-[10px] font-normal text-muted-foreground">
-                  {r.unit.name_ar || r.unit.name || r.unit.short_name}
+            <div className="flex flex-col items-end">
+              <span
+                className={`font-mono text-xs font-bold tabular-nums ${tone} inline-flex items-center gap-1`}
+              >
+                {decomp.hasPackaging ? (
+                  <span>{decomp.text}</span>
+                ) : (
+                  <>
+                    <span>{qtyCell(qty)}</span>
+                    {(r.unit?.name_ar || r.unit?.name || r.unit?.short_name) && (
+                      <span className="text-[10px] font-normal text-muted-foreground">
+                        {r.unit.name_ar || r.unit.name || r.unit.short_name}
+                      </span>
+                    )}
+                  </>
+                )}
+              </span>
+              {decomp.hasPackaging && (
+                <span className="text-[10px] font-mono text-muted-foreground/80">
+                  ({decomp.baseText})
                 </span>
               )}
-            </span>
+            </div>
           );
         },
       },
@@ -935,28 +994,40 @@ function InventoryPage() {
                   <p className="text-[10px] font-medium text-muted-foreground">
                     {t("inventory.on_hand")}
                   </p>
-                  <div className="flex items-baseline gap-1.5">
-                    <p
-                      className={`font-mono text-lg font-bold tracking-tight ${
-                        s === "out"
-                          ? "text-red-500"
-                          : s === "low"
-                            ? "text-amber-500"
-                            : s === "near"
-                              ? "text-orange-400"
-                              : s === "healthy"
-                                ? "text-emerald-500"
-                                : "text-foreground"
-                      }`}
-                    >
-                      {qtyCell(qty)}
-                    </p>
-                    {(r.unit?.name_ar || r.unit?.name || r.unit?.short_name) && (
-                      <span className="text-xs font-semibold text-muted-foreground">
-                        {r.unit.name_ar || r.unit.name || r.unit.short_name}
-                      </span>
-                    )}
-                  </div>
+                  {(() => {
+                    const decomp = decomposedFor(r, qty);
+                    return (
+                      <div className="flex flex-col">
+                        <div className="flex items-baseline gap-1.5">
+                          <p
+                            className={`font-mono text-base font-bold tracking-tight ${
+                              s === "out"
+                                ? "text-red-500"
+                                : s === "low"
+                                  ? "text-amber-500"
+                                  : s === "near"
+                                    ? "text-orange-400"
+                                    : s === "healthy"
+                                      ? "text-emerald-500"
+                                      : "text-foreground"
+                            }`}
+                          >
+                            {decomp.hasPackaging ? decomp.text : qtyCell(qty)}
+                          </p>
+                          {!decomp.hasPackaging && (r.unit?.name_ar || r.unit?.name || r.unit?.short_name) && (
+                            <span className="text-xs font-semibold text-muted-foreground">
+                              {r.unit.name_ar || r.unit.name || r.unit.short_name}
+                            </span>
+                          )}
+                        </div>
+                        {decomp.hasPackaging && (
+                          <p className="text-[11px] font-mono text-muted-foreground">
+                            ({decomp.baseText})
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
                   {min > 0 && qty < min && (
                     <p className="text-[10px] font-mono text-red-500/80">
                       {t("inventory.diff")}: {qtyCell(min - qty)}
@@ -1061,21 +1132,33 @@ function InventoryPage() {
                   <p className="text-[10px] font-medium text-muted-foreground">
                     {t("inventory.on_hand")}
                   </p>
-                  <p
-                    className={`font-mono text-base font-bold tracking-tight sm:text-lg ${
-                      s === "out"
-                        ? "text-red-500"
-                        : s === "low"
-                          ? "text-amber-500"
-                          : s === "near"
-                            ? "text-orange-400"
-                            : s === "healthy"
-                              ? "text-emerald-500"
-                              : "text-foreground"
-                    }`}
-                  >
-                    {qtyCell(qty)}
-                  </p>
+                  {(() => {
+                    const decomp = decomposedFor(r, qty);
+                    return (
+                      <div className="flex flex-col md:items-end">
+                        <p
+                          className={`font-mono text-base font-bold tracking-tight sm:text-lg ${
+                            s === "out"
+                              ? "text-red-500"
+                              : s === "low"
+                                ? "text-amber-500"
+                                : s === "near"
+                                  ? "text-orange-400"
+                                  : s === "healthy"
+                                    ? "text-emerald-500"
+                                    : "text-foreground"
+                          }`}
+                        >
+                          {decomp.hasPackaging ? decomp.text : `${qtyCell(qty)} ${(r.unit?.name_ar || r.unit?.name || r.unit?.short_name) ?? ""}`.trim()}
+                        </p>
+                        {decomp.hasPackaging && (
+                          <p className="text-[11px] font-mono text-muted-foreground">
+                            ({decomp.baseText})
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
                   {canViewCost && min > 0 && qty < min && (
                     <p className="text-[10px] font-mono text-red-500/80">
                       {t("inventory.diff")}: {qtyCell(min - qty)}
