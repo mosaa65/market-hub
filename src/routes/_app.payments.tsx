@@ -19,6 +19,7 @@ import {
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
+import { todayKey, dateOnlyIso } from "@/lib/time/business-date";
 import { useI18n } from "@/lib/i18n";
 import { money } from "@/lib/format";
 import {
@@ -120,7 +121,9 @@ function PaymentsPage() {
   const { banks, wallets } = useCompanyBankAccounts();
   const [reference, setReference] = useState("");
   const [note, setNote] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  // التاريخ المحلي لليوم. `toISOString()` يحوّل إلى UTC فيتصحّر اليوم في اليمن
+  // (UTC+3) بين منتصف الليل والثالثة صباحًا، فيُسجّل التحصيل بتاريخ الأمس.
+  const [date, setDate] = useState(todayKey);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
   const [paymentFormOpen, setPaymentFormOpen] = useState(false);
@@ -273,13 +276,15 @@ function PaymentsPage() {
         t("payments.invalid_amount") || (lang === "ar" ? "أدخل مبلغ صحيح" : "Enter a valid amount"),
       );
     }
-    const payableAmount = selectedInvoice ? remaining : Math.max(Number(selected.balance), 0);
-    if (amt > payableAmount + 0.001) {
+    // التحقق من متبقي الفاتورة المحددة فقط؛ أما في التحصيل العام فيُقبل المبلغ كدفعة على الحساب أو دفعة مقدمة
+    if (selectedInvoice && amt > remaining + 0.001) {
       savingRef.current = false;
       setSaving(false);
       return toast.error(
         t("payments.exceeds_remaining") ||
-          (lang === "ar" ? "المبلغ يتجاوز المتبقي" : "Amount exceeds remaining"),
+          (lang === "ar"
+            ? "المبلغ يتجاوز متبقي الفاتورة المحددة"
+            : "Amount exceeds invoice remaining"),
       );
     }
     if (!isSplitCollection && needsReference && !reference.trim()) {
@@ -365,7 +370,7 @@ function PaymentsPage() {
         );
       }
       const updatedCustomer = await refresh(selected.id);
-      const updatedBalance = Math.max(Number(updatedCustomer?.balance ?? selected.balance), 0);
+      const updatedBalance = Number(updatedCustomer?.balance ?? selected.balance);
       const receiptNumber = resultPaymentId;
       const resolvedMethodLabel = settlement.bankAccountName
         ? `${pmLabel(method)} (${settlement.bankAccountName})`
@@ -643,8 +648,8 @@ function PaymentsPage() {
                         ? "تحصيل فاتورة"
                         : "Invoice collection"
                       : lang === "ar"
-                        ? "تحصيل تلقائي"
-                        : "Automatic collection"
+                        ? "تحصيل عام / دفعة مقدمة"
+                        : "General collection / Advance payment"
                   }
                   subtitle={
                     selectedInvoice
@@ -652,8 +657,8 @@ function PaymentsPage() {
                         ? `سداد الفاتورة #${selectedInvoice.invoice_number}`
                         : `Payment for invoice #${selectedInvoice.invoice_number}`
                       : lang === "ar"
-                        ? "توزيع الدفعة من الأقدم إلى الأحدث"
-                        : "Allocate payment from oldest to newest"
+                        ? "سداد الفواتير المستحقة تلقائياً وقيد الفائض كدفعة مقدمة"
+                        : "Settle due invoices and credit surplus as advance payment"
                   }
                   icon={<Wallet className="h-5 w-5" />}
                   className="border-primary/30 shadow-primary/20"
@@ -779,6 +784,7 @@ function PaymentsPage() {
                         <input
                           type="date"
                           value={date}
+                          max={todayKey()}
                           onChange={(e) => setDate(e.target.value)}
                           className="h-11 w-full rounded-xl border border-primary/20 bg-card ps-10 pe-3 text-sm focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
                         />
@@ -995,7 +1001,13 @@ function PaymentsPage() {
                             className="min-h-[56px] cursor-pointer border-b border-border/50 transition-all hover:bg-surface-2/60 hover:shadow-sm hover:outline hover:outline-1 hover:outline-border/60"
                           >
                             <td className="px-3 py-2">
-                              <VortexDateBadge date={p.payment_date} size="sm" />
+                              {/* payment_date عمود date بلا وقت: عرضه كطابع زمني
+                                  يُظهر ساعة مستنبتة وتاريخًا قد ينزاح يومًا. */}
+                              <VortexDateBadge
+                                date={dateOnlyIso(p.payment_date)}
+                                size="sm"
+                                showTime={false}
+                              />
                             </td>
                             <td className="px-3 py-2 font-mono text-xs">
                               <span className="rounded-full bg-muted/70 px-2 py-0.5 text-muted-foreground">

@@ -91,6 +91,9 @@ export function SupplierFormDialog({
   const [country, setCountry] = useState<Country>(DEFAULT_COUNTRY);
   const [phone, setPhone] = useState<string>("");
   const [saving, setSaving] = useState(false);
+  const [showAdditional, setShowAdditional] = useState(
+    Boolean(initial?.email || initial?.address),
+  );
 
   useEffect(() => {
     if (open) {
@@ -98,6 +101,7 @@ export function SupplierFormDialog({
       const parsed = parseSupplierPhone(initial?.phone);
       setCountry(parsed.country);
       setPhone(parsed.local);
+      setShowAdditional(Boolean(initial?.email || initial?.address));
     }
   }, [open, initial]);
 
@@ -252,8 +256,8 @@ export function SupplierFormDialog({
                 </label>
                 <div className="flex gap-2">
                   <CountrySelector value={country} onChange={setCountry} disabled={saving} />
-                  <div className="relative flex-1">
-                    <Phone className="pointer-events-none absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <div className="relative flex-1" dir="ltr">
+                    <Phone className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                     <input
                       type="tel"
                       dir="ltr"
@@ -262,7 +266,7 @@ export function SupplierFormDialog({
                       onChange={(e) => setPhone(e.target.value)}
                       placeholder="772217218"
                       maxLength={15}
-                      className="h-12 w-full rounded-2xl border border-border/80 bg-surface/80 px-4 ps-10 text-right text-sm font-medium transition placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      className="h-12 w-full rounded-2xl border border-border/80 bg-surface/80 px-4 pl-10 text-left font-mono text-sm font-medium transition placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                     />
                   </div>
                 </div>
@@ -273,37 +277,54 @@ export function SupplierFormDialog({
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1.5 block text-xs font-medium text-foreground">
-                    {t("common.email")}
-                  </label>
-                  <div className="relative">
-                    <Mail className="pointer-events-none absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                    <input
-                      type="email"
-                      dir="ltr"
-                      value={edit.email ?? ""}
-                      onChange={(e) => setEdit({ ...edit, email: e.target.value })}
-                      placeholder="supplier@domain.com"
-                      className="h-12 w-full rounded-2xl border border-border/80 bg-surface/80 px-4 ps-10 text-right text-sm font-medium transition placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                    />
+              {/* Optional Collapsible Section: Email and Address */}
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowAdditional(!showAdditional)}
+                  className="flex w-full items-center justify-between rounded-xl px-2 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-surface-2 hover:text-foreground transition cursor-pointer"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Sparkles className="size-3 text-primary" />
+                    {isAr ? "معلومات إضافية (البريد، العنوان)" : "Additional Information (Email, Address)"}
+                  </span>
+                  <span className="text-[11px] text-primary">{showAdditional ? (isAr ? "إخفاء ▲" : "Hide ▲") : (isAr ? "إظهار ▼" : "Show ▼")}</span>
+                </button>
+
+                {showAdditional && (
+                  <div className="mt-2.5 grid grid-cols-1 gap-3 sm:grid-cols-2 animate-in fade-in duration-200">
+                    <div>
+                      <label className="mb-1.5 block text-xs font-medium text-foreground">
+                        {t("common.email")}
+                      </label>
+                      <div className="relative" dir="ltr">
+                        <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                        <input
+                          type="email"
+                          dir="ltr"
+                          value={edit.email ?? ""}
+                          onChange={(e) => setEdit({ ...edit, email: e.target.value })}
+                          placeholder="supplier@domain.com"
+                          className="h-12 w-full rounded-2xl border border-border/80 bg-surface/80 px-4 pl-10 text-left font-mono text-sm font-medium transition placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-xs font-medium text-foreground">
+                        {isAr ? "العنوان أو المدينة" : "Address"}
+                      </label>
+                      <div className="relative">
+                        <MapPin className="pointer-events-none absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                        <input
+                          value={edit.address ?? ""}
+                          onChange={(e) => setEdit({ ...edit, address: e.target.value })}
+                          placeholder={isAr ? "المدينة، الحي، الشارع" : "City, District, Street"}
+                          className="h-12 w-full rounded-2xl border border-border/80 bg-surface/80 px-4 ps-10 text-sm font-medium transition placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        />
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-xs font-medium text-foreground">
-                    {isAr ? "العنوان أو المدينة" : "Address"}
-                  </label>
-                  <div className="relative">
-                    <MapPin className="pointer-events-none absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                    <input
-                      value={edit.address ?? ""}
-                      onChange={(e) => setEdit({ ...edit, address: e.target.value })}
-                      placeholder={isAr ? "المدينة، الحي، الشارع" : "City, District, Street"}
-                      className="h-12 w-full rounded-2xl border border-border/80 bg-surface/80 px-4 ps-10 text-sm font-medium transition placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                    />
-                  </div>
-                </div>
+                )}
               </div>
             </div>
 
@@ -338,7 +359,7 @@ export function SupplierFormDialog({
                 >
                   <span
                     className={`pointer-events-none inline-block size-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      (edit.is_active ?? true) ? "translate-x-5" : "translate-x-0"
+                      (edit.is_active ?? true) ? "ltr:translate-x-5 rtl:-translate-x-5" : "translate-x-0"
                     }`}
                   />
                 </button>

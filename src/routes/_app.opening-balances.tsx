@@ -115,6 +115,11 @@ export function OpeningBalancesPage() {
   const selected = documents.data?.find((d) => d.id === selectedId) ?? null;
   const meta = OPENING_SECTIONS.find((s) => s.value === section)!;
   const selectedItem = items.data?.find((i) => i.id === refId);
+  const itemUnit =
+    (selectedItem as any)?.unit?.name_ar ||
+    (selectedItem as any)?.unit?.name ||
+    (selectedItem as any)?.unit?.short_name ||
+    "وحدة";
 
   // تعيين المستودع الافتراضي تلقائياً
   useEffect(() => {
@@ -123,30 +128,32 @@ export function OpeningBalancesPage() {
     }
   }, [warehouses.data, warehouseId]);
 
-  // تحديث سعة الكيس التلقائية عند اختيار الصنف
+  // تحديث سعة العبوة والتكلفة عند اختيار الصنف
   useEffect(() => {
     if (selectedItem?.package_weight_kg) {
       setBagCapacityKg(String(selectedItem.package_weight_kg));
+    } else {
+      setBagCapacityKg("1");
     }
     if (selectedItem?.cost_price && !unitCost) {
       setUnitCost(String(selectedItem.cost_price));
     }
   }, [selectedItem]);
 
-  // احتساب كمية وتكلفة المخزون تلقائياً عند تغيير الأكياس
+  // احتساب كمية وتكلفة المخزون تلقائياً عند تغيير العبوات
   useEffect(() => {
     if (section !== "STOCK" || stockInputMode !== "bags") return;
     const bags = Number(bagsCount) || 0;
-    const cap = Number(bagCapacityKg) || 50;
+    const cap = Number(bagCapacityKg) || 1;
     const bCost = Number(bagCost) || 0;
 
     if (bags > 0 && cap > 0) {
-      const calculatedKg = bags * cap;
-      setQty(String(calculatedKg));
+      const calculatedQty = bags * cap;
+      setQty(String(calculatedQty));
 
       if (bCost > 0) {
-        const costPerKg = bCost / cap;
-        setUnitCost(String(roundNum(costPerKg)));
+        const costPerUnit = bCost / cap;
+        setUnitCost(String(roundNum(costPerUnit)));
         setAmount(String(roundNum(bags * bCost)));
       }
     }
@@ -297,9 +304,9 @@ export function OpeningBalancesPage() {
     if (section === "STOCK" && selectedItem) {
       const itemTitle = selectedItem.name_ar || selectedItem.name || selectedItem.sku;
       if (stockInputMode === "bags" && Number(bagsCount) > 0) {
-        desc = `مخزون افتتاحي: ${bagsCount} كيس سعة ${bagCapacityKg} كجم — ${itemTitle}`;
+        desc = `مخزون افتتاحي: ${bagsCount} عبوة سعة ${bagCapacityKg} ${itemUnit} — ${itemTitle}`;
       } else {
-        desc = `مخزون افتتاحي: ${q} كجم — ${itemTitle}`;
+        desc = `مخزون افتتاحي: ${q} ${itemUnit} — ${itemTitle}`;
       }
     } else if (section === "RECEIVABLE") {
       const c = customers.data?.find((x) => x.id === refId);
@@ -462,7 +469,7 @@ export function OpeningBalancesPage() {
                     </span>
                   </div>
 
-                  {/* تبديل نمط الإدخال: أكياس أو كجم */}
+                  {/* تبديل نمط الإدخال: عبوات أو كمية مباشرة */}
                   <div className="flex items-center rounded-xl border border-border bg-surface p-1">
                     <button
                       type="button"
@@ -474,7 +481,7 @@ export function OpeningBalancesPage() {
                           : "text-muted-foreground hover:text-foreground",
                       )}
                     >
-                      بالأكياس والسعة
+                      بالعبوات / الأكياس
                     </button>
                     <button
                       type="button"
@@ -486,7 +493,7 @@ export function OpeningBalancesPage() {
                           : "text-muted-foreground hover:text-foreground",
                       )}
                     >
-                      بالكيلوجرام مباشر
+                      بالكمية المباشرة ({itemUnit})
                     </button>
                   </div>
                 </div>
@@ -533,13 +540,13 @@ export function OpeningBalancesPage() {
                   <div className="grid grid-cols-3 gap-3">
                     <div>
                       <label className="mb-1 block text-xs font-bold text-foreground">
-                        عدد الأكياس *
+                        عدد العبوات / الأكياس *
                       </label>
                       <QuantityInput
                         min={0}
                         decimals={0}
                         placeholder="مثال: 100"
-                        aria-label="عدد الأكياس"
+                        aria-label="عدد العبوات"
                         value={toNumberOrNull(bagsCount)}
                         onValueChange={(v) => setBagsCount(v == null ? "" : String(v))}
                       />
@@ -547,14 +554,13 @@ export function OpeningBalancesPage() {
 
                     <div>
                       <label className="mb-1 block text-xs font-bold text-foreground">
-                        سعة الكيس (كجم) *
+                        سعة العبوة ({itemUnit}) *
                       </label>
                       <QuantityInput
                         min={0}
                         decimals={3}
-                        unit="kg"
-                        placeholder="50"
-                        aria-label="سعة الكيس (كجم)"
+                        placeholder="1"
+                        aria-label={`سعة العبوة (${itemUnit})`}
                         value={toNumberOrNull(bagCapacityKg)}
                         onValueChange={(v) => setBagCapacityKg(v == null ? "" : String(v))}
                       />
@@ -562,12 +568,12 @@ export function OpeningBalancesPage() {
 
                     <div>
                       <label className="mb-1 block text-xs font-bold text-foreground">
-                        تكلفة الكيس الواحد *
+                        تكلفة العبوة الواحدة *
                       </label>
                       <AmountInput
                         min={0}
                         placeholder="مثال: 22000"
-                        aria-label="تكلفة الكيس الواحد"
+                        aria-label="تكلفة العبوة الواحدة"
                         value={toNumberOrNull(bagCost)}
                         onValueChange={(v) => setBagCost(v == null ? "" : String(v))}
                         wordsClassName="text-[10px] leading-3"
@@ -578,13 +584,13 @@ export function OpeningBalancesPage() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="mb-1 block text-xs font-bold text-foreground">
-                        الوزن الإجمالي (كجم) *
+                        الكمية الإجمالية ({itemUnit}) *
                       </label>
                       <QuantityInput
                         min={0}
                         decimals={3}
                         placeholder="مثال: 5000"
-                        aria-label="الوزن الإجمالي (كجم)"
+                        aria-label={`الكمية الإجمالية (${itemUnit})`}
                         value={toNumberOrNull(qty)}
                         onValueChange={(v) =>
                           handleQtyOrCostChange(v == null ? "" : String(v), unitCost)
@@ -594,12 +600,12 @@ export function OpeningBalancesPage() {
 
                     <div>
                       <label className="mb-1 block text-xs font-bold text-foreground">
-                        تكلفة الكيلوجرام الواحد *
+                        تكلفة {itemUnit} الواحد *
                       </label>
                       <AmountInput
                         min={0}
                         placeholder="مثال: 440"
-                        aria-label="تكلفة الكيلوجرام الواحد"
+                        aria-label={`تكلفة ${itemUnit} الواحد`}
                         value={toNumberOrNull(unitCost)}
                         onValueChange={(v) =>
                           handleQtyOrCostChange(qty, v == null ? "" : String(v))
@@ -614,14 +620,14 @@ export function OpeningBalancesPage() {
                 {Number(qty) > 0 && (
                   <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface/80 p-2.5 text-xs text-muted-foreground border border-border/60">
                     <span>
-                      إجمالي الوزن المخزني:{" "}
+                      إجمالي الكمية المخزنية:{" "}
                       <strong className="text-foreground">
-                        <Mono>{qty}</Mono> كجم
+                        <Mono>{qty}</Mono> {itemUnit}
                       </strong>
                       {unitCost && (
                         <span>
                           {" "}
-                          (تكلفة الكيلو:{" "}
+                          (تكلفة الوحدة:{" "}
                           <strong className="text-foreground">
                             <Mono>{unitCost}</Mono>
                           </strong>

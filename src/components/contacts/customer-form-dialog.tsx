@@ -369,7 +369,7 @@ export function CustomerFormDialog({
                 >
                   <span
                     className={`pointer-events-none inline-block size-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      (edit.is_active ?? true) ? "translate-x-5" : "translate-x-0"
+                      (edit.is_active ?? true) ? "ltr:translate-x-5 rtl:-translate-x-5" : "translate-x-0"
                     }`}
                   />
                 </button>

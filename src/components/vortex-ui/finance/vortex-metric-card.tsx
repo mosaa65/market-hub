@@ -4,6 +4,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { useCompanyCurrency } from "@/hooks/use-company-currency";
+import { splitAmountAndCurrency, formatCount } from "@/lib/format";
 
 export interface VortexMetricCardProps {
   title?: string;
@@ -22,10 +23,19 @@ export interface VortexMetricCardProps {
     label?: string;
   };
   highlight?: boolean;
-  currency?: string;
+  /**
+   * التحكم في رمز العملة:
+   * - نص صريح: يعرض رمز العملة المحدد (مثل "ر.ي" أو "$").
+   * - false أو null: يمنع إظهار رمز العملة تماماً (للأعداد والكميات).
+   * - true: يفرض إظهار رمز العملة للشركة.
+   */
+  currency?: string | boolean | null;
+  /**
+   * نوع القيمة: "currency" (مالية) | "count" (أعداد عناصر) | "quantity" (كميات) | "percentage" | "text"
+   */
+  type?: "currency" | "count" | "quantity" | "percentage" | "text";
+  isCurrency?: boolean;
   badge?: string;
-  /** كان مستخدماً في شاشة المبيعات عبر الفرع المدموج لكن لم يكن معرَّفاً.
-   *  صنف Tailwind لا يمكن بناؤه ديناميكياً، لذا يُطبّق عبر className. */
   gradient?: string;
   className?: string;
   onClick?: () => void;
@@ -38,6 +48,42 @@ const toneStyles: Record<string, string> = {
   info: "bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20",
   default: "bg-primary/10 text-primary",
 };
+
+/** الكلمات المفتاحية الدالة على أعداد وكميات لا ترتبط بعملة */
+const COUNT_KEYWORDS = [
+  "عملاء",
+  "عميل",
+  "موردين",
+  "مورد",
+  "أصناف",
+  "صنف",
+  "منتجات",
+  "منتج",
+  "موظف",
+  "مستخدم",
+  "فواتير",
+  "تشغيل",
+  "مستودع",
+  "تصنيف",
+  "إشعارات",
+  "سجلات",
+  "حركات",
+  "customer",
+  "supplier",
+  "product",
+  "item",
+  "user",
+  "employee",
+  "invoice",
+  "batch",
+  "warehouse",
+  "category",
+  "notification",
+  "count",
+  "total customers",
+  "total suppliers",
+  "total products",
+];
 
 export function VortexMetricCard({
   title,
@@ -52,8 +98,9 @@ export function VortexMetricCard({
   trend,
   highlight = false,
   currency,
+  type,
+  isCurrency,
   badge,
-  // مقبول للتوافق مع الشاشات القديمة؛视觉效果 يمر عبر tone/variant.
   gradient: _gradient,
   className,
   onClick,
@@ -65,6 +112,54 @@ export function VortexMetricCard({
   const appliedTone = tone ?? variant;
   const resolvedIconClass =
     iconClassName || (appliedTone && toneStyles[appliedTone]) || "bg-primary/10 text-primary";
+
+  // استنتاج هل القيمة مالية أم عددية
+  const shouldShowCurrency = (() => {
+    if (currency === false || currency === null || currency === "") return false;
+    if (isCurrency === false) return false;
+    if (type === "count" || type === "quantity" || type === "percentage" || type === "text") return false;
+    if (typeof currency === "string" && currency.length > 0) return true;
+    if (isCurrency === true || type === "currency") return true;
+
+    // فحص تلقائي بناءً على العنوان إذا كان مجهولاً
+    const lowerTitle = displayTitle.toLowerCase();
+    const isCountByTitle = COUNT_KEYWORDS.some((kw) => lowerTitle.includes(kw));
+    if (isCountByTitle && typeof value === "number") {
+      return false;
+    }
+
+    // إذا كانت القيمة نصاً يحتوي على رمز العملة
+    if (typeof value === "string" && /(?:ر\.?ي|YER|USD|\$|ريال|SAR|EUR)/i.test(value)) {
+      return true;
+    }
+
+    // افتراضياً للأرقام البحتة غير المعرفة بنوع مالي: لا نعرض عملة إن كانت عنواناً دالاً على عدد
+    return !isCountByTitle;
+  })();
+
+  // استخراج القيمة ورمز العملة لمنع التكرار (مثلاً "100 ر.ي ر.ي")
+  let displayValue: string;
+  let finalCurrencySymbol: string | null = null;
+
+  if (typeof value === "number") {
+    if (!shouldShowCurrency) {
+      displayValue = formatCount(value);
+      finalCurrencySymbol = null;
+    } else {
+      displayValue = value.toLocaleString("ar-YE");
+      finalCurrencySymbol = typeof currency === "string" ? currency : currencySymbol;
+    }
+  } else {
+    // قيمة نصية: فحص ما إذا كانت تحتوي بالفعل على رمز العملة
+    const parsed = splitAmountAndCurrency(value, typeof currency === "string" ? currency : currencySymbol);
+    if (!shouldShowCurrency) {
+      displayValue = parsed.amount;
+      finalCurrencySymbol = null;
+    } else {
+      displayValue = parsed.amount;
+      finalCurrencySymbol = parsed.currency || (typeof currency === "string" ? currency : currencySymbol);
+    }
+  }
 
   return (
     <div
@@ -94,11 +189,11 @@ export function VortexMetricCard({
           </div>
           <div className="flex items-baseline gap-1 pt-0.5">
             <span className="text-base sm:text-2xl font-black tracking-tight text-foreground font-mono truncate">
-              {typeof value === "number" ? value.toLocaleString("ar-YE") : value}
+              {displayValue}
             </span>
-            {(currency ?? currencySymbol) && (
+            {finalCurrencySymbol && (
               <span className="text-[10px] sm:text-xs font-bold text-muted-foreground shrink-0">
-                {currency ?? currencySymbol}
+                {finalCurrencySymbol}
               </span>
             )}
           </div>

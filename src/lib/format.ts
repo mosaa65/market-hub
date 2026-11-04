@@ -52,6 +52,89 @@ export function num(n: number, locale = "en-US") {
 }
 
 /**
+ * دالة مركزية لتنسيق الأعداد الصحيحة والإحصائيات (أعداد العملاء، الموردين، الفواتير، الموظفين).
+ * لا تضع رمز العملة أبداً.
+ * مثال: 1520 → "1,520"
+ */
+export function formatCount(n: number | string | null | undefined, locale = "en-US"): string {
+  const value = typeof n === "string" ? Number(n) : n;
+  if (value == null || !Number.isFinite(value)) return "0";
+  return toSystemDigits(
+    new Intl.NumberFormat(locale, { maximumFractionDigits: 0, useGrouping: true }).format(value),
+  );
+}
+
+/**
+ * دالة مركزية لتنسيق كميات الأصناف والمخزون.
+ * لا تضع رمز عملة، وتدعم إلحاق اسم الوحدة (كيس، كرتون، قطعة).
+ * تزيل الأصفار الزائدة بعد الفاصلة في حال كان الرقم صحيحاً.
+ */
+export function formatQuantity(
+  n: number | string | null | undefined,
+  unit?: string | null,
+  options?: { maxDecimals?: number; locale?: string },
+): string {
+  const value = typeof n === "string" ? Number(n) : n;
+  if (value == null || !Number.isFinite(value)) return "0" + (unit ? ` ${unit}` : "");
+  const maxDecimals = options?.maxDecimals ?? (Number.isInteger(value) ? 0 : 3);
+  const locale = options?.locale ?? "en-US";
+  const formatted = new Intl.NumberFormat(locale, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: maxDecimals,
+    useGrouping: true,
+  }).format(value);
+  const result = toSystemDigits(formatted);
+  return unit ? `${result} ${unit}` : result;
+}
+
+/**
+ * دالة مركزية لتنسيق النسب المئوية.
+ * مثال: 15.5 → "15.5%"
+ */
+export function formatPercent(
+  n: number | string | null | undefined,
+  decimals = 1,
+  locale = "en-US",
+): string {
+  const value = typeof n === "string" ? Number(n) : n;
+  if (value == null || !Number.isFinite(value)) return "0%";
+  const formatted = new Intl.NumberFormat(locale, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: decimals,
+  }).format(value);
+  return `${toSystemDigits(formatted)}%`;
+}
+
+/**
+ * يفصل القيمة الرقمية عن رمز العملة إن كان الرمز مدمجاً مسبقاً داخل النص.
+ * يمنع تكرار الرمز في بطاقات الملخصات.
+ */
+export function splitAmountAndCurrency(
+  input: string | number,
+  fallbackCurrency?: string,
+): { amount: string; currency: string | null } {
+  if (typeof input === "number") {
+    return {
+      amount: new Intl.NumberFormat("en-US", {
+        minimumFractionDigits: Number.isInteger(input) ? 0 : 2,
+        maximumFractionDigits: 2,
+        useGrouping: true,
+      }).format(input),
+      currency: fallbackCurrency || null,
+    };
+  }
+  const str = String(input).trim();
+  // Match common currency words/symbols: ر.ي, YER, USD, $, ريال, etc.
+  const currencyMatch = str.match(/(?:ر\.?ي|YER|USD|\$|ريال|SAR|EUR)/i);
+  if (currencyMatch) {
+    const symbol = currencyMatch[0];
+    const cleaned = str.replace(symbol, "").trim();
+    return { amount: cleaned, currency: symbol };
+  }
+  return { amount: str, currency: fallbackCurrency || null };
+}
+
+/**
  * Money for dense table cells: always grouped with thousands separators, always
  * two decimals, no currency symbol (the column header carries the unit).
  *

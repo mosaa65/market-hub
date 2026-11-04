@@ -219,6 +219,7 @@ export function MillingEmpty({ title, hint }: { title: string; hint?: string }) 
 }
 
 export function QueryErrorGuard({ error }: { error: unknown }) {
+  if (!error) return null;
   const message = error instanceof Error ? error.message : String(error);
   return (
     <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-600 dark:text-rose-300">

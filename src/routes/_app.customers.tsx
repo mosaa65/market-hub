@@ -895,27 +895,32 @@ function CustomersPage() {
         <VortexMetricCard
           title={lang === "ar" ? "إجمالي العملاء" : "Total Customers"}
           value={rows.length}
+          type="count"
+          currency=""
           subtitle={`${activeCount} ${lang === "ar" ? "عميل نشط" : "active"}`}
           icon={<Users className="size-4 text-primary" />}
           tone="default"
         />
         <VortexMetricCard
           title={lang === "ar" ? "المبالغ عليهم (ديون)" : "Receivables (Owed)"}
-          value={money(totalOwed)}
+          value={totalOwed}
+          type="currency"
           subtitle={`${debtCount} ${lang === "ar" ? "عميل عليه مبالغ" : "with debt"}`}
           icon={<Wallet className="size-4 text-amber-500" />}
           tone="warning"
         />
         <VortexMetricCard
           title={lang === "ar" ? "المبالغ لهم (رصيد دائن)" : "Credits (Advance)"}
-          value={money(totalCredit)}
+          value={totalCredit}
+          type="currency"
           subtitle={lang === "ar" ? "أرصدة مدفوعة مقدماً" : "prepaid credits"}
           icon={<CreditCard className="size-4 text-emerald-500" />}
           tone="success"
         />
         <VortexMetricCard
           title={lang === "ar" ? "صافي المستحقات" : "Net Receivables"}
-          value={money(totalOwed - totalCredit)}
+          value={totalOwed - totalCredit}
+          type="currency"
           subtitle={lang === "ar" ? "الرصيد الصافي للدفتر" : "Net ledger position"}
           icon={<DollarSign className="size-4 text-sky-500" />}
           tone={totalOwed - totalCredit >= 0 ? "warning" : "success"}
@@ -1118,10 +1123,10 @@ function CustomersPage() {
               </div>
 
               {/* Balance & Actions Section */}
-              <div className="mt-4 pt-3 border-t border-border/50 flex items-center justify-between">
+              <div className="mt-3.5 pt-3 border-t border-border/60 flex items-center justify-between gap-2">
                 {/* Financial Balance Status */}
-                <div>
-                  <span className="block text-[10px] text-muted-foreground">
+                <div className="min-w-0 flex-1 truncate">
+                  <span className="block text-[10px] text-muted-foreground truncate">
                     {bal > 0
                       ? lang === "ar"
                         ? "الرصيد المستحق (عليه)"
@@ -1135,7 +1140,7 @@ function CustomersPage() {
                           : "Current Balance"}
                   </span>
                   <span
-                    className={`font-mono text-base font-bold tracking-tight ${
+                    className={`font-mono text-sm sm:text-base font-bold tracking-tight truncate block ${
                       bal > 0
                         ? "text-amber-400"
                         : bal < 0
@@ -1147,8 +1152,8 @@ function CustomersPage() {
                   </span>
                 </div>
 
-                {/* Action Buttons */}
-                <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                {/* Action Buttons Row */}
+                <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                   {/* Communication Actions Menu */}
                   <CustomerCommunicationMenu
                     customer={{
@@ -1168,7 +1173,7 @@ function CustomersPage() {
                         title={
                           lang === "ar" ? "إجراءات المراسلة والتواصل" : "Communication options"
                         }
-                        className={`grid size-8 place-items-center rounded-full border transition active:scale-95 ${
+                        className={`grid size-7 sm:size-7.5 place-items-center rounded-xl border transition active:scale-95 ${
                           r.phone
                             ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border-emerald-500/20"
                             : "bg-muted/40 text-muted-foreground/50 border-border/60"
@@ -1184,10 +1189,9 @@ function CustomersPage() {
                     <button
                       onClick={() => goPayment(r)}
                       title={lang === "ar" ? "تحصيل دفعة (F3)" : "Collect payment (F3)"}
-                      className="flex h-8 items-center gap-1 rounded-full bg-primary/10 hover:bg-primary hover:text-primary-foreground border border-primary/20 px-2.5 text-[11px] font-bold text-primary transition active:scale-95"
+                      className="grid size-7 sm:size-7.5 place-items-center rounded-xl bg-primary/10 hover:bg-primary hover:text-primary-foreground border border-primary/20 text-primary transition active:scale-95"
                     >
-                      <Wallet className="size-3" />
-                      <span>{lang === "ar" ? "تحصيل" : "Pay"}</span>
+                      <Wallet className="size-3.5" />
                     </button>
                   )}
 
@@ -1195,7 +1199,7 @@ function CustomersPage() {
                   <button
                     onClick={() => goStatement(r)}
                     title={lang === "ar" ? "كشف حساب (F5)" : "Statement (F5)"}
-                    className="grid size-8 place-items-center rounded-full bg-surface-2 hover:bg-surface-3 border border-border text-muted-foreground hover:text-foreground transition active:scale-95"
+                    className="grid size-7 sm:size-7.5 place-items-center rounded-xl bg-surface-2 hover:bg-surface-3 border border-border text-muted-foreground hover:text-foreground transition active:scale-95"
                   >
                     <FileText className="size-3.5" />
                   </button>
@@ -1208,7 +1212,7 @@ function CustomersPage() {
                           ? "حساب نظامي رسمي (نقدي) — محمي من التعديل والحذف"
                           : "Official system entity (Cash) — protected"
                       }
-                      className="grid size-8 place-items-center rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                      className="grid size-7 sm:size-7.5 place-items-center rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
                     >
                       <Lock className="size-3.5" />
                     </span>
@@ -1216,7 +1220,7 @@ function CustomersPage() {
                     <button
                       onClick={() => setEdit(r)}
                       title={lang === "ar" ? "تعديل (F2)" : "Edit (F2)"}
-                      className="grid size-8 place-items-center rounded-full bg-surface-2 hover:bg-surface-3 border border-border text-muted-foreground hover:text-foreground transition active:scale-95"
+                      className="grid size-7 sm:size-7.5 place-items-center rounded-xl bg-surface-2 hover:bg-surface-3 border border-border text-muted-foreground hover:text-foreground transition active:scale-95"
                     >
                       <Pencil className="size-3.5" />
                     </button>
