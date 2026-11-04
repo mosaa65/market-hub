@@ -54,7 +54,6 @@ import type { DataTableColumn, DataTableSort } from "@/components/ui/data-table"
 import { VortexMetricCard } from "@/components/vortex-ui";
 import { RecordsSkeleton } from "@/components/ui/records-states";
 import { LuxuryPrintPreviewModal } from "@/components/luxury-print-preview-modal";
-import { UnifiedPrintModal } from "@/components/milling/unified-print-modal";
 import { DocumentShareDialog } from "@/components/communication/document-share-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -1049,14 +1048,21 @@ export function CustomerCustodyPageBase({ mode }: { mode: CustodyMode }) {
 
         {/* نافذة الطباعة الفاخرة الموحدة لسندات وفواتير المطحنة */}
         {printDoc && (
-          <UnifiedPrintModal
+          <LuxuryPrintPreviewModal
             open={printModalOpen}
             onClose={() => {
               setPrintModalOpen(false);
               setPrintDoc(null);
             }}
             doc={printDoc}
-            stage={printDoc.docType === "delivery_note" ? "delivery" : "intake"}
+            documentType={printDoc.docType === "delivery_note" ? "delivery_note" : "mill_document"}
+            title={
+              printDoc.docType === "delivery_note"
+                ? "معاينة وطباعة سند تسليم نواتج الأمانة"
+                : "معاينة وطباعة سند استلام أمانة وفاتورة أجور"
+            }
+            customerName={printDoc.partyName || undefined}
+            customerPhone={printDoc.partyPhone || undefined}
           />
         )}
 

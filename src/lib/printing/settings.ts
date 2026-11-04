@@ -62,7 +62,7 @@ const DEFAULT_DOCUMENT_OVERRIDES: UnifiedPrintSettings["overrides"] = {
     method: "browser",
   },
   delivery_note: {
-    templateId: "thermal-milling",
+    templateId: "milling-thermal",
     theme: "standard",
     paperId: "thermal-80",
     method: "thermal",
@@ -86,13 +86,13 @@ const DEFAULT_DOCUMENT_OVERRIDES: UnifiedPrintSettings["overrides"] = {
     method: "browser",
   },
   mill_document: {
-    templateId: "thermal-milling",
+    templateId: "milling-thermal",
     theme: "standard",
     paperId: "thermal-80",
     method: "thermal",
   },
   daily_ticket: {
-    templateId: "thermal-milling",
+    templateId: "milling-thermal",
     theme: "standard",
     paperId: "thermal-80",
     method: "thermal",

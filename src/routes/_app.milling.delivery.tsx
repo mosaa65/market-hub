@@ -35,7 +35,8 @@ import {
   type CustodyLine,
   type CustodyBalance,
 } from "@/lib/milling";
-import { UnifiedPrintModal } from "@/components/milling/unified-print-modal";
+import { LuxuryPrintPreviewModal } from "@/components/luxury-print-preview-modal";
+import { getUnifiedPrintSettings, printUnifiedDocument, type PrintRequest } from "@/lib/printing";
 import { MillingDocumentsBoard } from "@/components/milling/milling-documents-board";
 import type { UnifiedDocumentData } from "@/lib/templates/types";
 import {
@@ -284,7 +285,25 @@ function MillingDeliveryPage() {
       });
 
       setDeliveryPrintDoc(uDoc);
-      setIsPrintModalOpen(true);
+
+      const printSettings = getUnifiedPrintSettings();
+      const printOverride = printSettings.overrides.delivery_note;
+      const printBehavior = printOverride?.behavior ?? printSettings.behavior;
+
+      const printRequest: PrintRequest = {
+        documentType: "delivery_note",
+        rtl: true,
+        templateId: printOverride?.templateId || "milling-thermal",
+        paperId: printOverride?.paperId || "thermal-80",
+        method: printOverride?.method || "thermal",
+        doc: uDoc,
+      };
+
+      if (printBehavior === "direct" || (printBehavior === "default" && !printSettings.preview)) {
+        void printUnifiedDocument(printRequest);
+      } else if (printBehavior !== "off") {
+        setIsPrintModalOpen(true);
+      }
 
       // تفريغ النموذج
       setLines([{ itemId: "", bags: 0, kg: 0 }]);
@@ -577,14 +596,17 @@ function MillingDeliveryPage() {
 
         {/* نافذة المعاينة والطباعة الفاخرة المعتمدة لسند التسليم الموحد */}
         {deliveryPrintDoc && (
-          <UnifiedPrintModal
+          <LuxuryPrintPreviewModal
             open={isPrintModalOpen}
             onClose={() => {
               setIsPrintModalOpen(false);
               setDeliveryPrintDoc(null);
             }}
             doc={deliveryPrintDoc}
-            stage="delivery"
+            documentType="delivery_note"
+            title="معاينة وطباعة سند تسليم نواتج الأمانة"
+            customerName={selectedCustomer?.name || undefined}
+            customerPhone={selectedCustomer?.phone || undefined}
           />
         )}
 

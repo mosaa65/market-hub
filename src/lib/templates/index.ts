@@ -67,6 +67,7 @@ export function getTemplateRenderer(
     if (id === "standard" || id === "elegant" || id === "unified-modern")
       return renderInventoryStandardTemplate;
   }
+  if (id === "milling-thermal") return renderMillingThermalTemplate;
   if (id === "thermal-milling") return renderThermalMillingTemplate;
   if (id === "thermal-qr") return renderThermalQrTemplate;
   if (id === "milling-clean") return renderMillingCleanTemplate;
@@ -240,6 +241,19 @@ registerTemplate(
     supportedDocTypes: ALL_SUPPORTED_DOC_TYPES,
   },
   renderMillingCleanTemplate,
+);
+
+registerTemplate(
+  {
+    id: "milling-thermal",
+    nameAr: "قالب سندات وتذاكر المطحنة الحراري",
+    nameEn: "Milling Service Thermal Receipt",
+    category: "thermal",
+    paperSize: "80mm",
+    supportedPaperProfiles: ["thermal-80", "thermal-58"],
+    supportedDocTypes: ALL_SUPPORTED_DOC_TYPES,
+  },
+  renderMillingThermalTemplate,
 );
 
 registerTemplate(
