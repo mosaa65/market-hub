@@ -207,9 +207,17 @@ export interface ProductionExpenseInput {
 
 export interface ProductionLossInput {
   loss_type: "NORMAL" | "ABNORMAL";
+  /** الكمية بوحدة الكتلة المختارة (مسار الكتلة). */
   quantity: number;
-  uom_id: string;
+  uom_id?: string | null;
   reason: string;
+  /**
+   * فاقد عددي بوحدة الصنف (كيس تالف مثلاً). عند إرساله تُحوَّل الكمية إلى
+   * وحدة أساس الصنف في الخادم، ويُحسب مكافئ الكتلة من وزن العبوة أو وحدة
+   * الكتلة. mass_kg اختياري عندما لا يعرف الصنف مكافئاً كتلياً.
+   */
+  product_id?: string | null;
+  mass_kg?: number | null;
 }
 
 export async function createAndPostProductionOrder(input: {
@@ -243,4 +251,123 @@ export async function reverseProductionOrder(orderId: string, reason: string): P
   });
   if (error) throw error;
   return data as string;
+}
+
+/* ── تفاصيل تكلفة الأمر ─────────────────────────────────────────────────────
+   تُقرأ من production_order_cost_detail (9917) لا من حساب في الواجهة، حتى
+   تبقى الواجهة والمحرك على مصدر واحد للتكلفة. */
+export interface ProductionCostMaterial {
+  id: string;
+  product_id: string;
+  product_name: string | null;
+  entered_quantity: number;
+  entered_uom: string | null;
+  base_quantity: number;
+  base_uom: string | null;
+  uom_conversion_factor: number;
+  mass_kg: number | null;
+  unit_cost: number;
+  total_cost: number;
+  inventory_account_code: string;
+  stock_movement_id: string | null;
+  batches: { batch_id: string; batch_number: string; base_quantity: number }[];
+}
+
+export interface ProductionCostSource {
+  id: string;
+  expense_line_id: string;
+  expense_entry_id: string;
+  reference: string | null;
+  expense_date: string;
+  category: string | null;
+  expense_account_code: string;
+  amount: number;
+  allocation_basis: string;
+  note: string | null;
+  journal_entry_id: string | null;
+}
+
+export interface ProductionCostOutput {
+  id: string;
+  product_id: string;
+  product_name: string | null;
+  item_class: string | null;
+  entered_quantity: number;
+  entered_uom: string | null;
+  base_quantity: number;
+  base_uom: string | null;
+  mass_kg: number | null;
+  allocation_value_per_base: number;
+  allocation_weight: number;
+  allocated_cost: number;
+  actual_stock_cost: number;
+  unit_cost: number;
+  inventory_account_code: string;
+  batch_id: string | null;
+  batch_number: string | null;
+  expiry_date: string | null;
+  stock_movement_id: string | null;
+}
+
+export interface ProductionCostLoss {
+  id: string;
+  loss_type: "NORMAL" | "ABNORMAL";
+  quantity: number;
+  uom: string | null;
+  mass_kg: number;
+  reason: string;
+  charged_cost: number;
+}
+
+export interface ProductionCostJournal {
+  id: string;
+  entry_number: string;
+  entry_date: string;
+  memo: string;
+  source_type: string;
+  status: string;
+}
+
+export interface ProductionExcludedExpense {
+  expense_line_id: string;
+  expense_entry_id: string;
+  reference: string | null;
+  expense_date: string;
+  category: string | null;
+  net_amount: number;
+  tax_amount: number;
+  tax_recoverable: boolean;
+  cost_center_matches: boolean;
+  category_eligible: boolean;
+  reason: string | null;
+}
+
+export interface ProductionOrderCostDetail {
+  order: ProductionOrderSummary & {
+    warehouse_id: string;
+    cost_center_id: string;
+  };
+  materials: ProductionCostMaterial[];
+  cost_sources: ProductionCostSource[];
+  outputs: ProductionCostOutput[];
+  losses: ProductionCostLoss[];
+  journals: ProductionCostJournal[];
+  excluded_expenses: ProductionExcludedExpense[];
+  summary: {
+    wip_debit: number;
+    wip_credit: number;
+    conversion_from_expenses: number;
+    unallocated_conversion: number;
+    allocation_basis: string;
+  };
+}
+
+export async function loadProductionOrderCostDetail(
+  orderId: string,
+): Promise<ProductionOrderCostDetail> {
+  const { data, error } = await db.rpc("production_order_cost_detail", {
+    p_order_id: orderId,
+  });
+  if (error) throw error;
+  return data as ProductionOrderCostDetail;
 }

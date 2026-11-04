@@ -239,7 +239,7 @@ export function CompanyProductionPage() {
         .map((line) => ({
           loss_type: line.type,
           quantity: Number(line.quantity),
-          uom_id: line.uomId,
+          uom_id: line.uomId || null,
           reason: line.reason.trim(),
         }));
 
@@ -498,9 +498,7 @@ export function CompanyProductionPage() {
                   </MillingField>
                   <MillingField label="الكمية المدخلة">
                     <MillingInput
-                      type="number"
-                      min="0"
-                      step="0.001"
+                      inputMode="decimal"
                       value={line.quantity}
                       onChange={(event) => updateMaterial(index, { quantity: event.target.value })}
                     />
@@ -604,9 +602,7 @@ export function CompanyProductionPage() {
                   </MillingField>
                   <MillingField label="الكمية الناتجة">
                     <MillingInput
-                      type="number"
-                      min="0"
-                      step="0.001"
+                      inputMode="decimal"
                       value={line.quantity}
                       onChange={(event) => updateOutput(index, { quantity: event.target.value })}
                     />
@@ -633,9 +629,7 @@ export function CompanyProductionPage() {
                     }
                   >
                     <MillingInput
-                      type="number"
-                      min="0"
-                      step="0.0001"
+                      inputMode="decimal"
                       value={line.allocationValue}
                       onChange={(event) =>
                         updateOutput(index, { allocationValue: event.target.value })
@@ -779,15 +773,16 @@ export function CompanyProductionPage() {
                     </MillingSelect>
                     {source && (
                       <span className="mt-1 block text-[11px] text-muted-foreground">
-                        {source.description} · صافي البند {fmtNum(Number(source.net_amount))}
+                        {`${source.description} · صافي البند ${fmtNum(Number(source.net_amount))} · المتاح ${fmtNum(Number(source.available_amount))}`}
+                        {Number(source.allocated_amount) > 0
+                          ? ` · محمّل سابقاً ${fmtNum(Number(source.allocated_amount))}`
+                          : ""}
                       </span>
                     )}
                   </MillingField>
                   <MillingField label="المبلغ المحمل">
                     <MillingInput
-                      type="number"
-                      min="0"
-                      step="0.01"
+                      inputMode="decimal"
                       max={source?.available_amount}
                       value={line.amount}
                       onChange={(event) =>
@@ -889,9 +884,7 @@ export function CompanyProductionPage() {
                   </MillingField>
                   <MillingField label="الكمية">
                     <MillingInput
-                      type="number"
-                      min="0"
-                      step="0.001"
+                      inputMode="decimal"
                       value={line.quantity}
                       onChange={(event) =>
                         setLosses((current) =>

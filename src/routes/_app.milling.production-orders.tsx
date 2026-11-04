@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, ClipboardList, Plus, RotateCcw, Search } from "lucide-react";
+import { ArrowRight, Calculator, ClipboardList, Plus, RotateCcw, Search } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { ModuleGuard } from "@/lib/modules";
 import { useAuth } from "@/lib/auth";
 import { MillingPanel } from "@/components/milling/milling-ui";
+import { ProductionCostDetailDrawer } from "@/components/production/production-cost-detail-drawer";
 import {
   loadProductionOrderHistory,
   reverseProductionOrder,
@@ -23,6 +24,8 @@ function ProductionOrderHistoryPage() {
   const queryClient = useQueryClient();
   const { hasRole } = useAuth();
   const [search, setSearch] = useState("");
+  /** التشغيلة المعروض تفاصيل تكلفتها (نافذة مستقلة عن عكس الأمر). */
+  const [costOrder, setCostOrder] = useState<ProductionOrderSummary | null>(null);
   const query = useQuery({
     queryKey: ["company-production-order-history"],
     queryFn: loadProductionOrderHistory,
@@ -145,6 +148,7 @@ function ProductionOrderHistoryPage() {
                     <th className="p-3">تكاليف التحويل</th>
                     <th className="p-3">إجمالي التكلفة</th>
                     <th className="p-3">تكلفة النواتج</th>
+                    <th className="p-3">التفاصيل</th>
                     {canReverse && <th className="p-3">الإجراء</th>}
                   </tr>
                 </thead>
@@ -171,6 +175,17 @@ function ProductionOrderHistoryPage() {
                       <td className="p-3 tabular-nums">{money(order.conversion_cost)}</td>
                       <td className="p-3 font-bold tabular-nums">{money(order.total_cost)}</td>
                       <td className="p-3 tabular-nums">{money(order.output_cost)}</td>
+                      <td className="p-3">
+                        <button
+                          type="button"
+                          title="تفاصيل التكلفة ومصادرها"
+                          aria-label={`تفاصيل تكلفة التشغيلة ${order.order_number}`}
+                          onClick={() => setCostOrder(order)}
+                          className="inline-flex size-8 items-center justify-center rounded-full text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                        >
+                          <Calculator className="size-4" />
+                        </button>
+                      </td>
                       {canReverse && (
                         <td className="p-3">
                           {order.status === "POSTED" && (
@@ -202,6 +217,14 @@ function ProductionOrderHistoryPage() {
             يعرض آخر {query.data?.orders.length ?? 0} تشغيلة. تظهر تكلفة المنتج في بطاقة حركة المخزون وتتبع البيع.
           </div>
         </MillingPanel>
+
+        <ProductionCostDetailDrawer
+          order={costOrder}
+          open={Boolean(costOrder)}
+          onOpenChange={(open) => {
+            if (!open) setCostOrder(null);
+          }}
+        />
       </div>
     </ModuleGuard>
   );

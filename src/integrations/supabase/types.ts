@@ -2342,8 +2342,17 @@ export type Database = {
           _grain_qty: number;
           _outputs: Json;
           _notes: string;
+          _grain_uom_id?: string | null;
         };
         Returns: string;
+      };
+      production_order_cost_detail: {
+        Args: { p_order_id: string };
+        Returns: Json;
+      };
+      production_order_cost_check: {
+        Args: { p_order_id: string };
+        Returns: Json;
       };
       create_and_post_production_order: {
         Args: {
