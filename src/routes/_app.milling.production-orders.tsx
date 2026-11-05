@@ -43,11 +43,16 @@ function ProductionOrderHistoryPage() {
       ]);
     },
     onError: (error) =>
-      toast.error(translateRpcError(error, "ar", "تعذر عكس التشغيلة. قد تكون لها حركات مخزون لاحقة.")),
+      toast.error(
+        translateRpcError(error, "ar", "تعذر عكس التشغيلة. قد تكون لها حركات مخزون لاحقة."),
+      ),
   });
 
   const centersById = useMemo(
-    () => new Map((query.data?.centers ?? []).map((center) => [center.id, center.name_ar || center.name])),
+    () =>
+      new Map(
+        (query.data?.centers ?? []).map((center) => [center.id, center.name_ar || center.name]),
+      ),
     [query.data?.centers],
   );
   const visibleOrders = useMemo(() => {
@@ -98,7 +103,8 @@ function ProductionOrderHistoryPage() {
               <div>
                 <h2 className="text-sm font-bold">سجل الإنتاج</h2>
                 <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                  عكس التشغيلة ينشئ قيوداً عكسية ويرد المواد إذا لم توجد حركات لاحقة على الأصناف أو الدفعات.
+                  عكس التشغيلة ينشئ قيوداً عكسية ويرد المواد إذا لم توجد حركات لاحقة على الأصناف أو
+                  الدفعات.
                 </p>
               </div>
             </div>
@@ -115,7 +121,9 @@ function ProductionOrderHistoryPage() {
           </div>
 
           {query.isLoading ? (
-            <div className="p-10 text-center text-sm text-muted-foreground">جارٍ تحميل سجل الإنتاج…</div>
+            <div className="p-10 text-center text-sm text-muted-foreground">
+              جارٍ تحميل سجل الإنتاج…
+            </div>
           ) : query.error ? (
             <div className="m-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
               تعذر تحميل التشغيلات. {String(query.error)}
@@ -195,7 +203,9 @@ function ProductionOrderHistoryPage() {
                               title="عكس التشغيلة قبل الحركات اللاحقة"
                               aria-label={`عكس تشغيلة الإنتاج ${order.order_number}`}
                               onClick={() => {
-                                const reason = window.prompt(`سبب عكس تشغيلة الإنتاج ${order.order_number}`);
+                                const reason = window.prompt(
+                                  `سبب عكس تشغيلة الإنتاج ${order.order_number}`,
+                                );
                                 if (reason?.trim()) {
                                   reversal.mutate({ orderId: order.id, reason: reason.trim() });
                                 }
@@ -214,7 +224,8 @@ function ProductionOrderHistoryPage() {
             </div>
           )}
           <div className="border-t border-border/60 p-3 text-[11px] text-muted-foreground">
-            يعرض آخر {query.data?.orders.length ?? 0} تشغيلة. تظهر تكلفة المنتج في بطاقة حركة المخزون وتتبع البيع.
+            يعرض آخر {query.data?.orders.length ?? 0} تشغيلة. تظهر تكلفة المنتج في بطاقة حركة
+            المخزون وتتبع البيع.
           </div>
         </MillingPanel>
 

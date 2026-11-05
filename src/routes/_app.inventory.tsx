@@ -270,16 +270,19 @@ function InventoryPage() {
       const uomsByItem: Record<string, DecomposeUnit[]> = {};
       try {
         const { data: uomData } = await (supabase.from("product_uoms") as any)
-          .select("product_id, unit_id, factor_to_base, unit:units!product_uoms_unit_id_fkey(name, name_ar, short_name)")
+          .select(
+            "product_id, unit_id, factor_to_base, unit:units!product_uoms_unit_id_fkey(name, name_ar, short_name)",
+          )
           .in("product_id", pageIds)
           .eq("is_active", true);
 
         if (Array.isArray(uomData)) {
           for (const u of uomData) {
             if (!uomsByItem[u.product_id]) uomsByItem[u.product_id] = [];
-            const label = lang === "ar"
-              ? u.unit?.name_ar || u.unit?.name || u.unit?.short_name || ""
-              : u.unit?.name || u.unit?.name_ar || u.unit?.short_name || "";
+            const label =
+              lang === "ar"
+                ? u.unit?.name_ar || u.unit?.name || u.unit?.short_name || ""
+                : u.unit?.name || u.unit?.name_ar || u.unit?.short_name || "";
             uomsByItem[u.product_id].push({
               unit_id: u.unit_id,
               label,
@@ -976,11 +979,12 @@ function InventoryPage() {
                           >
                             {decomp.hasPackaging ? decomp.text : qtyCell(qty)}
                           </p>
-                          {!decomp.hasPackaging && (r.unit?.name_ar || r.unit?.name || r.unit?.short_name) && (
-                            <span className="text-xs font-semibold text-muted-foreground">
-                              {r.unit.name_ar || r.unit.name || r.unit.short_name}
-                            </span>
-                          )}
+                          {!decomp.hasPackaging &&
+                            (r.unit?.name_ar || r.unit?.name || r.unit?.short_name) && (
+                              <span className="text-xs font-semibold text-muted-foreground">
+                                {r.unit.name_ar || r.unit.name || r.unit.short_name}
+                              </span>
+                            )}
                         </div>
                         {decomp.hasPackaging && (
                           <p className="text-[11px] font-mono text-muted-foreground">
@@ -1106,7 +1110,9 @@ function InventoryPage() {
                                     : "text-foreground"
                           }`}
                         >
-                          {decomp.hasPackaging ? decomp.text : `${qtyCell(qty)} ${(r.unit?.name_ar || r.unit?.name || r.unit?.short_name) ?? ""}`.trim()}
+                          {decomp.hasPackaging
+                            ? decomp.text
+                            : `${qtyCell(qty)} ${(r.unit?.name_ar || r.unit?.name || r.unit?.short_name) ?? ""}`.trim()}
                         </p>
                         {decomp.hasPackaging && (
                           <p className="text-[11px] font-mono text-muted-foreground">

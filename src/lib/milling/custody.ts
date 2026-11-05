@@ -328,7 +328,9 @@ export async function fetchServiceItem(): Promise<ProductOption | null> {
   // م5: جلب خدمة أجور الطحن بدقة (بالكود أو الاسم) وتجنب الترتيب العشوائي حسب UUID
   const { data, error } = await db
     .from("products")
-    .select("id, sku, name, name_ar, item_class, sale_price, cost_price, package_weight_kg, base_uom_id, unit_id")
+    .select(
+      "id, sku, name, name_ar, item_class, sale_price, cost_price, package_weight_kg, base_uom_id, unit_id",
+    )
     .eq("item_class", "SERVICE")
     .eq("is_active", true);
 
@@ -566,7 +568,8 @@ export async function createMillingServiceDocumentMulti(input: {
     return { ok: false, message: "سجّل نوع حبوب واحد على الأقل مع كميته." };
   }
   const expectedQuantity = valid.reduce(
-    (sum, line) => sum + (input.billingBasis === "PER_BAG" ? Number(line.bags || 0) : Number(line.kg || 0)),
+    (sum, line) =>
+      sum + (input.billingBasis === "PER_BAG" ? Number(line.bags || 0) : Number(line.kg || 0)),
     0,
   );
   if (input.feeQuantity <= 0 || Math.abs(expectedQuantity - input.feeQuantity) > 0.001) {
@@ -593,7 +596,10 @@ export async function createMillingServiceDocumentMulti(input: {
     p_fee_quantity: input.feeQuantity,
   };
 
-  const { data, error } = await (db.rpc as any)("create_milling_service_document_multi_priced", rpcArgs);
+  const { data, error } = await (db.rpc as any)(
+    "create_milling_service_document_multi_priced",
+    rpcArgs,
+  );
   if (error) return { ok: false, message: translateCustodyError(error.message) };
   return { ok: true, data: data as MillingServiceDocumentCreated };
 }

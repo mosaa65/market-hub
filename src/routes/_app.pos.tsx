@@ -893,9 +893,13 @@ function POSPage() {
         const basePrice = baseSalePrices.get(p.id) ?? Number(p.sale_price ?? 0);
         const secondaryUoms = saleUomsByProduct.get(p.id) ?? [];
         const baseUomLabel = baseUnit
-          ? (lang === "ar" ? baseUnit.name_ar || baseUnit.name : baseUnit.name || baseUnit.name_ar) +
+          ? (lang === "ar"
+              ? baseUnit.name_ar || baseUnit.name
+              : baseUnit.name || baseUnit.name_ar) +
             (baseUnit.short_name ? ` (${baseUnit.short_name})` : "")
-          : (lang === "ar" ? "وحدة الأساس" : "Base unit");
+          : lang === "ar"
+            ? "وحدة الأساس"
+            : "Base unit";
 
         const hasSecondaryDefault = secondaryUoms.some((u) => u.is_default_sale);
         const baseUom: SaleUom = {
@@ -1569,7 +1573,8 @@ function POSPage() {
     if (!line || !option) return;
 
     const oldFactor = line.uom_factor && line.uom_factor > 0 ? line.uom_factor : 1;
-    const newFactor = option.factor_to_base && option.factor_to_base > 0 ? option.factor_to_base : 1;
+    const newFactor =
+      option.factor_to_base && option.factor_to_base > 0 ? option.factor_to_base : 1;
     const increment = Math.max(1, Math.round(option.quantity_increment ?? 1));
 
     // تحويل نسبي وذكي للكمية بين الوحدات (مثلاً: 12 حبة تصبح 1 كرتون، 1 كرتون يصبح 12 حبة، 1 حبة تصبح 1 كرتون)
@@ -2979,11 +2984,7 @@ function POSPage() {
                                     : "bg-muted/70 text-muted-foreground"
                               }`}
                             >
-                              {low
-                                ? lang === "ar"
-                                  ? "نفد"
-                                  : "0"
-                                : decompText}
+                              {low ? (lang === "ar" ? "نفد" : "0") : decompText}
                             </span>
                           </div>
 

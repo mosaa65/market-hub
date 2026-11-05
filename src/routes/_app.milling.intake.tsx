@@ -432,7 +432,10 @@ function MillingIntakePage() {
               doc: uDoc,
             };
 
-            if (printBehavior === "direct" || (printBehavior === "default" && !printSettings.preview)) {
+            if (
+              printBehavior === "direct" ||
+              (printBehavior === "default" && !printSettings.preview)
+            ) {
               void printUnifiedDocument(printRequest);
             } else if (printBehavior !== "off") {
               setPrintModalOpen(true);
