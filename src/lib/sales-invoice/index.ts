@@ -29,7 +29,6 @@
  * one thing the whole custody design exists to prevent.
  */
 import { supabase } from "@/integrations/supabase/client";
-import { todayKey } from "@/lib/time/business-date";
 
 const db = supabase as any;
 
@@ -94,14 +93,12 @@ export interface CreateSalesInvoiceInput {
   chequeBank?: string | null;
   chequeDueDate?: string | null;
   chequeDrawer?: string | null;
-  paymentSplits?:
-    | {
-        method: string;
-        amount: number;
-        payment_method_id?: string;
-        reference?: string | null;
-      }[]
-    | null;
+  paymentSplits?: {
+    method: string;
+    amount: number;
+    payment_method_id?: string;
+    reference?: string | null;
+  }[] | null;
 }
 
 export interface SalesInvoiceResult {
@@ -118,9 +115,7 @@ export interface SalesInvoiceResult {
 export async function fetchSellableProducts(warehouseId?: string, lang: "ar" | "en" = "ar") {
   const { data, error } = await db
     .from("products")
-    .select(
-      "id, sku, barcode, name, name_ar, sale_price, tax_rate, unit_id, item_class, is_active, unit:units!products_unit_id_fkey(name, name_ar, short_name)",
-    )
+    .select("id, sku, barcode, name, name_ar, sale_price, tax_rate, unit_id, item_class, is_active, unit:units!products_unit_id_fkey(name, name_ar, short_name)")
     .eq("is_active", true)
     .eq("is_sellable", true)
     .order("name_ar");
@@ -149,62 +144,40 @@ export async function fetchSellableProducts(warehouseId?: string, lang: "ar" | "
   if (rows.length) {
     const ids = rows.map((row) => row.id);
     const [uomResult, companyPriceResult] = await Promise.all([
-      db
-        .from("product_uoms")
-        .select(
-          "id, product_id, unit_id, factor_to_base, quantity_increment, can_sell, is_default_sale, unit:units!product_uoms_unit_id_fkey(name, name_ar, short_name)",
-        )
+      db.from("product_uoms")
+        .select("id, product_id, unit_id, factor_to_base, quantity_increment, can_sell, is_default_sale, unit:units!product_uoms_unit_id_fkey(name, name_ar, short_name)")
         .in("product_id", ids)
         .eq("is_active", true)
         .eq("can_sell", true),
-      db
-        .from("company_items")
+      db.from("company_items")
         .select("item_id, default_sale_price")
         .eq("company_id", 1)
         .eq("is_active", true)
         .in("item_id", ids),
     ]);
-    const missingUomSchema =
-      uomResult.error && ["42P01", "PGRST205"].includes(uomResult.error.code ?? "");
-    if (uomResult.error && !missingUomSchema)
-      throw new Error(`تعذّر تحميل وحدات البيع: ${uomResult.error.message}`);
-    if (companyPriceResult.error)
-      throw new Error(`تعذّر تحميل أسعار المنشأة: ${companyPriceResult.error.message}`);
+    const missingUomSchema = uomResult.error && ["42P01", "PGRST205"].includes(uomResult.error.code ?? "");
+    if (uomResult.error && !missingUomSchema) throw new Error(`تعذّر تحميل وحدات البيع: ${uomResult.error.message}`);
+    if (companyPriceResult.error) throw new Error(`تعذّر تحميل أسعار المنشأة: ${companyPriceResult.error.message}`);
     for (const row of companyPriceResult.data ?? []) {
-      if (row.default_sale_price != null)
-        basePrices.set(row.item_id, Number(row.default_sale_price));
+      if (row.default_sale_price != null) basePrices.set(row.item_id, Number(row.default_sale_price));
     }
     if (!missingUomSchema && uomResult.data?.length) {
       const uomIds = uomResult.data.map((row: any) => row.id);
       const [priceResult, barcodeResult] = await Promise.all([
-        db
-          .from("product_uom_prices")
-          .select("product_uom_id, sale_price")
-          .in("product_uom_id", uomIds)
-          .eq("company_id", 1),
-        db
-          .from("product_uom_barcodes")
-          .select("product_uom_id, barcode")
-          .in("product_uom_id", uomIds)
-          .eq("company_id", 1)
-          .eq("is_active", true),
+        db.from("product_uom_prices").select("product_uom_id, sale_price").in("product_uom_id", uomIds).eq("company_id", 1),
+        db.from("product_uom_barcodes").select("product_uom_id, barcode").in("product_uom_id", uomIds).eq("company_id", 1).eq("is_active", true),
       ]);
-      if (priceResult.error)
-        throw new Error(`تعذّر تحميل أسعار وحدات البيع: ${priceResult.error.message}`);
-      if (barcodeResult.error)
-        throw new Error(`تعذّر تحميل باركودات وحدات البيع: ${barcodeResult.error.message}`);
+      if (priceResult.error) throw new Error(`تعذّر تحميل أسعار وحدات البيع: ${priceResult.error.message}`);
+      if (barcodeResult.error) throw new Error(`تعذّر تحميل باركودات وحدات البيع: ${barcodeResult.error.message}`);
       const prices = new Map<string, number>();
-      for (const row of priceResult.data ?? [])
-        if (row.sale_price != null) prices.set(row.product_uom_id, Number(row.sale_price));
+      for (const row of priceResult.data ?? []) if (row.sale_price != null) prices.set(row.product_uom_id, Number(row.sale_price));
       for (const row of barcodeResult.data ?? []) {
         const list = barcodeByUom.get(row.product_uom_id) ?? [];
         list.push(row.barcode);
         barcodeByUom.set(row.product_uom_id, list);
       }
       for (const row of uomResult.data as any[]) {
-        const basePrice =
-          basePrices.get(row.product_id) ??
-          Number(rows.find((product) => product.id === row.product_id)?.sale_price ?? 0);
+        const basePrice = basePrices.get(row.product_id) ?? Number(rows.find((product) => product.id === row.product_id)?.sale_price ?? 0);
         const unit = row.unit;
         const list = saleUomsByProduct.get(row.product_id) ?? [];
         list.push({
@@ -212,9 +185,7 @@ export async function fetchSellableProducts(warehouseId?: string, lang: "ar" | "
           factor_to_base: Number(row.factor_to_base),
           sale_price: prices.get(row.id) ?? basePrice * Number(row.factor_to_base),
           quantity_increment: Number(row.quantity_increment ?? 1),
-          label: unit
-            ? `${lang === "ar" ? unit.name_ar || unit.name : unit.name || unit.name_ar}${unit.short_name ? ` (${unit.short_name})` : ""}`
-            : "",
+          label: unit ? `${lang === "ar" ? unit.name_ar || unit.name : unit.name || unit.name_ar}${unit.short_name ? ` (${unit.short_name})` : ""}` : "",
           is_default_sale: row.is_default_sale === true,
           barcodes: barcodeByUom.get(row.id) ?? [],
         });
@@ -227,8 +198,7 @@ export async function fetchSellableProducts(warehouseId?: string, lang: "ar" | "
     const secondaryUoms = saleUomsByProduct.get(r.id) ?? [];
     const basePrice = basePrices.get(r.id) ?? Number(r.sale_price ?? 0);
     const baseUnitLabel = r.unit
-      ? r.unit.short_name ||
-        (lang === "ar" ? r.unit.name_ar || r.unit.name : r.unit.name || r.unit.name_ar)
+      ? r.unit.short_name || (lang === "ar" ? r.unit.name_ar || r.unit.name : r.unit.name || r.unit.name_ar)
       : null;
     const hasSecondaryDefault = secondaryUoms.some((unit) => unit.is_default_sale);
     const baseUom: SellableUom = {
@@ -377,9 +347,7 @@ export async function createSalesInvoice(
     // overloads do not accept UOM snapshots and would silently post base units.
     const { data, error } = await db.rpc("create_sale", {
       ...saleArgs,
-      // تاريخ المعاملة: التاريخ الذي اختاره المستخدم، وإلا اليوم التشغيلي
-      // المحلي (لا UTC — انظر src/lib/time/business-date.ts).
-      _sale_date: input.saleDate || todayKey(),
+      _sale_date: input.saleDate ?? new Date().toISOString().slice(0, 10),
       _payment_splits: paymentSplits.map((line) => ({
         method: line.method,
         amount: Number(line.amount),

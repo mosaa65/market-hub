@@ -557,8 +557,6 @@ export async function createMillingServiceDocumentMulti(input: {
       }[]
     | null;
   notes?: string;
-  /** تاريخ كشف الطحن (المرحلة الثالثة) — YYYY-MM-DD. */
-  businessDate?: string;
 }): Promise<OpResult<MillingServiceDocumentCreated>> {
   const valid = (input.grains ?? []).filter(
     (g) => g.itemId && ((g.bags ?? 0) > 0 || (g.kg ?? 0) > 0),
@@ -596,7 +594,6 @@ export async function createMillingServiceDocumentMulti(input: {
     p_payment_splits: paymentSplits.length > 1 ? paymentSplits : [],
     p_billing_basis: input.billingBasis,
     p_fee_quantity: input.feeQuantity,
-    p_business_date: input.businessDate || null,
   };
 
   const { data, error } = await (db.rpc as any)(

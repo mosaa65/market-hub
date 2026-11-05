@@ -50,33 +50,6 @@ export function dateOnlyIso(value: string | null | undefined): string {
   return key ? `${key}T00:00:00Z` : value;
 }
 
-/**
- * تاريخ المعاملة الفعلي لسجل فاتورة (مبيعات أو مشتريات).
- *
- * المرحلة الثالثة: السجل يحمل تاريخين — `created_at` (لحظة الإدخال) و
- * `business_date` (اليوم الذي اختاره المستخدم). كل تصفية أو تقرير يجب أن
- * يقرأ هذا الحقل، لا `created_at`، وإلا ظهر كشف الأمس في تقرير اليوم.
- *
- * السجلات القديمة (قبل الترحيل) لا تحمل business_date، فتعود إلى created_at.
- */
-export function transactionDate(row: {
-  business_date?: string | null;
-  created_at?: string | null;
-}): string {
-  const business = row.business_date;
-  if (business) return dateOnlyIso(business);
-  return row.created_at ?? "";
-}
-
-/** مفتاح اليوم (YYYY-MM-DD) لتاريخ المعاملة — للمقارنة والتصفية. */
-export function transactionDayKey(row: {
-  business_date?: string | null;
-  created_at?: string | null;
-}): string {
-  const value = transactionDate(row);
-  return /^\d{4}-\d{2}-\d{2}/.exec(value)?.[0] ?? "";
-}
-
 /** هل التاريخ المجرّد قبل اليوم التشغيلي؟ */
 export function isPastDay(value: string | null | undefined): boolean {
   if (!value) return false;

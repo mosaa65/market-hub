@@ -35,7 +35,6 @@ import { useI18n } from "@/lib/i18n";
 import { money } from "@/lib/format";
 import { translateRpcError } from "@/lib/errors/rpc-errors";
 import { toSystemDigits } from "@/lib/format-preferences";
-import { transactionDate } from "@/lib/time/business-date";
 import { Ltr } from "@/components/ltr-value";
 import { LuxuryPrintPreviewModal } from "@/components/luxury-print-preview-modal";
 import { WhatsAppIcon } from "@/components/whatsapp-icon";
@@ -247,7 +246,7 @@ function PurchasesPage() {
       const { data, error } = await supabase
         .from("purchase_invoices")
         .select(
-          "id,invoice_number,status,subtotal,discount,tax,total,paid,payment_method,created_at,business_date,note,suppliers(name,phone),warehouses(name,name_ar)",
+          "id,invoice_number,status,subtotal,discount,tax,total,paid,payment_method,created_at,note,suppliers(name,phone),warehouses(name,name_ar)",
         )
         .order("created_at", { ascending: false })
         .limit(200);
@@ -477,17 +476,16 @@ function PurchasesPage() {
 
     if (filters.created_at && typeof filters.created_at === "object") {
       const { from, to } = filters.created_at as { from?: string; to?: string };
-      // تاريخ المعاملة (business_date) لا تاريخ الإنشاء — انظر المرحلة الثالثة.
       if (from) {
         const fromDate = new Date(from).getTime();
-        list = list.filter((r) => new Date(transactionDate(r)).getTime() >= fromDate);
+        list = list.filter((r) => new Date(r.created_at).getTime() >= fromDate);
       }
       if (to) {
         // شمول اليوم الأخير: نهاية اليوم 23:59:59.999 بدلاً من منتصف الليل،
         // وإلا تُستبعد فواتير اليوم الأخير من النتيجة.
         const toDate = new Date(to);
         toDate.setHours(23, 59, 59, 999);
-        list = list.filter((r) => new Date(transactionDate(r)).getTime() <= toDate.getTime());
+        list = list.filter((r) => new Date(r.created_at).getTime() <= toDate.getTime());
       }
     }
 

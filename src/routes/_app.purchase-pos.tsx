@@ -43,7 +43,6 @@ import { PaymentMethodSelect } from "@/components/ui/payment-method";
 import { AmountInput } from "@/components/commerce/amount-input";
 import { useFormNavigationScope } from "@/hooks/use-form-navigation";
 import { PosDatePicker } from "@/components/commerce/pos-date-picker";
-import { todayKey, isPastDay } from "@/lib/time/business-date";
 import { PartyPicker } from "@/components/commerce/party-picker";
 import { PosTotalsCard } from "@/components/commerce/pos-totals-card";
 import {
@@ -99,10 +98,6 @@ interface Product {
   purchase_uoms?: PurchaseUom[];
   origin_id?: string | null;
   quality_grade_id?: string | null;
-  /** ثوابت الصنف (المرحلة الرابعة) — اقتراحات فقط، لا تُلزم المعاملة. */
-  default_supplier_id?: string | null;
-  shelf_location?: string | null;
-  default_uom_id?: string | null;
   unit?: { short_name: string; name_ar: string | null; name: string } | null;
   category?: { name: string; name_ar: string | null } | null;
   brand?: { name: string; name_ar: string | null } | null;
@@ -135,14 +130,6 @@ interface CartLine {
   tracking: "NONE" | "BATCH" | "SERIAL";
   batch_number: string;
   expiry_date: string;
-  /**
-   * المورد والموقع لهذا السطر تحديداً. يبدأان من ثوابت الصنف، ويستطيع
-   * المستخدم تغييرهما دون المساس بإعداد الصنف الأساسي.
-   */
-  supplier_id: string | null;
-  location: string;
-  /** هل عُدّل المورد يدوياً في هذا السطر؟ (للعرض فقط) */
-  supplier_overridden: boolean;
 }
 
 interface Warehouse {
@@ -383,9 +370,7 @@ function PurchasePOSPage() {
     method: "cash",
   });
   const [note, setNote] = useState("");
-  // تاريخ المعاملة (المرحلة الثالثة): اليوم التشغيلي المحلي، قابل للتغيير
-  // لتسجيل كشف متأخر. لا يمرّ عبر toISOString() حتى لا يزحف يوماً.
-  const [purchaseDate, setPurchaseDate] = useState(() => todayKey());
+  const [purchaseDate, setPurchaseDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [transferRef, setTransferRef] = useState("");
 
   // Mobile workspace: cart-first, catalogue opened on demand.
@@ -541,7 +526,7 @@ function PurchasePOSPage() {
        */
       const fastProductQuery = (supabase.from("products") as any)
         .select(
-          "id,sku,barcode,name,name_ar,cost_price,sale_price,tax_rate,tracking,is_custody_item,is_purchasable,image_url,category_id,brand_id,unit_id,origin_id,quality_grade_id,default_supplier_id,shelf_location,default_uom_id,unit:units!products_unit_id_fkey(short_name,name,name_ar),category:categories(name,name_ar),brand:brands!products_brand_id_fkey(name,name_ar),origin:countries_of_origin(name,name_ar,code),quality:quality_grades(name,name_ar,code)",
+          "id,sku,barcode,name,name_ar,cost_price,sale_price,tax_rate,tracking,is_custody_item,is_purchasable,image_url,category_id,brand_id,unit_id,origin_id,quality_grade_id,unit:units!products_unit_id_fkey(short_name,name,name_ar),category:categories(name,name_ar),brand:brands!products_brand_id_fkey(name,name_ar),origin:countries_of_origin(name,name_ar,code),quality:quality_grades(name,name_ar,code)",
         )
         .eq("is_active", true)
         .eq("is_custody_item", false)
@@ -579,7 +564,7 @@ function PurchasePOSPage() {
           const pageSize = 500;
           let from = 0;
           let selectCols =
-            "id,sku,barcode,name,name_ar,cost_price,sale_price,tax_rate,tracking,is_custody_item,is_purchasable,image_url,category_id,brand_id,unit_id,origin_id,quality_grade_id,default_supplier_id,shelf_location,default_uom_id,unit:units!products_unit_id_fkey(short_name,name,name_ar),category:categories(name,name_ar),brand:brands!products_brand_id_fkey(name,name_ar),origin:countries_of_origin(name,name_ar,code),quality:quality_grades(name,name_ar,code)";
+            "id,sku,barcode,name,name_ar,cost_price,sale_price,tax_rate,tracking,is_custody_item,is_purchasable,image_url,category_id,brand_id,unit_id,origin_id,quality_grade_id,unit:units!products_unit_id_fkey(short_name,name,name_ar),category:categories(name,name_ar),brand:brands!products_brand_id_fkey(name,name_ar),origin:countries_of_origin(name,name_ar,code),quality:quality_grades(name,name_ar,code)";
 
           while (true) {
             const query = (supabase.from("products") as any)
@@ -746,19 +731,13 @@ function PurchasePOSPage() {
       setUnitBarcodeMap(barcodeLookup);
       setProducts(
         productRows.map((product) => {
-          const baseUnit = product.unit_id
-            ? uns?.find((u) => u.id === product.unit_id) || null
-            : null;
+          const baseUnit = product.unit_id ? uns?.find((u) => u.id === product.unit_id) || null : null;
           const baseCost = Number(product.cost_price || 0);
           const secondaryUoms = purchaseUomsByProduct.get(product.id) ?? [];
           const baseUomLabel = baseUnit
-            ? (lang === "ar"
-                ? baseUnit.name_ar || baseUnit.name
-                : baseUnit.name || baseUnit.name_ar) +
+            ? (lang === "ar" ? baseUnit.name_ar || baseUnit.name : baseUnit.name || baseUnit.name_ar) +
               (baseUnit.short_name ? ` (${baseUnit.short_name})` : "")
-            : lang === "ar"
-              ? "وحدة الأساس"
-              : "Base unit";
+            : (lang === "ar" ? "وحدة الأساس" : "Base unit");
           const hasSecondaryDefault = secondaryUoms.some((u) => u.is_default_purchase);
           const baseUom: PurchaseUom = {
             unit_id: product.unit_id || "",
@@ -1037,10 +1016,6 @@ function PurchasePOSPage() {
   }, [compatibilities, models, makes, lang]);
 
   // Add to purchase cart
-  /**
-   * ثوابت الصنف (المرحلة الرابعة): المورد الافتراضي والموقع الافتراضي.
-   * تُطبَّق على السطر الجديد فقط، ولا تُغيّر إعداد الصنف في قاعدة البيانات.
-   */
   function addToCart(p: Product, requestedUom?: PurchaseUom | null) {
     if (!purchaseUomsLoaded) {
       toast.info(
@@ -1089,17 +1064,9 @@ function PurchasePOSPage() {
           tracking: p.tracking ?? "NONE",
           batch_number: "",
           expiry_date: "",
-          supplier_id: p.default_supplier_id ?? null,
-          location: p.shelf_location ?? "",
-          supplier_overridden: false,
         },
       ];
     });
-    // اقتراح المورد الافتراضي للصنف على مستوى الكشف (إن لم يكن المستخدم قد
-    // اختار مورداً يدوياً لهذا الكشف).
-    if (p.default_supplier_id) {
-      setSupplierId((current) => current || (p.default_supplier_id as string));
-    }
   }
 
   function getDefaultPurchaseUom(product: Product): PurchaseUom {
@@ -1147,8 +1114,7 @@ function PurchasePOSPage() {
     if (!line || !option) return;
 
     const oldFactor = line.uom_factor && line.uom_factor > 0 ? line.uom_factor : 1;
-    const newFactor =
-      option.factor_to_base && option.factor_to_base > 0 ? option.factor_to_base : 1;
+    const newFactor = option.factor_to_base && option.factor_to_base > 0 ? option.factor_to_base : 1;
     const increment = Math.max(1, Math.round(option.quantity_increment ?? 1));
     const rawConvertedQty = (line.quantity * oldFactor) / newFactor;
     const nextQty = Math.max(increment, Math.round(rawConvertedQty));
@@ -1560,7 +1526,6 @@ function PurchasePOSPage() {
           uom_id: l.uom_id,
         })),
         _payment_splits: paymentMethod === "split" ? purchaseSplits : [],
-        _purchase_date: purchaseDate,
       };
       // Use the current atomic RPC signature for both split and single tenders;
       // the old short overload does not accept UOM snapshots.
@@ -2589,54 +2554,6 @@ function PurchasePOSPage() {
                       onUnitChange={(unitId) => changePurchaseUom(line.line_id, unitId)}
                       onRemove={() => setCart((c) => c.filter((x) => x.line_id !== line.line_id))}
                     />
-                    {/*
-                      ثوابت الصنف لهذا السطر: المورد والموقع. يبدآن من إعداد
-                      الصنف، ويُعدّلان هنا لهذه المعاملة فقط — لا يمسّان
-                      products.default_supplier_id أو products.shelf_location.
-                    */}
-                    <div className="grid grid-cols-2 gap-2 ps-2">
-                      <label className="space-y-1 text-[11px] text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          {lang === "ar" ? "مورد السطر" : "Line supplier"}
-                          {line.supplier_overridden && (
-                            <span className="rounded-full bg-amber-500/15 px-1.5 text-[9px] font-bold text-amber-600">
-                              {lang === "ar" ? "معدّل" : "changed"}
-                            </span>
-                          )}
-                        </span>
-                        <select
-                          aria-label={lang === "ar" ? "مورد السطر" : "Line supplier"}
-                          value={line.supplier_id ?? ""}
-                          onChange={(event) =>
-                            updateCartLine(line.line_id, {
-                              supplier_id: event.target.value || null,
-                              supplier_overridden: true,
-                            })
-                          }
-                          className="h-8 w-full rounded-lg border border-border bg-background px-2 text-xs text-foreground outline-none focus:border-primary"
-                        >
-                          <option value="">
-                            {lang === "ar" ? "— مورد الكشف —" : "— invoice supplier —"}
-                          </option>
-                          {suppliers.map((supplier) => (
-                            <option key={supplier.id} value={supplier.id}>
-                              {supplier.name}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="space-y-1 text-[11px] text-muted-foreground">
-                        <span>{lang === "ar" ? "الموقع" : "Location"}</span>
-                        <input
-                          value={line.location}
-                          onChange={(event) =>
-                            updateCartLine(line.line_id, { location: event.target.value })
-                          }
-                          placeholder={lang === "ar" ? "الثلاجة / الرف" : "Fridge / shelf"}
-                          className="h-8 w-full rounded-lg border border-border bg-background px-2 text-xs text-foreground outline-none focus:border-primary"
-                        />
-                      </label>
-                    </div>
                     {line.tracking === "BATCH" && (
                       <div className="grid grid-cols-2 gap-2 ps-2">
                         <label className="space-y-1 text-[11px] text-muted-foreground">

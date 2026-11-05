@@ -12,7 +12,6 @@ import {
   CreditCard,
   Boxes,
   PanelLeft,
-  ClipboardList,
   LucideIcon,
 } from "lucide-react";
 import { CompanySection } from "./sections/company-section";
@@ -20,7 +19,6 @@ import { InvoicingSection } from "./sections/invoicing-section";
 import { PrintingSection } from "./sections/printing-section";
 import { CatalogSection } from "./sections/catalog-section";
 import { StockSettingsSection } from "./sections/stock-settings-section";
-import { ItemDefaultsSection } from "./sections/item-defaults-section";
 import { MillingModeSection } from "./sections/milling-mode-section";
 import { SubscriptionSection } from "./sections/subscription-section";
 import { AppearanceSection } from "./sections/appearance-section";
@@ -127,16 +125,6 @@ registerSettingsSection({
   descriptionEn: "Central valuation method, stock codes, numbering rules, and stock thresholds",
   icon: Boxes,
   component: StockSettingsSection,
-});
-
-registerSettingsSection({
-  id: "item-defaults",
-  titleAr: "ثوابت الأصناف",
-  titleEn: "Item Defaults",
-  descriptionAr: "المورد الافتراضي والموقع والوحدة لكل صنف — تُقترح تلقائياً في الكشوف",
-  descriptionEn: "Default supplier, location and unit per item — suggested in statements",
-  icon: ClipboardList,
-  component: ItemDefaultsSection,
 });
 
 registerSettingsSection({

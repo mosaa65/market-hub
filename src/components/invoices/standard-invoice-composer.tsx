@@ -54,8 +54,6 @@ import { toast } from "sonner";
 import { PosBatchSelectorModal } from "@/components/batches/pos-batch-selector-modal";
 import { useBatchSettings } from "@/hooks/use-batch-settings";
 import { useNegativeSalesSetting } from "@/hooks/use-negative-sales-setting";
-import { PosDatePicker } from "@/components/commerce/pos-date-picker";
-import { todayKey, isPastDay } from "@/lib/time/business-date";
 
 type Kind = "sales" | "purchase";
 type Party = {
@@ -164,12 +162,6 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
   const [paid, setPaid] = useState<number | null>(null);
   const [discount, setDiscount] = useState<number | null>(null);
   const [note, setNote] = useState("");
-  /**
-   * تاريخ المعاملة (المرحلة الثالثة): يبدأ باليوم التشغيلي المحلي، ويستطيع
-   * المستخدم اختيار يوم سابق لتسجيل كشف متأخر. يُرسل للخادم كما هو ويُحفظ في
-   * business_date، فلا يتأثر بتوقيت المتصفح أو الخادم.
-   */
-  const [businessDate, setBusinessDate] = useState<string>(() => todayKey());
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [partyDialogOpen, setPartyDialogOpen] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
@@ -191,9 +183,8 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
       : "New purchase invoice";
   const partyTitle = sales ? (ar ? "العميل" : "Customer") : ar ? "المورد" : "Supplier";
   const currentDate = new Intl.DateTimeFormat(ar ? "ar-YE" : "en", { dateStyle: "medium" }).format(
-    new Date(`${businessDate}T12:00:00`),
+    new Date(),
   );
-  const backdated = isPastDay(businessDate);
   const label = (p: ProductRow) => (ar ? p.name_ar || p.name : p.name || p.name_ar || "—");
   const warehouseName = (w: WarehouseRow) =>
     ar ? w.name_ar || w.name : w.name || w.name_ar || "—";
@@ -641,7 +632,6 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
         const result = await createSalesInvoice({
           warehouseId,
           customerId: partyId,
-          saleDate: businessDate,
           paymentMethod: paymentMethod as any,
           paid: credit ? 0 : (paid ?? total),
           discount: discount ?? 0,
@@ -679,7 +669,6 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
           _paid: credit ? 0 : (paid ?? total),
           _discount: discount ?? 0,
           _note: note || null,
-          _purchase_date: businessDate,
           _items: cart.map(({ product, quantity, price, batch_number, expiry_date, uom_id }) => ({
             product_id: product.id,
             quantity,
@@ -731,7 +720,7 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
       const doc: InvoiceDoc = {
         title,
         number: invoiceNumber,
-        date: `${businessDate}T12:00:00`,
+        date: new Date().toISOString(),
         partyLabel: partyTitle,
         partyName: selectedParty?.name || "",
         partyPhone: selectedParty?.phone || undefined,
@@ -840,25 +829,9 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
                 </span>
                 <h2 className="font-bold">{ar ? "البيانات الأساسية" : "Invoice details"}</h2>
               </div>
-              <div className="flex items-center gap-2">
-                <PosDatePicker
-                  value={businessDate}
-                  onChange={setBusinessDate}
-                  lang={ar ? "ar" : "en"}
-                  label={ar ? "تاريخ الكشف" : "Statement date"}
-                />
-                <span
-                  className={`hidden text-xs sm:inline ${backdated ? "font-semibold text-amber-600" : "text-muted-foreground"}`}
-                >
-                  {backdated
-                    ? ar
-                      ? `كشف بتاريخ سابق · ${currentDate}`
-                      : `Backdated · ${currentDate}`
-                    : ar
-                      ? `تاريخ اليوم · ${currentDate}`
-                      : `Today · ${currentDate}`}
-                </span>
-              </div>
+              <span className="text-xs text-muted-foreground">
+                {ar ? "تاريخ اليوم" : "Today"} · {currentDate}
+              </span>
             </div>
             <div className="grid gap-4 p-5 sm:grid-cols-2 xl:grid-cols-3">
               <label className="space-y-1.5">
@@ -1398,7 +1371,7 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
             invoice={{
               id: savedInvoice.id,
               invoiceNumber: savedInvoice.number,
-              date: businessDate,
+              date: new Date().toISOString().slice(0, 10),
               subtotal,
               tax,
               discount: discount ?? 0,
