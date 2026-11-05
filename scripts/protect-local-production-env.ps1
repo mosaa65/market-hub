@@ -2,10 +2,18 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $RepoRoot = Split-Path -Parent $PSScriptRoot
-$PrivateFiles = @(
-    (Join-Path $RepoRoot "deploy/.env.local-production"),
-    (Join-Path $RepoRoot "deploy/supabase-stack/.env")
-)
+$StackDir = Join-Path $RepoRoot "deploy/supabase-stack"
+$PrivateFiles = @((Join-Path $RepoRoot "deploy/.env.local-production"))
+if (Test-Path -LiteralPath $StackDir -PathType Container) {
+    $PrivateFiles += @(
+        Get-ChildItem -LiteralPath $StackDir -Force -File |
+            Where-Object { $_.Name -eq ".env" -or $_.Name.StartsWith(".env.", [StringComparison]::Ordinal) } |
+            ForEach-Object { $_.FullName }
+    )
+}
+if ($PrivateFiles.Count -lt 2) {
+    throw "The self-hosted Supabase environment file was not found under $StackDir."
+}
 $CurrentUserSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 $IcaclsPath = Join-Path $env:SystemRoot "System32/icacls.exe"
 

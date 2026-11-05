@@ -20,17 +20,20 @@ ERROR: duplicate key value violates unique constraint "company_settings_pkey"
 supabase/seeds/
 ├── README.md                    ← هذا الملف
 │
-├── 01_system/                   ← يُشغَّل تلقائيًا على كل قاعدة جديدة
+├── 01_system/                   ← ملفات النظام المسموح بها تُشغَّل تلقائيًا
 │   ├── 01_modules.sql           سجل وحدات النظام
 │   ├── 02_plans.sql             باقات الاشتراك
 │   ├── 03_chart_of_accounts.sql دليل الحسابات
 │   ├── 04_units.sql             وحدات القياس
 │   ├── 05_expense_categories.sql تصنيفات المصروفات (مربوطة بحساباتها)
-│   ├── 06_platform_admins.sql   حسابات منصة (استثناء مقصود)
+│   ├── 06_platform_admins.sql   إعداد إداري منفصل، مستثنى من التشغيل التلقائي
 │   ├── 07_document_numbering.sql إعداد ترقيم المستندات
 │   ├── 08_payment_methods.sql   طرق الدفع + إعداد المنشأة الافتراضي
 │   ├── 09_essential_partners.sql شركاء النظام الأساسيون
-│   └── 10_production_expense_defaults.sql مركز الإنتاج وتصنيفات تكاليف الإنتاج الافتراضية
+│   ├── 10_production_expense_defaults.sql مركز الإنتاج وتصنيفات تكاليف الإنتاج الافتراضية
+│   ├── 11_accounting_periods.sql فترات السنة الحالية
+│   ├── 12_milling_reference.sql أنواع الحبوب ومركز خدمة الطحن
+│   └── 13_storage_buckets.sql حاوية النسخ الاحتياطي الخاصة
 │
 ├── 02_company/                  ← يدوي، مرة واحدة لكل عميل
 │   ├── README.md
@@ -190,8 +193,9 @@ SKU. **لا** على UUID عشوائي، لأن الصفّ المكرر يظهر
 
 ### حساب المنصة (سوبر أدمن / دعم)
 
-هذا مختلف: حساب المنصة **ليس** حساب عميل، ولذلك يُزرع في
-`01_system/06_platform_admins.sql` بحساب مصادقة حقيقي. راجع رأس الملف.
+حسابات المنصة **ليست** حسابات عميل، لكنها لا تُزرع تلقائيًا. الملف
+`01_system/06_platform_admins.sql` مستثنى من قائمة `supabase/config.toml` ومن
+سكربت بذور الإنتاج؛ لا تشغّله إلا ضمن إجراء إداري منفصل ومراجع.
 
 ---
 

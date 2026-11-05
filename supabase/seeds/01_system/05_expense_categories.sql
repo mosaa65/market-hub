@@ -89,4 +89,24 @@ BEGIN
   END IF;
 END $$;
 
+-- Safe system defaults required by the expense posting workflow.
+INSERT INTO public.expense_approval_rules (min_amount, required_role_rank)
+VALUES (0, 40)
+ON CONFLICT (min_amount) DO NOTHING;
+
+INSERT INTO public.expense_ledger_account_mappings (role, account_id)
+SELECT seed.role, a.id
+FROM (VALUES
+  ('INPUT_TAX', '1316', 'ASSET'),
+  ('SUPPLIER_PAYABLE', '2111', 'LIABILITY'),
+  ('EMPLOYEE_PAYABLE', '2221', 'LIABILITY'),
+  ('OTHER_PAYABLE', '2221', 'LIABILITY')
+) AS seed(role, code, account_type)
+JOIN public.accounts a
+  ON a.code = seed.code
+ AND a.account_type::text = seed.account_type
+ AND a.is_active
+ AND a.is_postable
+ON CONFLICT (role) DO NOTHING;
+
 COMMIT;

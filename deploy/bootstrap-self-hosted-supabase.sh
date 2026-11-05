@@ -20,11 +20,19 @@ fi
 usage() {
   echo "Usage: bash deploy/bootstrap-self-hosted-supabase.sh <app-domain> <supabase-api-domain>" >&2
   echo "Example: bash deploy/bootstrap-self-hosted-supabase.sh erp.example.com api.example.com" >&2
-  echo "Local Windows Docker Desktop host: bash deploy/bootstrap-self-hosted-supabase.sh --local" >&2
+  echo "Local Windows Docker Desktop host: npm run db:selfhosted:bootstrap:local" >&2
 }
 
-if [[ "$(uname -s)" != "Linux" ]]; then
-  echo "Run this bootstrap from Linux/WSL with Docker Desktop integration enabled." >&2
+HOST_OS="$(uname -s)"
+WINDOWS_GIT_BASH=false
+if [[ "$HOST_OS" == MINGW* || "$HOST_OS" == MSYS* || "$HOST_OS" == CYGWIN* ]]; then
+  WINDOWS_GIT_BASH=true
+  if [[ "$MODE" != "local" ]]; then
+    echo "Public production bootstrap must run on the Linux server." >&2
+    exit 1
+  fi
+elif [[ "$HOST_OS" != "Linux" ]]; then
+  echo "For local Windows setup, use scripts/bootstrap-local-production.ps1 from PowerShell." >&2
   exit 1
 fi
 
@@ -57,7 +65,17 @@ else
   API_URL="https://$SUPABASE_DOMAIN"
 fi
 
-for command_name in git python3 openssl jq docker; do
+if [[ "$WINDOWS_GIT_BASH" == true ]]; then
+  PYTHON_BIN="$(command -v python || command -v python3 || true)"
+else
+  PYTHON_BIN="$(command -v python3 || true)"
+fi
+if [[ -z "$PYTHON_BIN" ]]; then
+  echo "Required command is missing: python3 (or python on Windows)." >&2
+  exit 1
+fi
+
+for command_name in git openssl docker; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
     echo "Required command is missing: $command_name" >&2
     exit 1
@@ -65,7 +83,7 @@ for command_name in git python3 openssl jq docker; do
 done
 
 if ! docker compose version >/dev/null 2>&1; then
-  echo "Docker Compose is not available to this Linux user." >&2
+  echo "Docker Compose is not available to this shell." >&2
   exit 1
 fi
 compose_version="$(docker compose version --short | sed 's/^v//')"
@@ -127,7 +145,7 @@ printf 'ref=%s\n' "$SUPABASE_REF" > "$STACK_DIR/.supabase-version"
   sh utils/add-new-auth-keys.sh --update-env >/dev/null
 )
 
-python3 - "$STACK_DIR/.env" "$APP_DOMAIN" "$SUPABASE_DOMAIN" "$APP_URL" "$API_URL" "$MODE" <<'PY'
+"$PYTHON_BIN" - "$STACK_DIR/.env" "$APP_DOMAIN" "$SUPABASE_DOMAIN" "$APP_URL" "$API_URL" "$MODE" <<'PY'
 from pathlib import Path
 import sys
 import subprocess
@@ -167,7 +185,7 @@ for key, value in values.items():
 env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 PY
 
-python3 - "$STACK_DIR/.env" "$APP_ENV_FILE" "$APP_DOMAIN" "$SUPABASE_DOMAIN" "$APP_URL" "$API_URL" <<'PY'
+"$PYTHON_BIN" - "$STACK_DIR/.env" "$APP_ENV_FILE" "$APP_DOMAIN" "$SUPABASE_DOMAIN" "$APP_URL" "$API_URL" <<'PY'
 from pathlib import Path
 import os
 import sys
@@ -208,9 +226,13 @@ with os.fdopen(fd, "w", encoding="utf-8") as stream:
 os.chmod(app_env, 0o600)
 PY
 
-chmod 600 "$STACK_DIR/.env"
-chmod 600 "$APP_ENV_FILE"
-find "$STACK_DIR" -maxdepth 1 -type f -name '.env*' -exec chmod 600 {} +
+if [[ "$WINDOWS_GIT_BASH" == true ]]; then
+  echo "Windows file permissions will be restricted by the PowerShell wrapper."
+else
+  chmod 600 "$STACK_DIR/.env"
+  chmod 600 "$APP_ENV_FILE"
+  find "$STACK_DIR" -maxdepth 1 -type f -name '.env*' -exec chmod 600 {} +
+fi
 echo "Prepared the official Supabase stack in deploy/supabase-stack."
 echo "Prepared $APP_ENV_FILE from the generated stack keys with private file permissions."
 echo "Secret values were not printed."

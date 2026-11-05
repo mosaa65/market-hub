@@ -100,6 +100,43 @@ try {
   }
   $env:SUPABASE_DB_PASSWORD = $databaseCredentials[1]
 
+  # The active migration directory is a fresh-database baseline. Permit an
+  # empty target or a cloud already rebuilt from this exact baseline; refuse
+  # old, mixed, or partial migration histories.
+  $baselineSafetySql = @'
+WITH migration_state AS (
+  SELECT
+    count(*)::int AS migration_count,
+    count(*) FILTER (WHERE version IN ('001','002','003','004','005','006','007','008','009','010','011','012','013','014','015'))::int AS baseline_count,
+    count(*) FILTER (WHERE version NOT IN ('001','002','003','004','005','006','007','008','009','010','011','012','013','014','015'))::int AS other_count
+  FROM supabase_migrations.schema_migrations
+), public_state AS (
+  SELECT count(*)::int AS relation_count
+  FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p', 'v', 'm', 'S')
+)
+SELECT CASE
+  WHEN migration_state.other_count > 0 THEN 'INCOMPATIBLE_HISTORY'
+  WHEN migration_state.migration_count = 15 AND migration_state.baseline_count = 15 THEN 'BASELINE_READY'
+  WHEN migration_state.migration_count = 0 AND public_state.relation_count = 0 THEN 'EMPTY_BASELINE_TARGET'
+  ELSE 'UNSAFE_TARGET'
+END AS migration_target
+FROM migration_state CROSS JOIN public_state;
+'@
+  $baselineSafetySql = ($baselineSafetySql -replace '\s+', ' ').Trim()
+  $previousPreference = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  $safetyOutput = & supabase db query --linked $baselineSafetySql 2>&1
+  $safetyExitCode = $LASTEXITCODE
+  $ErrorActionPreference = $previousPreference
+  if ($safetyExitCode -ne 0) {
+    throw "Could not safely verify the cloud schema and migration ledger. No cloud migration was run."
+  }
+  $safetyText = $safetyOutput -join "`n"
+  if ($safetyText -notmatch "EMPTY_BASELINE_TARGET|BASELINE_READY") {
+    throw "Refusing to push migrations into this cloud project: its schema or migration history is neither empty nor the complete 001-015 baseline."
+  }
+
   Write-Host "Target cloud project: $linkedRef" -ForegroundColor Yellow
   Write-Host "This command applies pending migrations and safe system reference seeds only. It never resets the cloud database." -ForegroundColor Yellow
   $confirmation = Read-Host "Type CLOUD $linkedRef to continue"

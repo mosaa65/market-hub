@@ -15,7 +15,7 @@ const databaseUrl = new URL(connectionString);
 if (
   databaseUrl.hostname !== "127.0.0.1" ||
   databaseUrl.port !== "5433" ||
-  databaseUrl.username !== "postgres" ||
+  databaseUrl.username !== "supabase_admin" ||
   databaseUrl.pathname !== "/postgres" ||
   databaseUrl.searchParams.get("sslmode") !== "disable"
 ) {
@@ -32,6 +32,9 @@ const systemSeeds = [
   "08_payment_methods.sql",
   "09_essential_partners.sql",
   "10_production_expense_defaults.sql",
+  "11_accounting_periods.sql",
+  "12_milling_reference.sql",
+  "13_storage_buckets.sql",
 ];
 
 const repoRoot = process.cwd();
@@ -44,7 +47,7 @@ const client = new Client({
 await client.connect();
 try {
   const target = await client.query("SELECT current_database() AS database, current_user AS role");
-  if (target.rows[0]?.database !== "postgres" || target.rows[0]?.role !== "postgres") {
+  if (target.rows[0]?.database !== "postgres" || target.rows[0]?.role !== "supabase_admin") {
     throw new Error("Refusing to seed: connected database identity did not match the expected production database.");
   }
 

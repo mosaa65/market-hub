@@ -55,3 +55,4 @@ metadata.json
 .qa-session.json
 temp_*.txt
 .aistudio/
+.tmp_rebuild/

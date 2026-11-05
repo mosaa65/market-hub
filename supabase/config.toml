@@ -8,7 +8,7 @@ project_id = "kwzqvgdyadylwnvjghqn"
 # البيانات الافتتاحية والمثبتات (Database Seeding)
 # ---------------------------------------------------------------------------
 [db.seed]
-# يُشغَّل تلقائيًا فقط ما يجعل النظام "نظامًا".
+# تُشغَّل تلقائيًا قائمة ملفات صريحة فقط عند db reset.
 #
 # supabase/seeds/01_system/ يحوي الصفوف التي لا يعمل النظام بدونها:
 #   * 01_modules            — التطبيق يقرأ هذه الأكواد لتحديد الشاشات المتاحة.
@@ -16,19 +16,18 @@ project_id = "kwzqvgdyadylwnvjghqn"
 #   * 03_chart_of_accounts  — محرّك الترحيل يحلّ أكوادًا مثل '4111'.
 #   * 04_units              — كل منتج يحمل وحدة.
 #   * 05_expense_categories — نموذج المصروف يشترط تصنيفًا، مربوطة بحساباتها.
-#   * 06_platform_admins    — بلا مسؤول منصة لا تُدار الباقات ولا الوحدات.
 #   * 07_document_numbering — بلاها يرفض محرّك الترقيم توليد أي رقم.
 #   * 08_payment_methods    — كل دفعة تمر منها + إعداد المنشأة الافتراضي.
+#   * 09–13                — الشريك النقدي، الإعدادات والفهارس المرجعية.
 #
 # ⚠️ ممنوع أن يحوي هذا المسار بيانات أعمال أو هوية شركة:
 #   * بيانات الأعمال (منتجات، عملاء، موردون، فواتير، مخزون) = قيود مُختلقة داخل دفاتر العميل.
 #   * company_settings = الكتابة على اسم العميل وعملته ورقمه الضريبي.
 #
-# استثناء مقصود: 06_platform_admins يُنشئ صفوف auth.users حقيقية. هذا مبرَّر
-# لأنه حساب **المنصة** لا حساب عميل: وجوده شرط لعمل اللوحة الإدارية، وهو
-# نفسه في كل نسخة للنظام. حسابات المتجر تبقى ممنوعة تمامًا هنا — يملكها العميل وتُبنى من التطبيق.
+# 06_platform_admins مستثنى عمدًا من التشغيل التلقائي: إنشاء حسابات
+# auth.users وأدوار المنصة إجراء إداري منفصل، ولا يُزرع تلقائيًا على قاعدة عميل.
 #
-# ملاحظة: جدول pacsqlkaging_types يبدأ فارغًا عن قصد. «شوال» و«كيس» لا يحملان
+# ملاحظة: جدول packaging_types يبدأ فارغًا عن قصد. «شوال» و«كيس» لا يحملان
 # وزنًا ولا يصفان شيئًا يحتاجه كل عميل، والمنتج الحقيقي هو «كيس 50 كجم».
 #
 # ملفات العيّنات اختيارية وخارج التشغيل التلقائي؛ لن تُزرع عند `supabase db reset`:
@@ -39,9 +38,18 @@ project_id = "kwzqvgdyadylwnvjghqn"
 
 enabled = true
 sql_paths = [
-  "./seeds/01_system/*.sql"
-
-  
+  "./seeds/01_system/01_modules.sql",
+  "./seeds/01_system/02_plans.sql",
+  "./seeds/01_system/03_chart_of_accounts.sql",
+  "./seeds/01_system/04_units.sql",
+  "./seeds/01_system/05_expense_categories.sql",
+  "./seeds/01_system/07_document_numbering.sql",
+  "./seeds/01_system/08_payment_methods.sql",
+  "./seeds/01_system/09_essential_partners.sql",
+  "./seeds/01_system/10_production_expense_defaults.sql",
+  "./seeds/01_system/11_accounting_periods.sql",
+  "./seeds/01_system/12_milling_reference.sql",
+  "./seeds/01_system/13_storage_buckets.sql"
 ]
 
 

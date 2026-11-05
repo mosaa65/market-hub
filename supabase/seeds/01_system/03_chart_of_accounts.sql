@@ -50,6 +50,48 @@
 
 BEGIN;
 
+-- رؤوس دليل الحسابات التجميعية. كانت تُنشأ تاريخيًا بترحيل لاحق، لكن
+-- القاعدة الجديدة تبدأ من هذا الملف، لذلك تُزرع قبل الحسابات التفصيلية.
+INSERT INTO public.accounts
+  (code, name_ar, account_type, is_system, is_postable, notes)
+VALUES
+  ('1000', 'الأصول', 'ASSET', true, false, 'حساب رئيسي تجميعي — الأصول'),
+  ('2000', 'الخصوم والالتزامات', 'LIABILITY', true, false, 'حساب رئيسي تجميعي — الخصوم والالتزامات'),
+  ('3000', 'حقوق الملكية', 'EQUITY', true, false, 'حساب رئيسي تجميعي — حقوق الملكية'),
+  ('4000', 'الإيرادات', 'REVENUE', true, false, 'حساب رئيسي تجميعي — الإيرادات'),
+  ('5000', 'المصروفات', 'EXPENSE', true, false, 'حساب رئيسي تجميعي — المصروفات')
+ON CONFLICT (code) DO UPDATE SET
+  account_type = EXCLUDED.account_type,
+  is_system = true,
+  is_postable = false;
+
+INSERT INTO public.accounts
+  (code, name_ar, account_type, parent_id, is_system, is_postable, notes)
+VALUES
+  ('1100', 'النقدية والأرصدة بالبنوك وما في حكمها', 'ASSET', (SELECT id FROM public.accounts WHERE code = '1000'), true, false, 'حساب تجميعي للأموال النقدية والمصرفية والمحافظ'),
+  ('1200', 'المدينون والذمم المدينة التجارية', 'ASSET', (SELECT id FROM public.accounts WHERE code = '1000'), true, false, 'حساب تجميعي لذمم العملاء ومستحقات النشاط'),
+  ('1300', 'المخزون وبضاعة النشاط', 'ASSET', (SELECT id FROM public.accounts WHERE code = '1000'), true, false, 'حساب تجميعي لجميع أصناف المخزون وضريبة المدخلات'),
+  ('1400', 'الأصول الثابتة', 'ASSET', (SELECT id FROM public.accounts WHERE code = '1000'), true, false, 'حساب تجميعي للأصول الرأسمالية ومجمعات الإهلاك'),
+  ('1500', 'المصروفات والأصول المؤجلة والمدفوعة مقدمًا', 'ASSET', (SELECT id FROM public.accounts WHERE code = '1000'), true, false, 'حساب تجميعي للمصروفات المدفوعة مقدمًا والعقود المؤجلة'),
+  ('2100', 'الذمم الدائنة والموردون وأمانات العملاء', 'LIABILITY', (SELECT id FROM public.accounts WHERE code = '2000'), true, false, 'حساب تجميعي للموردين والتزامات الأمانات'),
+  ('2200', 'الالتزامات المستحقة والقروض قصيرة الأجل', 'LIABILITY', (SELECT id FROM public.accounts WHERE code = '2000'), true, false, 'حساب تجميعي للمستحقات والإيرادات المؤجلة'),
+  ('2300', 'الالتزامات الضريبية والضريبة المضافة', 'LIABILITY', (SELECT id FROM public.accounts WHERE code = '2000'), true, false, 'حساب تجميعي للضرائب'),
+  ('3100', 'رأس المال والمسحوبات الشخصية', 'EQUITY', (SELECT id FROM public.accounts WHERE code = '3000'), true, false, 'حساب تجميعي لرأس المال وحسابات الشركاء'),
+  ('3900', 'الأرباح والنتائج المالية المتراكمة', 'EQUITY', (SELECT id FROM public.accounts WHERE code = '3000'), true, false, 'حساب تجميعي للأرباح والنتائج'),
+  ('4100', 'إيرادات المبيعات والنشاط التشغيلي', 'REVENUE', (SELECT id FROM public.accounts WHERE code = '4000'), true, false, 'حساب تجميعي لإيرادات النشاط'),
+  ('4900', 'إيرادات وأرباح أخرى غير تشغيلية', 'REVENUE', (SELECT id FROM public.accounts WHERE code = '4000'), true, false, 'حساب تجميعي للإيرادات الأخرى'),
+  ('5100', 'تكلفة البضاعة والمبيعات', 'EXPENSE', (SELECT id FROM public.accounts WHERE code = '5000'), true, false, 'حساب تجميعي لتكلفة المبيعات'),
+  ('5200', 'أجور ورواتب ومنافع العاملين', 'EXPENSE', (SELECT id FROM public.accounts WHERE code = '5000'), true, false, 'حساب تجميعي لأجور العاملين'),
+  ('5300', 'المصروفات التشغيلية والخدمية', 'EXPENSE', (SELECT id FROM public.accounts WHERE code = '5000'), true, false, 'حساب تجميعي لمصروفات التشغيل'),
+  ('5400', 'المصروفات الإدارية والعمومية', 'EXPENSE', (SELECT id FROM public.accounts WHERE code = '5000'), true, false, 'حساب تجميعي للمصروفات الإدارية'),
+  ('5600', 'الإهلاك والاستهلاك للأصول', 'EXPENSE', (SELECT id FROM public.accounts WHERE code = '5000'), true, false, 'حساب تجميعي للإهلاك'),
+  ('5900', 'فاقد وتلف ومصروفات أخرى', 'EXPENSE', (SELECT id FROM public.accounts WHERE code = '5000'), true, false, 'حساب تجميعي للفاقد والخسائر')
+ON CONFLICT (code) DO UPDATE SET
+  parent_id = EXCLUDED.parent_id,
+  account_type = EXCLUDED.account_type,
+  is_system = true,
+  is_postable = false;
+
 INSERT INTO public.accounts
   (code,  name_ar,                             account_type, is_system, is_postable, requires_reconciliation, notes)
 VALUES
@@ -59,6 +101,7 @@ VALUES
   ('1111', 'حسابات البنوك',                      'ASSET', true,  true,  true,  'حساب تجميعي للتحويلات البنكية؛ تُضاف الحسابات البنكية الفعلية من إعدادات المنشأة.'),
   ('1131', 'المحافظ الإلكترونية',                'ASSET', true,  true,  true,  'حساب تجميعي للمحافظ؛ تُضاف المحافظ الفعلية من إعدادات المنشأة.'),
   ('1211', 'ذمم العملاء',                        'ASSET', true,  true,  false, 'ما هو مستحق لنا على العملاء مقابل مبيعات آجلة.'),
+  ('1231', 'إيرادات مستحقة القبض',               'ASSET', true,  true,  false, 'إيرادات تحققت للنشاط ولم يتم تحصيلها أو فوترتها بعد.'),
 
   -- ═══ المخزون ═══════════════════════════════════════════════════════════
   -- الأكواد 1311–1315 يستخدمها محرّك التكلفة والمبيعات والإنتاج، فلا تُغيّر.
@@ -188,7 +231,7 @@ DECLARE
     -- النقدية والبنوك — post_sales_invoice / post_purchase_invoice
     '1101','1111','1131','1221',
     -- ذمم العملاء — post_sales_invoice
-    '1211',
+    '1211','1231',
     -- المخزون وضريبة المدخلات — الترحيل ومحرك التكلفة والإنتاج
     '1311','1312','1313','1314','1315','1316',
     -- ذمم الموردين — post_purchase_invoice
