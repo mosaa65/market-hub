@@ -237,7 +237,7 @@ export function CustomerFormDialog({
                   {t("common.name")} <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
-                  <User className="pointer-events-none absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <User className="pointer-events-none absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground z-10" />
                   <input
                     required
                     disabled={isLockedCashCustomer}
@@ -245,7 +245,7 @@ export function CustomerFormDialog({
                     value={edit.name ?? ""}
                     onChange={(e) => setEdit({ ...edit, name: e.target.value })}
                     placeholder={isAr ? "اسم العميل أو المؤسسة" : "Customer or Company Name"}
-                    className="h-12 w-full rounded-2xl border border-border/80 bg-surface/80 px-4 ps-10 text-sm font-medium transition placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="h-12 w-full rounded-2xl border border-border/80 bg-surface/80 ps-11 pe-4 text-sm font-medium transition placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
                   />
                 </div>
               </div>
@@ -266,7 +266,7 @@ export function CustomerFormDialog({
                 <div className="flex gap-2">
                   <CountrySelector value={country} onChange={setCountry} disabled={saving} />
                   <div className="relative flex-1">
-                    <Phone className="pointer-events-none absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Phone className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground z-10" />
                     <input
                       type="tel"
                       dir="ltr"
@@ -275,7 +275,7 @@ export function CustomerFormDialog({
                       onChange={(e) => setPhone(e.target.value)}
                       placeholder="770000000"
                       maxLength={15}
-                      className="h-12 w-full rounded-2xl border border-border/80 bg-surface/80 px-4 ps-10 text-right text-sm font-medium transition placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      className="h-12 w-full rounded-2xl border border-border/80 bg-surface/80 pl-11 pr-4 text-left font-mono text-sm font-medium transition placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                     />
                   </div>
                 </div>
@@ -291,15 +291,15 @@ export function CustomerFormDialog({
                   <label className="mb-1.5 block text-xs font-medium text-foreground">
                     {t("common.email")}
                   </label>
-                  <div className="relative">
-                    <Mail className="pointer-events-none absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <div className="relative" dir="ltr">
+                    <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground z-10" />
                     <input
                       type="email"
                       dir="ltr"
                       value={edit.email ?? ""}
                       onChange={(e) => setEdit({ ...edit, email: e.target.value })}
                       placeholder="customer@domain.com"
-                      className="h-12 w-full rounded-2xl border border-border/80 bg-surface/80 px-4 ps-10 text-right text-sm font-medium transition placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      className="h-12 w-full rounded-2xl border border-border/80 bg-surface/80 pl-11 pr-4 text-left text-sm font-medium transition placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                     />
                   </div>
                 </div>
@@ -308,12 +308,12 @@ export function CustomerFormDialog({
                     {isAr ? "العنوان أو المدينة" : "Address"}
                   </label>
                   <div className="relative">
-                    <MapPin className="pointer-events-none absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <MapPin className="pointer-events-none absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground z-10" />
                     <input
                       value={edit.address ?? ""}
                       onChange={(e) => setEdit({ ...edit, address: e.target.value })}
                       placeholder={isAr ? "المدينة، الحي، الشارع" : "City, District, Street"}
-                      className="h-12 w-full rounded-2xl border border-border/80 bg-surface/80 px-4 ps-10 text-sm font-medium transition placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      className="h-12 w-full rounded-2xl border border-border/80 bg-surface/80 ps-11 pe-4 text-sm font-medium transition placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                     />
                   </div>
                 </div>
@@ -369,7 +369,9 @@ export function CustomerFormDialog({
                 >
                   <span
                     className={`pointer-events-none inline-block size-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      (edit.is_active ?? true) ? "ltr:translate-x-5 rtl:-translate-x-5" : "translate-x-0"
+                      (edit.is_active ?? true)
+                        ? "ltr:translate-x-5 rtl:-translate-x-5"
+                        : "translate-x-0"
                     }`}
                   />
                 </button>

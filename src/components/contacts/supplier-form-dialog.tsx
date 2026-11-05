@@ -91,9 +91,7 @@ export function SupplierFormDialog({
   const [country, setCountry] = useState<Country>(DEFAULT_COUNTRY);
   const [phone, setPhone] = useState<string>("");
   const [saving, setSaving] = useState(false);
-  const [showAdditional, setShowAdditional] = useState(
-    Boolean(initial?.email || initial?.address),
-  );
+  const [showAdditional, setShowAdditional] = useState(Boolean(initial?.email || initial?.address));
 
   useEffect(() => {
     if (open) {
@@ -229,7 +227,7 @@ export function SupplierFormDialog({
                   {t("common.name")} <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
-                  <User className="pointer-events-none absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <User className="pointer-events-none absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground z-10" />
                   <input
                     required
                     disabled={isLockedCashSupplier}
@@ -237,7 +235,7 @@ export function SupplierFormDialog({
                     value={edit.name ?? ""}
                     onChange={(e) => setEdit({ ...edit, name: e.target.value })}
                     placeholder={isAr ? "اسم المورد أو الشركة" : "Supplier or Company Name"}
-                    className="h-12 w-full rounded-2xl border border-border/80 bg-surface/80 px-4 ps-10 text-sm font-medium transition placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="h-12 w-full rounded-2xl border border-border/80 bg-surface/80 ps-11 pe-4 text-sm font-medium transition placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
                   />
                 </div>
               </div>
@@ -257,7 +255,7 @@ export function SupplierFormDialog({
                 <div className="flex gap-2">
                   <CountrySelector value={country} onChange={setCountry} disabled={saving} />
                   <div className="relative flex-1" dir="ltr">
-                    <Phone className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Phone className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground z-10" />
                     <input
                       type="tel"
                       dir="ltr"
@@ -266,7 +264,7 @@ export function SupplierFormDialog({
                       onChange={(e) => setPhone(e.target.value)}
                       placeholder="772217218"
                       maxLength={15}
-                      className="h-12 w-full rounded-2xl border border-border/80 bg-surface/80 px-4 pl-10 text-left font-mono text-sm font-medium transition placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      className="h-12 w-full rounded-2xl border border-border/80 bg-surface/80 pl-11 pr-4 text-left font-mono text-sm font-medium transition placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                     />
                   </div>
                 </div>
@@ -286,9 +284,13 @@ export function SupplierFormDialog({
                 >
                   <span className="flex items-center gap-1.5">
                     <Sparkles className="size-3 text-primary" />
-                    {isAr ? "معلومات إضافية (البريد، العنوان)" : "Additional Information (Email, Address)"}
+                    {isAr
+                      ? "معلومات إضافية (البريد، العنوان)"
+                      : "Additional Information (Email, Address)"}
                   </span>
-                  <span className="text-[11px] text-primary">{showAdditional ? (isAr ? "إخفاء ▲" : "Hide ▲") : (isAr ? "إظهار ▼" : "Show ▼")}</span>
+                  <span className="text-[11px] text-primary">
+                    {showAdditional ? (isAr ? "إخفاء ▲" : "Hide ▲") : isAr ? "إظهار ▼" : "Show ▼"}
+                  </span>
                 </button>
 
                 {showAdditional && (
@@ -298,14 +300,14 @@ export function SupplierFormDialog({
                         {t("common.email")}
                       </label>
                       <div className="relative" dir="ltr">
-                        <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                        <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground z-10" />
                         <input
                           type="email"
                           dir="ltr"
                           value={edit.email ?? ""}
                           onChange={(e) => setEdit({ ...edit, email: e.target.value })}
                           placeholder="supplier@domain.com"
-                          className="h-12 w-full rounded-2xl border border-border/80 bg-surface/80 px-4 pl-10 text-left font-mono text-sm font-medium transition placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          className="h-12 w-full rounded-2xl border border-border/80 bg-surface/80 pl-11 pr-4 text-left font-mono text-sm font-medium transition placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                         />
                       </div>
                     </div>
@@ -314,12 +316,12 @@ export function SupplierFormDialog({
                         {isAr ? "العنوان أو المدينة" : "Address"}
                       </label>
                       <div className="relative">
-                        <MapPin className="pointer-events-none absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                        <MapPin className="pointer-events-none absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground z-10" />
                         <input
                           value={edit.address ?? ""}
                           onChange={(e) => setEdit({ ...edit, address: e.target.value })}
                           placeholder={isAr ? "المدينة، الحي، الشارع" : "City, District, Street"}
-                          className="h-12 w-full rounded-2xl border border-border/80 bg-surface/80 px-4 ps-10 text-sm font-medium transition placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          className="h-12 w-full rounded-2xl border border-border/80 bg-surface/80 ps-11 pe-4 text-sm font-medium transition placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                         />
                       </div>
                     </div>
@@ -359,7 +361,9 @@ export function SupplierFormDialog({
                 >
                   <span
                     className={`pointer-events-none inline-block size-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      (edit.is_active ?? true) ? "ltr:translate-x-5 rtl:-translate-x-5" : "translate-x-0"
+                      (edit.is_active ?? true)
+                        ? "ltr:translate-x-5 rtl:-translate-x-5"
+                        : "translate-x-0"
                     }`}
                   />
                 </button>
