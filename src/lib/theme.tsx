@@ -17,6 +17,7 @@ import {
   DEFAULT_COLOR_ARCHIVE,
   DEFAULT_CUSTOM_HEX,
   GUEST_PREFERENCES_KEY,
+  MODE_VARIANTS,
   THEME_SYNC_BROADCAST_CHANNEL,
   applyAccentThemeVariables,
   applyModeVariant,
@@ -165,7 +166,7 @@ export function applyTheme(
   root.dataset.theme = theme;
   root.style.colorScheme = theme;
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", theme === "dark" ? "#0A0A0B" : "#FBFAF9");
+  if (meta) meta.setAttribute("content", theme === "dark" ? "#101218" : "#FCFAF7");
 
   // تطبيق درجة العرض (فخم/نقي/رمادي/معتم) — الافتراضي بدون كلاس
   applyModeVariant(modeVariant);
@@ -191,7 +192,7 @@ export const THEME_BOOT_SCRIPT = `(function(){
     r.dataset.theme = t;
     r.style.colorScheme = t;
     var m = document.querySelector('meta[name="theme-color"]');
-    if (m) { m.setAttribute("content", t === "dark" ? "#0A0A0B" : "#FBFAF9"); }
+    if (m) { m.setAttribute("content", t === "dark" ? "#101218" : "#FCFAF7"); }
 
     // نوع الخط المختار (تطبيق فوري قبل الرسم لمنع وميض الخطوط)
     var f = localStorage.getItem("${FONT_STORAGE_KEY}") || "${DEFAULT_FONT_THEME}";
@@ -205,7 +206,10 @@ export const THEME_BOOT_SCRIPT = `(function(){
     // درجة عرض العرض (فخم/نقي/رمادي/معتم)
     var v = localStorage.getItem("${MODE_VARIANT_STORAGE_KEY}") || "default";
     var vc = { "luxe": "light-luxe", "pure": "light-pure", "sand": "light-sand", "mist": "light-mist", "slate": "dark-slate", "deep": "dark-deep", "navy": "dark-navy", "cocoa": "dark-cocoa" };
-    if (vc[v]) { r.classList.add(vc[v]); }
+    var vb = { "luxe": "light", "pure": "light", "sand": "light", "mist": "light", "slate": "dark", "deep": "dark", "navy": "dark", "cocoa": "dark" };
+    // لا تضف كلاس الدرجة إلا إذا كان وضعها الأساسي مطابقاً للسمة الحالية،
+    // وإلا يبقى كلاس فاتح فوق .dark (أو العكس) فينكسر التباين.
+    if (vc[v] && vb[v] === t) { r.classList.add(vc[v]); }
     r.dataset.modeVariant = v;
 
     var a = localStorage.getItem("${ACCENT_STORAGE_KEY}") || "${DEFAULT_ACCENT_THEME}";
@@ -213,24 +217,24 @@ export const THEME_BOOT_SCRIPT = `(function(){
 
     var presets = {
       emerald: {
-        dark: { p: "oklch(0.68 0.20 155)", fg: "oklch(1 0 0)", r: "oklch(0.68 0.20 155 / 0.6)", sp: "oklch(0.68 0.20 155)", tp: "oklch(0.68 0.20 155 / 0.20)" },
-        light: { p: "oklch(0.54 0.18 155)", fg: "oklch(0.99 0.01 55)", r: "oklch(0.54 0.18 155 / 0.5)", sp: "oklch(0.50 0.18 155)", tp: "oklch(0.54 0.18 155 / 0.12)" }
+        dark: { p: "oklch(0.68 0.20 155)", fg: "oklch(1 0 0)", r: "oklch(0.68 0.20 155 / 0.6)", sp: "oklch(0.68 0.20 155)", tp: "oklch(0.68 0.20 155 / 0.20)", tf: "oklch(0.85 0.15 155)", ti: "oklch(0.68 0.18 155 / 0.20)", tif: "oklch(0.85 0.15 155)", sar: "oklch(1 0 0 / 0.10)", c1: "oklch(0.68 0.20 155)" },
+        light: { p: "oklch(0.54 0.18 155)", fg: "oklch(0.99 0.01 55)", r: "oklch(0.54 0.18 155 / 0.5)", sp: "oklch(0.50 0.18 155)", tp: "oklch(0.54 0.18 155 / 0.12)", tf: "oklch(0.34 0.16 155)", ti: "oklch(0.54 0.18 155 / 0.12)", tif: "oklch(0.34 0.16 155)", sar: "oklch(0.50 0.18 155 / 0.18)", c1: "oklch(0.54 0.18 155)" }
       },
       amethyst: {
-        dark: { p: "oklch(0.66 0.24 295)", fg: "oklch(1 0 0)", r: "oklch(0.66 0.24 295 / 0.6)", sp: "oklch(0.66 0.24 295)", tp: "oklch(0.66 0.24 295 / 0.20)" },
-        light: { p: "oklch(0.55 0.24 295)", fg: "oklch(0.99 0.01 55)", r: "oklch(0.55 0.24 295 / 0.5)", sp: "oklch(0.52 0.22 295)", tp: "oklch(0.55 0.24 295 / 0.12)" }
+        dark: { p: "oklch(0.66 0.24 295)", fg: "oklch(1 0 0)", r: "oklch(0.66 0.24 295 / 0.6)", sp: "oklch(0.66 0.24 295)", tp: "oklch(0.66 0.24 295 / 0.20)", tf: "oklch(0.84 0.16 295)", ti: "oklch(0.66 0.24 295 / 0.20)", tif: "oklch(0.84 0.16 295)", sar: "oklch(1 0 0 / 0.10)", c1: "oklch(0.66 0.24 295)" },
+        light: { p: "oklch(0.55 0.24 295)", fg: "oklch(0.99 0.01 55)", r: "oklch(0.55 0.24 295 / 0.5)", sp: "oklch(0.52 0.22 295)", tp: "oklch(0.55 0.24 295 / 0.12)", tf: "oklch(0.38 0.20 295)", ti: "oklch(0.55 0.24 295 / 0.12)", tif: "oklch(0.38 0.20 295)", sar: "oklch(0.52 0.22 295 / 0.18)", c1: "oklch(0.55 0.24 295)" }
       },
       ruby: {
-        dark: { p: "oklch(0.65 0.24 15)", fg: "oklch(1 0 0)", r: "oklch(0.65 0.24 15 / 0.6)", sp: "oklch(0.65 0.24 15)", tp: "oklch(0.65 0.24 15 / 0.20)" },
-        light: { p: "oklch(0.55 0.23 15)", fg: "oklch(0.99 0.01 55)", r: "oklch(0.55 0.23 15 / 0.5)", sp: "oklch(0.51 0.21 15)", tp: "oklch(0.55 0.23 15 / 0.12)" }
+        dark: { p: "oklch(0.65 0.24 15)", fg: "oklch(1 0 0)", r: "oklch(0.65 0.24 15 / 0.6)", sp: "oklch(0.65 0.24 15)", tp: "oklch(0.65 0.24 15 / 0.20)", tf: "oklch(0.84 0.16 15)", ti: "oklch(0.65 0.24 15 / 0.20)", tif: "oklch(0.84 0.16 15)", sar: "oklch(1 0 0 / 0.10)", c1: "oklch(0.65 0.24 15)" },
+        light: { p: "oklch(0.55 0.23 15)", fg: "oklch(0.99 0.01 55)", r: "oklch(0.55 0.23 15 / 0.5)", sp: "oklch(0.51 0.21 15)", tp: "oklch(0.55 0.23 15 / 0.12)", tf: "oklch(0.38 0.18 15)", ti: "oklch(0.55 0.23 15 / 0.12)", tif: "oklch(0.38 0.18 15)", sar: "oklch(0.51 0.21 15 / 0.18)", c1: "oklch(0.55 0.23 15)" }
       },
       amber: {
-        dark: { p: "oklch(0.74 0.19 75)", fg: "oklch(0.12 0 0)", r: "oklch(0.74 0.19 75 / 0.6)", sp: "oklch(0.74 0.19 75)", tp: "oklch(0.74 0.19 75 / 0.20)" },
-        light: { p: "oklch(0.58 0.18 75)", fg: "oklch(1 0 0)", r: "oklch(0.58 0.18 75 / 0.5)", sp: "oklch(0.54 0.17 75)", tp: "oklch(0.58 0.18 75 / 0.12)" }
+        dark: { p: "oklch(0.74 0.19 75)", fg: "oklch(0.12 0 0)", r: "oklch(0.74 0.19 75 / 0.6)", sp: "oklch(0.74 0.19 75)", tp: "oklch(0.74 0.19 75 / 0.20)", tf: "oklch(0.88 0.14 75)", ti: "oklch(0.74 0.19 75 / 0.20)", tif: "oklch(0.88 0.14 75)", sar: "oklch(1 0 0 / 0.10)", c1: "oklch(0.74 0.19 75)" },
+        light: { p: "oklch(0.58 0.18 75)", fg: "oklch(1 0 0)", r: "oklch(0.58 0.18 75 / 0.5)", sp: "oklch(0.54 0.17 75)", tp: "oklch(0.58 0.18 75 / 0.12)", tf: "oklch(0.40 0.16 75)", ti: "oklch(0.58 0.18 75 / 0.12)", tif: "oklch(0.40 0.16 75)", sar: "oklch(0.54 0.17 75 / 0.18)", c1: "oklch(0.58 0.18 75)" }
       },
       topaz: {
-        dark: { p: "oklch(0.70 0.18 215)", fg: "oklch(0.10 0 0)", r: "oklch(0.70 0.18 215 / 0.6)", sp: "oklch(0.70 0.18 215)", tp: "oklch(0.70 0.18 215 / 0.20)" },
-        light: { p: "oklch(0.56 0.18 215)", fg: "oklch(1 0 0)", r: "oklch(0.56 0.18 215 / 0.5)", sp: "oklch(0.52 0.17 215)", tp: "oklch(0.56 0.18 215 / 0.12)" }
+        dark: { p: "oklch(0.70 0.18 215)", fg: "oklch(0.10 0 0)", r: "oklch(0.70 0.18 215 / 0.6)", sp: "oklch(0.70 0.18 215)", tp: "oklch(0.70 0.18 215 / 0.20)", tf: "oklch(0.86 0.13 215)", ti: "oklch(0.70 0.18 215 / 0.20)", tif: "oklch(0.86 0.13 215)", sar: "oklch(1 0 0 / 0.10)", c1: "oklch(0.70 0.18 215)" },
+        light: { p: "oklch(0.56 0.18 215)", fg: "oklch(1 0 0)", r: "oklch(0.56 0.18 215 / 0.5)", sp: "oklch(0.52 0.17 215)", tp: "oklch(0.56 0.18 215 / 0.12)", tf: "oklch(0.36 0.16 215)", ti: "oklch(0.56 0.18 215 / 0.12)", tif: "oklch(0.36 0.16 215)", sar: "oklch(0.52 0.17 215 / 0.18)", c1: "oklch(0.56 0.18 215)" }
       }
     };
 
@@ -242,7 +246,12 @@ export const THEME_BOOT_SCRIPT = `(function(){
       r.style.setProperty("--sidebar-primary", s.sp);
       r.style.setProperty("--sidebar-primary-foreground", s.fg);
       r.style.setProperty("--sidebar-ring", s.r);
+      r.style.setProperty("--sidebar-active-ring", s.sar);
       r.style.setProperty("--tone-primary", s.tp);
+      r.style.setProperty("--tone-primary-fg", s.tf);
+      r.style.setProperty("--tone-info", s.ti);
+      r.style.setProperty("--tone-info-fg", s.tif);
+      r.style.setProperty("--chart-1", s.c1);
     } else if (a === "custom") {
       var c = localStorage.getItem("${CUSTOM_COLOR_STORAGE_KEY}") || "${DEFAULT_CUSTOM_HEX}";
       var clean = c.replace("#","");
@@ -252,13 +261,20 @@ export const THEME_BOOT_SCRIPT = `(function(){
         var lum = (0.299 * red + 0.587 * green + 0.114 * blue) / 255;
         var fg = lum > 0.62 ? "oklch(0.12 0 0)" : "oklch(1 0 0)";
         var rgbStr = "rgb(" + red + " " + green + " " + blue + ")";
+        var fgDark = "rgb(" + Math.min(255, red + 45) + " " + Math.min(255, green + 45) + " " + Math.min(255, blue + 45) + ")";
+        var fgLight = "rgb(" + Math.max(0, red - 30) + " " + Math.max(0, green - 30) + " " + Math.max(0, blue - 30) + ")";
         r.style.setProperty("--primary", rgbStr);
         r.style.setProperty("--primary-foreground", fg);
         r.style.setProperty("--ring", "rgb(" + red + " " + green + " " + blue + " / 0.55)");
         r.style.setProperty("--sidebar-primary", rgbStr);
         r.style.setProperty("--sidebar-primary-foreground", fg);
         r.style.setProperty("--sidebar-ring", "rgb(" + red + " " + green + " " + blue + " / 0.55)");
+        r.style.setProperty("--sidebar-active-ring", "rgb(" + red + " " + green + " " + blue + " / 0.18)");
         r.style.setProperty("--tone-primary", "rgb(" + red + " " + green + " " + blue + " / 0.15)");
+        r.style.setProperty("--tone-primary-fg", t === "dark" ? fgDark : fgLight);
+        r.style.setProperty("--tone-info", "rgb(" + red + " " + green + " " + blue + " / 0.15)");
+        r.style.setProperty("--tone-info-fg", t === "dark" ? fgDark : fgLight);
+        r.style.setProperty("--chart-1", rgbStr);
       }
     }
   } catch(e) {}
@@ -284,9 +300,25 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const cloudSyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const broadcastChannelRef = useRef<BroadcastChannel | null>(null);
-  const stateRef = useRef({ theme, modeVariant, fontTheme, accentTheme, customColor, colorArchive, userId });
+  const stateRef = useRef({
+    theme,
+    modeVariant,
+    fontTheme,
+    accentTheme,
+    customColor,
+    colorArchive,
+    userId,
+  });
 
-  stateRef.current = { theme, modeVariant, fontTheme, accentTheme, customColor, colorArchive, userId };
+  stateRef.current = {
+    theme,
+    modeVariant,
+    fontTheme,
+    accentTheme,
+    customColor,
+    colorArchive,
+    userId,
+  };
 
   // 1. تطبيق الثيم والخط فورياً على DOM عند أي تغيير (مع درجة العرض)
   useEffect(() => {
@@ -372,9 +404,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const setTheme = useCallback(
     (next: Theme) => {
       setThemeState(next);
+      // إصلاح تعارض الدرجة مع السمة: لو تبديلنا light↔dark والدرة المحفوظة
+      // من الوضع الآخر، تبقى كلاسها (مثلاً .light-luxe) مفعل فوق .dark
+      // فيعطي خلفية فاتحة بنص أبيض. نُرجع الدرجة للافتراضي لتطابق الوضع الجديد.
+      let nextVariant = stateRef.current.modeVariant;
+      if (MODE_VARIANTS[nextVariant] && MODE_VARIANTS[nextVariant].base !== next) {
+        nextVariant = "default";
+        setModeVariantState(nextVariant);
+      }
       const prefs: UserThemePreferences = {
         theme: next,
-        modeVariant: stateRef.current.modeVariant,
+        modeVariant: nextVariant,
         fontTheme: stateRef.current.fontTheme,
         accentTheme: stateRef.current.accentTheme,
         customColor: stateRef.current.customColor,
