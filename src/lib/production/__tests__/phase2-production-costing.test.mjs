@@ -27,7 +27,7 @@ const root = resolve(here, "../../../..");
 const read = (...parts) => readFileSync(join(root, ...parts), "utf8").replace(/\r\n/g, "\n");
 
 const M9917 = "supabase/migrations/9917_phase2_production_unification_and_costing.sql";
-const M9916 = "supabase/migrations/9916_phase1_expense_control_ledger_and_production_tax.sql";
+const M9923 = "supabase/migrations/9923_phase1_expense_control_ledger_and_production_tax.sql";
 const M9906 = "supabase/migrations/9906_company_production_orders_and_costing.sql";
 const M43 = "supabase/migrations/43_audit_remediation_delivery_blockers.sql";
 const M48 = "supabase/migrations/48_convert_stock_unit_count.sql";
@@ -66,7 +66,7 @@ function sqlFunction(sql, name, requiredParams = []) {
 }
 
 const phase2 = read(M9917);
-const phase1 = read(M9916);
+const phase1 = read(M9923);
 const modern = read(M9906);
 const legacy43 = read(M43);
 const legacy33 = read(M33);
