@@ -46,6 +46,7 @@ import { useI18n } from "@/lib/i18n";
 import { useModules } from "@/lib/modules";
 import { money } from "@/lib/format";
 import { toSystemDigits } from "@/lib/format-preferences";
+import { transactionDate } from "@/lib/time/business-date";
 import { generateInvoicePDF, type InvoiceDoc } from "@/lib/pdf";
 import { LuxuryPrintPreviewModal } from "@/components/luxury-print-preview-modal";
 import {
@@ -250,7 +251,7 @@ export function SalesPage() {
       const { data, error } = await supabase
         .from("sales_invoices")
         .select(
-          "id,invoice_number,status,subtotal,discount,tax,total,paid,payment_method,note,created_at,customer_id,warehouse_id,customers(id,name,phone,is_system),warehouses(name,name_ar)",
+          "id,invoice_number,status,subtotal,discount,tax,total,paid,payment_method,note,created_at,business_date,customer_id,warehouse_id,customers(id,name,phone,is_system),warehouses(name,name_ar)",
         )
         .order("created_at", { ascending: false })
         .range(from, to);
@@ -988,8 +989,10 @@ export function SalesPage() {
       if (maxAmount && tot > Number(maxAmount)) return false;
 
       // 7. Date filter from toolbar
+      //    يُقاس على تاريخ المعاملة (business_date) لا تاريخ الإنشاء، حتى تظهر
+      //    الكشوف المتأخرة في اليوم الذي سُجّلت عليه لا اليوم الذي أُدخلت فيه.
       if (filters.created_at && typeof filters.created_at === "object") {
-        const rowTime = new Date(r.created_at).getTime();
+        const rowTime = new Date(transactionDate(r)).getTime();
         if (filters.created_at.from && rowTime < new Date(filters.created_at.from).getTime())
           return false;
         if (filters.created_at.to) {
@@ -1001,7 +1004,7 @@ export function SalesPage() {
 
       // 8. Date preset filter from sheet
       if (filterDatePreset !== "all") {
-        const rowDate = new Date(r.created_at);
+        const rowDate = new Date(transactionDate(r));
         const now = new Date();
         if (filterDatePreset === "today") {
           if (rowDate.toDateString() !== now.toDateString()) return false;

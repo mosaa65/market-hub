@@ -71,6 +71,8 @@ import { QuantityInput } from "@/components/ui/quantity-input";
 import { ProductPicker } from "@/components/products/product-picker";
 import { ProductLinesEditor } from "@/components/products/product-lines-editor";
 import { WarehouseBadge } from "@/components/ui/warehouse-badge";
+import { PosDatePicker } from "@/components/commerce/pos-date-picker";
+import { todayKey } from "@/lib/time/business-date";
 import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
 import {
   getPaymentMethodDefinition,
@@ -132,6 +134,8 @@ function MillingIntakePage() {
   const [quickCustomerOpen, setQuickCustomerOpen] = useState(false);
   const [warehouseId, setWarehouseId] = useState("");
   const [notes, setNotes] = useState("");
+  /** تاريخ كشف الطحن (المرحلة الثالثة) — يبدأ باليوم التشغيلي المحلي. */
+  const [businessDate, setBusinessDate] = useState(() => todayKey());
 
   /**
    * أسطر الاستلام: نوع حبوب مستقل لكل سطر (بر 50كجم ×10 + بر 25كجم ×10 + ...)
@@ -399,6 +403,7 @@ function MillingIntakePage() {
         paid: currentPaid,
         paymentSplits: paymentSplits.length > 1 ? paymentSplits : null,
         notes: notes.trim() || undefined,
+        businessDate,
       });
     },
     onSuccess: async (res) => {
@@ -620,6 +625,13 @@ function MillingIntakePage() {
                       nameAr: w.name_ar || w.name,
                       isDefault: Boolean(w.is_default),
                     }))}
+                  />
+                  {/* تاريخ كشف الطحن — يمكن تسجيل كشف يوم سابق */}
+                  <PosDatePicker
+                    value={businessDate}
+                    onChange={setBusinessDate}
+                    lang={lang}
+                    label={lang === "ar" ? "تاريخ الكشف" : "Statement date"}
                   />
                 </div>
               </div>

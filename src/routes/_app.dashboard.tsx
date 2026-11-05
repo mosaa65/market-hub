@@ -15,6 +15,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/page-header";
 import { formatLuxuryDate, toSystemDigits } from "@/lib/format-preferences";
+import { transactionDayKey } from "@/lib/time/business-date";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { paymentMethodLabel as paymentMethodLabelFromCatalog } from "@/lib/payments/payment-methods";
@@ -229,7 +230,9 @@ function DashboardPage() {
       const [sales, customers, products, inv, items, recent, expenses] = await Promise.all([
         supabase
           .from("sales_invoices")
-          .select("id,invoice_number,total,paid,payment_method,created_at,status,customer_id")
+          .select(
+            "id,invoice_number,total,paid,payment_method,created_at,business_date,status,customer_id",
+          )
           .gte("created_at", since),
         supabase
           .from("customers")
@@ -272,7 +275,8 @@ function DashboardPage() {
         const d = new Date(Date.now() - i * 86400_000);
         const key = d.toISOString().slice(0, 10);
         const label = d.toLocaleDateString(lang === "ar" ? "ar" : "en", { weekday: "short" });
-        const rows = salesRows.filter((r) => (r as any).created_at.slice(0, 10) === key);
+        // تاريخ المعاملة، لا تاريخ الإدخال: كشف أمس يدخل اليوم يظهر أمس.
+        const rows = salesRows.filter((r) => transactionDayKey(r as any) === key);
         daily.push({
           day: label,
           revenue: rows.reduce((a, r: any) => a + Number(r.total), 0),
@@ -485,7 +489,7 @@ function DashboardPage() {
           // Sales rows calculation for selected date
           const allSales = data?.allSalesRows ?? [];
           const selectedDaySalesRows = allSales.filter(
-            (r: any) => ((r.created_at || "") as string).slice(0, 10) === selectedDateKey,
+            (r: any) => transactionDayKey(r) === selectedDateKey,
           );
           const selectedDayRevenue = isSelectedToday
             ? data?.daily && data.daily.length > 0
@@ -837,7 +841,7 @@ function DashboardPage() {
                               const m = String(now.getMinutes()).padStart(2, "0");
                               const s = String(now.getSeconds()).padStart(2, "0");
                               const h12 = String(h % 12 || 12).padStart(2, "0");
-                              const period = isAr ? (h >= 12 ? "م" : "ص") : (h >= 12 ? "PM" : "AM");
+                              const period = isAr ? (h >= 12 ? "م" : "ص") : h >= 12 ? "PM" : "AM";
                               return `${h12}:${m}:${s} ${period}`;
                             })()}
                           </span>
