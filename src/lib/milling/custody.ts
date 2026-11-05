@@ -1491,7 +1491,9 @@ export async function smartManufacture(input: {
   warehouseId: string;
   grainItemId: string;
   grainQty: number;
-  outputs: { itemId: string; qty: number }[];
+  /** وحدة كمية القمح المرسلة. تُستبعد عند عدم اختيارها فتستخدم وحدة الأساس. */
+  grainUomId?: string | null;
+  outputs: { itemId: string; qty: number; uomId?: string | null }[];
   notes?: string;
 }): Promise<OpResult> {
   if (!input.warehouseId || !input.grainItemId) {
@@ -1505,11 +1507,18 @@ export async function smartManufacture(input: {
     return { ok: false, message: "أضف ناتجاً واحداً على الأقل (صنف + كمية)." };
   }
 
+  // الوحدات تُرسل صراحةً لكل سطر؛ القاعدة الآن في SQL: تحويل كل كمية إلى وحدة
+  // أساس الصنف قبل مقارنة الكتل واحتساب الفاقد. إغفال الوحدة = وحدة الأساس.
   const { data, error } = await db.rpc("smart_manufacture", {
     _warehouse_id: input.warehouseId,
     _grain_item_id: input.grainItemId,
     _grain_qty: input.grainQty,
-    _outputs: validOutputs.map((o) => ({ item_id: o.itemId, qty: o.qty })),
+    _grain_uom_id: input.grainUomId || null,
+    _outputs: validOutputs.map((o) => ({
+      item_id: o.itemId,
+      qty: o.qty,
+      uom_id: o.uomId || null,
+    })),
     _notes: input.notes ?? null,
   });
   if (error) return { ok: false, message: translateCustodyError(error.message) };

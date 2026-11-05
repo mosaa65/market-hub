@@ -98,7 +98,11 @@ export async function loadProductionLookups() {
   const [warehouses, centers, products, units, productUoms, batches, inventory, costs] =
     await Promise.all([
       db.from("warehouses").select("id,name,name_ar,is_default").eq("is_active", true),
-      db.from("expense_cost_centers").select("id,code,name,name_ar").eq("is_active", true).order("name"),
+      db
+        .from("expense_cost_centers")
+        .select("id,code,name,name_ar")
+        .eq("is_active", true)
+        .order("name"),
       db
         .from("products")
         .select(
@@ -122,16 +126,7 @@ export async function loadProductionLookups() {
       db.rpc("production_cost_sources"),
     ]);
 
-  const result = [
-    warehouses,
-    centers,
-    products,
-    units,
-    productUoms,
-    batches,
-    inventory,
-    costs,
-  ];
+  const result = [warehouses, centers, products, units, productUoms, batches, inventory, costs];
   const failure = result.find((item) => item.error);
   if (failure?.error) throw failure.error;
 
@@ -163,14 +158,10 @@ export async function loadProductionLookups() {
 }
 
 export async function loadProductionOrderHistory() {
+  // السجل يُقرأ من production_order_history (9918): عمود الصفوف الخفيفة فقط،
+  // فإضافة عمود جديد على production_orders لا تكسر صفحة السجل بعد اليوم.
   const [orders, centers] = await Promise.all([
-    db
-      .from("production_orders")
-      .select(
-        "id,order_number,production_date,status,warehouse_id,cost_center_id,material_cost,conversion_cost,total_cost,output_cost,abnormal_loss_cost,notes,completed_at,reversed_at,reversal_reason",
-      )
-      .order("created_at", { ascending: false })
-      .limit(250),
+    db.rpc("production_order_history", { p_limit: 250 }),
     db.from("expense_cost_centers").select("id,name,name_ar").order("name"),
   ]);
   if (orders.error) throw orders.error;
@@ -207,9 +198,17 @@ export interface ProductionExpenseInput {
 
 export interface ProductionLossInput {
   loss_type: "NORMAL" | "ABNORMAL";
+  /** الكمية بوحدة الكتلة المختارة (مسار الكتلة). */
   quantity: number;
-  uom_id: string;
+  uom_id?: string | null;
   reason: string;
+  /**
+   * فاقد عددي بوحدة الصنف (كيس تالف مثلاً). عند إرساله تُحوَّل الكمية إلى
+   * وحدة أساس الصنف في الخادم، ويُحسب مكافئ الكتلة من وزن العبوة أو وحدة
+   * الكتلة. mass_kg اختياري عندما لا يعرف الصنف مكافئاً كتلياً.
+   */
+  product_id?: string | null;
+  mass_kg?: number | null;
 }
 
 export async function createAndPostProductionOrder(input: {
@@ -243,4 +242,129 @@ export async function reverseProductionOrder(orderId: string, reason: string): P
   });
   if (error) throw error;
   return data as string;
+}
+
+/* ── تفاصيل تكلفة الأمر ─────────────────────────────────────────────────────
+   تُقرأ من production_order_cost_detail (9917) لا من حساب في الواجهة، حتى
+   تبقى الواجهة والمحرك على مصدر واحد للتكلفة. */
+export interface ProductionCostMaterial {
+  id: string;
+  product_id: string;
+  product_name: string | null;
+  entered_quantity: number;
+  entered_uom: string | null;
+  base_quantity: number;
+  base_uom: string | null;
+  uom_conversion_factor: number;
+  mass_kg: number | null;
+  unit_cost: number;
+  total_cost: number;
+  inventory_account_code: string;
+  stock_movement_id: string | null;
+  batches: { batch_id: string; batch_number: string; base_quantity: number }[];
+}
+
+export interface ProductionCostSource {
+  id: string;
+  expense_line_id: string;
+  expense_entry_id: string;
+  reference: string | null;
+  expense_date: string;
+  category: string | null;
+  expense_account_code: string;
+  amount: number;
+  allocation_basis: string;
+  note: string | null;
+  journal_entry_id: string | null;
+}
+
+export interface ProductionCostOutput {
+  id: string;
+  product_id: string;
+  product_name: string | null;
+  item_class: string | null;
+  entered_quantity: number;
+  entered_uom: string | null;
+  base_quantity: number;
+  base_uom: string | null;
+  mass_kg: number | null;
+  allocation_value_per_base: number;
+  allocation_weight: number;
+  allocated_cost: number;
+  actual_stock_cost: number;
+  unit_cost: number;
+  inventory_account_code: string;
+  batch_id: string | null;
+  batch_number: string | null;
+  expiry_date: string | null;
+  stock_movement_id: string | null;
+}
+
+export interface ProductionCostLoss {
+  id: string;
+  loss_type: "NORMAL" | "ABNORMAL";
+  quantity: number;
+  uom: string | null;
+  mass_kg: number;
+  reason: string;
+  charged_cost: number;
+}
+
+export interface ProductionCostJournal {
+  id: string;
+  entry_number: string;
+  entry_date: string;
+  memo: string;
+  source_type: string;
+  status: string;
+}
+
+export interface ProductionExcludedExpense {
+  expense_line_id: string;
+  expense_entry_id: string;
+  reference: string | null;
+  expense_date: string;
+  category: string | null;
+  net_amount: number;
+  tax_amount: number;
+  tax_recoverable: boolean;
+  cost_center_matches: boolean;
+  category_eligible: boolean;
+  reason: string | null;
+}
+
+export interface ProductionOrderCostDetail {
+  order: ProductionOrderSummary & {
+    warehouse_id: string;
+    cost_center_id: string;
+  };
+  materials: ProductionCostMaterial[];
+  cost_sources: ProductionCostSource[];
+  outputs: ProductionCostOutput[];
+  losses: ProductionCostLoss[];
+  journals: ProductionCostJournal[];
+  excluded_expenses: ProductionExcludedExpense[];
+  summary: {
+    wip_debit: number;
+    wip_credit: number;
+    conversion_from_expenses: number;
+    unallocated_conversion: number;
+    /** مجاميع من السجلات (9918): لا تحسبها الواجهة. */
+    material_subtotal?: number;
+    conversion_subtotal?: number;
+    wip_total_from_parts?: number;
+    rounding_variance?: number;
+    wip_balanced?: boolean;
+    allocation_basis: string;
+  };
+}
+
+export async function loadProductionOrderCostDetail(
+  orderId: string,
+): Promise<ProductionOrderCostDetail> {
+  const { data, error } = await db.rpc("production_order_cost_detail", {
+    p_order_id: orderId,
+  });
+  if (error) throw error;
+  return data as ProductionOrderCostDetail;
 }
