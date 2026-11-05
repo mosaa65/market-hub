@@ -155,6 +155,9 @@ type ProductRow = {
   /** الوزن الصافي الثابت للعبوة؛ يستخدم لاقتراح كمية الكيس في الشراء والطحن. */
   package_weight_kg: number | null;
   shelf_location: string | null;
+  /** ثوابت الصنف (المرحلة الرابعة) */
+  default_supplier_id?: string | null;
+  default_uom_id?: string | null;
   origin_id: string | null;
   quality_grade_id: string | null;
   is_active: boolean;
@@ -2666,6 +2669,8 @@ function ProductDialog({
     package_weight_kg: initial?.package_weight_kg != null ? String(initial.package_weight_kg) : "",
     package_type_id: initial?.package_type_id ?? "",
     shelf_location: initial?.shelf_location ?? "",
+    default_supplier_id: initial?.default_supplier_id ?? "",
+    default_uom_id: initial?.default_uom_id ?? "",
     origin_id: initial?.origin_id ?? "",
     quality_grade_id: initial?.quality_grade_id ?? "",
     is_active: initial?.is_active ?? true,
@@ -2678,6 +2683,26 @@ function ProductDialog({
   );
   const [alternateUoms, setAlternateUoms] = useState<ProductUomDraft[]>([]);
   const [saving, setSaving] = useState(false);
+
+  /**
+   * الموردون المتاحون للاختيار كمورد افتراضي للصنف (المرحلة الرابعة).
+   * المورد النظامي (النقدي) مستبعد: ليس طرفاً حقيقياً في الكشوف.
+   */
+  const defaultSupplierOptionsQuery = useQuery({
+    queryKey: ["product-default-supplier-options"],
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("suppliers")
+        .select("id, name, is_system")
+        .eq("is_active", true)
+        .order("name")
+        .limit(1000);
+      if (error) throw error;
+      return (data ?? []).filter((row: any) => row.is_system !== true);
+    },
+  });
+  const defaultSupplierOptions = defaultSupplierOptionsQuery.data ?? [];
 
   const productUomSchemaQuery = useQuery({
     queryKey: ["product-uom-schema-ready"],
@@ -2735,6 +2760,13 @@ function ProductDialog({
           : DEFAULT_USER_ITEM_POLICY_PREFERENCES,
     );
     setBatchDispatchStrategy(initial?.batch_dispatch_strategy ?? "INHERIT");
+    // إعادة تحميل ثوابت الصنف عند تغيير الصنف المفتوح في الدرج
+    setForm((current) => ({
+      ...current,
+      default_supplier_id: initial?.default_supplier_id ?? "",
+      default_uom_id: initial?.default_uom_id ?? "",
+      shelf_location: initial?.shelf_location ?? "",
+    }));
   }, [initial, userId]);
 
   useEffect(() => {
@@ -2920,6 +2952,8 @@ function ProductDialog({
             ? form.package_type_id || null
             : null,
         shelf_location: form.shelf_location.trim() || null,
+        default_supplier_id: form.default_supplier_id || null,
+        default_uom_id: config.enableUnits ? form.default_uom_id || null : null,
         origin_id: config.enableOrigins ? form.origin_id || null : null,
         quality_grade_id: config.enableQualityGrades ? form.quality_grade_id || null : null,
         is_active: form.is_active,
@@ -3729,6 +3763,65 @@ function ProductDialog({
                     placeholder={lang === "ar" ? "رف A-12" : "Shelf A-12"}
                     className="rounded-full"
                   />
+                )}
+              </FormField>
+            )}
+
+            {/*
+              ثوابت الصنف (المرحلة الرابعة): المورد الافتراضي والوحدة الافتراضية.
+              تُقترح تلقائياً عند إضافة الصنف إلى الكشف، ويمكن تغييرها لكل
+              معاملة دون التأثير على هذه الإعدادات.
+            */}
+            <FormField
+              label={lang === "ar" ? "المورد الافتراضي" : "Default supplier"}
+              hint={
+                lang === "ar"
+                  ? "يُقترح تلقائياً عند إضافة الصنف إلى كشف المشتريات"
+                  : "Suggested automatically when the item is added to a purchase statement"
+              }
+            >
+              {(p) => (
+                <select
+                  id={p.id}
+                  aria-describedby={p["aria-describedby"]}
+                  value={form.default_supplier_id}
+                  onChange={(e) => setForm({ ...form, default_supplier_id: e.target.value })}
+                  className="h-10 w-full rounded-full border border-border/80 bg-background px-3 text-sm"
+                >
+                  <option value="">{lang === "ar" ? "— بدون مورد افتراضي —" : "— none —"}</option>
+                  {defaultSupplierOptions.map((supplier) => (
+                    <option key={supplier.id} value={supplier.id}>
+                      {supplier.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </FormField>
+
+            {config.enableUnits && (
+              <FormField
+                label={lang === "ar" ? "الوحدة الافتراضية" : "Default unit"}
+                hint={
+                  lang === "ar"
+                    ? "تُقترح تلقائياً عند إضافة الصنف إلى الكشف"
+                    : "Suggested automatically when the item is added to a statement"
+                }
+              >
+                {(p) => (
+                  <select
+                    id={p.id}
+                    aria-describedby={p["aria-describedby"]}
+                    value={form.default_uom_id}
+                    onChange={(e) => setForm({ ...form, default_uom_id: e.target.value })}
+                    className="h-10 w-full rounded-full border border-border/80 bg-background px-3 text-sm"
+                  >
+                    <option value="">{lang === "ar" ? "— وحدة الأساس —" : "— base unit —"}</option>
+                    {meta.units.map((unit) => (
+                      <option key={unit.id} value={unit.id}>
+                        {lang === "ar" ? unit.name_ar || unit.name : unit.name || unit.name_ar}
+                      </option>
+                    ))}
+                  </select>
                 )}
               </FormField>
             )}

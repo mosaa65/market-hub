@@ -29,6 +29,15 @@ import { formatPhoneE164 } from "@/lib/phone-utils";
  * Extracted so both the Suppliers page and any future surface (purchases,
  * expense dialog) share the same fields and locked-supplier protection.
  */
+/** تطبيع اسم المورد لمقارنة التكرار — مطابق لـ normalize_party_name في قاعدة البيانات. */
+function normalizeName(name: string): string {
+  return (name ?? "")
+    .toLowerCase()
+    .replace(/[\u064B-\u0652\u0670\u0640]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export function isSystemCashSupplierName(name?: string | null): boolean {
   if (!name) return false;
   const n = name.trim().toLowerCase();
@@ -131,6 +140,34 @@ export function SupplierFormDialog({
       }
     }
     setSaving(true);
+
+    /*
+     * حماية من التكرار (المرحلة الرابعة): قبل الإدراج، ابحث عن مورد نشط بنفس
+     * الاسم بعد التطبيع. الفهرس الفريد في قاعدة البيانات هو خط الدفاع الأخير،
+     * وهذا الفحص يمنح المستخدم رسالة مفيدة بدل خطأ قاعدة بيانات خام.
+     */
+    if (!edit.id) {
+      const normalized = normalizeName(edit.name);
+      const { data: existing, error: lookupError } = await supabase
+        .from("suppliers")
+        .select("id,name")
+        .eq("is_active", true)
+        .limit(500);
+      if (!lookupError) {
+        const duplicate = (existing ?? []).find((row: any) =>
+          normalizeName(row.name ?? "").includes(normalized),
+        );
+        if (duplicate && normalized.length > 0) {
+          setSaving(false);
+          toast.error(
+            isAr
+              ? `يوجد مورد بنفس الاسم تقريباً: «${duplicate.name}». استخدمه بدل إنشاء مورد مكرر.`
+              : `A supplier with a similar name already exists: “${duplicate.name}”. Use it instead of creating a duplicate.`,
+          );
+          return;
+        }
+      }
+    }
 
     let finalPhone: string | null = null;
     if (phone.trim()) {
