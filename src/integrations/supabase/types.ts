@@ -94,6 +94,7 @@ export type Database = {
       company_settings: {
         Row: {
           address: string | null;
+          allow_negative_sales: boolean;
           barcode_enabled: boolean;
           currency: string;
           currency_symbol: string;
@@ -113,6 +114,7 @@ export type Database = {
         };
         Insert: {
           address?: string | null;
+          allow_negative_sales?: boolean;
           barcode_enabled?: boolean;
           currency?: string;
           currency_symbol?: string;
@@ -132,6 +134,7 @@ export type Database = {
         };
         Update: {
           address?: string | null;
+          allow_negative_sales?: boolean;
           barcode_enabled?: boolean;
           currency?: string;
           currency_symbol?: string;

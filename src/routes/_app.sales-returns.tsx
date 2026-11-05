@@ -449,6 +449,8 @@ function SalesReturnsPage() {
         <VortexMetricCard
           title={isRtl ? "إجمالي المرتجعات" : "Total returns"}
           value={salesReturns.length}
+          type="count"
+          currency={false}
           subtitle={isRtl ? "المحمّلة حالياً" : "Currently loaded"}
           icon={<RotateCcw className="size-5" />}
           tone="info"
@@ -463,6 +465,8 @@ function SalesReturnsPage() {
         <VortexMetricCard
           title={isRtl ? "هذا الشهر" : "This month"}
           value={thisMonthCount}
+          type="count"
+          currency={false}
           subtitle={isRtl ? "عدد المرتجعات" : "Return documents"}
           icon={<Truck className="size-5" />}
           tone="success"

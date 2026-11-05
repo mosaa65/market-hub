@@ -12,6 +12,8 @@ export type DocumentType =
   | "payment_receipt" // سند قبض/صرف
   | "quotation" // عرض سعر
   | "delivery_note" // إذن تسليم
+  | "mill_document" // سند استلام وطحن أمانات
+  | "daily_ticket" // تذكرة يومية
   | string;
 
 export type PaperSize = "80mm" | "58mm" | "A4" | "A5";

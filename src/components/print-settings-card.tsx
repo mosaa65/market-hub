@@ -90,7 +90,7 @@ const DEPARTMENTS: DepartmentConfig[] = [
     descAr: "إيصالات وسندات التسليم الفوري، تذاكر الحجز، وأذونات تسليم النواتج",
     icon: Scale,
     defaultMethod: "thermal",
-    defaultTemplate: "thermal-milling",
+    defaultTemplate: "milling-thermal",
     defaultPaper: "thermal-80",
   },
   {
@@ -119,6 +119,24 @@ const DEPARTMENTS: DepartmentConfig[] = [
     defaultMethod: "page",
     defaultTemplate: "milling-clean",
     defaultPaper: "a4",
+  },
+  {
+    id: "mill_document",
+    titleAr: "قسم المطحنة والأمانات العينية",
+    descAr: "سندات استلام الحبوب، طحن الأمانات، وتذاكر كاونتر الخدمة الموحدة",
+    icon: Scale,
+    defaultMethod: "thermal",
+    defaultTemplate: "milling-thermal",
+    defaultPaper: "thermal-80",
+  },
+  {
+    id: "daily_ticket",
+    titleAr: "التذاكر اليومية وسندات الصالة",
+    descAr: "تذاكر العمليات والإيصالات السريعة اليومية لخدمات الطحن",
+    icon: Receipt,
+    defaultMethod: "thermal",
+    defaultTemplate: "milling-thermal",
+    defaultPaper: "thermal-80",
   },
 ];
 
@@ -503,7 +521,13 @@ export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
                             type="button"
                             disabled={!canEdit}
                             onClick={() => {
-                              handleDepartmentChange(dept.id, "thermal-milling", "thermal-80");
+                              const defaultThermal =
+                                dept.id === "mill_document" ||
+                                dept.id === "daily_ticket" ||
+                                dept.id === "delivery_note"
+                                  ? "milling-thermal"
+                                  : "thermal-milling";
+                              handleDepartmentChange(dept.id, defaultThermal, "thermal-80");
                             }}
                             className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-bold transition-all ${
                               printFamily === "thermal"
@@ -519,7 +543,13 @@ export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
                             type="button"
                             disabled={!canEdit}
                             onClick={() => {
-                              handleDepartmentChange(dept.id, "milling-clean", "a4");
+                              const defaultPage =
+                                dept.id === "mill_document" ||
+                                dept.id === "daily_ticket" ||
+                                dept.id === "delivery_note"
+                                  ? "milling-master"
+                                  : "milling-clean";
+                              handleDepartmentChange(dept.id, defaultPage, "a4");
                             }}
                             className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-bold transition-all ${
                               printFamily === "page"
@@ -556,6 +586,9 @@ export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
                           >
                             {isThermal ? (
                               <>
+                                <option value="milling-thermal">
+                                  🌾 قالب سندات وتذاكر المطحنة الحراري
+                                </option>
                                 <option value="thermal-milling">
                                   ⭐ قالب الإيصال الحراري الاحترافي
                                 </option>
@@ -564,6 +597,9 @@ export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
                               </>
                             ) : (
                               <>
+                                <option value="milling-master">
+                                  🌾 قالب خدمات المطحنة والتسليم المعتمد
+                                </option>
                                 <option value="elegant">
                                   ✨ قالب تنفيذي فاخر (Executive Luxury)
                                 </option>
@@ -684,19 +720,23 @@ export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
                       <div className="flex items-center justify-between border-t border-border/60 pt-3 text-xs">
                         <span className="text-[11px] text-muted-foreground flex items-center gap-1.5">
                           <span className="font-medium text-foreground">
-                            {rawTemplate === "thermal-milling"
-                              ? "الإيصال الحراري الاحترافي"
-                              : rawTemplate === "thermal"
-                                ? "إيصال نقطة البيع"
-                                : rawTemplate === "thermal-qr"
-                                  ? "إيصال باركود وQR"
-                                  : rawTemplate === "milling-clean"
-                                    ? "الفاتورة الرسمية المبسطة"
-                                    : rawTemplate === "elegant"
-                                      ? "تنفيذي فاخر"
-                                      : rawTemplate === "formal"
-                                        ? "رسمي معتمد"
-                                        : "قياسي مؤسسي"}
+                            {rawTemplate === "milling-thermal"
+                              ? "سندات المطحنة الحراري"
+                              : rawTemplate === "thermal-milling"
+                                ? "الإيصال الحراري الاحترافي"
+                                : rawTemplate === "thermal"
+                                  ? "إيصال نقطة البيع"
+                                  : rawTemplate === "thermal-qr"
+                                    ? "إيصال باركود وQR"
+                                    : rawTemplate === "milling-master"
+                                      ? "خدمات وسندات المطحنة"
+                                      : rawTemplate === "milling-clean"
+                                        ? "الفاتورة الرسمية المبسطة"
+                                        : rawTemplate === "elegant"
+                                          ? "تنفيذي فاخر"
+                                          : rawTemplate === "formal"
+                                            ? "رسمي معتمد"
+                                            : "قياسي مؤسسي"}
                           </span>
                           <span>·</span>
                           <span className="font-mono text-muted-foreground">
@@ -755,8 +795,20 @@ export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
                   </Button>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 pt-1">
                   {[
+                    {
+                      id: "milling-thermal" as InvoiceTemplateId,
+                      title: "🌾 سندات المطحنة الحراري",
+                      sub: "قالب الإيصال الحراري لسندات استلام وطحن وتسليم الأمانات",
+                      theme: "standard" as PrintTheme,
+                    },
+                    {
+                      id: "milling-master" as InvoiceTemplateId,
+                      title: "🌾 خدمات المطحنة المعتمد",
+                      sub: "قالب استلام الأمانات ونواتج الطحن والتسليم المعتمد (A4/A5)",
+                      theme: "standard" as PrintTheme,
+                    },
                     {
                       id: "elegant" as InvoiceTemplateId,
                       title: "✨ القالب التنفيذي الفاخر",

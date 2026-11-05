@@ -126,7 +126,7 @@ export const SAMPLE_INVENTORY_DOC: UnifiedDocumentData = {
 
 export const SAMPLE_DELIVERY_NOTE: UnifiedDocumentData = {
   docType: "delivery_note",
-  title: "إذن وسند تسليم نواتج طحن",
+  title: "سند تسليم نواتج الأمانة",
   number: "DEL-2026-0054",
   relatedRef: "JOB-2026-0031",
   date: new Date().toISOString(),
@@ -134,16 +134,33 @@ export const SAMPLE_DELIVERY_NOTE: UnifiedDocumentData = {
   partyName: "مطاعم الشيباني الحديثة",
   partyPhone: "774433221",
   warehouse: "بوابة خروج وتسليم المطحنة",
-  movementType: "تسليم أمانات عينية للعميل",
+  movementType: "صرف وتسليم أمانات عينية للعميل",
   operatorName: "كاشير صالة المطحنة",
   lines: [
     {
       product: "دقيق نمرة 1 فاخر (ناتج طحن أمانات)",
       qty: 20,
-      unit: "كيس 50 كجم",
+      unit: "كيس",
+      previousQty: 25,
+      remainingQty: 5,
+      previousKg: 1250,
+      currentKg: 1000,
+      remainingKg: 250,
       code: "OUT-FLOUR-1",
+      note: "1,000 كجم",
     },
-    { product: "نخالة خشنة (ردة نقية)", qty: 4, unit: "كيس 40 كجم", code: "OUT-BRAN" },
+    {
+      product: "نخالة خشنة (ردة نقية)",
+      qty: 4,
+      unit: "كيس",
+      previousQty: 5,
+      remainingQty: 1,
+      previousKg: 200,
+      currentKg: 160,
+      remainingKg: 40,
+      code: "OUT-BRAN",
+      note: "160 كجم",
+    },
   ],
   notes: "تم تسليم الدفعة كاملة للعميل بموجب إذن الصرف المعتمد.",
 };
@@ -181,9 +198,54 @@ export const SAMPLE_RETURN_DOC: UnifiedDocumentData = {
   notes: "تم فحص حالة الأكياس وإعادتها لرف المخزن وتسليم القيمة نقداً.",
 };
 
+export const SAMPLE_MILL_DOC: UnifiedDocumentData = {
+  docType: "mill_document",
+  title: "سند استلام أمانة وفاتورة أجور",
+  number: "MIL-2026-0088",
+  relatedRef: "فاتورة رسمية #INV-2026-0090",
+  date: new Date().toISOString(),
+  partyLabel: "صاحب الأمانة / العميل:",
+  partyName: "مزارع الخير والبركة",
+  partyPhone: "777889900",
+  warehouse: "مطحنة وصوامع البركة",
+  movementType: "أمانة عينية خاصة بالعميل + فاتورة أجور رسمية للعملية كاملة",
+  status: "مستلم — بانتظار الطحن",
+  lines: [
+    {
+      product: "حبوب مستلمة: قمح بلدي أحمر",
+      qty: 20,
+      unit: "كيس",
+      price: 0,
+      total: 0,
+      remainingKg: 1000,
+      note: "20 كيس سعة 50 كجم (إجمالي 1,000 كجم) — المتبقي غير المطحون: 20 كيس",
+    },
+    {
+      product: "أجور طحن وتجهيز (العملية كاملة)",
+      qty: 20,
+      unit: "كيس",
+      price: 500,
+      total: 10000,
+      note: "فاتورة أجور رسمية #INV-2026-0090",
+    },
+  ],
+  subtotal: 10000,
+  tax: 0,
+  discount: 0,
+  total: 10000,
+  paid: 10000,
+  balance: 0,
+  payment: "نقداً",
+  currency: "ر.ي",
+  notes: "حبوب ونواتج ملك العميل (أمانة عينية خارج مخزون المنشأة). أجور الخدمة مثبتة بالفاتورة الرسمية.",
+};
+
 /** يعيد مستند معاينة مناسبًا لنوع المستند المطلوب. */
 export function sampleDocumentFor(docType?: string): UnifiedDocumentData {
   switch (docType) {
+    case "mill_document":
+    case "daily_ticket":
+      return SAMPLE_MILL_DOC;
     case "inventory_document":
     case "stock_transfer":
     case "stock_issue":

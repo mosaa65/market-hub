@@ -7,8 +7,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { StockAdjustmentDialog } from "@/components/stock/stock-adjustment-dialog";
-import { DirectStockInDialog } from "@/components/stock/direct-stock-in-dialog";
-import { OpeningStockDialog } from "@/components/stock/opening-stock-dialog";
 import {
   Warehouse,
   Search,
@@ -29,12 +27,10 @@ import {
   Sparkles,
   TrendingDown,
   Wallet,
-  PackagePlus,
   RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { ActionButton } from "@/components/ui/action-button";
 import { IconButton } from "@/components/ui/icon-button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Modal } from "@/components/ui/modal";
@@ -52,7 +48,7 @@ import { RecordsViewToggle } from "@/components/ui/records-view-toggle";
 import { QuickFilterBar } from "@/components/ui/quick-filter-bar";
 import { usePersistedViewMode } from "@/hooks/use-persisted-view-mode";
 import { buildSearchIndex, fuzzySearch } from "@/design/fuzzy";
-import { moneyCell, qtyCell } from "@/lib/format";
+import { formatCount, moneyCell, qtyCell } from "@/lib/format";
 import { decomposeStock, formatDecomposed, type DecomposeUnit } from "@/lib/stock-decompose";
 import { useBreakpoint } from "@/design/breakpoints";
 import { useRealtimeTable } from "@/lib/realtime";
@@ -155,9 +151,6 @@ function InventoryPage() {
   const [viewMode, setViewMode] = usePersistedViewMode("inventory", "cards");
   const [warehouseId, setWarehouseId] = useState<string>("");
   const [adjust, setAdjust] = useState<{ product: Row } | null>(null);
-  /* Engine-side documents: a physical receipt and a standing balance. */
-  const [directIn, setDirectIn] = useState<{ product?: Row } | null>(null);
-  const [openingOpen, setOpeningOpen] = useState(false);
 
   const { data: warehouses } = useQuery({
     queryKey: QUERY_KEYS.warehouses,
@@ -514,7 +507,6 @@ function InventoryPage() {
       { value: "min_stock", label: t("inventory.sort.min") },
       { value: "gap", label: t("inventory.sort.gap") },
       { value: "name", label: t("common.name") },
-      { value: "sku", label: t("products.sku") },
     ];
   }, [lang, t, sort]);
 
@@ -529,8 +521,6 @@ function InventoryPage() {
           return Number(r.min_stock) || 0;
         case "gap":
           return Math.max(0, (Number(r.min_stock) || 0) - qtyFor(r));
-        case "sku":
-          return r.sku ?? "";
         default:
           return (lang === "ar" ? r.name_ar || r.name : r.name || r.name_ar) ?? "";
       }
@@ -592,16 +582,6 @@ function InventoryPage() {
             </div>
           );
         },
-      },
-      {
-        key: "sku",
-        header: t("products.sku"),
-        width: "w-[130px]",
-        cell: (r) => (
-          <span className="block truncate font-mono text-xs text-muted-foreground">
-            {r.sku ?? "—"}
-          </span>
-        ),
       },
       {
         key: "role",
@@ -723,25 +703,7 @@ function InventoryPage() {
 
   return (
     <div className="space-y-4 pb-12">
-      <PageHeader
-        title={t("inventory.title")}
-        subtitle={t("inventory.subtitle")}
-        actions={
-          <>
-            <ActionButton icon={<PackagePlus />} onClick={() => setDirectIn({})}>
-              {lang === "ar" ? "إدخال مخزون مباشر" : "Direct stock-in"}
-            </ActionButton>
-            <ActionButton
-              tone="outline"
-              icon={<Boxes />}
-              onClick={() => setOpeningOpen(true)}
-              disabled={!warehouseId}
-            >
-              {lang === "ar" ? "رصيد أول مدة" : "Opening balance"}
-            </ActionButton>
-          </>
-        }
-      />
+      <PageHeader title={t("inventory.title")} subtitle={t("inventory.subtitle")} />
 
       {/* ─── KPI cards: stock health at a glance ─── */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
@@ -751,7 +713,7 @@ function InventoryPage() {
               {t("inventory.kpi.total")}
             </p>
             <h3 className="mt-1 font-mono text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-              {(totalCount ?? rows.length).toLocaleString()}
+              {formatCount(totalCount ?? rows.length)}
             </h3>
             <span className="mt-1 inline-flex items-center gap-1 text-[10px] text-muted-foreground/80">
               <Sparkles className="size-3 text-primary" />
@@ -770,7 +732,7 @@ function InventoryPage() {
               {t("inventory.kpi.low")}
             </p>
             <h3 className="mt-1 font-mono text-xl font-bold tracking-tight text-amber-400 sm:text-2xl">
-              {kpi.low.toLocaleString()}
+              {formatCount(kpi.low)}
             </h3>
             <span className="mt-1 inline-flex items-center gap-1 text-[10px] text-amber-500/80">
               <TrendingDown className="size-3" />
@@ -789,7 +751,7 @@ function InventoryPage() {
               {t("inventory.kpi.out")}
             </p>
             <h3 className="mt-1 font-mono text-xl font-bold tracking-tight text-red-400 sm:text-2xl">
-              {kpi.out.toLocaleString()}
+              {formatCount(kpi.out)}
             </h3>
             <span className="mt-1 inline-flex items-center gap-1 text-[10px] text-red-500/80">
               <AlertTriangle className="size-3" />
@@ -1089,11 +1051,6 @@ function InventoryPage() {
                     />
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                    {r.sku ? (
-                      <span className="rounded-md border border-border/50 bg-surface-2 px-1.5 py-0.5 font-mono text-[10px]">
-                        {r.sku}
-                      </span>
-                    ) : null}
                     {r.barcode ? (
                       <span className="inline-flex items-center gap-1 rounded-md border border-border/50 bg-surface-2 px-1.5 py-0.5 font-mono text-[10px]">
                         <Barcode className="size-2.5" />
@@ -1192,36 +1149,6 @@ function InventoryPage() {
           onClose={() => setAdjust(null)}
           onSaved={() => {
             setAdjust(null);
-            qc.invalidateQueries({ queryKey: ["inventory"] });
-            qc.invalidateQueries({ queryKey: ["settlements"] });
-          }}
-        />
-      )}
-
-      {/*
-       * A physical receipt is a purchase, so it is posted through the engine's
-       * procurement RPC; an opening balance is its own document. Both refresh
-       * the list and the settlements ledger, because both show up there.
-       */}
-      {directIn && (
-        <DirectStockInDialog
-          initialProductId={directIn.product?.id}
-          initialWarehouseId={warehouseId || undefined}
-          onClose={() => setDirectIn(null)}
-          onSaved={() => {
-            setDirectIn(null);
-            qc.invalidateQueries({ queryKey: ["inventory"] });
-            qc.invalidateQueries({ queryKey: ["settlements"] });
-          }}
-        />
-      )}
-
-      {openingOpen && warehouseId && (
-        <OpeningStockDialog
-          warehouseId={warehouseId}
-          onClose={() => setOpeningOpen(false)}
-          onSaved={() => {
-            setOpeningOpen(false);
             qc.invalidateQueries({ queryKey: ["inventory"] });
             qc.invalidateQueries({ queryKey: ["settlements"] });
           }}

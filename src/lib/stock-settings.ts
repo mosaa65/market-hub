@@ -6,7 +6,6 @@ export interface StockSettings {
   autoGenerateSku: boolean;
   autoGenerateStackCode: boolean;
   defaultMinStock: number;
-  allowNegativeStock: boolean;
   paddingDigits: number;
 }
 
@@ -18,7 +17,6 @@ export const DEFAULT_STOCK_SETTINGS: StockSettings = {
   autoGenerateSku: true,
   autoGenerateStackCode: true,
   defaultMinStock: 10,
-  allowNegativeStock: false,
   paddingDigits: 4,
 };
 
@@ -31,7 +29,10 @@ export function getStockSettings(): StockSettings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_STOCK_SETTINGS;
-    const parsed = JSON.parse(raw);
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    // This former browser-only flag is deliberately ignored. Negative sales is
+    // now an audited company policy in the database, never a device setting.
+    delete parsed.allowNegativeStock;
     return {
       ...DEFAULT_STOCK_SETTINGS,
       ...parsed,

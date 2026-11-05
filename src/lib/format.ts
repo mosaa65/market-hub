@@ -36,11 +36,15 @@ export function getCompanyCurrencySymbol(): string {
 export function money(n: number, currency?: string, locale?: string) {
   const settings = readCompanyCurrency();
   const currencyCode = currency || settings.currency || "YER";
-  const resolvedLocale =
-    locale || (typeof navigator !== "undefined" ? navigator.language : "ar-YE");
-  const symbol = getCurrencySymbol(currencyCode, resolvedLocale);
+  // Numeric glyphs are a user preference, not a browser-language preference.
+  // Format from Latin digits first, then let `toSystemDigits` apply the company's
+  // selected digit style. Otherwise an Arabic browser locale leaks eastern
+  // digits even when the user selected Latin digits in Settings.
+  const numberLocale = locale || "en-US";
+  const symbolLocale = typeof navigator !== "undefined" ? navigator.language : "ar-YE";
+  const symbol = getCurrencySymbol(currencyCode, symbolLocale);
 
-  const base = new Intl.NumberFormat(resolvedLocale, {
+  const base = new Intl.NumberFormat(numberLocale, {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   }).format(n);
@@ -173,10 +177,10 @@ export function qtyCell(n: number | string | null | undefined, locale = "en-US")
  */
 export function moneyGrouped(n: number, locale?: string) {
   const settings = readCompanyCurrency();
-  const resolvedLocale =
-    locale || (typeof navigator !== "undefined" ? navigator.language : "ar-YE");
-  const symbol = getCurrencySymbol(settings.currency || "YER", resolvedLocale);
-  const base = new Intl.NumberFormat(resolvedLocale, {
+  const numberLocale = locale || "en-US";
+  const symbolLocale = typeof navigator !== "undefined" ? navigator.language : "ar-YE";
+  const symbol = getCurrencySymbol(settings.currency || "YER", symbolLocale);
+  const base = new Intl.NumberFormat(numberLocale, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
     useGrouping: true,

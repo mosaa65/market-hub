@@ -299,6 +299,40 @@ export const PAYMENT_METHODS_COLUMNS: ColumnRegistry = {
   ],
 };
 
+/** Stock movements / settlements. Source and user are available on demand,
+ * but are not part of the default scanning view. */
+export const SETTLEMENTS_COLUMNS: ColumnRegistry = {
+  id: "settlements",
+  columns: [
+    {
+      key: "product",
+      labelAr: "المنتج",
+      labelEn: "Product",
+      essential: true,
+      defaultVisible: true,
+    },
+    { key: "warehouse", labelAr: "المستودع", labelEn: "Warehouse", defaultVisible: true },
+    { key: "type", labelAr: "النوع", labelEn: "Type", defaultVisible: true },
+    {
+      key: "source",
+      labelAr: "المستند المصدر",
+      labelEn: "Source document",
+      defaultVisible: false,
+    },
+    { key: "quantity", labelAr: "الكمية", labelEn: "Quantity", defaultVisible: true },
+    { key: "reason", labelAr: "السبب", labelEn: "Reason", defaultVisible: true },
+    { key: "user", labelAr: "المستخدم", labelEn: "User", defaultVisible: false },
+    { key: "date", labelAr: "التاريخ والوقت", labelEn: "Date & time", defaultVisible: true },
+    {
+      key: "actions",
+      labelAr: "الإجراءات",
+      labelEn: "Actions",
+      essential: true,
+      defaultVisible: true,
+    },
+  ],
+};
+
 /** All registries by screen id. */
 export const COLUMN_REGISTRIES: Record<string, ColumnRegistry> = {
   products: PRODUCTS_COLUMNS,
@@ -309,6 +343,7 @@ export const COLUMN_REGISTRIES: Record<string, ColumnRegistry> = {
   customers: CUSTOMERS_COLUMNS,
   suppliers: SUPPLIERS_COLUMNS,
   "payment-methods": PAYMENT_METHODS_COLUMNS,
+  settlements: SETTLEMENTS_COLUMNS,
 };
 
 export function getColumnRegistry(screen: string): ColumnRegistry | undefined {

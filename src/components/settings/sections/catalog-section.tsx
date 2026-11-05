@@ -2,7 +2,6 @@ import {
   SlidersHorizontal,
   Box,
   Sprout,
-  Package,
   Layers,
   Globe2,
   Medal,
@@ -43,15 +42,6 @@ export function CatalogSection({ canEdit, lang }: CatalogSectionProps) {
       descEn: "Commercial grading for wheat, corn, barley, etc.",
       icon: Sprout,
       current: config.enableGrainGrades,
-    },
-    {
-      key: "enablePackagingBags" as const,
-      titleAr: "مستلزمات التعبئة والتغليف",
-      titleEn: "Packaging supplies",
-      descAr: "إدارة أكياس وخيوط التعبئة كأصناف استهلاكية مباشرة.",
-      descEn: "Manage packaging bags and strings as consumable catalog items.",
-      icon: Package,
-      current: config.enablePackagingBags,
     },
     {
       key: "enableBrands" as const,

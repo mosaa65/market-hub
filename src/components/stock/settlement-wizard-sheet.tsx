@@ -83,7 +83,7 @@ const REASONS = [
   { value: "shortfall", ar: "عجز جردي", en: "Stock Shortfall" },
   { value: "surplus", ar: "فائض جردي", en: "Stock Surplus" },
   { value: "damaged", ar: "تلف / كسر", en: "Damaged / Broken" },
-  { value: "expiry", ar: "انتهاء صلاحية", en: "Expired Product" },
+  { value: "expiry", ar: "نافذة", en: "Expired Product" },
   { value: "stocktake", ar: "تسوية جرد دوري", en: "Periodic Stocktake" },
   { value: "other", ar: "سبب آخر", en: "Other Reason" },
 ] as const;
@@ -596,7 +596,6 @@ export function SettlementWizardSheet({
                 <thead className="bg-surface-2/60 text-[11px] uppercase tracking-wider text-muted-foreground">
                   <tr>
                     <th className="px-3 py-2 text-start">{isAr ? "الصنف" : "Item"}</th>
-                    <th className="px-3 py-2 text-start">SKU</th>
                     <th className="px-3 py-2 text-end">
                       {isAr ? "الرصيد الدفتري" : "Book balance"}
                     </th>
@@ -606,9 +605,6 @@ export function SettlementWizardSheet({
                   {lines.map((l) => (
                     <tr key={l.product_id} className="border-t border-border/60">
                       <td className="px-3 py-2 text-foreground">{l.name}</td>
-                      <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
-                        {l.sku ?? "—"}
-                      </td>
                       <td className="px-3 py-2 text-end font-mono font-semibold text-foreground">
                         {l.ledgerQty.toFixed(2)}
                       </td>

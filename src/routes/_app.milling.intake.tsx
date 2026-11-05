@@ -44,7 +44,7 @@ import { CustomerFormDialog } from "@/components/contacts/customer-form-dialog";
 import { PartyPicker } from "@/components/commerce/party-picker";
 import { useI18n } from "@/lib/i18n";
 import { LuxuryPrintPreviewModal } from "@/components/luxury-print-preview-modal";
-import { UnifiedPrintModal } from "@/components/milling/unified-print-modal";
+import { getUnifiedPrintSettings, printUnifiedDocument, type PrintRequest } from "@/lib/printing";
 import { DocumentShareDialog } from "@/components/communication/document-share-dialog";
 import { QuickProductDialog } from "@/components/milling/quick-product-dialog";
 import { supabase } from "@/integrations/supabase/client";
@@ -418,8 +418,25 @@ function MillingIntakePage() {
             setActiveDetails(details);
             const uDoc = buildMillingDocumentUnifiedDoc(details, "intake");
             setPrintDoc(uDoc);
-            // فتح نافذة المعاينة والطباعة الفاخرة تلقائياً للسرعة
-            setPrintModalOpen(true);
+
+            const printSettings = getUnifiedPrintSettings();
+            const printOverride = printSettings.overrides.mill_document;
+            const printBehavior = printOverride?.behavior ?? printSettings.behavior;
+
+            const printRequest: PrintRequest = {
+              documentType: "mill_document",
+              rtl: true,
+              templateId: printOverride?.templateId || "milling-thermal",
+              paperId: printOverride?.paperId || "thermal-80",
+              method: printOverride?.method || "thermal",
+              doc: uDoc,
+            };
+
+            if (printBehavior === "direct" || (printBehavior === "default" && !printSettings.preview)) {
+              void printUnifiedDocument(printRequest);
+            } else if (printBehavior !== "off") {
+              setPrintModalOpen(true);
+            }
           }
         } catch (e) {
           console.error("Failed to load details for printing:", e);
@@ -1071,13 +1088,15 @@ function MillingIntakePage() {
         </div>
 
         {/* سند الاستلام وفاتورة الأجور — القالب الموحد المعتمد */}
-        {(activeDetails || printDoc) && (
-          <UnifiedPrintModal
+        {printDoc && (
+          <LuxuryPrintPreviewModal
             open={printModalOpen}
             onClose={() => setPrintModalOpen(false)}
-            details={activeDetails}
             doc={printDoc}
-            stage="intake"
+            documentType="mill_document"
+            title="معاينة وطباعة سند استلام أمانة وفاتورة أجور"
+            customerName={activeDetails?.customers?.name || undefined}
+            customerPhone={activeDetails?.customers?.phone || undefined}
           />
         )}
 

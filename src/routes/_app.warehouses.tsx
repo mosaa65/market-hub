@@ -441,6 +441,8 @@ function WarehousesPage() {
         <VortexMetricCard
           title={isRtl ? "إجمالي المستودعات" : "Total warehouses"}
           value={data.length}
+          type="count"
+          currency={false}
           subtitle={isRtl ? "المحمّلة حالياً" : "Currently loaded"}
           icon={<Warehouse className="size-5" />}
           tone="info"
@@ -448,6 +450,8 @@ function WarehousesPage() {
         <VortexMetricCard
           title={isRtl ? "نشط" : "Active"}
           value={activeCount}
+          type="count"
+          currency={false}
           subtitle={isRtl ? "جاهز للاستخدام" : "Ready to use"}
           icon={<Boxes className="size-5" />}
           tone="success"
@@ -457,6 +461,8 @@ function WarehousesPage() {
         <VortexMetricCard
           title={isRtl ? "غير نشط" : "Inactive"}
           value={inactiveCount}
+          type="count"
+          currency={false}
           subtitle={isRtl ? "موقوف مؤقتاً" : "Temporarily disabled"}
           icon={<Boxes className="size-5" />}
           tone="warning"
@@ -466,6 +472,8 @@ function WarehousesPage() {
         <VortexMetricCard
           title={isRtl ? "الافتراضي" : "Default"}
           value={defaultCount}
+          type="count"
+          currency={false}
           subtitle={isRtl ? "مستودع الترحيل الافتراضي" : "Default posting warehouse"}
           icon={<Star className="size-5" />}
           tone="default"

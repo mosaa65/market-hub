@@ -80,6 +80,7 @@ import { InvoiceSummaryPanel } from "@/components/sales/invoice-summary-panel";
 import { InvoiceStatusStrip } from "@/components/sales/invoice-status-strip";
 import { newLineKey, type PosCartLine } from "@/components/sales/invoice-pos-types";
 import { useCompanyCurrency } from "@/hooks/use-company-currency";
+import { useNegativeSalesSetting } from "@/hooks/use-negative-sales-setting";
 import { useFormNavigationScope } from "@/hooks/use-form-navigation";
 import { DynamicPaymentSelector } from "@/components/ui/payment-method/dynamic-payment-selector";
 import type { PaymentSettlementSelection } from "@/lib/payments/treasury-types";
@@ -163,6 +164,7 @@ export function SalesInvoiceComposer() {
   const { isModuleEnabled } = useModules();
   const isRtl = lang === "ar";
   const hasMultiWarehouse = isModuleEnabled("multi_warehouse");
+  const { data: allowNegativeSales = false } = useNegativeSalesSetting();
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -518,12 +520,20 @@ export function SalesInvoiceComposer() {
     if (lines.length === 0) {
       return toast.error(isRtl ? "أضف بندًا واحدًا على الأقل" : "Add at least one line item");
     }
-    if (cart.some((line) => {
-      const quantity = Number(line.quantity) || 0;
-      const increment = line.quantityStep || 0.001;
-      return quantity <= 0 || Math.abs(quantity / increment - Math.round(quantity / increment)) > 1e-7;
-    })) {
-      return toast.error(isRtl ? "تحقق من الكمية؛ يجب أن تطابق خطوة الوحدة المحددة" : "Check the quantity; it must follow the selected unit increment");
+    if (
+      cart.some((line) => {
+        const quantity = Number(line.quantity) || 0;
+        const increment = line.quantityStep || 0.001;
+        return (
+          quantity <= 0 || Math.abs(quantity / increment - Math.round(quantity / increment)) > 1e-7
+        );
+      })
+    ) {
+      return toast.error(
+        isRtl
+          ? "تحقق من الكمية؛ يجب أن تطابق خطوة الوحدة المحددة"
+          : "Check the quantity; it must follow the selected unit increment",
+      );
     }
     if (remaining > 0 && !partyId) {
       return toast.error(

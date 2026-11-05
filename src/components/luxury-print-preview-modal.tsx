@@ -162,9 +162,13 @@ export function LuxuryPrintPreviewModal({
     const deptOverride = settings.overrides[docType];
     if (deptOverride?.templateId) return deptOverride.templateId;
     if (initialMethod === "thermal") {
-      return "thermal-milling"; // Default to the admired modern milling counter template
+      return docType === "mill_document" || docType === "delivery_note" || docType === "daily_ticket"
+        ? "milling-thermal"
+        : "thermal-milling"; // Default to the admired modern milling counter template
     }
-    return "elegant"; // Default to executive luxury A4/A5 template
+    return docType === "mill_document" || docType === "delivery_note" || docType === "daily_ticket"
+      ? "milling-master"
+      : "elegant"; // Default to executive luxury A4/A5 template
   }, [request?.templateId, request?.settings, request?.documentType, documentType, initialMethod]);
 
   const [activeTemplate, setActiveTemplate] = useState<InvoiceTemplateId>(initialTemplateId);
@@ -272,10 +276,15 @@ export function LuxuryPrintPreviewModal({
     const deptOverride = settings.overrides[docType];
 
     if (newMethod === "thermal") {
+      const isThermalTpl =
+        deptOverride?.templateId === "milling-thermal" ||
+        deptOverride?.templateId?.startsWith("thermal");
       setActiveTemplate(
-        deptOverride?.templateId?.startsWith("thermal")
-          ? deptOverride.templateId
-          : "thermal-milling",
+        isThermalTpl
+          ? (deptOverride!.templateId as InvoiceTemplateId)
+          : docType === "mill_document" || docType === "delivery_note" || docType === "daily_ticket"
+            ? "milling-thermal"
+            : "thermal-milling",
       );
       setActivePaper(
         deptOverride?.paperId?.startsWith("thermal") ? deptOverride.paperId : "thermal-80",
@@ -283,10 +292,16 @@ export function LuxuryPrintPreviewModal({
       return;
     }
 
+    const isPageTpl =
+      deptOverride?.templateId &&
+      !deptOverride.templateId.startsWith("thermal") &&
+      deptOverride.templateId !== "milling-thermal";
     setActiveTemplate(
-      deptOverride?.templateId && !deptOverride.templateId.startsWith("thermal")
-        ? deptOverride.templateId
-        : "elegant",
+      isPageTpl
+        ? (deptOverride!.templateId as InvoiceTemplateId)
+        : docType === "mill_document" || docType === "delivery_note" || docType === "daily_ticket"
+          ? "milling-master"
+          : "elegant",
     );
     setActivePaper(
       deptOverride?.paperId && !deptOverride.paperId.startsWith("thermal")
@@ -664,6 +679,7 @@ export function LuxuryPrintPreviewModal({
                     <div className="grid grid-cols-2 gap-2">
                       {(isThermal
                         ? [
+                            { id: "milling-thermal", label: "مطحنة حراري" },
                             { id: "thermal-milling", label: "إيصال احترافي" },
                             { id: "thermal", label: "نقطة البيع" },
                             { id: "thermal-qr", label: "باركود و QR" },
@@ -767,6 +783,11 @@ export function LuxuryPrintPreviewModal({
                 <div className="space-y-1">
                   {(isThermal
                     ? [
+                        {
+                          id: "milling-thermal",
+                          label: "سندات المطحنة الحراري",
+                          icon: <Scale className="h-4 w-4" />,
+                        },
                         {
                           id: "thermal-milling",
                           label: "الإيصال الحراري الاحترافي",

@@ -44,10 +44,8 @@ import {
 import { QuantityInput } from "@/components/ui/quantity-input";
 import { ProductPicker } from "@/components/products/product-picker";
 import { UniversalPrintPreview } from "@/components/universal-print-preview";
-import {
-  UnifiedPrintModal,
-  type MillingTicketStage,
-} from "@/components/milling/unified-print-modal";
+import { LuxuryPrintPreviewModal } from "@/components/luxury-print-preview-modal";
+import { type MillingTicketStage } from "@/components/milling/unified-print-modal";
 import { DocumentShareDialog } from "@/components/communication/document-share-dialog";
 import type { PrintRequest } from "@/lib/printing";
 
@@ -510,12 +508,18 @@ export function MillingDocumentWorkflow({
 
       {/* سند المستند وفاتورة الأجور — القالب الموحد */}
       {printRequest && details && (
-        <UnifiedPrintModal
+        <LuxuryPrintPreviewModal
           open={Boolean(printRequest)}
           onClose={() => setPrintRequest(null)}
-          details={details}
           doc={printRequest.doc}
-          stage={printStage}
+          documentType={printStage === "delivery" ? "delivery_note" : "mill_document"}
+          title={
+            printStage === "delivery"
+              ? "معاينة وطباعة سند تسليم نواتج الأمانة"
+              : "معاينة وطباعة سند استلام أمانة وفاتورة أجور"
+          }
+          customerName={details.customers?.name || undefined}
+          customerPhone={details.customers?.phone || undefined}
         />
       )}
 

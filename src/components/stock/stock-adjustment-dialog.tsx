@@ -218,7 +218,7 @@ export function StockAdjustmentDialog({
     { value: "shortfall", labelAr: "عجز جردي", labelEn: "Shortfall" },
     { value: "surplus", labelAr: "فائض جردي", labelEn: "Surplus" },
     { value: "damaged", labelAr: "تلف / كسر", labelEn: "Damaged" },
-    { value: "expiry", labelAr: "انتهاء صلاحية", labelEn: "Expired" },
+    { value: "expiry", labelAr: "نافذة", labelEn: "Expired" },
     { value: "stocktake", labelAr: "تسوية دورية", labelEn: "Stocktake" },
     { value: "other", labelAr: "سبب آخر", labelEn: "Other" },
   ];
@@ -705,9 +705,7 @@ export function StockAdjustmentDialog({
                           <option value="damaged">
                             {isAr ? "تلف سوء تخزين / كسر" : "Damaged / Broken"}
                           </option>
-                          <option value="expiry">
-                            {isAr ? "انتهاء صلاحية" : "Expired Product"}
-                          </option>
+                          <option value="expiry">{isAr ? "نافذة" : "Expired Product"}</option>
                           <option value="stocktake">
                             {isAr ? "تسوية جرد دوري" : "Periodic Stocktake"}
                           </option>
