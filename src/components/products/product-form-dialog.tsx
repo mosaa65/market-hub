@@ -56,7 +56,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { MillingInput, MillingSelect } from "@/components/milling/milling-ui";
+import { MillingInput, MillingSelect, MillingTextarea } from "@/components/milling/milling-ui";
 import { QuantityInput } from "@/components/ui/quantity-input";
 import {
   productClassBadgeClass,
@@ -483,6 +483,9 @@ export function ProductFormDialog({
                 <MillingInput
                   value={nameAr}
                   onChange={(event) => setNameAr(event.target.value)}
+                  enableVoice
+                  voiceLabel="اسم الصنف بالعربي"
+                  onVoiceInput={(text) => setNameAr(text)}
                   maxLength={120}
                   autoFocus
                   placeholder={
@@ -644,12 +647,15 @@ export function ProductFormDialog({
           {/* ── 5. ملاحظات ── */}
           <section className="space-y-2">
             <SectionLabel step={5} title="ملاحظات وحالة" optional />
-            <textarea
-              value={notes}
+            <MillingTextarea
+              value={notes ?? ""}
               onChange={(event) => setNotes(event.target.value)}
+              enableVoice
+              voiceLabel="ملاحظات الصنف"
+              onVoiceInput={(text) => setNotes(text)}
               rows={2}
               placeholder="ملاحظات تشغيلية أو وصف مختصر…"
-              className="w-full resize-none rounded-xl border border-border/70 bg-surface-2/50 px-3 py-2 text-xs text-foreground outline-none transition focus:border-primary/50 focus:ring-2 focus:ring-primary/20"
+              className="resize-none text-xs"
             />
             <button
               type="button"

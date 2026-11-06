@@ -3,6 +3,7 @@ import { Search as SearchIcon, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import type { FieldSize } from "@/design/styles";
+import { VoiceInputButton } from "@/components/voice/voice-input-button";
 
 export interface SearchInputProps extends Omit<
   React.InputHTMLAttributes<HTMLInputElement>,
@@ -31,6 +32,8 @@ export interface SearchInputProps extends Omit<
   containerClassName?: string;
   /** Focuses the field when the user presses `/` anywhere on the page. */
   enableSlashShortcut?: boolean;
+  /** Enables integrated voice search button (default true). */
+  enableVoice?: boolean;
 }
 
 const searchSize: Record<FieldSize, string> = {
@@ -69,6 +72,7 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
       className,
       containerClassName,
       enableSlashShortcut = false,
+      enableVoice = true,
       placeholder,
       ...props
     },
@@ -202,6 +206,23 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
         />
 
         <span className="absolute inset-y-0 end-0 z-10 flex items-center gap-1.5 pe-2">
+          {enableVoice && (
+            <VoiceInputButton
+              size={size}
+              fieldLabel="بحث بالصوت"
+              currentValue={local}
+              onTranscript={(text) => {
+                setLocal(text);
+                onValueChange(text);
+                if (innerRef.current) {
+                  innerRef.current.value = text;
+                  innerRef.current.dispatchEvent(new Event("input", { bubbles: true }));
+                }
+              }}
+              title="بحث صوتي مباشر"
+            />
+          )}
+
           {resultCountText != null || resultCount != null ? (
             <span className="pointer-events-none hidden text-[11px] tabular-nums text-muted-foreground sm:inline">
               {resultCountText ?? resultCount}

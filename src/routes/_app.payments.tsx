@@ -38,6 +38,7 @@ import { usePaymentMethodsForContext } from "@/hooks/use-payment-methods";
 import { useCashboxes } from "@/hooks/use-cashboxes";
 import { useCompanyBankAccounts } from "@/hooks/use-company-bank-accounts";
 import { toast } from "sonner";
+import { VoiceInputButton } from "@/components/voice/voice-input-button";
 import { WhatsAppButton } from "@/components/whatsapp-button";
 import { debtReminderMessage } from "@/lib/whatsapp-templates";
 import {
@@ -791,11 +792,21 @@ function PaymentsPage() {
                       </div>
                     </Field>
                     <Field label={lang === "ar" ? "ملاحظات" : "Notes"}>
-                      <input
-                        value={note}
-                        onChange={(e) => setNote(e.target.value)}
-                        className="h-11 w-full rounded-xl border border-primary/20 bg-card px-3 text-sm focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
-                      />
+                      <div className="relative">
+                        <input
+                          value={note}
+                          onChange={(e) => setNote(e.target.value)}
+                          placeholder={lang === "ar" ? "بيان وسند الدفع..." : "Payment notes / memo..."}
+                          className="h-11 w-full rounded-xl border border-primary/20 bg-card ps-3 pe-11 text-sm focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+                        />
+                        <div className="absolute end-2.5 top-1/2 -translate-y-1/2 z-10">
+                          <VoiceInputButton
+                            fieldLabel={lang === "ar" ? "ملاحظات وبيان الدفع" : "Payment Notes"}
+                            currentValue={note}
+                            onTranscript={(text) => setNote(text)}
+                          />
+                        </div>
+                      </div>
                     </Field>
                   </div>
                   <div className="mt-5 flex items-center justify-between gap-3 border-t border-primary/10 pt-4">
