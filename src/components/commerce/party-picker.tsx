@@ -182,7 +182,8 @@ export function PartyPicker({
         avoidCollisions
         className="max-h-[min(28rem,70dvh)] w-[min(360px,calc(100vw-1rem))] overflow-hidden rounded-2xl border-border/70 bg-popover p-0 shadow-2xl"
       >
-        <div className="flex items-center justify-between border-b border-border/70 bg-gradient-to-l from-primary/[0.06] to-transparent px-3.5 py-3">
+        {/* الهدر: تدرّج أنيق بلون الـ primary يتلاشى تدريجياً بعد الهدر — بلا رمادي */}
+        <div className="flex items-center justify-between border-b border-border/70 bg-gradient-to-b from-primary/[0.12] via-primary/[0.05] to-transparent px-3.5 py-3">
           <div className="flex min-w-0 items-center gap-2.5">
             <span className="grid size-9 shrink-0 place-items-center rounded-full border border-primary/15 bg-primary/10 text-primary">
               <PartyIcon className="size-4.5" />
@@ -199,7 +200,7 @@ export function PartyPicker({
           </span>
         </div>
         {pinned.length > 0 && (
-          <div className="border-b border-border/70 bg-gradient-to-b from-primary/[0.07] to-transparent p-1.5">
+          <div className="border-b border-border/70 bg-gradient-to-b from-primary/[0.09] to-transparent p-1.5">
             <div className="mb-1 flex items-center gap-1 px-1.5 text-[10px] font-semibold uppercase tracking-wide text-primary/80">
               <Sparkles className="size-3" />
               {isArabic ? "الجهة الافتراضية" : "Default party"}
@@ -248,7 +249,7 @@ export function PartyPicker({
                 <CommandItem
                   value={`__empty__ ${emptyLabel}`}
                   onSelect={() => select("")}
-                  className={`mb-1 min-h-11 gap-2.5 rounded-xl px-2.5 py-2 ${!value ? "bg-primary/[0.07] text-primary" : ""}`}
+                  className={`mb-1 min-h-11 gap-2.5 rounded-xl px-2.5 py-2 ring-1 ring-inset ${!value ? "bg-primary/[0.09] text-primary ring-primary/25" : "ring-transparent"}`}
                 >
                   <span className="grid size-7 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground">
                     <UserRound className="size-3.5" />
@@ -267,7 +268,7 @@ export function PartyPicker({
                   key={option.id}
                   value={`${option.name} ${option.phone ?? ""} ${option.balance ?? ""}`}
                   onSelect={() => select(option.id)}
-                  className={`min-h-14 items-start gap-2.5 rounded-xl px-2.5 py-2 transition-colors ${active ? "bg-primary/[0.07] text-foreground" : "hover:bg-primary/[0.04]"}`}
+                  className={`min-h-14 items-start gap-2.5 rounded-xl px-2.5 py-2 ring-1 ring-inset transition-colors ${active ? "bg-primary/[0.09] text-foreground ring-primary/25 shadow-[0_1px_4px_oklch(0_0_0/0.05)]" : "ring-transparent hover:bg-primary/[0.04]"}`}
                 >
                   {/* أفاتار دائري معبّر بلون مشتق من اسم العميل */}
                   <span
@@ -277,7 +278,11 @@ export function PartyPicker({
                     {nameInitial(option.name)}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-xs font-semibold">{option.name}</span>
+                    <span
+                      className={`block truncate text-xs font-semibold ${active ? "text-primary" : ""}`}
+                    >
+                      {option.name}
+                    </span>
                     <span className="mt-1 flex min-w-0 items-center gap-1.5 text-[10px] text-muted-foreground">
                       <span className="min-w-0 flex-1 truncate">
                         {option.phone || (isArabic ? "بدون هاتف" : "No phone")}

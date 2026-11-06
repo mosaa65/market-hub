@@ -547,7 +547,8 @@ export function DataTable<T>({
            * and the body retains natural two-axis touch gestures. */}
           {detachedHeader ? (
             <div
-              className="sticky z-20 overflow-hidden rounded-b-[var(--radius-panel)] rounded-t-none border border-border bg-surface-2/85 shadow-[0_5px_14px_oklch(0_0_0/0.06)] backdrop-blur-xl"
+              /* سطح مصمت بلا ضبابية أو ظل ناعم — كان يعطي تظليلاً باهتاً على حافة الجدول */
+              className="sticky z-20 overflow-hidden rounded-b-[var(--radius-panel)] rounded-t-none border border-border bg-surface-2 shadow-[0_1px_3px_oklch(0_0_0/0.05)]"
               style={{ top: "calc(var(--ds-sticky-top,0px) + var(--ds-toolbar-h,0px))" }}
             >
               <div
@@ -760,8 +761,8 @@ function TableHead<T>({
         visuallyHidden
           ? "invisible h-0 border-none select-none pointer-events-none [&_th]:h-0 [&_th]:py-0 [&_th]:border-none [&_th]:leading-[0px] [&_th_*]:hidden"
           : sticky &&
-              "sticky z-20 bg-surface-2/70 backdrop-blur-md [top:calc(var(--ds-sticky-top,0px)+var(--ds-toolbar-h,0px))]",
-        !sticky && !visuallyHidden && "bg-surface-2/50",
+              "sticky z-20 bg-surface-2 [top:calc(var(--ds-sticky-top,0px)+var(--ds-toolbar-h,0px))]",
+        !sticky && !visuallyHidden && "bg-surface-2",
       )}
     >
       <tr className="border-b border-border">
@@ -793,10 +794,8 @@ function TableHead<T>({
                 column.className,
                 column.hideBelow && HIDE_BELOW[column.hideBelow],
                 stickyColumn && "sticky start-0 z-30 bg-surface-2",
-                // Active sort column header gets a subtle highlight
-                active
-                  ? "text-primary bg-primary/[0.06] dark:bg-primary/[0.08]"
-                  : "text-muted-foreground",
+                // عمود الفرز النشط: لون النص والأيقونة فقط (مثل ترويسات التقارير) دون تظليل الخلية
+                active ? "text-primary" : "text-muted-foreground",
               )}
             >
               {column.sortable && onSortChange ? (

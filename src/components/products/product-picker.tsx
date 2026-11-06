@@ -131,7 +131,6 @@ export function ProductPicker<T extends ProductPickerItem = ProductPickerItem>({
   const [query, setQuery] = React.useState("");
   const [activeIndex, setActiveIndex] = React.useState(0);
 
-  const rootRef = React.useRef<HTMLDivElement | null>(null);
   const searchRef = React.useRef<HTMLInputElement | null>(null);
   const listRef = React.useRef<HTMLDivElement | null>(null);
 
@@ -201,15 +200,6 @@ export function ProductPicker<T extends ProductPickerItem = ProductPickerItem>({
     if (activeIndex > flat.length - 1) setActiveIndex(Math.max(0, flat.length - 1));
   }, [flat.length, activeIndex]);
 
-  React.useEffect(() => {
-    if (!open) return;
-    const onDown = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [open]);
-
   /** يُبقي الصف النشط مرئيًا أثناء التنقل بالمفاتيح. */
   React.useEffect(() => {
     if (!open) return;
@@ -273,7 +263,7 @@ export function ProductPicker<T extends ProductPickerItem = ProductPickerItem>({
   const triggerRef = React.useRef<HTMLButtonElement | null>(null);
 
   return (
-    <div ref={rootRef} className={cn("relative min-w-0", className)}>
+    <div className={cn("relative min-w-0", className)}>
       {/* ── الحقل الظاهر ── */}
       <button
         id={id}

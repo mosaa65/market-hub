@@ -38,8 +38,8 @@ if ((Read-EnvValue $AppEnvPath "SUPABASE_TARGET") -ne "docker" -or
 
 $versions = @{}
 $migrations = @(Get-ChildItem -LiteralPath $MigrationPath -Filter "*.sql" -File | Sort-Object Name)
-if ($migrations.Count -ne 15) {
-    throw "Expected the approved 15-file baseline in supabase/migrations; found $($migrations.Count)."
+if ($migrations.Count -ne 17) {
+    throw "Expected the approved 17-file baseline in supabase/migrations; found $($migrations.Count)."
 }
 foreach ($migration in $migrations) {
     if ($migration.Name -notmatch '^([0-9]{3})_[a-z0-9_]+\.sql$') {
@@ -52,7 +52,7 @@ foreach ($migration in $migrations) {
     $versions[$version] = $migration.Name
 }
 $actualVersions = ($versions.Keys | Sort-Object) -join ","
-if ($actualVersions -ne "001,002,003,004,005,006,007,008,009,010,011,012,013,014,015") {
+if ($actualVersions -ne "001,002,003,004,005,006,007,008,009,010,011,012,013,014,015,016,017") {
     throw "Active migration versions do not match the approved baseline sequence."
 }
 
