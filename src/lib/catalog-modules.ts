@@ -70,7 +70,9 @@ export const DEFAULT_CATALOG_CONFIG: CatalogModulesConfig = {
   enableUnits: true,
   enableGrainGrades: true,
   enablePackagingBags: true,
-  enableBarcode: true,
+  /* الباركود معطّل افتراضياً — لا يظهر قارئ الباركود ولا الكاميرا في نقطة البيع والمشتريات
+     إلا عند تفعيله من الإعدادات (الفوترة) صراحةً. */
+  enableBarcode: false,
   enableMakesAndModels: false,
   enableOrigins: false,
   enableQualityGrades: false,

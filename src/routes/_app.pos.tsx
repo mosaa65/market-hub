@@ -417,9 +417,9 @@ function POSPage() {
   const [enableServiceFeeSetting, setEnableServiceFeeSetting] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("pos_enable_service_fee");
-      return saved !== null ? saved === "true" : true;
+      return saved !== null ? saved === "true" : false;
     }
-    return true;
+    return false;
   });
 
   const [postSaleRequest, setPostSaleRequest] = useState<PrintRequest | null>(null);

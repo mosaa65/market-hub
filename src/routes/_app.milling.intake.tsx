@@ -274,10 +274,6 @@ function MillingIntakePage() {
 
   // احتساب الإجمالي التلقائي للأكياس والوزن وسعر الخدمة
   // ─ أدوات أسطر الاستلام (تعدد أنواع الحبوب في عملية واحدة) ─
-  function updateLine(idx: number, patch: Partial<{ itemId: string; bags: string; kg: string }>) {
-    setLines((ls) => ls.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
-  }
-
   function addLine() {
     setServicePrice("");
     setLines((ls) => [...ls, { itemId: "", bags: "", kg: "" }]);
@@ -295,29 +291,39 @@ function MillingIntakePage() {
    */
   function setLineBags(idx: number, v: string) {
     setServicePrice("");
-    const line = lines[idx];
     const b = Number(v) || 0;
-    const item = (grainItems.data ?? []).find((g: ProductOption) => g.id === line.itemId);
-    const unit = Number(item?.package_weight_kg ?? 0);
-    const autoKg = b > 0 && unit > 0 ? String(b * unit) : line.kg;
-    updateLine(idx, { bags: v, kg: autoKg });
+    setLines((current) =>
+      current.map((line, index) => {
+        if (index !== idx) return line;
+        const item = (grainItems.data ?? []).find((g: ProductOption) => g.id === line.itemId);
+        const unit = Number(item?.package_weight_kg ?? 0);
+        const autoKg = b > 0 && unit > 0 ? String(b * unit) : line.kg;
+        return { ...line, bags: v, kg: autoKg };
+      }),
+    );
   }
 
   /** تغيير الصنف لسطر — يعيد تعبئة الوزن تلقائياً إذا كان هناك عدد أكياس */
   function setLineItem(idx: number, itemId: string) {
     setServicePrice("");
-    const line = lines[idx];
-    const item = (grainItems.data ?? []).find((g: ProductOption) => g.id === itemId);
-    const unit = Number(item?.package_weight_kg ?? 0);
-    const b = Number(line.bags) || 0;
-    const autoKg = b > 0 && unit > 0 ? String(b * unit) : line.kg;
-    updateLine(idx, { itemId, kg: autoKg });
+    setLines((current) =>
+      current.map((line, index) => {
+        if (index !== idx) return line;
+        const item = (grainItems.data ?? []).find((g: ProductOption) => g.id === itemId);
+        const unit = Number(item?.package_weight_kg ?? 0);
+        const bags = Number(line.bags) || 0;
+        const autoKg = bags > 0 && unit > 0 ? String(bags * unit) : line.kg;
+        return { ...line, itemId, kg: autoKg };
+      }),
+    );
   }
 
   /** تعديل الوزن يدوياً لسطر (من الميزان) — يبقى كما أدخله دون الكتابة فوقه */
   function setLineKg(idx: number, v: string) {
     setServicePrice("");
-    updateLine(idx, { kg: v });
+    setLines((current) =>
+      current.map((line, index) => (index === idx ? { ...line, kg: v } : line)),
+    );
   }
 
   // إجماليات العملية (كل الأسطر) — الأكياس والوزن

@@ -244,6 +244,7 @@ export async function fetchGrainItems(): Promise<ProductOption[]> {
       .from("products")
       .select("id, sku, name, name_ar, item_class, sale_price, cost_price, package_weight_kg")
       .eq("item_class", "RAW_MATERIAL")
+      .eq("is_custody_item", true)
       .eq("is_active", true)
       .order("name_ar", { ascending: true, nullsFirst: false })
       .order("name");
