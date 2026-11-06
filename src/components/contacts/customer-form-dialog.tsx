@@ -7,6 +7,7 @@ import { CountrySelector } from "@/components/country-selector";
 import { COUNTRIES, Country, DEFAULT_COUNTRY } from "@/lib/country-data";
 import { formatPhoneE164 } from "@/lib/phone-utils";
 import { AmountInput } from "@/components/ui/amount-input";
+import { VoiceInputButton } from "@/components/voice/voice-input-button";
 
 /**
  * CustomerFormDialog — the ONE customer form for the whole application.
@@ -245,8 +246,17 @@ export function CustomerFormDialog({
                     value={edit.name ?? ""}
                     onChange={(e) => setEdit({ ...edit, name: e.target.value })}
                     placeholder={isAr ? "اسم العميل أو المؤسسة" : "Customer or Company Name"}
-                    className="h-12 w-full rounded-2xl border border-border/80 bg-surface/80 ps-11 pe-4 text-sm font-medium transition placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="h-12 w-full rounded-2xl border border-border/80 bg-surface/80 ps-11 pe-12 text-sm font-medium transition placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
                   />
+                  {!isLockedCashCustomer && (
+                    <div className="absolute end-2.5 top-1/2 -translate-y-1/2 z-10">
+                      <VoiceInputButton
+                        fieldLabel={isAr ? "اسم العميل" : "Customer Name"}
+                        currentValue={edit.name ?? ""}
+                        onTranscript={(text) => setEdit({ ...edit, name: text })}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -313,8 +323,15 @@ export function CustomerFormDialog({
                       value={edit.address ?? ""}
                       onChange={(e) => setEdit({ ...edit, address: e.target.value })}
                       placeholder={isAr ? "المدينة، الحي، الشارع" : "City, District, Street"}
-                      className="h-12 w-full rounded-2xl border border-border/80 bg-surface/80 ps-11 pe-4 text-sm font-medium transition placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      className="h-12 w-full rounded-2xl border border-border/80 bg-surface/80 ps-11 pe-12 text-sm font-medium transition placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                     />
+                    <div className="absolute end-2.5 top-1/2 -translate-y-1/2 z-10">
+                      <VoiceInputButton
+                        fieldLabel={isAr ? "العنوان أو المدينة" : "Address"}
+                        currentValue={edit.address ?? ""}
+                        onTranscript={(text) => setEdit({ ...edit, address: text })}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>

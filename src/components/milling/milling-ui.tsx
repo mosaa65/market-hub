@@ -8,10 +8,11 @@
  * الحالة والنواتج القديمة (status enums / output types) أُزيلت مع النظام
  * القديم: لا حالات مستندات — السطر الواحد هو الحقيقة (docs/milling/00).
  */
+import * as React from "react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
-
 import { toSystemDigits } from "@/lib/format-preferences";
+import { VoiceInputButton } from "@/components/voice/voice-input-button";
 
 /* ------------------------------------------------------------------ panel */
 
@@ -100,15 +101,61 @@ export function MillingField({
  * تُستخدم فيها `QuantityInput` و`AmountInput` اللتان تعرضان `type="text"`،
  * فلا حاجة بعد الآن لمعالج `onWheel → blur` الذي كان يقاطع التركيز.
  */
-export function MillingInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
-  return (
+export interface MillingInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  enableVoice?: boolean;
+  voiceLabel?: string;
+  onVoiceInput?: (text: string) => void;
+}
+
+export function MillingInput({
+  enableVoice = false,
+  voiceLabel,
+  onVoiceInput,
+  value,
+  readOnly,
+  disabled,
+  className,
+  ...props
+}: MillingInputProps) {
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleVoice = (text: string) => {
+    onVoiceInput?.(text);
+    if (inputRef.current) {
+      inputRef.current.value = text;
+      inputRef.current.dispatchEvent(new Event("input", { bubbles: true }));
+      inputRef.current.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  };
+
+  const inputNode = (
     <input
-      // Every milling field is part of the keyboard order unless a screen opts
-      // out — the counter works without a mouse (see form-navigation.ts).
+      ref={inputRef}
       data-form-nav=""
+      value={value}
+      readOnly={readOnly}
+      disabled={disabled}
       {...props}
-      className={cn(fieldBase, props.className)}
+      className={cn(fieldBase, enableVoice && "pe-9", className)}
     />
+  );
+
+  if (!enableVoice) return inputNode;
+
+  return (
+    <div className="relative w-full">
+      {inputNode}
+      {!readOnly && !disabled && (
+        <div className="absolute end-2 top-1/2 -translate-y-1/2 z-10">
+          <VoiceInputButton
+            size="sm"
+            fieldLabel={voiceLabel || (typeof props.placeholder === "string" ? props.placeholder : undefined)}
+            currentValue={typeof value === "string" ? value : inputRef.current?.value || ""}
+            onTranscript={handleVoice}
+          />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -122,13 +169,61 @@ export function MillingSelect(props: React.SelectHTMLAttributes<HTMLSelectElemen
   );
 }
 
-export function MillingTextarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return (
+export interface MillingTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+  enableVoice?: boolean;
+  voiceLabel?: string;
+  onVoiceInput?: (text: string) => void;
+}
+
+export function MillingTextarea({
+  enableVoice = false,
+  voiceLabel,
+  onVoiceInput,
+  value,
+  readOnly,
+  disabled,
+  className,
+  ...props
+}: MillingTextareaProps) {
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+
+  const handleVoice = (text: string) => {
+    onVoiceInput?.(text);
+    if (textareaRef.current) {
+      textareaRef.current.value = text;
+      textareaRef.current.dispatchEvent(new Event("input", { bubbles: true }));
+      textareaRef.current.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  };
+
+  const textareaNode = (
     <textarea
+      ref={textareaRef}
       data-form-nav=""
+      value={value}
+      readOnly={readOnly}
+      disabled={disabled}
       {...props}
-      className={cn(fieldBase, "h-auto min-h-20 py-2 leading-relaxed", props.className)}
+      className={cn(fieldBase, "h-auto min-h-20 py-2 leading-relaxed", enableVoice && "pe-9", className)}
     />
+  );
+
+  if (!enableVoice) return textareaNode;
+
+  return (
+    <div className="relative w-full">
+      {textareaNode}
+      {!readOnly && !disabled && (
+        <div className="absolute top-2 end-2 z-10">
+          <VoiceInputButton
+            size="sm"
+            fieldLabel={voiceLabel || (typeof props.placeholder === "string" ? props.placeholder : undefined)}
+            currentValue={typeof value === "string" ? value : textareaRef.current?.value || ""}
+            onTranscript={handleVoice}
+          />
+        </div>
+      )}
+    </div>
   );
 }
 

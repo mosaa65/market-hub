@@ -746,6 +746,9 @@ export function StockAdjustmentDialog({
                       rows={2}
                       value={note}
                       onChange={(e) => setNote(e.target.value)}
+                      enableVoice
+                      voiceLabel={isAr ? "ملاحظات التسوية والإتلاف" : "Adjustment Notes"}
+                      onVoiceInput={(text) => setNote(text)}
                       placeholder={
                         isAr
                           ? "اكتب أي تفاصيل أو أرقام محاضر الجرد أو مبررات التسوية..."

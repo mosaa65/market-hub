@@ -12,6 +12,7 @@ import {
 } from "@/design/number";
 import type { FieldSize } from "@/design/styles";
 import { useFieldContext } from "@/components/ui/form-field";
+import { VoiceInputButton } from "@/components/voice/voice-input-button";
 
 const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
   ({ className, type, ...props }, ref) => {
@@ -98,6 +99,12 @@ export interface FieldInputProps extends Omit<
   invalid?: boolean;
   /** Class applied to the positioning wrapper. */
   containerClassName?: string;
+  /** Enables integrated voice-to-text microphone button in the field. */
+  enableVoice?: boolean;
+  /** Explicit callback when voice transcription completes */
+  onVoiceInput?: (text: string) => void;
+  /** Label describing the field in the voice modal */
+  voiceLabel?: string;
 }
 
 /**
@@ -121,6 +128,9 @@ export const FieldInput = React.forwardRef<HTMLInputElement, FieldInputProps>(
       suffix,
       prefixText,
       clearable = false,
+      enableVoice = false,
+      onVoiceInput,
+      voiceLabel,
       onValueChange,
       onChange,
       invalid,
@@ -258,14 +268,30 @@ export const FieldInput = React.forwardRef<HTMLInputElement, FieldInputProps>(
               // Digits read LTR without flipping the field's own direction.
               isNumeric && "[unicode-bidi:plaintext]",
               (resolvedIcon || prefixText) && "ps-10",
-              (suffix || showClear) && "pe-10",
+              (suffix || showClear || enableVoice) && "pe-10",
               className,
             )}
             {...props}
           />
 
-          {(suffix || showClear) && (
-            <span className="absolute inset-y-0 end-0 z-10 flex items-center gap-1 pe-3 [&_svg]:size-3.5">
+          {(suffix || showClear || enableVoice) && (
+            <span className="absolute inset-y-0 end-0 z-10 flex items-center gap-1 pe-2.5 [&_svg]:size-3.5">
+              {enableVoice && !readOnly && !props.disabled && (
+                <VoiceInputButton
+                  size={size}
+                  fieldLabel={voiceLabel || (typeof props.placeholder === "string" ? props.placeholder : undefined)}
+                  currentValue={typeof value === "string" ? value : inputRef.current?.value || ""}
+                  onTranscript={(text) => {
+                    onVoiceInput?.(text);
+                    onValueChange?.(text);
+                    if (inputRef.current) {
+                      inputRef.current.value = text;
+                      inputRef.current.dispatchEvent(new Event("input", { bubbles: true }));
+                      inputRef.current.dispatchEvent(new Event("change", { bubbles: true }));
+                    }
+                  }}
+                />
+              )}
               {suffix ? (
                 <span className="text-xs font-medium text-muted-foreground tabular-nums">
                   {suffix}

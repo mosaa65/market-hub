@@ -806,6 +806,9 @@ export function SettlementWizardSheet({
                 rows={3}
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
+                enableVoice
+                voiceLabel={isAr ? "مبرر وملاحظات التسوية" : "Adjustment notes"}
+                onVoiceInput={(text) => setNote(text)}
                 placeholder={isAr ? "مبرر التسوية..." : "Adjustment justification…"}
               />
             )}
