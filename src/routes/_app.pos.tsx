@@ -1539,7 +1539,7 @@ function POSPage() {
       return;
     }
 
-    if (!line.is_service) {
+    if (!line.is_service && !allowNegativeSales) {
       const stock = stockMap[line.product_id] ?? 0;
       const reservedByOtherLines = cart
         .filter((l) => l.product_id === line.product_id && l.line_id !== lineId)
@@ -1581,7 +1581,7 @@ function POSPage() {
     const rawConvertedQty = (line.quantity * oldFactor) / newFactor;
     let nextQty = Math.max(increment, Math.round(rawConvertedQty));
 
-    if (!line.is_service) {
+    if (!line.is_service && !allowNegativeSales) {
       const stock = stockMap[line.product_id] ?? 0;
       const reservedByOtherLines = cart
         .filter((entry) => entry.product_id === line.product_id && entry.line_id !== lineId)
@@ -2789,6 +2789,7 @@ function POSPage() {
                       const saleUom = getDefaultSaleUom(p);
                       const stockInSaleUnit = stock / Math.max(saleUom.factor_to_base, 0.000000001);
                       const low = p.is_service !== true && stock <= 0;
+                      const canAddToCart = !low || allowNegativeSales;
                       const catLabel =
                         lang === "ar"
                           ? p.category?.name_ar || p.category?.name
@@ -2820,11 +2821,13 @@ function POSPage() {
                         <button
                           key={p.id}
                           onClick={() => addToCart(p)}
-                          disabled={low}
-                          aria-disabled={low}
+                          disabled={!canAddToCart}
+                          aria-disabled={!canAddToCart}
                           className={`group relative flex flex-col items-start justify-between gap-2 rounded-2xl border p-2.5 text-start transition-all duration-150 hover:shadow-md active:scale-[0.98] ${
                             low
-                              ? "border-destructive/25 bg-gradient-to-b from-card to-destructive/[0.06] cursor-not-allowed"
+                              ? `border-destructive/25 bg-gradient-to-b from-card to-destructive/[0.06] ${
+                                  canAddToCart ? "" : "cursor-not-allowed"
+                                }`
                               : "border-border/80 bg-white hover:border-primary/50 dark:bg-card"
                           }`}
                         >
@@ -2928,6 +2931,7 @@ function POSPage() {
                       const stock = stockMap[p.id] ?? 0;
                       const saleUom = getDefaultSaleUom(p);
                       const low = p.is_service !== true && stock <= 0;
+                      const canAddToCart = !low || allowNegativeSales;
                       const catLabel =
                         lang === "ar"
                           ? p.category?.name_ar || p.category?.name
@@ -2996,7 +3000,7 @@ function POSPage() {
                           {/* Quick Add Button */}
                           <button
                             type="button"
-                            disabled={low}
+                            disabled={!canAddToCart}
                             onClick={() => addToCart(p)}
                             className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary transition hover:bg-primary hover:text-primary-foreground active:scale-90 disabled:opacity-30"
                             title={t("pos.add_to_cart")}
@@ -3104,6 +3108,7 @@ function POSPage() {
                           const stock = stockMap[p.id] ?? 0;
                           const saleUom = getDefaultSaleUom(p);
                           const low = p.is_service !== true && stock <= 0;
+                          const canAddToCart = !low || allowNegativeSales;
                           const catLabel =
                             lang === "ar"
                               ? p.category?.name_ar || p.category?.name
@@ -3122,11 +3127,11 @@ function POSPage() {
                           return (
                             <tr
                               key={p.id}
-                              onClick={() => !low && addToCart(p)}
+                              onClick={() => canAddToCart && addToCart(p)}
                               className={`transition hover:bg-primary/[0.04] ${
-                                low ? "cursor-not-allowed" : "cursor-pointer"
+                                canAddToCart ? "cursor-pointer" : "cursor-not-allowed"
                               }`}
-                              aria-disabled={low}
+                              aria-disabled={!canAddToCart}
                             >
                               <td className="py-2 px-3 font-mono text-[11px] text-muted-foreground">
                                 {p.barcode || p.sku || "—"}
@@ -3159,7 +3164,7 @@ function POSPage() {
                               <td className="py-2 px-3 text-center">
                                 <button
                                   type="button"
-                                  disabled={low}
+                                  disabled={!canAddToCart}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     addToCart(p);
@@ -3904,7 +3909,7 @@ function POSPage() {
             meta: p.barcode || p.sku || null,
             value: money(saleUom.sale_price),
             sub: `${t("pos.stock")}: ${decompText}`,
-            disabled: p.is_service !== true && stock <= 0,
+            disabled: !allowNegativeSales && p.is_service !== true && stock <= 0,
           };
         })}
         onSelect={(id) => {

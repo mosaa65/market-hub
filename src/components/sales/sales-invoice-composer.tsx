@@ -354,7 +354,7 @@ export function SalesInvoiceComposer() {
     const availableForLine = Math.max(0, line.product.on_hand - reservedByOtherLines);
     const availableInNewUom = availableForLine / newFactor;
 
-    if (nextQty > availableInNewUom) {
+    if (!allowNegativeSales && nextQty > availableInNewUom) {
       if (availableInNewUom >= increment) {
         nextQty = Math.max(increment, Math.floor(availableInNewUom));
         toast.info(

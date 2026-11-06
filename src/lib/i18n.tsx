@@ -1635,7 +1635,7 @@ const ar: Dict = {
   "inventory.kpi.out": "نفد من المخزون",
   "inventory.kpi.value": "قيمة المخزون",
   "inventory.status": "الحالة",
-  "inventory.status.out": "منتهي",
+  "inventory.status.out": "نفد",
   "inventory.status.low": "منخفض",
   "inventory.status.near": "قريب من النفاد",
   "inventory.status.healthy": "متوفر",
