@@ -100,15 +100,15 @@ try {
   }
   $env:SUPABASE_DB_PASSWORD = $databaseCredentials[1]
 
-  # The active migration directory is a fresh-database baseline. Permit an
-  # empty target or a cloud already rebuilt from this exact baseline; refuse
-  # old, mixed, or partial migration histories.
+  # Permit an empty target, or an existing cloud whose ledger is a complete
+  # prefix of the approved 001-017 baseline. This allows forward migrations
+  # added after the original 001-015 rebuild, while refusing mixed histories.
   $baselineSafetySql = @'
 WITH migration_state AS (
   SELECT
     count(*)::int AS migration_count,
-    count(*) FILTER (WHERE version IN ('001','002','003','004','005','006','007','008','009','010','011','012','013','014','015'))::int AS baseline_count,
-    count(*) FILTER (WHERE version NOT IN ('001','002','003','004','005','006','007','008','009','010','011','012','013','014','015'))::int AS other_count
+    string_agg(version::text, ',' ORDER BY version) AS versions,
+    count(*) FILTER (WHERE version NOT IN ('001','002','003','004','005','006','007','008','009','010','011','012','013','014','015','016','017'))::int AS other_count
   FROM supabase_migrations.schema_migrations
 ), public_state AS (
   SELECT count(*)::int AS relation_count
@@ -117,8 +117,12 @@ WITH migration_state AS (
 )
 SELECT CASE
   WHEN migration_state.other_count > 0 THEN 'INCOMPATIBLE_HISTORY'
-  WHEN migration_state.migration_count = 15 AND migration_state.baseline_count = 15 THEN 'BASELINE_READY'
   WHEN migration_state.migration_count = 0 AND public_state.relation_count = 0 THEN 'EMPTY_BASELINE_TARGET'
+  WHEN migration_state.versions IN (
+    '001,002,003,004,005,006,007,008,009,010,011,012,013,014,015',
+    '001,002,003,004,005,006,007,008,009,010,011,012,013,014,015,016',
+    '001,002,003,004,005,006,007,008,009,010,011,012,013,014,015,016,017'
+  ) THEN 'BASELINE_READY'
   ELSE 'UNSAFE_TARGET'
 END AS migration_target
 FROM migration_state CROSS JOIN public_state;
@@ -126,7 +130,7 @@ FROM migration_state CROSS JOIN public_state;
   $baselineSafetySql = ($baselineSafetySql -replace '\s+', ' ').Trim()
   $previousPreference = $ErrorActionPreference
   $ErrorActionPreference = "Continue"
-  $safetyOutput = & supabase db query --linked $baselineSafetySql 2>&1
+  $safetyOutput = & supabase db query --db-url $env:SUPABASE_DB_URL $baselineSafetySql 2>&1
   $safetyExitCode = $LASTEXITCODE
   $ErrorActionPreference = $previousPreference
   if ($safetyExitCode -ne 0) {
@@ -134,7 +138,7 @@ FROM migration_state CROSS JOIN public_state;
   }
   $safetyText = $safetyOutput -join "`n"
   if ($safetyText -notmatch "EMPTY_BASELINE_TARGET|BASELINE_READY") {
-    throw "Refusing to push migrations into this cloud project: its schema or migration history is neither empty nor the complete 001-015 baseline."
+    throw "Refusing to push migrations into this cloud project: its schema is not empty and its migration history is not a complete 001-017 baseline prefix."
   }
 
   Write-Host "Target cloud project: $linkedRef" -ForegroundColor Yellow

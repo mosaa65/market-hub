@@ -3,7 +3,7 @@
  *
  * العميل + الحبوب (أنواع متعددة) + الأكياس + الوزن (من الميزان)
  * + أجرة الطحن حسب وحدة الخدمة (كيس أو كجم) + الخصم + طريقة الدفع + المدفوع/الآجل
- * = مستند أمانة واحد + فاتورة مبيعات رسمية في نفس المعاملة الفورية.
+ * = سند استلام واحد + فاتورة مبيعات رسمية في نفس المعاملة الفورية.
  */
 import { createFileRoute, useSearch, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -46,6 +46,7 @@ import { useI18n } from "@/lib/i18n";
 import { LuxuryPrintPreviewModal } from "@/components/luxury-print-preview-modal";
 import { getUnifiedPrintSettings, printUnifiedDocument, type PrintRequest } from "@/lib/printing";
 import { DocumentShareDialog } from "@/components/communication/document-share-dialog";
+import { OperationSuccessModal } from "@/components/communication/operation-success-modal";
 import { QuickProductDialog } from "@/components/milling/quick-product-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -167,6 +168,7 @@ function MillingIntakePage() {
   const [printDoc, setPrintDoc] = useState<UnifiedDocumentData | null>(null);
   const [printModalOpen, setPrintModalOpen] = useState(false);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [quickReceiptOpen, setQuickReceiptOpen] = useState(false);
   const [showWorkflow, setShowWorkflow] = useState(false);
   const [quickGrainDialogOpen, setQuickGrainDialogOpen] = useState(false);
 
@@ -244,7 +246,7 @@ function MillingIntakePage() {
     }
   }, [serviceItem.data, feePerUnit]);
 
-  // رصيد أمانات العميل
+  // رصيد حبوب العميل
   const balances = useQuery({
     queryKey: ["milling", "balances", customerId, warehouseId],
     queryFn: () => fetchCustodyBalances(customerId || undefined, warehouseId || undefined),
@@ -452,6 +454,10 @@ function MillingIntakePage() {
         }
       }
 
+      // إظهار سند سريع بعد الحفظ: تفاصيل العميل + أزرار الطباعة والإرسال.
+      // إعدادات الطباعة لا تلغي هذا السند؛ فهي تتحكم بالطباعة التلقائية فقط.
+      if (getUnifiedPrintSettings().showQuickReceipt) setQuickReceiptOpen(true);
+
       // تفريغ حقول العملية لتجهيز الاستلام التالي
       setLines([{ itemId: "", bags: "", kg: "" }]);
       setNotes("");
@@ -471,6 +477,7 @@ function MillingIntakePage() {
     setCreatedDocument(null);
     setActiveDetails(null);
     setPrintDoc(null);
+    setQuickReceiptOpen(false);
     setShowWorkflow(false);
     setLines([{ itemId: "", bags: "", kg: "" }]);
     setNotes("");
@@ -484,8 +491,8 @@ function MillingIntakePage() {
       <div className="mx-auto max-w-7xl space-y-4 p-4">
         {/* شريط العنوان الرسمي */}
         <PageHeader
-          title="استلام الأمانات"
-          subtitle="استلام عدة أنواع حبوب في سند واحد (بر 50كجم ×10 + بر 25كجم ×10 + …) مع فاتورة أجور رسمية على العملية كلها."
+          title="استلام الحبوب وخدمات الطحن"
+          subtitle="استلام عدة أنواع حبوب في سند واحد مع فاتورة أجور رسمية على العملية كلها."
         />
 
         {/* شريط الإشعار بالعملية النشطة بعد الحفظ أو الفتح */}
@@ -506,7 +513,7 @@ function MillingIntakePage() {
                 </div>
                 <div className="mt-0.5 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                   <span>
-                    مستند الأمانة:{" "}
+                    سند الاستلام:{" "}
                     <Mono className="font-bold text-foreground">
                       {createdDocument.document_number}
                     </Mono>
@@ -580,13 +587,13 @@ function MillingIntakePage() {
             <MillingSectionTitle
               icon={<Scale className="h-4 w-4" />}
               title="بيانات استلام حبوب العميل"
-              subtitle="تسجيل الأمانة العينية بأنواع الحبوب والأكياس والوزن الفعلي."
+              subtitle="تسجيل أنواع الحبوب والأكياس والوزن الفعلي بدقة."
             />
 
             <div className="space-y-4 p-4">
               {/* العميل يُختار بحثًا، والمستودع شارة ثابتة لا حقل يزاحمه */}
               <div className="space-y-2">
-                <MillingField label="صاحب الأمانة / العميل *">
+                <MillingField label="العميل / صاحب الحبوب *">
                   <div className="flex min-w-0 flex-1 items-center gap-1.5">
                     <PartyPicker
                       options={customers.data ?? []}
@@ -676,7 +683,7 @@ function MillingIntakePage() {
                 {grainItems.data && grainItems.data.length === 0 ? (
                   <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-2.5 py-1.5 text-[11px]">
                     <span className="font-semibold text-amber-700 dark:text-amber-300">
-                      لا توجد أصناف حبوب أمانات بعد — أضف واحدًا لتستطيع الاستلام.
+                      لا توجد أصناف حبوب مهيأة بعد — أضف واحدًا لتستطيع الاستلام.
                     </span>
                     <button
                       type="button"
@@ -757,19 +764,19 @@ function MillingIntakePage() {
                 />
               </MillingField>
 
-              {/* رصيد أمانات العميل المتبقي في هذا المخزن */}
+              {/* رصيد حبوب العميل المتبقي في هذا المخزن */}
               {customerId && warehouseId && (
                 <div className="rounded-xl border border-border/80 bg-muted/30 p-3 space-y-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-bold text-foreground">
-                      رصيد أمانات العميل الحالي في هذا المستودع:
+                      رصيد الحبوب الحالي للعميل في هذا المستودع:
                     </span>
                     <span className="text-[11px] text-muted-foreground">مشتق من حركات السجل</span>
                   </div>
                   {(balances.data ?? []).filter((b) => b.bags_balance > 0 || b.kg_balance > 0)
                     .length === 0 ? (
                     <p className="text-xs text-muted-foreground italic">
-                      لا يوجد رصيد أمانات سابق للعميل حالياً (أول استلام).
+                      لا يوجد رصيد سابق للعميل حالياً (أول استلام).
                     </p>
                   ) : (
                     <div className="flex flex-wrap gap-2">
@@ -1096,6 +1103,47 @@ function MillingIntakePage() {
           </MillingPanel>
         </div>
 
+        {/* سند سريع بعد الحفظ — مناسب للعملاء الذين لا يستخدمون الفواتير */}
+        <OperationSuccessModal
+          open={quickReceiptOpen}
+          onClose={() => setQuickReceiptOpen(false)}
+          operationId={createdDocument?.document_id}
+          title="تم تسجيل استلام الحبوب بنجاح"
+          subtitle="سند سريع يتضمن تفاصيل العميل والاستلام، ويمكنك طباعته أو إرساله مباشرة."
+          amount={Number(activeDetails?.sales_invoices?.total ?? grandTotal)}
+          currency={currencySymbol}
+          referenceNumber={createdDocument?.document_number}
+          customer={
+            (selectedCustomer || activeDetails?.customers)
+              ? {
+                  id: selectedCustomer?.id || activeDetails?.customer_id || "",
+                  name: selectedCustomer?.name || activeDetails?.customers?.name || "",
+                  phone: selectedCustomer?.phone || activeDetails?.customers?.phone || undefined,
+                  balance: Number(selectedCustomer?.balance ?? 0),
+                }
+              : null
+          }
+          invoice={
+            createdDocument?.invoice_number
+              ? {
+                  id: createdDocument.invoice_id,
+                  invoiceNumber: createdDocument.invoice_number,
+                  date: new Date().toISOString(),
+                  subtotal: Number(activeDetails?.sales_invoices?.subtotal ?? currentSubtotal),
+                  total: Number(activeDetails?.sales_invoices?.total ?? grandTotal),
+                  paid: Number(activeDetails?.sales_invoices?.paid ?? currentPaid),
+                  remaining: Number(activeDetails?.sales_invoices?.remaining ?? remainingDue),
+                  status: remainingDue === 0 ? "paid" : "partial",
+                }
+              : null
+          }
+          eventType="invoice_created"
+          onPrint={() => {
+            setQuickReceiptOpen(false);
+            setPrintModalOpen(true);
+          }}
+        />
+
         {/* سند الاستلام وفاتورة الأجور — القالب الموحد المعتمد */}
         {printDoc && (
           <LuxuryPrintPreviewModal
@@ -1103,7 +1151,7 @@ function MillingIntakePage() {
             onClose={() => setPrintModalOpen(false)}
             doc={printDoc}
             documentType="mill_document"
-            title="معاينة وطباعة سند استلام أمانة وفاتورة أجور"
+            title="معاينة وطباعة سند استلام حبوب وفاتورة أجور"
             customerName={activeDetails?.customers?.name || undefined}
             customerPhone={activeDetails?.customers?.phone || undefined}
           />

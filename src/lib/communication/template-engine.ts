@@ -342,16 +342,16 @@ export const TEMPLATES: Record<CommunicationEventType, TemplateDefinition> = {
       const lines = [
         `السلام عليكم ورحمة الله وبركاته،`,
         `عزيزنا *${customerName}*،`,
-        companyName ? `تحية طيبة من *${companyName}* — خدمة المطحنة:` : `خدمة المطحنة والأمانات:`,
-        docNum ? `🔖 *مستند الطحن:* ${docNum}` : "",
-        inv?.invoiceNumber ? `🧾 *فاتورة الأجور الرسمية:* ${inv.invoiceNumber}` : "",
-        statusText ? `⚙️ *الحالة:* ${statusText}` : "",
-        `💵 *الإجمالي:* ${total}`,
-        `✅ *المدفوع:* ${paid}`,
+        companyName ? `تحية طيبة من *${companyName}* — خدمات المطحنة` : `تفاصيل خدمة المطحنة`,
+        docNum ? `🔖 *رقم السند:* ${docNum}` : "",
+        inv?.invoiceNumber ? `🧾 *رقم الفاتورة:* ${inv.invoiceNumber}` : "",
+        statusText ? `⚙️ *حالة العملية:* ${statusText}` : "",
+        `💵 *إجمالي الخدمة:* ${total}`,
+        `✅ *المبلغ المسدد:* ${paid}`,
         (inv?.remaining ?? 0) > 0
-          ? `⏳ *المتبقي المستحق:* *${remaining}*`
-          : `✨ *الحالة المالية:* مسددة بالكامل`,
-        `\nشاكرين لكم ثقتكم ونسعد بخدمتكم دائماً.`,
+          ? `⏳ *المبلغ المستحق على الحساب:* *${remaining}*`
+          : `✨ *الحالة المالية:* لا يوجد مبلغ مستحق — تم السداد بالكامل`,
+        `\nنشكر لكم ثقتكم، ويسعدنا خدمتكم دائماً.`,
       ].filter(Boolean);
 
       return lines.join("\n");
@@ -368,16 +368,16 @@ export const TEMPLATES: Record<CommunicationEventType, TemplateDefinition> = {
 
       const lines = [
         `Dear *${customerName}*,`,
-        companyName ? `Greetings from *${companyName}* — Milling Service:` : `Milling Service:`,
-        docNum ? `🔖 *Milling Doc:* ${docNum}` : "",
-        inv?.invoiceNumber ? `🧾 *Invoice:* ${inv.invoiceNumber}` : "",
-        statusText ? `⚙️ *Status:* ${statusText}` : "",
-        `💵 *Total:* ${total}`,
-        `✅ *Paid:* ${paid}`,
+        companyName ? `Greetings from *${companyName}* — Milling Services` : `Milling Service Details`,
+        docNum ? `🔖 *Receipt No.:* ${docNum}` : "",
+        inv?.invoiceNumber ? `🧾 *Invoice No.:* ${inv.invoiceNumber}` : "",
+        statusText ? `⚙️ *Operation Status:* ${statusText}` : "",
+        `💵 *Service Total:* ${total}`,
+        `✅ *Amount Paid:* ${paid}`,
         (inv?.remaining ?? 0) > 0
-          ? `⏳ *Remaining Balance:* *${remaining}*`
-          : `✨ *Status:* Fully Paid`,
-        `\nThank you for choosing us!`,
+          ? `⏳ *Amount Due on Account:* *${remaining}*`
+          : `✨ *Financial Status:* Fully paid — no amount due`,
+        `\nThank you for your trust. We are always happy to serve you.`,
       ].filter(Boolean);
 
       return lines.join("\n");

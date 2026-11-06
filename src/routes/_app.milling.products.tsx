@@ -985,11 +985,11 @@ function CustodyProductsPage() {
     <ModuleGuard moduleId="milling_operations">
       <div className="space-y-4 pb-12">
         <PageHeader
-          title={isAr ? "أصناف الأمانات" : "Custody Items"}
+          title={isAr ? "أصناف الحبوب ومنتجات الطحن" : "Grain & Milling Products"}
           subtitle={
             isAr
-              ? "الحبوب الخام ونواتج الطحن المستخدمة في عمليات الأمانات"
-              : "Raw grain and milled outputs used across custody operations"
+              ? "دليل رسمي للحبوب الخام ونواتج الطحن المستخدمة في خدمات العملاء"
+              : "Official catalogue for raw grain and milled outputs used in customer services"
           }
           actions={
             <Button
@@ -1016,7 +1016,7 @@ function CustodyProductsPage() {
             title={isAr ? "إجمالي الأصناف" : "Total Items"}
             value={toSystemDigits(products.length)}
             currency=""
-            subtitle={isAr ? "في دليل الأمانات" : "in custody catalogue"}
+            subtitle={isAr ? "في دليل أصناف المطحنة" : "in milling catalogue"}
             icon={<Package className="size-5" />}
             iconClassName="bg-primary/10 text-primary border border-primary/20"
             badge={isAr ? "الكتالوج" : "Catalog"}

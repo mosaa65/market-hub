@@ -798,10 +798,10 @@ export function buildMillingDocumentUnifiedDoc(
   const remaining = Math.max(0, total - paid);
   const title =
     stage === "delivery"
-      ? "سند تسليم نواتج الأمانة"
+      ? "سند تسليم نواتج الطحن"
       : stage === "milled"
-        ? "سند طحن أمانة"
-        : "سند استلام أمانة وفاتورة أجور";
+        ? "سند تشغيل الطحن"
+        : "سند استلام حبوب وفاتورة أجور";
 
   const lines: any[] = [];
 
@@ -891,11 +891,11 @@ export function buildMillingDocumentUnifiedDoc(
     number: details.document_number,
     relatedRef: inv?.invoice_number ? `فاتورة رسمية ${inv.invoice_number}` : undefined,
     date: details.received_at || new Date().toISOString(),
-    partyLabel: "صاحب الأمانة / العميل:",
-    partyName: details.customers?.name || "صاحب الأمانة",
+    partyLabel: "العميل / صاحب الحبوب:",
+    partyName: details.customers?.name || "العميل",
     partyPhone: details.customers?.phone || undefined,
     warehouse: details.warehouses?.name_ar || details.warehouses?.name || "المستودع الرئيسي",
-    movementType: "أمانة عينية خاصة بالعميل + فاتورة أجور رسمية للعملية كاملة",
+    movementType: "حبوب ومنتجات خاصة بالعميل + فاتورة أجور رسمية للعملية كاملة",
     status: statusLabel,
     lines,
     subtotal,
@@ -909,7 +909,7 @@ export function buildMillingDocumentUnifiedDoc(
     // ورقة يُقرأ سنينَ بعد التسليم، والافتراض الخاطئ فيه لا يمكن تصحيحه لاحقًا.
     payment: inv?.payment_method ? paymentMethodLabel(inv.payment_method) : "—",
     notes:
-      "حبوب ونواتج ملك العميل (أمانة عينية خارج مخزون المنشأة). أجور الخدمة مثبتة بالفاتورة الرسمية المبينة أعلاه.",
+      "الحبوب والنواتج تخص العميل وتُدار بشكل مستقل عن مخزون المنشأة. أجور الخدمة مثبتة بالفاتورة الرسمية المبينة أعلاه.",
     options: {
       showFinancialDetails: true,
       showPaymentInfo: true,

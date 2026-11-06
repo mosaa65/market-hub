@@ -42,6 +42,8 @@ export interface UnifiedPrintSettings {
   showPaymentInfo: boolean;
   showNotes: boolean;
   showFooter: boolean;
+  /** فتح سند سريع بعد عمليات المطحنة لعرض تفاصيل العميل وأزرار الإرسال. */
+  showQuickReceipt: boolean;
   standardAccentColor?: string; // لون القالب القياسي المؤسسي المخصص
   luxuryAccentColor?: string; // لون القالب التنفيذي الفاخر المخصص
   overrides: Partial<Record<PrintingDocumentType, DocumentPrintOverride>>;
@@ -120,6 +122,7 @@ export const DEFAULT_UNIFIED_PRINT_SETTINGS: UnifiedPrintSettings = {
   showPaymentInfo: true,
   showNotes: true,
   showFooter: false,
+  showQuickReceipt: true,
   standardAccentColor: undefined, // يستخدم اللون الافتراضي الأزرق الملكي
   luxuryAccentColor: undefined, // يستخدم اللون الافتراضي الذهبي الفاخر
   overrides: DEFAULT_DOCUMENT_OVERRIDES,

@@ -75,7 +75,7 @@ export function renderThermalMillingTemplate(
       <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; margin-top: 2px;">
         <span style="color: #475569;">${l.qty} ${l.unit ? esc(l.unit) : ""}${!isCustody ? ` × ${money(l.price)}` : ""}</span>
         <span style="font-weight: 700; font-family: monospace; color: ${isCustody ? "#059669" : "#0f172a"}; font-size: ${isCustody ? "10.5px" : "11px"};">
-          ${isCustody ? (doc.docType === "delivery_note" ? "تسليم" : "أمانة عينية") : money(l.total)}
+          ${isCustody ? (doc.docType === "delivery_note" ? "تسليم للعميل" : "حبوب مستلمة") : money(l.total)}
         </span>
       </div>
       ${

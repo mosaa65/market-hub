@@ -46,7 +46,7 @@ export function renderMillingMasterTemplate(
 
   const isDelivery = doc.docType === "delivery_note";
   const title = esc(
-    doc.title || (isDelivery ? "سند تسليم أمانات عميل" : "فاتورة وسند استلام وخدمات طحن"),
+    doc.title || (isDelivery ? "سند تسليم منتجات الطحن" : "فاتورة وسند استلام وخدمات طحن"),
   );
 
   const compName = esc(
@@ -382,7 +382,7 @@ export function renderMillingMasterTemplate(
     <div class="milling-details-box">
       <div class="hairline-row">
         <span class="hairline-row-label">نوع الحركة:</span>
-        <span class="hairline-row-val">${esc(doc.movementType || "طحن وخدمات أمانات")}</span>
+        <span class="hairline-row-val">${esc(doc.movementType || "طحن وخدمات العملاء")}</span>
       </div>
       <div class="hairline-row">
         <span class="hairline-row-label">إجمالي العمليات:</span>
@@ -514,7 +514,7 @@ export function renderMillingThermalTemplate(
 
   const isDelivery = doc.docType === "delivery_note";
   const title = esc(
-    doc.title || (isDelivery ? "سند تسليم نواتج الأمانة" : "سند استلام أمانة وفاتورة أجور"),
+    doc.title || (isDelivery ? "سند تسليم نواتج الطحن" : "سند استلام حبوب وفاتورة أجور"),
   );
 
   const compName = esc(
@@ -540,7 +540,7 @@ export function renderMillingThermalTemplate(
         <div style="display:flex; justify-content:space-between; font-size: 11px; margin-top: 2px;">
           <span>${l.qty} ${esc(l.unit || "")}${!isCustody && !isDelivery ? ` × ${money(l.price)}` : ""}</span>
           <span style="font-weight:800; color: ${isCustody ? "#059669" : "#000"};">
-            ${isCustody ? (isDelivery ? "تسليم أمانة" : "أمانة عينية") : !isDelivery ? money(l.total) : "تسليم"}
+            ${isCustody ? (isDelivery ? "تسليم للعميل" : "حبوب مستلمة") : !isDelivery ? money(l.total) : "تسليم"}
           </span>
         </div>
         ${

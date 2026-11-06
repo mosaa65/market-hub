@@ -184,6 +184,7 @@ export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
     "showPaymentInfo",
     "showNotes",
     "showFooter",
+    "showQuickReceipt",
     "showBarcode",
     "showQrCode",
     "showSignatures",
@@ -1317,13 +1318,23 @@ export function PrintSettingsCard({ canEdit = true }: PrintSettingsCardProps) {
                       المشتريات
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold">تفعيل المعاينة</span>
-                    <Switch
-                      checked={unified.preview}
-                      onCheckedChange={(val) => updateUnified({ preview: val })}
-                      disabled={!canEdit}
-                    />
+                  <div className="flex flex-wrap items-center justify-end gap-3">
+                    <label className="flex items-center gap-2 text-xs font-semibold">
+                      سند سريع بعد استلام الحبوب
+                      <Switch
+                        checked={unified.showQuickReceipt}
+                        onCheckedChange={(val) => updateUnified({ showQuickReceipt: val })}
+                        disabled={!canEdit}
+                      />
+                    </label>
+                    <label className="flex items-center gap-2 text-xs font-semibold">
+                      تفعيل المعاينة
+                      <Switch
+                        checked={unified.preview}
+                        onCheckedChange={(val) => updateUnified({ preview: val })}
+                        disabled={!canEdit}
+                      />
+                    </label>
                   </div>
                 </div>
 

@@ -1,5 +1,5 @@
 /**
- * /milling/delivery — واجهة تسليم الأمانات ونواتج الطحن الفاخرة.
+ * /milling/delivery — واجهة تسليم منتجات الطحن بتصميم رسمي.
  *
  * رصيد العميل العيني → إدخال الكميات المسلمة (دفعات أو كاملة) → أسطر DELIVERY في custody_ledger.
  * حساب الرصيد السابق والمسلم والمتبقي تلقائياً مع إصدار سند تسليم رسمي عبر محرك القوالب الموحد
@@ -61,7 +61,7 @@ import { useI18n } from "@/lib/i18n";
 import { WarehouseBadge } from "@/components/ui/warehouse-badge";
 
 export const Route = createFileRoute("/_app/milling/delivery")({
-  head: () => ({ meta: [{ title: "تسليم نواتج الأمانات — فورتكس ERP" }] }),
+  head: () => ({ meta: [{ title: "تسليم منتجات الطحن — فورتكس ERP" }] }),
   component: MillingDeliveryPage,
 });
 
@@ -131,7 +131,7 @@ function MillingDeliveryPage() {
     if (preferred) setWarehouseId(preferred.id);
   }, [warehouses.data, warehouseId]);
 
-  // أرصدة أمانات العميل المتاحة
+  // أرصدة منتجات العميل المتاحة
   const balances = useQuery({
     queryKey: ["milling", "balances", customerId, warehouseId],
     queryFn: () => fetchCustodyBalances(customerId || undefined, warehouseId || undefined),
@@ -277,7 +277,7 @@ function MillingDeliveryPage() {
 
       const uDoc = buildCustodyDeliveryDoc({
         docNumber,
-        customerName: selectedCustomer?.name || "عميل أمانة",
+        customerName: selectedCustomer?.name || "العميل",
         customerPhone: selectedCustomer?.phone,
         warehouseName,
         lines: deliveryLinesPayload,
@@ -319,8 +319,8 @@ function MillingDeliveryPage() {
       <div className="mx-auto max-w-7xl space-y-4 p-4">
         {/* شريط رأس الصفحة */}
         <PageHeader
-          title="تسليم نواتج الأمانات"
-          subtitle="صرف وخروج نواتج الطحن والأمانات العينية للعميل مع احتساب الأرصدة المتبقية وسند تسليم رسمي."
+          title="تسليم منتجات الطحن"
+          subtitle="صرف نواتج الطحن للعميل مع احتساب الرصيد المتبقي وإصدار سند تسليم رسمي."
           actions={
             <div className="flex items-center gap-2">
               <Link
@@ -345,8 +345,8 @@ function MillingDeliveryPage() {
           <MillingPanel className="lg:col-span-7 space-y-4">
             <MillingSectionTitle
               icon={<Truck className="h-4 w-4" />}
-              title="نموذج صرف وتسليم الأمانات"
-              subtitle="تسجيل صرف كلي أو جزئي (دفعات) مع تحديث فوري للمتبقي"
+              title="نموذج صرف وتسليم المنتجات"
+              subtitle="تسجيل صرف كلي أو جزئي مع تحديث فوري للرصيد المتبقي"
               action={
                 available.length > 0 ? (
                   <button
@@ -364,7 +364,7 @@ function MillingDeliveryPage() {
             <div className="space-y-4 p-4">
               {/* العميل والمستودع */}
               <div className="grid gap-3 sm:grid-cols-2">
-                <MillingField label="العميل صاحب الأمانة *">
+                <MillingField label="العميل صاحب الحبوب والمنتجات *">
                   <div className="flex min-w-0 flex-1 items-center gap-1.5">
                     <PartyPicker
                       options={customers.data ?? []}
@@ -604,7 +604,7 @@ function MillingDeliveryPage() {
             }}
             doc={deliveryPrintDoc}
             documentType="delivery_note"
-            title="معاينة وطباعة سند تسليم نواتج الأمانة"
+            title="معاينة وطباعة سند تسليم منتجات الطحن"
             customerName={selectedCustomer?.name || undefined}
             customerPhone={selectedCustomer?.phone || undefined}
           />
