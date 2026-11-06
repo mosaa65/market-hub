@@ -216,7 +216,7 @@ function PurchasesPage() {
     const dateStr = new Date(inv.created_at).toLocaleDateString(isRtl ? "ar" : "en-GB");
     const text = isRtl
       ? `فاتورة مشتريات رقم ${inv.invoice_number}\nالمورد: ${inv.suppliers?.name || ""}\nالتاريخ: ${dateStr}\nالإجمالي: ${money(Number(inv.total))}\nالمدفوع: ${money(Number(inv.paid))}${remaining > 0 ? `\nالمتبقي: ${money(remaining)}` : ""}`
-      : `Purchase Invoice #${inv.invoice_number}\nSupplier: ${inv.suppliers?.name || ""}\nTotal: ${money(Number(inv.total))}\nPaid: ${money(Number(inv.paid))}${remaining > 0 ? `\nRemaining: ${money(remaining)}` : ""}`;
+      : `Purchase Invoice ${inv.invoice_number}\nSupplier: ${inv.suppliers?.name || ""}\nTotal: ${money(Number(inv.total))}\nPaid: ${money(Number(inv.paid))}${remaining > 0 ? `\nRemaining: ${money(remaining)}` : ""}`;
     const clean = phone.replace(/[^\d+]/g, "");
     const target = clean.startsWith("+") ? clean.slice(1) : clean;
     window.open(`https://wa.me/${target}?text=${encodeURIComponent(text)}`, "_blank");
@@ -234,8 +234,8 @@ function PurchasesPage() {
     }
     const remaining = Math.max(0, Number(inv.total) - Number(inv.paid));
     const text = isRtl
-      ? `فاتورة مشتريات #${inv.invoice_number} - المورد: ${inv.suppliers?.name || ""} - الإجمالي: ${money(Number(inv.total))} - المتبقي: ${money(remaining)}`
-      : `Purchase #${inv.invoice_number} - Total: ${money(Number(inv.total))} - Due: ${money(remaining)}`;
+      ? `فاتورة مشتريات ${inv.invoice_number} - المورد: ${inv.suppliers?.name || ""} - الإجمالي: ${money(Number(inv.total))} - المتبقي: ${money(remaining)}`
+      : `Purchase ${inv.invoice_number} - Total: ${money(Number(inv.total))} - Due: ${money(remaining)}`;
     const clean = phone.replace(/[^\d+]/g, "");
     window.open(`sms:${clean}?body=${encodeURIComponent(text)}`, "_blank");
   };

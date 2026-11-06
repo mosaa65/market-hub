@@ -124,9 +124,9 @@ export const TEMPLATES: Record<CommunicationEventType, TemplateDefinition> = {
         `🧾 *إشعار سند قبض مالي*`,
         `تم بحمد الله استلام دفعة بمبلغ: *${amount}*`,
         p?.date ? `📅 التاريخ: ${p.date}` : "",
-        p?.receiptNumber ? `🔖 رقم السند: #${p.receiptNumber}` : "",
+        p?.receiptNumber ? `🔖 رقم السند: ${p.receiptNumber}` : "",
         p?.method ? `💳 طريقة الدفع: ${p.method}` : "",
-        p?.invoiceNumber ? `📄 الفاتورة: #${p.invoiceNumber}` : "",
+        p?.invoiceNumber ? `📄 الفاتورة: ${p.invoiceNumber}` : "",
         remaining !== null && (p?.remainingBalance ?? 0) > 0
           ? `⏳ الرصيد المتبقي: *${remaining}*`
           : (p?.remainingBalance ?? 0) <= 0 && remaining !== null
@@ -181,7 +181,7 @@ export const TEMPLATES: Record<CommunicationEventType, TemplateDefinition> = {
         `السلام عليكم ورحمة الله وبركاته،`,
         `عزيزنا *${customerName}*،`,
         companyName ? `تفاصيل فاتورتكم من *${companyName}*:` : `تفاصيل الفاتورة:`,
-        inv?.invoiceNumber ? `🧾 *رقم الفاتورة:* #${inv.invoiceNumber}` : "",
+        inv?.invoiceNumber ? `🧾 *رقم الفاتورة:* ${inv.invoiceNumber}` : "",
         inv?.date ? `📅 *التاريخ:* ${inv.date}` : "",
         `💵 *الإجمالي:* ${total}`,
         `✅ *المدفوع:* ${paid}`,
@@ -202,7 +202,7 @@ export const TEMPLATES: Record<CommunicationEventType, TemplateDefinition> = {
       const lines = [
         `Hello *${customerName}*,`,
         companyName ? `Invoice details from *${companyName}*:` : `Invoice details:`,
-        inv?.invoiceNumber ? `🧾 *Invoice #:* #${inv.invoiceNumber}` : "",
+        inv?.invoiceNumber ? `🧾 *Invoice:* ${inv.invoiceNumber}` : "",
         inv?.date ? `📅 *Date:* ${inv.date}` : "",
         `💵 *Total:* ${total}`,
         `✅ *Paid:* ${paid}`,
@@ -343,8 +343,8 @@ export const TEMPLATES: Record<CommunicationEventType, TemplateDefinition> = {
         `السلام عليكم ورحمة الله وبركاته،`,
         `عزيزنا *${customerName}*،`,
         companyName ? `تحية طيبة من *${companyName}* — خدمة المطحنة:` : `خدمة المطحنة والأمانات:`,
-        docNum ? `🔖 *مستند الطحن:* #${docNum}` : "",
-        inv?.invoiceNumber ? `🧾 *فاتورة الأجور الرسمية:* #${inv.invoiceNumber}` : "",
+        docNum ? `🔖 *مستند الطحن:* ${docNum}` : "",
+        inv?.invoiceNumber ? `🧾 *فاتورة الأجور الرسمية:* ${inv.invoiceNumber}` : "",
         statusText ? `⚙️ *الحالة:* ${statusText}` : "",
         `💵 *الإجمالي:* ${total}`,
         `✅ *المدفوع:* ${paid}`,
@@ -369,8 +369,8 @@ export const TEMPLATES: Record<CommunicationEventType, TemplateDefinition> = {
       const lines = [
         `Dear *${customerName}*,`,
         companyName ? `Greetings from *${companyName}* — Milling Service:` : `Milling Service:`,
-        docNum ? `🔖 *Milling Doc:* #${docNum}` : "",
-        inv?.invoiceNumber ? `🧾 *Invoice:* #${inv.invoiceNumber}` : "",
+        docNum ? `🔖 *Milling Doc:* ${docNum}` : "",
+        inv?.invoiceNumber ? `🧾 *Invoice:* ${inv.invoiceNumber}` : "",
         statusText ? `⚙️ *Status:* ${statusText}` : "",
         `💵 *Total:* ${total}`,
         `✅ *Paid:* ${paid}`,

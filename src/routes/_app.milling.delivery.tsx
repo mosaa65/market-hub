@@ -249,7 +249,7 @@ function MillingDeliveryPage() {
       }
 
       const docNumber = (res.data as string) || `DEL-${Date.now().toString().slice(-6)}`;
-      toast.success(`تم تسجيل التسليم بنجاح — سند رقم #${docNumber}`);
+      toast.success(`تم تسجيل التسليم بنجاح — سند رقم ${docNumber}`);
 
       // تجهيز بيانات سند التسليم الفاخر مع توضيح الكميات السابقة، المسلمة، والمتبقية
       const deliveryLinesPayload = lines

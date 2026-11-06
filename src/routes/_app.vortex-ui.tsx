@@ -291,7 +291,7 @@ function VortexUiShowcasePage() {
           customerPhone: "+967770000000",
           referenceNumber: "9921",
           method: "تحويل بنكي - مصرف الراجحي",
-          notes: "دفعة من فاتورة توريد البضائع رقم #INV-104",
+          notes: "دفعة من فاتورة توريد البضائع رقم INV-104",
           remainingBalance: 12000,
         }}
       />

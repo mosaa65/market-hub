@@ -138,8 +138,8 @@ export function getAvailableCustomerActions(ctx: CustomerActionContext): ActionD
   if (currentInvoice) {
     actions.push({
       key: "invoice_share",
-      labelAr: `مشاركة الفاتورة #${currentInvoice.invoiceNumber}`,
-      labelEn: `Share Invoice #${currentInvoice.invoiceNumber}`,
+      labelAr: `مشاركة الفاتورة ${currentInvoice.invoiceNumber}`,
+      labelEn: `Share Invoice ${currentInvoice.invoiceNumber}`,
       descriptionAr: "إرسال تفاصيل الفاتورة عبر واتساب",
       descriptionEn: "Send invoice details via WhatsApp",
       enabled: isValidPhone,

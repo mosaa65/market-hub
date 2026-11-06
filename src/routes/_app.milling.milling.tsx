@@ -387,7 +387,7 @@ function MillingMillPage() {
       const docNumber = res.data ?? "";
       toast.success(
         docNumber
-          ? `تم تسجيل عملية الطحن بنجاح — مرجع داخلي #${docNumber}`
+          ? `تم تسجيل عملية الطحن بنجاح — مرجع داخلي ${docNumber}`
           : "تم تسجيل عملية الطحن بنجاح.",
       );
 

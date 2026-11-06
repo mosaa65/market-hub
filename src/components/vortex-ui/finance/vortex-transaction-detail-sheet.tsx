@@ -55,7 +55,7 @@ export function VortexTransactionDetailContent({
     return `مرحباً أستاذ/ة ${transaction.customerName}،
 إشعار بعملية: ${transaction.title}
 المبلغ: ${formatSystemNumber(transaction.amount, { currency: currencySymbol })}
-رقم المرجع: #${transaction.referenceNumber || transaction.id.slice(-6)}
+رقم المرجع: ${transaction.referenceNumber || transaction.id.slice(-6)}
 التاريخ: ${transaction.date}
 ${transaction.cashboxName || transaction.bankAccountName ? `الجهة/الوعاء: ${transaction.cashboxName || transaction.bankAccountName}\n` : ""}${transaction.remainingBalance !== undefined ? `المتبقي في الحساب: ${formatSystemNumber(transaction.remainingBalance, { currency: currencySymbol })}` : ""}
 شاكرين لكم ومقدرين حسن تعاونكم.`;

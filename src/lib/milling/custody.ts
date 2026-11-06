@@ -874,7 +874,7 @@ export function buildMillingDocumentUnifiedDoc(
     unit: basis === "PER_BAG" ? "كيس" : "كجم",
     price: feePerUnit,
     total: subtotal,
-    note: inv?.invoice_number ? `فاتورة أجور رسمية #${inv.invoice_number}` : undefined,
+    note: inv?.invoice_number ? `فاتورة أجور رسمية ${inv.invoice_number}` : undefined,
   });
 
   const statusLabel =
@@ -888,7 +888,7 @@ export function buildMillingDocumentUnifiedDoc(
     docType: stage === "delivery" ? "delivery_note" : "mill_document",
     title,
     number: details.document_number,
-    relatedRef: inv?.invoice_number ? `فاتورة رسمية #${inv.invoice_number}` : undefined,
+    relatedRef: inv?.invoice_number ? `فاتورة رسمية ${inv.invoice_number}` : undefined,
     date: details.received_at || new Date().toISOString(),
     partyLabel: "صاحب الأمانة / العميل:",
     partyName: details.customers?.name || "صاحب الأمانة",

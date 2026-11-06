@@ -244,7 +244,7 @@ export function useFinancialPosting() {
         toast.success(
           lang === "ar"
             ? `تم تسجيل السند رقم ${receiptNumber} بنجاح`
-            : `Voucher #${receiptNumber} recorded successfully`,
+            : `Voucher ${receiptNumber} recorded successfully`,
         );
 
         return {

@@ -345,7 +345,7 @@ export function UnifiedPrintModal({
     } else {
       msg += `🧾 *سند استلام أمانة وفاتورة أجور*\n`;
       msg += `🔢 رقم السند: ${data.ticketNumber}\n`;
-      if (data.invoiceNumber) msg += `📋 فاتورة الأجور: #${data.invoiceNumber}\n`;
+      if (data.invoiceNumber) msg += `📋 فاتورة الأجور: ${data.invoiceNumber}\n`;
       msg += `👤 العميل: ${data.customerName}\n`;
       msg += `📅 التاريخ: ${formatPrintedDateTime(data.createdAt)}\n`;
       msg += `🌾 نوع الحبوب: ${data.grainType || "—"}\n`;
@@ -1168,7 +1168,7 @@ function renderThermalHtml(d: UnifiedTicketPrintData, width: ThermalWidth = "80m
 
   <div class="dashed"></div>
   <div class="flex"><span>رقم السند:</span><span class="bold" style="font-family: monospace;">${d.ticketNumber}</span></div>
-  ${d.invoiceNumber && isIntake ? `<div class="flex"><span>فاتورة الأجور:</span><span style="font-family: monospace;">#${d.invoiceNumber}</span></div>` : ""}
+  ${d.invoiceNumber && isIntake ? `<div class="flex"><span>فاتورة الأجور:</span><span style="font-family: monospace;">${d.invoiceNumber}</span></div>` : ""}
   <div class="flex"><span>التاريخ:</span><span style="font-family: monospace;">${formatPrintedDateTime(d.createdAt)}</span></div>
   <div class="flex"><span>العميل:</span><span class="bold">${d.customerName}</span></div>
   ${d.customerPhone ? `<div class="flex"><span>الهاتف:</span><span style="font-family: monospace;">${d.customerPhone}</span></div>` : ""}
@@ -1318,7 +1318,7 @@ function renderA4Html(d: UnifiedTicketPrintData): string {
       <div><strong>العميل:</strong> ${d.customerName}</div>
       <div><strong>الهاتف:</strong> ${d.customerPhone || "—"}</div>
       <div><strong>المستودع:</strong> ${d.warehouseName || "المستودع الرئيسي"}</div>
-      ${d.invoiceNumber ? `<div><strong>فاتورة الأجور:</strong> #${d.invoiceNumber}</div>` : ""}
+      ${d.invoiceNumber ? `<div><strong>فاتورة الأجور:</strong> ${d.invoiceNumber}</div>` : ""}
     </div>
   </div>
 

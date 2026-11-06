@@ -66,7 +66,7 @@ export function renderInventoryThermalTemplate(
     opts.showDocNumberDate
       ? `
   <div class="row"><span>${rtl ? "رقم المستند" : "Doc No"}:</span><b>${esc(doc.number)}</b></div>
-  ${doc.relatedRef ? `<div class="row"><span>${rtl ? "العملية المرتبطة" : "Ref No"}:</span><span>#${esc(doc.relatedRef)}</span></div>` : ""}
+  ${doc.relatedRef ? `<div class="row"><span>${rtl ? "العملية المرتبطة" : "Ref No"}:</span><span>${esc(doc.relatedRef)}</span></div>` : ""}
   <div class="row"><span>${L.date}:</span><span>${esc(formatPrintedDateTime(doc.date))}</span></div>
   `
       : ""
@@ -197,7 +197,7 @@ export function renderInventoryStandardTemplate(
           opts.showDocNumberDate
             ? `
         <div class="n">رقم المستند: ${esc(doc.number)}</div>
-        ${doc.relatedRef ? `<div class="n">مرجع العملية: #${esc(doc.relatedRef)}</div>` : ""}
+        ${doc.relatedRef ? `<div class="n">مرجع العملية: ${esc(doc.relatedRef)}</div>` : ""}
         <div class="n">التاريخ: ${esc(formatPrintedDateTime(doc.date))}</div>
         `
             : ""

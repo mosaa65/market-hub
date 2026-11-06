@@ -1020,8 +1020,8 @@ export function SalesInvoiceComposer() {
         subtitle={
           lastInvoice
             ? isRtl
-              ? `فاتورة مبيعات #${lastInvoice.number}`
-              : `Sales Invoice #${lastInvoice.number}`
+              ? `فاتورة مبيعات ${lastInvoice.number}`
+              : `Sales Invoice ${lastInvoice.number}`
             : undefined
         }
         amount={lastInvoice?.total}

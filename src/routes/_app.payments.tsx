@@ -654,8 +654,8 @@ function PaymentsPage() {
                   subtitle={
                     selectedInvoice
                       ? lang === "ar"
-                        ? `سداد الفاتورة #${selectedInvoice.invoice_number}`
-                        : `Payment for invoice #${selectedInvoice.invoice_number}`
+                        ? `سداد الفاتورة ${selectedInvoice.invoice_number}`
+                        : `Payment for invoice ${selectedInvoice.invoice_number}`
                       : lang === "ar"
                         ? "سداد الفواتير المستحقة تلقائياً وقيد الفائض كدفعة مقدمة"
                         : "Settle due invoices and credit surplus as advance payment"
@@ -672,7 +672,7 @@ function PaymentsPage() {
                       <div className="min-w-0">
                         <span className="block truncate font-bold text-foreground">
                           {selectedInvoice
-                            ? `#${selectedInvoice.invoice_number}`
+                            ? `${selectedInvoice.invoice_number}`
                             : lang === "ar"
                               ? "توزيع تلقائي"
                               : "Automatic allocation"}
@@ -980,7 +980,7 @@ function PaymentsPage() {
                               setSelectedTx({
                                 id: p.id,
                                 type: "payment",
-                                title: `سند تحصيل #${p.id.slice(-6)}`,
+                                title: `سند تحصيل ${p.id.slice(-6)}`,
                                 amount: Number(p.amount),
                                 date: p.payment_date,
                                 customerName: selected.name,

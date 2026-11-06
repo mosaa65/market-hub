@@ -181,7 +181,7 @@ async function generateInvoicePdfDoc(doc: InvoiceDoc) {
   pdf.setFontSize(16).setFont("helvetica", "bold").setTextColor(0);
   pdf.text(doc.title, rtl ? w - 14 : 14, 18, { align: rtl ? "right" : "left" });
   pdf.setFontSize(10).setFont("helvetica", "normal").setTextColor(80);
-  pdf.text(`#${doc.number}`, rtl ? w - 14 : 14, 24, { align: rtl ? "right" : "left" });
+  pdf.text(`${doc.number}`, rtl ? w - 14 : 14, 24, { align: rtl ? "right" : "left" });
   pdf.text(doc.date, rtl ? w - 14 : 14, 29, { align: rtl ? "right" : "left" });
 
   pdf.setDrawColor(220).line(14, 42, w - 14, 42);

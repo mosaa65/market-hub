@@ -104,7 +104,7 @@ export function renderThermalEscPos(
 
   // ── نوع المستند ورقمه وتاريخه ─────────────────────────────────────────
   blocks.push({ text: docTitle, align: "center", bold: true });
-  blocks.push({ text: `#${doc.number}`, align: "center" });
+  blocks.push({ text: `${doc.number}`, align: "center" });
   blocks.push({ text: `${rtl ? "التاريخ" : "Date"}: ${doc.date}`, align: "center" });
 
   // ── الطرف ──────────────────────────────────────────────────────────────

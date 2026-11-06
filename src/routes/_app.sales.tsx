@@ -490,8 +490,8 @@ export function SalesPage() {
 
     const remaining = Math.max(0, Number(inv.total) - Number(inv.paid));
     const text = isRtl
-      ? `فاتورة مبيعات #${inv.invoice_number}\nالعميل: ${inv.customers?.name || "العميل الكريم"}\nالإجمالي: ${money(Number(inv.total))}\nالمدفوع: ${money(Number(inv.paid))}${remaining > 0 ? `\nالمتبقي: ${money(remaining)}` : ""}`
-      : `Sales Invoice #${inv.invoice_number}\nTotal: ${money(Number(inv.total))}\nPaid: ${money(Number(inv.paid))}${remaining > 0 ? `\nDue: ${money(remaining)}` : ""}`;
+      ? `فاتورة مبيعات ${inv.invoice_number}\nالعميل: ${inv.customers?.name || "العميل الكريم"}\nالإجمالي: ${money(Number(inv.total))}\nالمدفوع: ${money(Number(inv.paid))}${remaining > 0 ? `\nالمتبقي: ${money(remaining)}` : ""}`
+      : `Sales Invoice ${inv.invoice_number}\nTotal: ${money(Number(inv.total))}\nPaid: ${money(Number(inv.paid))}${remaining > 0 ? `\nDue: ${money(remaining)}` : ""}`;
 
     const clean = (inv.customers?.phone || "").replace(/[^\d+]/g, "");
     window.open(`sms:${clean}?body=${encodeURIComponent(text)}`, "_blank");

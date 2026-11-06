@@ -1582,8 +1582,8 @@ function PurchasePOSPage() {
 
       toast.success(
         lang === "ar"
-          ? `تم تسجيل فاتورة الشراء وتحديث المخزون بنجاح${invoiceNumber ? ` — فاتورة #${invoiceNumber}` : ""}`
-          : `Purchase recorded successfully${invoiceNumber ? ` — Invoice #${invoiceNumber}` : ""}`,
+          ? `تم تسجيل فاتورة الشراء وتحديث المخزون بنجاح${invoiceNumber ? ` — فاتورة ${invoiceNumber}` : ""}`
+          : `Purchase recorded successfully${invoiceNumber ? ` — Invoice ${invoiceNumber}` : ""}`,
       );
 
       /*

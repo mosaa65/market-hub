@@ -347,8 +347,8 @@ export function ChequesManagement() {
         title={isAr ? "تحصيل الشيك وإيداعه في البنك" : "Clear & Deposit Cheque"}
         subtitle={
           isAr
-            ? `شيك رقم #${selectedCheque?.cheque_number} بمبلغ ${money(selectedCheque?.amount || 0)}`
-            : `Cheque #${selectedCheque?.cheque_number} with amount ${money(selectedCheque?.amount || 0)}`
+            ? `شيك رقم ${selectedCheque?.cheque_number} بمبلغ ${money(selectedCheque?.amount || 0)}`
+            : `Cheque ${selectedCheque?.cheque_number} with amount ${money(selectedCheque?.amount || 0)}`
         }
         footer={
           <div className="flex w-full justify-end gap-2">
@@ -436,8 +436,8 @@ export function ChequesManagement() {
         title={isAr ? "إثبات ارتداد الشيك وإعادة المديونية" : "Mark Cheque as Bounced"}
         subtitle={
           isAr
-            ? `شيك رقم #${selectedCheque?.cheque_number} للعميل ${selectedCheque?.customer?.name || ""}`
-            : `Cheque #${selectedCheque?.cheque_number}`
+            ? `شيك رقم ${selectedCheque?.cheque_number} للعميل ${selectedCheque?.customer?.name || ""}`
+            : `Cheque ${selectedCheque?.cheque_number}`
         }
         footer={
           <div className="flex w-full justify-end gap-2">

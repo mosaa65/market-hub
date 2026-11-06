@@ -2130,8 +2130,8 @@ function POSPage() {
         setLastInvoice({ id: invoiceId, number: invoiceNumber });
         toast.success(
           lang === "ar"
-            ? `تمت عملية البيع بنجاح — فاتورة #${invoiceNumber}`
-            : `${t("pos.sale_complete")} — #${invoiceNumber}`,
+            ? `تمت عملية البيع بنجاح — فاتورة ${invoiceNumber}`
+            : `${t("pos.sale_complete")} — ${invoiceNumber}`,
         );
       } catch (netErr: any) {
         // P1-4: كل خطأ من RPC يمر بطبقة الترجمة الموحدة قبل أن يراه الكاشير.
@@ -3758,8 +3758,8 @@ function POSPage() {
         subtitle={
           saleSuccess
             ? lang === "ar"
-              ? `تم إصدار الفاتورة رقم #${saleSuccess.number} بنجاح`
-              : `Invoice #${saleSuccess.number} issued successfully`
+              ? `تم إصدار الفاتورة رقم ${saleSuccess.number} بنجاح`
+              : `Invoice ${saleSuccess.number} issued successfully`
             : undefined
         }
         amount={saleSuccess?.total}
