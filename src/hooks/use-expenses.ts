@@ -551,8 +551,7 @@ export function useExpenseMutations() {
         p_account_label: input.accountLabel || null,
         p_reference_no: input.referenceNo || null,
         p_note: input.note || null,
-        p_idempotency_key:
-          input.idempotencyKey || makeIdempotencyKey(`pay:${input.id}`),
+        p_idempotency_key: input.idempotencyKey || makeIdempotencyKey(`pay:${input.id}`),
         p_account_id: input.accountId || null,
         p_cashbox_id: input.cashboxId || null,
         p_bank_account_id: input.bankAccountId || null,
@@ -641,6 +640,56 @@ export function useExpenseMutations() {
     onError: (error) => toast.error(describeExpenseError(error, lang)),
   });
 
+  const uploadAttachment = useMutation({
+    mutationFn: async (input: { entryId: string; file: File }) => {
+      if (input.file.size <= 0 || input.file.size > 10 * 1024 * 1024) {
+        throw new Error(
+          ar ? "حجم الملف يجب ألا يتجاوز 10 ميجابايت" : "File size must be 10 MB or less",
+        );
+      }
+      const allowed = new Set([
+        "application/pdf",
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+        "text/plain",
+      ]);
+      if (!allowed.has(input.file.type))
+        throw new Error(ar ? "نوع الملف غير مدعوم" : "Unsupported file type");
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData.user) throw userError ?? new Error("Authentication required");
+      const safeName =
+        input.file.name.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(-120) || "attachment";
+      const path = `${userData.user.id}/${input.entryId}/${crypto.randomUUID()}-${safeName}`;
+      const { error: uploadError } = await supabase.storage
+        .from("expense-attachments")
+        .upload(path, input.file, {
+          contentType: input.file.type,
+          upsert: false,
+        });
+      if (uploadError) throw uploadError;
+      const { error: rowError } = await (supabase as any).from("expense_attachments").insert({
+        entry_id: input.entryId,
+        bucket_id: "expense-attachments",
+        storage_path: path,
+        file_name: input.file.name,
+        mime_type: input.file.type,
+        file_size: input.file.size,
+        uploaded_by: userData.user.id,
+      });
+      if (rowError) {
+        await supabase.storage.from("expense-attachments").remove([path]);
+        throw rowError;
+      }
+    },
+    onSuccess: (_value, input) => {
+      invalidateExpenses(client, input.entryId);
+      toast.success(ar ? "تم رفع المرفق" : "Attachment uploaded");
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : describeExpenseError(error, lang)),
+  });
+
   return {
     create,
     update,
@@ -652,6 +701,7 @@ export function useExpenseMutations() {
     reverse,
     reversePayment,
     close,
+    uploadAttachment,
     /** True while any write is in flight — used to lock the action bar. */
     isBusy:
       create.isPending ||
@@ -663,7 +713,8 @@ export function useExpenseMutations() {
       cancel.isPending ||
       reverse.isPending ||
       reversePayment.isPending ||
-      close.isPending,
+      close.isPending ||
+      uploadAttachment.isPending,
   };
 }
 

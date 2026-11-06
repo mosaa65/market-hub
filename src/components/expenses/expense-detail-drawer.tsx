@@ -78,7 +78,9 @@ export function ExpenseDetailDrawer({
 
   const entry = data?.entry;
   const approvalRank = hasRole("owner") ? 50 : hasRole("manager") ? 40 : 0;
-  const canApprove = Boolean(entry?.can_approve && approvalRank >= (entry?.approval_required_rank ?? 40));
+  const canApprove = Boolean(
+    entry?.can_approve && approvalRank >= (entry?.approval_required_rank ?? 40),
+  );
 
   const overdue = useMemo(
     () => (entry ? isOverdue(entry.due_date, Number(entry.remaining_amount), entry.status) : false),
@@ -362,20 +364,37 @@ export function ExpenseDetailDrawer({
               <Meta label={t("expenses.field.warehouse")} value={entry.warehouse_name} />
               <Meta label={t("expenses.field.cost_center")} value={entry.cost_center_name} />
               <Meta label={t("expenses.field.project")} value={entry.project_name} />
-              <Meta label={ar ? "رقم فاتورة المورد" : "Supplier invoice"} value={entry.supplier_invoice_number} />
+              <Meta
+                label={ar ? "رقم فاتورة المورد" : "Supplier invoice"}
+                value={entry.supplier_invoice_number}
+              />
               <Meta
                 label={ar ? "معالجة الضريبة" : "Tax treatment"}
                 value={
                   entry.tax_mode === "NONE"
-                    ? ar ? "بدون ضريبة" : "No tax"
+                    ? ar
+                      ? "بدون ضريبة"
+                      : "No tax"
                     : entry.tax_recoverable
-                      ? ar ? "قابلة للاسترداد" : "Recoverable"
-                      : ar ? "ضمن تكلفة المصروف" : "Included in expense cost"
+                      ? ar
+                        ? "قابلة للاسترداد"
+                        : "Recoverable"
+                      : ar
+                        ? "ضمن تكلفة المصروف"
+                        : "Included in expense cost"
                 }
               />
               <Meta
                 label={ar ? "مستوى الاعتماد" : "Approval level"}
-                value={entry.approval_required_rank >= 50 ? (ar ? "المالك" : "Owner") : (ar ? "مدير أو مالك" : "Manager or owner")}
+                value={
+                  entry.approval_required_rank >= 50
+                    ? ar
+                      ? "المالك"
+                      : "Owner"
+                    : ar
+                      ? "مدير أو مالك"
+                      : "Manager or owner"
+                }
               />
               <Meta label={ar ? "أنشأه" : "Created by"} value={entry.created_by_name ?? "—"} />
             </div>
@@ -433,18 +452,55 @@ export function ExpenseDetailDrawer({
             ) : null}
             {tab === "timeline" ? <TimelineTab detail={data as ExpenseDetail} /> : null}
             {tab === "files" ? (
-              <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border/70 py-10 text-center">
+              <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border/70 py-10 text-center">
                 <Upload className="size-6 text-muted-foreground" />
+                {entry.can_edit ? (
+                  <label className="cursor-pointer rounded-md border border-border px-3 py-2 text-xs font-medium hover:bg-surface-2">
+                    {ar ? "رفع مستند" : "Upload document"}
+                    <input
+                      type="file"
+                      className="sr-only"
+                      accept="application/pdf,image/jpeg,image/png,image/webp,text/plain"
+                      disabled={mutations.uploadAttachment.isPending}
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        event.currentTarget.value = "";
+                        if (file) {
+                          void run(() =>
+                            mutations.uploadAttachment.mutateAsync({ entryId: entry.id, file }),
+                          );
+                        }
+                      }}
+                    />
+                  </label>
+                ) : null}
                 <p className="text-sm text-muted-foreground">
                   {ar
                     ? "المرفقات تُفعَّل في المرحلة التالية"
-                    : "Attachments are enabled in the next phase"}
+                    : "Private attachments are stored with the expense"}
                 </p>
                 <p className="max-w-sm text-[11px] text-muted-foreground/80">
                   {ar
                     ? "الجدول والسياسات جاهزة؛ يتبقى ربط مخزن الملفات الخاص."
-                    : "The table and policies are ready; the private storage bucket is the remaining step."}
+                    : "Supported: PDF, PNG, JPEG, WEBP and TXT; maximum 10 MB."}
                 </p>
+                {data?.attachments.length ? (
+                  <div className="w-full space-y-1 text-start">
+                    {data.attachments.map((attachment) => (
+                      <div
+                        key={attachment.id}
+                        className="flex items-center justify-between rounded-md bg-surface-2 px-3 py-2 text-xs"
+                      >
+                        <span className="truncate">{attachment.file_name}</span>
+                        <span className="ms-2 text-muted-foreground">
+                          {attachment.file_size
+                            ? `${Math.ceil(attachment.file_size / 1024)} KB`
+                            : ""}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -457,7 +513,10 @@ export function ExpenseDetailDrawer({
           <PaymentModal
             open={payOpen}
             onOpenChange={(open) => {
-              if (open) setPayAttemptKey(`${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`);
+              if (open)
+                setPayAttemptKey(
+                  `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
+                );
               setPayOpen(open);
             }}
             remaining={Number(entry.remaining_amount)}

@@ -31,6 +31,7 @@ export async function fetchUnifiedExpenseStats(options?: {
   dateTo?: string | null;
   warehouseId?: string | null;
 }): Promise<UnifiedExpenseStats> {
+  let rpcError: unknown = null;
   try {
     const { data, error } = await (supabase as any).rpc("expense_summary", {
       p_date_from: options?.dateFrom || null,
@@ -46,7 +47,9 @@ export async function fetchUnifiedExpenseStats(options?: {
         overdueTotal: Number(data.overdue_total ?? 0),
       };
     }
-  } catch {
+    rpcError = error;
+  } catch (error) {
+    rpcError = error;
     // Proceed to direct query fallback
   }
 
@@ -60,7 +63,12 @@ export async function fetchUnifiedExpenseStats(options?: {
   if (options?.dateTo) query = query.lte("expense_date", options.dateTo);
   if (options?.warehouseId) query = query.eq("warehouse_id", options.warehouseId);
 
-  const { data: rows } = await query;
+  const { data: rows, error: queryError } = await query;
+  if (queryError) {
+    const detail = queryError instanceof Error ? queryError.message : String(queryError);
+    const source = rpcError instanceof Error ? `expense_summary: ${rpcError.message}; ` : "";
+    throw new Error(`${source}expense_entries fallback: ${detail}`);
+  }
   if (!rows || !rows.length) {
     return { postedTotal: 0, paidCashOut: 0, outstandingTotal: 0, overdueTotal: 0 };
   }
