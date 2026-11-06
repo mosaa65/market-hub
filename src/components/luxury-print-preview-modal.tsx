@@ -77,7 +77,9 @@ function toUnifiedData(
     qty: Number(l?.qty ?? l?.quantity ?? 1),
     unit: l?.unit ? String(l.unit) : "",
     price: Number(l?.price ?? l?.unit_price ?? 0),
-    total: Number(l?.total ?? (Number(l?.qty ?? l?.quantity ?? 1) * Number(l?.price ?? l?.unit_price ?? 0))),
+    total: Number(
+      l?.total ?? Number(l?.qty ?? l?.quantity ?? 1) * Number(l?.price ?? l?.unit_price ?? 0),
+    ),
     code: l?.code || l?.sku,
     note: l?.note,
     previousQty: l?.previousQty,
@@ -162,7 +164,9 @@ export function LuxuryPrintPreviewModal({
     const deptOverride = settings.overrides[docType];
     if (deptOverride?.templateId) return deptOverride.templateId;
     if (initialMethod === "thermal") {
-      return docType === "mill_document" || docType === "delivery_note" || docType === "daily_ticket"
+      return docType === "mill_document" ||
+        docType === "delivery_note" ||
+        docType === "daily_ticket"
         ? "milling-thermal"
         : "thermal-milling"; // Default to the admired modern milling counter template
     }

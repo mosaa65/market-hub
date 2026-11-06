@@ -68,7 +68,10 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
           <div className="absolute top-2 end-2 z-10">
             <VoiceInputButton
               size="sm"
-              fieldLabel={voiceLabel || (typeof props.placeholder === "string" ? props.placeholder : undefined)}
+              fieldLabel={
+                voiceLabel ||
+                (typeof props.placeholder === "string" ? props.placeholder : undefined)
+              }
               currentValue={typeof value === "string" ? value : textareaRef.current?.value || ""}
               onTranscript={handleVoiceTranscript}
             />

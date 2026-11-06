@@ -131,7 +131,9 @@ export function ExpenseCategoriesSection({ canEdit = false, lang = "ar" }) {
       ]);
     },
     onError: (error: any) => {
-      toast.error(error?.message || (isAr ? "تعذر تحديث أهلية التصنيف" : "Could not update eligibility"));
+      toast.error(
+        error?.message || (isAr ? "تعذر تحديث أهلية التصنيف" : "Could not update eligibility"),
+      );
     },
   });
 
@@ -149,7 +151,9 @@ export function ExpenseCategoriesSection({ canEdit = false, lang = "ar" }) {
     },
     onSuccess: () => client.invalidateQueries({ queryKey: ["expense-category-management"] }),
     onError: (error: any) => {
-      toast.error(error?.message || (isAr ? "تعذر تحديث حالة التصنيف" : "Could not update category"));
+      toast.error(
+        error?.message || (isAr ? "تعذر تحديث حالة التصنيف" : "Could not update category"),
+      );
     },
   });
 
@@ -170,20 +174,32 @@ export function ExpenseCategoriesSection({ canEdit = false, lang = "ar" }) {
         {canEdit ? (
           <div className="space-y-3 rounded-xl border border-border/70 bg-muted/20 p-4">
             <p className="text-sm font-semibold">
-              {form.id ? (isAr ? "تعديل تصنيف" : "Edit category") : isAr ? "إضافة تصنيف" : "Add category"}
+              {form.id
+                ? isAr
+                  ? "تعديل تصنيف"
+                  : "Edit category"
+                : isAr
+                  ? "إضافة تصنيف"
+                  : "Add category"}
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label htmlFor="expense-category-name-ar">{isAr ? "الاسم بالعربية" : "Arabic name"}</Label>
+                <Label htmlFor="expense-category-name-ar">
+                  {isAr ? "الاسم بالعربية" : "Arabic name"}
+                </Label>
                 <Input
                   id="expense-category-name-ar"
                   value={form.name_ar}
                   onChange={(event) => setForm({ ...form, name_ar: event.target.value })}
-                  placeholder={isAr ? "مثال: أجور مباشرة للإنتاج" : "Example: Direct production labour"}
+                  placeholder={
+                    isAr ? "مثال: أجور مباشرة للإنتاج" : "Example: Direct production labour"
+                  }
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="expense-category-name">{isAr ? "اسم التصنيف *" : "Category name *"}</Label>
+                <Label htmlFor="expense-category-name">
+                  {isAr ? "اسم التصنيف *" : "Category name *"}
+                </Label>
                 <Input
                   id="expense-category-name"
                   value={form.name}
@@ -193,7 +209,11 @@ export function ExpenseCategoriesSection({ canEdit = false, lang = "ar" }) {
                 />
               </div>
               <div className="space-y-1.5 sm:col-span-2">
-                <Label htmlFor="expense-category-account">{isAr ? "الحساب المحاسبي (مطلوب لأهلية الإنتاج)" : "Posting account (required for production eligibility)"}</Label>
+                <Label htmlFor="expense-category-account">
+                  {isAr
+                    ? "الحساب المحاسبي (مطلوب لأهلية الإنتاج)"
+                    : "Posting account (required for production eligibility)"}
+                </Label>
                 <select
                   id="expense-category-account"
                   value={form.account_id}
@@ -201,7 +221,9 @@ export function ExpenseCategoriesSection({ canEdit = false, lang = "ar" }) {
                   className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm"
                   disabled={accounts.isLoading || Boolean(accounts.error)}
                 >
-                  <option value="">{isAr ? "استخدم الحساب الافتراضي للمصروف" : "Use the default expense account"}</option>
+                  <option value="">
+                    {isAr ? "استخدم الحساب الافتراضي للمصروف" : "Use the default expense account"}
+                  </option>
                   {(accounts.data ?? []).map((account) => (
                     <option key={account.id} value={account.id}>
                       {account.code} · {account.name_ar || account.code}
@@ -209,16 +231,24 @@ export function ExpenseCategoriesSection({ canEdit = false, lang = "ar" }) {
                   ))}
                 </select>
                 {accounts.error && (
-                  <p className="text-xs text-destructive">{isAr ? "تعذر تحميل حسابات المصروف." : "Could not load expense accounts."}</p>
+                  <p className="text-xs text-destructive">
+                    {isAr ? "تعذر تحميل حسابات المصروف." : "Could not load expense accounts."}
+                  </p>
                 )}
               </div>
               <div className="space-y-1.5 sm:col-span-2">
-                <Label htmlFor="expense-category-notes">{isAr ? "ملاحظة الاستخدام" : "Usage note"}</Label>
+                <Label htmlFor="expense-category-notes">
+                  {isAr ? "ملاحظة الاستخدام" : "Usage note"}
+                </Label>
                 <Input
                   id="expense-category-notes"
                   value={form.notes}
                   onChange={(event) => setForm({ ...form, notes: event.target.value })}
-                  placeholder={isAr ? "مثال: جزء الأجور الخاص بخط الإنتاج فقط" : "Example: Labour for the production line only"}
+                  placeholder={
+                    isAr
+                      ? "مثال: جزء الأجور الخاص بخط الإنتاج فقط"
+                      : "Example: Labour for the production line only"
+                  }
                 />
               </div>
             </div>
@@ -234,13 +264,21 @@ export function ExpenseCategoriesSection({ canEdit = false, lang = "ar" }) {
                 onClick={() => save.mutate(form)}
               >
                 {form.id ? <Check className="me-2 size-4" /> : <Plus className="me-2 size-4" />}
-                {save.isPending ? (isAr ? "جارٍ الحفظ…" : "Saving…") : isAr ? "حفظ التصنيف" : "Save category"}
+                {save.isPending
+                  ? isAr
+                    ? "جارٍ الحفظ…"
+                    : "Saving…"
+                  : isAr
+                    ? "حفظ التصنيف"
+                    : "Save category"}
               </Button>
             </div>
           </div>
         ) : (
           <p className="rounded-lg bg-muted/40 p-3 text-sm text-muted-foreground">
-            {isAr ? "إدارة التصنيفات متاحة للمالك والمدير." : "Category management is available to owners and managers."}
+            {isAr
+              ? "إدارة التصنيفات متاحة للمالك والمدير."
+              : "Category management is available to owners and managers."}
           </p>
         )}
 
@@ -251,9 +289,13 @@ export function ExpenseCategoriesSection({ canEdit = false, lang = "ar" }) {
         </div>
 
         <div className="space-y-2">
-          <h3 className="text-sm font-semibold">{isAr ? "التصنيفات المسجلة" : "Registered categories"}</h3>
+          <h3 className="text-sm font-semibold">
+            {isAr ? "التصنيفات المسجلة" : "Registered categories"}
+          </h3>
           {categories.isLoading ? (
-            <p className="py-4 text-sm text-muted-foreground">{isAr ? "جارٍ التحميل…" : "Loading…"}</p>
+            <p className="py-4 text-sm text-muted-foreground">
+              {isAr ? "جارٍ التحميل…" : "Loading…"}
+            </p>
           ) : categories.error ? (
             <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
               {isAr ? "تعذر تحميل التصنيفات." : "Could not load categories."}
@@ -267,7 +309,9 @@ export function ExpenseCategoriesSection({ canEdit = false, lang = "ar" }) {
               {(categories.data ?? []).map((category) => (
                 <li key={category.id} className="flex flex-wrap items-center gap-3 p-3">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold">{category.name_ar || category.name}</p>
+                    <p className="truncate text-sm font-semibold">
+                      {category.name_ar || category.name}
+                    </p>
                     <p className="truncate text-xs text-muted-foreground">
                       {accounts.data?.find((account) => account.id === category.account_id)?.code ??
                         (isAr ? "الحساب الافتراضي" : "Default expense account")}
@@ -281,7 +325,9 @@ export function ExpenseCategoriesSection({ canEdit = false, lang = "ar" }) {
                         <Switch
                           checked={category.production_cost_eligible}
                           disabled={eligibility.isPending || !category.account_id}
-                          onCheckedChange={(eligible) => eligibility.mutate({ id: category.id, eligible })}
+                          onCheckedChange={(eligible) =>
+                            eligibility.mutate({ id: category.id, eligible })
+                          }
                         />
                         <span>
                           {category.production_cost_eligible
@@ -302,14 +348,20 @@ export function ExpenseCategoriesSection({ canEdit = false, lang = "ar" }) {
                         type="button"
                         variant="ghost"
                         size="icon"
-                        aria-label={isAr ? `تعديل ${category.name_ar || category.name}` : `Edit ${category.name}`}
-                        onClick={() => setForm({
-                          id: category.id,
-                          name: category.name,
-                          name_ar: category.name_ar ?? "",
-                          notes: category.notes ?? "",
-                          account_id: category.account_id ?? "",
-                        })}
+                        aria-label={
+                          isAr
+                            ? `تعديل ${category.name_ar || category.name}`
+                            : `Edit ${category.name}`
+                        }
+                        onClick={() =>
+                          setForm({
+                            id: category.id,
+                            name: category.name,
+                            name_ar: category.name_ar ?? "",
+                            notes: category.notes ?? "",
+                            account_id: category.account_id ?? "",
+                          })
+                        }
                       >
                         <Pencil className="size-4" />
                       </Button>
@@ -325,7 +377,12 @@ export function ExpenseCategoriesSection({ canEdit = false, lang = "ar" }) {
                     </>
                   )}
                   {canEdit && !category.is_active && (
-                    <Button type="button" variant="outline" size="sm" onClick={() => setActive.mutate(category)}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setActive.mutate(category)}
+                    >
                       {isAr ? "إعادة تفعيل" : "Reactivate"}
                     </Button>
                   )}

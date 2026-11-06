@@ -368,7 +368,9 @@ export const TEMPLATES: Record<CommunicationEventType, TemplateDefinition> = {
 
       const lines = [
         `Dear *${customerName}*,`,
-        companyName ? `Greetings from *${companyName}* — Milling Services` : `Milling Service Details`,
+        companyName
+          ? `Greetings from *${companyName}* — Milling Services`
+          : `Milling Service Details`,
         docNum ? `🔖 *Receipt No.:* ${docNum}` : "",
         inv?.invoiceNumber ? `🧾 *Invoice No.:* ${inv.invoiceNumber}` : "",
         statusText ? `⚙️ *Operation Status:* ${statusText}` : "",

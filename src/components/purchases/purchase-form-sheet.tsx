@@ -581,7 +581,8 @@ export function PurchaseFormSheet({
                               const willBeBags = !l.buy_by_bags;
                               const cap = Number(l.package_weight_kg) || 0;
                               if (willBeBags) {
-                                const bags = cap > 0 ? Math.max(1, Math.round(l.quantity / cap)) : 1;
+                                const bags =
+                                  cap > 0 ? Math.max(1, Math.round(l.quantity / cap)) : 1;
                                 updateLine(l.product_id, {
                                   buy_by_bags: true,
                                   bags_count: bags,

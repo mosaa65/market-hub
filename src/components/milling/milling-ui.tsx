@@ -149,7 +149,9 @@ export function MillingInput({
         <div className="absolute end-2 top-1/2 -translate-y-1/2 z-10">
           <VoiceInputButton
             size="sm"
-            fieldLabel={voiceLabel || (typeof props.placeholder === "string" ? props.placeholder : undefined)}
+            fieldLabel={
+              voiceLabel || (typeof props.placeholder === "string" ? props.placeholder : undefined)
+            }
             currentValue={typeof value === "string" ? value : inputRef.current?.value || ""}
             onTranscript={handleVoice}
           />
@@ -204,7 +206,12 @@ export function MillingTextarea({
       readOnly={readOnly}
       disabled={disabled}
       {...props}
-      className={cn(fieldBase, "h-auto min-h-20 py-2 leading-relaxed", enableVoice && "pe-9", className)}
+      className={cn(
+        fieldBase,
+        "h-auto min-h-20 py-2 leading-relaxed",
+        enableVoice && "pe-9",
+        className,
+      )}
     />
   );
 
@@ -217,7 +224,9 @@ export function MillingTextarea({
         <div className="absolute top-2 end-2 z-10">
           <VoiceInputButton
             size="sm"
-            fieldLabel={voiceLabel || (typeof props.placeholder === "string" ? props.placeholder : undefined)}
+            fieldLabel={
+              voiceLabel || (typeof props.placeholder === "string" ? props.placeholder : undefined)
+            }
             currentValue={typeof value === "string" ? value : textareaRef.current?.value || ""}
             onTranscript={handleVoice}
           />

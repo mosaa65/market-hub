@@ -837,7 +837,7 @@ function DashboardPage() {
                               const m = String(now.getMinutes()).padStart(2, "0");
                               const s = String(now.getSeconds()).padStart(2, "0");
                               const h12 = String(h % 12 || 12).padStart(2, "0");
-                              const period = isAr ? (h >= 12 ? "م" : "ص") : (h >= 12 ? "PM" : "AM");
+                              const period = isAr ? (h >= 12 ? "م" : "ص") : h >= 12 ? "PM" : "AM";
                               return `${h12}:${m}:${s} ${period}`;
                             })()}
                           </span>

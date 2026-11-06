@@ -38,7 +38,11 @@ const expectedFonts: FontThemeId[] = [
   "noto-kufi-arabic",
   "changa",
 ];
-assert.deepEqual([...fontKeys].sort(), [...expectedFonts].sort(), "All 10 fonts must match expected IDs");
+assert.deepEqual(
+  [...fontKeys].sort(),
+  [...expectedFonts].sort(),
+  "All 10 fonts must match expected IDs",
+);
 
 // 3. Verify metadata integrity for each font
 for (const key of fontKeys) {
@@ -58,8 +62,16 @@ assert.ok(fs.existsSync(path.join(fontsDir, "fonts.css")), "public/fonts/fonts.c
 
 const fontsCss = fs.readFileSync(path.join(fontsDir, "fonts.css"), "utf8");
 // Ensure fonts.css does not have external Google URLs
-assert.equal(fontsCss.includes("https://fonts.gstatic.com"), false, "fonts.css must not reference external gstatic");
-assert.equal(fontsCss.includes("https://fonts.googleapis.com"), false, "fonts.css must not reference external googleapis");
+assert.equal(
+  fontsCss.includes("https://fonts.gstatic.com"),
+  false,
+  "fonts.css must not reference external gstatic",
+);
+assert.equal(
+  fontsCss.includes("https://fonts.googleapis.com"),
+  false,
+  "fonts.css must not reference external googleapis",
+);
 
 // Check folders on disk
 const expectedFolders = [
@@ -80,7 +92,7 @@ for (const folder of expectedFolders) {
   assert.ok(fs.existsSync(folderPath), `Font folder ${folder} must exist`);
   const files = fs.readdirSync(folderPath);
   assert.ok(files.length > 0, `Font folder ${folder} must contain downloaded .woff2 files`);
-  const woff2Files = files.filter(f => f.endsWith(".woff2"));
+  const woff2Files = files.filter((f) => f.endsWith(".woff2"));
   assert.ok(woff2Files.length > 0, `Font folder ${folder} must have .woff2 files`);
 }
 

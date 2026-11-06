@@ -34,9 +34,7 @@ const DRAWER = "src/components/expenses/expense-detail-drawer.tsx";
 
 /** يستخرج جسم دالة SQL من أول CREATE يعرّفها حتى آخر $function$; قبلها. */
 function sqlFunctionBody(sql, name) {
-  const start = sql.search(
-    new RegExp(`CREATE OR REPLACE FUNCTION public\\.${name}\\s*\\(`, "m"),
-  );
+  const start = sql.search(new RegExp(`CREATE OR REPLACE FUNCTION public\\.${name}\\s*\\(`, "m"));
   assert.notEqual(start, -1, `تعريف الدالة ${name} غير موجود`);
   const end = sql.indexOf("\n$function$;", start);
   assert.notEqual(end, -1, `نهاية الدالة ${name} غير موجودة`);
@@ -100,7 +98,10 @@ test("توقيع post_expense لم يتغير حتى لا تنكسر العمل�
 test("decide_expense هو المسار الوحيد الذي يفتح الترحيل المباشر", () => {
   const decide = sqlFunctionBody(migration, "decide_expense");
   assert.match(decide, /status NOT IN \('SUBMITTED', 'DRAFT'\)/);
-  assert.match(decide, /allow_draft_post = CASE WHEN p_approve AND v_entry\.status = 'DRAFT' THEN true/);
+  assert.match(
+    decide,
+    /allow_draft_post = CASE WHEN p_approve AND v_entry\.status = 'DRAFT' THEN true/,
+  );
   assert.match(decide, /v_reason IS NULL AND v_entry\.status = 'DRAFT'/, "سبب مكتوب إلزامي");
   assert.match(
     decide,
@@ -139,7 +140,10 @@ test("ترحيل مصروف مورد يكتب استحقاقاً في دفتر �
 
 test("السداد يخصم الذمة في دفتر المورد، بالتزامن مع قيد الأستاذ", () => {
   const body = sqlFunctionBody(migration, "record_expense_payment");
-  assert.match(body, /expense_write_supplier_ledger\([\s\S]{0,200}'EXPPAY-' \|\| v_payment_id::text/);
+  assert.match(
+    body,
+    /expense_write_supplier_ledger\([\s\S]{0,200}'EXPPAY-' \|\| v_payment_id::text/,
+  );
   assert.match(body, /v_credit_acct := public\.expense_posting_account_code\(v_payable_role\)/);
   assert.match(body, /v_credit_acct, 'debit', v_amount/, "قيد السداد: مدين الالتزام");
   assert.match(body, /v_cash_acct, 'credit', v_amount/, "قيد السداد: دائن النقدية/البنك");
@@ -147,7 +151,10 @@ test("السداد يخصم الذمة في دفتر المورد، بالتزا
 
 test("العكس يمحو حركة المورد ويقيد حركة عكسية بنفس المرجع", () => {
   const body = sqlFunctionBody(migration, "reverse_expense");
-  assert.match(body, /expense_reverse_supplier_ledger\(\s*v_entry\.supplier_id, 'EXP-' \|\| p_entry_id::text/);
+  assert.match(
+    body,
+    /expense_reverse_supplier_ledger\(\s*v_entry\.supplier_id, 'EXP-' \|\| p_entry_id::text/,
+  );
   const helper = sqlFunctionBody(migration, "expense_reverse_supplier_ledger");
   assert.match(helper, /v_original\.credit > 0[\s\S]{0,160}'DEBIT', v_original\.credit/);
   assert.match(helper, /v_original\.debit > 0[\s\S]{0,160}'CREDIT', v_original\.debit/);
@@ -166,12 +173,18 @@ test("توازن حركة المورد: اشتراك/استحقاق بالدائ
 
 test("الجزء المؤهل = الصافي + الضريبة غير المستردة فقط", () => {
   const helper = sqlFunctionBody(migration, "expense_line_production_base_amount");
-  assert.match(helper, /WHEN coalesce\(p_tax_recoverable, false\) THEN 0 ELSE coalesce\(p_tax_amount, 0\) END/);
+  assert.match(
+    helper,
+    /WHEN coalesce\(p_tax_recoverable, false\) THEN 0 ELSE coalesce\(p_tax_amount, 0\) END/,
+  );
 });
 
 test("حساب المتاح يطرح المحمَّل سابقاً من الجزء المؤهل (منع الرسملة المزدوجة)", () => {
   const body = sqlFunctionBody(migration, "production_expense_line_available");
-  assert.match(body, /public\.expense_line_production_base_amount\(l\.net_amount, l\.tax_amount, e\.tax_recoverable\)/);
+  assert.match(
+    body,
+    /public\.expense_line_production_base_amount\(l\.net_amount, l\.tax_amount, e\.tax_recoverable\)/,
+  );
   assert.match(body, /coalesce\(\([\s\S]*?sum\(a\.amount\)[\s\S]*?\), 0\)/);
   assert.match(body, /available_amount numeric/);
 });
@@ -234,8 +247,14 @@ test("السداد يعيد المستند عند تكرار المفتاح، و
 
 test("إنشاء المصروف يملك مفتاح idempotency وفهرساً فريداً (يحافظ على 9913)", () => {
   assert.match(lifecycle, /uq_expense_create_idempotency/);
-  assert.match(lifecycle, /pg_advisory_xact_lock\(hashtextextended\(v_user::text \|\| ':' \|\| v_idempotency_key, 0\)\)/);
-  assert.match(lifecycle, /WHERE created_by = v_user AND create_idempotency_key = v_idempotency_key/);
+  assert.match(
+    lifecycle,
+    /pg_advisory_xact_lock\(hashtextextended\(v_user::text \|\| ':' \|\| v_idempotency_key, 0\)\)/,
+  );
+  assert.match(
+    lifecycle,
+    /WHERE created_by = v_user AND create_idempotency_key = v_idempotency_key/,
+  );
 });
 
 /* ── سلامة الـ migration ───────────────────────────────────────────────────── */
@@ -251,14 +270,25 @@ test("9916 معاملة واحدة: BEGIN ثم COMMIT واحد في النهاي
 });
 
 test("9916 لا يعدّل مخطط 9906، ويعيد تعريف الدوال بنفس التوقيع والملكية", () => {
-  for (const name of ["post_expense", "record_expense_payment", "reverse_expense", "decide_expense"]) {
+  for (const name of [
+    "post_expense",
+    "record_expense_payment",
+    "reverse_expense",
+    "decide_expense",
+  ]) {
     const body = sqlFunctionBody(migration, name);
     assert.match(body, /LANGUAGE plpgsql/, `${name} بلغة plpgsql`);
     assert.match(body, /SECURITY DEFINER/, `${name} يحتفظ بحدود الصلاحيات`);
     assert.match(body, /SET search_path = public/, `${name} لا يعتمد على search_path المستدعي`);
   }
   const signature = sqlFunctionSignature(migration, "record_expense_payment");
-  for (const arg of ["p_entry_id", "p_amount", "p_payment_date", "p_idempotency_key", "p_cashbox_id"]) {
+  for (const arg of [
+    "p_entry_id",
+    "p_amount",
+    "p_payment_date",
+    "p_idempotency_key",
+    "p_cashbox_id",
+  ]) {
     assert.match(signature, new RegExp(arg), `التوقيع يحتفظ بـ ${arg}`);
   }
 });
@@ -271,5 +301,9 @@ test("التوازن المحاسبي: قيد الاستحقاق (مدين مص�
     /public\.expense_posting_account_code\(v_payable_role\),\s+'credit', round\(v_entry\.total_amount, 2\)/,
     "الاستحقاق يُقيد بكامل إجمالي المستند مقابل حساب الالتزام",
   );
-  assert.match(body, /WHEN v_entry\.tax_recoverable THEN 0 ELSE l\.tax_amount END/, "الضريبة غير المستردة داخل حساب المصروف");
+  assert.match(
+    body,
+    /WHEN v_entry\.tax_recoverable THEN 0 ELSE l\.tax_amount END/,
+    "الضريبة غير المستردة داخل حساب المصروف",
+  );
 });

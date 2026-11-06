@@ -34,21 +34,27 @@ export function useAudioVisualizer() {
     if (sourceNodeRef.current) {
       try {
         sourceNodeRef.current.disconnect();
-      } catch {}
+      } catch {
+        // تجاهل: العقدة قد تكون منقطعة مسبقاً
+      }
       sourceNodeRef.current = null;
     }
 
     if (analyserRef.current) {
       try {
         analyserRef.current.disconnect();
-      } catch {}
+      } catch {
+        // تجاهل: المحلل قد يكون منقطعاً مسبقاً
+      }
       analyserRef.current = null;
     }
 
     if (mediaStreamRef.current) {
       try {
         mediaStreamRef.current.getTracks().forEach((track) => track.stop());
-      } catch {}
+      } catch {
+        // تجاهل: المسارات قد تكون متوقفة مسبقاً
+      }
       mediaStreamRef.current = null;
     }
 
@@ -57,16 +63,15 @@ export function useAudioVisualizer() {
         if (audioContextRef.current.state !== "closed") {
           audioContextRef.current.close();
         }
-      } catch {}
+      } catch {
+        // تجاهل: سياق الصوت قد يكون مغلقًا مسبقاً
+      }
       audioContextRef.current = null;
     }
   }, []);
 
   const startVisualizer = useCallback(
-    async (
-      canvas: HTMLCanvasElement,
-      options: AudioVisualizerOptions = {},
-    ): Promise<boolean> => {
+    async (canvas: HTMLCanvasElement, options: AudioVisualizerOptions = {}): Promise<boolean> => {
       cleanup();
 
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -128,10 +133,7 @@ export function useAudioVisualizer() {
 
           // Calculate how many bars fit in the canvas
           const totalBarWidth = barWidth + barGap;
-          const numBars = Math.min(
-            bufferLength,
-            Math.floor(width / totalBarWidth),
-          );
+          const numBars = Math.min(bufferLength, Math.floor(width / totalBarWidth));
           const startX = Math.max(0, (width - numBars * totalBarWidth) / 2);
 
           canvasCtx.save();

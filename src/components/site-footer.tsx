@@ -131,4 +131,3 @@ export function SiteFooter({ className }: { className?: string }) {
     </footer>
   );
 }
-

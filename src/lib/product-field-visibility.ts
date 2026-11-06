@@ -47,7 +47,11 @@ export const PRODUCT_FIELDS: ProductFieldOption[] = [
   { key: "unit", labelAr: "وحدة القياس", labelEn: "Unit" },
   { key: "cost", labelAr: "سعر التكلفة", labelEn: "Cost price" },
   { key: "minStock", labelAr: "حد التنبيه الأدنى", labelEn: "Minimum alert threshold" },
-  { key: "packageWeight", labelAr: "معلومات العبوة ووزنها المعتاد", labelEn: "Package type and usual weight" },
+  {
+    key: "packageWeight",
+    labelAr: "معلومات العبوة ووزنها المعتاد",
+    labelEn: "Package type and usual weight",
+  },
   { key: "tax", labelAr: "نسبة الضريبة", labelEn: "Tax rate" },
   { key: "status", labelAr: "الحالة", labelEn: "Status" },
 ];

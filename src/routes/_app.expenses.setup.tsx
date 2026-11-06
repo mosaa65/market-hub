@@ -18,7 +18,7 @@ export const Route = createFileRoute("/_app/expenses/setup")({
           ? "accounts"
           : search.section === "approvals"
             ? "approvals"
-          : "categories",
+            : "categories",
   }),
   head: () => ({ meta: [{ title: "إعدادات المصروفات — فورتكس ERP" }] }),
   component: () => (
@@ -69,7 +69,12 @@ function ExpenseSetupPage() {
         actions={
           <Link
             to="/expenses"
-            search={{ create: false, costCenterId: undefined, categoryId: undefined, section: undefined }}
+            search={{
+              create: false,
+              costCenterId: undefined,
+              categoryId: undefined,
+              section: undefined,
+            }}
             className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-border px-3 text-sm font-semibold hover:bg-muted"
           >
             <ArrowRight className="size-4" aria-hidden="true" />

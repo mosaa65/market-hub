@@ -384,62 +384,15 @@ export function DataTable<T>({
       const explicit = parseColumnWidth(c.width);
       if (explicit) return explicit;
       // Smart defaults based on alignment/type heuristics
-      if (c.align === "center") return 56;   // checkboxes, icons
-      if (c.align === "end") return 80;       // numbers, amounts
-      return 72;                               // text labels
+      if (c.align === "center") return 56; // checkboxes, icons
+      if (c.align === "end") return 80; // numbers, amounts
+      return 72; // text labels
     });
   }, [visibleColumns]);
 
   const totalMinWidth = React.useMemo(() => {
     return columnMinWidths.reduce((sum, w) => sum + w, 0);
   }, [columnMinWidths]);
-
-  /* ---- error ---- */
-  if (error) {
-    return (
-      <div className={cn("flex min-w-0 flex-col", className)}>
-        {toolbar ? <div className="border-b border-border/60 px-3 py-2.5">{toolbar}</div> : null}
-        <QueryErrorState error={error} onRetry={onRetry} />
-      </div>
-    );
-  }
-
-  const effectiveTableWidth = isScrollable
-    ? Math.max(minWidth ?? 0, totalMinWidth)
-    : undefined;
-
-  /**
-   * `table-layout: auto` — the browser sizes columns to content,
-   * respecting the min-widths we set via <col>. This is the key to
-   * "smart" column sizing: narrow data → narrow column, wide data →
-   * wider column, surplus space → distributed evenly.
-   */
-  const tableStyle: React.CSSProperties = {
-    width: "100%",
-    minWidth: effectiveTableWidth ? `${effectiveTableWidth}px` : undefined,
-    tableLayout: "auto",
-  };
-
-  const alignedTableClassName = "w-full border-collapse text-sm";
-
-  const colGroup = visibleColumns.length ? (
-    <colgroup>
-      {visibleColumns.map((c, i) => {
-        const mw = columnMinWidths[i];
-        const explicit = parseColumnWidth(c.width);
-        return (
-          <col
-            key={c.key}
-            style={{
-              minWidth: `${mw}px`,
-              // If an explicit width was set, use it as a base width hint
-              ...(explicit ? { width: `${explicit}px` } : {}),
-            }}
-          />
-        );
-      })}
-    </colgroup>
-  ) : null;
 
   const bodyTheadRef = React.useRef<HTMLTableSectionElement | null>(null);
   const [measuredHeaderWidths, setMeasuredHeaderWidths] = React.useState<number[] | null>(null);
@@ -493,6 +446,51 @@ export function DataTable<T>({
       </colgroup>
     );
   }, [visibleColumns, measuredHeaderWidths, columnMinWidths]);
+
+  /* ---- error ---- */
+  if (error) {
+    return (
+      <div className={cn("flex min-w-0 flex-col", className)}>
+        {toolbar ? <div className="border-b border-border/60 px-3 py-2.5">{toolbar}</div> : null}
+        <QueryErrorState error={error} onRetry={onRetry} />
+      </div>
+    );
+  }
+
+  const effectiveTableWidth = isScrollable ? Math.max(minWidth ?? 0, totalMinWidth) : undefined;
+
+  /**
+   * `table-layout: auto` — the browser sizes columns to content,
+   * respecting the min-widths we set via <col>. This is the key to
+   * "smart" column sizing: narrow data → narrow column, wide data →
+   * wider column, surplus space → distributed evenly.
+   */
+  const tableStyle: React.CSSProperties = {
+    width: "100%",
+    minWidth: effectiveTableWidth ? `${effectiveTableWidth}px` : undefined,
+    tableLayout: "auto",
+  };
+
+  const alignedTableClassName = "w-full border-collapse text-sm";
+
+  const colGroup = visibleColumns.length ? (
+    <colgroup>
+      {visibleColumns.map((c, i) => {
+        const mw = columnMinWidths[i];
+        const explicit = parseColumnWidth(c.width);
+        return (
+          <col
+            key={c.key}
+            style={{
+              minWidth: `${mw}px`,
+              // If an explicit width was set, use it as a base width hint
+              ...(explicit ? { width: `${explicit}px` } : {}),
+            }}
+          />
+        );
+      })}
+    </colgroup>
+  ) : null;
 
   const detachedTableStyle: React.CSSProperties = {
     ...tableStyle,
@@ -580,10 +578,7 @@ export function DataTable<T>({
               scrollClassName,
             )}
           >
-            <table
-              className={alignedTableClassName}
-              style={tableStyle}
-            >
+            <table className={alignedTableClassName} style={tableStyle}>
               {colGroup}
               <TableHead
                 theadRef={bodyTheadRef}
@@ -812,9 +807,7 @@ function TableHead<T>({
                     "active:scale-[0.97]",
                     column.align === "end" && "justify-end w-full",
                     column.align === "center" && "justify-center w-full",
-                    active
-                      ? "text-primary font-bold"
-                      : "text-muted-foreground font-semibold",
+                    active ? "text-primary font-bold" : "text-muted-foreground font-semibold",
                   )}
                 >
                   <span>{column.header}</span>

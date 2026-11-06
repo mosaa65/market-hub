@@ -1361,7 +1361,9 @@ function QuickMillingModal({
             <MillingField label="العميل *">
               {initialRow ? (
                 <div className="flex h-10 items-center rounded-2xl border border-border/70 bg-muted/50 px-3 text-xs font-semibold text-foreground">
-                  {customers.find((c) => c.id === customerId)?.name || initialRow.customer_name_ar || "—"}
+                  {customers.find((c) => c.id === customerId)?.name ||
+                    initialRow.customer_name_ar ||
+                    "—"}
                 </div>
               ) : (
                 <PartyPicker
@@ -1557,32 +1559,32 @@ function QuickMillingModal({
             </button>
           </div>
 
-            {/* شريط المطابقة الذكي */}
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-muted/60 p-3 text-xs">
-              <div className="flex items-center gap-3">
-                <span>
-                  حبوب خام مطحونة: <strong className="text-foreground">{totalGrainKg}</strong> كجم
-                </span>
-                <span>•</span>
-                <span>
-                  إجمالي النواتج: <strong className="text-foreground">{totalOutputsKg}</strong> كجم
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-muted-foreground">نسبة الاستخراج:</span>
-                <span
-                  className={`font-black tabular-nums ${
-                    extractionRatio > 105
-                      ? "text-rose-600"
-                      : extractionRatio >= 90
-                        ? "text-emerald-600"
-                        : "text-amber-600"
-                  }`}
-                >
-                  {extractionRatio}%
-                </span>
-              </div>
+          {/* شريط المطابقة الذكي */}
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-muted/60 p-3 text-xs">
+            <div className="flex items-center gap-3">
+              <span>
+                حبوب خام مطحونة: <strong className="text-foreground">{totalGrainKg}</strong> كجم
+              </span>
+              <span>•</span>
+              <span>
+                إجمالي النواتج: <strong className="text-foreground">{totalOutputsKg}</strong> كجم
+              </span>
             </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-muted-foreground">نسبة الاستخراج:</span>
+              <span
+                className={`font-black tabular-nums ${
+                  extractionRatio > 105
+                    ? "text-rose-600"
+                    : extractionRatio >= 90
+                      ? "text-emerald-600"
+                      : "text-amber-600"
+                }`}
+              >
+                {extractionRatio}%
+              </span>
+            </div>
+          </div>
 
           {/* ملاحظات الطحن */}
           <MillingField label="ملاحظات تشغيلية">
@@ -1758,7 +1760,9 @@ function QuickDeliveryModal({
             <MillingField label="العميل المستلم *">
               {initialRow ? (
                 <div className="flex h-10 items-center rounded-2xl border border-border/70 bg-muted/50 px-3 text-xs font-semibold text-foreground">
-                  {customers.find((c) => c.id === customerId)?.name || initialRow.customer_name_ar || "—"}
+                  {customers.find((c) => c.id === customerId)?.name ||
+                    initialRow.customer_name_ar ||
+                    "—"}
                 </div>
               ) : (
                 <PartyPicker

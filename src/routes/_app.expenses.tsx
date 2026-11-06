@@ -16,7 +16,7 @@ export const Route = createFileRoute("/_app/expenses")({
             ? "categories"
             : search.section === "approvals"
               ? "approvals"
-            : undefined,
+              : undefined,
   }),
   head: () => ({ meta: [{ title: "المصروفات — Vortex ERP" }] }),
   component: () => (

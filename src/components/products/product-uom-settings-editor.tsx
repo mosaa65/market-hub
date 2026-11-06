@@ -42,8 +42,10 @@ type Props = {
 
 function initialConversion(unit: ProductUomChoice | undefined, base: ProductUomChoice | undefined) {
   const sameDimension =
-    !!unit?.dimension_code && unit.dimension_code === base?.dimension_code &&
-    unit.factor_to_reference != null && base.factor_to_reference != null;
+    !!unit?.dimension_code &&
+    unit.dimension_code === base?.dimension_code &&
+    unit.factor_to_reference != null &&
+    base.factor_to_reference != null;
   if (sameDimension) {
     return {
       conversion_basis: "STANDARD" as const,
@@ -56,10 +58,7 @@ function initialConversion(unit: ProductUomChoice | undefined, base: ProductUomC
   return { conversion_basis: "ITEM_SPECIFIC" as const, factor_to_base: "1" };
 }
 
-function defaultQuantityIncrement(
-  unit: ProductUomChoice | undefined,
-  conversionFactor: string,
-) {
+function defaultQuantityIncrement(unit: ProductUomChoice | undefined, conversionFactor: string) {
   if (["COUNT", "PACKAGING", "CUSTOM"].includes(unit?.dimension_code ?? "")) return "1";
   const factor = Number(conversionFactor);
   if (!Number.isFinite(factor) || factor <= 0) return "0.001";
@@ -88,17 +87,21 @@ export function ProductUomSettingsEditor({
   const baseUnit = units.find((unit) => unit.id === baseUnitId);
   const eligibleSalesUnits = [
     ...(canSell && baseUnit ? [baseUnit] : []),
-    ...rows.filter((row) => canSell && row.can_sell).flatMap((row) => {
-      const unit = units.find((candidate) => candidate.id === row.unit_id);
-      return unit ? [unit] : [];
-    }),
+    ...rows
+      .filter((row) => canSell && row.can_sell)
+      .flatMap((row) => {
+        const unit = units.find((candidate) => candidate.id === row.unit_id);
+        return unit ? [unit] : [];
+      }),
   ];
   const eligiblePurchaseUnits = [
     ...(canPurchase && baseUnit ? [baseUnit] : []),
-    ...rows.filter((row) => canPurchase && row.can_purchase).flatMap((row) => {
-      const unit = units.find((candidate) => candidate.id === row.unit_id);
-      return unit ? [unit] : [];
-    }),
+    ...rows
+      .filter((row) => canPurchase && row.can_purchase)
+      .flatMap((row) => {
+        const unit = units.find((candidate) => candidate.id === row.unit_id);
+        return unit ? [unit] : [];
+      }),
   ];
 
   function addUnit() {
@@ -125,7 +128,8 @@ export function ProductUomSettingsEditor({
   function update(index: number, patch: Partial<ProductUomDraft>) {
     const current = rows[index];
     if (patch.can_sell === false && current?.unit_id === salesUnitId) onSalesUnitChange(baseUnitId);
-    if (patch.can_purchase === false && current?.unit_id === purchaseUnitId) onPurchaseUnitChange(baseUnitId);
+    if (patch.can_purchase === false && current?.unit_id === purchaseUnitId)
+      onPurchaseUnitChange(baseUnitId);
     onRowsChange(rows.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)));
   }
 
@@ -152,11 +156,17 @@ export function ProductUomSettingsEditor({
           </h3>
           <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">
             {ar
-            ? "الرصيد والدفعات والتكلفة تحفظ بوحدة الأساس. أدخل معامل كل عبوة وسعرها وباركودها؛ لا يُستنتج محتوى العبوة تلقائيًا. خطوة الكمية حتى 6 منازل ويجب أن تتحول بدقة إلى دقة المخزون الحالية (0.001)."
+              ? "الرصيد والدفعات والتكلفة تحفظ بوحدة الأساس. أدخل معامل كل عبوة وسعرها وباركودها؛ لا يُستنتج محتوى العبوة تلقائيًا. خطوة الكمية حتى 6 منازل ويجب أن تتحول بدقة إلى دقة المخزون الحالية (0.001)."
               : "Stock, batches and valuation use the base unit. Set each package factor, price and barcode; package contents are never guessed. Quantity steps support up to 6 decimals and must convert exactly to the current base-stock precision (0.001)."}
           </p>
         </div>
-        <Button type="button" variant="outline" size="sm" onClick={addUnit} disabled={disabled || !baseUnitId || units.length <= rows.length + 1}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={addUnit}
+          disabled={disabled || !baseUnitId || units.length <= rows.length + 1}
+        >
           <Plus className="me-1 size-4" />
           {ar ? "إضافة وحدة بديلة" : "Add alternate unit"}
         </Button>
@@ -174,7 +184,9 @@ export function ProductUomSettingsEditor({
             >
               <option value="">{ar ? "اختر وحدة" : "Choose a unit"}</option>
               {eligibleSalesUnits.map((unit) => (
-                <option key={unit.id} value={unit.id}>{ar ? unit.name_ar || unit.name : unit.name}</option>
+                <option key={unit.id} value={unit.id}>
+                  {ar ? unit.name_ar || unit.name : unit.name}
+                </option>
               ))}
             </select>
           </label>
@@ -190,7 +202,9 @@ export function ProductUomSettingsEditor({
             >
               <option value="">{ar ? "اختر وحدة" : "Choose a unit"}</option>
               {eligiblePurchaseUnits.map((unit) => (
-                <option key={unit.id} value={unit.id}>{ar ? unit.name_ar || unit.name : unit.name}</option>
+                <option key={unit.id} value={unit.id}>
+                  {ar ? unit.name_ar || unit.name : unit.name}
+                </option>
               ))}
             </select>
           </label>
@@ -199,35 +213,75 @@ export function ProductUomSettingsEditor({
 
       {!baseUnitId && (
         <p className="rounded-xl border border-warning/40 bg-warning/10 p-3 text-xs text-warning">
-          {ar ? "اختر وحدة أساس أولًا لتحديد معاملات التحويل." : "Choose a base unit before defining conversions."}
+          {ar
+            ? "اختر وحدة أساس أولًا لتحديد معاملات التحويل."
+            : "Choose a base unit before defining conversions."}
         </p>
       )}
 
       {rows.map((row, index) => {
-        const usedIds = new Set([baseUnitId, ...rows.filter((_, rowIndex) => rowIndex !== index).map((item) => item.unit_id)]);
+        const usedIds = new Set([
+          baseUnitId,
+          ...rows.filter((_, rowIndex) => rowIndex !== index).map((item) => item.unit_id),
+        ]);
         const selectedUnit = units.find((unit) => unit.id === row.unit_id);
         const hasStandardConversion =
-          !!selectedUnit?.dimension_code && selectedUnit.dimension_code === baseUnit?.dimension_code &&
-          selectedUnit.factor_to_reference != null && baseUnit?.factor_to_reference != null;
+          !!selectedUnit?.dimension_code &&
+          selectedUnit.dimension_code === baseUnit?.dimension_code &&
+          selectedUnit.factor_to_reference != null &&
+          baseUnit?.factor_to_reference != null;
         return (
-          <article key={`${row.unit_id || "new"}-${index}`} className="space-y-3 rounded-xl border border-border/60 bg-muted/20 p-3 sm:p-4">
+          <article
+            key={`${row.unit_id || "new"}-${index}`}
+            className="space-y-3 rounded-xl border border-border/60 bg-muted/20 p-3 sm:p-4"
+          >
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1.4fr)_minmax(7rem,0.8fr)_auto]">
               <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
                 <span>{ar ? "الوحدة البديلة" : "Alternate unit"}</span>
-                <select value={row.unit_id} onChange={(event) => changeUnit(index, event.target.value)} disabled={disabled} className={selectClass}>
+                <select
+                  value={row.unit_id}
+                  onChange={(event) => changeUnit(index, event.target.value)}
+                  disabled={disabled}
+                  className={selectClass}
+                >
                   <option value="">{ar ? "اختر وحدة" : "Choose a unit"}</option>
-                  {units.filter((unit) => !usedIds.has(unit.id)).map((unit) => (
-                    <option key={unit.id} value={unit.id}>{ar ? unit.name_ar || unit.name : unit.name} ({unit.short_name})</option>
-                  ))}
-                  {selectedUnit && <option value={selectedUnit.id}>{ar ? selectedUnit.name_ar || selectedUnit.name : selectedUnit.name} ({selectedUnit.short_name})</option>}
+                  {units
+                    .filter((unit) => !usedIds.has(unit.id))
+                    .map((unit) => (
+                      <option key={unit.id} value={unit.id}>
+                        {ar ? unit.name_ar || unit.name : unit.name} ({unit.short_name})
+                      </option>
+                    ))}
+                  {selectedUnit && (
+                    <option value={selectedUnit.id}>
+                      {ar ? selectedUnit.name_ar || selectedUnit.name : selectedUnit.name} (
+                      {selectedUnit.short_name})
+                    </option>
+                  )}
                 </select>
               </label>
               <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
                 <span>{ar ? "كم وحدة أساس؟" : "Base units per unit"}</span>
-                <input type="number" min="0.000000000001" step="any" value={row.factor_to_base} onChange={(event) => update(index, { factor_to_base: event.target.value })} disabled={disabled || row.conversion_basis === "STANDARD"} className={inputClass} dir="ltr" />
+                <input
+                  inputMode="decimal"
+                  min="0.000000000001"
+                  step="any"
+                  value={row.factor_to_base}
+                  onChange={(event) => update(index, { factor_to_base: event.target.value })}
+                  disabled={disabled || row.conversion_basis === "STANDARD"}
+                  className={inputClass}
+                  dir="ltr"
+                />
               </label>
               <div className="flex items-end justify-end">
-                <Button type="button" variant="ghost" size="icon" aria-label={ar ? "حذف الوحدة" : "Remove unit"} onClick={() => onRowsChange(rows.filter((_, rowIndex) => rowIndex !== index))} disabled={disabled}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={ar ? "حذف الوحدة" : "Remove unit"}
+                  onClick={() => onRowsChange(rows.filter((_, rowIndex) => rowIndex !== index))}
+                  disabled={disabled}
+                >
                   <Trash2 className="size-4 text-destructive" />
                 </Button>
               </div>
@@ -239,51 +293,146 @@ export function ProductUomSettingsEditor({
                 <select
                   value={row.conversion_basis}
                   onChange={(event) => {
-                    const conversionBasis = event.target.value as ProductUomDraft["conversion_basis"];
+                    const conversionBasis = event.target
+                      .value as ProductUomDraft["conversion_basis"];
                     const standard = initialConversion(selectedUnit, baseUnit);
                     update(index, {
                       conversion_basis: conversionBasis,
-                      ...(conversionBasis === "STANDARD" ? { factor_to_base: standard.factor_to_base } : {}),
+                      ...(conversionBasis === "STANDARD"
+                        ? { factor_to_base: standard.factor_to_base }
+                        : {}),
                     });
                   }}
                   disabled={disabled}
                   className={selectClass}
                 >
-                  <option value="STANDARD" disabled={!hasStandardConversion}>{ar ? "قياسي حسب البعد" : "Standard measurement"}</option>
-                  <option value="FIXED_PACKAGE" disabled={selectedUnit?.dimension_code !== "PACKAGING" && baseUnit?.dimension_code !== "PACKAGING"}>{ar ? "محتوى عبوة ثابت" : "Fixed package contents"}</option>
-                  <option value="ITEM_SPECIFIC" disabled={selectedUnit?.dimension_code !== "CUSTOM" && baseUnit?.dimension_code !== "CUSTOM"}>{ar ? "خاص بهذا الصنف" : "Item-specific"}</option>
+                  <option value="STANDARD" disabled={!hasStandardConversion}>
+                    {ar ? "قياسي حسب البعد" : "Standard measurement"}
+                  </option>
+                  <option
+                    value="FIXED_PACKAGE"
+                    disabled={
+                      selectedUnit?.dimension_code !== "PACKAGING" &&
+                      baseUnit?.dimension_code !== "PACKAGING"
+                    }
+                  >
+                    {ar ? "محتوى عبوة ثابت" : "Fixed package contents"}
+                  </option>
+                  <option
+                    value="ITEM_SPECIFIC"
+                    disabled={
+                      selectedUnit?.dimension_code !== "CUSTOM" &&
+                      baseUnit?.dimension_code !== "CUSTOM"
+                    }
+                  >
+                    {ar ? "خاص بهذا الصنف" : "Item-specific"}
+                  </option>
                 </select>
               </label>
               <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
                 <span>{ar ? "خطوة الكمية" : "Quantity increment"}</span>
-                <input type="number" min="0.000001" step="0.000001" value={row.quantity_increment} onChange={(event) => update(index, { quantity_increment: event.target.value })} disabled={disabled} className={inputClass} dir="ltr" />
+                <input
+                  inputMode="decimal"
+                  min="0.000001"
+                  step="0.000001"
+                  value={row.quantity_increment}
+                  onChange={(event) => update(index, { quantity_increment: event.target.value })}
+                  disabled={disabled}
+                  className={inputClass}
+                  dir="ltr"
+                />
               </label>
               <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
                 <span>{ar ? "سعر البيع لهذه الوحدة" : "Sales price for this unit"}</span>
-                <input type="number" min="0" step="0.0001" value={row.sale_price} onChange={(event) => update(index, { sale_price: event.target.value })} disabled={disabled || !row.can_sell} className={inputClass} dir="ltr" placeholder={ar ? "تناسبيا من سعر الأساس" : "Falls back to base price × factor"} />
+                <input
+                  inputMode="decimal"
+                  min="0"
+                  step="0.0001"
+                  value={row.sale_price}
+                  onChange={(event) => update(index, { sale_price: event.target.value })}
+                  disabled={disabled || !row.can_sell}
+                  className={inputClass}
+                  dir="ltr"
+                  placeholder={ar ? "تناسبيا من سعر الأساس" : "Falls back to base price × factor"}
+                />
               </label>
               <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
                 <span>{ar ? "سعر الشراء المرجعي" : "Reference purchase price"}</span>
-                <input type="number" min="0" step="0.0001" value={row.purchase_price} onChange={(event) => update(index, { purchase_price: event.target.value })} disabled={disabled || !row.can_purchase} className={inputClass} dir="ltr" placeholder={ar ? "اختياري" : "Optional"} />
+                <input
+                  inputMode="decimal"
+                  min="0"
+                  step="0.0001"
+                  value={row.purchase_price}
+                  onChange={(event) => update(index, { purchase_price: event.target.value })}
+                  disabled={disabled || !row.can_purchase}
+                  className={inputClass}
+                  dir="ltr"
+                  placeholder={ar ? "اختياري" : "Optional"}
+                />
               </label>
             </div>
 
             {row.conversion_basis !== "STANDARD" && (
               <label className="block space-y-1.5 text-xs font-medium text-muted-foreground">
-                <span>{ar ? "بيان محتوى العبوة أو سبب التحويل الخاص" : "Package contents or item-specific conversion note"}</span>
-                <input value={row.conversion_note} onChange={(event) => update(index, { conversion_note: event.target.value })} disabled={disabled} className={inputClass} placeholder={ar ? "مثال: الكرتونة تحتوي 24 حبة" : "e.g. carton contains 24 pieces"} />
+                <span>
+                  {ar
+                    ? "بيان محتوى العبوة أو سبب التحويل الخاص"
+                    : "Package contents or item-specific conversion note"}
+                </span>
+                <input
+                  value={row.conversion_note}
+                  onChange={(event) => update(index, { conversion_note: event.target.value })}
+                  disabled={disabled}
+                  className={inputClass}
+                  placeholder={
+                    ar ? "مثال: الكرتونة تحتوي 24 حبة" : "e.g. carton contains 24 pieces"
+                  }
+                />
               </label>
             )}
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <fieldset className="flex flex-wrap gap-x-4 gap-y-2 rounded-lg border border-border/50 p-3 text-xs text-foreground">
-                <legend className="px-1 text-[11px] text-muted-foreground">{ar ? "السماح باستخدام الوحدة" : "Use this unit for"}</legend>
-                {canSell && <label className="inline-flex items-center gap-2"><input type="checkbox" checked={row.can_sell} disabled={disabled} onChange={(event) => update(index, { can_sell: event.target.checked })} />{ar ? "البيع" : "Sales"}</label>}
-                {canPurchase && <label className="inline-flex items-center gap-2"><input type="checkbox" checked={row.can_purchase} disabled={disabled} onChange={(event) => update(index, { can_purchase: event.target.checked })} />{ar ? "الشراء" : "Purchases"}</label>}
+                <legend className="px-1 text-[11px] text-muted-foreground">
+                  {ar ? "السماح باستخدام الوحدة" : "Use this unit for"}
+                </legend>
+                {canSell && (
+                  <label className="inline-flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={row.can_sell}
+                      disabled={disabled}
+                      onChange={(event) => update(index, { can_sell: event.target.checked })}
+                    />
+                    {ar ? "البيع" : "Sales"}
+                  </label>
+                )}
+                {canPurchase && (
+                  <label className="inline-flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={row.can_purchase}
+                      disabled={disabled}
+                      onChange={(event) => update(index, { can_purchase: event.target.checked })}
+                    />
+                    {ar ? "الشراء" : "Purchases"}
+                  </label>
+                )}
               </fieldset>
               <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
-                <span>{ar ? "باركودات هذه الوحدة (كل رمز في سطر)" : "Barcodes for this unit (one per line)"}</span>
-                <textarea value={row.barcodes} onChange={(event) => update(index, { barcodes: event.target.value })} disabled={disabled} rows={2} dir="ltr" className={cn(fieldSurfaceClass, "min-h-16 resize-y px-3 py-2 text-sm")} />
+                <span>
+                  {ar
+                    ? "باركودات هذه الوحدة (كل رمز في سطر)"
+                    : "Barcodes for this unit (one per line)"}
+                </span>
+                <textarea
+                  value={row.barcodes}
+                  onChange={(event) => update(index, { barcodes: event.target.value })}
+                  disabled={disabled}
+                  rows={2}
+                  dir="ltr"
+                  className={cn(fieldSurfaceClass, "min-h-16 resize-y px-3 py-2 text-sm")}
+                />
               </label>
             </div>
           </article>

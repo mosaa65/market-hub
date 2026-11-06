@@ -1114,7 +1114,7 @@ function MillingIntakePage() {
           currency={currencySymbol}
           referenceNumber={createdDocument?.document_number}
           customer={
-            (selectedCustomer || activeDetails?.customers)
+            selectedCustomer || activeDetails?.customers
               ? {
                   id: selectedCustomer?.id || activeDetails?.customer_id || "",
                   name: selectedCustomer?.name || activeDetails?.customers?.name || "",

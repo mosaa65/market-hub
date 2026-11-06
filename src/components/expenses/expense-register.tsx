@@ -454,17 +454,17 @@ export function ExpenseRegister({
             summary={summary}
             loading={isLoading && !summary}
             onSelect={(key) => {
-            // The cards double as the fastest filter, so a click narrows the
-            // register rather than doing nothing.
-            if (key === "pending_total") {
-              onFiltersChange({ ...filters, status: ["SUBMITTED"], paymentState: null });
-            } else if (key === "outstanding_total") {
-              onFiltersChange({ ...filters, status: [], paymentState: "unpaid" });
-            } else if (key === "paid_total") {
-              onFiltersChange({ ...filters, status: [], paymentState: "paid" });
-            } else if (key === "period_total") {
-              onFiltersChange({ ...filters, status: [], paymentState: null });
-            }
+              // The cards double as the fastest filter, so a click narrows the
+              // register rather than doing nothing.
+              if (key === "pending_total") {
+                onFiltersChange({ ...filters, status: ["SUBMITTED"], paymentState: null });
+              } else if (key === "outstanding_total") {
+                onFiltersChange({ ...filters, status: [], paymentState: "unpaid" });
+              } else if (key === "paid_total") {
+                onFiltersChange({ ...filters, status: [], paymentState: "paid" });
+              } else if (key === "period_total") {
+                onFiltersChange({ ...filters, status: [], paymentState: null });
+              }
             }}
           />
         ) : null}

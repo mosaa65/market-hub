@@ -6,16 +6,7 @@
  */
 
 import React, { useEffect, useState } from "react";
-import {
-  Mic,
-  MicOff,
-  Check,
-  RotateCcw,
-  X,
-  Volume2,
-  AlertCircle,
-  Sparkles,
-} from "lucide-react";
+import { Mic, MicOff, Check, RotateCcw, X, Volume2, AlertCircle, Sparkles } from "lucide-react";
 import { useSpeechToText } from "@/hooks/use-speech-to-text";
 import { AudioWaveformVisualizer } from "./audio-waveform-visualizer";
 
@@ -203,9 +194,7 @@ export function VoiceRecordingDialog({
           ) : (
             <div className="flex flex-col items-center justify-center h-full min-h-[80px] text-center text-muted-foreground/70">
               <Sparkles className="h-5 w-5 mb-1.5 text-primary/40 animate-pulse" />
-              <p className="text-xs">
-                ابدأ التحدث الآن... سيظهر النص المسموع هنا تدريجياً.
-              </p>
+              <p className="text-xs">ابدأ التحدث الآن... سيظهر النص المسموع هنا تدريجياً.</p>
             </div>
           )}
         </div>

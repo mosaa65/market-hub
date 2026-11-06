@@ -15,18 +15,21 @@ export function quantityIncrementDecimals(increment: number) {
  * entered in a package unit. Legacy returns without a source line are
  * conservatively deducted from each matching product, matching the posting RPC.
  */
-export async function addReturnableQuantities<T extends {
-  id: string;
-  product_id: string;
-  quantity: number | string;
-  entered_quantity?: number | string | null;
-  uom_conversion_factor?: number | string | null;
-  uom_quantity_increment?: number | string | null;
-}>(kind: ReturnKind, invoiceId: string, sourceLines: T[]) {
-  if (!sourceLines.length) return [] as (T & {
-    returnable_entered_quantity: number;
-    returnable_quantity_increment: number;
-  })[];
+export async function addReturnableQuantities<
+  T extends {
+    id: string;
+    product_id: string;
+    quantity: number | string;
+    entered_quantity?: number | string | null;
+    uom_conversion_factor?: number | string | null;
+    uom_quantity_increment?: number | string | null;
+  },
+>(kind: ReturnKind, invoiceId: string, sourceLines: T[]) {
+  if (!sourceLines.length)
+    return [] as (T & {
+      returnable_entered_quantity: number;
+      returnable_quantity_increment: number;
+    })[];
 
   const returnTable = kind === "sales" ? "sales_returns" : "purchase_returns";
   const itemTable = kind === "sales" ? "sales_return_items" : "purchase_return_items";
@@ -63,8 +66,8 @@ export async function addReturnableQuantities<T extends {
   return sourceLines.map((line) => {
     const factor = Number(line.uom_conversion_factor) || 1;
     const baseQuantity = Number(line.quantity) || 0;
-    const alreadyReturned = (exactReturned.get(line.id) ?? 0)
-      + (legacyReturnedByProduct.get(line.product_id) ?? 0);
+    const alreadyReturned =
+      (exactReturned.get(line.id) ?? 0) + (legacyReturnedByProduct.get(line.product_id) ?? 0);
     const remainingBase = Math.max(0, baseQuantity - alreadyReturned);
     const originalEntered = Number(line.entered_quantity ?? line.quantity) || 0;
     const increment = Number(line.uom_quantity_increment) || 0.001;

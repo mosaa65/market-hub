@@ -56,11 +56,7 @@ export function normalizeArabicSpeechTranscript(
 ): string {
   if (!text) return "";
 
-  const {
-    convertPunctuation = true,
-    asciiDigits = false,
-    trim = true,
-  } = options;
+  const { convertPunctuation = true, asciiDigits = false, trim = true } = options;
 
   let cleaned = text;
 

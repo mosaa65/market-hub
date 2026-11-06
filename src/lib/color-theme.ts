@@ -724,8 +724,7 @@ export function parseUserThemePreferences(raw: unknown): UserThemePreferences | 
         ? data.modeVariant
         : "default";
 
-    const fontTheme =
-      typeof data.fontTheme === "string" ? (data.fontTheme as any) : "ibm-plex";
+    const fontTheme = typeof data.fontTheme === "string" ? (data.fontTheme as any) : "ibm-plex";
 
     return {
       theme,

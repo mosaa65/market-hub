@@ -679,11 +679,7 @@ export function renderMillingThermalTemplate(
       : ""
   }
 
-  ${
-    opts.showFooter
-      ? renderUniversalFooter(companyProfile, rtl, true)
-      : ""
-  }
+  ${opts.showFooter ? renderUniversalFooter(companyProfile, rtl, true) : ""}
   <div style="text-align:center;font-size:7.5px;color:#9ca3af;padding:2px 0">${COMPANY_RIGHTS_TEXT}</div>
 </body>
 </html>`;

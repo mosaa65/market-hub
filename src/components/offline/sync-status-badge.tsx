@@ -11,14 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 export function SyncStatusBadge({ className }: { className?: string }) {
-  const {
-    is_online,
-    is_syncing,
-    pending_count,
-    conflicted_count,
-    rejected_count,
-    triggerSync,
-  } = useOfflineSync();
+  const { is_online, is_syncing, pending_count, conflicted_count, rejected_count, triggerSync } =
+    useOfflineSync();
 
   return (
     <div className={cn("flex items-center gap-2 text-xs font-medium", className)}>

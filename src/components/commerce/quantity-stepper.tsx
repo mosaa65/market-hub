@@ -57,8 +57,14 @@ export function QuantityStepper({
   className,
   size = "sm",
 }: QuantityStepperProps) {
-  const effectiveStep = Math.max(1, Math.round(Number.isFinite(step) && (step ?? 1) >= 1 ? (step ?? 1) : 1));
-  const effectiveMin = Math.max(1, Math.round(Number.isFinite(min) && (min ?? 1) >= 1 ? (min ?? 1) : 1));
+  const effectiveStep = Math.max(
+    1,
+    Math.round(Number.isFinite(step) && (step ?? 1) >= 1 ? (step ?? 1) : 1),
+  );
+  const effectiveMin = Math.max(
+    1,
+    Math.round(Number.isFinite(min) && (min ?? 1) >= 1 ? (min ?? 1) : 1),
+  );
 
   const [text, setText] = useState(() => String(value));
   const editing = useRef(false);

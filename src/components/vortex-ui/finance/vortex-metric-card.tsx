@@ -148,7 +148,8 @@ export function VortexMetricCard({
   const shouldShowCurrency = (() => {
     if (currency === false || currency === null || currency === "") return false;
     if (isCurrency === false) return false;
-    if (type === "count" || type === "quantity" || type === "percentage" || type === "text") return false;
+    if (type === "count" || type === "quantity" || type === "percentage" || type === "text")
+      return false;
     if (typeof currency === "string" && currency.length > 0) return true;
     if (isCurrency === true || type === "currency") return true;
 
@@ -186,13 +187,17 @@ export function VortexMetricCard({
     }
   } else {
     // قيمة نصية: فحص ما إذا كانت تحتوي بالفعل على رمز العملة
-    const parsed = splitAmountAndCurrency(value, typeof currency === "string" ? currency : currencySymbol);
+    const parsed = splitAmountAndCurrency(
+      value,
+      typeof currency === "string" ? currency : currencySymbol,
+    );
     if (!shouldShowCurrency) {
       displayValue = parsed.amount;
       finalCurrencySymbol = null;
     } else {
       displayValue = parsed.amount;
-      finalCurrencySymbol = parsed.currency || (typeof currency === "string" ? currency : currencySymbol);
+      finalCurrencySymbol =
+        parsed.currency || (typeof currency === "string" ? currency : currencySymbol);
     }
   }
 

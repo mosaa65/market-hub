@@ -85,12 +85,8 @@ export function useSpeechToText(options: UseSpeechToTextOptions = {}) {
           const cleanInterim = normalize
             ? normalizeArabicSpeechTranscript(interim, { trim: false })
             : interim;
-          const cleanFinal = normalize
-            ? normalizeArabicSpeechTranscript(final)
-            : final;
-          const cleanFull = normalize
-            ? normalizeArabicSpeechTranscript(full)
-            : full;
+          const cleanFinal = normalize ? normalizeArabicSpeechTranscript(final) : final;
+          const cleanFull = normalize ? normalizeArabicSpeechTranscript(full) : full;
 
           setInterimTranscript(cleanInterim);
           setFinalTranscript(cleanFinal);
@@ -128,10 +124,7 @@ export function useSpeechToText(options: UseSpeechToTextOptions = {}) {
     };
   }, []);
 
-  const fullTranscript = [finalTranscript, interimTranscript]
-    .filter(Boolean)
-    .join(" ")
-    .trim();
+  const fullTranscript = [finalTranscript, interimTranscript].filter(Boolean).join(" ").trim();
 
   return {
     status,

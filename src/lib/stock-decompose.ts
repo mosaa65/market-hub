@@ -99,15 +99,14 @@ export function decomposeStock(
  * formatDecomposed(segments, "ar") // → "5 كرتون و 3 حبة"
  * formatDecomposed(segments, "en") // → "5 Carton + 3 Piece"
  */
-export function formatDecomposed(
-  segments: DecomposedSegment[],
-  lang: "ar" | "en" = "ar",
-): string {
+export function formatDecomposed(segments: DecomposedSegment[], lang: "ar" | "en" = "ar"): string {
   if (segments.length === 0) return "0";
 
   const separator = lang === "ar" ? " و " : " + ";
-  return segments
-    .filter((s) => s.quantity > 0)
-    .map((s) => `${s.quantity} ${s.label}`)
-    .join(separator) || "0";
+  return (
+    segments
+      .filter((s) => s.quantity > 0)
+      .map((s) => `${s.quantity} ${s.label}`)
+      .join(separator) || "0"
+  );
 }

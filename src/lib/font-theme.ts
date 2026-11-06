@@ -42,9 +42,11 @@ export const CURATED_FONTS: Record<FontThemeId, FontThemeDefinition> = {
     id: "ibm-plex",
     name_ar: "آي بي إم بلكس (الافتراضي)",
     name_en: "IBM Plex Sans Arabic",
-    fontFamily: '"IBM Plex Sans Arabic", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    fontFamily:
+      '"IBM Plex Sans Arabic", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     category_ar: "عصري تقني معتمد",
-    description_ar: "الخط المعتمد رسمياً في النظام، قراءة استثنائية للأرقام والجداول المحاسبية والتقارير التنفيذية.",
+    description_ar:
+      "الخط المعتمد رسمياً في النظام، قراءة استثنائية للأرقام والجداول المحاسبية والتقارير التنفيذية.",
     badge: "الافتراضي المعتمد",
     isDefault: true,
   },
@@ -52,25 +54,30 @@ export const CURATED_FONTS: Record<FontThemeId, FontThemeDefinition> = {
     id: "cairo",
     name_ar: "كايرو (Cairo)",
     name_en: "Cairo",
-    fontFamily: '"Cairo", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    fontFamily:
+      '"Cairo", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     category_ar: "هندسي متوازن",
-    description_ar: "من أشهر الخطوط العربية الحديثة، عريض الحروف وواضح جداً في الشاشات وعناوين لوحات التحكم.",
+    description_ar:
+      "من أشهر الخطوط العربية الحديثة، عريض الحروف وواضح جداً في الشاشات وعناوين لوحات التحكم.",
     badge: "الأكثر شهرة",
   },
   tajawal: {
     id: "tajawal",
     name_ar: "تجوال (Tajawal)",
     name_en: "Tajawal",
-    fontFamily: '"Tajawal", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    fontFamily:
+      '"Tajawal", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     category_ar: "هندسي انسيابي",
-    description_ar: "خط هندسي هادئ وناعم، مريح جداً للعين أثناء العمل الميداني والعمليات المتواصلة.",
+    description_ar:
+      "خط هندسي هادئ وناعم، مريح جداً للعين أثناء العمل الميداني والعمليات المتواصلة.",
     badge: "انسيابي مريح",
   },
   "noto-sans-arabic": {
     id: "noto-sans-arabic",
     name_ar: "نوتو سانس (Noto Sans Arabic)",
     name_en: "Noto Sans Arabic",
-    fontFamily: '"Noto Sans Arabic", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    fontFamily:
+      '"Noto Sans Arabic", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     category_ar: "قياسي عالمي",
     description_ar: "خط قياسي عالي التناسق والدقة، ممتاز للمستندات والفواتير والطباعة الحرارية.",
     badge: "فائق التناسق",
@@ -79,7 +86,8 @@ export const CURATED_FONTS: Record<FontThemeId, FontThemeDefinition> = {
     id: "almarai",
     name_ar: "المراعي (Almarai)",
     name_en: "Almarai",
-    fontFamily: '"Almarai", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    fontFamily:
+      '"Almarai", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     category_ar: "رسمي واحترافي",
     description_ar: "طابع مؤسسي فخم ومحكم الزوايا، مصمم خصيصاً للتطبيقات والأعمال الاحترافية.",
     badge: "تنفيذي فخم",
@@ -88,7 +96,8 @@ export const CURATED_FONTS: Record<FontThemeId, FontThemeDefinition> = {
     id: "readex-pro",
     name_ar: "ريديكس برو (Readex Pro)",
     name_en: "Readex Pro",
-    fontFamily: '"Readex Pro", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    fontFamily:
+      '"Readex Pro", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     category_ar: "عصري سريع القراءة",
     description_ar: "صُمم هندسياً لتحسين سرعة القراءة والتركيز البصري في واجهات نقاط البيع POS.",
     badge: "سريع القراءة",
@@ -97,7 +106,8 @@ export const CURATED_FONTS: Record<FontThemeId, FontThemeDefinition> = {
     id: "alexandria",
     name_ar: "الإسكندرية (Alexandria)",
     name_en: "Alexandria",
-    fontFamily: '"Alexandria", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    fontFamily:
+      '"Alexandria", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     category_ar: "طباعي حديث",
     description_ar: "تصميم طباعي مميز ومصقول يمنح الواجهة هوية برمجية متطورة وفائقة الأناقة.",
     badge: "حديث ومميز",
@@ -106,7 +116,8 @@ export const CURATED_FONTS: Record<FontThemeId, FontThemeDefinition> = {
     id: "rubik",
     name_ar: "روبيك (Rubik)",
     name_en: "Rubik",
-    fontFamily: '"Rubik", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    fontFamily:
+      '"Rubik", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     category_ar: "مستدير وودود",
     description_ar: "زوايا مستديرة ناعمة تمنح تجربة استخدام دافئة وسلسة عبر جميع أقسام النظام.",
     badge: "ناعم ومريح",
@@ -115,16 +126,19 @@ export const CURATED_FONTS: Record<FontThemeId, FontThemeDefinition> = {
     id: "noto-kufi-arabic",
     name_ar: "نوتو كوفي (Noto Kufi Arabic)",
     name_en: "Noto Kufi Arabic",
-    fontFamily: '"Noto Kufi Arabic", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    fontFamily:
+      '"Noto Kufi Arabic", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     category_ar: "كوفي هندسي",
-    description_ar: "أسلوب كوفي أصيل بهندسة عصرية بارزة، يعطي طابعاً قوياً للعناوين والملخصات المالية.",
+    description_ar:
+      "أسلوب كوفي أصيل بهندسة عصرية بارزة، يعطي طابعاً قوياً للعناوين والملخصات المالية.",
     badge: "كوفي أصيل",
   },
   changa: {
     id: "changa",
     name_ar: "تشانجا (Changa)",
     name_en: "Changa",
-    fontFamily: '"Changa", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    fontFamily:
+      '"Changa", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     category_ar: "عريض وجريء",
     description_ar: "خط ذو وزن جريء وحضور بصري قوي، ممتاز للأرقام الكبيرة ومحطات الكاشير.",
     badge: "جريء وواضح",
@@ -164,5 +178,5 @@ export function applyFontTheme(fontId: FontThemeId): void {
  * خريطة الخطوط المجهزة لسكربت البداية السريع
  */
 export const FONT_FAMILY_BOOT_MAP: Record<FontThemeId, string> = Object.fromEntries(
-  Object.entries(CURATED_FONTS).map(([k, v]) => [k, v.fontFamily])
+  Object.entries(CURATED_FONTS).map(([k, v]) => [k, v.fontFamily]),
 ) as Record<FontThemeId, string>;

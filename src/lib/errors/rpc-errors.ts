@@ -157,8 +157,7 @@ const RULES: Rule[] = [
   },
   {
     test: /Invoice ([^ ]+) split total \(([\d.]+)\) does not match paid amount \(([\d.]+)\)/i,
-    ar: (m) =>
-      `مجموع أجزاء الدفع للفاتورة (${m[2]}) لا يطابق المبلغ المدفوع (${m[3]}).`,
+    ar: (m) => `مجموع أجزاء الدفع للفاتورة (${m[2]}) لا يطابق المبلغ المدفوع (${m[3]}).`,
     en: "The split total does not match the paid amount.",
   },
   {

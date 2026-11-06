@@ -731,13 +731,19 @@ function PurchasePOSPage() {
       setUnitBarcodeMap(barcodeLookup);
       setProducts(
         productRows.map((product) => {
-          const baseUnit = product.unit_id ? uns?.find((u) => u.id === product.unit_id) || null : null;
+          const baseUnit = product.unit_id
+            ? uns?.find((u) => u.id === product.unit_id) || null
+            : null;
           const baseCost = Number(product.cost_price || 0);
           const secondaryUoms = purchaseUomsByProduct.get(product.id) ?? [];
           const baseUomLabel = baseUnit
-            ? (lang === "ar" ? baseUnit.name_ar || baseUnit.name : baseUnit.name || baseUnit.name_ar) +
+            ? (lang === "ar"
+                ? baseUnit.name_ar || baseUnit.name
+                : baseUnit.name || baseUnit.name_ar) +
               (baseUnit.short_name ? ` (${baseUnit.short_name})` : "")
-            : (lang === "ar" ? "وحدة الأساس" : "Base unit");
+            : lang === "ar"
+              ? "وحدة الأساس"
+              : "Base unit";
           const hasSecondaryDefault = secondaryUoms.some((u) => u.is_default_purchase);
           const baseUom: PurchaseUom = {
             unit_id: product.unit_id || "",
@@ -1114,7 +1120,8 @@ function PurchasePOSPage() {
     if (!line || !option) return;
 
     const oldFactor = line.uom_factor && line.uom_factor > 0 ? line.uom_factor : 1;
-    const newFactor = option.factor_to_base && option.factor_to_base > 0 ? option.factor_to_base : 1;
+    const newFactor =
+      option.factor_to_base && option.factor_to_base > 0 ? option.factor_to_base : 1;
     const increment = Math.max(1, Math.round(option.quantity_increment ?? 1));
     const rawConvertedQty = (line.quantity * oldFactor) / newFactor;
     const nextQty = Math.max(increment, Math.round(rawConvertedQty));

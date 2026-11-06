@@ -94,7 +94,10 @@ function blankHeader(): ExpenseFormHeader {
 }
 
 function createRequestKey() {
-  return globalThis.crypto?.randomUUID?.() ?? `expense-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return (
+    globalThis.crypto?.randomUUID?.() ??
+    `expense-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  );
 }
 
 function lineGross(line: ExpenseLineDraft): number | null {
@@ -370,7 +373,15 @@ export function ExpenseFormDialog({
     }
 
     return { errors, valid: Object.keys(errors).length === 0 };
-  }, [header, numAmount, primaryLine.category_id, enteredTaxRate.ok, enteredTaxRate.ok ? enteredTaxRate.value : null, opMode, ar]);
+  }, [
+    header,
+    numAmount,
+    primaryLine.category_id,
+    enteredTaxRate.ok,
+    enteredTaxRate.ok ? enteredTaxRate.value : null,
+    opMode,
+    ar,
+  ]);
 
   /* -- الترحيل والتسجيل ---------------------------------------------- */
   const buildLinePayload = (): ExpenseLineInput[] => {
@@ -710,15 +721,15 @@ export function ExpenseFormDialog({
 
           <div className="rounded-2xl border border-primary/25 bg-primary/5 p-4 space-y-1.5">
             <label className="text-xs font-bold text-foreground flex items-center justify-between">
-                <span>
-                  {header.tax_mode === "EXCLUSIVE"
-                    ? ar
-                      ? "المبلغ قبل الضريبة *"
-                      : "Amount before tax *"
-                    : ar
-                      ? "إجمالي مبلغ الفاتورة *"
-                      : "Invoice total *"}
-                </span>
+              <span>
+                {header.tax_mode === "EXCLUSIVE"
+                  ? ar
+                    ? "المبلغ قبل الضريبة *"
+                    : "Amount before tax *"
+                  : ar
+                    ? "إجمالي مبلغ الفاتورة *"
+                    : "Invoice total *"}
+              </span>
               {validation.errors.amount && (
                 <span className="text-[11px] text-destructive font-semibold">
                   {validation.errors.amount}
@@ -847,7 +858,9 @@ export function ExpenseFormDialog({
                     if (mode === "NONE") {
                       setHeaderField("tax_recoverable", false);
                       setLines((current) =>
-                        current.map((line, index) => (index === 0 ? { ...line, tax_rate: "0" } : line)),
+                        current.map((line, index) =>
+                          index === 0 ? { ...line, tax_rate: "0" } : line,
+                        ),
                       );
                     }
                   })()
@@ -869,7 +882,9 @@ export function ExpenseFormDialog({
                 onValueChange={(value) => {
                   setDirty(true);
                   setLines((current) =>
-                    current.map((line, index) => (index === 0 ? { ...line, tax_rate: value } : line)),
+                    current.map((line, index) =>
+                      index === 0 ? { ...line, tax_rate: value } : line,
+                    ),
                   );
                 }}
                 placeholder="0"
@@ -1037,7 +1052,9 @@ export function ExpenseFormDialog({
                     <FieldInput
                       value={header.supplier_invoice_number}
                       onValueChange={(value) => setHeaderField("supplier_invoice_number", value)}
-                      placeholder={ar ? "كما يظهر في فاتورة المورد" : "As printed on the supplier invoice"}
+                      placeholder={
+                        ar ? "كما يظهر في فاتورة المورد" : "As printed on the supplier invoice"
+                      }
                     />
                     {validation.errors.supplier_invoice_number ? (
                       <span className="mt-1 block text-[11px] font-semibold text-destructive">
@@ -1087,7 +1104,7 @@ export function ExpenseFormDialog({
                     </option>
                   ))}
                 </select>
-              {validation.errors.supplier_id && (
+                {validation.errors.supplier_id && (
                   <span className="mt-1 block text-[11px] font-semibold text-destructive">
                     {validation.errors.supplier_id}
                   </span>
@@ -1101,7 +1118,9 @@ export function ExpenseFormDialog({
                 <FieldInput
                   value={header.supplier_invoice_number}
                   onValueChange={(value) => setHeaderField("supplier_invoice_number", value)}
-                  placeholder={ar ? "أدخل رقم الفاتورة كما هو مطبوع" : "Enter the printed invoice number"}
+                  placeholder={
+                    ar ? "أدخل رقم الفاتورة كما هو مطبوع" : "Enter the printed invoice number"
+                  }
                 />
                 {validation.errors.supplier_invoice_number ? (
                   <span className="mt-1 block text-[11px] font-semibold text-destructive">

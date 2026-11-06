@@ -5,12 +5,7 @@
  */
 
 export type VoiceRecognitionStatus =
-  | "idle"
-  | "requesting_permission"
-  | "listening"
-  | "processing"
-  | "error"
-  | "unsupported";
+  "idle" | "requesting_permission" | "listening" | "processing" | "error" | "unsupported";
 
 export type VoiceErrorCode =
   | "not-allowed"

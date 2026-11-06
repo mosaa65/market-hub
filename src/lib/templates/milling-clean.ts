@@ -6,7 +6,11 @@ import {
   CustomFieldOptions,
 } from "./types";
 import { getCachedCompanyProfile } from "@/lib/printing/company-profile";
-import { COMPANY_RIGHTS_TEXT, UNIVERSAL_FOOTER_CSS, renderUniversalFooter } from "@/lib/printing/footer";
+import {
+  COMPANY_RIGHTS_TEXT,
+  UNIVERSAL_FOOTER_CSS,
+  renderUniversalFooter,
+} from "@/lib/printing/footer";
 import { formatPrintedDateTime } from "@/lib/printing/date-time";
 import { numberToArabicWords } from "./tafqeet";
 import { generateBarcodeSvg, generateQrCodeSvg } from "@/lib/printing/barcode-qr";

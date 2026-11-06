@@ -216,7 +216,10 @@ export const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputPro
         value={text}
         suffix={suffix}
         // الرقم بخط مالي واضح ومرن دون التصاق
-        className={cn("text-center font-semibold tabular-nums tracking-tight transition-all duration-150", className)}
+        className={cn(
+          "text-center font-semibold tabular-nums tracking-tight transition-all duration-150",
+          className,
+        )}
         containerClassName={containerClassName}
         onFocus={(e) => {
           editing.current = true;

@@ -20,10 +20,7 @@ export function renderThermalTemplate(
   const money = (n?: number) => formatMoney(n, c);
   const company = getCachedCompanyProfile();
   const companyArabicName =
-    doc.company?.arabicName ||
-    doc.company?.name ||
-    company.arabicName ||
-    company.name;
+    doc.company?.arabicName || doc.company?.name || company.arabicName || company.name;
   const companyAddress = doc.company?.address || company.address || "";
   const companyPhone = doc.company?.phone || company.phone || "";
   const companyVat = doc.company?.vat || company.taxNumber || "";

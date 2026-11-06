@@ -17,12 +17,7 @@
 import type { ReactNode } from "react";
 
 export type ItemClass =
-  | "RAW_MATERIAL"
-  | "FINISHED_GOOD"
-  | "BY_PRODUCT"
-  | "SERVICE"
-  | "NON_STOCK_ITEM"
-  | "PACKAGING";
+  "RAW_MATERIAL" | "FINISHED_GOOD" | "BY_PRODUCT" | "SERVICE" | "NON_STOCK_ITEM" | "PACKAGING";
 
 export interface ItemRoleStyle {
   labelAr: string;

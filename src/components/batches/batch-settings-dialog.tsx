@@ -276,7 +276,11 @@ export function BatchSettingsDialog({ open, onOpenChange }: BatchSettingsDialogP
                     : "A batch number is required when purchasing a batch-tracked item; expiry date is optional."}
                 </p>
               </div>
-              <Switch checked disabled aria-label={isAr ? "رقم الدفعة إلزامي" : "Batch number required"} />
+              <Switch
+                checked
+                disabled
+                aria-label={isAr ? "رقم الدفعة إلزامي" : "Batch number required"}
+              />
             </div>
 
             {/* Auto-Sync Inventory */}

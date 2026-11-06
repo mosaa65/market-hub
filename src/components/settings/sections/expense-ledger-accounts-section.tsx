@@ -24,7 +24,10 @@ type ExpenseLedgerManagement = {
   accounts: ExpenseLedgerAccount[];
 };
 
-const ROLE_LABELS: Record<ExpenseLedgerRole, { ar: string; en: string; type: "ASSET" | "LIABILITY" }> = {
+const ROLE_LABELS: Record<
+  ExpenseLedgerRole,
+  { ar: string; en: string; type: "ASSET" | "LIABILITY" }
+> = {
   INPUT_TAX: { ar: "ضريبة مدخلات قابلة للاسترداد", en: "Recoverable input tax", type: "ASSET" },
   SUPPLIER_PAYABLE: { ar: "ذمم الموردين", en: "Supplier payable", type: "LIABILITY" },
   EMPLOYEE_PAYABLE: { ar: "مستحقات الموظفين", en: "Employee payable", type: "LIABILITY" },
@@ -56,7 +59,8 @@ export function ExpenseLedgerAccountsSection({ canEdit = false, lang = "ar" }) {
       void client.invalidateQueries({ queryKey: ["expense-ledger-account-management"] });
       toast.success(isAr ? "تم تحديث الربط المحاسبي" : "Ledger mapping saved");
     },
-    onError: (error: any) => toast.error(error?.message || (isAr ? "تعذر حفظ الربط" : "Could not save mapping")),
+    onError: (error: any) =>
+      toast.error(error?.message || (isAr ? "تعذر حفظ الربط" : "Could not save mapping")),
   });
 
   return (
@@ -67,7 +71,9 @@ export function ExpenseLedgerAccountsSection({ canEdit = false, lang = "ar" }) {
             <Landmark className="size-5" />
           </span>
           <div>
-            <CardTitle>{isAr ? "الحسابات الأساسية للمصروفات" : "Expense ledger accounts"}</CardTitle>
+            <CardTitle>
+              {isAr ? "الحسابات الأساسية للمصروفات" : "Expense ledger accounts"}
+            </CardTitle>
             <CardDescription className="mt-1 max-w-3xl leading-relaxed">
               {isAr
                 ? "تحدد هذه الروابط حسابات الالتزام والضريبة القابلة للاسترداد. كل حساب يجب أن يكون نشطًا وقابلًا للترحيل ومن النوع المحاسبي الصحيح. لا يستخدم النظام حسابًا افتراضيًا عند غياب الربط."
@@ -82,7 +88,10 @@ export function ExpenseLedgerAccountsSection({ canEdit = false, lang = "ar" }) {
             {isAr ? "جارٍ تحميل الحسابات…" : "Loading accounts…"}
           </p>
         ) : query.error ? (
-          <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/25 bg-destructive/5 p-4 text-sm">
+          <div
+            role="alert"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/25 bg-destructive/5 p-4 text-sm"
+          >
             <span>{isAr ? "تعذر تحميل روابط الحسابات." : "Could not load account mappings."}</span>
             <Button variant="outline" size="sm" onClick={() => void query.refetch()}>
               {isAr ? "إعادة المحاولة" : "Retry"}
@@ -92,9 +101,14 @@ export function ExpenseLedgerAccountsSection({ canEdit = false, lang = "ar" }) {
           <div className="grid gap-3 lg:grid-cols-2">
             {(query.data?.roles ?? []).map((row) => {
               const meta = ROLE_LABELS[row.role];
-              const options = (query.data?.accounts ?? []).filter((account) => account.account_type === meta.type);
+              const options = (query.data?.accounts ?? []).filter(
+                (account) => account.account_type === meta.type,
+              );
               return (
-                <label key={row.role} className="min-w-0 rounded-xl border border-border/70 bg-surface/50 p-3">
+                <label
+                  key={row.role}
+                  className="min-w-0 rounded-xl border border-border/70 bg-surface/50 p-3"
+                >
                   <span className="mb-2 block text-sm font-semibold text-foreground">
                     {isAr ? meta.ar : meta.en}
                   </span>
@@ -102,7 +116,8 @@ export function ExpenseLedgerAccountsSection({ canEdit = false, lang = "ar" }) {
                     value={row.account_id ?? ""}
                     disabled={!canEdit || save.isPending}
                     onChange={(event) => {
-                      if (event.target.value) void save.mutateAsync({ role: row.role, accountId: event.target.value });
+                      if (event.target.value)
+                        void save.mutateAsync({ role: row.role, accountId: event.target.value });
                     }}
                     className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                   >

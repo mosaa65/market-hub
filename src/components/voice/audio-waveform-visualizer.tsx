@@ -65,7 +65,9 @@ export function AudioWaveformVisualizer({
   }, [isListening, startVisualizer, stopVisualizer, barColor, barGlowColor, barWidth, barGap]);
 
   return (
-    <div className={`relative flex items-center justify-center overflow-hidden rounded-xl bg-surface-2/60 backdrop-blur-md p-2 border border-border/50 ${className}`}>
+    <div
+      className={`relative flex items-center justify-center overflow-hidden rounded-xl bg-surface-2/60 backdrop-blur-md p-2 border border-border/50 ${className}`}
+    >
       <canvas
         ref={canvasRef}
         className="w-full h-full block"

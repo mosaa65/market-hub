@@ -696,7 +696,10 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
     titleEn: "Expense Setup",
     descriptionAr: "إدارة تصنيفات المصروفات ومراكز التكلفة من قسم المصروفات",
     descriptionEn: "Manage expense categories and cost centers in the expenses section",
-    keywords: withSynonyms(["تصنيفات المصروفات", "مراكز التكلفة", "تكلفة الإنتاج", "expense setup"], SEARCH_SYNONYMS.settings),
+    keywords: withSynonyms(
+      ["تصنيفات المصروفات", "مراكز التكلفة", "تكلفة الإنتاج", "expense setup"],
+      SEARCH_SYNONYMS.settings,
+    ),
     category: "expenses",
     moduleId: "expenses",
     requiredRoles: FINANCE,
@@ -939,7 +942,10 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
       "تصنيع منتجات المنشأة وتسجيل صرف المواد والتكاليف والنواتج — منفصل عن خدمة طحن حبوب العملاء",
     descriptionEn:
       "Create company production runs with material issues, production costs and finished outputs",
-    keywords: withSynonyms(["تصنيع", "إنتاج", "تشغيلات", "manufacture", "production"], SEARCH_SYNONYMS.milling),
+    keywords: withSynonyms(
+      ["تصنيع", "إنتاج", "تشغيلات", "manufacture", "production"],
+      SEARCH_SYNONYMS.milling,
+    ),
     category: "milling",
     moduleId: "milling_operations",
     requiredRoles: STOCK_OPS,
@@ -951,7 +957,10 @@ export const ROUTE_REGISTRY: RouteSearchEntry[] = [
     titleEn: "Production Run Register",
     descriptionAr: "مراجعة تكاليف التشغيلات والنواتج وعكس التشغيلة وفق الضوابط",
     descriptionEn: "Review production run costs and outputs, and reverse runs when allowed",
-    keywords: withSynonyms(["سجل الإنتاج", "تشغيلة", "أمر إنتاج", "production order", "production run"], SEARCH_SYNONYMS.milling),
+    keywords: withSynonyms(
+      ["سجل الإنتاج", "تشغيلة", "أمر إنتاج", "production order", "production run"],
+      SEARCH_SYNONYMS.milling,
+    ),
     category: "milling",
     moduleId: "milling_operations",
     requiredRoles: ["owner", "manager", "accountant", "warehouse"],

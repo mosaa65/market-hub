@@ -156,8 +156,8 @@ export function PosBatchSelectorModal({
               manualSelectionRequired
                 ? "cursor-not-allowed border-border/60 opacity-50"
                 : selectedId === null
-                ? "border-primary bg-primary/10 shadow-sm"
-                : "border-border/80 bg-surface hover:border-border"
+                  ? "border-primary bg-primary/10 shadow-sm"
+                  : "border-border/80 bg-surface hover:border-border"
             }`}
           >
             <div className="flex items-center gap-2.5">

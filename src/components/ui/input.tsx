@@ -279,7 +279,10 @@ export const FieldInput = React.forwardRef<HTMLInputElement, FieldInputProps>(
               {enableVoice && !readOnly && !props.disabled && (
                 <VoiceInputButton
                   size={size}
-                  fieldLabel={voiceLabel || (typeof props.placeholder === "string" ? props.placeholder : undefined)}
+                  fieldLabel={
+                    voiceLabel ||
+                    (typeof props.placeholder === "string" ? props.placeholder : undefined)
+                  }
                   currentValue={typeof value === "string" ? value : inputRef.current?.value || ""}
                   onTranscript={(text) => {
                     onVoiceInput?.(text);

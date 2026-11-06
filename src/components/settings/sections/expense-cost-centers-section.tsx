@@ -100,9 +100,7 @@ export function ExpenseCostCentersSection({ canEdit = false, lang = "ar" }) {
       await loadCenters();
     } catch (error) {
       console.error("Could not change cost center status", error);
-      toast.error(
-        isAr ? "تعذر تغيير حالة مركز التكلفة" : "Could not change cost center status",
-      );
+      toast.error(isAr ? "تعذر تغيير حالة مركز التكلفة" : "Could not change cost center status");
     } finally {
       setSaving(false);
     }
@@ -147,7 +145,9 @@ export function ExpenseCostCentersSection({ canEdit = false, lang = "ar" }) {
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="space-y-1.5">
-                <Label htmlFor="cost-center-name-ar">{isAr ? "الاسم بالعربية" : "Arabic name"}</Label>
+                <Label htmlFor="cost-center-name-ar">
+                  {isAr ? "الاسم بالعربية" : "Arabic name"}
+                </Label>
                 <Input
                   id="cost-center-name-ar"
                   value={form.name_ar}
@@ -169,7 +169,9 @@ export function ExpenseCostCentersSection({ canEdit = false, lang = "ar" }) {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="cost-center-code">{isAr ? "الرمز (اختياري)" : "Code (optional)"}</Label>
+                <Label htmlFor="cost-center-code">
+                  {isAr ? "الرمز (اختياري)" : "Code (optional)"}
+                </Label>
                 <Input
                   id="cost-center-code"
                   value={form.code}
@@ -186,18 +188,28 @@ export function ExpenseCostCentersSection({ canEdit = false, lang = "ar" }) {
                 loading={saving}
                 onClick={() => void saveCenter(form)}
               >
-                {form.id ? (isAr ? "حفظ التعديل" : "Save changes") : isAr ? "إضافة المركز" : "Add center"}
+                {form.id
+                  ? isAr
+                    ? "حفظ التعديل"
+                    : "Save changes"
+                  : isAr
+                    ? "إضافة المركز"
+                    : "Add center"}
               </ActionButton>
             </div>
           </div>
         ) : (
           <p className="rounded-lg bg-muted/40 p-3 text-sm text-muted-foreground">
-            {isAr ? "إضافة وتعديل مراكز التكلفة متاح للمالك والمدير." : "Only owners and managers can manage cost centers."}
+            {isAr
+              ? "إضافة وتعديل مراكز التكلفة متاح للمالك والمدير."
+              : "Only owners and managers can manage cost centers."}
           </p>
         )}
 
         <div className="space-y-2">
-          <h3 className="text-sm font-semibold">{isAr ? "المراكز المسجلة" : "Registered centers"}</h3>
+          <h3 className="text-sm font-semibold">
+            {isAr ? "المراكز المسجلة" : "Registered centers"}
+          </h3>
           {loading ? (
             <div className="flex items-center gap-2 py-5 text-sm text-muted-foreground">
               <LoaderCircle className="size-4 animate-spin" />
@@ -205,16 +217,26 @@ export function ExpenseCostCentersSection({ canEdit = false, lang = "ar" }) {
             </div>
           ) : centers.length === 0 ? (
             <p className="rounded-lg border border-dashed p-5 text-center text-sm text-muted-foreground">
-              {isAr ? "لا توجد مراكز تكلفة بعد. أضف المركز الأول من النموذج أعلاه." : "No cost centers yet. Add the first one above."}
+              {isAr
+                ? "لا توجد مراكز تكلفة بعد. أضف المركز الأول من النموذج أعلاه."
+                : "No cost centers yet. Add the first one above."}
             </p>
           ) : (
             <ul className="divide-y rounded-xl border">
               {centers.map((center) => (
-                <li key={center.id} className="flex flex-wrap items-center justify-between gap-3 p-3">
+                <li
+                  key={center.id}
+                  className="flex flex-wrap items-center justify-between gap-3 p-3"
+                >
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold">{center.name_ar || center.name}</p>
+                    <p className="truncate text-sm font-semibold">
+                      {center.name_ar || center.name}
+                    </p>
                     <p className="truncate text-xs text-muted-foreground">
-                      {[center.code, center.name_ar && center.name_ar !== center.name ? center.name : null]
+                      {[
+                        center.code,
+                        center.name_ar && center.name_ar !== center.name ? center.name : null,
+                      ]
                         .filter(Boolean)
                         .join(" · ") || (isAr ? "بدون رمز" : "No code")}
                     </p>
@@ -243,7 +265,13 @@ export function ExpenseCostCentersSection({ canEdit = false, lang = "ar" }) {
                         disabled={saving}
                         onClick={() => void setActive(center)}
                       >
-                        {center.is_active ? (isAr ? "إيقاف" : "Deactivate") : isAr ? "تفعيل" : "Activate"}
+                        {center.is_active
+                          ? isAr
+                            ? "إيقاف"
+                            : "Deactivate"
+                          : isAr
+                            ? "تفعيل"
+                            : "Activate"}
                       </ActionButton>
                     </div>
                   ) : null}

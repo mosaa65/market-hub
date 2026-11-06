@@ -147,13 +147,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             fetchIsActive(userId, permissionAbort.signal),
           ]),
           new Promise<never>((_, reject) => {
-            timeoutHandle = window.setTimeout(
-              () => {
-                permissionAbort.abort();
-                reject(new Error("Permission verification timed out"));
-              },
-              15_000,
-            );
+            timeoutHandle = window.setTimeout(() => {
+              permissionAbort.abort();
+              reject(new Error("Permission verification timed out"));
+            }, 15_000);
           }),
         ]);
       } catch (err) {

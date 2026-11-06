@@ -181,7 +181,9 @@ export async function fetchStockableItems(): Promise<StockableItem[]> {
   const rows = unwrap(
     await db
       .from("products")
-      .select("id, sku, name, name_ar, package_weight_kg, cost_price, item_class, item_nature, unit:units!products_unit_id_fkey(name, name_ar, short_name)")
+      .select(
+        "id, sku, name, name_ar, package_weight_kg, cost_price, item_class, item_nature, unit:units!products_unit_id_fkey(name, name_ar, short_name)",
+      )
       .eq("inventory_policy", "TRACKED")
       .eq("is_active", true)
       .order("name_ar"),
