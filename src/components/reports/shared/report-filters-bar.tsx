@@ -215,10 +215,6 @@ export function ReportFiltersBar({
   const handleSelectReport = (reportId: string) => {
     if (onSelectReport) {
       onSelectReport(reportId);
-    } else {
-      const url = new URL(window.location.href);
-      url.searchParams.set("report", reportId);
-      window.location.href = url.toString();
     }
   };
 

@@ -180,13 +180,16 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       className="vortex-toaster-container group"
       position={position}
-      expand={true}
+      /* النمط الأيفوني: الإشعارات مكدسة فوق بعضها، وتتوسع فقط عند التمرير أو اللمس */
+      expand={false}
       richColors={false}
-      closeButton={true}
-      visibleToasts={4}
+      /* بدون زر X مزعج — الإغلاق يكون بالسحب (Swipe) أو النقر أو تلقائياً */
+      closeButton={false}
+      visibleToasts={3}
       gap={10}
       offset={18}
-      mobileOffset={{ top: 14, left: 14, right: 14 }}
+      /* على الجوال: إزاحة متماثلة يمين/يسار = توسيط مثالي في منتصف الشاشة */
+      mobileOffset={{ top: 14, bottom: 14, left: 14, right: 14 }}
       icons={{
         success: (
           <div className="vortex-toast-icon-badge vortex-toast-icon-success">

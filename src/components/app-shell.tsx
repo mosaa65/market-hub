@@ -1,6 +1,7 @@
 import { useCompanyCurrency } from "@/hooks/use-company-currency";
 import { HeaderNavArrows } from "@/components/header-nav-arrows";
-import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
+import { Link, useRouterState, useNavigate, useRouter } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -992,6 +993,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { t, dir } = useI18n();
 
   const navigate = useNavigate();
+  const router = useRouter();
+  const queryClient = useQueryClient();
 
   const pathname = useRouterState({
     select: (s) => s.location.pathname,
@@ -1170,9 +1173,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {/* زر تحديث الصفحة الحالية في نفس المكان بدون انتقال */}
             <button
               type="button"
-              onClick={() => {
+              onClick={async () => {
                 setIsRefreshing(true);
-                window.location.reload();
+                try {
+                  // تحديث ذكي: يعيد جلب البيانات من الخادم دون إعادة تحميل كامل للصفحة
+                  // حتى لا يفقد المستخدم حالته أو عمله الجاري أبداً.
+                  await queryClient.invalidateQueries();
+                  await router.invalidate();
+                } finally {
+                  setTimeout(() => setIsRefreshing(false), 500);
+                }
               }}
               className="grid h-10 w-10 place-items-center rounded-full border border-border/60 bg-surface text-muted-foreground hover:text-foreground hover:border-ring/40 hover:bg-surface-2 transition-all active:scale-95"
               title={dir === "rtl" ? "تحديث الصفحة الحالية" : "Refresh page"}

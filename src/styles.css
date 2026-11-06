@@ -1347,3 +1347,77 @@ input::-ms-reveal {
   color: #818cf8;
   border: 1px solid rgba(129, 140, 248, 0.35);
 }
+
+/* ============================================================
+ * إشعارات بأسلوب iOS: مكدس أنيق، سحب للحذف، بدون زر إغلاق
+ * ========================================================== */
+
+/* إخفاء زر الإغلاق نهائياً (الإغلاق أصبح بالسحب فقط — لا يوجد X مزعج) */
+.vortex-toaster-container [data-close-button] {
+  display: none !important;
+}
+
+/* على الجوال: توسيط الإشعار في منتصف الشاشة أفقيًا
+   (حل مشكلة ظهور نصفه مخفي من جهة اليسار) */
+@media (max-width: 640px) {
+  .vortex-toaster-container ol[data-sonner-toaster],
+  ol[data-sonner-toaster][data-x-position="left"],
+  ol[data-sonner-toaster][data-x-position="right"] {
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    padding-inline: 12px !important;
+    align-items: center !important;
+    display: flex !important;
+    flex-direction: column !important;
+    pointer-events: none !important;
+  }
+
+  .vortex-toaster-container ol[data-sonner-toaster] [data-sonner-toast],
+  ol[data-sonner-toaster][data-x-position] [data-sonner-toast] {
+    pointer-events: auto !important;
+    width: 100% !important;
+    max-width: calc(100vw - 24px) !important;
+    margin-inline: auto !important;
+  }
+}
+
+/* لمسة iOS: أصغر حركة نابضة عند دخول الإشعار الأمامي */
+@keyframes vortex-toast-pop {
+  0% {
+    transform: scale(0.94);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.02);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.vortex-toaster-container [data-sonner-toast]:not([data-expanded="true"]) {
+  cursor: default;
+}
+
+/* عند سحب الإشعار للإزالة، يعطي إحساس مطاطي ناعم مثل iOS */
+.vortex-toaster-container [data-sonner-toast][data-swiped="true"] {
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+/* عند توسيع المكدس (بالتمرير أو النقر) تترتب البطاقات بسلاسة مثل iOS */
+.vortex-toaster-container ol[data-sonner-toaster] [data-sonner-toast] {
+  transition: transform 0.35s cubic-bezier(0.21, 1.02, 0.73, 1),
+    opacity 0.3s ease !important;
+  will-change: transform;
+}
+
+/* البطاقات الخلفية في المكدس: خفوت بسيط يعطي عمق iOS */
+.vortex-toaster-container ol[data-sonner-toaster] [data-sonner-toast][data-index="1"] {
+  opacity: 0.94;
+}
+.vortex-toaster-container ol[data-sonner-toaster] [data-sonner-toast][data-index="2"] {
+  opacity: 0.88;
+}
