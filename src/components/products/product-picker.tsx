@@ -376,7 +376,12 @@ export function ProductPicker<T extends ProductPickerItem = ProductPickerItem>({
                         aria-selected={isSelected}
                         disabled={item.disabled}
                         onMouseEnter={() => setActiveIndex(globalIndex)}
-                        onMouseDown={(event) => event.preventDefault()}
+                        onMouseDown={(event) => {
+                          // القائمة في Portal خارج زر الاختيار؛ امنع مستمعات
+                          // النقر الخارجي من إغلاقها قبل وصول حدث الاختيار.
+                          event.preventDefault();
+                          event.stopPropagation();
+                        }}
                         onClick={() => choose(item)}
                         className={cn(
                           "flex w-full items-center gap-2.5 rounded-lg border border-transparent px-2 py-1.5 text-start transition-colors",
