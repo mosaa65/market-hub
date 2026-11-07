@@ -738,7 +738,8 @@ export function StandardInvoiceComposer({ kind }: { kind: Kind }) {
               ? "مدفوع"
               : "Paid",
         lines: cart.map((line) => ({
-          product: `${label(line.product)} (${line.uom_label})`,
+          product: label(line.product),
+          unit: line.uom_label || undefined,
           qty: line.quantity,
           price: line.price,
           total: line.quantity * line.price,

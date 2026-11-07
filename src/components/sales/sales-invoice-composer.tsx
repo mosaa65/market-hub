@@ -655,8 +655,8 @@ export function SalesInvoiceComposer() {
         total: result.total ?? total,
         paid: effectivePaid,
         lines: lines.map((l) => ({
-          // الوحدة تُطبع مع البيان: "5" بلا وحدة لا يعني شيئًا على المستند.
-          product: l.kind === "catalog" && l.unit_label ? `${l.name} (${l.unit_label})` : l.name,
+          product: l.name,
+          unit: l.kind === "catalog" ? l.unit_label || undefined : undefined,
           qty: Number(l.quantity),
           price: Number(l.unit_price),
           total: Math.round(lineTotal(l) * 100) / 100,

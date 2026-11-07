@@ -49,12 +49,10 @@ const store = new Map<string, string>();
 
 clearCompanyProfileCache();
 const empty = getCachedCompanyProfile();
-check("empty cache returns the default profile", empty.name === DEFAULT_COMPANY_PROFILE.name);
+check("empty cache returns a blank company name", empty.name === "");
 check(
-  "empty profile falls back to the platform default contacts (إنما سوفت)",
-  empty.name === "إنما سوفت" &&
-  empty.englishName === "Inama Soft — Software Solutions" &&
-    empty.contacts.includes("772217218"),
+  "empty profile does not invent platform identity or contacts",
+  !empty.name && !empty.arabicName && !empty.englishName && empty.contacts.length === 0,
 );
 
 // كتابة صف كامل من قاعدة البيانات
@@ -101,8 +99,8 @@ check("patch is visible on the next read", getCachedCompanyProfile().currency ==
 clearCompanyProfileCache();
 const blank = cacheCompanyProfile({});
 check(
-  "blank row shows the platform defaults, not blanks",
-  blank.name === "إنما سوفت" && blank.contacts.includes("772217218"),
+  "blank row preserves blank company identity",
+  blank.name === "" && blank.contacts.length === 0,
 );
 check("blank row does not throw on contacts", Array.isArray(blank.contacts));
 
@@ -116,8 +114,8 @@ const nullish = cacheCompanyProfile({
 });
 check("null name falls back instead of rendering 'null'", !String(nullish.name).includes("null"));
 check(
-  "null phone falls back to the platform default",
-  nullish.phone === DEFAULT_COMPANY_PROFILE.phone,
+  "null phone stays absent instead of using a platform contact",
+  nullish.phone === undefined,
 );
 check("null email becomes undefined", nullish.email === undefined);
 

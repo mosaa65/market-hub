@@ -24,7 +24,7 @@ import {
   InvoiceLabels,
   escapeHtml,
   formatMoney,
-  DEFAULT_COMPANY_LOGO,
+  productNameWithoutUnit,
   CustomFieldOptions,
 } from "./types";
 import { numberToArabicWords } from "./tafqeet";
@@ -723,16 +723,38 @@ export function renderUnifiedLayout(
   const c = doc.currency ?? "ر.ي";
   const esc = escapeHtml;
   const money = (n?: number) => formatMoney(n ?? 0, c);
-  const company = options?.company ?? getCachedCompanyProfile();
-  const rawLogo =
-    doc.company?.logo || (doc.company as Record<string, any>)?.logo_url || company.logoUrl;
+  const cachedCompany = getCachedCompanyProfile();
+  const company = {
+    ...cachedCompany,
+    ...options?.company,
+    name:
+      doc.company?.name ||
+      doc.company?.legalName ||
+      doc.company?.arabicName ||
+      options?.company?.name ||
+      cachedCompany.name,
+    arabicName: doc.company?.arabicName || options?.company?.arabicName || cachedCompany.arabicName,
+    englishName: doc.company?.englishName || options?.company?.englishName || cachedCompany.englishName,
+    phone: doc.company?.phone || options?.company?.phone || cachedCompany.phone,
+    contacts:
+      doc.company?.contacts ||
+      (doc.company?.phone ? [doc.company.phone] : undefined) ||
+      options?.company?.contacts ||
+      cachedCompany.contacts,
+    address: doc.company?.address || options?.company?.address || cachedCompany.address,
+    email: doc.company?.email || options?.company?.email || cachedCompany.email,
+    taxNumber: doc.company?.vat || options?.company?.taxNumber || cachedCompany.taxNumber,
+    logoUrl:
+      doc.company?.logo ||
+      (doc.company as Record<string, any>)?.logo_url ||
+      options?.company?.logoUrl ||
+      cachedCompany.logoUrl,
+  };
+  const rawLogo = company.logoUrl;
   const logoUrl =
-    rawLogo &&
-    typeof rawLogo === "string" &&
-    rawLogo.trim().length > 0 &&
-    !rawLogo.includes("inama-soft-logo.ico")
+    typeof rawLogo === "string" && rawLogo.trim().length > 0 && !rawLogo.includes("inama-soft-logo.ico")
       ? rawLogo.trim()
-      : DEFAULT_COMPANY_LOGO;
+      : "";
 
   const opts = {
     showLogo: true,
@@ -765,8 +787,9 @@ export function renderUnifiedLayout(
   // لقطة المستند (بيانات المنشأة وقت الفاتورة) أولًا، ثم البروفايل —
   // البروفايل نفسه يحمل افتراضيات المنصة عند غياب بيانات المنشأة.
   const companyName =
-    options?.company?.name ||
     doc.company?.name ||
+    doc.company?.legalName ||
+    options?.company?.name ||
     company.name ||
     company.arabicName ||
     doc.company?.arabicName ||
@@ -789,9 +812,9 @@ export function renderUnifiedLayout(
     <tr>
       <td class="col-idx">${i + 1}</td>
       <td class="col-desc">
-        <div class="prod-name">${esc(l.product)}</div>
+        <div class="prod-name">${esc(productNameWithoutUnit(l.product, l.unit))}</div>
       </td>
-      <td class="col-qty num-isolated">${l.qty} ${l.unit ? esc(l.unit) : rtl ? "حبة" : ""}</td>
+      <td class="col-qty num-isolated">${l.qty} ${l.unit ? esc(l.unit) : ""}</td>
       <td class="col-price num-isolated">${money(itemPrice)}</td>
       <td class="col-total num-isolated">${money(itemTotal)}</td>
     </tr>`;
@@ -847,10 +870,10 @@ export function renderUnifiedLayout(
         <!-- المنتصف: الشعار -->
         <div class="luxury-header-center">
           ${
-            opts.showLogo
+            opts.showLogo && logoUrl
               ? `
           <div class="luxury-logo-box">
-            <img src="${esc(logoUrl)}" alt="Logo" onerror="this.onerror=null; this.src='${DEFAULT_COMPANY_LOGO}';" />
+            <img src="${esc(logoUrl)}" alt="${esc(arabicName || companyName || "Company logo")}" />
           </div>`
               : "<div></div>"
           }
@@ -940,7 +963,7 @@ export function renderUnifiedLayout(
 
         <!-- المنتصف: الشعار فقط -->
         <div class="corporate-center-block">
-          ${opts.showLogo ? `<div class="corporate-logo-box"><img src="${esc(logoUrl)}" alt="Logo" onerror="this.onerror=null; this.src='${DEFAULT_COMPANY_LOGO}';" /></div>` : ""}
+          ${opts.showLogo && logoUrl ? `<div class="corporate-logo-box"><img src="${esc(logoUrl)}" alt="${esc(arabicName || companyName || "Company logo")}" /></div>` : ""}
         </div>
 
         <!-- اليسار: بيانات المنشأة الإنجليزية -->

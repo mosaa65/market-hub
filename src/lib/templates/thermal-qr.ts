@@ -3,6 +3,7 @@ import {
   InvoiceLabels,
   escapeHtml,
   formatMoney,
+  productNameWithoutUnit,
   CustomFieldOptions,
 } from "./types";
 import { generateBarcodeSvg, generateQrCodeSvg } from "@/lib/printing/barcode-qr";
@@ -61,11 +62,11 @@ export function renderThermalQrTemplate(
       (l, idx) => `
     <div style="padding: 3.5px 0; border-bottom: ${idx < doc.lines.length - 1 ? "1px dotted #cbd5e1" : "none"};">
       <div style="display: flex; justify-content: space-between; font-weight: 700; font-size: 11.5px; color: #0f172a;">
-        <span>${esc(l.product)}</span>
+        <span>${esc(productNameWithoutUnit(l.product, l.unit))}</span>
         <span class="font-mono">${money(l.total)}</span>
       </div>
       <div style="display: flex; justify-content: space-between; font-size: 10.5px; color: #64748b; margin-top: 1px;">
-        <span>${l.qty} ${l.unit ? esc(l.unit) : ""} × ${money(l.price)}</span>
+        <span>${new Intl.NumberFormat("en-US", { maximumFractionDigits: 3 }).format(l.qty)} ${l.unit ? esc(l.unit) : ""} × ${money(l.price)}</span>
       </div>
     </div>`,
     )

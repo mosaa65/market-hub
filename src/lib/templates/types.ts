@@ -1,3 +1,4 @@
+import { toSystemDigits } from "@/lib/format-preferences";
 import type { PaperProfileId } from "./paper-profiles";
 
 export type DocumentType =
@@ -224,7 +225,34 @@ export function escapeHtml(s: unknown): string {
     .replace(/'/g, "&#039;");
 }
 
+/** Format money and quantities consistently with the POS digit preference. */
+export function formatPrintQuantity(value: number): string {
+  const quantity = Number(value);
+  const formatted = new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 3,
+    useGrouping: true,
+  }).format(Number.isFinite(quantity) ? quantity : 0);
+  return toSystemDigits(formatted);
+}
+
+/** Remove a unit suffix from older invoice snapshots before rendering its dedicated unit column. */
+export function productNameWithoutUnit(product: unknown, unit?: unknown): string {
+  const name = String(product ?? "").trim();
+  const label = String(unit ?? "").trim();
+  if (!name || !label) return name;
+  const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return name
+    .replace(new RegExp(`\\s*\\(\\s*${escapedLabel}\\s*\\)$`, "i"), "")
+    .replace(new RegExp(`\\s+${escapedLabel}$`, "i"), "")
+    .trim();
+}
+
 export function formatMoney(n?: number, cur = ""): string {
-  if (n === undefined || n === null) return "0.00";
-  return `${cur ? cur + " " : ""}${Number(n || 0).toFixed(2)}`;
+  const value = Number(n ?? 0);
+  const formatted = new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+    useGrouping: true,
+  }).format(Number.isFinite(value) ? value : 0);
+  return `${cur ? `${cur} ` : ""}${toSystemDigits(formatted)}`;
 }

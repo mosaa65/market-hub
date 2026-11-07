@@ -37,6 +37,10 @@ import { toast } from "sonner";
 
 export type PrintMethodType = "thermal" | "page";
 
+function isThermalTemplateId(templateId?: InvoiceTemplateId): boolean {
+  return Boolean(templateId && (templateId === "milling-thermal" || templateId.startsWith("thermal")));
+}
+
 export interface LuxuryPrintPreviewModalProps {
   open: boolean;
   onClose?: () => void;
@@ -119,7 +123,7 @@ export function LuxuryPrintPreviewModal({
   doc,
   document,
   request,
-  documentType = "customer_invoice",
+  documentType,
   title,
   defaultFormat,
   rtl = true,
@@ -130,12 +134,22 @@ export function LuxuryPrintPreviewModal({
   const { user } = useAuth();
   const { companyProfile } = useCompanyCurrency();
   const activeDoc = document ?? doc;
+  const resolvedDocumentType =
+    request?.documentType ??
+    documentType ??
+    (activeDoc && "docType" in activeDoc ? (activeDoc.docType as PrintingDocumentType) : undefined) ??
+    "customer_invoice";
   const handleModalClose = () => {
     if (onClose) onClose();
     if (onOpenChange) onOpenChange(false);
   };
   // Determine initial print method (thermal vs page)
   const initialMethod: PrintMethodType = useMemo(() => {
+    const settings = request?.settings ?? getUnifiedPrintSettings();
+    const docType = request?.documentType ?? resolvedDocumentType;
+    const configuredMethod = request?.method ?? settings.overrides[docType]?.method;
+    if (configuredMethod === "thermal") return "thermal";
+    if (configuredMethod === "browser" || configuredMethod === "pdf") return "page";
     if (defaultFormat === "thermal-58" || defaultFormat === "thermal-80") return "thermal";
     if (
       defaultFormat &&
@@ -150,17 +164,19 @@ export function LuxuryPrintPreviewModal({
     if (request?.paperId === "a4" || request?.paperId === "a5") return "page";
     if (request?.templateId?.startsWith("thermal")) return "thermal";
     return "thermal"; // Default cashier preference
-  }, [defaultFormat, request]);
+  }, [defaultFormat, request, resolvedDocumentType]);
 
   const [printMethod, setPrintMethod] = useState<PrintMethodType>(initialMethod);
 
   // Initial template selection per method
   const initialTemplateId: InvoiceTemplateId = useMemo(() => {
-    if (request?.templateId) return request.templateId;
     const settings = request?.settings ?? getUnifiedPrintSettings();
-    const docType = documentType ?? request?.documentType ?? "customer_invoice";
+    const docType = request?.documentType ?? resolvedDocumentType;
     const deptOverride = settings.overrides[docType];
-    if (deptOverride?.templateId) return deptOverride.templateId;
+    const configuredTemplate = request?.templateId ?? deptOverride?.templateId;
+    if (configuredTemplate && isThermalTemplateId(configuredTemplate) === (initialMethod === "thermal")) {
+      return configuredTemplate;
+    }
     if (initialMethod === "thermal") {
       return docType === "mill_document" || docType === "delivery_note" || docType === "daily_ticket"
         ? "milling-thermal"
@@ -169,17 +185,19 @@ export function LuxuryPrintPreviewModal({
     return docType === "mill_document" || docType === "delivery_note" || docType === "daily_ticket"
       ? "milling-master"
       : "elegant"; // Default to executive luxury A4/A5 template
-  }, [request?.templateId, request?.settings, request?.documentType, documentType, initialMethod]);
+  }, [request?.templateId, request?.settings, request?.documentType, resolvedDocumentType, initialMethod]);
 
   const [activeTemplate, setActiveTemplate] = useState<InvoiceTemplateId>(initialTemplateId);
 
   // Initial paper size per method
   const initialPaperId: PrintPaperId = useMemo(() => {
-    if (request?.paperId) return request.paperId;
     const settings = request?.settings ?? getUnifiedPrintSettings();
-    const docType = documentType ?? request?.documentType ?? "customer_invoice";
+    const docType = request?.documentType ?? resolvedDocumentType;
     const deptOverride = settings.overrides[docType];
-    if (deptOverride?.paperId) return deptOverride.paperId;
+    const configuredPaper = request?.paperId ?? deptOverride?.paperId;
+    if (configuredPaper && PRINT_PAPERS[configuredPaper].thermal === (initialMethod === "thermal")) {
+      return configuredPaper;
+    }
     if (defaultFormat === "thermal-58") return "thermal-58";
     if (defaultFormat === "a5") return "a5";
     return initialMethod === "thermal" ? "thermal-80" : "a4";
@@ -187,7 +205,7 @@ export function LuxuryPrintPreviewModal({
     request?.paperId,
     request?.settings,
     request?.documentType,
-    documentType,
+    resolvedDocumentType,
     defaultFormat,
     initialMethod,
   ]);
@@ -197,7 +215,7 @@ export function LuxuryPrintPreviewModal({
   const [showQrCode, setShowQrCode] = useState(request?.showQrCode ?? false);
   const [showSignatures, setShowSignatures] = useState(
     request?.showSignatures ??
-      request?.settings?.overrides[documentType]?.showSignatures ??
+      request?.settings?.overrides[resolvedDocumentType]?.showSignatures ??
       request?.settings?.showSignatures ??
       false,
   );
@@ -236,7 +254,7 @@ export function LuxuryPrintPreviewModal({
     setShowQrCode(request?.showQrCode ?? false);
     setShowSignatures(
       request?.showSignatures ??
-        request?.settings?.overrides[documentType]?.showSignatures ??
+        request?.settings?.overrides[resolvedDocumentType]?.showSignatures ??
         request?.settings?.showSignatures ??
         false,
     );
@@ -252,7 +270,7 @@ export function LuxuryPrintPreviewModal({
     request?.showQrCode,
     request?.showSignatures,
     request?.settings,
-    documentType,
+    resolvedDocumentType,
   ]);
 
   const iframeMinHeight =
@@ -272,46 +290,46 @@ export function LuxuryPrintPreviewModal({
   const handleMethodChange = (newMethod: PrintMethodType) => {
     setPrintMethod(newMethod);
     const settings = request?.settings ?? getUnifiedPrintSettings();
-    const docType = documentType ?? request?.documentType ?? "customer_invoice";
+    const docType = request?.documentType ?? resolvedDocumentType;
     const deptOverride = settings.overrides[docType];
+    const configuredTemplates = [request?.templateId, deptOverride?.templateId].filter(
+      (template): template is InvoiceTemplateId => Boolean(template),
+    );
+    const configuredThermalTemplate = configuredTemplates.find(isThermalTemplateId);
+    const configuredPageTemplate = configuredTemplates.find((template) => !isThermalTemplateId(template));
 
     if (newMethod === "thermal") {
-      const isThermalTpl =
-        deptOverride?.templateId === "milling-thermal" ||
-        deptOverride?.templateId?.startsWith("thermal");
-      setActiveTemplate(
-        isThermalTpl
-          ? (deptOverride!.templateId as InvoiceTemplateId)
-          : docType === "mill_document" || docType === "delivery_note" || docType === "daily_ticket"
-            ? "milling-thermal"
-            : "thermal-milling",
-      );
+      setActiveTemplate(configuredThermalTemplate ?? (
+        docType === "mill_document" || docType === "delivery_note" || docType === "daily_ticket"
+          ? "milling-thermal"
+          : "thermal-milling"
+      ));
       setActivePaper(
-        deptOverride?.paperId?.startsWith("thermal") ? deptOverride.paperId : "thermal-80",
+        request?.paperId?.startsWith("thermal")
+          ? request.paperId
+          : deptOverride?.paperId?.startsWith("thermal")
+            ? deptOverride.paperId
+            : "thermal-80",
       );
       return;
     }
 
-    const isPageTpl =
-      deptOverride?.templateId &&
-      !deptOverride.templateId.startsWith("thermal") &&
-      deptOverride.templateId !== "milling-thermal";
-    setActiveTemplate(
-      isPageTpl
-        ? (deptOverride!.templateId as InvoiceTemplateId)
-        : docType === "mill_document" || docType === "delivery_note" || docType === "daily_ticket"
-          ? "milling-master"
-          : "elegant",
-    );
+    setActiveTemplate(configuredPageTemplate ?? (
+      docType === "mill_document" || docType === "delivery_note" || docType === "daily_ticket"
+        ? "milling-master"
+        : "elegant"
+    ));
     setActivePaper(
-      deptOverride?.paperId && !deptOverride.paperId.startsWith("thermal")
-        ? deptOverride.paperId
-        : "a4",
+      request?.paperId && !request.paperId.startsWith("thermal")
+        ? request.paperId
+        : deptOverride?.paperId && !deptOverride.paperId.startsWith("thermal")
+          ? deptOverride.paperId
+          : "a4",
     );
   };
 
   const unifiedDoc = useMemo(() => {
-    const source = request?.doc ?? toUnifiedData(activeDoc, documentType);
+    const source = request?.doc ?? toUnifiedData(activeDoc, resolvedDocumentType);
     const metadataName =
       user?.user_metadata?.full_name ||
       user?.user_metadata?.name ||
@@ -321,7 +339,7 @@ export function LuxuryPrintPreviewModal({
       ...source,
       operatorName: source.operatorName || profileSellerName || metadataName || undefined,
     };
-  }, [request, activeDoc, documentType, profileSellerName, user]);
+  }, [request, activeDoc, resolvedDocumentType, profileSellerName, user]);
 
   const activeTheme: PrintTheme = useMemo(() => {
     if (activeTemplate === "elegant") return "luxury";
@@ -349,11 +367,17 @@ export function LuxuryPrintPreviewModal({
           ...(customColor ? { accentColor: customColor } : {}),
         },
       },
-      documentType,
+      documentType: resolvedDocumentType,
       rtl,
       paperId: activePaper,
       templateId: activeTemplate,
       theme: activeTheme,
+      method:
+        printMethod === "thermal"
+          ? "thermal"
+          : request?.method === "pdf"
+            ? "pdf"
+            : "browser",
       accentColor: customColor,
       settings: unifiedSettings,
       showBarcode,
@@ -363,11 +387,12 @@ export function LuxuryPrintPreviewModal({
     };
   }, [
     unifiedDoc,
-    documentType,
+    resolvedDocumentType,
     rtl,
     activePaper,
     activeTemplate,
     activeTheme,
+    printMethod,
     showBarcode,
     showQrCode,
     showSignatures,

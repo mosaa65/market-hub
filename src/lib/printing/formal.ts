@@ -1,5 +1,5 @@
 import type { UnifiedDocumentData, InvoiceLabels, CustomFieldOptions } from "@/lib/templates/types";
-import { escapeHtml, formatMoney } from "@/lib/templates/types";
+import { escapeHtml, formatMoney, productNameWithoutUnit } from "@/lib/templates/types";
 import type { CompanyProfile } from "./company-profile";
 import { getCachedCompanyProfile } from "./company-profile";
 import { formatPrintedDateTime } from "./date-time";
@@ -45,7 +45,7 @@ export function renderFormalTemplate(
   const rows = doc.lines
     .map(
       (line, i) =>
-        `<tr><td>${i + 1}</td><td><strong>${e(line.product)}</strong></td><td dir="ltr">${e(line.qty)} ${e(line.unit || "")}</td><td dir="ltr">${money(line.price)}</td><td dir="ltr">${money(line.total ?? line.qty * (line.price ?? 0))}</td></tr>`,
+        `<tr><td>${i + 1}</td><td><strong>${e(productNameWithoutUnit(line.product, line.unit))}</strong></td><td dir="ltr">${e(line.qty)} ${e(line.unit || "")}</td><td dir="ltr">${money(line.price)}</td><td dir="ltr">${money(line.total ?? line.qty * (line.price ?? 0))}</td></tr>`,
     )
     .join("");
   const footer = "";

@@ -3,10 +3,11 @@ import {
   InvoiceLabels,
   escapeHtml,
   formatMoney,
+  productNameWithoutUnit,
   CustomFieldOptions,
 } from "./types";
+import { toSystemDigits } from "@/lib/format-preferences";
 import { generateBarcodeSvg, generateQrCodeSvg } from "@/lib/printing/barcode-qr";
-import { COMPANY_RIGHTS_TEXT } from "@/lib/printing/footer";
 import { getCachedCompanyProfile } from "@/lib/printing/company-profile";
 import { formatPrintedDateTime } from "@/lib/printing/date-time";
 import { UNIVERSAL_FOOTER_CSS } from "@/lib/printing/footer";
@@ -71,9 +72,9 @@ export function renderThermalMillingTemplate(
         (l.price === 0 || l.price === undefined) && (l.total === 0 || l.total === undefined);
       return `
     <div style="padding: 4px 0; border-bottom: ${idx < doc.lines.length - 1 ? "1px dashed #e2e8f0" : "none"};">
-      <div style="font-weight: 700; font-size: 11.5px; color: #0f172a; line-height: 1.3;">${esc(l.product)}</div>
+      <div style="font-weight: 700; font-size: 11.5px; color: #0f172a; line-height: 1.3;">${esc(productNameWithoutUnit(l.product, l.unit))}</div>
       <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; margin-top: 2px;">
-        <span style="color: #475569;">${l.qty} ${l.unit ? esc(l.unit) : ""}${!isCustody ? ` × ${money(l.price)}` : ""}</span>
+        <span style="color: #475569;">${toSystemDigits(l.qty)} ${l.unit ? esc(l.unit) : ""}${!isCustody ? ` × ${money(l.price)}` : ""}</span>
         <span style="font-weight: 700; font-family: monospace; color: ${isCustody ? "#059669" : "#0f172a"}; font-size: ${isCustody ? "10.5px" : "11px"};">
           ${isCustody ? (doc.docType === "delivery_note" ? "تسليم" : "أمانة عينية") : money(l.total)}
         </span>
@@ -367,13 +368,7 @@ export function renderThermalMillingTemplate(
 
     <div class="dashed-divider"></div>
 
-    <!-- Polite Footer -->
-    <div class="footer-note">
-      <div style="font-weight: 700; color: #0f172a;">${esc(L.thanks)}</div>
-      <div>نسعد بخدمتكم دائماً — تم استلام المستند بنجاح</div>
-      ${opts.showFooter ? `<footer class="universal-footer">${esc(L.thanks)}</footer>` : ""}
-      <div style="text-align:center;font-size:7px;color:#9ca3af;margin-top:2px;">${COMPANY_RIGHTS_TEXT}</div>
-    </div>
+    <!-- The professional thermal receipt intentionally omits the repeated thanks and platform-contact footer. -->
   </div>
 </body>
 </html>`;

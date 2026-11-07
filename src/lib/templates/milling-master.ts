@@ -3,10 +3,15 @@ import {
   InvoiceLabels,
   escapeHtml,
   formatMoney,
+  productNameWithoutUnit,
   CustomFieldOptions,
 } from "./types";
 import { getCachedCompanyProfile } from "@/lib/printing/company-profile";
-import { COMPANY_RIGHTS_TEXT, renderUniversalFooter } from "@/lib/printing/footer";
+import {
+  COMPANY_RIGHTS_TEXT,
+  renderUniversalFooter,
+  UNIVERSAL_FOOTER_CSS,
+} from "@/lib/printing/footer";
 import { formatPrintedDateTime } from "@/lib/printing/date-time";
 import { generateBarcodeSvg, generateQrCodeSvg } from "@/lib/printing/barcode-qr";
 import { numberToArabicWords } from "./tafqeet";
@@ -40,8 +45,8 @@ export function renderMillingMasterTemplate(
     showFooter: true,
     showBarcode: true,
     showQrCode: false,
-    ...options,
     ...doc.options,
+    ...options,
   };
 
   const isDelivery = doc.docType === "delivery_note";
@@ -50,17 +55,21 @@ export function renderMillingMasterTemplate(
   );
 
   const compName = esc(
-    companyProfile.arabicName ||
-      doc.company?.arabicName ||
+    doc.company?.arabicName ||
       doc.company?.name ||
+      companyProfile.arabicName ||
       companyProfile.name ||
-      "المطحنة الحديثة لإنتاج الدقيق والأعلاف",
+      "",
   );
-  const compAddress = esc(doc.company?.address || companyProfile.address || "المركز الرئيسي");
+  const compAddress = esc(doc.company?.address || companyProfile.address || "");
   const compPhone = esc(
     doc.company?.phone || companyProfile.phone || companyProfile.contacts[0] || "",
   );
   const compVat = esc(doc.company?.vat || companyProfile.taxNumber || "");
+  const logoUrl = doc.company?.logo || companyProfile.logoUrl;
+  const logoHtml = opts.showLogo && logoUrl
+    ? `<img class="company-logo" src="${esc(logoUrl)}" alt="${compName}" />`
+    : "";
 
   // Barcode & QR Svg
   const barcodeSvg = opts.showBarcode && doc.number ? generateBarcodeSvg(doc.number, 42) : "";
@@ -79,7 +88,7 @@ export function renderMillingMasterTemplate(
         .map(
           (l, i) => `
         <tr style="${i < doc.lines.length - 1 ? "border-bottom: 1px solid rgba(0, 0, 0, 0.08);" : ""}">
-          <td style="padding: 10px 8px; font-weight: bold; color: #0f172a;">${esc(l.product)}</td>
+          <td style="padding: 10px 8px; font-weight: bold; color: #0f172a;">${esc(productNameWithoutUnit(l.product, l.unit))}</td>
           ${
             isDelivery
               ? `<td style="padding: 10px 8px; text-align: center; font-weight: 600; color: #475569;">${
@@ -141,6 +150,7 @@ export function renderMillingMasterTemplate(
     }
     .company-title { font-size: 21px; font-weight: 900; color: #0f172a; margin: 0; }
     .company-sub { font-size: 12px; color: #64748b; margin-top: 4px; }
+    .company-logo { display:block; max-width:32mm; max-height:18mm; object-fit:contain; margin:0 auto 6px; }
     .doc-badge {
       text-align: ${rtl ? "left" : "right"};
     }
@@ -291,6 +301,7 @@ export function renderMillingMasterTemplate(
     <!-- Header -->
     <div class="header-bar">
       <div>
+        ${logoHtml}
         ${opts.showCompanyInfo ? `<h1 class="company-title">${compName}</h1>` : ""}
         ${opts.showCompanyInfo && compAddress ? `<div class="company-sub">${compAddress}</div>` : ""}
         ${opts.showCompanyInfo && compPhone ? `<div class="company-sub">هاتف: ${compPhone}</div>` : ""}
@@ -445,7 +456,7 @@ export function renderMillingMasterTemplate(
 
     <!-- Notes -->
     ${
-      doc.notes
+      opts.showNotes && doc.notes
         ? `
     <div style="margin-top: 16px; padding: 10px 14px; background: #fffbeb; border: 1px solid #fef3c7; border-radius: 8px; font-size: 12px; color: #92400e;">
       <strong>ملاحظات وبيان العملية:</strong> ${esc(doc.notes)}
@@ -501,6 +512,7 @@ export function renderMillingThermalTemplate(
   const companyProfile = getCachedCompanyProfile();
 
   const opts = {
+    showLogo: true,
     showCompanyInfo: true,
     showCustomerInfo: true,
     showDocNumberDate: true,
@@ -508,8 +520,8 @@ export function renderMillingThermalTemplate(
     showFooter: false,
     showBarcode: true,
     showQrCode: false,
-    ...options,
     ...doc.options,
+    ...options,
   };
 
   const isDelivery = doc.docType === "delivery_note";
@@ -517,17 +529,29 @@ export function renderMillingThermalTemplate(
     doc.title || (isDelivery ? "سند تسليم نواتج الأمانة" : "سند استلام أمانة وفاتورة أجور"),
   );
 
-  const compName = esc(
+  const rawCompanyName =
+    doc.company?.arabicName ||
+    doc.company?.name ||
     companyProfile.arabicName ||
-      doc.company?.arabicName ||
-      doc.company?.name ||
-      companyProfile.name ||
-      "المطحنة الحديثة",
-  );
-  const compAddress = esc(doc.company?.address || companyProfile.address || "المركز الرئيسي");
+    companyProfile.name ||
+    "";
+  const compName = esc(rawCompanyName);
+  const compAddress = esc(doc.company?.address || companyProfile.address || "");
   const compPhone = esc(
     doc.company?.phone || companyProfile.phone || companyProfile.contacts[0] || "",
   );
+  const logoUrl = doc.company?.logo || companyProfile.logoUrl;
+  const logoHtml = opts.showLogo && logoUrl
+    ? `<img class="company-logo" src="${esc(logoUrl)}" alt="${compName}" />`
+    : "";
+  const barcodeHtml = opts.showBarcode && doc.number ? generateBarcodeSvg(doc.number, 38) : "";
+  const qrPayload = [
+    `Seller: ${rawCompanyName}`,
+    `Invoice: ${doc.number}`,
+    `Date: ${formatPrintedDateTime(doc.date)}`,
+    `Total: ${doc.total ?? 0} ${c}`,
+  ].join("\n");
+  const qrHtml = opts.showQrCode && doc.number ? generateQrCodeSvg(qrPayload, 72) : "";
 
   const linesHtml = doc.lines
     ? doc.lines
@@ -536,7 +560,7 @@ export function renderMillingThermalTemplate(
             (l.price === 0 || l.price === undefined) && (l.total === 0 || l.total === undefined);
           return `
       <div class="hairline-row" style="${idx < doc.lines.length - 1 ? "border-bottom: 1px solid rgba(0, 0, 0, 0.08);" : ""}">
-        <div style="font-weight: 800; font-size: 12px; color: #000;">${esc(l.product)}</div>
+        <div style="font-weight: 800; font-size: 12px; color: #000;">${esc(productNameWithoutUnit(l.product, l.unit))}</div>
         <div style="display:flex; justify-content:space-between; font-size: 11px; margin-top: 2px;">
           <span>${l.qty} ${esc(l.unit || "")}${!isCustody && !isDelivery ? ` × ${money(l.price)}` : ""}</span>
           <span style="font-weight:800; color: ${isCustody ? "#059669" : "#000"};">
@@ -556,6 +580,161 @@ export function renderMillingThermalTemplate(
         })
         .join("")
     : "";
+
+  const intakeGrains = doc.lines.filter((line) =>
+    line.product.trim().startsWith("حبوب مستلمة:"),
+  );
+  const hasMillingOutputs = doc.lines.some((line) => line.product.trim().startsWith("ناتج طحن:"));
+  const isMillingIntake =
+    doc.docType === "mill_document" && intakeGrains.length > 0 && !hasMillingOutputs;
+  const isMillingOperation = ["mill_document", "delivery_note", "daily_ticket"].includes(
+    String(doc.docType),
+  );
+  const useCompactReceiptLayout = isMillingIntake || !isMillingOperation;
+  const formatReceiptNumber = (value: number) =>
+    new Intl.NumberFormat("en-US", { maximumFractionDigits: 3 }).format(value);
+
+  if (useCompactReceiptLayout) {
+    const metadataRow = (label: string, value: string, dir = "auto") =>
+      `<div class="receipt-meta-row"><span class="receipt-meta-label">${esc(label)}</span><strong class="receipt-meta-value" dir="${dir}">${esc(value)}</strong></div>`;
+
+    const grainCards = intakeGrains
+      .map((line) => {
+        const grainName = line.product.replace(/^حبوب مستلمة:\s*/i, "");
+        const quantity = Number(line.qty) || 0;
+        const weight = Number(line.remainingKg ?? line.currentKg ?? 0);
+        const isBagQuantity = line.unit === "كيس";
+        const bagSize = isBagQuantity && quantity > 0 && weight > 0 ? weight / quantity : 0;
+        const quantityText = isBagQuantity
+          ? `${formatReceiptNumber(quantity)} كيس${bagSize ? ` × ${formatReceiptNumber(bagSize)} كجم` : ""}`
+          : `${formatReceiptNumber(quantity)} ${esc(line.unit || "كجم")}`;
+        const weightText = `${formatReceiptNumber(weight || (line.unit === "كجم" ? quantity : 0))} كجم`;
+
+        return `<div class="grain-card">
+          <div class="grain-detail-row"><span>نوع الحبوب:</span><strong>${esc(grainName)}</strong></div>
+          <div class="grain-detail-row"><span>الكمية والأكياس:</span><strong dir="auto">${quantityText}</strong></div>
+          <div class="grain-detail-row"><span>الوزن الصافي:</span><strong dir="auto">${weightText}</strong></div>
+        </div>`;
+      })
+      .join("");
+
+    const otherLines = isMillingIntake
+      ? doc.lines.filter((line) => !intakeGrains.includes(line))
+      : [];
+    const serviceRows = otherLines
+      .map(
+        (line) => `<div class="receipt-meta-row service-row">
+          <span>${esc(line.product)}</span>
+          <strong dir="auto">${money(line.total ?? (line.qty * (line.price ?? 0)))}</strong>
+        </div>${opts.showNotes && line.note ? `<div class="receipt-note">${esc(line.note)}</div>` : ""}`,
+      )
+      .join("");
+    const invoiceItemCards = isMillingIntake
+      ? ""
+      : doc.lines
+          .map((line) => {
+            const quantity = `${formatReceiptNumber(Number(line.qty) || 0)} ${line.unit ? esc(line.unit) : ""}`.trim();
+            const details = line.price !== undefined ? `${quantity} × ${money(line.price)}` : quantity;
+            const lineTotal = line.total ?? (line.qty * (line.price ?? 0));
+            return `<div class="grain-card invoice-item-card">
+              <div class="invoice-item-heading"><strong>${esc(productNameWithoutUnit(line.product, line.unit))}</strong><strong dir="auto">${money(lineTotal)}</strong></div>
+              <div class="grain-detail-row"><span>الكمية والسعر:</span><strong dir="auto">${details}</strong></div>
+              ${opts.showNotes && line.note ? `<div class="receipt-note">${esc(line.note)}</div>` : ""}
+            </div>`;
+          })
+          .join("");
+    const relatedInvoice = doc.relatedRef?.replace(/^\s*فاتورة\s+(?:رسمية|الأجور)\s*/i, "").trim();
+    const logoUrl = doc.company?.logo || companyProfile.logoUrl;
+    const receiptLogo = opts.showLogo && logoUrl
+      ? `<img class="receipt-logo" src="${esc(logoUrl)}" alt="${esc(doc.company?.arabicName || doc.company?.name || companyProfile.arabicName || companyProfile.name)}" />`
+      : "";
+    const note = opts.showNotes && doc.notes ? `<div class="receipt-note"><strong>ملاحظة:</strong> ${esc(doc.notes)}</div>` : "";
+    const companyHeader = !isMillingIntake
+      ? `<header class="receipt-company">
+          ${opts.showLogo && logoUrl ? `<img class="receipt-logo" src="${esc(logoUrl)}" alt="${esc(compName)}" />` : ""}
+          ${opts.showCompanyInfo && compName ? `<strong class="receipt-company-name">${compName}</strong>` : ""}
+          ${opts.showCompanyInfo && compAddress ? `<div>${compAddress}</div>` : ""}
+          ${opts.showCompanyInfo && compPhone ? `<div dir="ltr">${compPhone}</div>` : ""}
+          <div class="receipt-document-title">${title}</div>
+        </header>`
+      : "";
+    const financialRows = opts.showFinancialDetails
+      ? `<section class="receipt-financials">
+          ${!isMillingIntake && doc.subtotal !== undefined ? `<div class="receipt-meta-row"><span>المجموع:</span><strong dir="auto">${money(doc.subtotal)}</strong></div>` : ""}
+          ${!isMillingIntake && (doc.discount || 0) > 0 ? `<div class="receipt-meta-row"><span>الخصم:</span><strong dir="auto">-${money(doc.discount)}</strong></div>` : ""}
+          ${!isMillingIntake && (doc.tax || 0) > 0 ? `<div class="receipt-meta-row"><span>الضريبة:</span><strong dir="auto">${money(doc.tax)}</strong></div>` : ""}
+          <div class="receipt-meta-row"><span>الإجمالي:</span><strong dir="auto">${money(doc.total)}</strong></div>
+          ${doc.paid !== undefined ? `<div class="receipt-meta-row"><span>المدفوع:</span><strong dir="auto">${money(doc.paid)}</strong></div>` : ""}
+          ${(doc.balance || 0) > 0 ? `<div class="receipt-meta-row balance-row"><span>المتبقي:</span><strong dir="auto">${money(doc.balance)}</strong></div>` : ""}
+        </section>`
+      : "";
+
+    return `<!doctype html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="utf-8" />
+  <title>${esc(doc.number || title)}</title>
+  <style>
+    @page { size: var(--print-paper-width, 80mm) auto; margin: 0; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: #fff; color: #111827; font-family: 'IBM Plex Sans Arabic', 'Segoe UI', Tahoma, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .milling-intake-receipt { width: var(--print-paper-width, 80mm); margin: 0 auto; padding: 5mm 4mm; font-size: 11px; line-height: 1.4; }
+    .receipt-logo { display:block; max-width:30mm; max-height:14mm; object-fit:contain; margin:0 auto 5px; }
+    .receipt-company { margin-bottom:7px; padding-bottom:6px; border-bottom:1px dashed #cbd5e1; text-align:center; color:#475467; font-size:10px; }
+    .receipt-company-name { display:block; color:#111827; font-size:14px; font-weight:900; }
+    .receipt-document-title { display:inline-block; margin-top:4px; padding:2px 9px; border:1px solid #111827; border-radius:999px; color:#111827; font-weight:800; }
+    .receipt-meta { padding: 0 1px 5px; }
+    .receipt-meta-row, .grain-detail-row { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; padding:2px 0; }
+    .receipt-meta-label, .grain-detail-row > span { flex:0 0 29%; color:#667085; text-align:right; }
+    .receipt-meta-value, .grain-detail-row > strong { flex:1; min-width:0; color:#111827; font-weight:800; text-align:left; overflow-wrap:anywhere; }
+    .receipt-divider { border:0; border-top:1px dashed #cbd5e1; margin:7px 0; }
+    .grain-heading { display:flex; justify-content:space-between; align-items:center; gap:8px; margin:5px 0; }
+    .grain-heading h1 { margin:0; font-size:12px; font-weight:900; color:#111827; }
+    .custody-badge { flex:0 0 auto; border-radius:999px; padding:2px 8px; background:#fff1c2; color:#7a4b00; font-size:9.5px; font-weight:900; }
+    .grain-card { margin:5px 0; padding:7px 9px; border:1px solid #e4e7ec; border-radius:14px; background:#f8fafc; }
+    .invoice-item-heading { display:flex; justify-content:space-between; gap:8px; padding-bottom:3px; color:#111827; font-weight:800; }
+    .receipt-section-heading { margin:5px 0; font-weight:900; }
+    .grain-detail-row { padding:1.5px 0; }
+    .service-section, .receipt-financials { margin-top:7px; padding-top:5px; border-top:1px dashed #cbd5e1; }
+    .service-row { font-size:10.5px; }
+    .balance-row { color:#b42318; }
+    .receipt-note { margin-top:4px; color:#475467; font-size:9.5px; overflow-wrap:anywhere; }
+    .code-wrap { margin:6px auto; text-align:center; max-width:100%; overflow:hidden; }
+    ${UNIVERSAL_FOOTER_CSS}
+    @media screen { body { background:#f2f4f7; padding:14px 0; } .milling-intake-receipt { background:#fff; box-shadow:0 2px 16px rgba(16,24,40,.12); } }
+  </style>
+</head>
+<body>
+  <main class="milling-intake-receipt">
+    ${isMillingIntake ? receiptLogo : companyHeader}
+    <section class="receipt-meta">
+      ${opts.showDocNumberDate ? metadataRow(isMillingIntake ? "رقم السند:" : "رقم المستند:", doc.number, "ltr") : ""}
+      ${opts.showDocNumberDate && relatedInvoice ? metadataRow(isMillingIntake ? "فاتورة الأجور:" : "المرجع:", relatedInvoice, "ltr") : ""}
+      ${opts.showDocNumberDate && doc.date ? metadataRow("التاريخ:", formatPrintedDateTime(doc.date), "ltr") : ""}
+      ${opts.showCustomerInfo && doc.partyName ? metadataRow(doc.partyLabel || "العميل:", doc.partyName) : ""}
+      ${opts.showCustomerInfo && doc.partyPhone ? metadataRow("الهاتف:", doc.partyPhone, "ltr") : ""}
+      ${!isMillingIntake && opts.showMovementInfo && doc.warehouse ? metadataRow("المستودع:", doc.warehouse) : ""}
+      ${!isMillingIntake && opts.showPaymentInfo && doc.payment ? metadataRow("طريقة الدفع:", doc.payment) : ""}
+      ${!isMillingIntake && doc.operatorName ? metadataRow("البائع / المستخدم:", doc.operatorName) : ""}
+    </section>
+    <hr class="receipt-divider" />
+    ${isMillingIntake
+      ? `<section class="grain-section">
+          <div class="grain-heading"><h1>تفاصيل الحبوب المستلمة:</h1><span class="custody-badge">أمانة عينية</span></div>
+          ${grainCards}
+        </section>`
+      : `<section class="invoice-items-section"><div class="receipt-section-heading">تفاصيل البنود:</div>${invoiceItemCards || `<div class="grain-card">لا توجد بنود</div>`}</section>`}
+    ${serviceRows ? `<section class="service-section">${serviceRows}</section>` : ""}
+    ${financialRows}
+    ${note}
+    ${barcodeHtml ? `<div class="code-wrap barcode-wrap">${barcodeHtml}</div>` : ""}
+    ${qrHtml ? `<div class="code-wrap qr-wrap">${qrHtml}</div>` : ""}
+    ${opts.showFooter ? renderUniversalFooter(companyProfile, rtl, true) : ""}
+    <div style="text-align:center;font-size:7.5px;color:#9ca3af;padding:2px 0">${COMPANY_RIGHTS_TEXT}</div>
+  </main>
+</body>
+</html>`;
+  }
 
   return `<!DOCTYPE html>
 <html dir="${rtl ? "rtl" : "ltr"}" lang="${rtl ? "ar" : "en"}">
@@ -599,6 +778,8 @@ export function renderMillingThermalTemplate(
       font-size: 11.5px;
       margin: 4px 0;
     }
+    .company-logo { display:block; max-width:28mm; max-height:14mm; object-fit:contain; margin:0 auto 4px; }
+    .code-wrap { text-align:center; margin:6px auto; max-width:100%; overflow:hidden; }
     .box {
       background: #f8fafc;
       border: 1px solid #e2e8f0;
@@ -619,6 +800,7 @@ export function renderMillingThermalTemplate(
 </head>
 <body onload="window.print()">
   <div class="center">
+    ${logoHtml}
     ${opts.showCompanyInfo ? `<div style="font-size: 16px; font-weight: 900;">${compName}</div>` : ""}
     ${opts.showCompanyInfo && compAddress ? `<div>${compAddress}</div>` : ""}
     ${opts.showCompanyInfo && compPhone ? `<div>هاتف: ${compPhone}</div>` : ""}
@@ -671,13 +853,16 @@ export function renderMillingThermalTemplate(
   }
 
   ${
-    doc.notes
+    opts.showNotes && doc.notes
       ? `
   <div style="font-size: 10.5px; margin: 4px 0; color: #444; border-top: 1px dashed #ccc; padding-top: 3px;">
     <strong>ملاحظة:</strong> ${esc(doc.notes)}
   </div>`
       : ""
   }
+
+  ${barcodeHtml ? `<div class="code-wrap barcode-wrap">${barcodeHtml}</div>` : ""}
+  ${qrHtml ? `<div class="code-wrap qr-wrap">${qrHtml}</div>` : ""}
 
   ${
     opts.showFooter

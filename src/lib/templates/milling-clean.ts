@@ -3,6 +3,7 @@ import {
   InvoiceLabels,
   escapeHtml,
   formatMoney,
+  productNameWithoutUnit,
   CustomFieldOptions,
 } from "./types";
 import { getCachedCompanyProfile } from "@/lib/printing/company-profile";
@@ -68,7 +69,7 @@ export function renderMillingCleanTemplate(
     <tr>
       <td style="text-align: center; font-family: monospace; color: #64748b;">${idx + 1}</td>
       <td>
-        <div style="font-weight: 700; color: #0f172a;">${esc(l.product)}</div>
+        <div style="font-weight: 700; color: #0f172a;">${esc(productNameWithoutUnit(l.product, l.unit))}</div>
       </td>
       <td style="text-align: center; font-family: monospace; font-weight: 600;">
         ${l.qty} ${l.unit ? `<span style="font-size: 10.5px; color: #64748b;">${esc(l.unit)}</span>` : ""}

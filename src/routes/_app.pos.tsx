@@ -2184,7 +2184,8 @@ function POSPage() {
         total,
         paid: Math.min(Math.max(effectivePaid, 0), total),
         lines: cart.map((l) => ({
-          product: l.uom_label ? `${l.name} (${l.uom_label})` : l.name,
+          product: l.name,
+          unit: l.uom_label || undefined,
           qty: l.quantity,
           price: l.unit_price,
           total: Math.round(l.unit_price * l.quantity * (1 + l.tax_rate / 100) * 100) / 100,
@@ -2364,7 +2365,8 @@ function POSPage() {
             ? "هذا عرض أسعار وليس فاتورة — الأسعار صالحة حسب الاتفاق."
             : "This is a price quotation, not an invoice.",
         lines: cart.map((l) => ({
-          product: l.uom_label ? `${l.name} (${l.uom_label})` : l.name,
+          product: l.name,
+          unit: l.uom_label || undefined,
           qty: l.quantity,
           price: l.unit_price,
           total: Math.round(l.unit_price * l.quantity * (1 + l.tax_rate / 100) * 100) / 100,

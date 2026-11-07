@@ -17,21 +17,10 @@ export interface CompanyProfile {
 const CACHE_KEY = "company_settings_cache";
 /** In-memory mirror used where localStorage does not exist (SSR, Node, tests). */
 let memoryProfile: CompanyProfile | null = null;
-/**
- * Fallback used when `company_settings` has no row (or fields are empty).
- * الاسم/اللغة/الأرقام هنا بيانات المنصة الافتراضية (إنما سوفت) — تظهر فقط
- * ما لم تُدخل المنشأة بياناتها، وليست بديلاً عنها.
- */
+/** Empty profile used until real company settings are available. */
 const DEFAULT_PROFILE: CompanyProfile = {
-  name: "إنما سوفت",
-  arabicName: "إنما سوفت — للحلول البرمجية",
-  englishName: "Inama Soft — Software Solutions",
-  legalName: "Inama Soft for Software Solutions",
-  phone: "772217218",
-  contacts: ["772217218", "779099272"],
-  address: "إب - مفرق جبلة",
-  email: "mousa.mc13@gmail.com",
-  logoUrl: "/vortex-erp-wordmark.png",
+  name: "",
+  contacts: [],
 };
 
 function fromRow(row: Record<string, unknown> | null | undefined): CompanyProfile {
@@ -41,26 +30,20 @@ function fromRow(row: Record<string, unknown> | null | undefined): CompanyProfil
     .map((v) => v.trim())
     .filter(Boolean);
   const contacts = Array.from(new Set([phone, ...extra].filter(Boolean)));
-  // المنشأة بلا بيانات؟ نعرض بيانات المنصة الافتراضية بدل الحقول الفارغة.
-  const effectiveContacts = contacts.length ? contacts : DEFAULT_PROFILE.contacts;
   const rawName = String(row?.name ?? "").trim();
-  const name = !rawName || rawName === "My Company" ? DEFAULT_PROFILE.name : rawName;
+  const name = !rawName || rawName === "My Company" ? "" : rawName;
   const rawAddress = String(row?.address ?? "").trim();
-  const address =
-    !rawAddress || rawAddress.includes("جلبة") || rawAddress.includes("اليمن")
-      ? DEFAULT_PROFILE.address
-      : rawAddress;
   return {
     name,
-    arabicName: String(row?.name_ar ?? "").trim() || DEFAULT_PROFILE.arabicName,
-    englishName: String(row?.name_en ?? "").trim() || DEFAULT_PROFILE.englishName,
+    arabicName: String(row?.name_ar ?? "").trim() || undefined,
+    englishName: String(row?.name_en ?? "").trim() || undefined,
     legalName: String(row?.legal_name ?? "").trim() || undefined,
-    phone: phone || DEFAULT_PROFILE.phone,
-    contacts: effectiveContacts,
-    address,
+    phone: phone || undefined,
+    contacts,
+    address: rawAddress || undefined,
     email: String(row?.email ?? "").trim() || undefined,
     taxNumber: String(row?.tax_number ?? "").trim() || undefined,
-    logoUrl: String(row?.logo_url ?? "").trim() || DEFAULT_PROFILE.logoUrl,
+    logoUrl: String(row?.logo_url ?? "").trim() || undefined,
     currency: String(row?.currency_symbol ?? row?.currency ?? "").trim() || undefined,
   };
 }

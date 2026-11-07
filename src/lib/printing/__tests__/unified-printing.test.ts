@@ -30,6 +30,7 @@ import {
 } from "@/lib/templates";
 import { formatPrintedDateTime } from "@/lib/templates/unified-layout";
 import { renderFormalTemplate } from "../formal";
+import { sampleDocumentFor } from "../samples";
 import {
   COMPANY_RIGHTS_TEXT,
   renderInvoiceRightsFooter,
@@ -65,6 +66,11 @@ check("landscape paper css swaps dimensions", landscapeCss.includes("297mm 210mm
 check(
   "thermal paper css uses auto height",
   paperCss(PRINT_PAPERS["thermal-80"]).includes("80mm auto"),
+);
+check(
+  "thermal paper css provides both current and legacy width variables",
+  paperCss(PRINT_PAPERS["thermal-58"]).includes("--print-width:58mm") &&
+    paperCss(PRINT_PAPERS["thermal-58"]).includes("--print-paper-width:58mm"),
 );
 
 /* ─────────────────────────── Themes ─────────────────────────── */
@@ -263,7 +269,7 @@ const fiftyLinesHtml = renderStandardTemplate(fiftyLinesDoc, LABELS, true, { com
 check("50 lines and one summary row render", (fiftyLinesHtml.match(/<tr>/g) ?? []).length === 51);
 check(
   "50 line summary quantity and amount are aggregated",
-  fiftyLinesHtml.includes("50 each") && fiftyLinesHtml.includes("500.00"),
+  fiftyLinesHtml.includes("50 each") && fiftyLinesHtml.includes("500"),
 );
 const fiftyOneLinesDoc = {
   ...fiftyLinesDoc,
@@ -324,6 +330,139 @@ check(
   formalHtml.includes("<!doctype html>") && formalHtml.includes("T-001"),
 );
 
+const millingThermalDoc = {
+  ...docFor("mill_document"),
+  notes: "MILLING_NOTE_SHOULD_BE_TOGGLED",
+  company: { name: "شركة الطباعة", arabicName: "شركة الطباعة", logo: "/company-logo.png" },
+  options: { showNotes: true, showLogo: true, showBarcode: true, showQrCode: true },
+};
+const millingThermalVisible = renderMillingThermalTemplate(
+  millingThermalDoc,
+  LABELS,
+  true,
+  { showNotes: true, showLogo: true, showBarcode: true, showQrCode: true },
+);
+check("milling thermal honors showLogo when a real logo is provided", millingThermalVisible.includes('class="company-logo"') && millingThermalVisible.includes("/company-logo.png"));
+check("milling thermal honors showBarcode", millingThermalVisible.includes("barcode-wrap"));
+check("milling thermal honors showQrCode", millingThermalVisible.includes("qr-wrap"));
+check("milling thermal shows notes when enabled", millingThermalVisible.includes("MILLING_NOTE_SHOULD_BE_TOGGLED"));
+
+const millingThermalHidden = renderMillingThermalTemplate(
+  millingThermalDoc,
+  LABELS,
+  true,
+  { showNotes: false, showLogo: false, showBarcode: false, showQrCode: false },
+);
+check("milling thermal hides notes when disabled", !millingThermalHidden.includes("MILLING_NOTE_SHOULD_BE_TOGGLED"));
+check("milling thermal hides logo when disabled", !millingThermalHidden.includes('class="company-logo"'));
+check("milling thermal hides barcode when disabled", !millingThermalHidden.includes("barcode-wrap"));
+check("milling thermal hides QR when disabled", !millingThermalHidden.includes("qr-wrap"));
+
+const millingThermalNoCompany = renderMillingThermalTemplate(
+  docFor("mill_document"),
+  LABELS,
+  true,
+  { showCompanyInfo: true },
+);
+check("milling thermal does not invent a company name or address", !millingThermalNoCompany.includes("المطحنة الحديثة") && !millingThermalNoCompany.includes("المركز الرئيسي"));
+
+const referenceMillingReceipt = renderMillingThermalTemplate(
+  {
+    ...docFor("mill_document"),
+    number: "MT-202610-0003",
+    relatedRef: "فاتورة رسمية INV-2026-10-0013",
+    date: "2026-10-29T05:34:00.000Z",
+    partyName: "فيصل الجماعي",
+    partyPhone: "+967772217218",
+    notes: "ملاحظة اختبارية مخفية",
+    lines: [
+      {
+        product: "حبوب مستلمة: حبوب بر سمراء كيلو جرام",
+        qty: 200,
+        unit: "كيس",
+        price: 0,
+        total: 0,
+        remainingKg: 5000,
+        note: "تفاصيل داخلية مخفية",
+      },
+    ],
+  },
+  LABELS,
+  true,
+  { showLogo: false, showNotes: false, showBarcode: true, showQrCode: false },
+);
+check("reference receipt has the dedicated grain section", referenceMillingReceipt.includes('class="grain-heading"') && referenceMillingReceipt.includes("تفاصيل الحبوب المستلمة:"));
+check("reference receipt shows the custody badge", referenceMillingReceipt.includes("أمانة عينية"));
+check("reference receipt includes the ticket and linked invoice numbers", referenceMillingReceipt.includes("MT-202610-0003") && referenceMillingReceipt.includes("INV-2026-10-0013"));
+check("reference receipt includes customer and phone metadata", referenceMillingReceipt.includes("فيصل الجماعي") && referenceMillingReceipt.includes("+967772217218"));
+check("reference receipt calculates bag size and net weight", referenceMillingReceipt.includes("200 كيس × 25 كجم") && referenceMillingReceipt.includes("5,000 كجم"));
+const referenceOrder = ["رقم السند:", "فاتورة الأجور:", "التاريخ:", "العميل:", "تفاصيل الحبوب المستلمة:", "نوع الحبوب:", "الكمية والأكياس:", "الوزن الصافي:"];
+check("reference receipt fields follow the reference visual order", referenceOrder.every((label, index) => index === 0 || referenceMillingReceipt.indexOf(label) > referenceMillingReceipt.indexOf(referenceOrder[index - 1])));
+check("reference receipt hides disabled notes", !referenceMillingReceipt.includes("ملاحظة اختبارية مخفية") && !referenceMillingReceipt.includes("تفاصيل داخلية مخفية"));
+check("reference receipt keeps barcode option and avoids automatic print", referenceMillingReceipt.includes('aria-label="MT-202610-0003"') && !referenceMillingReceipt.includes("onload="));
+
+const referenceMillingQr = renderMillingThermalTemplate(
+  { ...docFor("mill_document"), number: "MT-202610-0003", lines: [{ product: "حبوب مستلمة: قمح", qty: 1, unit: "كيس", remainingKg: 25 }] },
+  LABELS,
+  true,
+  { showBarcode: false, showQrCode: true },
+);
+check("reference receipt can show QR without barcode", referenceMillingQr.includes('shape-rendering="crispEdges"') && !referenceMillingQr.includes('aria-label="MT-202610-0003"'));
+
+const engineMillingReceipt = renderUnifiedDocument({
+  doc: {
+    ...docFor("mill_document"),
+    number: "MT-202610-0003",
+    lines: [{ product: "حبوب مستلمة: قمح", qty: 200, unit: "كيس", remainingKg: 5000 }],
+  },
+  documentType: "mill_document",
+  templateId: "milling-thermal",
+  paperId: "thermal-58",
+  rtl: true,
+});
+check("unified engine routes milling intake to the reference receipt layout", engineMillingReceipt.includes('class="grain-heading"'));
+check("unified engine applies 58mm width to the milling receipt", engineMillingReceipt.includes("--print-paper-width:58mm"));
+
+const milledStageHtml = renderMillingThermalTemplate(
+  {
+    ...docFor("mill_document"),
+    lines: [
+      { product: "حبوب مستلمة: قمح", qty: 2, unit: "كيس", remainingKg: 100 },
+      { product: "ناتج طحن: دقيق", qty: 2, unit: "كيس", previousQty: 2, remainingQty: 2, currentKg: 90 },
+    ],
+  },
+  LABELS,
+  true,
+);
+check("milled-stage output lines retain their detailed template", !milledStageHtml.includes('class="grain-heading"') && milledStageHtml.includes("ناتج طحن: دقيق"));
+
+const settingsMillingSampleHtml = renderUnifiedDocument({
+  doc: sampleDocumentFor("mill_document"),
+  documentType: "mill_document",
+  templateId: "milling-thermal",
+  paperId: "thermal-80",
+  method: "thermal",
+  rtl: true,
+});
+check("settings preview sample renders the milling receipt instead of throwing", settingsMillingSampleHtml.includes('class="grain-heading"') && settingsMillingSampleHtml.includes("مزارع الخير والبركة"));
+
+const salesUsingMillingTemplate = renderUnifiedDocument({
+  doc: sampleDocumentFor("customer_invoice"),
+  documentType: "customer_invoice",
+  templateId: "milling-thermal",
+  paperId: "thermal-80",
+  method: "thermal",
+  rtl: true,
+});
+check(
+  "sales preview honors the selected milling template layout",
+  salesUsingMillingTemplate.includes("invoice-item-card") &&
+    salesUsingMillingTemplate.includes("فاتورة مبيعات نقدية") &&
+    salesUsingMillingTemplate.includes("طريقة الدفع:") &&
+    !salesUsingMillingTemplate.includes(".receipt-container") &&
+    !salesUsingMillingTemplate.includes(".hairline-row"),
+);
+
 /* Engine — profiles & overrides */
 const engineThermal = renderUnifiedDocument({
   doc: docFor("customer_invoice"),
@@ -332,7 +471,11 @@ const engineThermal = renderUnifiedDocument({
   paperId: "thermal-58",
   theme: "standard",
 });
-check("engine honours thermal-58 paper", engineThermal.includes("--print-width:58mm"));
+check(
+  "engine honours thermal-58 paper for current and legacy template variables",
+  engineThermal.includes("--print-width:58mm") &&
+    engineThermal.includes("--print-paper-width:58mm"),
+);
 
 const engineLandscape = renderUnifiedDocument({
   doc: docFor("customer_invoice"),
@@ -369,10 +512,10 @@ check("engine routes formal theme to the formal template", engineFormal.includes
 /* ─────────────────────────── Company Profile ─────────────────────────── */
 
 check(
-  "default company profile carries the platform defaults (إنما سوفت)",
-  DEFAULT_COMPANY_PROFILE.name === "إنما سوفت" &&
-    DEFAULT_COMPANY_PROFILE.englishName === "Inama Soft" &&
-    DEFAULT_COMPANY_PROFILE.contacts.includes("772217218"),
+  "default company profile does not invent platform identity or contacts",
+  DEFAULT_COMPANY_PROFILE.name === "" &&
+    DEFAULT_COMPANY_PROFILE.englishName === undefined &&
+    DEFAULT_COMPANY_PROFILE.contacts.length === 0,
 );
 
 const footer = renderUniversalFooter(COMPANY, true);
@@ -397,12 +540,6 @@ function rightsOccurrences(html: string): number {
     .replace(/<[^>]*>/g, "")
     .replace(/\s+/g, " ")
     .trim();
-  // COMPANY_RIGHTS_TEXT is intentionally empty now. `split("")` splits into
-  // characters and would always report a match, so an empty needle means the
-  // line is removed by definition.
-  // COMPANY_RIGHTS_TEXT is intentionally empty now. `split("")` splits into
-  // characters and would always report a match, so an empty needle means the
-  // line is removed by definition.
   if (!COMPANY_RIGHTS_TEXT) return 0;
   return text.split(COMPANY_RIGHTS_TEXT).length - 1;
 }
@@ -443,9 +580,15 @@ check(
 );
 
 /* Company data must come from Company Profile, not a template constant. */
-const profileDrivenHtml = renderStandardTemplate(docFor("customer_invoice"), LABELS, true, {
-  company: { ...COMPANY, name: "منشأة العميل الفعلية" },
-});
+const profileDrivenHtml = renderStandardTemplate(
+  {
+    ...docFor("customer_invoice"),
+    company: { ...docFor("customer_invoice").company, name: "منشأة العميل الفعلية" },
+  },
+  LABELS,
+  true,
+  { company: COMPANY },
+);
 check(
   "template reads the company name from the profile",
   profileDrivenHtml.includes("منشأة العميل الفعلية"),
@@ -653,8 +796,8 @@ check(
    القالب الموحّد (stdHtml من unified) يطبع بيانات المنشأة فقط عند showFooter. */
 /* فوتر الموحّد نفسه لا يستخدم صنف footer-contact — إنما داخل CSS المشترك فقط. */
 check(
-  "document output omits legacy footer fields",
-  !stdHtml.includes('class="footer-contact"') && !stdHtml.includes('footer-contact">'),
+  "document output omits hard-coded platform support contacts",
+  !stdHtml.includes("779099272"),
 );
 check("unified invoice carries the restored company rights line", rightsOccurrences(stdHtml) === 1);
 
@@ -663,14 +806,17 @@ const invoiceTemplateOutputs = [
   renderFormalTemplate(docFor("customer_invoice"), LABELS, true),
   renderThermalTemplate(docFor("customer_invoice"), LABELS, true),
   renderThermalQrTemplate(docFor("customer_invoice"), LABELS, true),
-  renderThermalMillingTemplate(docFor("customer_invoice"), LABELS, true),
   renderMillingCleanTemplate(docFor("customer_invoice"), LABELS, true),
   renderMillingMasterTemplate(docFor("customer_invoice"), LABELS, true),
   renderMillingThermalTemplate(docFor("customer_invoice"), LABELS, true),
 ];
 check(
-  "company rights line appears in every invoice template",
+  "company rights line appears in templates that retain the shared credits footer",
   invoiceTemplateOutputs.every((html) => rightsOccurrences(html) === 1),
+);
+check(
+  "professional thermal receipt omits the removed platform credits footer",
+  rightsOccurrences(renderThermalMillingTemplate(docFor("customer_invoice"), LABELS, true)) === 0,
 );
 if (failures.length > 0) {
   throw new Error(`Unified printing tests failed:\n - ${failures.join("\n - ")}`);

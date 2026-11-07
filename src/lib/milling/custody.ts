@@ -889,7 +889,8 @@ export function buildMillingDocumentUnifiedDoc(
     title,
     number: details.document_number,
     relatedRef: inv?.invoice_number ? `فاتورة رسمية ${inv.invoice_number}` : undefined,
-    date: details.received_at || new Date().toISOString(),
+    // لا نستبدل تاريخ العملية المفقود بتاريخ إعادة الطباعة الحالي.
+    date: details.received_at || "",
     partyLabel: "صاحب الأمانة / العميل:",
     partyName: details.customers?.name || "صاحب الأمانة",
     partyPhone: details.customers?.phone || undefined,

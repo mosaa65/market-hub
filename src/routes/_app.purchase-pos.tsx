@@ -1640,7 +1640,8 @@ function PurchasePOSPage() {
           balance: Math.max(0, total - paidN),
           notes: composedNote ?? undefined,
           lines: cart.map((l) => ({
-            product: l.uom_label ? `${l.name} (${l.uom_label})` : l.name,
+            product: l.name,
+            unit: l.uom_label || undefined,
             qty: l.quantity,
             price: l.unit_cost,
             total: Math.round(l.unit_cost * l.quantity * (1 + l.tax_rate / 100) * 100) / 100,
@@ -1707,7 +1708,8 @@ function PurchasePOSPage() {
             ? "هذه معاينة لأسعار الشراء فقط ولا تسجل أي عملية."
             : "Preview only. No purchase is recorded.",
         lines: cart.map((line) => ({
-          product: line.uom_label ? `${line.name} (${line.uom_label})` : line.name,
+          product: line.name,
+          unit: line.uom_label || undefined,
           qty: line.quantity,
           price: line.unit_cost,
           total: line.unit_cost * line.quantity * (1 + line.tax_rate / 100),

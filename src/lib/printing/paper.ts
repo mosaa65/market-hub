@@ -62,5 +62,5 @@ export function paperCss(profile: PrintPaperProfile, orientation = profile.orien
     orientation === "landscape" && profile.heightMm ? profile.widthMm : profile.heightMm;
   const size = height ? `${width}mm ${height}mm` : `${width}mm auto`;
   const m = profile.marginsMm;
-  return `@page{size:${size};margin:${m.top}mm ${m.right}mm ${m.bottom}mm ${m.left}mm;} :root{--print-width:${width}mm;}`;
+  return `@page{size:${size};margin:${m.top}mm ${m.right}mm ${m.bottom}mm ${m.left}mm;} :root{--print-width:${width}mm;--print-paper-width:${width}mm;}`;
 }

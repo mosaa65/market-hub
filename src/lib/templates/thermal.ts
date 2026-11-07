@@ -3,8 +3,10 @@ import {
   InvoiceLabels,
   escapeHtml,
   formatMoney,
+  productNameWithoutUnit,
   CustomFieldOptions,
 } from "./types";
+import { toSystemDigits } from "@/lib/format-preferences";
 import { getCachedCompanyProfile } from "@/lib/printing/company-profile";
 import { COMPANY_RIGHTS_TEXT } from "@/lib/printing/footer";
 import { formatPrintedDateTime } from "@/lib/printing/date-time";
@@ -46,8 +48,8 @@ export function renderThermalTemplate(
     .map(
       (l) => `
     <div class="li">
-      <div class="ln">${esc(l.product)}</div>
-      <div class="lr"><span>${l.qty} ${l.unit ? esc(l.unit) : ""} × ${money(l.price)}</span><span>${money(l.total)}</span></div>
+      <div class="ln">${esc(productNameWithoutUnit(l.product, l.unit))}</div>
+      <div class="lr"><span>${toSystemDigits(l.qty)} ${l.unit ? esc(l.unit) : ""} × ${money(l.price)}</span><span>${money(l.total)}</span></div>
     </div>`,
     )
     .join("");
