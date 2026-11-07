@@ -212,6 +212,12 @@ export const FieldInput = React.forwardRef<HTMLInputElement, FieldInputProps>(
             ? "search"
             : undefined;
 
+    const activeEndItems =
+      (Boolean(enableVoice && !readOnly && !props.disabled) ? 1 : 0) +
+      (showClear ? 1 : 0) +
+      (suffix ? 1 : 0);
+    const peClass = activeEndItems >= 2 ? "pe-20" : activeEndItems === 1 ? "pe-10" : "";
+
     return (
       <div className={cn("group relative w-full min-w-0", containerClassName)}>
         {/*
@@ -268,7 +274,7 @@ export const FieldInput = React.forwardRef<HTMLInputElement, FieldInputProps>(
               // Digits read LTR without flipping the field's own direction.
               isNumeric && "[unicode-bidi:plaintext]",
               (resolvedIcon || prefixText) && "ps-10",
-              (suffix || showClear || enableVoice) && "pe-10",
+              peClass,
               className,
             )}
             {...props}

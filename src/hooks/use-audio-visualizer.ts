@@ -123,16 +123,20 @@ export function useAudioVisualizer() {
 
           analyser.getByteFrequencyData(dataArray);
 
-          const { width, height } = canvas;
-          canvasCtx.clearRect(0, 0, width, height);
+          // Use logical client bounding rect dimensions when context is scaled with DPR
+          const rect = canvas.getBoundingClientRect();
+          const logicalWidth = rect.width || canvas.width;
+          const logicalHeight = rect.height || canvas.height;
+
+          canvasCtx.clearRect(0, 0, logicalWidth, logicalHeight);
 
           // Calculate how many bars fit in the canvas
           const totalBarWidth = barWidth + barGap;
           const numBars = Math.min(
             bufferLength,
-            Math.floor(width / totalBarWidth),
+            Math.floor(logicalWidth / totalBarWidth),
           );
-          const startX = Math.max(0, (width - numBars * totalBarWidth) / 2);
+          const startX = Math.max(0, (logicalWidth - numBars * totalBarWidth) / 2);
 
           canvasCtx.save();
           canvasCtx.shadowBlur = 8;
@@ -142,10 +146,10 @@ export function useAudioVisualizer() {
             const rawVal = dataArray[i] || 0;
             // Normalize with minimum height so visualizer feels alive even in silence
             const percent = rawVal / 255;
-            const barHeight = Math.max(4, percent * (height - 8));
+            const barHeight = Math.max(4, percent * (logicalHeight - 8));
 
             const x = startX + i * totalBarWidth;
-            const y = (height - barHeight) / 2;
+            const y = (logicalHeight - barHeight) / 2;
 
             // Rounded vertical bar
             canvasCtx.fillStyle = barColor;

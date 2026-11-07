@@ -82,14 +82,15 @@ export function useSpeechToText(options: UseSpeechToTextOptions = {}) {
         },
         onResult: ({ interim, final, full }) => {
           const normalize = optionsRef.current.normalizeArabic !== false;
+          const asciiDigits = optionsRef.current.normalizeDigits ?? true;
           const cleanInterim = normalize
-            ? normalizeArabicSpeechTranscript(interim, { trim: false })
+            ? normalizeArabicSpeechTranscript(interim, { trim: false, asciiDigits })
             : interim;
           const cleanFinal = normalize
-            ? normalizeArabicSpeechTranscript(final)
+            ? normalizeArabicSpeechTranscript(final, { asciiDigits })
             : final;
           const cleanFull = normalize
-            ? normalizeArabicSpeechTranscript(full)
+            ? normalizeArabicSpeechTranscript(full, { asciiDigits })
             : full;
 
           setInterimTranscript(cleanInterim);

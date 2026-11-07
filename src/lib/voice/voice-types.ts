@@ -35,6 +35,8 @@ export interface SpeechRecognitionOptions {
   continuous?: boolean;
   /** Automatically normalize Arabic numbers, remove stuttering/fillers */
   normalizeArabic?: boolean;
+  /** Automatically transliterate Eastern Arabic numerals (٠-٩) to Western (0-9) */
+  normalizeDigits?: boolean;
   /** Max silence timeout in milliseconds before auto-stopping (default 8000ms) */
   silenceTimeoutMs?: number;
 }
